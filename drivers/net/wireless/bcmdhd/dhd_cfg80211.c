@@ -33,6 +33,12 @@
 extern struct wl_priv *wlcfg_drv_priv;
 static int dhd_dongle_up = FALSE;
 
+#include <dngl_stats.h>
+#include <dhd.h>
+#include <dhdioctl.h>
+#include <wlioctl.h>
+#include <dhd_cfg80211.h>
+
 static s32 wl_dongle_up(struct net_device *ndev, u32 up);
 
 /**
@@ -51,9 +57,64 @@ s32 dhd_cfg80211_deinit(struct wl_priv *wl)
 	return 0;
 }
 
+s32 dhd_cfg80211_get_opmode(struct wl_priv *wl)
+{
+	dhd_pub_t *dhd =  (dhd_pub_t *)(wl->pub);
+	return dhd->op_mode;
+}
+
 s32 dhd_cfg80211_down(struct wl_priv *wl)
 {
 	dhd_dongle_up = FALSE;
+	return 0;
+}
+
+s32 dhd_cfg80211_set_p2p_info(struct wl_priv *wl, int val)
+{
+	dhd_pub_t *dhd =  (dhd_pub_t *)(wl->pub);
+	int bcn_timeout = DHD_BEACON_TIMEOUT_HIGH;
+	char iovbuf[30];
+
+	dhd->op_mode |= val;
+	WL_ERR(("Set : op_mode=%d\n", dhd->op_mode));
+
+#ifdef ARP_OFFLOAD_SUPPORT
+	/* IF P2P is enabled, disable arpoe */
+	dhd_arp_offload_set(dhd, 0);
+	dhd_arp_offload_enable(dhd, false);
+#endif /* ARP_OFFLOAD_SUPPORT */
+
+	dhd_os_set_packet_filter(dhd, 0);
+
+	/* Setup timeout if Beacons are lost and roam is off to report link down */
+	bcm_mkiovar("bcn_timeout", (char *)&bcn_timeout, 4, iovbuf, sizeof(iovbuf));
+	dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf, sizeof(iovbuf), TRUE, 0);
+
+
+	return 0;
+}
+
+s32 dhd_cfg80211_clean_p2p_info(struct wl_priv *wl)
+{
+	dhd_pub_t *dhd =  (dhd_pub_t *)(wl->pub);
+	int bcn_timeout = DHD_BEACON_TIMEOUT_NORMAL;
+	char iovbuf[30];
+
+	dhd->op_mode &= ~CONCURENT_MASK;
+	WL_ERR(("Clean : op_mode=%d\n", dhd->op_mode));
+
+#ifdef ARP_OFFLOAD_SUPPORT
+	/* IF P2P is disabled, enable arpoe back for STA mode. */
+	dhd_arp_offload_set(dhd, dhd_arp_mode);
+	dhd_arp_offload_enable(dhd, true);
+#endif /* ARP_OFFLOAD_SUPPORT */
+
+	dhd_os_set_packet_filter(dhd, 1);
+
+	/* Setup timeout if Beacons are lost and roam is off to report link down */
+	bcm_mkiovar("bcn_timeout", (char *)&bcn_timeout, 4, iovbuf, sizeof(iovbuf));
+	dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf, sizeof(iovbuf), TRUE, 0);
+
 	return 0;
 }
 
@@ -67,6 +128,7 @@ static s32 wl_dongle_up(struct net_device *ndev, u32 up)
 	}
 	return err;
 }
+
 s32 dhd_config_dongle(struct wl_priv *wl, bool need_lock)
 {
 #ifndef DHD_SDALIGN
@@ -467,7 +529,6 @@ void wl_cfg80211_btcoex_deinit(struct wl_priv *wl)
 	kfree(wl->btcoex_info);
 	wl->btcoex_info = NULL;
 }
-#endif 
 
 int wl_cfg80211_set_btcoex_dhcp(struct net_device *dev, char *command)
 {
@@ -591,3 +652,4 @@ int wl_cfg80211_set_btcoex_dhcp(struct net_device *dev, char *command)
 
 	return (strlen("OK"));
 }
+#endif 

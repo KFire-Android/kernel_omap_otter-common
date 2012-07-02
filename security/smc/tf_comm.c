@@ -492,7 +492,6 @@ inline struct page *tf_l2_page_descriptor_to_page(u32 l2_page_descriptor)
 	return pte_page(l2_page_descriptor & L2_DESCRIPTOR_ADDR_MASK);
 }
 
-#define TF_DEFAULT_COMMON_DESCRIPTORS 0x0000044C
 
 /*
  * Returns the L1 descriptor for the 1KB-aligned coarse page table. The address
@@ -502,19 +501,41 @@ static void tf_get_l2_page_descriptor(
 	u32 *l2_page_descriptor,
 	u32 flags, struct mm_struct *mm)
 {
+	unsigned long page_vaddr;
 	u32 descriptor;
 	struct page *page;
+	bool unmap_page = false;
 
+#if 0
 	dprintk(KERN_INFO
-		"%s *l2_page_descriptor=%x vm_flags=%lx\n",
-		__func__, *l2_page_descriptor, vmas->vm_flags);
+		"tf_get_l2_page_descriptor():"
+		"*l2_page_descriptor=%x\n",
+		*l2_page_descriptor);
+#endif
 
 	if (*l2_page_descriptor == L2_DESCRIPTOR_FAULT)
 		return;
 
 	page = (struct page *) (*l2_page_descriptor);
 
-	descriptor = TF_DEFAULT_COMMON_DESCRIPTORS;
+	page_vaddr = (unsigned long) page_address(page);
+	if (page_vaddr == 0) {
+		dprintk(KERN_INFO "page_address returned 0\n");
+		/* Should we use kmap_atomic(page, KM_USER0) instead ? */
+		page_vaddr = (unsigned long) kmap(page);
+		if (page_vaddr == 0) {
+			*l2_page_descriptor = L2_DESCRIPTOR_FAULT;
+			dprintk(KERN_ERR "kmap returned 0\n");
+			return;
+		}
+		unmap_page = true;
+	}
+
+	descriptor = tf_get_l2_descriptor_common(page_vaddr, mm);
+	if (descriptor == 0) {
+		*l2_page_descriptor = L2_DESCRIPTOR_FAULT;
+		return;
+	}
 	descriptor |= L2_PAGE_DESCRIPTOR_BASE;
 
 	descriptor |= (page_to_phys(page) & L2_DESCRIPTOR_ADDR_MASK);
@@ -526,6 +547,8 @@ static void tf_get_l2_page_descriptor(
 		/* read and write access */
 		descriptor |= L2_PAGE_DESCRIPTOR_AP_APX_READ_WRITE;
 
+	if (unmap_page)
+		kunmap(page);
 
 	*l2_page_descriptor = descriptor;
 }

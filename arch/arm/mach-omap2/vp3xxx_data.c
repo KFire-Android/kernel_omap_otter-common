@@ -57,6 +57,11 @@ static const struct omap_vp_common omap3_vp_common = {
 	.ops = &omap3_vp_ops,
 };
 
+struct omap_vp_volt_limits omap3_vp_mpu_limit = {
+	.vddmin	= OMAP3430_VP1_VLIMITTO_VDDMIN,
+	.vddmax	= OMAP3430_VP1_VLIMITTO_VDDMAX,
+};
+
 struct omap_vp_instance omap3_vp_mpu = {
 	.id = OMAP3_PRM_IRQ_VDD_MPU_ID,
 	.common = &omap3_vp_common,
@@ -66,6 +71,12 @@ struct omap_vp_instance omap3_vp_mpu = {
 	.vlimitto = OMAP3_PRM_VP1_VLIMITTO_OFFSET,
 	.vstatus = OMAP3_PRM_VP1_STATUS_OFFSET,
 	.voltage = OMAP3_PRM_VP1_VOLTAGE_OFFSET,
+	.vlimits = &omap3_vp_mpu_limit,
+};
+
+struct omap_vp_volt_limits omap3_vp_core_limit = {
+	.vddmin	= OMAP3430_VP2_VLIMITTO_VDDMIN,
+	.vddmax	= OMAP3430_VP2_VLIMITTO_VDDMAX,
 };
 
 struct omap_vp_instance omap3_vp_core = {
@@ -77,4 +88,5 @@ struct omap_vp_instance omap3_vp_core = {
 	.vlimitto = OMAP3_PRM_VP2_VLIMITTO_OFFSET,
 	.vstatus = OMAP3_PRM_VP2_STATUS_OFFSET,
 	.voltage = OMAP3_PRM_VP2_VOLTAGE_OFFSET,
+	.vlimits = &omap3_vp_core_limit,
 };

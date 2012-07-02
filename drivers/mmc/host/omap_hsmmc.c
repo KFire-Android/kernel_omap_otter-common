@@ -2557,7 +2557,7 @@ static int omap_hsmmc_remove(struct platform_device *pdev)
 	struct resource *res;
 
 	if (host) {
-		mmc_host_enable(host->mmc);
+		mmc_claim_host(host->mmc);
 		mmc_remove_host(host->mmc);
 		if (host->use_reg)
 			omap_hsmmc_reg_put(host);
@@ -2572,7 +2572,7 @@ static int omap_hsmmc_remove(struct platform_device *pdev)
 			dma_free_coherent(NULL, ADMA_TABLE_SZ,
 				host->adma_table, host->phy_adma_table);
 
-		mmc_host_disable(host->mmc);
+		mmc_release_host(host->mmc);
 		pm_runtime_suspend(host->dev);
 
 		clk_put(host->fclk);
@@ -2623,11 +2623,11 @@ static int omap_hsmmc_suspend(struct device *dev)
 			host->mmc->pm_flags |= MMC_PM_KEEP_POWER;
 		ret = mmc_suspend_host(host->mmc);
 		if (ret == 0) {
-			mmc_host_enable(host->mmc);
+			mmc_claim_host(host->mmc);
 			omap_hsmmc_disable_irq(host);
 			OMAP_HSMMC_WRITE(host->base, HCTL,
 				OMAP_HSMMC_READ(host->base, HCTL) & ~SDBP);
-			mmc_host_disable(host->mmc);
+			mmc_release_host_sync(host->mmc);
 
 			if (host->got_dbclk)
 				clk_disable(host->dbclk);
@@ -2657,9 +2657,7 @@ static int omap_hsmmc_resume(struct device *dev)
 		return 0;
 
 	if (host) {
-		if (mmc_host_enable(host->mmc) != 0) {
-			goto clk_en_err;
-		}
+		mmc_claim_host(host->mmc);
 
 		if (host->got_dbclk)
 			clk_enable(host->dbclk);
@@ -2680,14 +2678,9 @@ static int omap_hsmmc_resume(struct device *dev)
 		if (ret == 0)
 			host->suspended = 0;
 
-		mmc_host_lazy_disable(host->mmc);
+		mmc_release_host(host->mmc);
 	}
 
-	return ret;
-
-clk_en_err:
-	dev_dbg(mmc_dev(host->mmc),
-		"Failed to enable MMC clocks during resume\n");
 	return ret;
 }
 

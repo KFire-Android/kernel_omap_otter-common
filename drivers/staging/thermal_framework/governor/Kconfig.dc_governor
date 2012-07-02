@@ -1,0 +1,14 @@
+#
+# Duty cycle governor driver config
+#
+
+config OMAP4_DUTY_CYCLE_GOVERNOR
+	bool "OMAP duty cycle governor support"
+	depends on OMAP4_DUTY_CYCLE
+	default n
+	help
+	  This is the governor for the OMAP4 duty cycle.
+	  This governor will instituted the policy to define
+	  aggressiveness of duty cycle. The governor changes duty cycle
+	  threshold, depending on the PCB temperature sensor
+

@@ -1658,13 +1658,14 @@ static ssize_t soc_dsp_show_state(struct snd_soc_pcm_runtime *fe,
 
 	list_for_each_entry(dsp_params, &fe->dsp[stream].be_clients, list_be) {
 		struct snd_soc_pcm_runtime *be = dsp_params->be;
+		params = &dsp_params->hw_params;
 
 		offset += snprintf(buf + offset, size - offset,
 				"- %s\n", be->dai_link->name);
 
 		offset += snprintf(buf + offset, size - offset,
 				"   State: %s\n",
-				dsp_state_string(fe->dsp[stream].state));
+				dsp_state_string(be->dsp[stream].state));
 
 		if ((be->dsp[stream].state >= SND_SOC_DSP_STATE_HW_PARAMS) &&
 		    (be->dsp[stream].state <= SND_SOC_DSP_STATE_STOP))

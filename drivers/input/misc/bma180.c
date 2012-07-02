@@ -239,6 +239,9 @@ static void bma180_accel_device_sleep(struct bma180_accel_data *data)
 {
 	uint8_t reg_val;
 
+	if (!data->client->irq)
+		cancel_delayed_work_sync(&data->wq);
+
 	bma180_read_transfer(data, BMA180_CTRL_REG0, &reg_val, 1);
 	reg_val |= BMA180_SLEEP;
 	bma180_write(data, BMA180_CTRL_REG0, reg_val);
@@ -252,6 +255,9 @@ static void bma180_accel_device_wakeup(struct bma180_accel_data *data)
 	reg_val &= ~BMA180_SLEEP;
 	bma180_write(data, BMA180_CTRL_REG0, reg_val);
 	msleep(10);
+
+	if (!data->client->irq)
+		schedule_delayed_work(&data->wq, 0);
 }
 
 static int bma180_accel_data_ready(struct bma180_accel_data *data)
@@ -365,12 +371,8 @@ static ssize_t bma180_store_attr_enable(struct device *dev,
 
 	if (enable) {
 		bma180_accel_device_wakeup(data);
-		if (!data->client->irq)
-			schedule_delayed_work(&data->wq, 0);
 	} else {
 		bma180_accel_device_sleep(data);
-		if (!data->client->irq)
-			cancel_delayed_work_sync(&data->wq);
 	}
 
 	data->pdata->mode = enable;

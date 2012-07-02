@@ -17,6 +17,7 @@
 
 #include "gcerror.h"
 #include <linux/bverror.h>
+#include <linux/cache-2dmanager.h>
 
 /* IOCTL parameters. */
 #define GCIOCTL_TYPE 0x5D
@@ -85,11 +86,37 @@ struct gcmap {
 	enum gcerror gcerror;		/* Return status code. */
 	unsigned int handle;		/* Mapped handle of the buffer. */
 
-	void *logical;			/* Pointer to the buffer. */
+	union {
+		void *logical;		/* Pointer to the buffer; used when
+					   pagearray is NULL. */
+		unsigned int offset;	/* Page offset of the buffer; used when
+					   pagearray is provided. */
+	} buf;
+
+	unsigned int pagesize;		/* Size of a physical page, 0 for
+					   default. */
+	unsigned long *pagearray;	/* Pointer to array of physical
+					   pages. */
+
 	unsigned int size;		/* Size of the buffer. */
-	unsigned long pagecount;
-	unsigned long *pagearray;
 };
+
+/*****************************************************************************
+ * Cache manipulation API entries.
+ */
+
+struct bvcachexfer;
+
+#define GCIOCTL_CACHE _IOW(GCIOCTL_TYPE, GCIOCTL_BASE + 0x22,\
+			struct bvcachexfer)
+
+struct bvcachexfer {
+	int count;			/* number of regions */
+	struct c2dmrgn rgn[3];		/* The most regions that we deal with
+					   is 3 */
+	int dir;			/* direction of data */
+};
+
 
 /*******************************************************************************
  * BLTsville: blit API entry.

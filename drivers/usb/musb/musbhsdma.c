@@ -368,8 +368,12 @@ done:
 
 void dma_controller_destroy(struct dma_controller *c)
 {
-	struct musb_dma_controller *controller = container_of(c,
-			struct musb_dma_controller, controller);
+	struct musb_dma_controller *controller;
+
+	if (!c)
+		return;
+
+	controller = container_of(c, struct musb_dma_controller, controller);
 
 	if (!controller)
 		return;

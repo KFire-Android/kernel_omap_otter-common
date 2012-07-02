@@ -69,9 +69,9 @@
 #define GPIO_HUB_NRESET		62
 #define GPIO_WIFI_PMENA		43
 #define GPIO_WIFI_IRQ		53
-#define HDMI_GPIO_CT_CP_HPD     60
-#define HDMI_GPIO_HPD 63 /* Hot plug pin for HDMI */
+#define HDMI_GPIO_CT_CP_HPD 60 /* HPD mode enable/disable */
 #define HDMI_GPIO_LS_OE 41 /* Level shifter for HDMI */
+#define HDMI_GPIO_HPD  63 /* Hotplug detect */
 #define TPS62361_GPIO   7 /* VCORE1 power control */
 
 /* wl127x BT, FM, GPS connectivity chip */
@@ -825,12 +825,6 @@ static void __init omap4_panda_reserve(void)
 	/* ipu needs to recognize secure input buffer area as well */
 	omap_ipu_set_static_mempool(PHYS_ADDR_DUCATI_MEM, PHYS_ADDR_DUCATI_SIZE +
 					OMAP4_ION_HEAP_SECURE_INPUT_SIZE);
-#ifdef CONFIG_OMAP_REMOTE_PROC_DSP
-	memblock_remove(PHYS_ADDR_TESLA_MEM, PHYS_ADDR_TESLA_SIZE);
-	omap_dsp_set_static_mempool(PHYS_ADDR_TESLA_MEM,
-					PHYS_ADDR_TESLA_SIZE);
-#endif
-
 #ifdef CONFIG_ION_OMAP
 	omap_ion_init();
 #endif

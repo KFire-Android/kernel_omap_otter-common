@@ -41,7 +41,6 @@ struct omap_rproc_timers_info {
  * @clkdm_name: name of clock domain in which this device is located
  * @clkdm: clock domain in which this device is located
  * @ops: platform-specific start/stop rproc handlers
- * @memory_maps: table of da-to-pa iommu memory maps
  * @memory_pool: platform-specific pool data
  * @omap_rproc_timers_info: optional, timer(s) rproc can use
  * @boot_reg: optional, control register for storing boot address

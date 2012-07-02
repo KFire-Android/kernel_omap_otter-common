@@ -18,9 +18,9 @@
 #include <linux/io.h>
 #include <linux/delay.h>
 #include <linux/wait.h>
-
 #include "gcmain.h"
 
+#define GCZONE_NONE		0
 #define GCZONE_ALL		(~0U)
 #define GCZONE_INIT		(1 << 0)
 #define GCZONE_MAPPING		(1 << 1)
@@ -29,8 +29,13 @@
 #define GCZONE_ALLOC		(1 << 4)
 #define GCZONE_FLUSH		(1 << 5)
 
-#include <linux/gcx.h>
-#include "gccmdbuf.h"
+GCDBG_FILTERDEF(cmdbuf, GCZONE_NONE,
+		"init",
+		"mapping",
+		"commit",
+		"buffer",
+		"alloc",
+		"flush")
 
 #define GC_CMD_BUF_PAGES	32
 #define GC_CMD_BUF_SIZE		(PAGE_SIZE * GC_CMD_BUF_PAGES)
@@ -53,10 +58,9 @@ enum gcerror cmdbuf_init(void)
 {
 	enum gcerror gcerror;
 
-	GCPRINT(GCDBGFILTER, GCZONE_INIT, "++" GC_MOD_PREFIX
-		"\n", __func__, __LINE__);
+	GCENTER(GCZONE_INIT);
 
-	gcerror = gc_alloc_pages(&cmdbuf.page, GC_CMD_BUF_SIZE);
+	gcerror = gc_alloc_noncached(&cmdbuf.page, GC_CMD_BUF_SIZE);
 	if (gcerror != GCERR_NONE)
 		return GCERR_SETGRP(gcerror, GCERR_CMD_ALLOC);
 
@@ -66,56 +70,36 @@ enum gcerror cmdbuf_init(void)
 	cmdbuf.available = cmdbuf.page.size;
 	cmdbuf.data_size = 0;
 
-	GCPRINT(GCDBGFILTER, GCZONE_INIT, GC_MOD_PREFIX
-		"initialized command buffer.\n",
-		__func__, __LINE__);
+	GCDBG(GCZONE_INIT, "initialized command buffer.\n");
+	GCDBG(GCZONE_INIT, "  physical = 0x%08X\n", cmdbuf.page.physical);
+	GCDBG(GCZONE_INIT, "  logical = 0x%08X\n", (u32) cmdbuf.page.logical);
+	GCDBG(GCZONE_INIT, "  size = %d\n", cmdbuf.page.size);
 
-	GCPRINT(GCDBGFILTER, GCZONE_INIT, GC_MOD_PREFIX
-		"  physical = 0x%08X\n",
-		__func__, __LINE__, cmdbuf.page.physical);
-
-	GCPRINT(GCDBGFILTER, GCZONE_INIT, GC_MOD_PREFIX
-		"  logical = 0x%08X\n",
-		__func__, __LINE__, (u32) cmdbuf.page.logical);
-
-	GCPRINT(GCDBGFILTER, GCZONE_INIT, GC_MOD_PREFIX
-		"  size = %d\n",
-		__func__, __LINE__, cmdbuf.page.size);
-
-	GCPRINT(GCDBGFILTER, GCZONE_INIT, "--" GC_MOD_PREFIX
-		"\n", __func__, __LINE__);
-
+	GCEXIT(GCZONE_INIT);
 	return GCERR_NONE;
 }
 
 void cmdbuf_physical(bool forcephysical)
 {
-	GCPRINT(GCDBGFILTER, GCZONE_ALLOC, "++" GC_MOD_PREFIX
-		"forcephysical = %d\n",
-		__func__, __LINE__, forcephysical);
-
+	GCENTERARG(GCZONE_ALLOC, "forcephysical = %d\n", forcephysical);
 	cmdbuf.forcephysical = forcephysical;
-
-	GCPRINT(GCDBGFILTER, GCZONE_ALLOC, "--" GC_MOD_PREFIX
-		"\n", __func__, __LINE__);
+	GCEXIT(GCZONE_ALLOC);
 }
 
-enum gcerror cmdbuf_map(struct mmu2dcontext *ctxt)
+enum gcerror cmdbuf_map(struct gccorecontext *gccorecontext,
+			struct gcmmucontext *ctxt)
 {
 	enum gcerror gcerror;
-	struct mmu2dphysmem mem;
-	struct mmu2darena *mapped;
+	struct gcmmuphysmem mem;
+	struct gcmmuarena *mapped;
 	pte_t physpages[GC_CMD_BUF_PAGES];
 	unsigned char *physical;
 	int i;
 
-	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, "++" GC_MOD_PREFIX
-		"\n", __func__, __LINE__);
+	GCENTER(GCZONE_MAPPING);
 
 	if (cmdbuf.data_size != 0)
-		GCPRINT(NULL, 0, GC_MOD_PREFIX
-			"command buffer has data!\n",
-			__func__, __LINE__);
+		GCERR("command buffer has data!\n");
 
 	physical = (unsigned char *) cmdbuf.page.physical;
 	for (i = 0; i < GC_CMD_BUF_PAGES; i += 1) {
@@ -129,41 +113,29 @@ enum gcerror cmdbuf_map(struct mmu2dcontext *ctxt)
 	mem.pages = physpages;
 	mem.pagesize = PAGE_SIZE;
 
-	gcerror = mmu2d_map(ctxt, &mem, &mapped);
+	gcerror = gcmmu_map(gccorecontext, ctxt, &mem, &mapped);
 	if (gcerror != 0)
 		return gcerror;
 
 	if (cmdbuf.mapped) {
-		if (mapped->address != cmdbuf.mappedbase) {
-			GCPRINT(NULL, 0, GC_MOD_PREFIX
-				"inconsitent command buffer mapping!\n",
-				__func__, __LINE__);
-		}
+		if (mapped->address != cmdbuf.mappedbase)
+			GCERR("inconsitent command buffer mapping!\n");
 	} else {
 		cmdbuf.mapped = true;
 	}
 
 	cmdbuf.mappedbase = mapped->address;
 
-	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, GC_MOD_PREFIX
-		"  physical address = 0x%08X\n",
-		__func__, __LINE__, cmdbuf.physicalbase);
+	GCDBG(GCZONE_MAPPING, "  physical address = 0x%08X\n",
+		cmdbuf.physicalbase);
+	GCDBG(GCZONE_MAPPING, "  mapped address = 0x%08X\n",
+		cmdbuf.mappedbase);
+	GCDBG(GCZONE_MAPPING, "  logical = 0x%08X\n",
+		(u32) cmdbuf.page.logical);
+	GCDBG(GCZONE_MAPPING, "  size = %d\n",
+		cmdbuf.page.size);
 
-	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, GC_MOD_PREFIX
-		"  mapped address = 0x%08X\n",
-		__func__, __LINE__, cmdbuf.mappedbase);
-
-	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, GC_MOD_PREFIX
-		"  logical = 0x%08X\n",
-		__func__, __LINE__, (u32) cmdbuf.page.logical);
-
-	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, GC_MOD_PREFIX
-		"  size = %d\n",
-		__func__, __LINE__, cmdbuf.page.size);
-
-	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, "--" GC_MOD_PREFIX
-		"\n", __func__, __LINE__);
-
+	GCEXIT(GCZONE_MAPPING);
 	return GCERR_NONE;
 }
 
@@ -172,8 +144,7 @@ enum gcerror cmdbuf_alloc(u32 size, void **logical, u32 *physical)
 	enum gcerror gcerror = GCERR_NONE;
 	unsigned int base;
 
-	GCPRINT(GCDBGFILTER, GCZONE_ALLOC, "++" GC_MOD_PREFIX
-		"\n", __func__, __LINE__);
+	GCENTER(GCZONE_ALLOC);
 
 	if (size > cmdbuf.available) {
 		gcerror = GCERR_CMD_ALLOC;
@@ -192,20 +163,11 @@ enum gcerror cmdbuf_alloc(u32 size, void **logical, u32 *physical)
 	if (physical != NULL)
 		*physical = base + cmdbuf.data_size;
 
-	GCPRINT(GCDBGFILTER, GCZONE_ALLOC, GC_MOD_PREFIX
-		"logical = 0x%08X\n",
-		__func__, __LINE__,
-		(unsigned int)
-			((unsigned char *) cmdbuf.page.logical
-					+ cmdbuf.data_size));
-
-	GCPRINT(GCDBGFILTER, GCZONE_ALLOC, GC_MOD_PREFIX
-		"address = 0x%08X\n",
-		__func__, __LINE__, base + cmdbuf.data_size);
-
-	GCPRINT(GCDBGFILTER, GCZONE_ALLOC, GC_MOD_PREFIX
-		"size = %d\n",
-		__func__, __LINE__, size);
+	GCDBG(GCZONE_ALLOC, "logical = 0x%08X\n",
+		(unsigned int) ((unsigned char *) cmdbuf.page.logical
+						+ cmdbuf.data_size));
+	GCDBG(GCZONE_ALLOC, "address = 0x%08X\n", base + cmdbuf.data_size);
+	GCDBG(GCZONE_ALLOC, "size = %d\n", size);
 
 	/* Determine the data size. */
 	size = (size + 3) & ~3;
@@ -215,9 +177,7 @@ enum gcerror cmdbuf_alloc(u32 size, void **logical, u32 *physical)
 	cmdbuf.data_size += size;
 
 fail:
-	GCPRINT(GCDBGFILTER, GCZONE_ALLOC, "--" GC_MOD_PREFIX
-		"\n", __func__, __LINE__);
-
+	GCEXIT(GCZONE_ALLOC);
 	return gcerror;
 }
 
@@ -226,8 +186,7 @@ int cmdbuf_flush(void *logical)
 	static const int flushSize
 		= sizeof(struct gcmosignal) + sizeof(struct gccmdend);
 
-	GCPRINT(GCDBGFILTER, GCZONE_FLUSH, "++" GC_MOD_PREFIX
-		"\n", __func__, __LINE__);
+	GCENTER(GCZONE_FLUSH);
 
 	if (logical != NULL) {
 		struct gcmosignal *gcmosignal;
@@ -254,15 +213,13 @@ int cmdbuf_flush(void *logical)
 		/* Compute the data count. */
 		count = (cmdbuf.data_size + 7) >> 3;
 
-		GCPRINT(GCDBGFILTER, GCZONE_COMMIT, GC_MOD_PREFIX
+		GCDBG(GCZONE_COMMIT,
 			"starting DMA at 0x%08X with count of %d\n",
-			__func__, __LINE__, base, count);
+			base, count);
 
 		/* Dump command buffer. */
-		GCDUMPBUFFER(GCDBGFILTER, GCZONE_BUFFER,
-				cmdbuf.page.logical, base, cmdbuf.data_size);
-
-		gc_flush_pages(&cmdbuf.page);
+		GCDUMPBUFFER(GCZONE_BUFFER, cmdbuf.page.logical, base,
+				cmdbuf.data_size);
 
 		/* Enable all events. */
 		gc_write_reg(GCREG_INTR_ENBL_Address, ~0U);
@@ -282,20 +239,16 @@ int cmdbuf_flush(void *logical)
 		gc_wait_interrupt();
 		ack = gc_get_interrupt_data();
 
-		GCPRINT(GCDBGFILTER, GCZONE_COMMIT, GC_MOD_PREFIX
-			"ack = 0x%08X\n",
-			__func__, __LINE__, ack);
+		GCDBG(GCZONE_COMMIT, "ack = 0x%08X\n", ack);
 
 		if ((ack & 0xC0000000) != 0)
-			GCGPUSTATUS(NULL, 0, __func__, __LINE__, &ack);
+			GCGPUSTATUS(0, &ack);
 
 		/* Reset the buffer. */
 		cmdbuf.available = cmdbuf.page.size;
 		cmdbuf.data_size = 0;
 	}
 
-	GCPRINT(GCDBGFILTER, GCZONE_FLUSH, "--" GC_MOD_PREFIX
-		"flushSize = %d\n", __func__, __LINE__, flushSize);
-
+	GCEXITARG(GCZONE_FLUSH, "flushSize = %d\n", flushSize);
 	return flushSize;
 }

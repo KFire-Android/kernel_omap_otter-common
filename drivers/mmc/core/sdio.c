@@ -655,7 +655,7 @@ static int mmc_sdio_suspend(struct mmc_host *host)
 	if (!err && mmc_card_keep_power(host) && mmc_card_wake_sdio_irq(host)) {
 		mmc_claim_host(host);
 		sdio_disable_wide(host->card);
-		mmc_release_host(host);
+		mmc_release_host_sync(host);
 	}
 
 	return err;
@@ -686,7 +686,7 @@ static int mmc_sdio_resume(struct mmc_host *host)
 
 	if (!err && host->sdio_irqs)
 		mmc_signal_sdio_irq(host);
-	mmc_release_host(host);
+	mmc_release_host_sync(host);
 
 	/*
 	 * If the card looked to be the same as before suspending, then

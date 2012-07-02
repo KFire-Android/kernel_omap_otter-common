@@ -49,6 +49,18 @@
 #define THREAD_INFO(sp) ((struct thread_info *) \
 		((unsigned long)(sp) & ~(THREAD_SIZE - 1)))
 
+#ifndef CONFIG_PRINTK
+static int do_syslog(int type, char __user *bug, int count)
+{
+	return -1;
+}
+
+static int log_buf_copy(char *dest, int idx, int len)
+{
+	return -1;
+}
+#endif
+
 struct fiq_debugger_state {
 	struct fiq_glue_handler handler;
 
@@ -190,7 +202,6 @@ static void debug_prompt(struct fiq_debugger_state *state)
 	debug_puts(state, "debug> ");
 }
 
-int log_buf_copy(char *dest, int idx, int len);
 static void dump_kernel_log(struct fiq_debugger_state *state)
 {
 	char buf[1024];
@@ -508,7 +519,6 @@ static void end_syslog_dump(struct fiq_debugger_state *state)
 	state->syslog_dumping = false;
 }
 #else
-extern int do_syslog(int type, char __user *bug, int count);
 static void begin_syslog_dump(struct fiq_debugger_state *state)
 {
 	do_syslog(5 /* clear */, NULL, 0);

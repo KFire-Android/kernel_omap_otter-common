@@ -354,6 +354,7 @@ config MACH_OMAP_4430SDP
 	select TWL6030_GPADC
 	select OMAP_REBOOT_REASON
 	select OMAP_RAM_CONSOLE
+	select CDC_TCXO
 
 config MACH_OMAP_BLAZE
 	bool "OMAP 44xx Tablet2 Board"
@@ -374,6 +375,7 @@ config MACH_OMAP_BLAZE
 	select TWL6040_VIB
 	select OMAP_REBOOT_REASON
 	select OMAP_RAM_CONSOLE
+	select CDC_TCXO
 
 config MACH_OMAP_4430_KC1
 	bool "OMAP 4430 KC1 board"

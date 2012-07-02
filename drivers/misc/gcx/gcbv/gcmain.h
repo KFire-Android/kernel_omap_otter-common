@@ -15,13 +15,13 @@
 #ifndef GCMAIN_H
 #define GCMAIN_H
 
+#include <linux/slab.h>
+#include <linux/module.h>
 #include <linux/gcx.h>
 #include <linux/gcioctl.h>
 #include <linux/gcbv.h>
-#include <linux/module.h>
-#include <linux/slab.h>
 #include <linux/gccore.h>
-#include <linux/gcdebug.h>
+#include "gcbv-cache.h"
 
 #define GC_DEV_NAME	"gc2d"
 
@@ -40,10 +40,10 @@
  */
 
 #define gc_map_wrapper(gcmap) \
-	gc_map(gcmap)
+	gc_map(gcmap, false)
 
 #define gc_unmap_wrapper(gcmap) \
-	gc_unmap(gcmap)
+	gc_unmap(gcmap, false)
 
 #define gc_commit_wrapper(gccommit) \
 	gc_commit(gccommit, false)

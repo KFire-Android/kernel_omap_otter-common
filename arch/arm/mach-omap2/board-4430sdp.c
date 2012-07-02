@@ -25,6 +25,7 @@
 #include <linux/omapfb.h>
 #include <linux/wl12xx.h>
 #include <linux/memblock.h>
+#include <linux/cdc_tcxo.h>
 #include <linux/mfd/twl6040-codec.h>
 
 #include <mach/omap4-common.h>
@@ -66,7 +67,7 @@
 #define ETH_KS8851_QUART		138
 #define OMAP4_TOUCH_IRQ_1		35
 #define OMAP4_TOUCH_IRQ_2		36
-#define HDMI_GPIO_CT_CP_HPD		60
+#define HDMI_GPIO_CT_CP_HPD		60 /* HPD mode enable/disable */
 #define HDMI_GPIO_HPD			63  /* Hot plug pin for HDMI */
 #define HDMI_GPIO_LS_OE 41 /* Level shifter for HDMI */
 #define LCD_BL_GPIO		27	/* LCD Backlight GPIO */
@@ -82,6 +83,8 @@
 #define OMAP_HDMI_HPD_ADDR	0x4A100098
 #define OMAP_HDMI_PULLTYPE_MASK	0x00000010
 
+#define OMAP4_SFH7741_SENSOR_OUTPUT_GPIO	184
+#define OMAP4_SFH7741_ENABLE_GPIO		188
 
 static const int sdp4430_keymap[] = {
 	KEY(0, 0, KEY_E),
@@ -199,7 +202,7 @@ void keypad_pad_wkup(int enable)
 
 }
 
-#ifdef CONFIG_OMAP4_DUTY_CYCLE
+#ifdef CONFIG_OMAP4_DUTY_CYCLE_GOVERNOR
 
 static struct pcb_section omap4_duty_governor_pcb_sections[] = {
 	{
@@ -654,6 +657,26 @@ static struct bq2415x_platform_data sdp4430_bqdata = {
 	.max_charger_currentmA = 1550,
 };
 
+/*
+ * The Clock Driver Chip (TCXO) on OMAP4 based SDP needs to
+ * be programmed to output CLK1 based on REQ1 from OMAP.
+ * By default CLK1 is driven based on an internal REQ1INT signal
+ * which is always set to 1.
+ * Doing this helps gate sysclk (from CLK1) to OMAP while OMAP
+ * is in sleep states.
+ */
+static struct cdc_tcxo_platform_data sdp4430_cdc_data = {
+	.buf = {
+		CDC_TCXO_REQ4INT | CDC_TCXO_REQ1INT |
+		CDC_TCXO_REQ4POL | CDC_TCXO_REQ3POL |
+		CDC_TCXO_REQ2POL | CDC_TCXO_REQ1POL,
+		CDC_TCXO_MREQ4 | CDC_TCXO_MREQ3 |
+		CDC_TCXO_MREQ2 | CDC_TCXO_MREQ1,
+		CDC_TCXO_LDOEN1,
+		0,
+	},
+};
+
 static struct i2c_board_info __initdata sdp4430_i2c_boardinfo[] = {
 	{
 		I2C_BOARD_INFO("bq24156", 0x6a),
@@ -662,6 +685,10 @@ static struct i2c_board_info __initdata sdp4430_i2c_boardinfo[] = {
 	{
 		I2C_BOARD_INFO("tps6130x", 0x33),
 		.platform_data = &twl6040_vddhf,
+	},
+	{
+		I2C_BOARD_INFO("cdc_tcxo_driver", 0x6c),
+		.platform_data = &sdp4430_cdc_data,
 	},
 };
 
@@ -947,6 +974,10 @@ static void omap_4430sdp_display_init(void)
 	omap_vram_set_sdram_vram(BLAZE_FB_RAM_SIZE, 0);
 	omapfb_set_platform_data(&blaze_fb_pdata);
 	omap_display_init(&sdp4430_dss_data);
+
+	omap_mux_init_gpio(HDMI_GPIO_LS_OE, OMAP_PIN_OUTPUT);
+	omap_mux_init_gpio(HDMI_GPIO_CT_CP_HPD, OMAP_PIN_OUTPUT);
+	omap_mux_init_gpio(HDMI_GPIO_HPD, OMAP_PIN_INPUT_PULLDOWN);
 }
 
 #ifdef CONFIG_OMAP_MUX
@@ -1174,12 +1205,6 @@ static void __init omap_4430sdp_reserve(void)
 	/* ipu needs to recognize secure input buffer area as well */
 	omap_ipu_set_static_mempool(PHYS_ADDR_DUCATI_MEM, PHYS_ADDR_DUCATI_SIZE +
 					OMAP4_ION_HEAP_SECURE_INPUT_SIZE);
-#ifdef CONFIG_OMAP_REMOTE_PROC_DSP
-	memblock_remove(PHYS_ADDR_TESLA_MEM, PHYS_ADDR_TESLA_SIZE);
-	omap_dsp_set_static_mempool(PHYS_ADDR_TESLA_MEM,
-					PHYS_ADDR_TESLA_SIZE);
-#endif
-
 #ifdef CONFIG_ION_OMAP
 	omap_ion_init();
 #endif

@@ -612,6 +612,23 @@ void mmc_release_host(struct mmc_host *host)
 
 EXPORT_SYMBOL(mmc_release_host);
 
+/**
+ *	mmc_release_host_sync - release a host immediately
+ *	@host: mmc host to release
+ *
+ *	Release a MMC host immediately, allowing others to claim the host
+ *	for their operations. Calls host->disable() synchronously
+ */
+void mmc_release_host_sync(struct mmc_host *host)
+{
+	WARN_ON(!host->claimed);
+
+	mmc_host_disable(host);
+
+	mmc_do_release_host(host);
+}
+EXPORT_SYMBOL(mmc_release_host_sync);
+
 /*
  * Internal function that does the actual ios call to the host driver,
  * optionally printing some debug output.

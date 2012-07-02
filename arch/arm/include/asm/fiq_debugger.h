@@ -61,4 +61,10 @@ struct fiq_debugger_pdata {
 	void (*force_irq_ack)(struct platform_device *pdev, unsigned int irq);
 };
 
+#ifdef CONFIG_PRINTK
+extern int log_buf_copy(char *dest, int idx, int len);
+extern int do_syslog(int type, char __user *bug, int count);
+#endif
+
+
 #endif
