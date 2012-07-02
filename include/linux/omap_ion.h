@@ -86,7 +86,6 @@ enum {
  * List of heaps in the system
  */
 enum {
-	OMAP_ION_HEAP_SYSTEM,
 	OMAP_ION_HEAP_LARGE_SURFACES,
 	OMAP_ION_HEAP_TILER,
 	OMAP_ION_HEAP_SECURE_INPUT,
