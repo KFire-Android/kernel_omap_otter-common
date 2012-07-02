@@ -41,15 +41,31 @@ SYS_CFLAGS := \
 
 SYS_EXE_CRTBEGIN := $(TOOLCHAIN)/lib/crtbegin_dynamic.o
 SYS_EXE_CRTEND := $(TOOLCHAIN)/lib/crtend_android.o
-SYS_EXE_LDFLAGS := \
- -Bdynamic -Wl,-T$(ANDROID_ROOT)/build/core/armelf.x \
- -nostdlib -Wl,-dynamic-linker,/system/bin/linker \
- -lc -ldl -lcutils
 
-SYS_LIB_LDFLAGS := \
- -Bdynamic -Wl,-T$(ANDROID_ROOT)/build/core/armelf.xsc \
+SYS_EXE_LDFLAGS := \
+ -Bdynamic \
  -nostdlib -Wl,-dynamic-linker,/system/bin/linker \
  -lc -ldl -lcutils
+SYS_LIB_LDFLAGS := $(SYS_EXE_LDFLAGS)
+
+# This is required with the change to the GCC4.6 toolchain
+# in JB (otherwise commands just segfault)
+ifeq ($(is_future_version),0)
+SYS_EXE_LDFLAGS += -fPIE -pie
+endif
+
+# Handle the removal of the armelf.x and armelf.xsc linker scripts.
+ifeq ($(strip $(wildcard $(ANDROID_ROOT)/build/core/armelf.x)),)
+# The linker scripts have been removed. We need to use these options
+# instead.
+SYS_EXE_LDFLAGS += -Wl,-z,relro -Wl,-z,now
+SYS_LIB_LDFLAGS += -Wl,-z,relro -Wl,-z,now
+else
+# The linker scripts are still present in the Android tree, so we need to
+# use them.
+SYS_EXE_LDFLAGS += -Wl,-T$(ANDROID_ROOT)/build/core/armelf.x
+SYS_LIB_LDFLAGS += -Wl,-T$(ANDROID_ROOT)/build/core/armelf.xsc
+endif
 
 JNI_CPU_ABI := armeabi
 

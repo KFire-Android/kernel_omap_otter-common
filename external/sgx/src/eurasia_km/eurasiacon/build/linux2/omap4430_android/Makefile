@@ -134,6 +134,9 @@ endif
 
 PVR_ANDROID_PLATFORM_HAS_LINUX_FBDEV := 1
 
+# FIXME: Remove this once vsync issues are resolved
+PVR_ANDROID_COMPOSITOR_WAIT_FOR_RENDER := 1
+
 ifeq ($(is_at_least_icecream_sandwich),1)
 -include products.mk
 endif

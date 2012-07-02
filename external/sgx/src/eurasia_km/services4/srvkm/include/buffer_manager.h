@@ -127,8 +127,19 @@ struct _BM_CONTEXT_
 	struct _BM_CONTEXT_ **ppsThis;
 };
 
+typedef struct _XPROC_DATA_{
+	IMG_UINT32 ui32RefCount;
+	IMG_UINT32 ui32AllocFlags;
+	IMG_UINT32 ui32Size;
+	IMG_UINT32 ui32PageSize;
+    RA_ARENA *psArena;
+    IMG_SYS_PHYADDR sSysPAddr;
+	IMG_VOID *pvCpuVAddr;
+	IMG_HANDLE hOSMemHandle;
+	IMG_UINT32 ui32Offsets[PVRSRV_MAX_NUMBER_OF_MM_BUFFER_PLANES];
+} XPROC_DATA;
 
-
+extern XPROC_DATA gXProcWorkaroundShareData[];
 typedef IMG_VOID *BM_HANDLE;
 
 #define BP_POOL_MASK         0x7
@@ -243,6 +254,25 @@ _BMMappingType (IMG_INT eCpuMemoryOrigin)
 	}
 	return "junk";
 }
+
+#if defined(PVRSRV_REFCOUNT_DEBUG)
+IMG_VOID _BM_XProcIndexAcquireDebug(const IMG_CHAR *pszFile, IMG_INT iLine, IMG_UINT32 ui32Index);
+IMG_VOID _BM_XProcIndexReleaseDebug(const IMG_CHAR *pszFile, IMG_INT iLine, IMG_UINT32 ui32Index);
+
+#define BM_XProcIndexAcquire(x...) \
+	_BM_XProcIndexAcquireDebug(__FILE__, __LINE__, x)
+#define BM_XProcIndexRelease(x...) \
+	_BM_XProcIndexReleaseDebug(__FILE__, __LINE__, x)
+
+#else
+IMG_VOID _BM_XProcIndexAcquire(IMG_UINT32 ui32Index);
+IMG_VOID _BM_XProcIndexRelease(IMG_UINT32 ui32Index);
+
+#define BM_XProcIndexAcquire(x...) \
+	_BM_XProcIndexAcquire( x)
+#define BM_XProcIndexRelease(x...) \
+	_BM_XProcIndexRelease( x)
+#endif
 
 #if defined(__cplusplus)
 }

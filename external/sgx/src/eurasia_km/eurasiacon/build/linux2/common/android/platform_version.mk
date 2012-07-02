@@ -53,15 +53,22 @@ PLATFORM_VERSION := 2.3
 else ifeq ($(call version-starts-with,Honeycomb),1)
 PLATFORM_VERSION := 3.0
 else ifeq ($(call version-starts-with,IceCreamSandwichMR),1)
-PLATFORM_VERSION := 4.1
+PLATFORM_VERSION := 4.0.3
 else ifeq ($(call version-starts-with,IceCreamSandwich),1)
 PLATFORM_VERSION := 4.0
 else ifeq ($(shell echo $(PLATFORM_VERSION) | grep -qE "[A-Za-z]+"; echo $$?),0)
-PLATFORM_VERSION := 4.5
+PLATFORM_VERSION := 4.1
 endif
 
-PLATFORM_VERSION_MAJ := $(shell echo $(PLATFORM_VERSION) | cut -f1 -d'.')
-PLATFORM_VERSION_MIN := $(shell echo $(PLATFORM_VERSION) | cut -f2 -d'.')
+PLATFORM_VERSION_MAJ   := $(shell echo $(PLATFORM_VERSION) | cut -f1 -d'.')
+PLATFORM_VERSION_MIN   := $(shell echo $(PLATFORM_VERSION) | cut -f2 -d'.')
+PLATFORM_VERSION_PATCH := $(shell echo $(PLATFORM_VERSION) | cut -f3 -d'.')
+
+# Not all versions have a patchlevel; fix that up here
+#
+ifeq ($(PLATFORM_VERSION_PATCH),)
+PLATFORM_VERSION_PATCH := 0
+endif
 
 # Macros to help categorize support for features and API_LEVEL for tests.
 #
@@ -84,21 +91,21 @@ is_at_least_icecream_sandwich := \
 is_at_least_icecream_sandwich_mr1 := \
 	$(shell ( test $(PLATFORM_VERSION_MAJ) -gt 4 || \
 				( test $(PLATFORM_VERSION_MAJ) -eq 4 && \
-				  test $(PLATFORM_VERSION_MIN) -ge 1 ) ) && echo 1 || echo 0)
+					( test $(PLATFORM_VERSION_MIN) -ge 1 || \
+					  test $(PLATFORM_VERSION_PATCH) -ge 3 ) ) ) && echo 1 || echo 0)
 
-# FIXME: Assume "future versions" are >=4.5, but we don't really know
+# FIXME: Assume "future versions" are >=4.1, but we don't really know
 is_future_version := \
 	$(shell ( test $(PLATFORM_VERSION_MAJ) -gt 4 || \
 				( test $(PLATFORM_VERSION_MAJ) -eq 4 && \
-				  test $(PLATFORM_VERSION_MIN) -ge 5 ) ) && echo 1 || echo 0)
+				  test $(PLATFORM_VERSION_MIN) -ge 1 ) ) && echo 1 || echo 0)
 
 # Picking an exact match of API_LEVEL for the platform we're building
 # against can avoid compatibility theming and affords better integration.
 #
 ifeq ($(is_future_version),1)
-API_LEVEL := 15
+API_LEVEL := 16
 else ifeq ($(is_at_least_icecream_sandwich),1)
-# MR2        15
 # MR1        15
 API_LEVEL := 14
 else ifeq ($(is_at_least_honeycomb),1)

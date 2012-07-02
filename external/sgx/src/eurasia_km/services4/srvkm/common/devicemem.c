@@ -602,6 +602,7 @@ PVRSRV_ERROR IMG_CALLCONV PVRSRVAllocSyncInfoKM(IMG_HANDLE					hDevCookie,
 	psSyncData->ui32ReadOps2Complete = 0;
 	psSyncData->ui32LastOpDumpVal = 0;
 	psSyncData->ui32LastReadOpDumpVal = 0;
+	psSyncData->ui64LastWrite = 0;
 
 #if defined(PDUMP)
 	PDUMPCOMMENT("Allocating kernel sync object");
@@ -705,7 +706,7 @@ PVRSRV_ERROR _PollUntilAtLeast(volatile IMG_UINT32* pui32WatchedValue,
 			if(psSysData->psGlobalEventObject)
 			{
 				eError = OSEventObjectOpenKM(psSysData->psGlobalEventObject, &hOSEventKM);
-				if (eError |= PVRSRV_OK)
+				if (eError != PVRSRV_OK)
 				{
 					PVR_DPF((PVR_DBG_ERROR,
 								"_PollUntilAtLeast: OSEventObjectOpen failed"));

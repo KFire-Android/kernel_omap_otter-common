@@ -125,7 +125,7 @@ extern "C" {
 
 #define PVRSRV_PDUMP_FLAGS_CONTINUOUS		0x1
 
-#define PVRSRV_MAX_NUMBER_OF_MM_BUFFER_PLANES  2
+#define PVRSRV_MAX_NUMBER_OF_MM_BUFFER_PLANES  3
 
 /* Invalid Device Virtual Address Value */
 #define PVRSRV_BAD_DEVICE_ADDRESS           0

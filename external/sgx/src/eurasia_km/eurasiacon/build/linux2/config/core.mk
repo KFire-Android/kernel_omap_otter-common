@@ -260,7 +260,31 @@ override SUPPORT_HW_RECOVERY := 0
 override SUPPORT_ACTIVE_POWER_MANAGEMENT := 0
 endif
 
+# We're bumping against USSE limits on older cores because the ukernel
+# is too large when building both SGX_DISABLE_VISTEST_SUPPORT=0 and
+# PVRSRV_USSE_EDM_STATUS_DEBUG=1.
+#
+# Automatically disable vistest support if debugging the ukernel to
+# prevent build failures.
+#
+ifneq ($(filter 520 530 531 535 540,$(SGXCORE)),)
+ifneq ($(SGX_DISABLE_VISTEST_SUPPORT),1)
+SGX_DISABLE_VISTEST_SUPPORT ?= not-overridden
+ifeq ($(SGX_DISABLE_VISTEST_SUPPORT),not-overridden)
+$(warning Setting SGX_DISABLE_VISTEST_SUPPORT=1 because PVRSRV_USSE_EDM_STATUS_DEBUG=1)
+SGX_DISABLE_VISTEST_SUPPORT := 1
+endif
+endif
+endif
+
 ifeq ($(SGXCORE),535)
+ifeq ($(PVRSRV_USSE_EDM_STATUS_DEBUG),1)
+SUPPORT_SGX_HWPERF ?= not-overridden
+ifeq ($(SUPPORT_SGX_HWPERF),not-overridden)
+$(warning Setting SUPPORT_SGX_HWPERF=0 because PVRSRV_USSE_EDM_STATUS_DEBUG=1)
+SUPPORT_SGX_HWPERF := 0
+endif
+endif
 PVR2D_ALT_2DHW ?= 0
 endif
 
@@ -385,6 +409,18 @@ $(eval $(call BothConfigC,PVR_SECURE_HANDLES,))
 
 $(eval $(call BothConfigC,DISPLAY_CONTROLLER,$(DISPLAY_CONTROLLER)))
 
+PVR_LINUX_MEM_AREA_POOL_MAX_PAGES ?= 0
+ifneq ($(PVR_LINUX_MEM_AREA_POOL_MAX_PAGES),0)
+PVR_LINUX_MEM_AREA_USE_VMAP ?= 1
+include ../kernel_version.mk
+ifeq ($(call kernel-version-at-least,3,0),true)
+PVR_LINUX_MEM_AREA_POOL_ALLOW_SHRINK ?= 1
+endif
+endif
+$(eval $(call KernelConfigC,PVR_LINUX_MEM_AREA_POOL_MAX_PAGES,$(PVR_LINUX_MEM_AREA_POOL_MAX_PAGES)))
+$(eval $(call TunableKernelConfigC,PVR_LINUX_MEM_AREA_USE_VMAP,))
+$(eval $(call TunableKernelConfigC,PVR_LINUX_MEM_AREA_POOL_ALLOW_SHRINK,))
+
 
 $(eval $(call BothConfigMake,PVR_SYSTEM,$(PVR_SYSTEM)))
 
@@ -401,7 +437,6 @@ $(eval $(call KernelConfigC,DEBUG_LINUX_MMAP_AREAS,))
 $(eval $(call KernelConfigC,DEBUG_BRIDGE_KM,))
 else ifeq ($(BUILD),release)
 $(eval $(call BothConfigC,RELEASE,))
-$(eval $(call TunableBothConfigMake,DEBUGLINK,1))
 else ifeq ($(BUILD),timing)
 $(eval $(call BothConfigC,TIMING,))
 $(eval $(call TunableBothConfigMake,DEBUGLINK,1))

@@ -103,6 +103,7 @@
 #include "private_data.h"
 #include "lock.h"
 #include "linkage.h"
+#include "buffer_manager.h"
 
 #if defined(SUPPORT_DRI_DRM)
 #include "pvr_drm.h"
@@ -283,10 +284,10 @@ static int __devinit PVRSRVDriverProbe(LDM_DEV *pDevice, const struct pci_device
 
 #if defined(CONFIG_ION_OMAP)
 	gpsIONClient = ion_client_create(omap_ion_device,
-									 1 << ION_HEAP_TYPE_CARVEOUT |
-									 1 << OMAP_ION_HEAP_TYPE_TILER |
-									 1 << ION_HEAP_TYPE_SYSTEM,
-									 "pvr");
+			1 << ION_HEAP_TYPE_CARVEOUT |
+			1 << OMAP_ION_HEAP_TYPE_TILER |
+			1 << ION_HEAP_TYPE_SYSTEM,
+			"pvr");
 	if (IS_ERR_OR_NULL(gpsIONClient))
 	{
 		PVR_DPF((PVR_DBG_ERROR, "PVRSRVDriverProbe: Couldn't create ion client"));
@@ -553,6 +554,12 @@ static int PVRSRVRelease(struct inode unref__ * pInode, struct file *pFile)
 				PVR_DPF((PVR_DBG_ERROR, "%s: Failed to look up export handle", __FUNCTION__));
 				err = -EFAULT;
 				goto err_unlock;
+			}
+
+			
+			if (psKernelMemInfo->sShareMemWorkaround.bInUse)
+			{
+				BM_XProcIndexRelease(psKernelMemInfo->sShareMemWorkaround.ui32ShareIndex);
 			}
 
 			

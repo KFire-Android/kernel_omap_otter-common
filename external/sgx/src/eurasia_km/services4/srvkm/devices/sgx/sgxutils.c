@@ -49,6 +49,8 @@
 #include <stdio.h>
 #endif
 
+IMG_UINT64 ui64KickCount;
+
 
 #if defined(SYS_CUSTOM_POWERDOWN)
 PVRSRV_ERROR SysPowerDownMISR(PVRSRV_DEVICE_NODE	* psDeviceNode, IMG_UINT32 ui32CallerID);
@@ -553,6 +555,7 @@ PVRSRV_ERROR SGXScheduleCCBCommand(PVRSRV_DEVICE_NODE	*psDeviceNode,
 	*psKernelCCB->pui32ReadOffset = (*psKernelCCB->pui32ReadOffset + 1) & 255;
 #endif
 
+	ui64KickCount++;
 Exit:
 	return eError;
 }
@@ -716,11 +719,18 @@ PVRSRV_ERROR SGXCleanupRequest(PVRSRV_DEVICE_NODE *psDeviceNode,
 	
 		#if defined(PDUMP)
 		
+
+
+
+
+
+
+
 		PDUMPCOMMENTWITHFLAGS(0, "Host Control - Poll for clean-up request to complete");
 		PDUMPMEMPOL(psHostCtlMemInfo,
 					offsetof(SGXMKIF_HOST_CTL, ui32CleanupStatus),
-					PVRSRV_USSE_EDM_CLEANUPCMD_COMPLETE,
-					PVRSRV_USSE_EDM_CLEANUPCMD_COMPLETE,
+					PVRSRV_USSE_EDM_CLEANUPCMD_COMPLETE | PVRSRV_USSE_EDM_CLEANUPCMD_DONE,
+					PVRSRV_USSE_EDM_CLEANUPCMD_COMPLETE | PVRSRV_USSE_EDM_CLEANUPCMD_DONE,
 					PDUMP_POLL_OPERATOR_EQUAL,
 					0,
 					MAKEUNIQUETAG(psHostCtlMemInfo));
@@ -734,7 +744,7 @@ PVRSRV_ERROR SGXCleanupRequest(PVRSRV_DEVICE_NODE *psDeviceNode,
 
 	if (psHostCtl->ui32CleanupStatus & PVRSRV_USSE_EDM_CLEANUPCMD_BUSY)
 	{
-		/* Only one flag should be set */
+		
 		PVR_ASSERT((psHostCtl->ui32CleanupStatus & PVRSRV_USSE_EDM_CLEANUPCMD_DONE) == 0);
 		eError = PVRSRV_ERROR_RETRY;
 		psHostCtl->ui32CleanupStatus &= ~(PVRSRV_USSE_EDM_CLEANUPCMD_COMPLETE | PVRSRV_USSE_EDM_CLEANUPCMD_BUSY);
@@ -744,7 +754,7 @@ PVRSRV_ERROR SGXCleanupRequest(PVRSRV_DEVICE_NODE *psDeviceNode,
 		eError = PVRSRV_OK;
 		psHostCtl->ui32CleanupStatus &= ~(PVRSRV_USSE_EDM_CLEANUPCMD_COMPLETE | PVRSRV_USSE_EDM_CLEANUPCMD_DONE);
 	}
-
+	
 	PDUMPMEM(IMG_NULL, psHostCtlMemInfo, offsetof(SGXMKIF_HOST_CTL, ui32CleanupStatus), sizeof(IMG_UINT32), 0, MAKEUNIQUETAG(psHostCtlMemInfo));
 
 	
@@ -763,6 +773,8 @@ typedef struct _SGX_HW_RENDER_CONTEXT_CLEANUP_
     PVRSRV_KERNEL_MEM_INFO *psHWRenderContextMemInfo;
     IMG_HANDLE hBlockAlloc;
 	PRESMAN_ITEM psResItem;
+	IMG_BOOL bCleanupTimerRunning;
+	IMG_PVOID pvTimeData;
 } SGX_HW_RENDER_CONTEXT_CLEANUP;
 
 
@@ -780,20 +792,44 @@ static PVRSRV_ERROR SGXCleanupHWRenderContextCallback(IMG_PVOID		pvParam,
 					  PVRSRV_CLEANUPCMD_RC,
 					  bForceCleanup);
 
-    
+	if (eError == PVRSRV_ERROR_RETRY)
+	{
+		if (!psCleanup->bCleanupTimerRunning)
+		{
+			OSTimeCreateWithUSOffset(&psCleanup->pvTimeData, MAX_CLEANUP_TIME_US);
+			psCleanup->bCleanupTimerRunning = IMG_TRUE;
+		}
+		else
+		{
+			if (OSTimeHasTimePassed(psCleanup->pvTimeData))
+			{
+				eError = PVRSRV_ERROR_TIMEOUT_POLLING_FOR_VALUE;
+				psCleanup->bCleanupTimerRunning = IMG_FALSE;
+				OSTimeDestroy(psCleanup->pvTimeData);
+			}
+		}
+	}
+	else
+	{
+		if (psCleanup->bCleanupTimerRunning)
+		{
+			OSTimeDestroy(psCleanup->pvTimeData);
+		}
+	}
+
 	if (eError != PVRSRV_ERROR_RETRY)
 	{
-	    /* Free the Device Mem allocated */
+	    
 	    PVRSRVFreeDeviceMemKM(psCleanup->psDeviceNode,
 	            psCleanup->psHWRenderContextMemInfo);
 	
-	    /* Finally, free the cleanup structure itself */
+	    
 		OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP,
 				  sizeof(SGX_HW_RENDER_CONTEXT_CLEANUP),
 				  psCleanup,
 				  psCleanup->hBlockAlloc);
-		/*not nulling pointer, copy on stack*/
-	}	
+		
+	}
 
 	return eError;
 }
@@ -804,6 +840,8 @@ typedef struct _SGX_HW_TRANSFER_CONTEXT_CLEANUP_
     PVRSRV_KERNEL_MEM_INFO *psHWTransferContextMemInfo;
 	IMG_HANDLE hBlockAlloc;
 	PRESMAN_ITEM psResItem;
+	IMG_BOOL bCleanupTimerRunning;
+	IMG_PVOID pvTimeData;
 } SGX_HW_TRANSFER_CONTEXT_CLEANUP;
 
 
@@ -821,20 +859,44 @@ static PVRSRV_ERROR SGXCleanupHWTransferContextCallback(IMG_PVOID	pvParam,
 					  PVRSRV_CLEANUPCMD_TC,
 					  bForceCleanup);
 
-    
+	if (eError == PVRSRV_ERROR_RETRY)
+	{
+		if (!psCleanup->bCleanupTimerRunning)
+		{
+			OSTimeCreateWithUSOffset(&psCleanup->pvTimeData, MAX_CLEANUP_TIME_US);
+			psCleanup->bCleanupTimerRunning = IMG_TRUE;
+		}
+		else
+		{
+			if (OSTimeHasTimePassed(psCleanup->pvTimeData))
+			{
+				eError = PVRSRV_ERROR_TIMEOUT_POLLING_FOR_VALUE;
+				psCleanup->bCleanupTimerRunning = IMG_FALSE;
+				OSTimeDestroy(psCleanup->pvTimeData);
+			}
+		}
+	}
+	else
+	{
+		if (psCleanup->bCleanupTimerRunning)
+		{
+			OSTimeDestroy(psCleanup->pvTimeData);
+		}
+	}
+
 	if (eError != PVRSRV_ERROR_RETRY)
 	{
-	    /* Free the Device Mem allocated */
+	    
 	    PVRSRVFreeDeviceMemKM(psCleanup->psDeviceNode,
 	            psCleanup->psHWTransferContextMemInfo);
 	
-	    /* Finally, free the cleanup structure itself */
+	    
 		OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP,
 				  sizeof(SGX_HW_TRANSFER_CONTEXT_CLEANUP),
 				  psCleanup,
 				  psCleanup->hBlockAlloc);
-		/*not nulling pointer, copy on stack*/
-	}	
+		
+	}
 
 	return eError;
 }
@@ -963,6 +1025,7 @@ IMG_HANDLE SGXRegisterHWRenderContextKM(IMG_HANDLE				hDeviceNode,
 
 	psCleanup->hBlockAlloc = hBlockAlloc;
 	psCleanup->psDeviceNode = psDeviceNode;
+	psCleanup->bCleanupTimerRunning = IMG_FALSE;
 
 	psResItem = ResManRegisterRes(psPerProc->hResManContext,
 								  RESMAN_TYPE_HW_RENDER_CONTEXT,
@@ -1140,6 +1203,7 @@ IMG_HANDLE SGXRegisterHWTransferContextKM(IMG_HANDLE				hDeviceNode,
 
 	psCleanup->hBlockAlloc = hBlockAlloc;
 	psCleanup->psDeviceNode = psDeviceNode;
+	psCleanup->bCleanupTimerRunning = IMG_FALSE;
 
 	psResItem = ResManRegisterRes(psPerProc->hResManContext,
 								  RESMAN_TYPE_HW_TRANSFER_CONTEXT,
@@ -1283,6 +1347,8 @@ typedef struct _SGX_HW_2D_CONTEXT_CLEANUP_
 	PVRSRV_KERNEL_MEM_INFO *psHW2DContextMemInfo;
 	IMG_HANDLE hBlockAlloc;
 	PRESMAN_ITEM psResItem;
+	IMG_BOOL bCleanupTimerRunning;
+	IMG_PVOID pvTimeData;
 } SGX_HW_2D_CONTEXT_CLEANUP;
 
 static PVRSRV_ERROR SGXCleanupHW2DContextCallback(IMG_PVOID  pvParam,
@@ -1300,21 +1366,44 @@ static PVRSRV_ERROR SGXCleanupHW2DContextCallback(IMG_PVOID  pvParam,
 					  PVRSRV_CLEANUPCMD_2DC,
 					  bForceCleanup);
 
-    
+	if (eError == PVRSRV_ERROR_RETRY)
+	{
+		if (!psCleanup->bCleanupTimerRunning)
+		{
+			OSTimeCreateWithUSOffset(&psCleanup->pvTimeData, MAX_CLEANUP_TIME_US);
+			psCleanup->bCleanupTimerRunning = IMG_TRUE;
+		}
+		else
+		{
+			if (OSTimeHasTimePassed(psCleanup->pvTimeData))
+			{
+				eError = PVRSRV_ERROR_TIMEOUT_POLLING_FOR_VALUE;
+				psCleanup->bCleanupTimerRunning = IMG_FALSE;
+				OSTimeDestroy(psCleanup->pvTimeData);
+			}
+		}
+	}
+	else
+	{
+		if (psCleanup->bCleanupTimerRunning)
+		{
+			OSTimeDestroy(psCleanup->pvTimeData);
+		}
+	}
+
 	if (eError != PVRSRV_ERROR_RETRY)
 	{
-	    /* Free the Device Mem allocated */
+	    
 	    PVRSRVFreeDeviceMemKM(psCleanup->psDeviceNode,
 	            psCleanup->psHW2DContextMemInfo);
 	
-	    /* Finally, free the cleanup structure itself */
+	    
 	    OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP,
 				  sizeof(SGX_HW_2D_CONTEXT_CLEANUP),
 				  psCleanup,
 				  psCleanup->hBlockAlloc);
-	                  /*not nulling pointer, copy on stack*/
-	}                  
-
+	                  
+	}
 	return eError;
 }
 
@@ -1440,6 +1529,7 @@ IMG_HANDLE SGXRegisterHW2DContextKM(IMG_HANDLE				hDeviceNode,
 
 	psCleanup->hBlockAlloc = hBlockAlloc;
 	psCleanup->psDeviceNode = psDeviceNode;
+	psCleanup->bCleanupTimerRunning = IMG_FALSE;
 
 	psResItem = ResManRegisterRes(psPerProc->hResManContext,
 								  RESMAN_TYPE_HW_2D_CONTEXT,

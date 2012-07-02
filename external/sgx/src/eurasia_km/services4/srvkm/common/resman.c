@@ -615,10 +615,10 @@ static PVRSRV_ERROR FreeResourceByPtr(RESMAN_ITEM	*psItem,
 
 	if (eError != PVRSRV_ERROR_RETRY)
 	{
-		/* Remove this item from the resource list */
+		
 		List_RESMAN_ITEM_Remove(psItem);
 
-		/* Free memory for the resource item */
+		
 		OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP, sizeof(RESMAN_ITEM), psItem, IMG_NULL);
 	}
 
@@ -686,14 +686,14 @@ static PVRSRV_ERROR FreeResourceByCriteria(PRESMAN_CONTEXT	psResManContext,
 			eError = FreeResourceByPtr(psCurItem, bExecuteCallback, CLEANUP_WITH_POLL);
 			if (eError == PVRSRV_ERROR_RETRY)
 			{
-                RELEASE_SYNC_OBJ;        
+				RELEASE_SYNC_OBJ;
 				OSReleaseBridgeLock();
-				/* Give a chance for other threads to come in */
-				OSSleepms(20);
+				
+				OSSleepms(MAX_CLEANUP_TIME_WAIT_US/1000);
 				OSReacquireBridgeLock();
 				ACQUIRE_SYNC_OBJ;
 			}
-		} while (eError == PVRSRV_ERROR_RETRY);	
+		} while (eError == PVRSRV_ERROR_RETRY);
 	}
 
 	return eError;

@@ -25,10 +25,12 @@
 
 TARGET_BUILD_TYPE ?= release
 
+OUT_DIR ?= $(ANDROID_ROOT)/out
+
 ifeq ($(TARGET_BUILD_TYPE),debug)
-TARGET_ROOT := $(ANDROID_ROOT)/out/debug/target
+TARGET_ROOT := $(OUT_DIR)/debug/target
 else
-TARGET_ROOT := $(ANDROID_ROOT)/out/target
+TARGET_ROOT := $(OUT_DIR)/target
 endif
 
 TOOLCHAIN ?= $(TARGET_ROOT)/product/$(TARGET_PRODUCT)/obj

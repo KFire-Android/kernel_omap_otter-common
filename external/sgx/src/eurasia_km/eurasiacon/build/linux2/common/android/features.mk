@@ -112,10 +112,16 @@ UNITTEST_INCLUDES += $(ANDROID_ROOT)/frameworks/base/native/include
 endif
 
 ifeq ($(is_future_version),1)
-UNITTEST_INCLUDES += $(ANDROID_ROOT)/frameworks/native/include
-UNITTEST_INCLUDES += $(ANDROID_ROOT)/frameworks/native/opengl/include
+UNITTEST_INCLUDES += \
+ $(ANDROID_ROOT)/frameworks/native/include \
+ $(ANDROID_ROOT)/frameworks/native/opengl/include \
+ $(ANDROID_ROOT)/libnativehelper/include
+# FIXME: This is the old location for the JNI header.
+UNITTEST_INCLUDES += $(ANDROID_ROOT)/dalvik/libnativehelper/include
 else
-UNITTEST_INCLUDES += $(ANDROID_ROOT)/frameworks/base/opengl/include
+UNITTEST_INCLUDES += \
+ $(ANDROID_ROOT)/frameworks/base/opengl/include \
+ $(ANDROID_ROOT)/dalvik/libnativehelper/include
 endif
 
 # But it doesn't have OpenVG headers
@@ -174,15 +180,8 @@ endif
 # allocated from the framebuffer pool) which maximizes compatibility with
 # most 3rdparty display controllers. It is orthogonal to HWC support.
 #
-# SUPPORT_ANDROID_REFERENCE_COMPOSER_HAL enables the IMG HWC module and
-# depends on both of the above options (for now).
-#
 ifeq ($(is_at_least_honeycomb),1)
 SUPPORT_ANDROID_COMPOSER_HAL := 1
-ifeq ($(SUPPORT_ANDROID_REFERENCE_COMPOSER_HAL),1)
-# FIXME: Needs reworking
-#SUPPORT_ANDROID_COMPOSITION_BYPASS := 1
-endif
 endif
 
 ##############################################################################
@@ -279,6 +278,14 @@ endif
 #
 ifeq ($(is_at_least_icecream_sandwich_mr1),1)
 PVR_ANDROID_HAS_GRALLOC_USAGE_HW_VIDEO_ENCODER := 1
+endif
+
+##############################################################################
+# ICS and earlier should rate-limit composition by waiting for 3D renders
+# to complete in the compositor's eglSwapBuffers().
+#
+ifeq ($(is_future_version),0)
+PVR_ANDROID_COMPOSITOR_WAIT_FOR_RENDER := 1
 endif
 
 # Placeholder for future version handling

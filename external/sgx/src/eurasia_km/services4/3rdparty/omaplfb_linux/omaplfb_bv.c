@@ -344,11 +344,6 @@ static OMAPLFB_ERROR InitBltFBsTiler2D(OMAPLFB_DEVINFO *psDevInfo)
 	res = omap_ion_nonsecure_tiler_alloc(gpsIONClient, &sAllocData);
 	if (res < 0)
 	{
-		res = omap_ion_tiler_alloc(gpsIONClient, &sAllocData);
-	}
-	psPVRFBInfo->psIONHandle = sAllocData.handle;
-	if (res < 0)
-	{
 		printk(KERN_ERR DRIVER_PREFIX
 			"Could not allocate BltFBs\n");
 		return OMAPLFB_ERROR_INIT_FAILURE;
@@ -410,13 +405,14 @@ static void OMAPLFBDoBatching(struct rgz_blt_entry *prev_entry,
 		cur_bltparams->flags |= BVFLAG_BATCH_CONTINUE;
 	}
 
-	/* Ommited BVBATCH_DST since the destination is always the same
-	 * framebuffer descriptor per frame. On the first blit we don't
-	 * need to set all flags but the delta on consequent blits.
+	/*
+	 * On the first blit we don't need to set all flags but the delta on
+	 * consequent blits
 	 */
 	prev_bltparams = &prev_entry->bp;
 	cur_bltparams->batch = prev_bltparams->batch;
 	cur_bltparams->batchflags =
+		(prev_bltparams->dstgeom->format == cur_bltparams->dstgeom->format ? 0 : BVBATCH_DST) |
 		(prev_bltparams->src1.desc == cur_bltparams->src1.desc ? 0 : BVBATCH_SRC1) |
 		(prev_bltparams->src2.desc == cur_bltparams->src2.desc ? 0 : BVBATCH_SRC2) |
 		(bvrect_same_origin(&prev_bltparams->src1rect, &cur_bltparams->src1rect) ? 0 : BVBATCH_SRC1RECT_ORIGIN) |
@@ -425,6 +421,15 @@ static void OMAPLFBDoBatching(struct rgz_blt_entry *prev_entry,
 		(bvrect_same_size(&prev_bltparams->src1rect, &cur_bltparams->src1rect) ? 0 : BVBATCH_SRC1RECT_SIZE) |
 		(bvrect_same_size(&prev_bltparams->src2rect, &cur_bltparams->src2rect) ? 0 : BVBATCH_SRC2RECT_SIZE) |
 		(bvrect_same_size(&prev_bltparams->dstrect, &cur_bltparams->dstrect) ? 0 : BVBATCH_DSTRECT_SIZE);
+}
+
+static void OMAPLFBSetNV12Params(struct bvsurfgeom *geom, struct bvbuffdesc *desc)
+{
+	if (geom->format != OCDFMT_NV12)
+		return;
+
+	/* Fixup stride for NV12 format */
+	geom->virtstride = (desc->length * 2) / (geom->height * 3);
 }
 
 void OMAPLFBDoBlits(OMAPLFB_DEVINFO *psDevInfo, PDC_MEM_INFO *ppsMemInfos, struct omap_hwc_blit_data *blit_data, IMG_UINT32 ui32NumMemInfos)
@@ -449,6 +454,7 @@ void OMAPLFBDoBlits(OMAPLFB_DEVINFO *psDevInfo, PDC_MEM_INFO *ppsMemInfos, struc
 		entry->dstgeom.virtstride = psDevInfo->sFBInfo.uiBltFBsByteStride;
 		entry->bp.dstdesc = psPVRFBInfo->psBltFBsBvHndl[psPVRFBInfo->iBltFBsIdx];
 		entry->bp.dstgeom = &entry->dstgeom;
+		OMAPLFBSetNV12Params(entry->bp.dstgeom, entry->bp.dstdesc);
 
 		/* Src1 buffer data */
 		meminfo_ix = (unsigned int)entry->src1desc.auxptr;
@@ -488,6 +494,7 @@ void OMAPLFBDoBlits(OMAPLFB_DEVINFO *psDevInfo, PDC_MEM_INFO *ppsMemInfos, struc
 
 			entry->bp.src1.desc = pBvDesc;
 			entry->bp.src1geom = &entry->src1geom;
+			OMAPLFBSetNV12Params(entry->bp.src1geom, pBvDesc);
 		}
 
 		/* Src2 buffer data
@@ -523,6 +530,7 @@ void OMAPLFBDoBlits(OMAPLFB_DEVINFO *psDevInfo, PDC_MEM_INFO *ppsMemInfos, struc
 
 				entry->bp.src2.desc = pBvDesc;
 				entry->bp.src2geom = &entry->src2geom;
+				OMAPLFBSetNV12Params(entry->bp.src2geom, pBvDesc);
 			}
 		}
 		else

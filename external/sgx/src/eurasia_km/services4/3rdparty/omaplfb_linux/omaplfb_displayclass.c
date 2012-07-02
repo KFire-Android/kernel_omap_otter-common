@@ -388,7 +388,6 @@ static PVRSRV_ERROR CreateDCSwapChain(IMG_HANDLE hDevice,
 	OMAPLFB_BUFFER *psBuffer;
 	IMG_UINT32 i;
 	PVRSRV_ERROR eError;
-	IMG_UINT32 ui32BuffersToSkip;
 
 	UNREFERENCED_PARAMETER(ui32OEMFlags);
 	
@@ -431,10 +430,6 @@ static PVRSRV_ERROR CreateDCSwapChain(IMG_HANDLE hDevice,
 		eError = PVRSRV_ERROR_TOOMANYBUFFERS;
 		goto ExitUnLock;
 	}
-
-	
-	ui32BuffersToSkip = psDevInfo->sDisplayInfo.ui32MaxSwapChainBuffers - ui32BufferCount;
-
 	
 	if(psDstSurfAttrib->pixelformat != psDevInfo->sDisplayFormat.pixelformat
 	|| psDstSurfAttrib->sDims.ui32ByteStride != psDevInfo->sDisplayDim.ui32ByteStride
@@ -494,7 +489,7 @@ static PVRSRV_ERROR CreateDCSwapChain(IMG_HANDLE hDevice,
 
 	for(i=0; i<ui32BufferCount; i++)
 	{
-		IMG_UINT32 ui32SwapBuffer = i + ui32BuffersToSkip;
+		IMG_UINT32 ui32SwapBuffer = i;
 		IMG_UINT32 ui32BufferOffset = ui32SwapBuffer * (IMG_UINT32)psDevInfo->sFBInfo.ulRoundedBufferSize;
 		if (psDevInfo->sFBInfo.bIs2D)
 		{
@@ -1222,11 +1217,6 @@ static OMAPLFB_ERROR OMAPLFBInitIonOmap(OMAPLFB_DEVINFO *psDevInfo,
 	psPVRFBInfo->uiBytesPerPixel = psLINFBInfo->var.bits_per_pixel >> 3;
 	psPVRFBInfo->bIs2D = OMAPLFB_TRUE;
 	res = omap_ion_nonsecure_tiler_alloc(gpsIONClient, &sAllocData);
-	if (res < 0)
-	{
-		res = omap_ion_tiler_alloc(gpsIONClient, &sAllocData);
-	}
-	psPVRFBInfo->psIONHandle = sAllocData.handle;
 	if (res < 0)
 	{
 		printk(KERN_ERR DRIVER_PREFIX
