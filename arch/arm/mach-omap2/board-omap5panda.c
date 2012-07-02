@@ -54,8 +54,6 @@
 #ifdef CONFIG_OMAP_MUX
 static struct omap_board_mux board_mux[] __initdata = {
 	OMAP5_MUX(FREF_CLK1_OUT, OMAP_PIN_INPUT_PULLUP),
-	OMAP5_MUX(LLIA_WAKEREQIN, OMAP_PIN_OUTPUT | OMAP_PIN_OFF_NONE | OMAP_MUX_MODE6),
-	OMAP5_MUX(HSI2_CAFLAG, OMAP_PIN_OUTPUT | OMAP_PIN_OFF_NONE | OMAP_MUX_MODE6),
 	OMAP5_MUX(USBB2_HSIC_STROBE, OMAP_PIN_INPUT | OMAP_MUX_MODE0),
 	OMAP5_MUX(USBB2_HSIC_DATA, OMAP_PIN_INPUT | OMAP_MUX_MODE0),
 	{ .reg_offset = OMAP_MUX_TERMINATOR },
@@ -762,6 +760,11 @@ static void __init omap_ehci_ohci_init(void)
 		clk_set_rate(phy_ref_clk, 19200000);
 		clk_enable(phy_ref_clk);
 	}
+
+	omap_mux_init_gpio(GPIO_HUB_NRESET,
+			OMAP_PIN_OUTPUT | OMAP_PIN_OFF_NONE | OMAP_MUX_MODE6);
+	omap_mux_init_gpio(GPIO_ETH_NRESET,
+			OMAP_PIN_OUTPUT | OMAP_PIN_OFF_NONE | OMAP_MUX_MODE6);
 
 	usbhs_init(&usbhs_bdata);
 	return;
