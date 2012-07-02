@@ -59,7 +59,7 @@
 
 #define DISPC_MAX_NR_ISRS		8
 
-static struct clockdomain *l3_1_clkdm;
+static struct clockdomain *l3_1_clkdm, *l3_2_clkdm;
 
 struct omap_dispc_isr_data {
 	omap_dispc_isr_t	isr;
@@ -3304,10 +3304,13 @@ static void _omap_dispc_initial_config(void)
 		dispc_write_reg(DISPC_DIVISOR, l);
 	}
 
-	if (cpu_is_omap44xx())
+	if (cpu_is_omap44xx()) {
 		l3_1_clkdm = clkdm_lookup("l3_1_clkdm");
-	else if (cpu_is_omap54xx() && (omap_rev() <= OMAP5430_REV_ES1_0))
+		l3_2_clkdm = clkdm_lookup("l3_2_clkdm");
+	} else if (cpu_is_omap54xx() && (omap_rev() <= OMAP5430_REV_ES1_0)) {
 		l3_1_clkdm = clkdm_lookup("l3main1_clkdm");
+		l3_2_clkdm = clkdm_lookup("l3main2_clkdm");
+	}
 
 	/* FUNCGATED */
 	if (dss_has_feature(FEAT_FUNCGATED))
@@ -3421,8 +3424,10 @@ static int dispc_runtime_suspend(struct device *dev)
 	 * Restore L3_1 CD to HW_AUTO, when DSS module idles.
 	 */
 	if (cpu_is_omap44xx() || (cpu_is_omap54xx() &&
-			(omap_rev() <= OMAP5430_REV_ES1_0)))
+			(omap_rev() <= OMAP5430_REV_ES1_0))) {
 		clkdm_allow_idle(l3_1_clkdm);
+		clkdm_allow_idle(l3_2_clkdm);
+	}
 
 	return 0;
 }
@@ -3455,8 +3460,10 @@ static int dispc_runtime_resume(struct device *dev)
 	 * is ON.
 	 */
 	if (cpu_is_omap44xx() || (cpu_is_omap54xx() &&
-			(omap_rev() <= OMAP5430_REV_ES1_0)))
+			(omap_rev() <= OMAP5430_REV_ES1_0))) {
 		clkdm_deny_idle(l3_1_clkdm);
+		clkdm_deny_idle(l3_2_clkdm);
+	}
 
 	dispc_restore_context();
 
