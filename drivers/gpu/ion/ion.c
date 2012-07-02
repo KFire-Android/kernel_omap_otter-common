@@ -370,6 +370,13 @@ int ion_phys(struct ion_client *client, struct ion_handle *handle,
 }
 EXPORT_SYMBOL(ion_phys);
 
+int ion_handle_phys(struct ion_handle *handle,
+	ion_phys_addr_t *addr, size_t *len)
+{
+	return ion_phys(handle->client, handle, addr, len);
+}
+EXPORT_SYMBOL(ion_handle_phys);
+
 int ion_phys_frm_dev(struct ion_device *dev, struct ion_handle *handle,
 	     ion_phys_addr_t *addr, size_t *len)
 {

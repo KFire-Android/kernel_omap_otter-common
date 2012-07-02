@@ -43,6 +43,7 @@
 #include <mach/emif.h>
 #include <mach/lpddr2-elpida.h>
 #include <mach/dmm.h>
+#include <mach/omap4_ion.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
@@ -64,6 +65,7 @@
 
 #include <plat/dmtimer.h>
 
+#include "omap_ram_console.h"
 #include "common-board-devices.h"
 #include "mux.h"
 #include "hsmmc.h"
@@ -72,7 +74,6 @@
 #include "pm.h"
 #include "prm-regbits-44xx.h"
 #include "prm44xx.h"
-#include "omap4_ion.h"
 #include "voltage.h"
 
 #include "board-4430kc1-tablet.h"
@@ -828,27 +829,23 @@ static void __init omap_4430sdp_map_io(void)
 
 static void __init omap_4430sdp_reserve(void)
 {
-#ifdef CONFIG_ION_OMAP_DYNAMIC
-	/* do the static reservations first */
-	memblock_remove(PHYS_ADDR_DUCATI_MEM, PHYS_ADDR_DUCATI_SIZE);
+	omap_init_ram_size();
 
-	/* ipu needs to recognize secure input buffer area as well */
-	omap_ipu_set_static_mempool(PHYS_ADDR_DUCATI_MEM, PHYS_ADDR_DUCATI_SIZE);
-#else
+#ifdef CONFIG_ION_OMAP
+	omap_ion_init();
+#endif
+	omap_ram_console_init(OMAP_RAM_CONSOLE_START_DEFAULT, OMAP_RAM_CONSOLE_SIZE_DEFAULT);
+
 	/* do the static reservations first */
 	memblock_remove(PHYS_ADDR_SMC_MEM, PHYS_ADDR_SMC_SIZE);
 	memblock_remove(PHYS_ADDR_DUCATI_MEM, PHYS_ADDR_DUCATI_SIZE);
 	/* ipu needs to recognize secure input buffer area as well */
 	omap_ipu_set_static_mempool(PHYS_ADDR_DUCATI_MEM, PHYS_ADDR_DUCATI_SIZE + OMAP4_ION_HEAP_SECURE_INPUT_SIZE);
-#endif
 #ifdef CONFIG_OMAP_REMOTE_PROC_DSP
 	memblock_remove(PHYS_ADDR_TESLA_MEM, PHYS_ADDR_TESLA_SIZE);
 	omap_dsp_set_static_mempool(PHYS_ADDR_TESLA_MEM, PHYS_ADDR_TESLA_SIZE);
 #endif
 
-#ifdef CONFIG_ION_OMAP
-	omap_ion_init();
-#endif
 	omap_reserve();
 }
 
