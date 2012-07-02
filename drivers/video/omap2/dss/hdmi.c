@@ -517,13 +517,13 @@ static int hdmi_power_on(struct omap_dss_device *dssdev)
 	/* Make selection of HDMI in DSS */
 	dss_select_hdmi_venc_clk_source(DSS_HDMI_M_PCLK);
 
-	/*
-	 * Select the DISPC clock source as PRCM clock in case when both LCD
-	 * panels are disabled and we cannot use DSI PLL for this purpose.
+	/* Select the dispc clock source as PRCM clock, to ensure that it is not
+	 * DSI PLL source as the clock selected by DSI PLL might not be
+	 * sufficient for the resolution selected / that can be changed
+	 * dynamically by user. This can be moved to single location , say
+	 * Boardfile.
 	 */
-	if (!dispc_is_channel_enabled(OMAP_DSS_CHANNEL_LCD) &&
-	    !dispc_is_channel_enabled(OMAP_DSS_CHANNEL_LCD2))
-		dss_select_dispc_clk_source(dssdev->clocks.dispc.dispc_fclk_src);
+	dss_select_dispc_clk_source(dssdev->clocks.dispc.dispc_fclk_src);
 
 	/* bypass TV gamma table */
 	dispc_enable_gamma_table(0);

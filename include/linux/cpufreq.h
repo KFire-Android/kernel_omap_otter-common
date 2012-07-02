@@ -331,6 +331,11 @@ static inline unsigned int cpufreq_quick_get(unsigned int cpu)
 }
 #endif
 
+#if defined(CONFIG_CPU_FREQ_GOV_INTERACTIVE) && \
+					defined(CONFIG_OMAP4_DPLL_CASCADING)
+extern void cpufreq_interactive_set_timer_rate(unsigned long val,
+							unsigned int reset);
+#endif
 
 /*********************************************************************
  *                       CPUFREQ DEFAULT GOVERNOR                    *

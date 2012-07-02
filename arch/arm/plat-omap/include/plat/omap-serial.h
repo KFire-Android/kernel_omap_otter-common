@@ -146,6 +146,11 @@ struct uart_omap_port {
 	unsigned char		wer;
 	unsigned char		scr;
 
+#ifdef CONFIG_OMAP4_DPLL_CASCADING
+	unsigned int            baud_rate;
+	struct notifier_block   nb;
+#endif
+
 	int			use_dma;
 	bool			suspended;
 	/*

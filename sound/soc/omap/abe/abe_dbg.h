@@ -206,6 +206,7 @@ struct omap_abe {
 	u32 muted_gains_decibel[MAX_NBGAIN_CMEM];
 	u32 desired_gains_linear[MAX_NBGAIN_CMEM];
 	u32 desired_ramp_delay_ms[MAX_NBGAIN_CMEM];
+	u32 mcpdm_path;
 	int pp_buf_id;
 	int pp_buf_id_next;
 	int pp_buf_addr[4];

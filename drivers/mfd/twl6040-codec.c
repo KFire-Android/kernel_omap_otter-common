@@ -523,17 +523,11 @@ static irqreturn_t twl6040_naudint_handler(int irq, void *data)
 	return IRQ_HANDLED;
 }
 
-static int twl6040_power_up_completion(struct twl6040 *twl6040,
-				       int naudint)
+static int twl6040_is_powered(struct twl6040 *twl6040)
 {
-	int time_left;
-	int round = 0;
-	int ret = 0;
-	int retry = 0;
-	u8 intid;
-	u8 ncpctl;
-	u8 ldoctl;
-	u8 lppllctl;
+	int ncpctl;
+	int ldoctl;
+	int lppllctl;
 	u8 ncpctl_exp;
 	u8 ldoctl_exp;
 	u8 lppllctl_exp;
@@ -547,11 +541,51 @@ static int twl6040_power_up_completion(struct twl6040 *twl6040,
 	/* LPPLLCTL expected value: Low-Power PLL enabled */
 	lppllctl_exp = TWL6040_LPLLENA;
 
+	ncpctl = twl6040_reg_read(twl6040, TWL6040_REG_NCPCTL);
+	if (ncpctl < 0)
+		return 0;
+
+	ldoctl = twl6040_reg_read(twl6040, TWL6040_REG_LDOCTL);
+	if (ldoctl < 0)
+		return 0;
+
+	lppllctl = twl6040_reg_read(twl6040, TWL6040_REG_LPPLLCTL);
+	if (lppllctl < 0)
+		return 0;
+
+	if ((ncpctl != ncpctl_exp) ||
+	    (ldoctl != ldoctl_exp) ||
+	    (lppllctl != lppllctl_exp)) {
+		dev_warn(twl6040->dev,
+			"NCPCTL: 0x%02x (should be 0x%02x)\n"
+			"LDOCTL: 0x%02x (should be 0x%02x)\n"
+			"LPLLCTL: 0x%02x (should be 0x%02x)\n",
+			ncpctl, ncpctl_exp,
+			ldoctl, ldoctl_exp,
+			lppllctl, lppllctl_exp);
+		return 0;
+	}
+
+	return 1;
+}
+
+static int twl6040_power_up_completion(struct twl6040 *twl6040,
+				       int naudint)
+{
+	int time_left;
+	int round = 0;
+	int ret = 0;
+	u8 intid;
+
 	do {
 		INIT_COMPLETION(twl6040->ready);
 		gpio_set_value(twl6040->audpwron, 1);
 		time_left = wait_for_completion_timeout(&twl6040->ready,
 							msecs_to_jiffies(700));
+
+		if (twl6040_is_powered(twl6040))
+			return 0;
+
 		if (!time_left) {
 			intid = twl6040_reg_read(twl6040, TWL6040_REG_INTID);
 			if (!(intid & TWL6040_READYINT)) {
@@ -560,38 +594,14 @@ static int twl6040_power_up_completion(struct twl6040 *twl6040,
 				return -ETIMEDOUT;
 			}
 		}
+
 		/*
 		 * Power on seemingly completed.
-		 * Look for clues that the twl6040 might be still booting.
+		 * READYINT received, but not in expected state, retry.
 		 */
-
-		retry = 0;
-		ncpctl = twl6040_reg_read(twl6040, TWL6040_REG_NCPCTL);
-		if (ncpctl != ncpctl_exp)
-			retry++;
-
-		ldoctl = twl6040_reg_read(twl6040, TWL6040_REG_LDOCTL);
-		if (ldoctl != ldoctl_exp)
-			retry++;
-
-		lppllctl = twl6040_reg_read(twl6040, TWL6040_REG_LPPLLCTL);
-		if (lppllctl != lppllctl_exp)
-			retry++;
-
-		if (retry) {
-			dev_err(twl6040->dev,
-				"NCPCTL: 0x%02x (should be 0x%02x)\n"
-				"LDOCTL: 0x%02x (should be 0x%02x)\n"
-				"LPLLCTL: 0x%02x (should be 0x%02x)\n",
-				ncpctl, ncpctl_exp,
-				ldoctl, ldoctl_exp,
-				lppllctl, lppllctl_exp);
-			round++;
-			gpio_set_value(twl6040->audpwron, 0);
-			usleep_range(1000, 1500);
-			continue;
-		}
-	} while (round && (round < 3));
+		gpio_set_value(twl6040->audpwron, 0);
+		usleep_range(1000, 1500);
+	} while (round++ < 3);
 
 	if (round >= 3) {
 		dev_err(twl6040->dev,

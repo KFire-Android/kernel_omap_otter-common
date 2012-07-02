@@ -15,12 +15,13 @@
 #ifndef GCDBGLOG_H
 #define GCDBGLOG_H
 
-#include <linux/bltsville.h>
+#include "list.h"
+#include "bltsville.h"
 struct gcmmucontext;
 
 
 /*******************************************************************************
- * Debug logging enable switch.
+ * Debug logging switches.
  */
 
 /* Enables internal gccore logging backend. */
@@ -36,6 +37,7 @@ struct gcmmucontext;
 #if GCDEBUG_ENABLE && GCDEBUG_LINUXLOGS
 #error GCDEBUG_ENABLE and GCDEBUG_LINUXLOGS cannot be enabled simultaneously.
 #endif
+
 
 /*******************************************************************************
  * Dumping interface macro for release mode.
@@ -56,32 +58,33 @@ struct gcmmucontext;
 #define GCDUMPBUFFER(...)
 #define GCDUMPARENA(...)
 #define GCDUMPARENAS(...)
-#define GCGPUSTATUS(...)
 #endif
 
 #if !GCDEBUG_ENABLE
-#define GCDBG_REPORT_MISSING() \
-	printk(KERN_INFO "gcx logging is not integrated.\n")
+#define GCDBG_REPORT_MISSING(file, line)				\
+	printk(KERN_INFO "(%s:%d) gcx logging is not integrated.\n",	\
+		   file, line)
 
 #define GCDBG_SHOWENABLED(s) \
-	GCDBG_REPORT_MISSING()
+	GCDBG_REPORT_MISSING(__FILE__, __LINE__)
 
 #define GCDBG_ENABLEDUMP() \
-	GCDBG_REPORT_MISSING()
+	GCDBG_REPORT_MISSING(__FILE__, __LINE__)
 
 #define GCDBG_DISABLEDUMP() \
-	GCDBG_REPORT_MISSING()
+	GCDBG_REPORT_MISSING(__FILE__, __LINE__)
 
 #define GCDBG_SETFILTER(filtername, zone) \
-	GCDBG_REPORT_MISSING()
+	GCDBG_REPORT_MISSING(__FILE__, __LINE__)
 
 #define GCDBG_FLUSHDUMP(s) \
-	GCDBG_REPORT_MISSING()
+	GCDBG_REPORT_MISSING(__FILE__, __LINE__)
 
 #define GCDBG_RESETDUMP() \
-	GCDBG_REPORT_MISSING()
+	GCDBG_REPORT_MISSING(__FILE__, __LINE__)
 
 #endif
+
 
 /*******************************************************************************
  * Dumping macros not specific to a particular logging backend.
@@ -126,6 +129,9 @@ do { \
 
 #endif
 
+#define GC_FUNC_ENTER "++"
+#define GC_FUNC_EXIT "--"
+
 
 /*******************************************************************************
  * Dumping macros for internal gccore logging backend.
@@ -133,7 +139,7 @@ do { \
 
 #if GCDEBUG_ENABLE
 
-#define GCDBGFILTER() \
+#define GCDBGFILTER \
 	g_gcdbgfilter
 
 #define GCDBG_INIT() \
@@ -143,20 +149,17 @@ do { \
 	gcdbg_exit()
 
 #define GCDBG_FILTERDEF(name, initzone, ...) \
-	static struct gcdbgfilter GCDBGFILTER(); \
-	\
-	struct gcdbgfilter *name ## _dbgfilter(void) \
-	{ \
-		return &GCDBGFILTER(); \
-	} \
-	\
-	static struct gcdbgfilter GCDBGFILTER() =	    \
-	{						    \
-		.link = LIST_HEAD_INIT(GCDBGFILTER().link), \
+	static struct gcdbgfilter GCDBGFILTER = { \
+		.link = LIST_HEAD_INIT(GCDBGFILTER.link), \
 		.filtername = #name, \
 		.zone = initzone, \
 		.zonename = { __VA_ARGS__, NULL } \
-	};
+	}; \
+	\
+	struct gcdbgfilter *name ## _dbgfilter(void) \
+	{ \
+		return &GCDBGFILTER; \
+	}
 
 #define GCDBG_REGISTER(name) \
 do { \
@@ -183,38 +186,34 @@ do { \
 	gc_dump_reset()
 
 #define GCENTER(zone) \
-	gc_dump_string(&GCDBGFILTER(), zone, "++" GC_MOD_PREFIX "\n", \
+	gc_dump_string(&GCDBGFILTER, zone, GC_FUNC_ENTER GC_MOD_PREFIX "\n", \
 			__func__, __LINE__)
 
 #define GCEXIT(zone) \
-	gc_dump_string(&GCDBGFILTER(), zone, "--" GC_MOD_PREFIX "\n", \
+	gc_dump_string(&GCDBGFILTER, zone, GC_FUNC_EXIT GC_MOD_PREFIX "\n", \
 			__func__, __LINE__)
 
 #define GCENTERARG(zone, msg, ...) \
-	gc_dump_string(&GCDBGFILTER(), zone, "++" GC_MOD_PREFIX msg, \
+	gc_dump_string(&GCDBGFILTER, zone, GC_FUNC_ENTER GC_MOD_PREFIX msg, \
 			__func__, __LINE__, ##__VA_ARGS__)
 
 #define GCEXITARG(zone, msg, ...) \
-	gc_dump_string(&GCDBGFILTER(), zone, "--" GC_MOD_PREFIX msg, \
+	gc_dump_string(&GCDBGFILTER, zone, GC_FUNC_EXIT GC_MOD_PREFIX msg, \
 			__func__, __LINE__, ##__VA_ARGS__)
 
 #define GCDBG(zone, msg, ...) \
-	gc_dump_string(&GCDBGFILTER(), zone, GC_MOD_PREFIX msg,	\
+	gc_dump_string(&GCDBGFILTER, zone, GC_MOD_PREFIX msg,	\
 			__func__, __LINE__, ##__VA_ARGS__)
 
 #define GCERR(msg, ...) \
-	gc_dump_string(NULL, 0, GC_MOD_PREFIX msg,	\
+	gc_dump_string(NULL, 0, GC_MOD_PREFIX "[ERROR] " msg,	\
 			__func__, __LINE__, ##__VA_ARGS__)
 
 #define GCDUMPSTRING(msg, ...) \
 	gc_dump_string(NULL, 0, msg, ##__VA_ARGS__)
 
 #define GCDUMPBUFFER(zone, ptr, gpuaddr, datasize) \
-	gc_dump_cmd_buffer(&GCDBGFILTER(), zone, ptr, gpuaddr, datasize)
-
-#define GCGPUSTATUS(zone, acknowledge) \
-	gc_gpu_status(&GCDBGFILTER(), zone, (char *) __func__, __LINE__, \
-			acknowledge)
+	gc_dump_cmd_buffer(&GCDBGFILTER, zone, ptr, gpuaddr, datasize)
 
 #endif
 
@@ -231,16 +230,18 @@ do { \
 #define GCDBG_REGISTER(...)
 
 #define GCENTER(zone) \
-	GCDBG(zone, "++ %s(%d)\n", __func__, __LINE__)
+	GCDBG(zone, GC_FUNC_ENTER " %s(%d)\n", __func__, __LINE__)
 
 #define GCEXIT(zone) \
-	GCDBG(zone, "-- %s(%d)\n", __func__, __LINE__)
+	GCDBG(zone, GC_FUNC_EXIT " %s(%d)\n", __func__, __LINE__)
 
 #define GCENTERARG(zone, msg, ...) \
-	GCDBG(zone, "++ %s(%d) " msg "\n", __func__, __LINE__, ##__VA_ARGS__)
+	GCDBG(zone, GC_FUNC_ENTER " %s(%d) " msg "\n", \
+	      __func__, __LINE__, ##__VA_ARGS__)
 
 #define GCEXITARG(zone, msg, ...) \
-	GCDBG(zone, "-- %s(%d) " msg "\n", __func__, __LINE__, ##__VA_ARGS__)
+	GCDBG(zone, GC_FUNC_EXIT " %s(%d) " msg "\n", \
+	      __func__, __LINE__, ##__VA_ARGS__)
 
 #define GCDBG(zone, msg, ...) \
 	dev_dbg(gc_get_dev(), msg, ##__VA_ARGS__)
@@ -252,7 +253,6 @@ do { \
 	GCDBG(0, msg, ##__VA_ARGS__)
 
 #define GCDUMPBUFFER(...)
-#define GCGPUSTATUS(...)
 
 #endif
 
@@ -298,7 +298,7 @@ struct gccommandinfo {
 
 /* Parse the specified command buffer and fill in the structure. */
 int gc_parse_command_buffer(unsigned int *buffer, unsigned int size,
-				struct gccommandinfo *info);
+			    struct gccommandinfo *info);
 
 
 /*******************************************************************************
@@ -326,14 +326,14 @@ void gcdbg_exit(void);
  */
 
 /* Print GPU status. */
-void gc_gpu_status(struct gcdbgfilter *filter, unsigned int zone,
-			char *function, int line, unsigned int *acknowledge);
+void gc_dump_status(struct gcdbgfilter *filter, unsigned int zone,
+		    char *function, int line);
 
 /* String dumping. */
 void gc_dump_string(struct gcdbgfilter *filter, unsigned int zone,
-			const char *message, ...);
+		    const char *message, ...);
 void gc_dump_string_sized(struct gcdbgfilter *filter, unsigned int zone,
-				unsigned int argsize, const char *message, ...);
+			  unsigned int argsize, const char *message, ...);
 
 /* Dump command buffer. */
 void gc_dump_cmd_buffer(struct gcdbgfilter *filter, unsigned int zone,
@@ -341,31 +341,31 @@ void gc_dump_cmd_buffer(struct gcdbgfilter *filter, unsigned int zone,
 
 /* Dump generic buffer. */
 void gc_dump_buffer(struct gcdbgfilter *filter, unsigned int zone,
-			void *ptr, unsigned int gpuaddr, unsigned int datasize);
+		    void *ptr, unsigned int gpuaddr, unsigned int datasize);
 void gc_dump_phys_buffer(struct gcdbgfilter *filter, unsigned int zone,
-				struct gcmmucontext *gcmmucontext,
-				unsigned int gpuaddr, unsigned int datasize);
+			 struct gcmmucontext *gcmmucontext,
+			 unsigned int gpuaddr, unsigned int datasize);
 
 /* Dump surface. */
 void gc_dump_surface(struct gcdbgfilter *filter, unsigned int zone,
-			void *ptr, unsigned int surfwidth,
-			unsigned int surfheight, unsigned int surfbpp,
-			unsigned int x1, unsigned int y1,
-			unsigned int x2, unsigned int y2,
-			unsigned int gpuaddr);
+		     void *ptr, unsigned int surfwidth,
+		     unsigned int surfheight, unsigned int surfbpp,
+		     unsigned int x1, unsigned int y1,
+		     unsigned int x2, unsigned int y2,
+		     unsigned int gpuaddr);
 void gc_dump_phys_surface(struct gcdbgfilter *filter, unsigned int zone,
-				struct gcmmucontext *gcmmucontext,
-				unsigned int surfwidth, unsigned int surfheight,
-				unsigned int surfbpp,
-				unsigned int x1, unsigned int y1,
-				unsigned int x2, unsigned int y2,
-				unsigned int gpuaddr);
+			  struct gcmmucontext *gcmmucontext,
+			  unsigned int surfwidth, unsigned int surfheight,
+			  unsigned int surfbpp,
+			  unsigned int x1, unsigned int y1,
+			  unsigned int x2, unsigned int y2,
+			  unsigned int gpuaddr);
 
 /* Dump MMU content. */
 void gc_dump_mmu_arenas(struct gcdbgfilter *filter, unsigned int zone,
 			char *message, struct list_head *head);
 void gc_dump_mmu(struct gcdbgfilter *filter, unsigned int zone,
-			struct gcmmucontext *gcmmucontext);
+		 struct gcmmucontext *gcmmucontext);
 
 
 /*******************************************************************************
@@ -374,14 +374,14 @@ void gc_dump_mmu(struct gcdbgfilter *filter, unsigned int zone,
 
 /* Fill surface using its virtual GPU address. */
 void gc_fill_phys_surface(struct gcdbgfilter *filter, unsigned int zone,
-				struct gcmmucontext *gcmmucontext,
-				unsigned int surfwidth,
-				unsigned int surfheight,
-				unsigned int surfbpp,
-				unsigned int x1, unsigned int y1,
-				unsigned int x2, unsigned int y2,
-				unsigned int gpuaddr,
-				unsigned int fillcolor);
+			  struct gcmmucontext *gcmmucontext,
+			  unsigned int surfwidth,
+			  unsigned int surfheight,
+			  unsigned int surfbpp,
+			  unsigned int x1, unsigned int y1,
+			  unsigned int x2, unsigned int y2,
+			  unsigned int gpuaddr,
+			  unsigned int fillcolor);
 
 
 /*******************************************************************************

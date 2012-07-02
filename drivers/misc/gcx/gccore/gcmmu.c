@@ -23,20 +23,23 @@
 
 #define GCZONE_NONE		0
 #define GCZONE_ALL		(~0U)
-#define GCZONE_MAPPING		(1 << 0)
-#define GCZONE_CONTEXT		(1 << 1)
-#define GCZONE_MASTER		(1 << 2)
-#define GCZONE_FIXUP		(1 << 3)
-#define GCZONE_FLUSH		(1 << 4)
-#define GCZONE_ARENA		(1 << 5)
+#define GCZONE_INIT		(1 << 0)
+#define GCZONE_MAPPING		(1 << 1)
+#define GCZONE_CONTEXT		(1 << 2)
+#define GCZONE_MASTER		(1 << 3)
+#define GCZONE_FIXUP		(1 << 4)
+#define GCZONE_FLUSH		(1 << 5)
+#define GCZONE_ARENA		(1 << 6)
 
 GCDBG_FILTERDEF(mmu, GCZONE_NONE,
+		"init",
 		"mapping",
 		"context",
 		"master",
 		"fixup",
 		"flush",
 		"arena")
+
 
 /*******************************************************************************
  * Internal definitions.
@@ -51,6 +54,31 @@ struct gcmmustlbblock {
 	struct gcmmustlbblock *next;
 };
 
+
+/*******************************************************************************
+ * Call back to enable MMU.
+ */
+
+static void event_enable_mmu(struct gcevent *gcevent, unsigned int *flags)
+{
+	GCENTER(GCZONE_INIT);
+
+	/*
+	* Enable MMU. For security reasons, once it is enabled,
+	* the only way to disable is to reset the system.
+	*/
+	gc_write_reg(
+		GCREG_MMU_CONTROL_Address,
+		GCSETFIELDVAL(0, GCREG_MMU_CONTROL, ENABLE, ENABLE));
+
+	/* After MMU command buffer is processed, FE will stop.
+	 * Let the control thread know that FE needs to be restarted. */
+	*flags |= GC_CMDBUF_START_FE;
+
+	GCEXIT(GCZONE_INIT);
+}
+
+
 /*******************************************************************************
  * Arena record management.
  */
@@ -61,6 +89,8 @@ static enum gcerror get_arena(struct gcmmu *gcmmu, struct gcmmuarena **arena)
 	struct gcmmuarena *temp;
 
 	GCENTER(GCZONE_ARENA);
+
+	GCLOCK(&gcmmu->lock);
 
 	if (list_empty(&gcmmu->vacarena)) {
 		temp = kmalloc(sizeof(struct gcmmuarena), GFP_KERNEL);
@@ -80,14 +110,16 @@ static enum gcerror get_arena(struct gcmmu *gcmmu, struct gcmmuarena **arena)
 	*arena = temp;
 
 exit:
+	GCUNLOCK(&gcmmu->lock);
+
 	GCEXITARG(GCZONE_ARENA, "gc%s = 0x%08X\n",
 		(gcerror == GCERR_NONE) ? "result" : "error", gcerror);
 	return gcerror;
 }
 
 static inline bool siblings(struct list_head *head,
-				struct list_head *arenahead1,
-				struct list_head *arenahead2)
+			    struct list_head *arenahead1,
+			    struct list_head *arenahead2)
 {
 	struct gcmmuarena *arena1;
 	struct gcmmuarena *arena2;
@@ -343,34 +375,39 @@ enum gcerror gcmmu_init(struct gccorecontext *gccorecontext)
 {
 	enum gcerror gcerror;
 	struct gcmmu *gcmmu = &gccorecontext->gcmmu;
-	unsigned int safecount;
-	unsigned int *logical;
-	unsigned int i;
 
-	GCENTER(GCZONE_CONTEXT);
+	GCENTER(GCZONE_INIT);
 
-	/* Allocate the safe zone. */
-	gcerror = gc_alloc_cached(&gcmmu->safezone, GCMMU_SAFE_ZONE_SIZE);
+	/* Initialize access lock. */
+	GCLOCK_INIT(&gcmmu->lock);
+
+	/* Allocate one page. */
+	gcerror = gc_alloc_noncached(&gcmmu->gcpage, PAGE_SIZE);
 	if (gcerror != GCERR_NONE) {
-		GCERR("failed to allocate MMU safe zone.\n");
+		GCERR("failed to allocate MMU management buffer.\n");
 		gcerror = GCERR_SETGRP(gcerror, GCERR_MMU_SAFE_ALLOC);
 		goto exit;
 	}
 
-	/* Initialize safe zone to a value. */
-	safecount = GCMMU_SAFE_ZONE_SIZE / sizeof(unsigned int);
-	logical = gcmmu->safezone.logical;
-	for (i = 0; i < safecount; i += 1)
-		logical[i] = 0xDEADC0DE;
+	/* Determine the location of the physical command buffer. */
+	gcmmu->cmdbufphys = gcmmu->gcpage.physical;
+	gcmmu->cmdbuflog = gcmmu->gcpage.logical;
+	gcmmu->cmdbufsize = PAGE_SIZE - GCMMU_SAFE_ZONE_SIZE;
 
-	gc_flush_region(gcmmu->safezone.physical, gcmmu->safezone.logical,
-			0, safecount * sizeof(unsigned int));
+	/* Determine the location of the safe zone. */
+	gcmmu->safezonephys = gcmmu->gcpage.physical + gcmmu->cmdbufsize;
+	gcmmu->safezonelog = (unsigned int *) ((unsigned char *)
+		gcmmu->gcpage.logical + gcmmu->cmdbufsize);
+	gcmmu->safezonesize = GCMMU_SAFE_ZONE_SIZE;
+
+	/* Reset the master table. */
+	gcmmu->master = ~0U;
 
 	/* Initialize the list of vacant arenas. */
 	INIT_LIST_HEAD(&gcmmu->vacarena);
 
 exit:
-	GCEXITARG(GCZONE_CONTEXT, "gc%s = 0x%08X\n",
+	GCEXITARG(GCZONE_INIT, "gc%s = 0x%08X\n",
 		(gcerror == GCERR_NONE) ? "result" : "error", gcerror);
 	return gcerror;
 }
@@ -381,10 +418,10 @@ void gcmmu_exit(struct gccorecontext *gccorecontext)
 	struct list_head *head;
 	struct gcmmuarena *arena;
 
-	GCENTER(GCZONE_CONTEXT);
+	GCENTER(GCZONE_INIT);
 
 	/* Free the safe zone. */
-	gc_free_cached(&gcmmu->safezone);
+	gc_free_noncached(&gcmmu->gcpage);
 
 	/* Free vacant arena list. */
 	while (!list_empty(&gcmmu->vacarena)) {
@@ -394,11 +431,12 @@ void gcmmu_exit(struct gccorecontext *gccorecontext)
 		kfree(arena);
 	}
 
-	GCEXIT(GCZONE_CONTEXT);
+	GCEXIT(GCZONE_INIT);
 }
 
 enum gcerror gcmmu_create_context(struct gccorecontext *gccorecontext,
-					struct gcmmucontext *gcmmucontext)
+				  struct gcmmucontext *gcmmucontext,
+				  pid_t pid)
 {
 	enum gcerror gcerror;
 	struct gcmmu *gcmmu = &gccorecontext->gcmmu;
@@ -416,9 +454,18 @@ enum gcerror gcmmu_create_context(struct gccorecontext *gccorecontext,
 	/* Reset the context. */
 	memset(gcmmucontext, 0, sizeof(struct gcmmucontext));
 
+	/* Initialize access lock. */
+	GCLOCK_INIT(&gcmmucontext->lock);
+
 	/* Initialize arena lists. */
 	INIT_LIST_HEAD(&gcmmucontext->vacant);
 	INIT_LIST_HEAD(&gcmmucontext->allocated);
+
+	/* Mark context as dirty. */
+	gcmmucontext->dirty = true;
+
+	/* Set PID. */
+	gcmmucontext->pid = pid;
 
 	/* Allocate MTLB table. */
 	gcerror = gc_alloc_cached(&gcmmucontext->master, GCMMU_MTLB_SIZE);
@@ -441,8 +488,8 @@ enum gcerror gcmmu_create_context(struct gccorecontext *gccorecontext,
 	gcmmucontext->mmuconfig.reg.address_mask
 		= GCREG_MMU_CONFIGURATION_MASK_ADDRESS_ENABLED;
 	gcmmucontext->mmuconfig.reg.address
-		= GETFIELD(gcmmucontext->master.physical,
-				GCREG_MMU_CONFIGURATION, ADDRESS);
+		= GCGETFIELD(gcmmucontext->master.physical,
+			     GCREG_MMU_CONFIGURATION, ADDRESS);
 
 	/* Allocate the first vacant arena. */
 	gcerror = get_arena(gcmmu, &arena);
@@ -456,6 +503,11 @@ enum gcerror gcmmu_create_context(struct gccorecontext *gccorecontext,
 	list_add(&arena->link, &gcmmucontext->vacant);
 	GCDUMPARENA(GCZONE_ARENA, "initial vacant arena", arena);
 
+	/* Map the command queue. */
+	gcerror = gcqueue_map(gccorecontext, gcmmucontext);
+	if (gcerror != GCERR_NONE)
+		goto exit;
+
 	/* Reference MMU. */
 	gcmmu->refcount += 1;
 
@@ -465,13 +517,12 @@ enum gcerror gcmmu_create_context(struct gccorecontext *gccorecontext,
 exit:
 	gcmmu_destroy_context(gccorecontext, gcmmucontext);
 
-	GCEXITARG(GCZONE_CONTEXT, "gc%s = 0x%08X\n",
-		(gcerror == GCERR_NONE) ? "result" : "error", gcerror);
+	GCEXITARG(GCZONE_CONTEXT, "gcerror = 0x%08X\n", gcerror);
 	return gcerror;
 }
 
 enum gcerror gcmmu_destroy_context(struct gccorecontext *gccorecontext,
-					struct gcmmucontext *gcmmucontext)
+				   struct gcmmucontext *gcmmucontext)
 {
 	enum gcerror gcerror;
 	struct gcmmu *gcmmu = &gccorecontext->gcmmu;
@@ -483,6 +534,11 @@ enum gcerror gcmmu_destroy_context(struct gccorecontext *gccorecontext,
 		gcerror = GCERR_MMU_CTXT_BAD;
 		goto exit;
 	}
+
+	/* Unmap the command queue. */
+	gcerror = gcqueue_unmap(gccorecontext, gcmmucontext);
+	if (gcerror != GCERR_NONE)
+		goto exit;
 
 	/* Free slave tables. */
 	while (gcmmucontext->slavealloc != NULL) {
@@ -496,8 +552,10 @@ enum gcerror gcmmu_destroy_context(struct gccorecontext *gccorecontext,
 	gc_free_cached(&gcmmucontext->master);
 
 	/* Free arenas. */
+	GCLOCK(&gcmmu->lock);
 	list_splice_init(&gcmmucontext->vacant, &gcmmu->vacarena);
 	list_splice_init(&gcmmucontext->allocated, &gcmmu->vacarena);
+	GCUNLOCK(&gcmmu->lock);
 
 	/* Dereference. */
 	gcmmu->refcount -= 1;
@@ -506,19 +564,115 @@ enum gcerror gcmmu_destroy_context(struct gccorecontext *gccorecontext,
 	return GCERR_NONE;
 
 exit:
-	GCEXITARG(GCZONE_CONTEXT, "gc%s = 0x%08X\n",
-		(gcerror == GCERR_NONE) ? "result" : "error", gcerror);
+	GCEXITARG(GCZONE_CONTEXT, "gcerror = 0x%08X\n", gcerror);
+	return gcerror;
+}
+
+enum gcerror gcmmu_enable(struct gccorecontext *gccorecontext,
+			  struct gcqueue *gcqueue)
+{
+	enum gcerror gcerror;
+	struct gcmmu *gcmmu = &gccorecontext->gcmmu;
+	struct list_head *head;
+	struct gccmdbuf *headcmdbuf;
+	struct gccmdbuf *gccmdbuf = NULL;
+	struct gcevent *gcevent = NULL;
+	struct gcmommuinit *gcmommuinit;
+	struct gcmosignal *gcmosignal;
+	struct gccmdend *gccmdend;
+	unsigned int status, enabled;
+
+	GCENTER(GCZONE_INIT);
+
+	/* Read the MMU status. */
+	status = gc_read_reg(GCREG_MMU_CONTROL_Address);
+	enabled = GCGETFIELD(status, GCREG_MMU_CONTROL, ENABLE);
+
+	/* Is MMU enabled? */
+	if (!enabled) {
+		GCDBG(GCZONE_MASTER, "enabling MMU.\n");
+
+		/* Queue cannot be empty. */
+		if (list_empty(&gcqueue->queue)) {
+			GCERR("queue is empty.");
+			gcerror = GCERR_MMU_INIT;
+			goto fail;
+		}
+
+		/* Get the first entry from the active queue. */
+		head = gcqueue->queue.next;
+		headcmdbuf = list_entry(head, struct gccmdbuf, link);
+
+		/* Allocate command init buffer. */
+		gcerror = gcqueue_alloc_cmdbuf(gcqueue, &gccmdbuf);
+		if (gcerror != GCERR_NONE)
+			goto fail;
+
+		/* Add event for the current command buffer. */
+		gcerror = gcqueue_alloc_event(gcqueue, &gcevent);
+		if (gcerror != GCERR_NONE)
+			goto fail;
+
+		/* Attach records. */
+		list_add_tail(&gcevent->link, &gccmdbuf->events);
+		list_add(&gccmdbuf->link, &gcqueue->queue);
+
+		/* Initialize the event and add to the list. */
+		gcevent->handler = event_enable_mmu;
+
+		/* Get free interrupt. */
+		gcerror = gcqueue_alloc_int(gcqueue, &gccmdbuf->interrupt);
+		if (gcerror != GCERR_NONE)
+			goto fail;
+
+		/* Program the safe zone and the master table address. */
+		gcmommuinit = (struct gcmommuinit *) gcmmu->cmdbuflog;
+		gcmommuinit->safe_ldst = gcmommuinit_safe_ldst;
+		gcmommuinit->safe = gcmmu->safezonephys;
+		gcmommuinit->mtlb = headcmdbuf->gcmmucontext->mmuconfig.raw;
+
+		/* Configure EVENT command. */
+		gcmosignal = (struct gcmosignal *) (gcmommuinit + 1);
+		gcmosignal->signal_ldst = gcmosignal_signal_ldst;
+		gcmosignal->signal.raw = 0;
+		gcmosignal->signal.reg.id = gccmdbuf->interrupt;
+		gcmosignal->signal.reg.pe = GCREG_EVENT_PE_SRC_ENABLE;
+
+		/* Configure the END command. */
+		gccmdend = (struct gccmdend *) (gcmosignal + 1);
+		gccmdend->cmd.raw = gccmdend_const.cmd.raw;
+
+		/* Initialize the command buffer. */
+		gccmdbuf->gcmmucontext = headcmdbuf->gcmmucontext;
+		gccmdbuf->logical = (unsigned char *) gcmmu->cmdbuflog;
+		gccmdbuf->physical = gcmmu->cmdbufphys;
+		gccmdbuf->size = sizeof(struct gcmommuinit)
+			       + sizeof(struct gcmosignal)
+			       + sizeof(struct gccmdend);
+		gccmdbuf->count = (gccmdbuf->size + 7) >> 3;
+		gccmdbuf->gcmoterminator = NULL;
+
+		GCDUMPBUFFER(GCZONE_INIT, gccmdbuf->logical,
+				gccmdbuf->physical, gccmdbuf->size);
+	}
+
+	GCEXIT(GCZONE_INIT);
+	return GCERR_NONE;
+
+fail:
+	if (gccmdbuf != NULL)
+		gcqueue_free_cmdbuf(gcqueue, gccmdbuf);
+
+	GCEXITARG(GCZONE_CONTEXT, "gcerror = 0x%08X\n", gcerror);
 	return gcerror;
 }
 
 enum gcerror gcmmu_set_master(struct gccorecontext *gccorecontext,
-				struct gcmmucontext *gcmmucontext)
+			      struct gcmmucontext *gcmmucontext)
 {
 	enum gcerror gcerror;
 	struct gcmmu *gcmmu = &gccorecontext->gcmmu;
 	struct gcmommumaster *gcmommumaster;
-	struct gcmommuinit *gcmommuinit;
-	unsigned int size, status, enabled;
 
 	GCENTER(GCZONE_MASTER);
 
@@ -527,56 +681,27 @@ enum gcerror gcmmu_set_master(struct gccorecontext *gccorecontext,
 		goto exit;
 	}
 
-	/* Read the MMU status. */
-	status = gc_read_reg(GCREG_MMU_CONTROL_Address);
-	enabled = GETFIELD(status, GCREG_MMU_CONTROL, ENABLE);
-
-	/* Is MMU enabled? */
-	if (enabled) {
-		/* Allocate command buffer space. */
-		gcerror = cmdbuf_alloc(sizeof(struct gcmommumaster),
-					(void **) &gcmommumaster, NULL);
-		if (gcerror != GCERR_NONE) {
-			gcerror = GCERR_SETGRP(gcerror, GCERR_MMU_MTLB_SET);
-			goto exit;
-		}
-
-		/* Program master table address. */
-		gcmommumaster->master_ldst = gcmommumaster_master_ldst;
-		gcmommumaster->master = gcmmucontext->mmuconfig.raw;
-	} else {
-		GCDBG(GCZONE_MASTER, "enabling MMU.\n");
-
-		/* MMU disabled, force physical mode. */
-		cmdbuf_physical(true);
-
-		/* Allocate command buffer space. */
-		size = sizeof(struct gcmommuinit) + cmdbuf_flush(NULL);
-		gcerror = cmdbuf_alloc(size, (void **) &gcmommuinit, NULL);
-		if (gcerror != GCERR_NONE) {
-			gcerror = GCERR_SETGRP(gcerror, GCERR_MMU_INIT);
-			goto exit;
-		}
-
-		/* Program the safe zone and the master table address. */
-		gcmommuinit->safe_ldst = gcmommuinit_safe_ldst;
-		gcmommuinit->safe = gcmmu->safezone.physical;
-		gcmommuinit->mtlb = gcmmucontext->mmuconfig.raw;
-
-		/* Execute the buffer. */
-		cmdbuf_flush(gcmommuinit + 1);
-
-		/* Resume normal mode. */
-		cmdbuf_physical(false);
-
-		/*
-		* Enable MMU. For security reasons, once it is enabled,
-		* the only way to disable is to reset the system.
-		*/
-		gc_write_reg(
-			GCREG_MMU_CONTROL_Address,
-			SETFIELDVAL(0, GCREG_MMU_CONTROL, ENABLE, ENABLE));
+	/* Did the master change? */
+	if (gcmmu->master == gcmmucontext->mmuconfig.raw) {
+		gcerror = GCERR_NONE;
+		goto exit;
 	}
+
+	/* Allocate command buffer space. */
+	gcerror = gcqueue_alloc(gccorecontext, gcmmucontext,
+				sizeof(struct gcmommumaster),
+				(void **) &gcmommumaster, NULL);
+	if (gcerror != GCERR_NONE) {
+		gcerror = GCERR_SETGRP(gcerror, GCERR_MMU_MTLB_SET);
+		goto exit;
+	}
+
+	/* Program master table address. */
+	gcmommumaster->master_ldst = gcmommumaster_master_ldst;
+	gcmommumaster->master = gcmmucontext->mmuconfig.raw;
+
+	/* Update master table address. */
+	gcmmu->master = gcmmucontext->mmuconfig.raw;
 
 exit:
 	GCEXITARG(GCZONE_MASTER, "gc%s = 0x%08X\n",
@@ -585,11 +710,12 @@ exit:
 }
 
 enum gcerror gcmmu_map(struct gccorecontext *gccorecontext,
-			struct gcmmucontext *gcmmucontext,
-			struct gcmmuphysmem *mem,
-			struct gcmmuarena **mapped)
+		       struct gcmmucontext *gcmmucontext,
+		       struct gcmmuphysmem *mem,
+		       struct gcmmuarena **mapped)
 {
 	enum gcerror gcerror = GCERR_NONE;
+	bool locked = false;
 	struct gcmmu *gcmmu = &gccorecontext->gcmmu;
 	struct list_head *arenahead;
 	struct gcmmuarena *vacant = NULL, *split;
@@ -612,6 +738,9 @@ enum gcerror gcmmu_map(struct gccorecontext *gccorecontext,
 		gcerror = GCERR_MMU_ARG;
 		goto exit;
 	}
+
+	GCLOCK(&gcmmucontext->lock);
+	locked = true;
 
 	/*
 	 * Find available sufficient arena.
@@ -752,6 +881,9 @@ enum gcerror gcmmu_map(struct gccorecontext *gccorecontext,
 	/* Determine the size of the area. */
 	vacant->size = mem->count * GCMMU_PAGE_SIZE - mem->offset;
 
+	/* Invalidate the MMU. */
+	gcmmucontext->dirty = true;
+
 	/* Set the result. */
 	*mapped = vacant;
 
@@ -766,16 +898,20 @@ exit:
 			release_physical_pages(vacant);
 	}
 
+	if (locked)
+		GCUNLOCK(&gcmmucontext->lock);
+
 	GCEXITARG(GCZONE_MAPPING, "gc%s = 0x%08X\n",
 		(gcerror == GCERR_NONE) ? "result" : "error", gcerror);
 	return gcerror;
 }
 
 enum gcerror gcmmu_unmap(struct gccorecontext *gccorecontext,
-				struct gcmmucontext *gcmmucontext,
-				struct gcmmuarena *mapped)
+			 struct gcmmucontext *gcmmucontext,
+			 struct gcmmuarena *mapped)
 {
 	enum gcerror gcerror = GCERR_NONE;
+	bool locked = false;
 	struct gcmmu *gcmmu = &gccorecontext->gcmmu;
 	struct list_head *allochead, *prevhead, *nexthead;
 	struct gcmmuarena *allocated, *prevvacant, *nextvacant = NULL;
@@ -791,6 +927,9 @@ enum gcerror gcmmu_unmap(struct gccorecontext *gccorecontext,
 		goto exit;
 	}
 
+	GCLOCK(&gcmmucontext->lock);
+	locked = true;
+
 	/*
 	 * Find the arena.
 	 */
@@ -805,12 +944,15 @@ enum gcerror gcmmu_unmap(struct gccorecontext *gccorecontext,
 	}
 
 	if (allochead == &gcmmucontext->allocated) {
-		GCERR("mapped arena not found.\n");
+		GCERR("mapped arena 0x%08X not found.\n",
+			(unsigned int) mapped);
 		gcerror = GCERR_MMU_ARG;
 		goto exit;
 	}
 
-	GCDBG(GCZONE_MAPPING, "mapped arena found.\n");
+	GCDBG(GCZONE_MAPPING, "mapped arena found:\n");
+	GCDBG(GCZONE_MAPPING, "  arena phys = 0x%08X\n", allocated->address);
+	GCDBG(GCZONE_MAPPING, "  arena size = %d\n", allocated->size);
 
 	/*
 	 * Free slave tables.
@@ -887,8 +1029,10 @@ enum gcerror gcmmu_unmap(struct gccorecontext *gccorecontext,
 			prevvacant->end.absolute = nextvacant->end.absolute;
 
 			/* Free the merged arenas. */
+			GCLOCK(&gcmmu->lock);
 			list_move(allochead, &gcmmu->vacarena);
 			list_move(nexthead, &gcmmu->vacarena);
+			GCUNLOCK(&gcmmu->lock);
 		} else {
 			prevvacant = list_entry(prevhead, struct gcmmuarena,
 						link);
@@ -903,7 +1047,9 @@ enum gcerror gcmmu_unmap(struct gccorecontext *gccorecontext,
 			prevvacant->end.absolute = allocated->end.absolute;
 
 			/* Free the merged arena. */
+			GCLOCK(&gcmmu->lock);
 			list_move(allochead, &gcmmu->vacarena);
+			GCUNLOCK(&gcmmu->lock);
 		}
 	} else if (siblings(&gcmmucontext->vacant, allochead, nexthead)) {
 		GCDBG(GCZONE_MAPPING, "merged with the next:\n");
@@ -916,80 +1062,121 @@ enum gcerror gcmmu_unmap(struct gccorecontext *gccorecontext,
 		nextvacant->count += allocated->count;
 
 		/* Free the merged arena. */
+		GCLOCK(&gcmmu->lock);
 		list_move(allochead, &gcmmu->vacarena);
+		GCUNLOCK(&gcmmu->lock);
 	} else {
-		GCDBG(GCZONE_MAPPING, "cannot merge, inserting in between:\n");
-
+		GCDBG(GCZONE_MAPPING,
+		      "nothing to merge with, inserting in between:\n");
 		GCDUMPARENA(GCZONE_ARENA, "allocated arena", allocated);
 
 		/* Neighbor vacant arenas are not siblings, can't merge. */
 		list_move(allochead, prevhead);
 	}
 
+	/* Invalidate the MMU. */
+	gcmmucontext->dirty = true;
+
 exit:
+	if (locked)
+		GCUNLOCK(&gcmmucontext->lock);
+
 	GCEXITARG(GCZONE_MAPPING, "gc%s = 0x%08X\n",
 		(gcerror == GCERR_NONE) ? "result" : "error", gcerror);
 	return gcerror;
 }
 
-int gcmmu_flush(void *logical, unsigned int address, unsigned int size)
+enum gcerror gcmmu_flush(struct gccorecontext *gccorecontext,
+			 struct gcmmucontext *gcmmucontext)
 {
-	static const int flushSize = sizeof(struct gcmommuflush);
-	struct gcmommuflush *gcmommuflush;
-	unsigned int count;
+	enum gcerror gcerror = GCERR_NONE;
+	struct gcmommuflush *flushlogical;
+	unsigned int flushaddress;
+	struct gcqueue *gcqueue;
 
 	GCENTER(GCZONE_FLUSH);
 
-	if (logical != NULL) {
-		GCDBG(GCZONE_FLUSH, "address = 0x%08X\n", address);
-		GCDBG(GCZONE_FLUSH, "size = %d\n", size);
+	GCLOCK(&gcmmucontext->lock);
 
-		/* Compute the buffer count. */
-		count = (size - flushSize + 7) >> 3;
+	if (gcmmucontext->dirty) {
+		/* Allocate space for the flush. */
+		gcerror = gcqueue_alloc(gccorecontext, gcmmucontext,
+					sizeof(struct gcmommuflush),
+					(void **) &flushlogical, &flushaddress);
+		if (gcerror != GCERR_NONE)
+			goto exit;
 
-		gcmommuflush = (struct gcmommuflush *) logical;
+		/* Get a shortcut to the queue object. */
+		gcqueue = &gccorecontext->gcqueue;
 
-		/* Flush 2D PE cache. */
-		gcmommuflush->peflush.flush_ldst = gcmoflush_flush_ldst;
-		gcmommuflush->peflush.flush.reg = gcregflush_pe2D;
+		/* Store flush information. */
+		gcqueue->flushlogical = flushlogical;
+		gcqueue->flushaddress = flushaddress;
 
-		/* Arm the FE-PE semaphore. */
-		gcmommuflush->peflushsema.sema_ldst = gcmosema_sema_ldst;
-		gcmommuflush->peflushsema.sema.reg  = gcregsema_fe_pe;
-
-		/* Stall FE until PE is done flushing. */
-		gcmommuflush->peflushstall.cmd.fld = gcfldstall;
-		gcmommuflush->peflushstall.arg.fld = gcfldstall_fe_pe;
-
-		/* LINK to the next slot to flush FE FIFO. */
-		gcmommuflush->feflush.cmd.fld = gcfldlink4;
-		gcmommuflush->feflush.address
-			= address
-			+ offsetof(struct gcmommuflush, mmuflush_ldst);
-
-		/* Flush MMU cache. */
-		gcmommuflush->mmuflush_ldst = gcmommuflush_mmuflush_ldst;
-		gcmommuflush->mmuflush.reg = gcregmmu_flush;
-
-		/* Arm the FE-PE semaphore. */
-		gcmommuflush->mmuflushsema.sema_ldst = gcmosema_sema_ldst;
-		gcmommuflush->mmuflushsema.sema.reg  = gcregsema_fe_pe;
-
-		/* Stall FE until PE is done flushing. */
-		gcmommuflush->mmuflushstall.cmd.fld = gcfldstall;
-		gcmommuflush->mmuflushstall.arg.fld = gcfldstall_fe_pe;
-
-		/* LINK to the next slot to flush FE FIFO. */
-		gcmommuflush->link.cmd.fld.opcode
-			= GCREG_COMMAND_LINK_COMMAND_OPCODE_LINK;
-		gcmommuflush->link.cmd.fld.count = count;
-		gcmommuflush->link.address = address + flushSize;
+		/* Validate the context. */
+		gcmmucontext->dirty = false;
 	}
 
-	GCEXIT(GCZONE_FLUSH);
+exit:
+	GCUNLOCK(&gcmmucontext->lock);
 
-	/* Return the size in bytes required for the flush. */
-	return flushSize;
+	GCEXITARG(GCZONE_FLUSH, "gc%s = 0x%08X\n",
+		(gcerror == GCERR_NONE) ? "result" : "error", gcerror);
+	return gcerror;
+}
+
+void gcmmu_flush_finalize(struct gccmdbuf *gccmdbuf,
+			  struct gcmommuflush *flushlogical,
+			  unsigned int flushaddress)
+{
+	int size;
+	unsigned int datacount;
+
+	GCENTER(GCZONE_FLUSH);
+
+	/* Compute the size of the command buffer after the flush block */
+	size = gccmdbuf->physical + gccmdbuf->size
+		- flushaddress - sizeof(struct gcmommuflush);
+
+	/* Compute the data count. */
+	datacount = (size + 7) >> 3;
+
+	/* Flush 2D PE cache. */
+	flushlogical->peflush.flush_ldst = gcmoflush_flush_ldst;
+	flushlogical->peflush.flush.reg = gcregflush_pe2D;
+
+	/* Arm the FE-PE semaphore. */
+	flushlogical->peflushsema.sema_ldst = gcmosema_sema_ldst;
+	flushlogical->peflushsema.sema.reg  = gcregsema_fe_pe;
+
+	/* Stall FE until PE is done flushing. */
+	flushlogical->peflushstall.cmd.fld = gcfldstall;
+	flushlogical->peflushstall.arg.fld = gcfldstall_fe_pe;
+
+	/* LINK to the next slot to flush FE FIFO. */
+	flushlogical->feflush.cmd.fld = gcfldlink4;
+	flushlogical->feflush.address
+		= flushaddress
+		+ offsetof(struct gcmommuflush, mmuflush_ldst);
+
+	/* Flush MMU cache. */
+	flushlogical->mmuflush_ldst = gcmommuflush_mmuflush_ldst;
+	flushlogical->mmuflush.reg = gcregmmu_flush;
+
+	/* Arm the FE-PE semaphore. */
+	flushlogical->mmuflushsema.sema_ldst = gcmosema_sema_ldst;
+	flushlogical->mmuflushsema.sema.reg  = gcregsema_fe_pe;
+
+	/* Stall FE until PE is done flushing. */
+	flushlogical->mmuflushstall.cmd.fld = gcfldstall;
+	flushlogical->mmuflushstall.arg.fld = gcfldstall_fe_pe;
+
+	/* LINK to the next slot to flush FE FIFO. */
+	flushlogical->link.cmd.fld.opcode = GCREG_COMMAND_OPCODE_LINK;
+	flushlogical->link.cmd.fld.count = datacount;
+	flushlogical->link.address = flushaddress + sizeof(struct gcmommuflush);
+
+	GCEXIT(GCZONE_FLUSH);
 }
 
 enum gcerror gcmmu_fixup(struct gcfixup *fixup, unsigned int *data)
@@ -998,45 +1185,51 @@ enum gcerror gcmmu_fixup(struct gcfixup *fixup, unsigned int *data)
 	struct gcfixupentry *table;
 	struct gcmmuarena *arena;
 	unsigned int dataoffset;
-	unsigned int surfoffset;
 	unsigned int i;
 
 	GCENTER(GCZONE_FIXUP);
 
 	/* Process fixups. */
 	while (fixup != NULL) {
-		GCDBG(GCZONE_FIXUP, "processing %d fixup(s) @ 0x%08X\n",
+		/* Verify fixup pointer. */
+		if (!virt_addr_valid(fixup)) {
+			GCERR("bad fixup @ 0x%08X\n", (unsigned int) fixup);
+			gcerror = GCERR_OODM;
+			goto exit;
+		}
+
+		GCDBG(GCZONE_FIXUP, "%d fixup(s) @ 0x%08X\n",
 			fixup->count, (unsigned int) fixup);
 
 		/* Apply fixups. */
 		table = fixup->fixup;
 		for (i = 0; i < fixup->count; i += 1) {
-			GCDBG(GCZONE_FIXUP, "[%02d] buffer offset = 0x%08X, "
-				"surface offset = 0x%08X\n",
-				i, table->dataoffset * 4, table->surfoffset);
+			GCDBG(GCZONE_FIXUP, "#%d\n", i);
+			GCDBG(GCZONE_FIXUP, "  buffer offset = 0x%08X\n",
+				table->dataoffset * 4);
+			GCDBG(GCZONE_FIXUP, "  surface offset = 0x%08X\n",
+				table->surfoffset);
 
 			dataoffset = table->dataoffset;
+
 			arena = (struct gcmmuarena *) data[dataoffset];
-
-			GCDBG(GCZONE_FIXUP, "arena = 0x%08X\n",
-				(unsigned int) arena);
-			GCDBG(GCZONE_FIXUP, "arena phys = 0x%08X\n",
-				arena->address);
-			GCDBG(GCZONE_FIXUP, "arena size = %d\n",
-				arena->size);
-
-			surfoffset = table->surfoffset;
-
-#if 0
-			if (surfoffset > arena->size) {
-				gcerror = GCERR_MMU_OFFSET;
+			if (!virt_addr_valid(arena)) {
+				GCERR("bad arena @ 0x%08X\n",
+				      (unsigned int) arena);
+				gcerror = GCERR_OODM;
 				goto exit;
 			}
-#endif
 
-			data[dataoffset] = arena->address + surfoffset;
+			GCDBG(GCZONE_FIXUP, "  arena = 0x%08X\n",
+				(unsigned int) arena);
+			GCDBG(GCZONE_FIXUP, "  arena phys = 0x%08X\n",
+				arena->address);
+			GCDBG(GCZONE_FIXUP, "  arena size = %d\n",
+				arena->size);
 
-			GCDBG(GCZONE_FIXUP, "surface address = 0x%08X\n",
+			data[dataoffset] = arena->address + table->surfoffset;
+
+			GCDBG(GCZONE_FIXUP, "  surface @ 0x%08X\n",
 				data[dataoffset]);
 
 			table += 1;
@@ -1046,6 +1239,7 @@ enum gcerror gcmmu_fixup(struct gcfixup *fixup, unsigned int *data)
 		fixup = fixup->next;
 	}
 
+exit:
 	GCEXITARG(GCZONE_FIXUP, "gc%s = 0x%08X\n",
 		(gcerror == GCERR_NONE) ? "result" : "error", gcerror);
 	return gcerror;

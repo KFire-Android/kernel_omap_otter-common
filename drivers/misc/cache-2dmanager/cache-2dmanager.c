@@ -12,6 +12,9 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
+#include <linux/dma-mapping.h>
+#include <asm/cacheflush.h>
+#include <linux/sched.h>
 #include <linux/cache-2dmanager.h>
 
 static void per_cpu_cache_flush_arm(void *arg)

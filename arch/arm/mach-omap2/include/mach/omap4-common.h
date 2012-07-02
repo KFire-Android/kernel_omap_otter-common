@@ -83,6 +83,14 @@ extern void omap_do_wfi(void);
 extern bool gic_dist_disabled(void);
 extern void gic_timer_retrigger(void);
 
+#ifdef CONFIG_OMAP4_DPLL_CASCADING
+extern bool omap4_abe_can_enter_dpll_cascading(void);
+extern bool omap4_is_in_dpll_cascading(void);
+struct device;
+extern int omap4_dpll_cascading_blocker_hold(struct device *dev);
+extern int omap4_dpll_cascading_blocker_release(struct device *dev);
+#endif
+
 /*
  * Read MPIDR: Multiprocessor affinity register
  */

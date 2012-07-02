@@ -295,6 +295,7 @@ obj-$(CONFIG_MACH_OMAP_4430_KC1)	+= board-4430kc1-tablet.o \
 					   hsmmc.o \
 					   omap_phy_internal.o \
 					   omap4_apps_brd_id.o
+obj-$(CONFIG_TOUCHSCREEN_CYPRESS_TTSP)  += board-touch-cyttsp4_core.o
 obj-$(CONFIG_MACH_OMAP4_PANDA)		+= board-omap4panda.o \
 					   hsmmc.o \
 					   board-44xx-identity.o \
@@ -349,3 +350,4 @@ endif
 
 obj-$(CONFIG_OMAP_RAM_CONSOLE)		+= omap_ram_console.o
 obj-$(CONFIG_ARCH_OMAP4)		+= omap_gcxxx.o
+obj-$(CONFIG_OMAP_RFKILL_STE_MODEM)	+= omap-rfkill-ste.o

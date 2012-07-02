@@ -15,11 +15,7 @@
 #ifndef CACHE_2DMANAGER_H_
 #define CACHE_2DMANAGER_H_
 
-#include <linux/dma-mapping.h>
-#include <asm/cacheflush.h>
-#include <asm/outercache.h>
-#include <linux/slab.h>
-#include <linux/sched.h>
+#include "slab.h"
 
 /* The value below only applies to OMAP4 */
 #define L1CACHE_SIZE 32768

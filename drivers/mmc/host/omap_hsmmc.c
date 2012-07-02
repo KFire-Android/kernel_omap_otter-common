@@ -43,6 +43,11 @@
 #include <plat/cpu.h>
 #include <plat/omap-pm.h>
 
+#ifdef CONFIG_OMAP4_DPLL_CASCADING
+#include <linux/notifier.h>
+#include <plat/clock.h>
+#endif
+
 /* OMAP HSMMC Host Controller Registers */
 #define OMAP_HSMMC_SYSCONFIG	0x0010
 #define OMAP_HSMMC_SYSSTATUS	0x0014
@@ -156,6 +161,9 @@
 
 #define MMC_TIMEOUT_MS		20
 #define OMAP_MMC_MASTER_CLOCK	96000000
+#ifdef CONFIG_OMAP4_DPLL_CASCADING
+#define OMAP_MMC_DPLL_CLOCK	49152000
+#endif
 #define DRIVER_NAME		"omap_hsmmc"
 
 /* Timeouts for entering power saving states on inactivity, msec */
@@ -194,6 +202,12 @@ struct omap_hsmmc_host {
 	struct	clk		*fclk;
 	struct	clk		*iclk;
 	struct	clk		*dbclk;
+#ifdef CONFIG_OMAP4_DPLL_CASCADING
+	struct notifier_block	nb;
+	int			dpll_entry;
+	int			dpll_exit;
+	spinlock_t		dpll_lock;
+#endif
 	/*
 	 * vcc == configured supply
 	 * vcc_aux == optional
@@ -2034,11 +2048,61 @@ static int omap_hsmmc_sleep_to_off(struct omap_hsmmc_host *host)
 	return 0;
 }
 
+#ifdef CONFIG_OMAP4_DPLL_CASCADING
+static void
+omap_hsmmc_dpll_clocks_configure(struct omap_hsmmc_host *host, int clk)
+{
+	int regval = 0, dsor = 0;
+	unsigned long timeout = 0;
+	u32 count = 0;
+
+	if (host->mmc->ios.clock != 0)
+		dsor = clk / host->mmc->ios.clock;
+	omap_hsmmc_stop_clock(host);
+	regval = OMAP_HSMMC_READ(host->base, SYSCTL);
+	regval = regval & ~(CLKD_MASK);
+	regval = regval | (dsor << 6) | (DTO << 16);
+	OMAP_HSMMC_WRITE(host->base, SYSCTL, regval);
+	OMAP_HSMMC_WRITE(host->base, SYSCTL,
+	OMAP_HSMMC_READ(host->base, SYSCTL) | ICE);
+	/* Wait till the ICS bit is set */
+	timeout = jiffies + msecs_to_jiffies(MMC_TIMEOUT_MS);
+	while ((OMAP_HSMMC_READ(host->base, SYSCTL) & ICS) != ICS
+		&& time_before(jiffies, timeout)) {
+		if (count++ > 1000) {
+			dev_err(host->dev,
+				"Timeout during waiting for ICS bit");
+			break;
+		}
+	}
+
+	OMAP_HSMMC_WRITE(host->base, SYSCTL,
+	OMAP_HSMMC_READ(host->base, SYSCTL) | CEN);
+}
+
+static void
+omap_hsmmc_dpll_clocks_reconfigure(struct omap_hsmmc_host *host)
+{
+	spin_lock(&host->dpll_lock);
+	if (host->dpll_entry == 1) {
+		omap_hsmmc_dpll_clocks_configure(host, OMAP_MMC_DPLL_CLOCK);
+		host->dpll_entry = 0;
+	} else if (host->dpll_exit == 1) {
+		omap_hsmmc_dpll_clocks_configure(host, OMAP_MMC_MASTER_CLOCK);
+		host->dpll_exit = 0;
+	}
+	spin_unlock(&host->dpll_lock);
+}
+#endif
+
 /* Handler for [DISABLED -> ENABLED] transition */
 static int omap_hsmmc_disabled_to_enabled(struct omap_hsmmc_host *host)
 {
 	pm_runtime_get_sync(host->dev);
 
+#ifdef CONFIG_OMAP4_DPLL_CASCADING
+	omap_hsmmc_dpll_clocks_reconfigure(host);
+#endif
 	host->dpm_state = ENABLED;
 
 	dev_dbg(mmc_dev(host->mmc), "DISABLED -> ENABLED\n");
@@ -2054,6 +2118,9 @@ static int omap_hsmmc_sleep_to_enabled(struct omap_hsmmc_host *host)
 
 	pm_runtime_get_sync(host->dev);
 
+#ifdef CONFIG_OMAP4_DPLL_CASCADING
+	omap_hsmmc_dpll_clocks_reconfigure(host);
+#endif
 	if (mmc_slot(host).set_sleep)
 		mmc_slot(host).set_sleep(host->dev, host->slot_id, 0,
 			 host->vdd, host->dpm_state == CARDSLEEP);
@@ -2245,6 +2312,31 @@ static void omap_hsmmc_debugfs(struct mmc_host *mmc)
 
 #endif
 
+#ifdef CONFIG_OMAP4_DPLL_CASCADING
+static int omap_hsmmc_dpll_notifier(struct notifier_block *nb,
+					unsigned long val, void *data)
+{
+	struct omap_hsmmc_host *host =
+		container_of(nb, struct omap_hsmmc_host, nb);
+	struct clk_notifier_data *cnd = (struct clk_notifier_data *)data;
+
+	spin_lock(&host->dpll_lock);
+
+	if (val != CLK_PRE_RATE_CHANGE) {
+		if (cnd->old_rate == OMAP_MMC_DPLL_CLOCK) {
+			host->dpll_entry = 1;
+			host->master_clock = OMAP_MMC_DPLL_CLOCK;
+		} else if (cnd->old_rate == OMAP_MMC_MASTER_CLOCK) {
+			host->dpll_exit = 1;
+			host->master_clock = OMAP_MMC_MASTER_CLOCK;
+		}
+	}
+
+	spin_unlock(&host->dpll_lock);
+	return 0;
+}
+#endif
+
 static int __init omap_hsmmc_probe(struct platform_device *pdev)
 {
 	struct omap_mmc_platform_data *pdata = pdev->dev.platform_data;
@@ -2342,6 +2434,15 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
 		clk_put(host->iclk);
 		goto err1;
 	}
+
+#ifdef CONFIG_OMAP4_DPLL_CASCADING
+	if (0 == host->id) {
+		spin_lock_init(&host->dpll_lock);
+		host->nb.notifier_call = omap_hsmmc_dpll_notifier;
+		host->nb.next = NULL;
+		clk_notifier_register(host->fclk, &host->nb);
+	}
+#endif
 
 	omap_hsmmc_context_save(host);
 

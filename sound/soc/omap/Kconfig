@@ -147,6 +147,14 @@ config SND_OMAP_SOC_OMAP4_HDMI
 	  Say Y if you want to add support for SoC HDMI audio on Texas Instruments
 	  OMAP4 chips
 
+config SND_OMAP_SOC_ABE_DL2
+	bool "Use ABE DL2 path"
+	depends on SND_OMAP_SOC && SND_OMAP_SOC_ABE_DSP
+	default n
+	help
+	  Say Y if you want to enable ABE DL2 path for PDM_DL2, otherwise it will be
+	  connected to DL1 path.
+
 config SND_OMAP4_ABE_USE_ALT_FW
 	bool "Use alternate ABE firmware, which includes DMIC support"
 	default n

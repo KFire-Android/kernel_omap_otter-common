@@ -4,6 +4,6 @@ gccore-y := \
 	gcmain.o \
 	gcmem.o \
 	gcmmu.o \
-	gccmdbuf.o \
+	gcqueue.o \
 	gcdebug.o \
 	gcdbglog.o

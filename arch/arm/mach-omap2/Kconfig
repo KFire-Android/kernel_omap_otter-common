@@ -355,6 +355,7 @@ config MACH_OMAP_4430SDP
 	select OMAP_REBOOT_REASON
 	select OMAP_RAM_CONSOLE
 	select CDC_TCXO
+	select OMAP_RFKILL_STE_MODEM
 
 config MACH_OMAP_BLAZE
 	bool "OMAP 44xx Tablet2 Board"
@@ -363,6 +364,7 @@ config MACH_OMAP_BLAZE
 	select OMAP_PACKAGE_CBL
 	select OMAP_PACKAGE_CBS
 	select TOUCHSCREEN_QUANTUM_OBP
+	select TOUCHSCREEN_CYPRESS_TTSP
 	select LEDS_OMAP4430_SDP_DISPLAY
 	select LEDS_OMAP4430_SDP_KEYPAD
 	select INPUT_TSL2771
@@ -447,6 +449,29 @@ config OMAP_REBOOT_REASON
 	depends on ARCH_OMAP4
 	bool
 
+config OMAP4_DPLL_CASCADING
+       bool  "Enable DPLL Cascading for OMAP4"
+       depends on ARCH_OMAP4
+       depends on PM
+       depends on HAS_EARLYSUSPEND
+       default y
+       help
+         Select this option to enable DPLL Cascading during Low power mp3
+         playback. It will enter DPLL cascade when :
+               - Head set is inserted.
+               - Display is Off.
+               - No USB.
+
+config OMAP4_ONLY_OMAP4430_DPLL_CASCADING
+       bool  "Enable DPLL Cascading for OMAP4430 only"
+       depends on OMAP4_DPLL_CASCADING
+       default y
+       help
+         Enables DPLL Cascading only for OMAP4430.
+	 Current DPLL cascading implementation is going to be used
+	 only on OMAP4430, where it provides significant power savings.
+	 Keeps DPLL cascading disabled for other OMAPs.
+
 config OMAP_RAM_CONSOLE
         bool "Enable OMAP support for Android RAM console"
         depends on ANDROID_RAM_CONSOLE
@@ -509,6 +534,15 @@ config OMAP4_HSOTG_ED_CORRECTION
 	  Select this option to overrive HSOTG PHY settings in
 	  order to improve Eye Diagramm. On 4430 CPUs this should
 	  improve Eye Diagram at least 8%.
+
+config OMAP_RFKILL_STE_MODEM
+	bool "Enable OMAP RFKILL driver for ST-E modem"
+	depends on RFKILL || !RFKILL
+	help
+	  Select this option to enable usage of RFKILL driver for ST-E modem on
+	  OMAP platforms. This will permit control of power on and off sequences
+	  of the modem as well as necessary dynamic pin muxing of AP/CP
+	  interfaces (platform data dependant)
 
 endmenu
 

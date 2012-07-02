@@ -475,6 +475,19 @@ s32 tiler_memsize(enum tiler_fmt fmt, u32 width, u32 height, u32 *alloc_pages,
 		  u32 *virt_pages);
 
 /**
+ * Gives back page memory requirements for a given container
+ * allocation
+ *
+ * @param fmt		Tiler bpp mode
+ * @param width		Width in pixels
+ * @param height	Height in pixels
+ *
+ * @return Number of pages required to back tiler container.
+ *         Returns 0 for error
+ */
+u32 tiler_backpages(enum tiler_fmt fmt, u32 width, u32 height);
+
+/**
  * Returns virtual stride of a tiler block
  *
  * @param handle	Handle to tiler block allocation

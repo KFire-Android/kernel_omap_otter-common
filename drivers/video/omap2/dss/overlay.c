@@ -566,16 +566,18 @@ int dss_check_overlay(struct omap_overlay *ovl, struct omap_dss_device *dssdev)
 			outh = info->out_height;
 	}
 
-	if (dw < info->pos_x + outw) {
-		DSSDBG("check_overlay failed 1: %d < %d + %d\n",
-				dw, info->pos_x, outw);
-		return -EINVAL;
-	}
+	if (!info->wb_source) {
+		if (dw < info->pos_x + outw) {
+			DSSDBG("check_overlay failed 1: %d < %d + %d\n",
+					dw, info->pos_x, outw);
+			return -EINVAL;
+		}
 
-	if (dh < info->pos_y + outh) {
-		DSSDBG("check_overlay failed 2: %d < %d + %d\n",
-				dh, info->pos_y, outh);
-		return -EINVAL;
+		if (dh < info->pos_y + outh) {
+			DSSDBG("check_overlay failed 2: %d < %d + %d\n",
+					dh, info->pos_y, outh);
+			return -EINVAL;
+		}
 	}
 
 	if ((ovl->supported_modes & info->color_mode) == 0) {

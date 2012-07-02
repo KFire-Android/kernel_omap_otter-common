@@ -17,7 +17,6 @@
 #include <linux/slab.h>
 #include <linux/fs.h>
 #include <linux/io.h>
-#include <linux/spinlock.h>
 #include <linux/sched.h>
 #include <linux/ioctl.h>
 #include <linux/clk.h>
@@ -34,62 +33,53 @@
  * Debug switches.
  */
 
-/*
- * GC_DUMP_ENABLE
- *
- * Dumping enable default state.
- */
+/* Dumping enable default state. */
 #define GC_DUMP_ENABLE		0
 
-/*
- * GC_BUFFERED_OUTPUT
- *
- * When set to non-zero, all output is collected into a buffer with the
- * specified size.	 Once the buffer gets full, the debug buffer will be
- * printed to the console. GC_DUMP_BUFFER_SIZE determines the size of
- * the buffer.
- */
-#define GC_BUFFERED_OUTPUT	1
+/* Ignore all zones as if they were all enabled in all modules. */
+#define GC_IGNORE_ZONES		0
 
-/*
- * GC_DUMP_BUFFER_SIZE
- *
- * When set to non-zero, all output is collected into a buffer with the
- * specified size.	 Once the buffer gets full, the debug buffer will be
- * printed to the console.
- */
-#define GC_DUMP_BUFFER_SIZE	(4 * 1024 * 1024)
+/* When enabled, all output is collected into a buffer with a predefined size.
+ * GC_DUMP_BUFFER_SIZE determines the size of the buffer and GC_ENABLE_OVERFLOW
+ * controls what happens when the buffer gets full. */
+#define GC_BUFFERED_OUTPUT	0
 
-/*
- * GC_ENABLE_OVERFLOW
- *
- * When set to non-zero, and the output buffer gets full, instead of being
- * printed, it will be allowed to overflow removing the oldest messages.
- */
-#define GC_ENABLE_OVERFLOW	0
+/* Debug output buffer size. */
+#define GC_DUMP_BUFFER_SIZE	(200 * 1024)
 
-/*
- * GC_FLUSH_COUNT
- *
- * When set to non-zero, specifies how many prints are accumulated in the
- * buffer before the buffer is flushed.
- */
+/* If disabled, the contents of the buffer will be dumped to the console when
+ * the buffer gets full.
+ * If enabled, wrap around mode is enabled where when the buffer gets full,
+ * the oldest entries are overwritten with the new entrie. To dump the buffer
+ * to the console gc_dump_flush must be called explicitly. */
+#define GC_ENABLE_OVERFLOW	1
+
+/* Specifies how many prints are accumulated in the buffer before the buffer is
+ * flushed. Set to zero to disable auto dumping mode. */
 #define GC_FLUSH_COUNT		0
 
-/*
- * GC_SHOW_PID
- *
- * When enabled, each print statement will be preceeded with the current
- * process ID.
- */
-#define GC_SHOW_PID		0
+/* Specifies the maximum number of threads that will be tracked in an attempt
+ * to visually separate messages from different threads. To disable thread
+ * tracking, set to 0 or 1. */
+#define GC_THREAD_COUNT		20
 
-/*
- * GC_DEBUG_SELF
- *
- * When enabled, internal logging validation code is turned on.
- */
+/* Specifies spacing for thread messages. */
+#define GC_THREAD_INDENT	0
+
+/* When set to non-zero, specifies how many prints are accumulated in the
+ * buffer before the buffer is flushed. */
+#define GC_SHOW_DUMP_LINE	1
+
+/* If enabled, each print statement will be preceeded with the current
+ * process ID. */
+#define GC_SHOW_PID		1
+
+/* If enabled, internal logging validation code is turned on. */
 #define GC_DEBUG_SELF		0
+
+/* Maximum length of a dump string. */
+#define GC_MAXSTR_LENGTH	256
+
 
 /*******************************************************************************
  * Miscellaneous macros.
@@ -112,22 +102,33 @@
 
 #define GC_VARARG_ALIGNMENT sizeof(unsigned long long)
 
-#ifndef countof
-#	define countof(a) \
-	( \
-		sizeof(a) / sizeof(a[0]) \
-	)
-#endif
-
 #if defined(GCDBGFILTER)
 #undef GCDBGFILTER
 #endif
 
-#define GCDBGFILTER() \
+#define GCDBGFILTER \
 	(*filter)
 
+#if GC_IGNORE_ZONES
+#define GC_VERIFY_ENABLE(filter, zone) \
+	(g_initdone)
+#else
+#define GC_VERIFY_ENABLE(filter, zone) \
+	(g_initdone && ((filter == NULL) || ((filter->zone & zone) != 0)))
+#endif
+
+#if GC_SHOW_DUMP_LINE
+#define GC_DUMPLINE_FORMAT "[%12d] "
+#endif
+
+#if GC_SHOW_PID
+#define GC_PID_FORMAT "[pid=%04X] "
+#endif
+
+#define GC_EOL_RESERVE 1
+
 /*******************************************************************************
- * Internal structures.
+ * Dump item header definition.
  */
 
 enum itemtype {
@@ -141,16 +142,30 @@ struct itemhead {
 	enum itemtype type;
 };
 
-/* Buffered string. */
+
+/*******************************************************************************
+ * Supported dump items.
+ */
+
+/* GC_BUFITEM_STRING: buffered string. */
 struct itemstring {
 	enum itemtype itemtype;
 	int indent;
+
+#if GC_SHOW_PID
+	struct task_struct *task;
+#endif
+
+#if GC_SHOW_DUMP_LINE
+	unsigned int dumpline;
+#endif
+
 	const char *message;
 	va_list messagedata;
 	unsigned int datasize;
 };
 
-/* Buffered memory. */
+/* GC_BUFITEM_BUFFER: buffered memory. */
 enum buffertype {
 	GC_BUFTYPE_GENERIC,
 	GC_BUFTYPE_COMMAND,
@@ -175,9 +190,30 @@ struct itembuffer {
 	unsigned int gpuaddr;
 };
 
+
+/*******************************************************************************
+ * Debug output buffer.
+ */
+
+struct threadinfo {
+	struct task_struct *task;
+	int msgindent;
+	int threadindent;
+};
+
 struct buffout {
 	int enable;
-	int indent;
+
+#if GC_THREAD_COUNT > 1
+	unsigned int threadcount;
+	struct threadinfo threadinfo[1 + GC_THREAD_COUNT];
+#else
+	struct threadinfo threadinfo[1];
+#endif
+
+#if GC_SHOW_DUMP_LINE
+	unsigned int dumpline;
+#endif
 
 #if GC_BUFFERED_OUTPUT
 	int start;
@@ -187,6 +223,15 @@ struct buffout {
 #endif
 };
 
+static struct buffout g_outputbuffer = {
+	.enable = GC_DUMP_ENABLE
+};
+
+
+/*******************************************************************************
+ * Internal structures.
+ */
+
 struct copypos {
 	struct gcmmustlb *slave;
 	union gcmmuloc pos;
@@ -194,14 +239,15 @@ struct copypos {
 	unsigned char *logical;
 };
 
+
+/*******************************************************************************
+ * Globals.
+ */
+
 static bool g_initdone;
 static DEFINE_MUTEX(g_lockmutex);
-
-static struct buffout g_outputbuffer = {
-	.enable = GC_DUMP_ENABLE
-};
-
 static struct list_head gc_filterlist = LIST_HEAD_INIT(gc_filterlist);
+
 
 /*******************************************************************************
  * Item size functions.
@@ -238,44 +284,77 @@ static getitemsize g_itemsize[] = {
 #endif
 #endif
 
+
 /*******************************************************************************
  * Printing functions.
  */
 
-#if GC_SHOW_PID
-#	define GC_PRINTK(s, fmt, ...) \
-	do { \
-		if (s) { \
-			seq_printf(s, "tid=[0x%04X] ", \
-					task_pid_vnr(current)); \
-			seq_printf(s, fmt, ##__VA_ARGS__); \
-		} else { \
-			printk(KERN_INFO "tid=[0x%04X] ", \
-					task_pid_vnr(current)); \
-			printk(KERN_INFO fmt, ##__VA_ARGS__); \
-		} \
-	} while (0)
-#else
 #define GC_PRINTK(s, fmt, ...) \
-	do { \
-		if (s) \
-			seq_printf(s, fmt, ##__VA_ARGS__); \
-		else \
-			printk(KERN_INFO fmt, ##__VA_ARGS__); \
-	} while (0)
-#endif
+do { \
+	if (s) \
+		seq_printf(s, fmt, ##__VA_ARGS__); \
+	else \
+		printk(KERN_INFO fmt, ##__VA_ARGS__); \
+} while (0)
 
 #if GC_DEBUG_SELF
 #	define GC_DEBUGMSG(fmt, ...) \
 		GC_PRINTK(NULL, "[%s:%d] " fmt, __func__, __LINE__, \
-			##__VA_ARGS__)
+			  ##__VA_ARGS__)
 #else
 #	define GC_DEBUGMSG(...)
 #endif
 
+static struct threadinfo *get_threadinfo(struct buffout *buffout)
+{
+#if GC_THREAD_COUNT > 1
+	struct threadinfo *threadinfo;
+	struct task_struct *task;
+	unsigned int i, count;
+
+	/* Get current task. */
+	task = current;
+
+	/* Try to locate task record. */
+	count = buffout->threadcount + 1;
+	for (i = 1; i < count; i += 1)
+		if (buffout->threadinfo[i].task == task)
+			return &buffout->threadinfo[i];
+
+	/* Not found, still have room? */
+	if (buffout->threadcount < GC_THREAD_COUNT) {
+		threadinfo = &buffout->threadinfo[count];
+		threadinfo->task = task;
+		threadinfo->msgindent = 0;
+		threadinfo->threadindent = buffout->threadcount
+					 * GC_THREAD_INDENT;
+		buffout->threadcount += 1;
+		return threadinfo;
+	}
+
+	/* Too many threads, use the common entry. */
+	GC_PRINTK(NULL, "%s(%d) [ERROR] reached the maximum thread number.\n",
+		  __func__, __LINE__);
+	threadinfo = buffout->threadinfo;
+	threadinfo->task = task;
+	return threadinfo;
+#else
+	struct threadinfo *threadinfo;
+	threadinfo = buffout->threadinfo;
+
+#if GC_SHOW_PID
+	threadinfo->task = current;
+#else
+	threadinfo->task = NULL;
+#endif
+
+	return threadinfo;
+#endif
+}
+
 static int gc_get_indent(int indent, char *buffer, int buffersize)
 {
-	static const int MAX_INDENT = 40;
+	static const int MAX_INDENT = 80;
 	int len, _indent;
 
 	_indent = indent % MAX_INDENT;
@@ -285,25 +364,32 @@ static int gc_get_indent(int indent, char *buffer, int buffersize)
 	for (len = 0; len < _indent; len += 1)
 		buffer[len] = ' ';
 
-	if (_indent != indent)
-		len += snprintf(buffer + len, buffersize - len - 1,
-						" <%d> ", indent);
-
 	buffer[len] = '\0';
 	return len;
 }
 
 static void gc_print_string(struct seq_file *s, struct itemstring *str)
 {
-	int len;
-	char buffer[128];
+	int len = 0;
+	char buffer[GC_MAXSTR_LENGTH];
+
+#if GC_SHOW_DUMP_LINE
+	len += snprintf(buffer + len, sizeof(buffer) - len - GC_EOL_RESERVE,
+			GC_DUMPLINE_FORMAT, str->dumpline);
+#endif
+
+#if GC_SHOW_PID
+	len += snprintf(buffer + len, sizeof(buffer) - len - GC_EOL_RESERVE,
+			GC_PID_FORMAT, task_pid_vnr(str->task));
+#endif
 
 	/* Append the indent string. */
-	len = gc_get_indent(str->indent, buffer, sizeof(buffer));
+	len += gc_get_indent(str->indent, buffer + len,
+			     sizeof(buffer) - len - GC_EOL_RESERVE);
 
 	/* Format the string. */
-	len += vsnprintf(buffer + len, sizeof(buffer) - len - 2,
-				str->message, str->messagedata);
+	len += vsnprintf(buffer + len, sizeof(buffer) - len - GC_EOL_RESERVE,
+			 str->message, str->messagedata);
 
 	/* Add end-of-line if missing. */
 	if (buffer[len - 1] != '\n')
@@ -318,17 +404,17 @@ static void gc_print_string(struct seq_file *s, struct itemstring *str)
 }
 
 static void gc_print_generic(struct seq_file *s, struct itembuffer *item,
-				unsigned char *data)
+			     unsigned char *data)
 {
-	char buffer[256];
+	char buffer[GC_MAXSTR_LENGTH];
 	unsigned int i, indent, len;
 
 	/* Append the indent string. */
 	indent = gc_get_indent(item->indent, buffer, sizeof(buffer));
 
 	/* Print the title. */
-	GC_PRINTK(s, "%s"  "BUFFER @ 0x%08X\n",
-			buffer, item->gpuaddr);
+	GC_PRINTK(s, "%sBUFFER @ 0x%08X\n",
+		  buffer, item->gpuaddr);
 
 	/* Notify the OS that we are still alive. */
 	touch_softlockup_watchdog();
@@ -347,14 +433,12 @@ static void gc_print_generic(struct seq_file *s, struct itembuffer *item,
 				len = indent;
 			}
 
-			len += snprintf(buffer + len,
-					sizeof(buffer) - len - 2,
+			len += snprintf(buffer + len, sizeof(buffer) - len,
 					"0x%08X: ", item->gpuaddr + i);
 		}
 
 		/* Append the data value. */
-		len += snprintf(buffer + len,
-				sizeof(buffer) - len - 2,
+		len += snprintf(buffer + len, sizeof(buffer) - len,
 				" 0x%08X", *(unsigned int *) (data + i));
 	}
 
@@ -381,9 +465,9 @@ static char *gc_module_name(unsigned int index)
 }
 
 static void gc_print_command(struct seq_file *s, struct itembuffer *item,
-				unsigned char *data)
+			     unsigned char *data)
 {
-	char buffer[256];
+	char buffer[GC_MAXSTR_LENGTH];
 	unsigned int *data32;
 	unsigned int i, j, datacount;
 	unsigned int command, count, addr;
@@ -394,10 +478,8 @@ static void gc_print_command(struct seq_file *s, struct itembuffer *item,
 	gc_get_indent(item->indent, buffer, sizeof(buffer));
 
 	/* Print the title. */
-	GC_PRINTK(s, "%s"  "COMMAND BUFFER @ 0x%08X\n",
-			buffer, item->gpuaddr);
-	GC_PRINTK(s, "%s"  "  size = %d\n",
-			buffer, item->datasize);
+	GC_PRINTK(s, "%sCOMMAND BUFFER @ 0x%08X\n", buffer, item->gpuaddr);
+	GC_PRINTK(s, "%s  size = %d\n", buffer, item->datasize);
 
 	datacount = (item->datasize + 3) / 4;
 	data32 = (unsigned int *) data;
@@ -405,26 +487,35 @@ static void gc_print_command(struct seq_file *s, struct itembuffer *item,
 		command = (data32[i] >> 27) & 0x1F;
 
 		switch (command) {
-		case GCREG_COMMAND_LOAD_STATE_COMMAND_OPCODE_LOAD_STATE:
+		case GCREG_COMMAND_OPCODE_LOAD_STATE:
 			count = (data32[i] >> 16) & 0x3F;
 			addr = data32[i] & 0xFFFF;
-			GC_PRINTK(s, "%s"
-				"  0x%08X: 0x%08X  STATE(0x%04X, %d)\n",
-				buffer, item->gpuaddr + (i << 2),
-				data32[i], addr, count);
+			GC_PRINTK(s, "%s  0x%08X: 0x%08X  STATE(0x%04X, %d)\n",
+				  buffer, item->gpuaddr + (i << 2),
+				  data32[i], addr, count);
 			i += 1;
 
 			count |= 1;
 			for (j = 0; j < count; i += 1, j += 1)
-				GC_PRINTK(s, "%s"  "%14c0x%08X\n",
-					buffer, ' ', data32[i]);
+				GC_PRINTK(s, "%s%14c0x%08X\n",
+					  buffer, ' ', data32[i]);
 			break;
 
-		case GCREG_COMMAND_END_COMMAND_OPCODE_END:
-			GC_PRINTK(s, "%s"
-				"  0x%08X: 0x%08X  END()\n",
-				buffer, item->gpuaddr + (i << 2),
-				data32[i]);
+		case GCREG_COMMAND_OPCODE_END:
+			GC_PRINTK(s, "%s  0x%08X: 0x%08X  END()\n",
+				  buffer, item->gpuaddr + (i << 2),
+				  data32[i]);
+			i += 1;
+
+			GC_PRINTK(s, "%s%14c0x%08X\n",
+				  buffer, ' ', data32[i]);
+			i += 1;
+			break;
+
+		case GCREG_COMMAND_OPCODE_NOP:
+			GC_PRINTK(s, "%s  0x%08X: 0x%08X  NOP()\n",
+				  buffer, item->gpuaddr + (i << 2),
+				  data32[i]);
 			i += 1;
 
 			GC_PRINTK(s, "%s"  "%14c0x%08X\n",
@@ -432,24 +523,11 @@ static void gc_print_command(struct seq_file *s, struct itembuffer *item,
 			i += 1;
 			break;
 
-		case GCREG_COMMAND_NOP_COMMAND_OPCODE_NOP:
-			GC_PRINTK(s, "%s"
-				"  0x%08X: 0x%08X  NOP()\n",
-				buffer, item->gpuaddr + (i << 2),
-				data32[i]);
-			i += 1;
-
-			GC_PRINTK(s, "%s"  "%14c0x%08X\n",
-				buffer, ' ', data32[i]);
-			i += 1;
-			break;
-
-		case GCREG_COMMAND_START_DE_COMMAND_OPCODE_START_DE:
+		case GCREG_COMMAND_OPCODE_STARTDE:
 			count = (data32[i] >> 8) & 0xFF;
-			GC_PRINTK(s, "%s"
-				"  0x%08X: 0x%08X  STARTDE(%d)\n",
-				buffer, item->gpuaddr + (i << 2),
-				data32[i], count);
+			GC_PRINTK(s, "%s  0x%08X: 0x%08X  STARTDE(%d)\n",
+				  buffer, item->gpuaddr + (i << 2),
+				  data32[i], count);
 			i += 1;
 
 			GC_PRINTK(s, "%s"  "%14c0x%08X\n",
@@ -457,83 +535,73 @@ static void gc_print_command(struct seq_file *s, struct itembuffer *item,
 			i += 1;
 
 			for (j = 0; j < count; j += 1) {
-				x1 =  data32[i]		   & 0xFFFF;
+				x1 =  data32[i]	       & 0xFFFF;
 				y1 = (data32[i] >> 16) & 0xFFFF;
-				GC_PRINTK(s, "%s"
-					"%14c0x%08X	 LT(%d,%d)\n",
-					buffer, ' ', data32[i], x1, y1);
+				GC_PRINTK(s, "%s%14c0x%08X	 LT(%d,%d)\n",
+					  buffer, ' ', data32[i], x1, y1);
 				i += 1;
 
-				x2 =  data32[i]		   & 0xFFFF;
+				x2 =  data32[i]	       & 0xFFFF;
 				y2 = (data32[i] >> 16) & 0xFFFF;
-				GC_PRINTK(s, "%s"
-					"%14c0x%08X	 RB(%d,%d)\n",
-					buffer, ' ', data32[i], x2, y2);
+				GC_PRINTK(s, "%s%14c0x%08X	 RB(%d,%d)\n",
+					  buffer, ' ', data32[i], x2, y2);
 				i += 1;
 			}
 			break;
 
-		case GCREG_COMMAND_WAIT_COMMAND_OPCODE_WAIT:
+		case GCREG_COMMAND_OPCODE_WAIT:
 			delay = data32[i] & 0xFFFF;
-			GC_PRINTK(s, "%s"
-				"  0x%08X: 0x%08X  WAIT(%d)\n",
-				buffer, item->gpuaddr + (i << 2),
-				data32[i], delay);
+			GC_PRINTK(s, "%s  0x%08X: 0x%08X  WAIT(%d)\n",
+				  buffer, item->gpuaddr + (i << 2),
+				  data32[i], delay);
 			i += 1;
 
-			GC_PRINTK(s, "%s"  "%14c0x%08X\n",
-				buffer, ' ', data32[i]);
+			GC_PRINTK(s, "%s%14c0x%08X\n", buffer, ' ', data32[i]);
 			i += 1;
 			break;
 
-		case GCREG_COMMAND_LINK_COMMAND_OPCODE_LINK:
+		case GCREG_COMMAND_OPCODE_LINK:
 			count = data32[i] & 0xFFFF;
 			addr = data32[i + 1];
-			GC_PRINTK(s, "%s"
-				"  0x%08X: 0x%08X  LINK(0x%08X-0x%08X, %d)\n",
-				buffer, item->gpuaddr + (i << 2),
-				data32[i], addr, addr + count * 8,
-				count);
+			GC_PRINTK(s, "%s  0x%08X: 0x%08X  "
+				  "LINK(0x%08X-0x%08X, %d)\n",
+				  buffer, item->gpuaddr + (i << 2),
+				  data32[i], addr, addr + count * 8,
+				  count);
 			i += 1;
 
-			GC_PRINTK(s, "%s"  "%14c0x%08X\n",
-				buffer, ' ', data32[i]);
+			GC_PRINTK(s, "%s%14c0x%08X\n", buffer, ' ', data32[i]);
 			i += 1;
 			break;
 
-		case GCREG_COMMAND_STALL_COMMAND_OPCODE_STALL:
+		case GCREG_COMMAND_OPCODE_STALL:
 			src =  data32[i + 1]	   & 0x1F;
 			dst = (data32[i + 1] >> 8) & 0x1F;
 
-			GC_PRINTK(s, "%s"
-				"  0x%08X: 0x%08X  STALL(%s-%s)\n",
-				buffer, item->gpuaddr + (i << 2),
-				data32[i],
-				gc_module_name(src),
-				gc_module_name(dst));
+			GC_PRINTK(s, "%s  0x%08X: 0x%08X  STALL(%s-%s)\n",
+				  buffer, item->gpuaddr + (i << 2),
+				  data32[i],
+				  gc_module_name(src),
+				  gc_module_name(dst));
 			i += 1;
 
 			GC_PRINTK(s, "%s"  "%14c0x%08X\n",
-				buffer, ' ', data32[i]);
+				  buffer, ' ', data32[i]);
 			i += 1;
 			break;
 
 		default:
-			GC_PRINTK(s, "%s"
-				"  0x%08X: 0x%08X  UNKNOWN COMMAND\n",
-				buffer, item->gpuaddr + (i << 2),
-				data32[i]);
+			GC_PRINTK(s, "%s  0x%08X: 0x%08X  UNKNOWN COMMAND\n",
+				  buffer, item->gpuaddr + (i << 2),
+				  data32[i]);
 			i += 2;
 		}
 	}
 }
 
-static void gc_flush_line(struct seq_file *s,
-				char *buffer,
-				unsigned int indent,
-				unsigned int *len,
-				unsigned int count,
-				unsigned char checksum)
+static void gc_flush_line(struct seq_file *s, char *buffer,
+			  unsigned int indent, unsigned int *len,
+			  unsigned int count, unsigned char checksum)
 {
 	unsigned int _len;
 	char countstr[10];
@@ -543,18 +611,14 @@ static void gc_flush_line(struct seq_file *s,
 	if (count == 0)
 		count = GC_SURFACE_DATA_COUNT;
 
-	snprintf(countstr, sizeof(countstr) - 1, "%02X", count);
+	snprintf(countstr, sizeof(countstr), "%02X", count);
 	buffer[indent + 1] = countstr[0];
 	buffer[indent + 2] = countstr[1];
 
 	/* Append the checksum. */
 	_len = *len;
-	_len += snprintf(buffer + _len,
-			sizeof(buffer) - _len - 2,
-			"%02X", checksum);
-
-	/* Terminate the line. */
-	buffer[_len] = '\0';
+	_len += snprintf(buffer + _len, sizeof(buffer) - _len,
+			 "%02X", checksum);
 
 	/* Print the string. */
 	GC_PRINTK(s, "%s\n", buffer);
@@ -567,9 +631,9 @@ static void gc_flush_line(struct seq_file *s,
 }
 
 static void gc_print_surface(struct seq_file *s, struct itembuffer *itembuffer,
-				unsigned char *data)
+			     unsigned char *data)
 {
-	char buffer[256];
+	char buffer[GC_MAXSTR_LENGTH];
 	unsigned int i, indent, len;
 	unsigned int prevupper32 = ~0U;
 	unsigned int currupper32;
@@ -580,19 +644,18 @@ static void gc_print_surface(struct seq_file *s, struct itembuffer *itembuffer,
 	indent = gc_get_indent(itembuffer->indent, buffer, sizeof(buffer));
 
 	/* Print the title. */
-	GC_PRINTK(s, "%s"  "IMAGE SURFACE @ 0x%08X\n",
-			buffer, itembuffer->gpuaddr);
+	GC_PRINTK(s, "%sIMAGE SURFACE @ 0x%08X\n",
+		  buffer, itembuffer->gpuaddr);
 
-	GC_PRINTK(s, "%s"  "  surface size = %dx%d\n",
-			buffer, itembuffer->surfwidth,
-			itembuffer->surfheight);
+	GC_PRINTK(s, "%s  surface size = %dx%d\n",
+		  buffer, itembuffer->surfwidth, itembuffer->surfheight);
 
-	GC_PRINTK(s, "%s"  "  surface colordepth = %d\n",
-			buffer, itembuffer->surfbpp);
+	GC_PRINTK(s, "%s  surface colordepth = %d\n",
+		  buffer, itembuffer->surfbpp);
 
-	GC_PRINTK(s, "%s"  "  dumping rectangle = (%d,%d)-(%d,%d)\n",
-			buffer, itembuffer->x1, itembuffer->y1,
-			itembuffer->x2, itembuffer->y2);
+	GC_PRINTK(s, "%s  dumping rectangle = (%d,%d)-(%d,%d)\n",
+		  buffer, itembuffer->x1, itembuffer->y1,
+		  itembuffer->x2, itembuffer->y2);
 
 	/* Notify the OS that we are still alive. */
 	touch_softlockup_watchdog();
@@ -601,10 +664,10 @@ static void gc_print_surface(struct seq_file *s, struct itembuffer *itembuffer,
 	width  = itembuffer->x2 - itembuffer->x1;
 	height = itembuffer->y2 - itembuffer->y1;
 	GC_PRINTK(s, ":12000000000002000000000000000000"
-			  "%02X%02X%02X%02X%02X2000\n",
-		(width	& 0xFF), ((width  >> 8) & 0xFF),
-		(height & 0xFF), ((height >> 8) & 0xFF),
-		itembuffer->surfbpp * 8);
+		  "%02X%02X%02X%02X%02X2000\n",
+		  (width  & 0xFF), ((width  >> 8) & 0xFF),
+		  (height & 0xFF), ((height >> 8) & 0xFF),
+		  itembuffer->surfbpp * 8);
 
 	/* TGA skip header. */
 	offset = 18;
@@ -656,7 +719,7 @@ static void gc_print_surface(struct seq_file *s, struct itembuffer *itembuffer,
 }
 
 typedef void (*printbuffer) (struct seq_file *s, struct itembuffer *itembuffer,
-				unsigned char *data);
+			     unsigned char *data);
 
 static printbuffer g_printbuffer[] = {
 	gc_print_generic,
@@ -665,18 +728,19 @@ static printbuffer g_printbuffer[] = {
 };
 
 static void gc_print_buffer(struct seq_file *s, struct itembuffer *itembuffer,
-				unsigned char *data)
+			    unsigned char *data)
 {
 	if ((itembuffer->buffertype < 0) ||
 		(itembuffer->buffertype >= countof(g_printbuffer))) {
 		GC_PRINTK(s,  "BUFFER ENTRY 0x%08X\n",
-				(unsigned int) itembuffer);
+			  (unsigned int) itembuffer);
 		GC_PRINTK(s,  "INVALID BUFFER TYPE %d\n",
-				itembuffer->buffertype);
+			  itembuffer->buffertype);
 	} else {
 		g_printbuffer[itembuffer->buffertype](s, itembuffer, data);
 	}
 }
+
 
 /*******************************************************************************
  * Print function wrappers.
@@ -684,15 +748,15 @@ static void gc_print_buffer(struct seq_file *s, struct itembuffer *itembuffer,
 
 #if GC_BUFFERED_OUTPUT
 static unsigned int gc_print_none(struct seq_file *s, struct buffout *buffout,
-					struct itemhead *item)
+				  struct itemhead *item)
 {
 	/* Return the size of the node. */
 	return get_item_size_terminator(item);
 }
 
 static unsigned int gc_print_string_wrapper(struct seq_file *s,
-						struct buffout *buffout,
-						struct itemhead *item)
+					    struct buffout *buffout,
+					    struct itemhead *item)
 {
 	/* Print the message. */
 	gc_print_string(s, (struct itemstring *) item);
@@ -702,8 +766,8 @@ static unsigned int gc_print_string_wrapper(struct seq_file *s,
 }
 
 static unsigned int gc_print_buffer_wrapper(struct seq_file *s,
-						struct buffout *buffout,
-						struct itemhead *item)
+					    struct buffout *buffout,
+					    struct itemhead *item)
 {
 	unsigned char *data;
 	struct itembuffer *itembuffer = (struct itembuffer *) item;
@@ -719,7 +783,7 @@ static unsigned int gc_print_buffer_wrapper(struct seq_file *s,
 }
 
 typedef unsigned int (*printitem) (struct seq_file *s, struct buffout *buffout,
-					struct itemhead *item);
+				   struct itemhead *item);
 
 static printitem g_printarray[] = {
 	gc_print_none,
@@ -727,6 +791,7 @@ static printitem g_printarray[] = {
 	gc_print_buffer_wrapper
 };
 #endif
+
 
 /*******************************************************************************
  * Private functions.
@@ -949,18 +1014,15 @@ static void gc_buffer_flush(struct seq_file *s, struct buffout *buffout)
 	touch_softlockup_watchdog();
 
 	for (i = 0; i < buffout->count; i += 1) {
-		GC_DEBUGMSG(
-				"printing item %d of type %d @ 0x%08X.\n",
-				i, item->type, (unsigned int) item);
+		GC_DEBUGMSG("printing item %d of type %d @ 0x%08X.\n",
+			    i, item->type, (unsigned int) item);
 		skip = (*g_printarray[item->type]) (s, buffout, item);
 
 		item = (struct itemhead *) ((unsigned char *) item + skip);
-		GC_DEBUGMSG("next item @ 0x%08X.\n",
-				(unsigned int) item);
+		GC_DEBUGMSG("next item @ 0x%08X.\n", (unsigned int) item);
 
 		if (item->type == GC_BUFITEM_NONE) {
-			GC_DEBUGMSG(
-					"reached the end of buffer.\n");
+			GC_DEBUGMSG("reached the end of buffer.\n");
 			item = (struct itemhead *) buffout->buffer;
 		}
 	}
@@ -1047,7 +1109,7 @@ static struct itemhead *gc_allocate_item(struct buffout *buffout, int size)
 }
 
 static void gc_append_string(struct buffout *buffout,
-				struct itemstring *itemstring)
+			     struct itemstring *itemstring)
 {
 	unsigned char *messagedata;
 	struct itemstring *item;
@@ -1062,7 +1124,7 @@ static void gc_append_string(struct buffout *buffout,
 	/* Allocate the item. */
 	item = (struct itemstring *) gc_allocate_item(buffout, allocsize);
 	GC_DEBUGMSG("allocated %d bytes @ 0x%08X.\n",
-				allocsize, (unsigned int) item);
+		    allocsize, (unsigned int) item);
 
 	/* Compute the initial message data pointer. */
 	messagedata = (unsigned char *) (item + 1);
@@ -1070,8 +1132,7 @@ static void gc_append_string(struct buffout *buffout,
 	/* Align the data pointer as necessary. */
 	alignment = GC_PTRALIGNMENT(messagedata, GC_VARARG_ALIGNMENT);
 	messagedata += alignment;
-	GC_DEBUGMSG("messagedata @ 0x%08X.\n",
-				(unsigned int) messagedata);
+	GC_DEBUGMSG("messagedata @ 0x%08X.\n", (unsigned int) messagedata);
 
 	/* Set item data. */
 	item->itemtype = GC_BUFITEM_STRING;
@@ -1080,13 +1141,21 @@ static void gc_append_string(struct buffout *buffout,
 	item->messagedata = *(va_list *) &messagedata;
 	item->datasize = itemstring->datasize;
 
+#if GC_SHOW_PID
+	item->task = itemstring->task;
+#endif
+
+#if GC_SHOW_DUMP_LINE
+	item->dumpline = itemstring->dumpline;
+#endif
+
 	/* Copy argument value. */
 	if (itemstring->datasize != 0) {
 		GC_DEBUGMSG("copying %d bytes of messagedata.\n",
-					itemstring->datasize);
+			    itemstring->datasize);
 		memcpy(messagedata,
-			   *(unsigned char **) &itemstring->messagedata,
-			   itemstring->datasize);
+		       *(unsigned char **) &itemstring->messagedata,
+		       itemstring->datasize);
 	}
 
 	/* Compute the actual node size. */
@@ -1127,7 +1196,7 @@ static void gc_append_buffer(struct gcmmucontext *gcmmucontext,
 	/* Allocate the item. */
 	item = (struct itembuffer *) gc_allocate_item(buffout, allocsize);
 	GC_DEBUGMSG("allocated %d bytes @ 0x%08X.\n",
-				allocsize, (unsigned int) item);
+		    allocsize, (unsigned int) item);
 
 	/* Set item data. */
 	*item = *itembuffer;
@@ -1160,20 +1229,35 @@ static void gc_append_buffer(struct gcmmucontext *gcmmucontext,
 #endif
 
 static void gc_print(struct buffout *buffout, unsigned int argsize,
-			const char *message, va_list args)
+		     const char *message, va_list args)
 {
 	struct itemstring itemstring;
+	struct threadinfo *threadinfo;
+
+	mutex_lock(&g_lockmutex);
+
+	/* Locate thead entry. */
+	threadinfo = get_threadinfo(buffout);
 
 	/* Form the indent string. */
 	if (strncmp(message, "--", 2) == 0)
-		buffout->indent -= 2;
+		threadinfo->msgindent -= 2;
 
 	/* Fill in the sructure. */
 	itemstring.itemtype = GC_BUFITEM_STRING;
-	itemstring.indent = buffout->indent;
+	itemstring.indent = threadinfo->msgindent
+			  + threadinfo->threadindent;
 	itemstring.message = message;
 	itemstring.messagedata = args;
 	itemstring.datasize = argsize;
+
+#if GC_SHOW_PID
+	itemstring.task = threadinfo->task;
+#endif
+
+#if GC_SHOW_DUMP_LINE
+	itemstring.dumpline = ++buffout->dumpline;
+#endif
 
 	/* Print the message. */
 #if GC_BUFFERED_OUTPUT
@@ -1184,8 +1268,11 @@ static void gc_print(struct buffout *buffout, unsigned int argsize,
 
 	/* Check increasing indent. */
 	if (strncmp(message, "++", 2) == 0)
-		buffout->indent += 2;
+		threadinfo->msgindent += 2;
+
+	mutex_unlock(&g_lockmutex);
 }
+
 
 /*******************************************************************************
  * Dumping functions.
@@ -1200,14 +1287,10 @@ void gc_dump_string(struct gcdbgfilter *filter, unsigned int zone,
 	if (!g_outputbuffer.enable)
 		return;
 
-	mutex_lock(&g_lockmutex);
-
-#if GC_DEBUG_SELF
 	if (message == NULL)
 		GC_DEBUGMSG("message is NULL.\n");
-#endif
 
-	if (g_initdone && ((filter == NULL) || ((filter->zone & zone) != 0))) {
+	if (GC_VERIFY_ENABLE(filter, zone)) {
 		for (i = 0, count = 0; message[i]; i += 1)
 			if (message[i] == '%')
 				count += 1;
@@ -1219,8 +1302,6 @@ void gc_dump_string(struct gcdbgfilter *filter, unsigned int zone,
 		gc_print(&g_outputbuffer, argsize, message, args);
 		va_end(args);
 	}
-
-	mutex_unlock(&g_lockmutex);
 }
 EXPORT_SYMBOL(gc_dump_string);
 
@@ -1232,15 +1313,11 @@ void gc_dump_string_sized(struct gcdbgfilter *filter, unsigned int zone,
 	if (!g_outputbuffer.enable)
 		return;
 
-	mutex_lock(&g_lockmutex);
-
-	if (g_initdone && ((filter == NULL) || ((filter->zone & zone) != 0))) {
+	if (GC_VERIFY_ENABLE(filter, zone)) {
 		va_start(args, message);
 		gc_print(&g_outputbuffer, argsize, message, args);
 		va_end(args);
 	}
-
-	mutex_unlock(&g_lockmutex);
 }
 EXPORT_SYMBOL(gc_dump_string_sized);
 
@@ -1248,17 +1325,22 @@ void gc_dump_cmd_buffer(struct gcdbgfilter *filter, unsigned int zone,
 			void *ptr, unsigned int gpuaddr, unsigned int datasize)
 {
 	struct itembuffer itembuffer;
+	struct threadinfo *threadinfo;
 
 	if (!g_outputbuffer.enable)
 		return;
 
-	mutex_lock(&g_lockmutex);
+	if (GC_VERIFY_ENABLE(filter, zone)) {
+		mutex_lock(&g_lockmutex);
 
-	if (g_initdone && ((filter == NULL) || ((filter->zone & zone) != 0))) {
+		/* Locate thead entry. */
+		threadinfo = get_threadinfo(&g_outputbuffer);
+
 		/* Fill in the sructure. */
 		itembuffer.itemtype = GC_BUFITEM_BUFFER;
 		itembuffer.buffertype = GC_BUFTYPE_COMMAND;
-		itembuffer.indent = g_outputbuffer.indent;
+		itembuffer.indent = threadinfo->msgindent
+				  + threadinfo->threadindent;
 		itembuffer.datasize = datasize;
 		itembuffer.gpuaddr = gpuaddr;
 
@@ -1270,9 +1352,9 @@ void gc_dump_cmd_buffer(struct gcdbgfilter *filter, unsigned int zone,
 		gc_print_buffer(NULL, &itembuffer,
 					(unsigned char *) ptr);
 #endif
-	}
 
-	mutex_unlock(&g_lockmutex);
+		mutex_unlock(&g_lockmutex);
+	}
 }
 EXPORT_SYMBOL(gc_dump_cmd_buffer);
 
@@ -1281,17 +1363,22 @@ void gc_dump_buffer(struct gcdbgfilter *filter, unsigned int zone,
 			unsigned int datasize)
 {
 	struct itembuffer itembuffer;
+	struct threadinfo *threadinfo;
 
 	if (!g_outputbuffer.enable)
 		return;
 
-	mutex_lock(&g_lockmutex);
+	if (GC_VERIFY_ENABLE(filter, zone)) {
+		mutex_lock(&g_lockmutex);
 
-	if (g_initdone && ((filter == NULL) || ((filter->zone & zone) != 0))) {
+		/* Locate thead entry. */
+		threadinfo = get_threadinfo(&g_outputbuffer);
+
 		/* Fill in the sructure. */
 		itembuffer.itemtype = GC_BUFITEM_BUFFER;
 		itembuffer.buffertype = GC_BUFTYPE_GENERIC;
-		itembuffer.indent = g_outputbuffer.indent;
+		itembuffer.indent = threadinfo->msgindent
+				  + threadinfo->threadindent;
 		itembuffer.datasize = datasize;
 		itembuffer.gpuaddr = gpuaddr;
 
@@ -1303,9 +1390,9 @@ void gc_dump_buffer(struct gcdbgfilter *filter, unsigned int zone,
 		gc_print_buffer(NULL, &itembuffer,
 					(unsigned char *) ptr);
 #endif
-	}
 
-	mutex_unlock(&g_lockmutex);
+		mutex_unlock(&g_lockmutex);
+	}
 }
 EXPORT_SYMBOL(gc_dump_buffer);
 
@@ -1315,6 +1402,7 @@ void gc_dump_phys_buffer(struct gcdbgfilter *filter, unsigned int zone,
 				unsigned int datasize)
 {
 	struct itembuffer itembuffer;
+	struct threadinfo *threadinfo;
 
 #if !GC_BUFFERED_OUTPUT
 	void *data;
@@ -1323,13 +1411,17 @@ void gc_dump_phys_buffer(struct gcdbgfilter *filter, unsigned int zone,
 	if (!g_outputbuffer.enable)
 		return;
 
-	mutex_lock(&g_lockmutex);
+	if (GC_VERIFY_ENABLE(filter, zone)) {
+		mutex_lock(&g_lockmutex);
 
-	if (g_initdone && ((filter == NULL) || ((filter->zone & zone) != 0))) {
+		/* Locate thead entry. */
+		threadinfo = get_threadinfo(&g_outputbuffer);
+
 		/* Fill in the sructure. */
 		itembuffer.itemtype = GC_BUFITEM_BUFFER;
 		itembuffer.buffertype = GC_BUFTYPE_GENERIC;
-		itembuffer.indent = g_outputbuffer.indent;
+		itembuffer.indent = threadinfo->msgindent
+				  + threadinfo->threadindent;
 		itembuffer.datasize = datasize;
 		itembuffer.gpuaddr = gpuaddr;
 
@@ -1346,9 +1438,9 @@ void gc_dump_phys_buffer(struct gcdbgfilter *filter, unsigned int zone,
 			kfree(data);
 		}
 #endif
-	}
 
-	mutex_unlock(&g_lockmutex);
+		mutex_unlock(&g_lockmutex);
+	}
 }
 EXPORT_SYMBOL(gc_dump_phys_buffer);
 
@@ -1360,21 +1452,26 @@ void gc_dump_surface(struct gcdbgfilter *filter, unsigned int zone,
 			unsigned int gpuaddr)
 {
 	struct itembuffer itembuffer;
+	struct threadinfo *threadinfo;
 	unsigned int datasize;
 
 	if (!g_outputbuffer.enable)
 		return;
 
-	mutex_lock(&g_lockmutex);
+	if (GC_VERIFY_ENABLE(filter, zone)) {
+		mutex_lock(&g_lockmutex);
 
-	if (g_initdone && ((filter == NULL) || ((filter->zone & zone) != 0))) {
+		/* Locate thead entry. */
+		threadinfo = get_threadinfo(&g_outputbuffer);
+
 		/* Compute data size. */
 		datasize = (x2 - x1) * (y2 - y1) * surfbpp;
 
 		/* Fill in the sructure. */
 		itembuffer.itemtype = GC_BUFITEM_BUFFER;
 		itembuffer.buffertype = GC_BUFTYPE_SURFACE;
-		itembuffer.indent = g_outputbuffer.indent;
+		itembuffer.indent = threadinfo->msgindent
+				  + threadinfo->threadindent;
 		itembuffer.surfwidth = surfwidth;
 		itembuffer.surfheight = surfheight;
 		itembuffer.surfbpp = surfbpp;
@@ -1393,9 +1490,9 @@ void gc_dump_surface(struct gcdbgfilter *filter, unsigned int zone,
 		gc_print_buffer(NULL, &itembuffer,
 					(unsigned char *) ptr);
 #endif
-	}
 
-	mutex_unlock(&g_lockmutex);
+		mutex_unlock(&g_lockmutex);
+	}
 }
 EXPORT_SYMBOL(gc_dump_surface);
 
@@ -1408,6 +1505,7 @@ void gc_dump_phys_surface(struct gcdbgfilter *filter, unsigned int zone,
 				unsigned int gpuaddr)
 {
 	struct itembuffer itembuffer;
+	struct threadinfo *threadinfo;
 	unsigned int datasize;
 
 #if !GC_BUFFERED_OUTPUT
@@ -1417,16 +1515,20 @@ void gc_dump_phys_surface(struct gcdbgfilter *filter, unsigned int zone,
 	if (!g_outputbuffer.enable)
 		return;
 
-	mutex_lock(&g_lockmutex);
+	if (GC_VERIFY_ENABLE(filter, zone)) {
+		mutex_lock(&g_lockmutex);
 
-	if (g_initdone && ((filter == NULL) || ((filter->zone & zone) != 0))) {
+		/* Locate thead entry. */
+		threadinfo = get_threadinfo(&g_outputbuffer);
+
 		/* Compute data size. */
 		datasize = (x2 - x1) * (y2 - y1) * surfbpp;
 
 		/* Fill in the sructure. */
 		itembuffer.itemtype = GC_BUFITEM_BUFFER;
 		itembuffer.buffertype = GC_BUFTYPE_SURFACE;
-		itembuffer.indent = g_outputbuffer.indent;
+		itembuffer.indent = threadinfo->msgindent
+				  + threadinfo->threadindent;
 		itembuffer.surfwidth = surfwidth;
 		itembuffer.surfheight = surfheight;
 		itembuffer.surfbpp = surfbpp;
@@ -1450,11 +1552,12 @@ void gc_dump_phys_surface(struct gcdbgfilter *filter, unsigned int zone,
 			kfree(data);
 		}
 #endif
-	}
 
-	mutex_unlock(&g_lockmutex);
+		mutex_unlock(&g_lockmutex);
+	}
 }
 EXPORT_SYMBOL(gc_dump_phys_surface);
+
 
 /*******************************************************************************
  * MMU dumping functions.
@@ -1597,6 +1700,7 @@ void gc_dump_mmu(struct gcdbgfilter *filter, unsigned int zone,
 }
 EXPORT_SYMBOL(gc_dump_mmu);
 
+
 /*******************************************************************************
  * Dumping control functions.
  */
@@ -1733,6 +1837,7 @@ void gc_dump_reset(void)
 }
 EXPORT_SYMBOL(gc_dump_reset);
 
+
 /*******************************************************************************
  * Command buffer parser.
  */
@@ -1754,7 +1859,7 @@ int gc_parse_command_buffer(unsigned int *buffer, unsigned int size,
 		command = (buffer[i] >> 27) & 0x1F;
 
 		switch (command) {
-		case GCREG_COMMAND_LOAD_STATE_COMMAND_OPCODE_LOAD_STATE:
+		case GCREG_COMMAND_OPCODE_LOAD_STATE:
 			count = (buffer[i] >> 16) & 0x3F;
 			addr = buffer[i] & 0xFFFF;
 			i += 1;
@@ -1926,15 +2031,15 @@ int gc_parse_command_buffer(unsigned int *buffer, unsigned int size,
 			i += ((~count) & 1);
 			break;
 
-		case GCREG_COMMAND_END_COMMAND_OPCODE_END:
-		case GCREG_COMMAND_NOP_COMMAND_OPCODE_NOP:
-		case GCREG_COMMAND_WAIT_COMMAND_OPCODE_WAIT:
-		case GCREG_COMMAND_LINK_COMMAND_OPCODE_LINK:
-		case GCREG_COMMAND_STALL_COMMAND_OPCODE_STALL:
+		case GCREG_COMMAND_OPCODE_END:
+		case GCREG_COMMAND_OPCODE_NOP:
+		case GCREG_COMMAND_OPCODE_WAIT:
+		case GCREG_COMMAND_OPCODE_LINK:
+		case GCREG_COMMAND_OPCODE_STALL:
 			i += 2;
 			break;
 
-		case GCREG_COMMAND_START_DE_COMMAND_OPCODE_START_DE:
+		case GCREG_COMMAND_OPCODE_STARTDE:
 			info->dst.rectcount = (buffer[i] >> 8) & 0xFF;
 			i += 2;
 
@@ -1975,163 +2080,6 @@ exit:
 	return res;
 }
 EXPORT_SYMBOL(gc_parse_command_buffer);
-
-/* TODO: merge this with gpu status caching in gcdebug.c */
-void gc_gpu_status(struct gcdbgfilter *filter, unsigned int zone,
-			char *function, int line, unsigned int *acknowledge)
-{
-	int i;
-	unsigned int idle;
-	unsigned int dma_state, dma_addr;
-	unsigned int dma_low_data, dma_high_data;
-	unsigned int status;
-	unsigned int mmu;
-	unsigned int address;
-	unsigned int total_reads;
-	unsigned int total_writes;
-	unsigned int total_read_bursts;
-	unsigned int total_write_bursts;
-	unsigned int total_read_reqs;
-	unsigned int total_write_reqs;
-
-	gc_dump_string(filter, zone,
-			"Current GPU status requested from %s(%d).\n",
-			function, line);
-
-	idle = gc_read_reg(GCREG_HI_IDLE_Address);
-	gc_dump_string(filter, zone,
-			"  idle = 0x%08X\n",
-			idle);
-
-	dma_state = gc_read_reg(GCREG_FE_DEBUG_STATE_Address);
-	gc_dump_string(filter, zone,
-			"  DMA state = 0x%08X\n",
-				dma_state);
-
-	dma_addr = gc_read_reg(GCREG_FE_DEBUG_CUR_CMD_ADR_Address);
-	gc_dump_string(filter, zone,
-			"  DMA address = 0x%08X\n",
-			dma_addr);
-
-	dma_low_data = gc_read_reg(GCREG_FE_DEBUG_CMD_LOW_REG_Address);
-	gc_dump_string(filter, zone,
-			"  DMA low data = 0x%08X\n",
-			dma_low_data);
-
-	dma_high_data = gc_read_reg(GCREG_FE_DEBUG_CMD_HI_REG_Address);
-	gc_dump_string(filter, zone,
-			"  DMA high data = 0x%08X\n",
-			dma_high_data);
-
-	total_reads = gc_read_reg(GC_TOTAL_READS_Address);
-	gc_dump_string(filter, zone,
-			"  Total memory reads = %d\n",
-			total_reads);
-
-	total_writes = gc_read_reg(GC_TOTAL_WRITES_Address);
-	gc_dump_string(filter, zone,
-			"  Total memory writes = %d\n",
-			total_writes);
-
-	total_read_bursts = gc_read_reg(GC_TOTAL_READ_BURSTS_Address);
-	gc_dump_string(filter, zone,
-			"  Total memory read 64-bit bursts = %d\n",
-			total_read_bursts);
-
-	total_write_bursts = gc_read_reg(GC_TOTAL_WRITE_BURSTS_Address);
-	gc_dump_string(filter, zone,
-			"  Total memory write 64-bit bursts = %d\n",
-			total_write_bursts);
-
-	total_read_reqs = gc_read_reg(GC_TOTAL_READ_REQS_Address);
-	gc_dump_string(filter, zone,
-			"  Total memory read requests = %d\n",
-			total_read_reqs);
-
-	total_write_reqs = gc_read_reg(GC_TOTAL_WRITE_REQS_Address);
-	gc_dump_string(filter, zone,
-			"  Total memory write requests = %d\n",
-			total_write_reqs);
-
-	if (acknowledge != NULL)
-		gc_dump_string(filter, zone,
-				"  interrupt acknowledge = 0x%08X\n",
-				*acknowledge);
-
-	if (*acknowledge & 0x80000000)
-		gc_dump_string(filter, zone,
-				"  *** BUS ERROR ***\n");
-
-	if (*acknowledge & 0x40000000) {
-		unsigned int mtlb, stlb, offset;
-
-		gc_dump_string(filter, zone,
-				"  *** MMU ERROR ***\n");
-
-		status = gc_read_reg(GCREG_MMU_STATUS_Address);
-		gc_dump_string(filter, zone,
-				"  MMU status = 0x%08X\n",
-				status);
-
-		for (i = 0; i < 4; i += 1) {
-			mmu = status & 0xF;
-			status >>= 4;
-
-			if (mmu == 0)
-				continue;
-
-			switch (mmu) {
-			case 1:
-				gc_dump_string(filter, zone,
-						"  MMU%d: slave not present\n",
-						i);
-				break;
-
-			case 2:
-				gc_dump_string(filter, zone,
-						"  MMU%d: page not present\n",
-						i);
-				break;
-
-			case 3:
-				gc_dump_string(filter, zone,
-						"  MMU%d: write violation\n",
-						i);
-				break;
-
-			default:
-				gc_dump_string(filter, zone,
-						"  MMU%d: unknown state\n",
-						i);
-			}
-
-			address = gc_read_reg(GCREG_MMU_EXCEPTION_Address + i);
-
-			mtlb   = (address & GCMMU_MTLB_MASK)
-						>> GCMMU_MTLB_SHIFT;
-			stlb   = (address & GCMMU_STLB_MASK)
-						>> GCMMU_STLB_SHIFT;
-			offset =  address & GCMMU_OFFSET_MASK;
-
-			gc_dump_string(filter, zone,
-					"  MMU%d: exception address = 0x%08X\n",
-					i, address);
-
-			gc_dump_string(filter, zone,
-					"	 MTLB entry = %d\n",
-					mtlb);
-
-			gc_dump_string(filter, zone,
-					"	 STLB entry = %d\n",
-					stlb);
-
-			gc_dump_string(filter, zone,
-					"	 Offset = 0x%08X (%d)\n",
-					offset, offset);
-		}
-	}
-}
-EXPORT_SYMBOL(gc_gpu_status);
 
 /*******************************************************************************
  * Bltsville debugging.
@@ -2180,6 +2128,7 @@ char *gc_bvblend_name(enum bvblend blend)
 	}
 }
 EXPORT_SYMBOL(gc_bvblend_name);
+
 
 /*******************************************************************************
  * Initialization/cleanup.

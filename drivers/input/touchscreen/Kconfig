@@ -761,4 +761,13 @@ config TOUCHSCREEN_ILITEK
 
 	  To compile this driver as a module, choose M here.
 
+config TOUCHSCREEN_CYPRESS_TTSP
+	tristate "Cypress True Touch touchscreens"
+	depends on I2C
+	help
+	  Say Y here if you have a Cypress true touch touchscreen.
+
+	  If unsure, say N.
+
+
 endif

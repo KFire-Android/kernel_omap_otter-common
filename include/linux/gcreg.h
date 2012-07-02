@@ -19,54 +19,52 @@
 ** Register access macros.
 */
 
-#define __GCSTART(reg_field) \
+#define GCREGSTART(reg_field) \
 ( \
 	0 ? reg_field \
 )
 
-#define __GCEND(reg_field) \
+#define GCREGEND(reg_field) \
 ( \
 	1 ? reg_field \
 )
 
-#define __GCGETSIZE(reg_field) \
+#define GCREGSIZE(reg_field) \
 ( \
-	__GCEND(reg_field) - __GCSTART(reg_field) + 1 \
+	GCREGEND(reg_field) - GCREGSTART(reg_field) + 1 \
 )
 
-#define __GCALIGN(data, reg_field) \
+#define GCREGALIGN(data, reg_field) \
 ( \
-	((unsigned int) (data)) << __GCSTART(reg_field) \
+	((unsigned int) (data)) << GCREGSTART(reg_field) \
 )
 
-#define __GCMASK(reg_field) \
-	((__GCGETSIZE(reg_field) == 32) \
-		?  ~0U \
-		: (unsigned int) (~(~0UL << __GCGETSIZE(reg_field))))
-
-#define SETFIELDVAL(data, reg, field, value) \
+#define GCREGMASK(reg_field) \
 ( \
-	(((unsigned int) (data)) \
-		& ~__GCALIGN(__GCMASK(reg##_##field), reg##_##field)) \
-		|  __GCALIGN(reg##_##field##_##value \
-			&  __GCMASK(reg##_##field), reg##_##field) \
+	GCREGALIGN(~0UL >> (32 - GCREGSIZE(reg_field)), reg_field) \
 )
 
-#define SETFIELD(data, reg, field, value) \
+#define GCSETFIELDVAL(data, reg, field, value) \
 ( \
-	(((unsigned int) (data)) \
-		& ~__GCALIGN(__GCMASK(reg##_##field), reg##_##field)) \
-		|  __GCALIGN((unsigned int) (value) \
-			&  __GCMASK(reg##_##field), reg##_##field) \
+	(((unsigned int) (data)) & ~GCREGMASK(reg##_##field)) \
+	| (GCREGALIGN(reg##_##field##_##value, reg##_##field) \
+		& GCREGMASK(reg##_##field)) \
 )
 
-#define GETFIELD(data, reg, field) \
+#define GCSETFIELD(data, reg, field, value) \
 ( \
-	((((unsigned int) (data)) >> __GCSTART(reg##_##field)) \
-		& __GCMASK(reg##_##field)) \
+	(((unsigned int) (data)) & ~GCREGMASK(reg##_##field)) \
+	| (GCREGALIGN((unsigned int) (value), reg##_##field) \
+		& GCREGMASK(reg##_##field)) \
 )
 
-#define REGVALUE(reg, field, val) \
+#define GCGETFIELD(data, reg, field) \
+( \
+	(((unsigned int) (data)) & GCREGMASK(reg##_##field)) \
+	>> GCREGSTART(reg##_##field) \
+)
+
+#define GCREGVALUE(reg, field, val) \
 ( \
 	reg##_##field##_##val \
 )
@@ -1823,62 +1821,75 @@ union gcidle {
 #define GC_TOTAL_IDLE_CYCLES_CYCLES_Type                                     U32
 
 /*******************************************************************************
+** Command opcodes.
+*/
+
+#define GCREG_COMMAND_OPCODE_LOAD_STATE                                     0x01
+#define GCREG_COMMAND_OPCODE_END                                            0x02
+#define GCREG_COMMAND_OPCODE_NOP                                            0x03
+#define GCREG_COMMAND_OPCODE_STARTDE                                        0x04
+#define GCREG_COMMAND_OPCODE_WAIT                                           0x07
+#define GCREG_COMMAND_OPCODE_LINK                                           0x08
+#define GCREG_COMMAND_OPCODE_STALL                                          0x09
+#define GCREG_COMMAND_OPCODE_CALL                                           0x0A
+#define GCREG_COMMAND_OPCODE_RETURN                                         0x0B
+
+/*******************************************************************************
 ** Command gcregCommandLoadState
 */
 
 /* When enabled, convert 16.16 fixed point into 32-bit floating point. */
-#define GCREG_COMMAND_LOAD_STATE_COMMAND_FLOAT                           26 : 26
-#define GCREG_COMMAND_LOAD_STATE_COMMAND_FLOAT_End                            26
-#define GCREG_COMMAND_LOAD_STATE_COMMAND_FLOAT_Start                          26
-#define GCREG_COMMAND_LOAD_STATE_COMMAND_FLOAT_Type                          U01
-#define   GCREG_COMMAND_LOAD_STATE_COMMAND_FLOAT_NORMAL                      0x0
-#define   GCREG_COMMAND_LOAD_STATE_COMMAND_FLOAT_FIXED16_DOT16               0x1
+#define GCREG_COMMAND_LOAD_STATE_FLOAT                                   26 : 26
+#define GCREG_COMMAND_LOAD_STATE_FLOAT_End                                    26
+#define GCREG_COMMAND_LOAD_STATE_FLOAT_Start                                  26
+#define GCREG_COMMAND_LOAD_STATE_FLOAT_Type                                  U01
+#define   GCREG_COMMAND_LOAD_STATE_FLOAT_NORMAL                              0x0
+#define   GCREG_COMMAND_LOAD_STATE_FLOAT_FIXED16_DOT16                       0x1
 
 /* Number of states. 0 = 1024. */
-#define GCREG_COMMAND_LOAD_STATE_COMMAND_COUNT                           25 : 16
-#define GCREG_COMMAND_LOAD_STATE_COMMAND_COUNT_End                            25
-#define GCREG_COMMAND_LOAD_STATE_COMMAND_COUNT_Start                          16
-#define GCREG_COMMAND_LOAD_STATE_COMMAND_COUNT_Type                          U10
+#define GCREG_COMMAND_LOAD_STATE_COUNT                                   25 : 16
+#define GCREG_COMMAND_LOAD_STATE_COUNT_End                                    25
+#define GCREG_COMMAND_LOAD_STATE_COUNT_Start                                  16
+#define GCREG_COMMAND_LOAD_STATE_COUNT_Type                                  U10
 
 /* Starting state address. */
-#define GCREG_COMMAND_LOAD_STATE_COMMAND_ADDRESS                          15 : 0
-#define GCREG_COMMAND_LOAD_STATE_COMMAND_ADDRESS_End                          15
-#define GCREG_COMMAND_LOAD_STATE_COMMAND_ADDRESS_Start                         0
-#define GCREG_COMMAND_LOAD_STATE_COMMAND_ADDRESS_Type                        U16
+#define GCREG_COMMAND_LOAD_STATE_ADDRESS                                  15 : 0
+#define GCREG_COMMAND_LOAD_STATE_ADDRESS_End                                  15
+#define GCREG_COMMAND_LOAD_STATE_ADDRESS_Start                                 0
+#define GCREG_COMMAND_LOAD_STATE_ADDRESS_Type                                U16
 
-#define GCREG_COMMAND_LOAD_STATE_COMMAND_OPCODE                          31 : 27
-#define GCREG_COMMAND_LOAD_STATE_COMMAND_OPCODE_End                           31
-#define GCREG_COMMAND_LOAD_STATE_COMMAND_OPCODE_Start                         27
-#define GCREG_COMMAND_LOAD_STATE_COMMAND_OPCODE_Type                         U05
-#define   GCREG_COMMAND_LOAD_STATE_COMMAND_OPCODE_LOAD_STATE                0x01
+#define GCREG_COMMAND_LOAD_STATE_OPCODE                                  31 : 27
+#define GCREG_COMMAND_LOAD_STATE_OPCODE_End                                   31
+#define GCREG_COMMAND_LOAD_STATE_OPCODE_Start                                 27
+#define GCREG_COMMAND_LOAD_STATE_OPCODE_Type                                 U05
 
 struct gccmdldstate {
-	/* gcregCommandLoadState:GCREG_COMMAND_LOAD_STATE_COMMAND_ADDRESS */
+	/* gcregCommandLoadState:GCREG_COMMAND_LOAD_STATE_ADDRESS */
 	unsigned int address:16;
 
-	/* gcregCommandLoadState:GCREG_COMMAND_LOAD_STATE_COMMAND_COUNT */
+	/* gcregCommandLoadState:GCREG_COMMAND_LOAD_STATE_COUNT */
 	unsigned int count:10;
 
-	/* gcregCommandLoadState:GCREG_COMMAND_LOAD_STATE_COMMAND_FLOAT */
+	/* gcregCommandLoadState:GCREG_COMMAND_LOAD_STATE_FLOAT */
 	unsigned int fixed:1;
 
-	/* gcregCommandLoadState:GCREG_COMMAND_LOAD_STATE_COMMAND_OPCODE */
+	/* gcregCommandLoadState:GCREG_COMMAND_LOAD_STATE_OPCODE */
 	unsigned int opcode:5;
 };
 
 #define GCLDSTATE(Address, Count) \
 { \
-	/* gcregCommandLoadState:GCREG_COMMAND_LOAD_STATE_COMMAND_ADDRESS */ \
+	/* gcregCommandLoadState:GCREG_COMMAND_LOAD_STATE_ADDRESS */ \
 	Address, \
 	\
-	/* gcregCommandLoadState:GCREG_COMMAND_LOAD_STATE_COMMAND_COUNT */ \
+	/* gcregCommandLoadState:GCREG_COMMAND_LOAD_STATE_COUNT */ \
 	Count, \
 	\
-	/* gcregCommandLoadState:GCREG_COMMAND_LOAD_STATE_COMMAND_FLOAT */ \
-	GCREG_COMMAND_LOAD_STATE_COMMAND_FLOAT_NORMAL, \
+	/* gcregCommandLoadState:GCREG_COMMAND_LOAD_STATE_FLOAT */ \
+	GCREG_COMMAND_LOAD_STATE_FLOAT_NORMAL, \
 	\
-	/* gcregCommandLoadState:GCREG_COMMAND_LOAD_STATE_COMMAND_OPCODE */ \
-	GCREG_COMMAND_LOAD_STATE_COMMAND_OPCODE_LOAD_STATE \
+	/* gcregCommandLoadState:GCREG_COMMAND_LOAD_STATE_OPCODE */ \
+	GCREG_COMMAND_OPCODE_LOAD_STATE \
 }
 
 /*******************************************************************************
@@ -1886,37 +1897,38 @@ struct gccmdldstate {
 */
 
 /* Send event when END is completed. */
-#define GCREG_COMMAND_END_COMMAND_EVENT_ENABLE                             8 : 8
-#define GCREG_COMMAND_END_COMMAND_EVENT_ENABLE_End                             8
-#define GCREG_COMMAND_END_COMMAND_EVENT_ENABLE_Start                           8
-#define GCREG_COMMAND_END_COMMAND_EVENT_ENABLE_Type                          U01
+#define GCREG_COMMAND_END_EVENT                                            8 : 8
+#define GCREG_COMMAND_END_EVENT_End                                            8
+#define GCREG_COMMAND_END_EVENT_Start                                          8
+#define GCREG_COMMAND_END_EVENT_Type                                         U01
+#define   GCREG_COMMAND_END_EVENT_DISABLE                                    0x0
+#define   GCREG_COMMAND_END_EVENT_ENABLE                                     0x1
 
 /* Event ID to be send. */
-#define GCREG_COMMAND_END_COMMAND_EVENT_ID                                 4 : 0
-#define GCREG_COMMAND_END_COMMAND_EVENT_ID_End                                 4
-#define GCREG_COMMAND_END_COMMAND_EVENT_ID_Start                               0
-#define GCREG_COMMAND_END_COMMAND_EVENT_ID_Type                              U05
+#define GCREG_COMMAND_END_EVENT_ID                                         4 : 0
+#define GCREG_COMMAND_END_EVENT_ID_End                                         4
+#define GCREG_COMMAND_END_EVENT_ID_Start                                       0
+#define GCREG_COMMAND_END_EVENT_ID_Type                                      U05
 
-#define GCREG_COMMAND_END_COMMAND_OPCODE                                 31 : 27
-#define GCREG_COMMAND_END_COMMAND_OPCODE_End                                  31
-#define GCREG_COMMAND_END_COMMAND_OPCODE_Start                                27
-#define GCREG_COMMAND_END_COMMAND_OPCODE_Type                                U05
-#define   GCREG_COMMAND_END_COMMAND_OPCODE_END                              0x02
+#define GCREG_COMMAND_END_OPCODE                                         31 : 27
+#define GCREG_COMMAND_END_OPCODE_End                                          31
+#define GCREG_COMMAND_END_OPCODE_Start                                        27
+#define GCREG_COMMAND_END_OPCODE_Type                                        U05
 
 struct gcfldend {
-	/* gcregCommandEnd:GCREG_COMMAND_END_COMMAND_EVENT_ID */
+	/* gcregCommandEnd:GCREG_COMMAND_END_EVENT_ID */
 	unsigned int signalid:5;
 
 	/* gcregCommandEnd:reserved */
 	unsigned int _reserved_5_7:3;
 
-	/* gcregCommandEnd:GCREG_COMMAND_END_COMMAND_EVENT_ENABLE */
+	/* gcregCommandEnd:GCREG_COMMAND_END_EVENT_ENABLE */
 	unsigned int signal:1;
 
 	/* gcregCommandEnd:reserved */
 	unsigned int _reserved_9_26:18;
 
-	/* gcregCommandEnd:GCREG_COMMAND_END_COMMAND_OPCODE */
+	/* gcregCommandEnd:GCREG_COMMAND_END_OPCODE */
 	unsigned int opcode:5;
 };
 
@@ -1931,38 +1943,46 @@ struct gccmdend {
 	unsigned int _filler;
 };
 
-static const struct gcfldend gcfldend = {
-	/* gcregCommandEnd:GCREG_COMMAND_END_COMMAND_EVENT_ID */
-	0,
+static const struct gccmdend gccmdend_const = {
+	/* cmd */
+	{
+		/* fld */
+		{
+			/* gcregCommandEnd:GCREG_COMMAND_END_EVENT_ID */
+			0,
 
-	/* gcregCommandEnd:reserved */
-	0,
+			/* gcregCommandEnd:reserved */
+			0,
 
-	/* gcregCommandEnd:GCREG_COMMAND_END_COMMAND_EVENT_ENABLE */
-	0,
+			/* gcregCommandEnd:GCREG_COMMAND_END_EVENT */
+			GCREG_COMMAND_END_EVENT_DISABLE,
 
-	/* gcregCommandEnd:reserved */
-	0,
+			/* gcregCommandEnd:reserved */
+			0,
 
-	/* gcregCommandEnd:GCREG_COMMAND_END_COMMAND_OPCODE */
-	GCREG_COMMAND_END_COMMAND_OPCODE_END
+			/* gcregCommandEnd:GCREG_COMMAND_END_OPCODE */
+			GCREG_COMMAND_OPCODE_END
+		}
+	},
+
+	/* Alignment filler. */
+	0
 };
 
 /*******************************************************************************
 ** Command gcregCommandNop
 */
 
-#define GCREG_COMMAND_NOP_COMMAND_OPCODE                                 31 : 27
-#define GCREG_COMMAND_NOP_COMMAND_OPCODE_End                                  31
-#define GCREG_COMMAND_NOP_COMMAND_OPCODE_Start                                27
-#define GCREG_COMMAND_NOP_COMMAND_OPCODE_Type                                U05
-#define   GCREG_COMMAND_NOP_COMMAND_OPCODE_NOP                              0x03
+#define GCREG_COMMAND_NOP_OPCODE                                         31 : 27
+#define GCREG_COMMAND_NOP_OPCODE_End                                          31
+#define GCREG_COMMAND_NOP_OPCODE_Start                                        27
+#define GCREG_COMMAND_NOP_OPCODE_Type                                        U05
 
 struct gcfldnop {
 	/* gcregCommandNop:reserve */
 	unsigned int _reserved_0_26:27;
 
-	/* gcregCommandNop:GCREG_COMMAND_NOP_COMMAND_OPCODE */
+	/* gcregCommandNop:GCREG_COMMAND_NOP_OPCODE */
 	unsigned int opcode:5;
 };
 
@@ -1977,12 +1997,21 @@ struct gccmdnop {
 	unsigned int _filler;
 };
 
-static const struct gcfldnop gcfldnop = {
-	/* gcregCommandNop:reserve */
-	0,
+static const struct gccmdnop gccmdnop_const = {
+	/* cmd */
+	{
+		/* fld */
+		{
+			/* gcregCommandNop:reserve */
+			0,
 
-	/* gcregCommandNop:GCREG_COMMAND_NOP_COMMAND_OPCODE */
-	GCREG_COMMAND_NOP_COMMAND_OPCODE_NOP
+			/* gcregCommandNop:GCREG_COMMAND_NOP_OPCODE */
+			GCREG_COMMAND_OPCODE_NOP
+		}
+	},
+
+	/* Alignment filler. */
+	0
 };
 
 /*******************************************************************************
@@ -1995,36 +2024,35 @@ static const struct gcfldnop gcfldnop = {
 /* Number of 32-bit data words to send.
 ** The data follows the rectangles, aligned at 64-bit.
 */
-#define GCREG_COMMAND_START_DE_COMMAND_DATA_COUNT                        26 : 16
-#define GCREG_COMMAND_START_DE_COMMAND_DATA_COUNT_End                         26
-#define GCREG_COMMAND_START_DE_COMMAND_DATA_COUNT_Start                       16
-#define GCREG_COMMAND_START_DE_COMMAND_DATA_COUNT_Type                       U11
+#define GCREG_COMMAND_STARTDE_DATA_COUNT                                 26 : 16
+#define GCREG_COMMAND_STARTDE_DATA_COUNT_End                                  26
+#define GCREG_COMMAND_STARTDE_DATA_COUNT_Start                                16
+#define GCREG_COMMAND_STARTDE_DATA_COUNT_Type                                U11
 
 /* Number of rectangles to send.
 ** The rectangles follow the command, aligned at 64-bit.
 */
-#define GCREG_COMMAND_START_DE_COMMAND_COUNT                              15 : 8
-#define GCREG_COMMAND_START_DE_COMMAND_COUNT_End                              15
-#define GCREG_COMMAND_START_DE_COMMAND_COUNT_Start                             8
-#define GCREG_COMMAND_START_DE_COMMAND_COUNT_Type                            U08
+#define GCREG_COMMAND_STARTDE_COUNT                                       15 : 8
+#define GCREG_COMMAND_STARTDE_COUNT_End                                       15
+#define GCREG_COMMAND_STARTDE_COUNT_Start                                      8
+#define GCREG_COMMAND_STARTDE_COUNT_Type                                     U08
 
-#define GCREG_COMMAND_START_DE_COMMAND_OPCODE                            31 : 27
-#define GCREG_COMMAND_START_DE_COMMAND_OPCODE_End                             31
-#define GCREG_COMMAND_START_DE_COMMAND_OPCODE_Start                           27
-#define GCREG_COMMAND_START_DE_COMMAND_OPCODE_Type                           U05
-#define   GCREG_COMMAND_START_DE_COMMAND_OPCODE_START_DE                    0x04
+#define GCREG_COMMAND_STARTDE_OPCODE                                     31 : 27
+#define GCREG_COMMAND_STARTDE_OPCODE_End                                      31
+#define GCREG_COMMAND_STARTDE_OPCODE_Start                                    27
+#define GCREG_COMMAND_STARTDE_OPCODE_Type                                    U05
 
 struct gcfldstartde {
 	/* gcregCommandStartDE:reserved */
 	unsigned int _reserved_0_7:8;
 
-	/* gcregCommandStartDE:GCREG_COMMAND_START_DE_COMMAND_COUNT */
+	/* gcregCommandStartDE:GCREG_COMMAND_STARTDE_COUNT */
 	unsigned int rectcount:8;
 
-	/* gcregCommandStartDE:GCREG_COMMAND_START_DE_COMMAND_DATA_COUNT */
+	/* gcregCommandStartDE:GCREG_COMMAND_STARTDE_DATA_COUNT */
 	unsigned int datacount:11;
 
-	/* gcregCommandStartDE:GCREG_COMMAND_START_DE_COMMAND_OPCODE */
+	/* gcregCommandStartDE:GCREG_COMMAND_STARTDE_OPCODE */
 	unsigned int opcode:5;
 };
 
@@ -2042,14 +2070,14 @@ static const struct gcfldstartde gcfldstartde = {
 	/* gcregCommandStartDE:reserved */
 	0,
 
-	/* gcregCommandStartDE:GCREG_COMMAND_START_DE_COMMAND_COUNT */
+	/* gcregCommandStartDE:GCREG_COMMAND_STARTDE_COUNT */
 	1,
 
-	/* gcregCommandStartDE:GCREG_COMMAND_START_DE_COMMAND_DATA_COUNT */
+	/* gcregCommandStartDE:GCREG_COMMAND_STARTDE_DATA_COUNT */
 	0,
 
-	/* gcregCommandStartDE:GCREG_COMMAND_START_DE_COMMAND_OPCODE */
-	GCREG_COMMAND_START_DE_COMMAND_OPCODE_START_DE
+	/* gcregCommandStartDE:GCREG_COMMAND_STARTDE_OPCODE */
+	GCREG_COMMAND_OPCODE_STARTDE
 };
 
 /* Offset TopLeft
@@ -2097,25 +2125,24 @@ struct gccmdstartderect {
 */
 
 /* Number of cycles to wait until the next command gets fetched. */
-#define GCREG_COMMAND_WAIT_COMMAND_DELAY                                  15 : 0
-#define GCREG_COMMAND_WAIT_COMMAND_DELAY_End                                  15
-#define GCREG_COMMAND_WAIT_COMMAND_DELAY_Start                                 0
-#define GCREG_COMMAND_WAIT_COMMAND_DELAY_Type                                U16
+#define GCREG_COMMAND_WAIT_DELAY                                          15 : 0
+#define GCREG_COMMAND_WAIT_DELAY_End                                          15
+#define GCREG_COMMAND_WAIT_DELAY_Start                                         0
+#define GCREG_COMMAND_WAIT_DELAY_Type                                        U16
 
-#define GCREG_COMMAND_WAIT_COMMAND_OPCODE                                31 : 27
-#define GCREG_COMMAND_WAIT_COMMAND_OPCODE_End                                 31
-#define GCREG_COMMAND_WAIT_COMMAND_OPCODE_Start                               27
-#define GCREG_COMMAND_WAIT_COMMAND_OPCODE_Type                               U05
-#define   GCREG_COMMAND_WAIT_COMMAND_OPCODE_WAIT                            0x07
+#define GCREG_COMMAND_WAIT_OPCODE                                        31 : 27
+#define GCREG_COMMAND_WAIT_OPCODE_End                                         31
+#define GCREG_COMMAND_WAIT_OPCODE_Start                                       27
+#define GCREG_COMMAND_WAIT_OPCODE_Type                                       U05
 
 struct gcfldwait {
-	/* gcregCommandWait:GCREG_COMMAND_WAIT_COMMAND_DELAY */
+	/* gcregCommandWait:GCREG_COMMAND_WAIT_DELAY */
 	unsigned int delay:16;
 
 	/* gcregCommandWait:reserved */
 	unsigned int _reserved_16_26:11;
 
-	/* gcregCommandWait:GCREG_COMMAND_WAIT_COMMAND_OPCODE */
+	/* gcregCommandWait:GCREG_COMMAND_WAIT_OPCODE */
 	unsigned int opcode:5;
 };
 
@@ -2130,14 +2157,14 @@ struct gccmdwait {
 };
 
 static const struct gcfldwait gcfldwait200 = {
-	/* gcregCommandWait:GCREG_COMMAND_WAIT_COMMAND_DELAY */
+	/* gcregCommandWait:GCREG_COMMAND_WAIT_DELAY */
 	200,
 
 	/* gcregCommandWait:reserved */
 	0,
 
-	/* gcregCommandWait:GCREG_COMMAND_WAIT_COMMAND_OPCODE */
-	GCREG_COMMAND_WAIT_COMMAND_OPCODE_WAIT
+	/* gcregCommandWait:GCREG_COMMAND_WAIT_OPCODE */
+	GCREG_COMMAND_OPCODE_WAIT
 };
 
 /*******************************************************************************
@@ -2148,16 +2175,15 @@ static const struct gcfldwait gcfldwait200 = {
 ** nothing else will be fetched.  So, make sure that the last command in the
 ** new command buffer is either an END, a LINK, a CALL, or a RETURN.
 */
-#define GCREG_COMMAND_LINK_COMMAND_PREFETCH                               15 : 0
-#define GCREG_COMMAND_LINK_COMMAND_PREFETCH_End                               15
-#define GCREG_COMMAND_LINK_COMMAND_PREFETCH_Start                              0
-#define GCREG_COMMAND_LINK_COMMAND_PREFETCH_Type                             U16
+#define GCREG_COMMAND_LINK_PREFETCH                                       15 : 0
+#define GCREG_COMMAND_LINK_PREFETCH_End                                       15
+#define GCREG_COMMAND_LINK_PREFETCH_Start                                      0
+#define GCREG_COMMAND_LINK_PREFETCH_Type                                     U16
 
-#define GCREG_COMMAND_LINK_COMMAND_OPCODE                                31 : 27
-#define GCREG_COMMAND_LINK_COMMAND_OPCODE_End                                 31
-#define GCREG_COMMAND_LINK_COMMAND_OPCODE_Start                               27
-#define GCREG_COMMAND_LINK_COMMAND_OPCODE_Type                               U05
-#define   GCREG_COMMAND_LINK_COMMAND_OPCODE_LINK                            0x08
+#define GCREG_COMMAND_LINK_OPCODE                                        31 : 27
+#define GCREG_COMMAND_LINK_OPCODE_End                                         31
+#define GCREG_COMMAND_LINK_OPCODE_Start                                       27
+#define GCREG_COMMAND_LINK_OPCODE_Type                                       U05
 
 /* Offset Address
 ** ~~~~~~~~~~~~~~ */
@@ -2170,13 +2196,13 @@ static const struct gcfldwait gcfldwait200 = {
 #define GCREG_COMMAND_LINK_ADDRESS_ADDRESS_Type                              U31
 
 struct gcfldlink {
-	/* gcregCommandLink:GCREG_COMMAND_LINK_COMMAND_PREFETCH */
+	/* gcregCommandLink:GCREG_COMMAND_LINK_PREFETCH */
 	unsigned int count:16;
 
 	/* gcregCommandLink:reserved */
 	unsigned int _reserved_16_26:11;
 
-	/* gcregCommandLink:GCREG_COMMAND_LINK_COMMAND_OPCODE */
+	/* gcregCommandLink:GCREG_COMMAND_LINK_OPCODE */
 	unsigned int opcode:5;
 };
 
@@ -2190,15 +2216,26 @@ struct gccmdlink {
 	unsigned int address;
 };
 
+static const struct gcfldlink gcfldlink2 = {
+	/* gcregCommandLink:GCREG_COMMAND_LINK_PREFETCH */
+	2,
+
+	/* gcregCommandLink:reserved */
+	0,
+
+	/* gcregCommandLink:GCREG_COMMAND_LINK_OPCODE */
+	GCREG_COMMAND_OPCODE_LINK
+};
+
 static const struct gcfldlink gcfldlink4 = {
-	/* gcregCommandLink:GCREG_COMMAND_LINK_COMMAND_PREFETCH */
+	/* gcregCommandLink:GCREG_COMMAND_LINK_PREFETCH */
 	4,
 
 	/* gcregCommandLink:reserved */
 	0,
 
-	/* gcregCommandLink:GCREG_COMMAND_LINK_COMMAND_OPCODE */
-	GCREG_COMMAND_LINK_COMMAND_OPCODE_LINK
+	/* gcregCommandLink:GCREG_COMMAND_LINK_OPCODE */
+	GCREG_COMMAND_OPCODE_LINK
 };
 
 /*******************************************************************************
@@ -2207,11 +2244,10 @@ static const struct gcfldlink gcfldlink4 = {
 
 /* Offset Command
 ** ~~~~~~~~~~~~~~ */
-#define GCREG_COMMAND_STALL_COMMAND_OPCODE                               31 : 27
-#define GCREG_COMMAND_STALL_COMMAND_OPCODE_End                                31
-#define GCREG_COMMAND_STALL_COMMAND_OPCODE_Start                              27
-#define GCREG_COMMAND_STALL_COMMAND_OPCODE_Type                              U05
-#define   GCREG_COMMAND_STALL_COMMAND_OPCODE_STALL                          0x09
+#define GCREG_COMMAND_STALL_OPCODE                                       31 : 27
+#define GCREG_COMMAND_STALL_OPCODE_End                                        31
+#define GCREG_COMMAND_STALL_OPCODE_Start                                      27
+#define GCREG_COMMAND_STALL_OPCODE_Type                                      U05
 
 /* Offset Stall
 ** ~~~~~~~~~~~~ */
@@ -2235,7 +2271,7 @@ struct gcfldstall {
 	/* gcregCommandStall:reserved */
 	unsigned int _reserved_0_26:27;
 
-	/* gcregCommandStall:GCREG_COMMAND_STALL_COMMAND_OPCODE */
+	/* gcregCommandStall:GCREG_COMMAND_STALL_OPCODE */
 	unsigned int opcode:5;
 };
 
@@ -2269,8 +2305,8 @@ static const struct gcfldstall gcfldstall = {
 	/* gcregCommandStall:reserved */
 	0,
 
-	/* gcregCommandStall:GCREG_COMMAND_STALL_COMMAND_OPCODE */
-	GCREG_COMMAND_STALL_COMMAND_OPCODE_STALL
+	/* gcregCommandStall:GCREG_COMMAND_STALL_OPCODE */
+	GCREG_COMMAND_OPCODE_STALL
 };
 
 static const struct gcfldstallarg gcfldstall_fe_pe = {
@@ -2298,16 +2334,15 @@ static const struct gcfldstallarg gcfldstall_fe_pe = {
 ** nothing else will be fetched.  So, make sure that the last command in the
 ** new command buffer is either an END, a LINK, a CALL, or a RETURN.
 */
-#define GCREG_COMMAND_CALL_COMMAND_PREFETCH                               15 : 0
-#define GCREG_COMMAND_CALL_COMMAND_PREFETCH_End                               15
-#define GCREG_COMMAND_CALL_COMMAND_PREFETCH_Start                              0
-#define GCREG_COMMAND_CALL_COMMAND_PREFETCH_Type                             U16
+#define GCREG_COMMAND_CALL_PREFETCH                                       15 : 0
+#define GCREG_COMMAND_CALL_PREFETCH_End                                       15
+#define GCREG_COMMAND_CALL_PREFETCH_Start                                      0
+#define GCREG_COMMAND_CALL_PREFETCH_Type                                     U16
 
-#define GCREG_COMMAND_CALL_COMMAND_OPCODE                                31 : 27
-#define GCREG_COMMAND_CALL_COMMAND_OPCODE_End                                 31
-#define GCREG_COMMAND_CALL_COMMAND_OPCODE_Start                               27
-#define GCREG_COMMAND_CALL_COMMAND_OPCODE_Type                               U05
-#define   GCREG_COMMAND_CALL_COMMAND_OPCODE_CALL                            0x0A
+#define GCREG_COMMAND_CALL_OPCODE                                        31 : 27
+#define GCREG_COMMAND_CALL_OPCODE_End                                         31
+#define GCREG_COMMAND_CALL_OPCODE_Start                                       27
+#define GCREG_COMMAND_CALL_OPCODE_Type                                       U05
 
 /* Offset Address
 ** ~~~~~~~~~~~~~~ */
@@ -2338,13 +2373,13 @@ static const struct gcfldstallarg gcfldstall_fe_pe = {
 #define GCREG_COMMAND_CALL_RETURN_ADDRESS_ADDRESS_Type                       U31
 
 struct gccmdcall {
-	/* gcregCommandCall:GCREG_COMMAND_CALL_COMMAND_PREFETCH */
+	/* gcregCommandCall:GCREG_COMMAND_CALL_PREFETCH */
 	unsigned int count:16;
 
 	/* gcregCommandCall:reserved */
 	unsigned int _reserved_16_26:11;
 
-	/* gcregCommandCall:GCREG_COMMAND_CALL_COMMAND_OPCODE */
+	/* gcregCommandCall:GCREG_COMMAND_CALL_OPCODE */
 	unsigned int opcode:5;
 
 	/* gcregCommandCall:GCREG_COMMAND_CALL_ADDRESS_ADDRESS */
@@ -2361,17 +2396,16 @@ struct gccmdcall {
 ** Command gccmdCommandReturn
 */
 
-#define GCREG_COMMAND_RETURN_COMMAND_OPCODE                              31 : 27
-#define GCREG_COMMAND_RETURN_COMMAND_OPCODE_End                               31
-#define GCREG_COMMAND_RETURN_COMMAND_OPCODE_Start                             27
-#define GCREG_COMMAND_RETURN_COMMAND_OPCODE_Type                             U05
-#define   GCREG_COMMAND_RETURN_COMMAND_OPCODE_RETURN                        0x0B
+#define GCREG_COMMAND_RETURN_OPCODE                                      31 : 27
+#define GCREG_COMMAND_RETURN_OPCODE_End                                       31
+#define GCREG_COMMAND_RETURN_OPCODE_Start                                     27
+#define GCREG_COMMAND_RETURN_OPCODE_Type                                     U05
 
 struct gcfldret {
 	/* gccmdCommandReturn:reserve */
 	unsigned int _reserved_0_26:27;
 
-	/* gccmdCommandReturn:GCREG_COMMAND_RETURN_COMMAND_OPCODE */
+	/* gccmdCommandReturn:GCREG_COMMAND_RETURN_OPCODE */
 	unsigned int opcode:5;
 };
 
@@ -2390,8 +2424,8 @@ static const struct gcfldret gcfldret = {
 	/* gccmdCommandReturn:reserve */
 	0,
 
-	/* gccmdCommandReturn:GCREG_COMMAND_RETURN_COMMAND_OPCODE */
-	GCREG_COMMAND_RETURN_COMMAND_OPCODE_RETURN
+	/* gccmdCommandReturn:GCREG_COMMAND_RETURN_OPCODE */
+	GCREG_COMMAND_OPCODE_RETURN
 };
 
 /*******************************************************************************
@@ -2464,6 +2498,14 @@ struct gcregpipeselect {
 static const struct gcregpipeselect gcregpipeselect_2D = {
 	/* gcregPipeSelectRegAddrs:GCREG_PIPE_SELECT_PIPE */
 	GCREG_PIPE_SELECT_PIPE_PIPE2D,
+
+	/* gcregPipeSelectRegAddrs:reserved */
+	0
+};
+
+static const struct gcregpipeselect gcregpipeselect_3D = {
+	/* gcregPipeSelectRegAddrs:GCREG_PIPE_SELECT_PIPE */
+	GCREG_PIPE_SELECT_PIPE_PIPE3D,
 
 	/* gcregPipeSelectRegAddrs:reserved */
 	0
@@ -8203,6 +8245,28 @@ struct gcmosema {
 ** Modular operations: mmuinit
 */
 
+struct gcmoterminator {
+	union {
+		struct gcmosignal done;
+		struct gccmdnop nop;
+	} u1;
+
+	union {
+		struct gccmdwait wait;
+		struct gccmdlink linknext;
+		struct gccmdend end;
+	} u2;
+
+	union {
+		struct gccmdlink linkwait;
+		struct gccmdnop nop;
+	} u3;
+};
+
+/*******************************************************************************
+** Modular operations: mmuinit
+*/
+
 static const struct gccmdldstate gcmommuinit_safe_ldst =
 	GCLDSTATE(gcregMMUSafeAddressRegAddrs, 2);
 
@@ -8349,6 +8413,34 @@ static const struct gccmdldstate gcmosrc_stride_ldst[4] = {
 	GCLDSTATE(gcregBlock4SrcStrideRegAddrs + 1, 1),
 	GCLDSTATE(gcregBlock4SrcStrideRegAddrs + 2, 1),
 	GCLDSTATE(gcregBlock4SrcStrideRegAddrs + 3, 1),
+};
+
+static const struct gccmdldstate gcmosrc_uplaneaddress_ldst[4] = {
+	GCLDSTATE(gcregUPlaneAddressRegAddrs + 0, 1),
+	GCLDSTATE(gcregUPlaneAddressRegAddrs + 1, 1),
+	GCLDSTATE(gcregUPlaneAddressRegAddrs + 2, 1),
+	GCLDSTATE(gcregUPlaneAddressRegAddrs + 3, 1),
+};
+
+static const struct gccmdldstate gcmosrc_uplanestride_ldst[4] = {
+	GCLDSTATE(gcregUPlaneStrideRegAddrs + 0, 1),
+	GCLDSTATE(gcregUPlaneStrideRegAddrs + 1, 1),
+	GCLDSTATE(gcregUPlaneStrideRegAddrs + 2, 1),
+	GCLDSTATE(gcregUPlaneStrideRegAddrs + 3, 1),
+};
+
+static const struct gccmdldstate gcmosrc_vplaneaddress_ldst[4] = {
+	GCLDSTATE(gcregVPlaneAddressRegAddrs + 0, 1),
+	GCLDSTATE(gcregVPlaneAddressRegAddrs + 1, 1),
+	GCLDSTATE(gcregVPlaneAddressRegAddrs + 2, 1),
+	GCLDSTATE(gcregVPlaneAddressRegAddrs + 3, 1),
+};
+
+static const struct gccmdldstate gcmosrc_vplanestride_ldst[4] = {
+	GCLDSTATE(gcregVPlaneStrideRegAddrs + 0, 1),
+	GCLDSTATE(gcregVPlaneStrideRegAddrs + 1, 1),
+	GCLDSTATE(gcregVPlaneStrideRegAddrs + 2, 1),
+	GCLDSTATE(gcregVPlaneStrideRegAddrs + 3, 1),
 };
 
 static const struct gccmdldstate gcmosrc_rotation_ldst[4] = {
@@ -8512,6 +8604,24 @@ struct gcmosrc {
 			struct gcregalphacontrol reg;
 			unsigned int raw;
 		} alphacontrol;
+};
+
+struct gcmosrcplanaryuv {
+	/* gcregUPlaneAddressRegAddrs */
+	struct gccmdldstate uplaneaddress_ldst;
+		unsigned int uplaneaddress;
+
+	/* gcregUPlaneStrideRegAddrs */
+	struct gccmdldstate uplanestride_ldst;
+		unsigned int uplanestride;
+
+	/* gcregVPlaneAddressRegAddrs */
+	struct gccmdldstate vplaneaddress_ldst;
+		unsigned int vplaneaddress;
+
+	/* gcregVPlaneStrideRegAddrs */
+	struct gccmdldstate vplanestride_ldst;
+		unsigned int vplanestride;
 };
 
 struct gcmosrcalpha {

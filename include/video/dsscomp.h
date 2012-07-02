@@ -56,6 +56,22 @@ enum omap_color_mode {
 	OMAP_DSS_COLOR_XRGB16_1555	= 1 << 18, /* xRGB16-1555 */
 };
 
+/* Writeback data structures */
+enum omap_writeback_source {
+	OMAP_WB_LCD1		= 0,
+	OMAP_WB_TV		= 1,
+	OMAP_WB_LCD2		= 2,
+	OMAP_WB_GFX		= 3,
+	OMAP_WB_VID1		= 4,
+	OMAP_WB_VID2		= 5,
+	OMAP_WB_VID3		= 6
+};
+
+enum omap_writeback_mode {
+	OMAP_WB_CAPTURE_MODE	= 0x0,
+	OMAP_WB_MEM2MEM_MODE	= 0x1,
+};
+
 enum omap_dss_trans_key_type {
 	OMAP_DSS_COLOR_KEY_GFX_DST = 0,
 	OMAP_DSS_COLOR_KEY_VID_SRC = 1,
@@ -334,6 +350,8 @@ struct dss2_ovl_cfg {
 	struct omap_dss_cconv_coefs cconv;
 	struct dss2_vc1_range_map_info vc1;
 
+	__u8 wb_source; /* pipe: is source or not, wb: capture device id */
+	enum omap_writeback_mode wb_mode;
 	__u8 ix;	/* ovl index same as sysfs/overlay# */
 	__u8 zorder;	/* 0..3 */
 	__u8 enabled;	/* bool */
@@ -632,6 +650,52 @@ struct dsscomp_wait_data {
 	enum dsscomp_wait_phase phase;	/* phase to wait for */
 };
 
+enum dsscomp_fbmem_type {
+	DSSCOMP_FBMEM_TILER2D = 0,
+	DSSCOMP_FBMEM_VRAM = 1,
+};
+
+/*
+ * ioctl: DSSCIOC_QUERY_PLATFORM, struct dsscomp_platform_info
+ *
+ * Use this ioctl to get platform information needed to decide
+ * DSS/DSSCOMP capabilities, by filling out the passed structure with:
+ *
+ * A) predecimation limits
+ * B) maximum fclk (DSS is assumed to scale up to this fclk automatically
+ *    to support frames)
+ * C) minimum and maximum sizes (for now we use the same limits for
+ *    both source and window sizes, which works for OMAP4/5)
+ * D) scaler limitations. (assuming same max downscale limitation both
+ *    horizontally/vertically; however, fclock requirements are only
+ *    dependent on horizontal scaling, which works for OMAP4 ES1.1+ and
+ *    OMAP5 only).
+ *    integer_scale_ratio_limit is the maximum source width to round up
+ *    fclock/pixclock to an integer.
+ * E) Tiler1D slot size
+ *
+ * Returns: 0 on success, <0 error value on failure (unlikely)
+ */
+
+struct dsscomp_platform_info {
+	/* decimation limits for 2D and 1D buffers */
+	__u8 max_xdecim_2d;
+	__u8 max_ydecim_2d;
+	__u8 max_xdecim_1d;
+	__u8 max_ydecim_1d;
+	__u32 fclk;		/* dispc max fclk */
+	/* pipeline source/destination limits */
+	__u8 min_width;
+	__u16 max_width;
+	__u16 max_height;
+	/* scaler limitations */
+	__u8 max_downscale;
+	/* below this width, we assume integer pixelclk scale */
+	__u16 integer_scale_ratio_limit;
+	__u32 tiler1d_slot_size;
+	enum dsscomp_fbmem_type fbmem_type; /* TILER2D vs VRAM */
+};
+
 /* IOCTLS */
 #define DSSCIOC_SETUP_MGR	_IOW('O', 128, struct dsscomp_setup_mgr_data)
 #define DSSCIOC_CHECK_OVL	_IOWR('O', 129, struct dsscomp_check_ovl_data)
@@ -641,4 +705,5 @@ struct dsscomp_wait_data {
 
 #define DSSCIOC_SETUP_DISPC	_IOW('O', 133, struct dsscomp_setup_dispc_data)
 #define DSSCIOC_SETUP_DISPLAY	_IOW('O', 134, struct dsscomp_setup_display_data)
+#define DSSCIOC_QUERY_PLATFORM	_IOR('O', 135, struct dsscomp_platform_info)
 #endif

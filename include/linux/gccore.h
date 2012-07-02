@@ -15,7 +15,7 @@
 #ifndef GCCORE_H
 #define GCCORE_H
 
-#include <linux/sched.h>
+#include "sched.h"
 #include "gcioctl.h"
 
 /* Command buffer submission. */
