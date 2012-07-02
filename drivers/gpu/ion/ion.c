@@ -83,6 +83,7 @@ static struct ion_buffer *ion_buffer_create(struct ion_heap *heap,
 	}
 	buffer->dev = dev;
 	buffer->size = len;
+	buffer->cached = false;
 	mutex_init(&buffer->lock);
 	ion_buffer_add(dev, buffer);
 	return buffer;
@@ -899,6 +900,60 @@ err:
 	return ret;
 }
 
+static int ion_flush_cached(struct ion_handle *handle, size_t size,
+			   unsigned long vaddr)
+{
+	struct ion_buffer *buffer;
+	int ret;
+
+	if (!handle->buffer->heap->ops->flush_user) {
+		pr_err("%s: this heap does not define a method for flushing\n",
+				__func__);
+		return -EINVAL;
+	}
+
+	buffer = handle->buffer;
+
+	mutex_lock(&buffer->lock);
+	/* now flush buffer mapped to userspace */
+	ret = buffer->heap->ops->flush_user(buffer, size, vaddr);
+	mutex_unlock(&buffer->lock);
+	if (ret) {
+		pr_err("%s: failure flushing buffer\n",
+		       __func__);
+		return ret;
+	}
+
+	return 0;
+}
+
+static int ion_inval_cached(struct ion_handle *handle, size_t size,
+			   unsigned long vaddr)
+{
+	struct ion_buffer *buffer;
+	int ret;
+
+	if (!handle->buffer->heap->ops->inval_user) {
+		pr_err("%s: this heap does not define a method for invalidating\n",
+				__func__);
+		return -EINVAL;
+	}
+
+	buffer = handle->buffer;
+
+	mutex_lock(&buffer->lock);
+	/* now flush buffer mapped to userspace */
+	ret = buffer->heap->ops->inval_user(buffer, size, vaddr);
+	mutex_unlock(&buffer->lock);
+	if (ret) {
+		pr_err("%s: failure invalidating buffer\n",
+		       __func__);
+		return ret;
+	}
+
+	return 0;
+}
+
 static const struct file_operations ion_share_fops = {
 	.owner		= THIS_MODULE,
 	.release	= ion_share_release,
@@ -975,6 +1030,9 @@ static long ion_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 			mutex_unlock(&client->lock);
 			return -EINVAL;
 		}
+
+		if (cmd == ION_IOC_MAP)
+			data.handle->buffer->cached = data.cacheable;
 		data.fd = ion_ioctl_share(filp, client, data.handle);
 		mutex_unlock(&client->lock);
 		if (copy_to_user((void __user *)arg, &data, sizeof(data)))
@@ -1008,6 +1066,51 @@ static long ion_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 			return -EFAULT;
 		return dev->custom_ioctl(client, data.cmd, data.arg);
 	}
+
+	case ION_IOC_FLUSH_CACHED:
+	{
+		struct ion_cached_user_buf_data data;
+		int ret;
+
+		if (copy_from_user(&data, (void __user *)arg, sizeof(data)))
+			return -EFAULT;
+		if (!ion_handle_validate(client, data.handle)) {
+			pr_err("%s: invalid handle passed to cache flush ioctl.\n",
+			       __func__);
+			mutex_unlock(&client->lock);
+			return -EINVAL;
+		}
+
+		ret = ion_flush_cached(data.handle, data.size, data.vaddr);
+		if (ret)
+			return ret;
+		if (copy_to_user((void __user *)arg, &data, sizeof(data)))
+			return -EFAULT;
+		break;
+	}
+
+	case ION_IOC_INVAL_CACHED:
+	{
+		struct ion_cached_user_buf_data data;
+		int ret;
+
+		if (copy_from_user(&data, (void __user *)arg, sizeof(data)))
+			return -EFAULT;
+		if (!ion_handle_validate(client, data.handle)) {
+			pr_err("%s: invalid handle passed to cache inval ioctl.\n",
+			       __func__);
+			mutex_unlock(&client->lock);
+			return -EINVAL;
+		}
+
+		ret = ion_inval_cached(data.handle, data.size, data.vaddr);
+		if (ret)
+			return ret;
+		if (copy_to_user((void __user *)arg, &data, sizeof(data)))
+			return -EFAULT;
+		break;
+	}
+
 	default:
 		return -ENOTTY;
 	}

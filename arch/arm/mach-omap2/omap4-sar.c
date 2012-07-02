@@ -16,6 +16,8 @@
 #include <linux/clk.h>
 #include <linux/delay.h>
 
+#include <plat/usb.h>
+
 #include <mach/omap4-common.h>
 #include <mach/ctrl_module_wkup_44xx.h>
 
@@ -34,6 +36,7 @@
 
 /* OMAP4 modulemode control */
 #define OMAP4430_MODULEMODE_SWCTRL			1
+#define OMAP4430_USBHOST_CTX_NUM			9
 
 static void __iomem *sar_ram_base;
 static void __iomem *omap4_sar_modules[MAX_SAR_MODULES];

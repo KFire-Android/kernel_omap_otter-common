@@ -419,6 +419,7 @@ static void __init omap4_check_revision(void)
 		idcode = read_cpuid(CPUID_ID);
 		rev = (idcode & 0xf) - 1;
 	}
+
 	switch (hawkeye) {
 	case 0xb852:
 		switch (rev) {

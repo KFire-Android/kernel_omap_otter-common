@@ -766,14 +766,9 @@ static int rproc_add_mem_entry(struct rproc *rproc, struct fw_resource *rsc)
 		 * carveouts we don't care about in a core dump.
 		 * Perhaps the ION carveout should be reported as RSC_DEVMEM.
 		 */
-
-#ifdef CONFIG_ION_OMAP_DYNAMIC
-		me->core = (rsc->type == RSC_CARVEOUT && rsc->pa != 0x80000000);
-#else
 		me->core = (rsc->type == RSC_CARVEOUT &&
 				strcmp(rsc->name, "IPU_MEM_IOBUFS") &&
 				strcmp(rsc->name, "DSP_MEM_IOBUFS"));
-#endif
 #endif
 	}
 
@@ -810,7 +805,7 @@ static int rproc_check_poolmem(struct rproc *rproc, u32 size, phys_addr_t pa)
 	}
 
 	if (pa < pool->st_base || pa + size > pool->st_base + pool->st_size) {
-		pr_warn("section size does not fit within carveout memory pa=%p size=0x%x pool (pa=%p, size=%d)\n", pa, size, pool->st_base,pool->st_size);
+		pr_warn("section size does not fit within carveout memory\n");
 		return -ENOSPC;
 	}
 
@@ -899,10 +894,6 @@ static int rproc_handle_resources(struct rproc *rproc, struct fw_resource *rsc,
 				}
 				rsc->pa = pa;
 			} else {
-				pr_info("RSC_CARVEOUT handle_resources, name == %s\n", rsc->name);
-#ifdef CONFIG_ION_OMAP_DYNAMIC
-				if (strcmp(rsc->name, "IPU_MEM_IOBUFS") != 0)
-#endif
 				ret = rproc_check_poolmem(rproc, rsc->len, pa);
 				/*
 				 * ignore the error for DSP buffers as they can
