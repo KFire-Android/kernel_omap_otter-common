@@ -617,6 +617,7 @@ static struct platform_device *omap5evm_devices[] __initdata = {
 
 static struct pca953x_platform_data omap5evm_gpio_expander_info = {
 	.gpio_base	= OMAP_MAX_GPIO_LINES,
+	.irq_base	= OMAP_TCA6424_IRQ_BASE,
 };
 
 static struct i2c_board_info __initdata omap5evm_i2c_5_boardinfo[] = {
