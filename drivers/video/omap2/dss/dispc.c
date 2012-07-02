@@ -38,6 +38,8 @@
 #include <linux/pm_runtime.h>
 
 #include <plat/clock.h>
+#include "../../../drivers/staging/omapdrm/omap_dmm_tiler.h"
+#include <mach-omap2/clockdomain.h>
 
 #include <video/omapdss.h>
 
@@ -56,6 +58,8 @@
 					 DISPC_IRQ_SYNC_LOST_DIGIT)
 
 #define DISPC_MAX_NR_ISRS		8
+
+static struct clockdomain *l3_1_clkdm;
 
 struct omap_dispc_isr_data {
 	omap_dispc_isr_t	isr;
@@ -3300,6 +3304,11 @@ static void _omap_dispc_initial_config(void)
 		dispc_write_reg(DISPC_DIVISOR, l);
 	}
 
+	if (cpu_is_omap44xx())
+		l3_1_clkdm = clkdm_lookup("l3_1_clkdm");
+	else if (cpu_is_omap54xx() && (omap_rev() <= OMAP5430_REV_ES1_0))
+		l3_1_clkdm = clkdm_lookup("l3main1_clkdm");
+
 	/* FUNCGATED */
 	if (dss_has_feature(FEAT_FUNCGATED))
 		REG_FLD_MOD(DISPC_CONFIG, 1, 9, 9);
@@ -3406,11 +3415,49 @@ static int dispc_runtime_suspend(struct device *dev)
 {
 	dispc_save_context();
 
+	/*
+	 * OMAP4,5 ERRATUM i740: Mstandby and disconnect protocol issue
+	 * Workaround:
+	 * Restore L3_1 CD to HW_AUTO, when DSS module idles.
+	 */
+	if (cpu_is_omap44xx() || (cpu_is_omap54xx() &&
+			(omap_rev() <= OMAP5430_REV_ES1_0)))
+		clkdm_allow_idle(l3_1_clkdm);
+
 	return 0;
 }
 
 static int dispc_runtime_resume(struct device *dev)
 {
+
+	/*
+	 * OMAP4,5 ERRATUM i740: Mstandby and disconnect protocol issue
+	 * Impacts: all OMAP4 and OMAP5_ES1 devices
+	 * Simplfied Description:
+	 * issue #1: The handshake between IP modules on L3_1
+	 * peripherals with PRCM has a limitation in a certain time
+	 * window of L4 clock cycle. Due to the fact that a wrong
+	 * variant of stall signal was used in circuit of PRCM, the
+	 * intitator-interconnect protocol is broken when the time
+	 * window is hit where the PRCM requires the interconnect to go
+	 * to idle while intitator asks to wakeup.
+	 * Issue #2: DISPC asserts a sub-mstandby signal for a short
+	 * period. In this time interval, IP block requests
+	 * disconnection of Master port, and results in Mstandby and
+	 * wait request to PRCM. In parallel, if mstandby is de-asserted
+	 * by DISPC simultaneously, interconnect requests for a
+	 * reconnect for one cycle alone resulting in a disconnect
+	 * protocol violation and a deadlock of the system.
+	 *
+	 * Workaround:
+	 * L3_1 clock domain must not be programmed in HW_AUTO if
+	 * Static dependency with DSS is enabled and DSS clock domain
+	 * is ON.
+	 */
+	if (cpu_is_omap44xx() || (cpu_is_omap54xx() &&
+			(omap_rev() <= OMAP5430_REV_ES1_0)))
+		clkdm_deny_idle(l3_1_clkdm);
+
 	dispc_restore_context();
 
 	return 0;
