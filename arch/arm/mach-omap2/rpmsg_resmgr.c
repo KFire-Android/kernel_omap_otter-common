@@ -19,6 +19,8 @@
 #include <linux/err.h>
 #include <linux/device.h>
 #include <linux/platform_device.h>
+#include <linux/ratelimit.h>
+#include <linux/opp.h>
 
 #include <plat/rpmsg_resmgr.h>
 #include <plat/omap-pm.h>
@@ -104,7 +106,29 @@ static int omap2_rprm_set_max_dev_wakeup_lat(struct device *rdev,
 static int omap2_rprm_device_scale(struct device *rdev, struct device *tdev,
 		unsigned long val)
 {
-	return omap_device_scale(tdev, val);
+	unsigned long freq_valid = val;
+	struct opp *opp;
+
+	/* FIXME: RPMSG/Ducati does not honor SoC Frequencies, So we HACK */
+	rcu_read_lock();
+	opp = opp_find_freq_ceil(tdev, &freq_valid);
+	if (IS_ERR(opp)) {
+		pr_warn_ratelimited("%s:%s:%s:HACK for overflow:%ld to %ld\n",
+				    dev_name(rdev), dev_name(tdev), __func__,
+				    val, freq_valid);
+		opp = opp_find_freq_floor(tdev, &freq_valid);
+		if (IS_ERR(opp)) {
+			rcu_read_unlock();
+			/* Sigh.. just give up.. */
+			pr_err_ratelimited("%s:%s:%s:No match for %ld\n",
+					   dev_name(rdev), dev_name(tdev),
+					   __func__, val);
+			return -ENOENT;
+		}
+	}
+	rcu_read_unlock();
+
+	return omap_device_scale(tdev, freq_valid);
 }
 
 static struct omap_rprm_regulator *omap2_rprm_lookup_regulator(u32 reg_id)
