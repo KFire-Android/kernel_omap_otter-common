@@ -99,8 +99,12 @@
 
 		ti,mcpdm = <&mcpdm>;
 		ti,dmic = <&dmic>;
+		ti,mcbsp1 = <&mcbsp1>;
+		ti,mcbsp2 = <&mcbsp2>;
 
 		ti,twl6040 = <&twl6040>;
+
+		ti,aess = <&aess>;
 
 		/* Audio routing */
 		ti,audio-routing =
@@ -122,7 +126,23 @@
 			"AFML", "Line In",
 			"AFMR", "Line In",
 			"DMic", "Digital Mic",
-			"Digital Mic", "Digital Mic1 Bias";
+			"Digital Mic", "Digital Mic1 Bias",
+			"Headset Playback", "PDM_DL1",
+			"Handsfree Playback", "PDM_DL2",
+			"PDM_UL1", "Capture",
+			"omap-mcbsp.1 Playback", "BT_VX_DL",
+			"BT_VX_UL", "omap-mcbsp.1 Capture",
+			"omap-mcbsp.2 Playback", "MM_EXT_DL",
+			"MM_EXT_UL", "omap-mcbsp.2 Capture",
+			"DMIC0", "omap-dmic-abe.0 Capture",
+			"omap-dmic-abe.0 Capture", "Digital Mic1 Bias",
+			"Digital Mic1 Bias", "Digital Mic 0",
+			"DMIC1", "omap-dmic-abe.1 Capture",
+			"omap-dmic-abe.1 Capture", "Digital Mic1 Bias",
+			"Digital Mic1 Bias", "Digital Mic 1",
+			"DMIC2", "omap-dmic-abe.2 Capture",
+			"omap-dmic-abe.2 Capture", "Digital Mic1 Bias",
+			"Digital Mic1 Bias", "Digital Mic 2";
 	};
 };
 
