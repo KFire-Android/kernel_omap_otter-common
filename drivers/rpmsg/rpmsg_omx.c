@@ -766,7 +766,11 @@ static int rpmsg_omx_probe(struct rpmsg_channel *rpdev)
 
 	omxserv->dev = device_create(rpmsg_omx_class, &rpdev->dev,
 			MKDEV(major, minor), NULL,
+#ifdef CONFIG_VIDEO_OMAP_DCE
 			"rpmsg-omx%d", minor);
+#else
+			rpdev->id.name);
+#endif
 	if (IS_ERR(omxserv->dev)) {
 		ret = PTR_ERR(omxserv->dev);
 		dev_err(&rpdev->dev, "device_create failed: %d\n", ret);
@@ -841,7 +845,12 @@ static void rpmsg_omx_driver_cb(struct rpmsg_channel *rpdev, void *data,
 		       data, len,  true);
 }
 
-#if 0
+#ifdef CONFIG_VIDEO_OMAP_DCE
+static struct rpmsg_device_id rpmsg_omx_id_table[] = {
+	{ .name	= "rpmsg-omx" },
+	{ },
+};
+#else
 static struct rpmsg_device_id rpmsg_omx_id_table[] = {
 	{ .name	= "rpmsg-omx0" }, /* ipu_c0 */
 	{ .name	= "rpmsg-omx1" }, /* ipu_c1 */
@@ -849,10 +858,6 @@ static struct rpmsg_device_id rpmsg_omx_id_table[] = {
 	{ },
 };
 #endif
-static struct rpmsg_device_id rpmsg_omx_id_table[] = {
-	{ .name	= "rpmsg-omx" },
-	{ },
-};
 MODULE_DEVICE_TABLE(rpmsg, rpmsg_omx_id_table);
 
 static struct rpmsg_driver rpmsg_omx_driver = {
