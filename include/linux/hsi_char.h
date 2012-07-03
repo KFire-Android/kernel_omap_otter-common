@@ -21,6 +21,10 @@
 #ifndef HSI_CHAR_H
 #define HSI_CHAR_H
 
+/* how many char devices would be created at most */
+#define HSI_MAX_CHAR_DEVS       16
+
+/* IOCTL interface */
 #define HSI_CHAR_BASE		'S'
 #define CS_IOW(num, dtype)	_IOW(HSI_CHAR_BASE, num, dtype)
 #define CS_IOR(num, dtype)	_IOR(HSI_CHAR_BASE, num, dtype)
@@ -98,5 +102,10 @@ struct hsi_rx_config {
 			  /* SSI: FT[8..0] */
 };
 
+struct hsi_char_platform_data {
+	unsigned int port;
+	unsigned int num_channels;
+	unsigned int channels_map[HSI_MAX_CHAR_DEVS];
+};
 
 #endif /* HSI_CHAR_H */

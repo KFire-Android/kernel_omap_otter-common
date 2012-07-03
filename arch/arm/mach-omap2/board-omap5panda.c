@@ -62,8 +62,6 @@
 #ifdef CONFIG_OMAP_MUX
 static struct omap_board_mux board_mux[] __initdata = {
 	OMAP5_MUX(FREF_CLK1_OUT, OMAP_PIN_INPUT_PULLUP),
-	OMAP5_MUX(LLIA_WAKEREQIN, OMAP_PIN_OUTPUT | OMAP_PIN_OFF_NONE | OMAP_MUX_MODE6),
-	OMAP5_MUX(HSI2_CAFLAG, OMAP_PIN_OUTPUT | OMAP_PIN_OFF_NONE | OMAP_MUX_MODE6),
 	OMAP5_MUX(USBB2_HSIC_STROBE, OMAP_PIN_INPUT | OMAP_MUX_MODE0),
 	OMAP5_MUX(USBB2_HSIC_DATA, OMAP_PIN_INPUT | OMAP_MUX_MODE0),
 	{ .reg_offset = OMAP_MUX_TERMINATOR },
@@ -629,6 +627,7 @@ static struct platform_device *omap5evm_devices[] __initdata = {
 
 static struct pca953x_platform_data omap5evm_gpio_expander_info = {
 	.gpio_base	= OMAP_MAX_GPIO_LINES,
+	.irq_base	= OMAP_TCA6424_IRQ_BASE,
 };
 
 static struct i2c_board_info __initdata omap5evm_i2c_5_boardinfo[] = {
@@ -769,6 +768,11 @@ static void __init omap_ehci_ohci_init(void)
 		clk_set_rate(phy_ref_clk, 19200000);
 		clk_enable(phy_ref_clk);
 	}
+
+	omap_mux_init_gpio(GPIO_HUB_NRESET,
+			OMAP_PIN_OUTPUT | OMAP_PIN_OFF_NONE | OMAP_MUX_MODE6);
+	omap_mux_init_gpio(GPIO_ETH_NRESET,
+			OMAP_PIN_OUTPUT | OMAP_PIN_OFF_NONE | OMAP_MUX_MODE6);
 
 	usbhs_init(&usbhs_bdata);
 	return;

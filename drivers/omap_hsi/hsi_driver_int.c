@@ -124,6 +124,7 @@ bool hsi_is_hsi_port_busy(struct hsi_port *pport)
 	struct hsi_dev *hsi_ctrl = pport->hsi_controller;
 	bool cur_cawake = hsi_get_cawake(pport);
 	int ch;
+	int hsr_mode;
 
 	if (pport->in_int_tasklet) {
 		dev_dbg(hsi_ctrl->dev, "Interrupt tasklet running\n");
@@ -139,6 +140,28 @@ bool hsi_is_hsi_port_busy(struct hsi_port *pport)
 		dev_dbg(hsi_ctrl->dev, "Receiver Port %d in 3 wires mode, acwake_status %d\n",
 			pport->port_number, pport->acwake_status);
 		return true;
+	}
+
+	/* If CAWAKE interrupt is pending, tasklet will take care of updating */
+	/* HSR state machine */
+	/* Only do this check in 4 wires mode ! */
+	if (!hsi_driver_is_interrupt_pending(pport, HSI_CAWAKEDETECTED,
+					     false)) {
+		hsr_mode = hsi_inl(hsi_ctrl->base,
+				   HSI_HSR_MODE_REG(pport->port_number));
+		if (cur_cawake &&
+		   ((hsr_mode & HSI_HSR_MODE_MODE_VAL_MASK) ==
+						HSI_MODE_SLEEP)) {
+			dev_warn(hsi_ctrl->dev, "CAWAKE high, but HSR in SLEEP. HSR MODE 0x%x !\n",
+				 hsr_mode);
+			hsi_hsr_resume(hsi_ctrl);
+		} else if (!cur_cawake &&
+			   (hsr_mode & HSI_HSR_MODE_MODE_VAL_MASK)) {
+			dev_warn(hsi_ctrl->dev,
+				"CAWAKE low, but HSR not in SLEEP. HSR MODE 0x%x !\n",
+				hsr_mode);
+			hsi_hsr_suspend(hsi_ctrl);
+		}
 	}
 
 	if (cur_cawake || pport->acwake_status) {
@@ -757,6 +780,33 @@ static u32 hsi_process_int_event(struct hsi_port *pport)
 				    HSI_SSI_CHANNELS_MAX, pport->max_ch - 1);
 
 	pport->cawake_double_int = false;
+
+
+	/* Check if we missed a CAWAKE Interrupt */
+	/* Only in 4-wires mode */
+	if (!pport->wake_rx_3_wires_mode) {
+		bool cawake_status = hsi_get_cawake(pport);
+		bool caw_int, caw_int_u;
+
+		if (pport->cawake_status != cawake_status) {
+			/* Add a security to not process CAWAKE here if
+			 * interrupt is pending because it will be processed
+			 * soon anyway. */
+			caw_int = hsi_driver_is_interrupt_pending(pport,
+							HSI_CAWAKEDETECTED,
+							false);
+			caw_int_u = hsi_driver_is_interrupt_pending(pport,
+							HSI_CAWAKEDETECTED,
+							true);
+			if (!caw_int && !caw_int_u) {
+				dev_warn(pport->hsi_controller->dev,
+				"%s: Missed CAWAKE. last %d, cur %d, CAWAKE int %d-%d\n",
+				__func__, pport->cawake_status, cawake_status,
+				caw_int, caw_int_u);
+			    hsi_do_cawake_process(pport);
+			}
+		}
+	}
 
 	return status_reg;
 }
