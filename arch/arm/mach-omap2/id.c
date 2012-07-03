@@ -84,6 +84,11 @@ EXPORT_SYMBOL(omap_type);
 #define OMAP_TAP_PROD_ID_44XX_0	0x0214
 #define OMAP_TAP_PROD_ID_44XX_1	0x0218
 
+#define OMAP5_ALL_OPP_ENABLED1			0x1544d4E
+#define OMAP5_ALL_OPP_ENABLED2			0x15451DE
+#define OMAP5_ALL_OPP_ENABLED3			0x154525E
+#define OMAP5_DIE_ID_OFFSET				0x208
+
 #define read_tap_reg(reg)	__raw_readl(tap_base  + (reg))
 
 struct omap_id {
@@ -295,6 +300,15 @@ void __init omap4xxx_check_features(void)
 			break;
 		}
 	}
+}
+
+void __init omap5xxx_check_features(void)
+{
+	if ((omap_rev() == OMAP5430_REV_ES1_0) &&
+	    ((omap_ctrl_readl(OMAP5_DIE_ID_OFFSET) == OMAP5_ALL_OPP_ENABLED1) ||
+	     (omap_ctrl_readl(OMAP5_DIE_ID_OFFSET) == OMAP5_ALL_OPP_ENABLED2) ||
+	     (omap_ctrl_readl(OMAP5_DIE_ID_OFFSET) == OMAP5_ALL_OPP_ENABLED3)))
+		omap_features |= OMAP5_HAS_OPP_HIGH;
 }
 
 void __init ti81xx_check_features(void)

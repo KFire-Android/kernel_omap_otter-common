@@ -21,8 +21,11 @@
  */
 #include <linux/module.h>
 #include <linux/opp.h>
+#include <linux/clk.h>
 
 #include <plat/cpu.h>
+#include <plat/omap_device.h>
+#include <plat/clock.h>
 
 #include "control.h"
 #include "omap_opp_data.h"
@@ -258,6 +261,24 @@ static struct omap_opp_def __initdata omap54xx_opp_def_list[] = {
 	OPP_INITIALIZER(&gpu_dev_info, false, 532000000, OMAP5430_VDD_MM_OPP_OD),
 };
 
+static int __init opp_def_list_enable_opp(struct omap_opp_def *list,
+					  unsigned int size,
+					  struct device_info *dev_info,
+					  unsigned long opp_freq, bool state)
+{
+	int i;
+	for (i = 0; i < size; i++) {
+		struct omap_opp_def *entry = &list[i];
+		if (entry->dev_info == dev_info && entry->freq == opp_freq) {
+			entry->default_available = state;
+			return 0;
+		}
+	}
+	WARN(1, "Unable to find opp for %s, frequency %ld\n",
+	     dev_info->hwmod_name, opp_freq);
+	return -EINVAL;
+}
+
 /**
  * omap5_opp_init() - initialize omap4 opp table
  */
@@ -267,6 +288,23 @@ static int __init omap5_opp_init(void)
 
 	if (!cpu_is_omap54xx())
 		return r;
+
+	if (omap5_has_opp_high()) {
+		opp_def_list_enable_opp(omap54xx_opp_def_list,
+					ARRAY_SIZE(omap54xx_opp_def_list),
+					&mpu_dev_info,
+					1100000000, true);
+
+		opp_def_list_enable_opp(omap54xx_opp_def_list,
+					ARRAY_SIZE(omap54xx_opp_def_list),
+					&iva_dev_info,
+					532000000, true);
+
+		opp_def_list_enable_opp(omap54xx_opp_def_list,
+					ARRAY_SIZE(omap54xx_opp_def_list),
+					&dsp_dev_info,
+					532000000, true);
+	}
 
 	r = omap_init_opp_table(omap54xx_opp_def_list,
 			ARRAY_SIZE(omap54xx_opp_def_list));

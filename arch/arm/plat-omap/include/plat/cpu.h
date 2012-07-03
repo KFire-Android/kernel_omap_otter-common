@@ -474,6 +474,7 @@ void omap5xxx_check_revision(void);
 void omap3xxx_check_features(void);
 void ti81xx_check_features(void);
 void omap4xxx_check_features(void);
+void omap5xxx_check_features(void);
 
 /*
  * Runtime detection of OMAP3 features
@@ -499,6 +500,7 @@ extern u32 omap_features;
 #define OMAP4_HAS_MPU_1GHZ		BIT(9)
 #define OMAP4_HAS_MPU_1_2GHZ		BIT(10)
 #define OMAP4_HAS_MPU_1_5GHZ		BIT(11)
+#define OMAP5_HAS_OPP_HIGH			BIT(12)
 
 
 #define OMAP3_HAS_FEATURE(feat,flag)			\
@@ -529,5 +531,16 @@ static inline unsigned int omap4_has_ ##feat(void)	\
 OMAP4_HAS_FEATURE(mpu_1ghz, MPU_1GHZ)
 OMAP4_HAS_FEATURE(mpu_1_2ghz, MPU_1_2GHZ)
 OMAP4_HAS_FEATURE(mpu_1_5ghz, MPU_1_5GHZ)
+
+/*
+ * Runtime detection of OMAP5 features
+ */
+#define OMAP5_HAS_FEATURE(feat, flag)			\
+static inline unsigned int omap5_has_ ##feat(void)	\
+{							\
+	return omap_features & OMAP5_HAS_ ##flag;	\
+}							\
+
+OMAP5_HAS_FEATURE(opp_high, OPP_HIGH)
 
 #endif
