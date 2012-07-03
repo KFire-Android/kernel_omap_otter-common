@@ -782,12 +782,6 @@ void __init iotable_init(struct map_desc *io_desc, int nr)
 	for (md = io_desc; nr; md++, nr--) {
 		create_mapping(md);
 		vm->addr = (void *)(md->virtual & PAGE_MASK);
-		/*
-		 * FIXME: Aligning static mappings for a 2MB boundary always.
-		 * Note that this is a temporary WA till the issue
-		 * with vmalloc and section static io mappings are fixed.
-		 */
-		md->length = ALIGN(md->length, SZ_2M);
 		vm->size = PAGE_ALIGN(md->length + (md->virtual & ~PAGE_MASK));
 		vm->phys_addr = __pfn_to_phys(md->pfn);
 		vm->flags = VM_IOREMAP | VM_ARM_STATIC_MAPPING;
