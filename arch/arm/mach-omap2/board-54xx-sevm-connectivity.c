@@ -76,7 +76,8 @@ static void __init omap5_sdp5430_wifi_mux_init(void)
 {
 	omap_mux_init_gpio(GPIO_WIFI_IRQ, OMAP_PIN_INPUT);
 
-	omap_mux_init_gpio(GPIO_WIFI_PMENA, OMAP_PIN_OUTPUT);
+	omap_mux_init_gpio(GPIO_WIFI_PMENA, OMAP_PIN_OUTPUT |
+			OMAP_PIN_INPUT_PULLUP);
 
 	omap_mux_init_signal("wlsdio_cmd.wlsdio_cmd",
 					OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP);
