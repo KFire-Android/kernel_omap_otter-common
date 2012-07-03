@@ -1480,9 +1480,13 @@ static enum power_supply_property twl6030_ac_props[] = {
 	POWER_SUPPLY_PROP_VOLTAGE_NOW,
 };
 
+#ifndef CONFIG_ANDROID
 static enum power_supply_property twl6030_bk_bci_battery_props[] = {
 	POWER_SUPPLY_PROP_VOLTAGE_NOW,
 };
+#else
+static enum power_supply_property twl6030_bk_bci_battery_props[] = {};
+#endif
 
 static void twl6030_current_avg(struct work_struct *work)
 {
