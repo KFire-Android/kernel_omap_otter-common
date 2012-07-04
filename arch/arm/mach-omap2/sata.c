@@ -39,6 +39,8 @@
 #define OMAP_SATA_PLL_STATUS_LOCK_SHIFT				1
 #define OMAP_SATA_PLL_STATUS_LOCK				1
 #define OMAP_SATA_PLL_STATUS_RESET_DONE				1
+#define OMAP_SATA_PLL_STATUS_LDOPWDN_SHIFT			15
+#define OMAP_SATA_PLL_STATUS_TICOPWDN_SHIFT			16
 
 #define OMAP_SATA_PLL_GO					0x08
 
@@ -271,8 +273,7 @@ static int sata_dpll_config(struct device *dev, void __iomem *base)
 		cpu_relax();
 
 		if (time_after(jiffies, timeout)) {
-			dev_err(dev, "ADPLLLJM RESET[0x%08x] - timed out\n",
-				reg);
+			dev_err(dev, "SATA PLL RESET - timed out\n");
 			return -1;
 		}
 	}
@@ -460,6 +461,106 @@ static void omap_ahci_plat_exit(struct device *dev)
 	sata_phy_exit(dev);
 }
 
+#ifdef CONFIG_PM
+
+static int omap_sata_suspend(struct device *dev)
+{
+	struct ahci_platform_data	*pdata;
+	struct omap_sata_platdata	*spdata;
+	unsigned long			timeout;
+	u32				reg;
+
+	pdata = dev->platform_data;
+	if (!pdata || !pdata->priv) {
+		dev_err(dev, "No platform data\n");
+		return -ENXIO;
+	}
+	spdata = pdata->priv;
+	if (!spdata->ref_clk || !spdata->pll) {
+		dev_err(dev, "No refclk and pll\n");
+		return -EPERM;
+	}
+
+	reg  = omap_sata_readl(spdata->pll, OMAP_SATA_PLL_CFG2);
+	reg &= ~OMAP_SATA_PLL_CFG2_IDLE_MASK;
+	reg |= OMAP_SATA_PLL_CFG2_IDLE;
+	omap_sata_writel(spdata->pll, OMAP_SATA_PLL_CFG2, reg);
+
+	/* wait for internal LDO and internal oscilator power down */
+	timeout = jiffies + msecs_to_jiffies(10000);
+	do {
+		cpu_relax();
+		reg = omap_sata_readl(spdata->pll, OMAP_SATA_PLL_STATUS);
+		reg = (reg >> OMAP_SATA_PLL_STATUS_LDOPWDN_SHIFT) &
+		      (reg >> OMAP_SATA_PLL_STATUS_TICOPWDN_SHIFT);
+		if (time_after(jiffies, timeout) & !reg) {
+			dev_err(dev, "ADPLLLJM IDLE[0x%08x] - timed out\n",
+				reg);
+			return -EIO;
+		}
+	} while (!reg);
+
+#ifdef OMAP_SATA_PHY_PWR
+	sataphy_pwr_off();
+#endif
+
+	clk_disable(spdata->ref_clk);
+	return 0;
+}
+
+
+static int omap_sata_resume(struct device *dev)
+{
+	struct ahci_platform_data	*pdata;
+	struct omap_sata_platdata	*spdata;
+	u32				reg;
+
+	pdata = dev->platform_data;
+	if (!pdata || !pdata->priv) {
+		dev_err(dev, "No platform data\n");
+		return -ENXIO;
+	}
+	spdata = pdata->priv;
+	if (!spdata->ref_clk || !spdata->pll ||
+	    !spdata->ocp2scp3 || !spdata->phyrx) {
+		dev_err(dev, "No refclk , pll and ocp2scp3\n");
+		return -EPERM;
+	}
+
+	clk_enable(spdata->ref_clk);
+	omap_ocp2scp_init(dev, spdata->ocp2scp3);
+	reg  = omap_sata_readl(spdata->pll, OMAP_SATA_PLL_CFG2);
+	if (reg & OMAP_SATA_PLL_CFG2_IDLE_MASK) {
+		dev_err(dev, "sata pll in idle\n");
+		reg &= ~OMAP_SATA_PLL_CFG2_IDLE_MASK;
+		omap_sata_writel(spdata->pll, OMAP_SATA_PLL_CFG2, reg);
+	} else {
+		dev_err(dev, "sata pll not in idle, so reconfigure pll\n");
+		omap_sataphyrx_init(dev, spdata->phyrx);
+		sata_dpll_config(dev, spdata->pll);
+	}
+	sata_dpll_wait_lock(dev, spdata->pll);
+
+#ifdef OMAP_SATA_PHY_PWR
+	sataphy_pwr_on();
+#endif
+
+	return 0;
+}
+
+#else
+static int omap_sata_suspend(struct device *dev)
+{
+	return -EPERM;
+}
+
+static int omap_sata_resume(struct device *dev)
+{
+	return -EPERM;
+}
+
+#endif
+
 void __init omap_sata_init(void)
 {
 	struct omap_hwmod	*hwmod[2];
@@ -473,6 +574,8 @@ void __init omap_sata_init(void)
 
 	sata_pdata.init		= omap_ahci_plat_init;
 	sata_pdata.exit		= omap_ahci_plat_exit;
+	sata_pdata.suspend	= omap_sata_suspend;
+	sata_pdata.resume	= omap_sata_resume;
 
 	hwmod[0] = omap_hwmod_lookup(OMAP_SATA_HWMODNAME);
 	if (!hwmod[0]) {
