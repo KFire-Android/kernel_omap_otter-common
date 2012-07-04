@@ -49,14 +49,10 @@ int hdmi_get_current_hpd(void)
 
 static irqreturn_t hpd_enable_handler(int irq, void *ptr)
 {
-	static int hpd_prev;
 	int hpd = hdmi_get_current_hpd();
 
 	pr_info("hpd %d\n", hpd);
-	if (hpd_prev != hpd) {
-		hdmi_panel_hpd_handler(hpd);
-		hpd_prev = hpd;
-	}
+	hdmi_panel_hpd_handler(hpd);
 
 	return IRQ_HANDLED;
 }
