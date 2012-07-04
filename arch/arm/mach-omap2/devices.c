@@ -913,16 +913,18 @@ int omap_device_scale_gpu(struct device *req_dev, struct device *target_dev,
 			unsigned long rate)
 {
 	unsigned long freq = 0;
+	int ret;
 
 	/* find lowest frequency */
 	opp_find_freq_ceil(target_dev, &freq);
 
 	if (rate > freq)
 		omap4_dpll_cascading_blocker_hold(target_dev);
-	else
+	ret = omap_device_scale(req_dev, target_dev, rate);
+	if (!ret && rate <= freq)
 		omap4_dpll_cascading_blocker_release(target_dev);
 
-	return omap_device_scale(req_dev, target_dev, rate);
+	return ret;
 }
 #endif
 
