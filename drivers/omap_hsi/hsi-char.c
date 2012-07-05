@@ -453,6 +453,16 @@ static long  hsi_char_ioctl(struct file *file,
 		break;
 	case CS_SET_CLK_DYNAMIC:
 		if_hsi_set_clk_dynamic(ch);
+	case CS_SET_HSI_LATENCY:
+		if (copy_from_user(&state, (void __user *)arg, sizeof(state)))
+			ret = -EFAULT;
+		else
+			if_hsi_set_hsi_latency(ch, state);
+		break;
+	case CS_GET_HSI_LATENCY:
+		if_hsi_get_hsi_latency(ch, &state);
+		if (copy_to_user((void __user *)arg, &fclock, sizeof(state)))
+			ret = -EFAULT;
 		break;
 	default:
 		ret = -ENOIOCTLCMD;

@@ -175,29 +175,36 @@ K) int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg);
 	- HSI_IOCTL_ACWAKE_DOWN:
 		Description: Unset HSI wakeup line (acwake) for the channel
 		Parameters: None
+
 	- HSI_IOCTL_ACWAKE_UP:
 		Description: Set HSI wakeup line (acwake) for the channel
 		Parameters: None
+
 	- HSI_IOCTL_SEND_BREAK:
 		Description: Send a HW BREAK frame in FRAME mode
 		Parameters: None
+
 	- HSI_IOCTL_GET_ACWAKE:
 		Description: Get HST ACWAKE line status
 		Parameters: Pointer to a u32 variable to return result
 		(Result: 0 means ACWAKE DOWN, other result means ACWAKE UP)
+
 	- HSI_IOCTL_FLUSH_RX:
 		Description: Force the HSR to idle state
 		Parameters: None
+
 	- HSI_IOCTL_FLUSH_TX:
 		Description: Force the HST to idle state
 		Parameters: None
 		Notes:
 		HSI: HST FIFO Flush not possible on HSI. Warning is printed in
 		the HSI case.
+
 	- HSI_IOCTL_GET_CAWAKE:
 		Description: Get CAWAKE (HSR) line status
 		Parameters: Pointer to a u32 variable to return result
 		(Result: 0 means CAWAKE DOWN, other result means CAWAKE UP)
+
 	- HSI_IOCTL_SET_RX:
 		Description: Set HSR configuration
 		Parameters: Pointer to a hsr_ctx structure describing
@@ -214,17 +221,20 @@ K) int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg);
 		timeout counter. This counter can be re-enabled by programming
 		the 0x1001 value as bit-rate divisor. The SSI does not accept
 		any other SSR bit-rate divisor values.
+
 	- HSI_IOCTL_GET_RX:
 		Description: Get HSR configuration
 		Parameters: Pointer to a hsr_ctx structure describing
 		configurable HSR parameters (mode, frame size, channels,
 		data flow type, bit-rate divisor, counters)
+
 	- HSI_IOCTL_SET_TX:
 		Description: Set HST configuration
 		Parameters: Pointer to a hst_ctx structure describing
 		configurable HST parameters (mode, frame size, divisor,
 		arb_mode, channels, data flow type)
 		Note: flow type is not used in HST.
+
 	- HSI_IOCTL_GET_TX:
 		Description: Get HST configuration
 		Parameters: Pointer to a hst_ctx structure describing
@@ -237,15 +247,19 @@ K) int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg);
 	accordingly. Depending on the required speed and HSI device, some
 	constraints on OPP may have to be handled. This shall be managed by the
 	HSI driver user.
+
 	- HSI_IOCTL_SW_RESET:
 		Description: Force a Reset of HSI block and HSI DMA engine
 		Parameters: None
+
 	- HSI_IOCTL_GET_FIFO_OCCUPANCY:
 		Description: Get amount of words in RX FIFO
 		Parameters: Pointer to a size_t variable to return result
+
 	- HSI_IOCTL_SET_WAKE_RX_3WIRES_MODE:
 		Description: Set the 3 wires mode and the AC_READY to 1.
 		Parameters: None
+
 	- HSI_IOCTL_SET_WAKE_RX_4WIRES_MODE:
 		Description: Set the 4 wires mode.
 		Parameters: None
@@ -257,6 +271,17 @@ K) int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg);
 	- HSI_IOCTL_CLK_DYNAMIC:
 		Description: Exit from forced clocks on mode and go back to automatic mode.
 		Parameters: None
+
+	- HSI_IOCTL_SET_HSI_LATENCY:
+		Description: Change HSI device wakeup latency.
+		             - Set a constraint on HSI/L3INIT_PD to change HSI wakeup latency :
+                 - Allows L3INIT_PD to enter power states (OSWR, CSWR, INACT) based on required wakeup latency
+		Parameters: Latency to use in us
+
+	- HSI_IOCTL_GET_HSI_LATENCY:
+		Description: Get current HSI device wakeup latency.
+		Returns: Current latency in us
+
 
 L) void hsi_close(struct hsi_device *dev);
 

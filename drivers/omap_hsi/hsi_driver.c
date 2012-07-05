@@ -955,6 +955,9 @@ static int __devinit hsi_platform_device_probe(struct platform_device *pd)
 	if ((err < 0) && (err != -EBUSY))
 		goto rollback4;
 
+	dev_pm_qos_add_request(hsi_ctrl->dev, &hsi_ctrl->dev_pm_qos,
+			       PM_QOS_DEFAULT_VALUE);
+
 	/* From here no need for HSI HW access */
 	hsi_clocks_disable(hsi_ctrl->dev, __func__);
 
@@ -983,6 +986,8 @@ static int __devexit hsi_platform_device_remove(struct platform_device *pd)
 
 	if (!hsi_ctrl)
 		return 0;
+
+	dev_pm_qos_remove_request(&hsi_ctrl->dev_pm_qos);
 
 	unregister_hsi_devices(hsi_ctrl);
 

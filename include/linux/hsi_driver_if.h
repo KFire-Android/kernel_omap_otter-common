@@ -71,6 +71,8 @@ enum {
 	HSI_IOCTL_GET_SPEED, /* Get HSI Fclock (96MHz/192MHz) */
 	HSI_IOCTL_SET_CLK_FORCE_ON, /* Enter mode where HSI clk are forced on */
 	HSI_IOCTL_SET_CLK_DYNAMIC,  /* Exit from forced clocks on mode */
+	HSI_IOCTL_SET_HSI_LATENCY, /* Change HSI latency for high tput */
+	HSI_IOCTL_GET_HSI_LATENCY, /* Get HSI latency */
 };
 
 /* Forward references */

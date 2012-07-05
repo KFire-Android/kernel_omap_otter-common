@@ -16,6 +16,9 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
+#include <linux/pm_qos.h>
+#include <plat/common.h>
+
 #include "hsi_driver.h"
 
 
@@ -58,4 +61,28 @@ int hsi_pm_change_hsi_speed(struct hsi_dev *hsi_ctrl, bool hi_speed)
 	return err;
 }
 
+int hsi_pm_change_hsi_wakeup_latency(struct hsi_dev *hsi_ctrl,
+					  int latency_us)
+{
+	struct hsi_platform_data *pdata;
+	int err = 0;
+
+	pdata = dev_get_platdata(hsi_ctrl->dev);
+
+	/* Set a constraint on HSI/L3INIT_PD to change HSI wakeup latency. */
+	/* +1 will force L3INIT_PD to ON, -1 will release the constraint. */
+	err = pdata->pm_set_max_dev_wakeup_lat(hsi_ctrl->dev, hsi_ctrl->dev,
+					       latency_us);
+	if (err < 0) {
+		dev_err(hsi_ctrl->dev,
+			"%s: Cannot set HSI latency to %d, err %d\n",
+			__func__, latency_us, err);
+	} else {
+		dev_info(hsi_ctrl->dev, "HSI wakeup latency changed to %d\n",
+			 latency_us);
+		hsi_ctrl->hsi_latency_us = latency_us;
+	}
+
+	return err;
+}
 

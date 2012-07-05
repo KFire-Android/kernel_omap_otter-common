@@ -963,7 +963,6 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 		}
 		hi_speed = *(unsigned int *)arg;
 
-
 		if (hsi_is_controller_transfer_ongoing(hsi_ctrl)) {
 			err = -EBUSY;
 			goto out;
@@ -975,7 +974,6 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 
 		spin_lock_bh(&hsi_ctrl->lock);
 		hsi_ctrl->clock_change_ongoing = false;
-
 		break;
 	case HSI_IOCTL_GET_SPEED:
 		if (!arg) {
@@ -993,6 +991,27 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 		dev_info(hsi_ctrl->dev, "Entering clocks dynamic mode\n");
 		hsi_ctrl->clock_forced_on = false;
 		break;
+	case HSI_IOCTL_SET_HSI_LATENCY:
+		if (!arg) {
+			err = -EINVAL;
+			goto out;
+		}
+
+		spin_unlock_bh(&hsi_ctrl->lock);
+
+		hsi_pm_change_hsi_wakeup_latency(hsi_ctrl, *(int *)arg);
+
+		spin_lock_bh(&hsi_ctrl->lock);
+		break;
+	case HSI_IOCTL_GET_HSI_LATENCY:
+		if (!arg) {
+			err = -EINVAL;
+			goto out;
+		}
+
+		*(int *)arg = hsi_ctrl->hsi_latency_us;
+		break;
+
 	default:
 		err = -ENOIOCTLCMD;
 		break;
