@@ -72,6 +72,7 @@ static struct {
 	int hdmi_irq;
 
 	struct clk *sys_clk;
+	struct clk *dss_32k_clk;
 
 	struct regulator *vdds_hdmi;
 	bool enabled;
@@ -1063,6 +1064,13 @@ static int hdmi_get_clocks(struct platform_device *pdev)
 
 	hdmi.sys_clk = clk;
 
+	clk = clk_get(&pdev->dev, "dss_32khz_clk");
+	if (IS_ERR(clk)) {
+		DSSERR("can't get dss_32khz_clk\n");
+		return PTR_ERR(clk);
+	}
+	hdmi.dss_32k_clk = clk;
+
 	return 0;
 }
 
@@ -1070,6 +1078,8 @@ static void hdmi_put_clocks(void)
 {
 	if (hdmi.sys_clk)
 		clk_put(hdmi.sys_clk);
+	if (hdmi.dss_32k_clk)
+		clk_put(hdmi.dss_32k_clk);
 }
 
 #if defined(CONFIG_OMAP4_DSS_HDMI_AUDIO)
@@ -1292,6 +1302,8 @@ static int hdmi_runtime_suspend(struct device *dev)
 {
 	clk_disable(hdmi.sys_clk);
 
+	clk_disable(hdmi.dss_32k_clk);
+
 	dispc_runtime_put();
 
 	return 0;
@@ -1306,6 +1318,7 @@ static int hdmi_runtime_resume(struct device *dev)
 		return r;
 
 	clk_enable(hdmi.sys_clk);
+	clk_enable(hdmi.dss_32k_clk);
 
 	return 0;
 }
