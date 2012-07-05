@@ -23,6 +23,7 @@
 #include <linux/init.h>
 
 #include "powerdomain.h"
+#include "powerdomain-private.h"
 
 #include "prcm-common.h"
 #include "prcm44xx.h"

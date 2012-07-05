@@ -66,16 +66,12 @@ static int omap4_5_pm_suspend(void)
 	u32 cpu_id = smp_processor_id();
 
 	/* Save current powerdomain state */
-	list_for_each_entry(pwrst, &pwrst_list, node) {
+	list_for_each_entry(pwrst, &pwrst_list, node)
 		pwrst->saved_state = pwrdm_read_next_pwrst(pwrst->pwrdm);
-		pwrst->saved_logic_state = pwrdm_read_logic_retst(pwrst->pwrdm);
-	}
 
 	/* Set targeted power domain states by suspend */
-	list_for_each_entry(pwrst, &pwrst_list, node) {
+	list_for_each_entry(pwrst, &pwrst_list, node)
 		omap_set_pwrdm_state(pwrst->pwrdm, pwrst->next_state);
-		pwrdm_set_logic_retst(pwrst->pwrdm, PWRDM_POWER_OFF);
-	}
 
 	/*
 	 * For MPUSS to hit power domain retention(CSWR or OSWR),
@@ -98,7 +94,6 @@ static int omap4_5_pm_suspend(void)
 			ret = -1;
 		}
 		omap_set_pwrdm_state(pwrst->pwrdm, pwrst->saved_state);
-		pwrdm_set_logic_retst(pwrst->pwrdm, pwrst->saved_logic_state);
 	}
 	if (ret)
 		pr_crit("Could not enter target state in pm_suspend\n");
@@ -149,7 +144,7 @@ void omap_pm_clear_dsp_wake_up(void)
 	 * If current Tesla power state is in RET/OFF and not in transition,
 	 * then not hit by errata.
 	 */
-	if (ret <= PWRDM_POWER_RET) {
+	if (ret <= PWRDM_POWER_CSWR) {
 		if (!(omap4_prminst_read_inst_reg(tesla_pwrdm->prcm_partition,
 				tesla_pwrdm->prcm_offs, OMAP4_PM_PWSTST)
 				& OMAP_INTRANSITION_MASK))
@@ -219,7 +214,7 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
 		return -ENOMEM;
 
 	pwrst->pwrdm = pwrdm;
-	pwrst->next_state = PWRDM_POWER_RET;
+	pwrst->next_state = PWRDM_POWER_CSWR;
 	list_add(&pwrst->node, &pwrst_list);
 
 	return omap_set_pwrdm_state(pwrst->pwrdm, pwrst->next_state);

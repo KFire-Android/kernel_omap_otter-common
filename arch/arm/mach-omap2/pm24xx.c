@@ -93,8 +93,7 @@ static int omap2_enter_full_retention(void)
 	 * Set MPU powerdomain's next power state to RETENTION;
 	 * preserve logic state during retention
 	 */
-	pwrdm_set_logic_retst(mpu_pwrdm, PWRDM_POWER_RET);
-	pwrdm_set_next_pwrst(mpu_pwrdm, PWRDM_POWER_RET);
+	pwrdm_set_next_pwrst(mpu_pwrdm, PWRDM_POWER_CSWR);
 
 	/* Workaround to kill USB */
 	l = omap_ctrl_readl(OMAP2_CONTROL_DEVCONF0) | OMAP24XX_USBSTANDBYCTRL;
@@ -235,7 +234,6 @@ out:
 
 static void __init prcm_setup_regs(void)
 {
-	int i, num_mem_banks;
 	struct powerdomain *pwrdm;
 
 	/*
@@ -245,23 +243,14 @@ static void __init prcm_setup_regs(void)
 	omap2_prm_write_mod_reg(OMAP24XX_AUTOIDLE_MASK, OCP_MOD,
 			  OMAP2_PRCM_SYSCONFIG_OFFSET);
 
-	/*
-	 * Set CORE powerdomain memory banks to retain their contents
-	 * during RETENTION
-	 */
-	num_mem_banks = pwrdm_get_mem_bank_count(core_pwrdm);
-	for (i = 0; i < num_mem_banks; i++)
-		pwrdm_set_mem_retst(core_pwrdm, i, PWRDM_POWER_RET);
-
 	/* Set CORE powerdomain's next power state to RETENTION */
-	pwrdm_set_next_pwrst(core_pwrdm, PWRDM_POWER_RET);
+	pwrdm_set_next_pwrst(core_pwrdm, PWRDM_POWER_CSWR);
 
 	/*
 	 * Set MPU powerdomain's next power state to RETENTION;
 	 * preserve logic state during retention
 	 */
-	pwrdm_set_logic_retst(mpu_pwrdm, PWRDM_POWER_RET);
-	pwrdm_set_next_pwrst(mpu_pwrdm, PWRDM_POWER_RET);
+	pwrdm_set_next_pwrst(mpu_pwrdm, PWRDM_POWER_CSWR);
 
 	/* Force-power down DSP, GFX powerdomains */
 

@@ -189,7 +189,8 @@ static void scu_pwrst_prepare(unsigned int cpu_id, unsigned int cpu_state)
 	u32 scu_pwr_st;
 
 	switch (cpu_state) {
-	case PWRDM_POWER_RET:
+	case PWRDM_POWER_OSWR:
+	case PWRDM_POWER_CSWR:
 		scu_pwr_st = SCU_PM_DORMANT;
 		break;
 	case PWRDM_POWER_OFF:
@@ -315,7 +316,7 @@ int omap_enter_lowpower(unsigned int cpu, unsigned int power_state)
 	case PWRDM_POWER_OFF:
 		save_state = 1;
 		break;
-	case PWRDM_POWER_RET:
+	case PWRDM_POWER_CSWR:
 		if (cpu_is_omap54xx()) {
 			save_state = 0;
 			break;
@@ -338,8 +339,7 @@ int omap_enter_lowpower(unsigned int cpu, unsigned int power_state)
 	 * In MPUSS OSWR or device OFF, interrupt controller  contest is lost.
 	 */
 	mpuss_clear_prev_logic_pwrst();
-	if ((pwrdm_read_next_pwrst(mpuss_pd) == PWRDM_POWER_RET) &&
-		(pwrdm_read_logic_retst(mpuss_pd) == PWRDM_POWER_OFF))
+	if (pwrdm_read_next_pwrst(mpuss_pd) == PWRDM_POWER_OSWR)
 		save_state = 2;
 
 	cpu_pwrdm_pre_post_transition(cpu, 1);

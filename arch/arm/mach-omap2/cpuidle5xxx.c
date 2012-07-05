@@ -29,7 +29,6 @@
 /* Machine specific information to be recorded in the C-state driver_data */
 struct omap5_idle_statedata {
 	u32 cpu_state;
-	u32 mpu_logic_state;
 	u32 mpu_state;
 	atomic_t mpu_state_vote;
 	u8 valid;
@@ -85,10 +84,8 @@ static int omap5_enter_idle(struct cpuidle_device *dev,
 	atomic_inc(&cx->mpu_state_vote);
 	smp_mb__after_atomic_inc();
 
-	if (atomic_read(&cx->mpu_state_vote) == num_online_cpus()) {
-		pwrdm_set_logic_retst(mpu_pd, cx->mpu_logic_state);
+	if (atomic_read(&cx->mpu_state_vote) == num_online_cpus())
 		omap_set_pwrdm_state(mpu_pd, cx->mpu_state);
-	}
 
 	omap_enter_lowpower(dev->cpu, cx->cpu_state);
 
@@ -138,12 +135,10 @@ static int omap5_enter_couple_idle(struct cpuidle_device *dev,
 		pwrdm_enable_force_off(cpu_pd[1]);
 
 	if (dev->cpu == 0) {
-		pwrdm_set_logic_retst(mpu_pd, cx->mpu_logic_state);
 		omap_set_pwrdm_state(mpu_pd, cx->mpu_state);
 
-		if ((cx->mpu_state == PWRDM_POWER_RET) &&
-			(cx->mpu_logic_state == PWRDM_POWER_OFF))
-				cpu_cluster_pm_enter();
+		if (cx->mpu_state == PWRDM_POWER_OSWR)
+			cpu_cluster_pm_enter();
 	}
 
 
@@ -258,7 +253,6 @@ int __init omap5_idle_init(void)
 		cx->valid = 1;	/* C1 is always valid */
 		cx->cpu_state = PWRDM_POWER_ON;
 		cx->mpu_state = PWRDM_POWER_ON;
-		cx->mpu_logic_state = PWRDM_POWER_RET;
 		atomic_set(&cx->mpu_state_vote, 0);
 		dev->state_count++;
 		drv->state_count++;
@@ -268,9 +262,8 @@ int __init omap5_idle_init(void)
 			_fill_cstate(drv, 1, "MPUSS OSWR", 0);
 			cx = _fill_cstate_usage(dev, 1);
 			if (cx != NULL) {
-				cx->cpu_state = PWRDM_POWER_RET;
-				cx->mpu_state = PWRDM_POWER_RET;
-				cx->mpu_logic_state = PWRDM_POWER_RET;
+				cx->cpu_state = PWRDM_POWER_CSWR;
+				cx->mpu_state = PWRDM_POWER_CSWR;
 				atomic_set(&cx->mpu_state_vote, 0);
 				dev->state_count++;
 				drv->state_count++;
@@ -284,8 +277,7 @@ int __init omap5_idle_init(void)
 			cx = _fill_cstate_usage(dev, 2);
 			if (cx != NULL) {
 				cx->cpu_state = PWRDM_POWER_OFF;
-				cx->mpu_state = PWRDM_POWER_RET;
-				cx->mpu_logic_state = PWRDM_POWER_OFF;
+				cx->mpu_state = PWRDM_POWER_OSWR;
 				atomic_set(&cx->mpu_state_vote, 0);
 				dev->state_count++;
 				drv->state_count++;

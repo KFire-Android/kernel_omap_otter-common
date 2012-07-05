@@ -32,6 +32,7 @@
  */
 
 #include "powerdomain.h"
+#include "powerdomain-private.h"
 
 #include "prcm-common.h"
 #include "prm.h"
