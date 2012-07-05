@@ -79,6 +79,9 @@ obj-$(CONFIG_ARCH_OMAP3)		+= pm34xx.o sleep34xx.o \
 obj-$(CONFIG_ARCH_OMAP4)		+= $(omap-4-5-common-pm) cpuidle44xx.o
 obj-$(CONFIG_ARCH_OMAP5)		+= $(omap-4-5-common-pm) cpuidle5xxx.o
 obj-$(CONFIG_PM_DEBUG)			+= pm-debug.o
+ifeq ($(CONFIG_PM_DEBUG),y)
+obj-$(CONFIG_ARCH_OMAP5)		+= prcm-54xx-debug.o
+endif
 obj-$(CONFIG_OMAP_SMARTREFLEX)          += sr_device.o smartreflex.o
 obj-$(CONFIG_OMAP_SMARTREFLEX_CLASS3)	+= smartreflex-class3.o
 
