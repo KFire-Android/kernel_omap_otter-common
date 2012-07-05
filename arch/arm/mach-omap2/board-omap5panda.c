@@ -810,14 +810,14 @@ static struct omap_dss_device omap5panda_hdmi_device = {
 };
 
 static struct omap_dss_device *omap5panda_dss_devices[] = {
-	&omap5_panda_dvi_device,
 	&omap5panda_hdmi_device,
+	&omap5_panda_dvi_device,
 };
 
 static struct omap_dss_board_info omap5evm_dss_data = {
 	.num_devices	= ARRAY_SIZE(omap5panda_dss_devices),
 	.devices	= omap5panda_dss_devices,
-	.default_device	= &omap5_panda_dvi_device,
+	.default_device	= &omap5panda_hdmi_device,
 };
 
 static void omap5panda_hdmi_init(void)
