@@ -1082,13 +1082,13 @@ static int omap_bandgap_tshut_init(struct omap_bandgap *bg_ptr,
 	/* Request for gpio_86 line */
 	status = gpio_request(gpio_nr, "tshut");
 	if (status < 0) {
-		dev_err(bg_ptr->dev,
-			"Could not request for TSHUT GPIO:%i\n", 86);
+		dev_err(&pdev->dev,
+			"Could not request for TSHUT GPIO:%i\n", gpio_nr);
 		return status;
 	}
 	status = gpio_direction_input(gpio_nr);
 	if (status) {
-		dev_err(bg_ptr->dev,
+		dev_err(&pdev->dev,
 			"Cannot set input TSHUT GPIO %d\n", gpio_nr);
 		return status;
 	}
@@ -1099,7 +1099,7 @@ static int omap_bandgap_tshut_init(struct omap_bandgap *bg_ptr,
 			     NULL);
 	if (status) {
 		gpio_free(gpio_nr);
-		dev_err(bg_ptr->dev, "request irq failed for TSHUT");
+		dev_err(&pdev->dev, "request irq failed for TSHUT");
 	}
 
 
@@ -1148,7 +1148,7 @@ static struct omap_bandgap_data omap4460_data = {
 
 static struct omap_bandgap_data omap5430_data = {
 	.has_talert = true,
-	.has_tshut = true,
+	.has_tshut = false,
 	.fclock_name = "ts_clk_div_ck",
 	.div_ck_name = "ts_clk_div_ck",
 	.conv_table = omap5430_adc_to_temp,
@@ -1216,7 +1216,7 @@ struct omap_bandgap *omap_bandgap_platform_build(struct platform_device *pdev)
 	}
 
 	if (bg_ptr->pdata->has_tshut) {
-		bg_ptr->tshut_gpio = bg_ptr->pdata->tshut_gpio;
+		bg_ptr->tshut_gpio = pdata->tshut_gpio;
 		if (!gpio_is_valid(bg_ptr->tshut_gpio)) {
 			dev_err(&pdev->dev, "invalid gpio for tshut (%d)\n",
 				bg_ptr->tshut_gpio);
@@ -1407,8 +1407,10 @@ put_clks:
 	clk_put(bg_ptr->fclock);
 	clk_put(bg_ptr->div_clk);
 free_irqs:
-	free_irq(gpio_to_irq(bg_ptr->tshut_gpio), NULL);
-	gpio_free(bg_ptr->tshut_gpio);
+	if (bg_ptr->pdata->has_tshut) {
+		free_irq(gpio_to_irq(bg_ptr->tshut_gpio), NULL);
+		gpio_free(bg_ptr->tshut_gpio);
+	}
 
 	return ret;
 }
@@ -1427,9 +1429,12 @@ int __devexit omap_bandgap_remove(struct platform_device *pdev)
 	clk_disable(bg_ptr->fclock);
 	clk_put(bg_ptr->fclock);
 	clk_put(bg_ptr->div_clk);
-	free_irq(bg_ptr->irq, bg_ptr);
-	free_irq(gpio_to_irq(bg_ptr->tshut_gpio), NULL);
-	gpio_free(bg_ptr->tshut_gpio);
+	if (bg_ptr->pdata->has_talert)
+		free_irq(bg_ptr->irq, bg_ptr);
+	if (bg_ptr->pdata->has_tshut) {
+		free_irq(gpio_to_irq(bg_ptr->tshut_gpio), NULL);
+		gpio_free(bg_ptr->tshut_gpio);
+	}
 
 	return 0;
 }
