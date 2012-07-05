@@ -224,4 +224,11 @@ static inline int thermal_check_domain(const char *domain_name)
 }
 #endif
 
+/* Specific to governors */
+#ifdef CONFIG_CASE_TEMP_GOVERNOR
+extern int case_subzone_number;
+#else
+#define case_subzone_number	-1
+#endif
+
 #endif /* __LINUX_THERMAL_FRAMEWORK_H__ */
