@@ -284,7 +284,7 @@ static inline int omap4_init_static_deps(void)
 
 static inline int omap5_init_static_deps(void)
 {
-	struct clockdomain *mpuss_clkdm, *emif_clkdm;
+	struct clockdomain *mpuss_clkdm, *emif_clkdm, *dss_clkdm;
 	int ret;
 
 	/*
@@ -295,12 +295,19 @@ static inline int omap5_init_static_deps(void)
 	 */
 	mpuss_clkdm = clkdm_lookup("mpu_clkdm");
 	emif_clkdm = clkdm_lookup("emif_clkdm");
-	if (!mpuss_clkdm || !emif_clkdm)
+	dss_clkdm = clkdm_lookup("dss_clkdm");
+	if (!mpuss_clkdm || !emif_clkdm || !dss_clkdm)
 		return -EINVAL;
 
 	ret = clkdm_add_wkdep(mpuss_clkdm, emif_clkdm);
 	if (ret)
-		pr_err("Failed to add MPUSS -> L4PER wakeup dependency\n");
+		pr_err("Failed to add MPUSS -> emif wakeup dependency\n");
+
+	ret |= clkdm_add_wkdep(dss_clkdm, emif_clkdm);
+	if (ret)
+		pr_err("Failed to add dss -> l3main2/emif wakeup dependency\n");
+	else
+		WARN(1, "Enabled DSS->EMIF Static dependency, needs proper rootcause\n");
 
 	return ret;
 }

@@ -71,4 +71,10 @@ int voltdm_unregister_notifier(struct voltagedomain *voltdm,
 
 struct voltagedomain *voltdm_lookup(const char *name);
 
+#if defined(CONFIG_PM) && defined(CONFIG_ARCH_OMAP4)
+extern void omap_pm_clear_dsp_wake_up(void);
+#else
+static inline void omap_pm_clear_dsp_wake_up(void) { }
+#endif
+
 #endif			/* __ARCH_ARM_MACH_OMAP2_MACH_COMMON_H_ */

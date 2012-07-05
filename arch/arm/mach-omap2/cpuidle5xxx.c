@@ -40,14 +40,19 @@ static struct cpuidle_params cpuidle_params_table[] = {
 	/* C1 - CPU0 ON + CPU1 ON + MPU ON */
 	{.exit_latency = 2 + 2 , .target_residency = 5, .valid = 1},
 	/* C2- CPU0 CSWR + CPU1 CSWR + MPU CSWR */
-	{.exit_latency = 16 + 16 , .target_residency = 40, .valid = 1},
+	{.exit_latency = 100 + 100 , .target_residency = 200, .valid = 1},
+
+	/*
+	 * FIXME: Errata analysis pending. Disabled C-state as CPU Forced-OFF is
+	 * not safe on ES1.0. Preventing MPU OSWR C-state for now.
+	 */
 	/* C3 - CPU0 OFF + CPU1 OFF + MPU OSWR */
-	{.exit_latency = 460 + 518 , .target_residency = 1100, .valid = 1},
+	{.exit_latency = 460 + 518 , .target_residency = 1100, .valid = 0},
 };
 
 #define OMAP5_NUM_STATES ARRAY_SIZE(cpuidle_params_table)
 
-struct omap5_idle_statedata omap5_idle_data[OMAP5_NUM_STATES];
+static struct omap5_idle_statedata omap5_idle_data[OMAP5_NUM_STATES];
 static struct powerdomain *mpu_pd, *cpu_pd[NR_CPUS];
 static struct clockdomain *cpu_clkdm[NR_CPUS];
 static atomic_t abort_barrier;
@@ -174,9 +179,9 @@ fail:
 	return index;
 }
 
-DEFINE_PER_CPU(struct cpuidle_device, omap5_idle_dev);
+static DEFINE_PER_CPU(struct cpuidle_device, omap5_idle_dev);
 
-struct cpuidle_driver omap5_idle_driver = {
+static struct cpuidle_driver omap5_idle_driver = {
 	.name			= "omap5_idle",
 	.owner			= THIS_MODULE,
 	.en_core_tk_irqen	= 1,
@@ -185,17 +190,18 @@ struct cpuidle_driver omap5_idle_driver = {
 static inline void _fill_cstate(struct cpuidle_driver *drv,
 					int idx, const char *descr, int flags)
 {
-	struct cpuidle_state *state = &drv->states[idx];
+	struct cpuidle_state *state = &drv->states[drv->state_count];
 
 	state->exit_latency	= cpuidle_params_table[idx].exit_latency;
 	state->target_residency	= cpuidle_params_table[idx].target_residency;
+	state->disable	= !cpuidle_params_table[idx].valid;
 	state->flags            = (CPUIDLE_FLAG_TIME_VALID | flags);
 	if (state->flags & CPUIDLE_FLAG_COUPLED)
 		state->enter		= omap5_enter_couple_idle;
 	else
 		state->enter		= omap5_enter_idle;
 
-	sprintf(state->name, "C%d", idx + 1);
+	sprintf(state->name, "C%d", drv->state_count + 1);
 	strncpy(state->desc, descr, CPUIDLE_DESC_LEN);
 }
 
@@ -258,27 +264,32 @@ int __init omap5_idle_init(void)
 		drv->state_count++;
 
 		/* C2 - CPU0 CSWR + CPU1 CSWR + MPU CSWR */
-		_fill_cstate(drv, 1, "MPUSS OSWR", 0);
-		cx = _fill_cstate_usage(dev, 1);
-		if (cx != NULL) {
-			cx->cpu_state = PWRDM_POWER_RET;
-			cx->mpu_state = PWRDM_POWER_RET;
-			cx->mpu_logic_state = PWRDM_POWER_RET;
-			atomic_set(&cx->mpu_state_vote, 0);
-			dev->state_count++;
-			drv->state_count++;
+		if (cpuidle_params_table[1].valid) {
+			_fill_cstate(drv, 1, "MPUSS OSWR", 0);
+			cx = _fill_cstate_usage(dev, 1);
+			if (cx != NULL) {
+				cx->cpu_state = PWRDM_POWER_RET;
+				cx->mpu_state = PWRDM_POWER_RET;
+				cx->mpu_logic_state = PWRDM_POWER_RET;
+				atomic_set(&cx->mpu_state_vote, 0);
+				dev->state_count++;
+				drv->state_count++;
+			}
 		}
 
 		/* C3 - CPU0 OFF + CPU1 OFF + MPU OSWR */
-		_fill_cstate(drv, 2, "MPUSS OSWR", CPUIDLE_FLAG_COUPLED);
-		cx = _fill_cstate_usage(dev, 2);
-		if (cx != NULL) {
-			cx->cpu_state = PWRDM_POWER_OFF;
-			cx->mpu_state = PWRDM_POWER_RET;
-			cx->mpu_logic_state = PWRDM_POWER_OFF;
-			atomic_set(&cx->mpu_state_vote, 0);
-			dev->state_count++;
-			drv->state_count++;
+		if (cpuidle_params_table[2].valid) {
+			_fill_cstate(drv, 2, "MPUSS OSWR",
+				     CPUIDLE_FLAG_COUPLED);
+			cx = _fill_cstate_usage(dev, 2);
+			if (cx != NULL) {
+				cx->cpu_state = PWRDM_POWER_OFF;
+				cx->mpu_state = PWRDM_POWER_RET;
+				cx->mpu_logic_state = PWRDM_POWER_OFF;
+				atomic_set(&cx->mpu_state_vote, 0);
+				dev->state_count++;
+				drv->state_count++;
+			}
 		}
 
 		/* Setup the brodcast device */

@@ -44,7 +44,7 @@ static struct cpuidle_params cpuidle_params_table[] = {
 
 #define OMAP4_NUM_STATES ARRAY_SIZE(cpuidle_params_table)
 
-struct omap4_idle_statedata omap4_idle_data[OMAP4_NUM_STATES];
+static struct omap4_idle_statedata omap4_idle_data[OMAP4_NUM_STATES];
 static struct powerdomain *mpu_pd, *cpu_pd[NR_CPUS];
 static struct clockdomain *cpu_clkdm[NR_CPUS];
 
@@ -159,9 +159,9 @@ fail:
 	return index;
 }
 
-DEFINE_PER_CPU(struct cpuidle_device, omap4_idle_dev);
+static DEFINE_PER_CPU(struct cpuidle_device, omap4_idle_dev);
 
-struct cpuidle_driver omap4_idle_driver = {
+static struct cpuidle_driver omap4_idle_driver = {
 	.name				= "omap4_idle",
 	.owner				= THIS_MODULE,
 	.en_core_tk_irqen		= 1,
