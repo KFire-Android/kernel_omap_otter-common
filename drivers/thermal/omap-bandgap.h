@@ -154,7 +154,6 @@ struct omap_temp_sensor {
  * @div_ck_nme: clock name of the clock divisor
  * @sensor_count: count of temperature sensor device in scm
  * @rev: Revision of the temperature sensor
- * @tshut_gpio: gpio linked to tshut signal
  * @accurate: Accuracy of the temperature
  * @sensors: array of sensors present in this bandgap instance
  * @expose_sensor: callback to export sensor to thermal API
@@ -167,7 +166,6 @@ struct omap_bandgap_data {
 	char				*div_ck_name;
 	int				sensor_count;
 	int				rev;
-	int				tshut_gpio;
 	bool				accurate;
 	int (*report_temperature)(struct omap_bandgap *bg_ptr, int id);
 	int (*expose_sensor)(struct omap_bandgap *bg_ptr, int id,
