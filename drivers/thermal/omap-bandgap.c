@@ -1082,13 +1082,13 @@ static int omap_bandgap_tshut_init(struct omap_bandgap *bg_ptr,
 	/* Request for gpio_86 line */
 	status = gpio_request(gpio_nr, "tshut");
 	if (status < 0) {
-		dev_err(bg_ptr->dev,
-			"Could not request for TSHUT GPIO:%i\n", 86);
+		dev_err(&pdev->dev,
+			"Could not request for TSHUT GPIO:%i\n", gpio_nr);
 		return status;
 	}
 	status = gpio_direction_input(gpio_nr);
 	if (status) {
-		dev_err(bg_ptr->dev,
+		dev_err(&pdev->dev,
 			"Cannot set input TSHUT GPIO %d\n", gpio_nr);
 		return status;
 	}
@@ -1099,7 +1099,7 @@ static int omap_bandgap_tshut_init(struct omap_bandgap *bg_ptr,
 			     NULL);
 	if (status) {
 		gpio_free(gpio_nr);
-		dev_err(bg_ptr->dev, "request irq failed for TSHUT");
+		dev_err(&pdev->dev, "request irq failed for TSHUT");
 	}
 
 
