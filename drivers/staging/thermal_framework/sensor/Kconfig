@@ -27,3 +27,11 @@ config OMAP5_THERMAL
 
 	  This includes alert interrupts generation and also the TSHUT
 	  support.
+
+config CASE_TEMP_SENSOR
+	bool "Case temp sensor support"
+	depends on THERMAL_FRAMEWORK && OMAP_THERMAL
+	help
+	  Enabling this config will give support for the case
+	  temp sensor for the OMAP platform.
+
