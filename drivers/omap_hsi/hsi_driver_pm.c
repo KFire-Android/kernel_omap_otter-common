@@ -18,6 +18,7 @@
 
 #include <linux/pm_qos.h>
 #include <plat/common.h>
+#include <plat/omap_device.h>
 
 #include "hsi_driver.h"
 
@@ -61,18 +62,44 @@ int hsi_pm_change_hsi_speed(struct hsi_dev *hsi_ctrl, bool hi_speed)
 	return err;
 }
 
-int hsi_pm_change_hsi_wakeup_latency(struct hsi_dev *hsi_ctrl,
-					  int latency_us)
+int hsi_pm_change_mpu_opp(struct hsi_dev *hsi_ctrl, unsigned long mpu_freq)
 {
 	struct hsi_platform_data *pdata;
 	int err = 0;
+	static struct device *mpu_dev;
+
+	if (!mpu_dev)
+		mpu_dev = omap_device_get_by_hwmod_name("mpu");
+	if (!mpu_dev) {
+		pr_warning("%s: unable to get the mpu device\n", __func__);
+		return -EINVAL;
+	}
 
 	pdata = dev_get_platdata(hsi_ctrl->dev);
 
+	/* Set the MPU to requested OPP */
+	err = pdata->device_scale(mpu_dev, mpu_freq);
+	if (err < 0) {
+		dev_err(hsi_ctrl->dev, "%s: Cannot set MPU to %ldHz, err %d\n",
+			__func__, mpu_freq, err);
+	} else {
+		hsi_ctrl->mpu_fclk_current = mpu_freq;
+		dev_info(hsi_ctrl->dev, "MPU OPP changed to %ldHz\n", mpu_freq);
+	}
+
+	return 0;
+}
+
+int hsi_pm_change_hsi_wakeup_latency(struct hsi_dev *hsi_ctrl,
+					  int latency_us)
+{
+	int err = 0;
+
+	dev_pm_qos_update_request(&hsi_ctrl->dev_pm_qos, latency_us);
+
 	/* Set a constraint on HSI/L3INIT_PD to change HSI wakeup latency. */
 	/* +1 will force L3INIT_PD to ON, -1 will release the constraint. */
-	err = pdata->pm_set_max_dev_wakeup_lat(hsi_ctrl->dev, hsi_ctrl->dev,
-					       latency_us);
+	err = dev_pm_qos_update_request(&hsi_ctrl->dev_pm_qos, latency_us);
 	if (err < 0) {
 		dev_err(hsi_ctrl->dev,
 			"%s: Cannot set HSI latency to %d, err %d\n",

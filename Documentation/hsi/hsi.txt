@@ -293,6 +293,18 @@ K) int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg);
 		Description: Get current MPU wakeup latency.
 		Returns: Current latency in us
 
+	- HSI_IOCTL_SET_MPU_OPP:
+		Description: Change MPU frequency.
+                 - Force MPU OPP:
+                  * Direct control of MPU OPP (50, 100, TURBO, NITRO)
+                  * Usage of omap_device_scale(mpu, opp)
+		Parameters: MPU freq value (in Hz)
+
+	- HSI_IOCTL_GET_MPU_OPP:
+		Description: Get current MPU frequency.
+		Returns: Current MPU freq value (in Hz)
+
+
 L) void hsi_close(struct hsi_device *dev);
 
   Description: Close an HSI channel

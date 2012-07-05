@@ -475,6 +475,17 @@ static long  hsi_char_ioctl(struct file *file,
 		if (copy_to_user((void __user *)arg, &fclock, sizeof(state)))
 			ret = -EFAULT;
 		break;
+	case CS_SET_MPU_OPP:
+		if (copy_from_user(&fclock, (void __user *)arg, sizeof(fclock)))
+			ret = -EFAULT;
+		else
+			if_hsi_set_hi_speed(ch, fclock);
+		break;
+	case CS_GET_MPU_OPP:
+		if_hsi_get_speed(ch, &fclock);
+		if (copy_to_user((void __user *)arg, &fclock, sizeof(fclock)))
+			ret = -EFAULT;
+		break;
 	default:
 		ret = -ENOIOCTLCMD;
 		break;

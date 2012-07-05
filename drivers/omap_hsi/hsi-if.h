@@ -61,6 +61,8 @@ void if_hsi_set_hsi_latency(int ch, int lat);
 void if_hsi_get_hsi_latency(int ch, int *lat);
 void if_hsi_set_mpu_latency(int ch, int lat);
 void if_hsi_get_mpu_latency(int ch, int *lat);
+void if_hsi_set_mpu_opp(int ch, unsigned long mpu_fclk);
+void if_hsi_get_mpu_opp(int ch, unsigned long *mpu_fclk);
 int if_hsi_set_rx(int ch, struct hsi_rx_config *cfg);
 void if_hsi_get_rx(int ch, struct hsi_rx_config *cfg);
 int if_hsi_set_tx(int ch, struct hsi_tx_config *cfg);

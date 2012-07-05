@@ -50,6 +50,8 @@
 #define CS_SET_CLK_FORCE_ON	CS_IO(17)
 #define CS_SET_CLK_DYNAMIC	CS_IO(18)
 
+#define CS_SET_MPU_OPP		CS_IOR(17, unsigned long)
+#define CS_GET_MPU_OPP		CS_IOW(18, unsigned long)
 #define CS_SET_HSI_LATENCY	CS_IOR(19, unsigned int)
 #define CS_GET_HSI_LATENCY	CS_IOW(20, unsigned int)
 #define CS_SET_MPU_LATENCY	CS_IOR(21, unsigned int)

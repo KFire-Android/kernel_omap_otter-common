@@ -180,6 +180,7 @@ struct hsi_port {
  * @hsi_fclk_req: Indicates what HSI FClk user requested (96MHz/192MHz)
  * @hsi_fclk_current: Current HSI Fclock
  * @context_loss_cnt: lost context count
+ * @mpu_fclk_current: Current MPU Fclock
  * @hsi_latency_us: Current HSI latency
  * @mpu_latency_us: Current MPU latency
  * @gdd_irq: GDD (DMA) irq number
@@ -209,6 +210,7 @@ struct hsi_dev { /* HSI_TODO:  should be later renamed into hsi_controller*/
 	unsigned long hsi_fclk_req;
 	unsigned long hsi_fclk_current;
 	u32 context_loss_cnt;
+	unsigned long mpu_fclk_current;
 	int hsi_latency_us;
 	int mpu_latency_us;
 	int gdd_irq;
@@ -349,6 +351,7 @@ void hsi_save_ctx(struct hsi_dev *hsi_ctrl);
 void hsi_restore_ctx(struct hsi_dev *hsi_ctrl);
 
 int hsi_pm_change_hsi_speed(struct hsi_dev *hsi_ctrl, bool hi_speed);
+int hsi_pm_change_mpu_opp(struct hsi_dev *hsi_ctrl, unsigned long mpu_freq);
 int hsi_pm_change_hsi_wakeup_latency(struct hsi_dev *hsi_ctrl,
 					   int latency_us);
 void hsi_pm_change_mpu_wakeup_latency(struct hsi_dev *hsi_ctrl,
