@@ -1148,7 +1148,7 @@ static struct omap_bandgap_data omap4460_data = {
 
 static struct omap_bandgap_data omap5430_data = {
 	.has_talert = true,
-	.has_tshut = true,
+	.has_tshut = false,
 	.fclock_name = "ts_clk_div_ck",
 	.div_ck_name = "ts_clk_div_ck",
 	.conv_table = omap5430_adc_to_temp,
