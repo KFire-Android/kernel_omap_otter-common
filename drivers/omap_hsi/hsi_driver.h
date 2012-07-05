@@ -181,6 +181,7 @@ struct hsi_port {
  * @hsi_fclk_current: Current HSI Fclock
  * @context_loss_cnt: lost context count
  * @hsi_latency_us: Current HSI latency
+ * @mpu_latency_us: Current MPU latency
  * @gdd_irq: GDD (DMA) irq number
  * @fifo_mapping_strategy: Selected strategy for fifo to ports/channels mapping
  * @gdd_usecount: Holds the number of ongoning DMA transfers
@@ -209,6 +210,7 @@ struct hsi_dev { /* HSI_TODO:  should be later renamed into hsi_controller*/
 	unsigned long hsi_fclk_current;
 	u32 context_loss_cnt;
 	int hsi_latency_us;
+	int mpu_latency_us;
 	int gdd_irq;
 	unsigned int fifo_mapping_strategy;
 	unsigned int gdd_usecount;
@@ -223,6 +225,7 @@ struct hsi_dev { /* HSI_TODO:  should be later renamed into hsi_controller*/
 	struct dentry *dir;
 #endif
 	struct device *dev;
+	struct pm_qos_request pm_qos;
 	struct dev_pm_qos_request dev_pm_qos;
 
 };
@@ -347,6 +350,8 @@ void hsi_restore_ctx(struct hsi_dev *hsi_ctrl);
 
 int hsi_pm_change_hsi_speed(struct hsi_dev *hsi_ctrl, bool hi_speed);
 int hsi_pm_change_hsi_wakeup_latency(struct hsi_dev *hsi_ctrl,
+					   int latency_us);
+void hsi_pm_change_mpu_wakeup_latency(struct hsi_dev *hsi_ctrl,
 					   int latency_us);
 
 #ifdef CONFIG_DEBUG_FS

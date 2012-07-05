@@ -1011,7 +1011,26 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 
 		*(int *)arg = hsi_ctrl->hsi_latency_us;
 		break;
+	case HSI_IOCTL_SET_MPU_LATENCY:
+		if (!arg) {
+			err = -EINVAL;
+			goto out;
+		}
 
+		spin_unlock_bh(&hsi_ctrl->lock);
+
+		hsi_pm_change_mpu_wakeup_latency(hsi_ctrl, *(int *)arg);
+
+		spin_lock_bh(&hsi_ctrl->lock);
+		break;
+	case HSI_IOCTL_GET_MPU_LATENCY:
+		if (!arg) {
+			err = -EINVAL;
+			goto out;
+		}
+
+		*(int *)arg = hsi_ctrl->mpu_latency_us;
+		break;
 	default:
 		err = -ENOIOCTLCMD;
 		break;

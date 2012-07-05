@@ -73,6 +73,8 @@ enum {
 	HSI_IOCTL_SET_CLK_DYNAMIC,  /* Exit from forced clocks on mode */
 	HSI_IOCTL_SET_HSI_LATENCY, /* Change HSI latency for high tput */
 	HSI_IOCTL_GET_HSI_LATENCY, /* Get HSI latency */
+	HSI_IOCTL_SET_MPU_LATENCY, /* Change MPU latency for high tput */
+	HSI_IOCTL_GET_MPU_LATENCY, /* Get MPU latency */
 };
 
 /* Forward references */

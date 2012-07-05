@@ -86,3 +86,14 @@ int hsi_pm_change_hsi_wakeup_latency(struct hsi_dev *hsi_ctrl,
 	return err;
 }
 
+void hsi_pm_change_mpu_wakeup_latency(struct hsi_dev *hsi_ctrl,
+					   int latency_us)
+{
+	pm_qos_update_request(&hsi_ctrl->pm_qos, latency_us);
+	hsi_ctrl->mpu_latency_us = latency_us;
+
+	dev_info(hsi_ctrl->dev, "MPU wakeup latency changed to %d\n",
+		 latency_us);
+	return;
+}
+

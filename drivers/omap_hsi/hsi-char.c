@@ -464,6 +464,17 @@ static long  hsi_char_ioctl(struct file *file,
 		if (copy_to_user((void __user *)arg, &fclock, sizeof(state)))
 			ret = -EFAULT;
 		break;
+	case CS_SET_MPU_LATENCY:
+		if (copy_from_user(&state, (void __user *)arg, sizeof(state)))
+			ret = -EFAULT;
+		else
+			if_hsi_set_mpu_latency(ch, state);
+		break;
+	case CS_GET_MPU_LATENCY:
+		if_hsi_get_mpu_latency(ch, &state);
+		if (copy_to_user((void __user *)arg, &fclock, sizeof(state)))
+			ret = -EFAULT;
+		break;
 	default:
 		ret = -ENOIOCTLCMD;
 		break;

@@ -52,6 +52,8 @@
 
 #define CS_SET_HSI_LATENCY	CS_IOR(19, unsigned int)
 #define CS_GET_HSI_LATENCY	CS_IOW(20, unsigned int)
+#define CS_SET_MPU_LATENCY	CS_IOR(21, unsigned int)
+#define CS_GET_MPU_LATENCY	CS_IOW(22, unsigned int)
 
 
 #define HSI_MODE_SLEEP		0

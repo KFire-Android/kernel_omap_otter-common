@@ -957,6 +957,8 @@ static int __devinit hsi_platform_device_probe(struct platform_device *pd)
 
 	dev_pm_qos_add_request(hsi_ctrl->dev, &hsi_ctrl->dev_pm_qos,
 			       PM_QOS_DEFAULT_VALUE);
+	pm_qos_add_request(&hsi_ctrl->pm_qos, PM_QOS_CPU_DMA_LATENCY,
+			   PM_QOS_DEFAULT_VALUE);
 
 	/* From here no need for HSI HW access */
 	hsi_clocks_disable(hsi_ctrl->dev, __func__);
@@ -988,6 +990,7 @@ static int __devexit hsi_platform_device_remove(struct platform_device *pd)
 		return 0;
 
 	dev_pm_qos_remove_request(&hsi_ctrl->dev_pm_qos);
+	pm_qos_remove_request(&hsi_ctrl->pm_qos);
 
 	unregister_hsi_devices(hsi_ctrl);
 

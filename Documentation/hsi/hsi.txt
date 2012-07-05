@@ -282,6 +282,16 @@ K) int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg);
 		Description: Get current HSI device wakeup latency.
 		Returns: Current latency in us
 
+	- HSI_IOCTL_SET_MPU_LATENCY:
+		Description: Change MPU wakeup latency.
+		             - Set a constraint on MPU/CORE to change MPU wakeup latency
+                  * This configure which C-state will be used in CPUidle
+                  * Usage of pm_qos_add_request(cpu_dma_latency, latency)
+		Parameters: Latency to use in us
+
+	- HSI_IOCTL_GET_MPU_LATENCY:
+		Description: Get current MPU wakeup latency.
+		Returns: Current latency in us
 
 L) void hsi_close(struct hsi_device *dev);
 

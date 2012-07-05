@@ -382,6 +382,23 @@ void if_hsi_get_hsi_latency(int ch, int *lat)
 	hsi_ioctl(channel->dev, HSI_IOCTL_GET_HSI_LATENCY, lat);
 }
 
+void if_hsi_set_mpu_latency(int ch, int lat)
+{
+	struct if_hsi_channel *channel;
+	channel = &hsi_iface.channels[ch];
+
+	spin_lock_bh(&hsi_iface.lock);
+	hsi_ioctl(channel->dev, HSI_IOCTL_SET_MPU_LATENCY, &lat);
+	spin_unlock_bh(&hsi_iface.lock);
+}
+
+void if_hsi_get_mpu_latency(int ch, int *lat)
+{
+	struct if_hsi_channel *channel;
+	channel = &hsi_iface.channels[ch];
+	hsi_ioctl(channel->dev, HSI_IOCTL_GET_MPU_LATENCY, lat);
+}
+
 void if_hsi_get_fifo_occupancy(int ch, size_t *occ)
 {
 	struct if_hsi_channel *channel;
