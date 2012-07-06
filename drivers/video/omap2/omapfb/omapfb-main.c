@@ -2395,11 +2395,14 @@ static int omapfb_init_display(struct omapfb2_device *fbdev,
 	struct omapfb_display_data *d;
 	int r;
 
-	r = dssdrv->enable(dssdev);
-	if (r) {
-		dev_warn(fbdev->dev, "Failed to enable display '%s'\n",
-				dssdev->name);
-		return r;
+	if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE) {
+
+		r = dssdrv->enable(dssdev);
+		if (r) {
+			dev_warn(fbdev->dev, "Failed to enable display '%s'\n",
+					dssdev->name);
+			return r;
+		}
 	}
 
 	d = get_display_data(fbdev, dssdev);
