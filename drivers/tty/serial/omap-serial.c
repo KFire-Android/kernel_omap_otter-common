@@ -934,8 +934,11 @@ static int serial_omap_set_wake(struct uart_port *port, unsigned int state)
 	struct uart_omap_port *up = (struct uart_omap_port *)port;
 	struct omap_uart_port_info *pdata = up->pdev->dev.platform_data;
 
-	if (pdata->enable_wakeup)
+	if (pdata->enable_wakeup) {
+		pm_runtime_get_sync(&up->pdev->dev);
 		pdata->enable_wakeup(up->pdev, state ? true : false);
+		pm_runtime_put(&up->pdev->dev);
+	}
 
 	return 0;
 }

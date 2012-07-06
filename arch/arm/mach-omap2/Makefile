@@ -272,6 +272,7 @@ obj-$(CONFIG_MACH_OMAP5_SEVM)		+= board-omap5evm.o \
 					   board-54xx-sevm-sensors.o \
 					   board-54xx-sevm-connectivity.o \
 					   board-54xx-sevm-panel.o \
+					   board-omap5evm-serial.o \
 					      hsmmc.o
 obj-$(CONFIG_MACH_OMAP5_PANDA)		+= board-omap5panda.o
 
