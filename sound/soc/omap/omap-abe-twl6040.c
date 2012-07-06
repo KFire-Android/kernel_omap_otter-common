@@ -212,6 +212,9 @@ static int omap_abe_mcbsp_hw_params(struct snd_pcm_substream *substream,
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
 	struct snd_soc_card *card = rtd->card;
+	struct omap_mcbsp *mcbsp = snd_soc_dai_get_drvdata(cpu_dai);
+	struct clk *fclk;
+	unsigned long fclk_rate;
 	int ret;
 	unsigned int channels;
 
@@ -225,7 +228,6 @@ static int omap_abe_mcbsp_hw_params(struct snd_pcm_substream *substream,
 	}
 
 	if (rtd->dai_link->no_pcm) {
-		struct omap_mcbsp *mcbsp = snd_soc_dai_get_drvdata(cpu_dai);
 		/* Configure McBSP internal buffer usage */
 		/* this need to be done for playback and/or record */
 		channels = params_channels(params);
@@ -235,9 +237,19 @@ static int omap_abe_mcbsp_hw_params(struct snd_pcm_substream *substream,
 			omap_mcbsp_set_rx_threshold(mcbsp, channels);
 	}
 
+	/* Get McBSP PRCM FCLK (internal clock) rate */
+	fclk = clk_get(mcbsp->dev, "prcm_fck");
+	if (IS_ERR(fclk)) {
+		dev_err(card->dev, "can't get McBSP prcm_fck\n");
+		return PTR_ERR(fclk);
+	}
+
+	fclk_rate = clk_get_rate(fclk);
+	clk_put(fclk);
+
 	/* Set McBSP clock to external */
 	ret = snd_soc_dai_set_sysclk(cpu_dai, OMAP_MCBSP_SYSCLK_CLKS_FCLK,
-				     64 * params_rate(params), SND_SOC_CLOCK_IN);
+				     fclk_rate, SND_SOC_CLOCK_IN);
 	if (ret < 0)
 		dev_err(card->dev, "can't set cpu system clock\n");
 
