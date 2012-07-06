@@ -409,7 +409,7 @@ int omap_enter_lowpower(unsigned int cpu, unsigned int power_state)
 		return -ENXIO;
 	}
 
-	pwrdm_pre_transition(mpuss_pd);
+	pwrdm_pre_transition(NULL);
 
 	/*
 	 * Check MPUSS next state and save interrupt controller if needed.
@@ -433,7 +433,6 @@ int omap_enter_lowpower(unsigned int cpu, unsigned int power_state)
 		save_state = 2;
 	}
 
-	cpu_pwrdm_pre_post_transition(cpu, 1);
 	cpu_clear_prev_logic_pwrst(cpu);
 	set_cpu_next_pwrst(cpu, power_state);
 	set_cpu_wakeup_addr(cpu, virt_to_phys(omap_pm_ops.resume));
@@ -454,7 +453,6 @@ int omap_enter_lowpower(unsigned int cpu, unsigned int power_state)
 	 * domain transition
 	 */
 	wakeup_cpu = smp_processor_id();
-	cpu_pwrdm_pre_post_transition(wakeup_cpu, 0);
 	set_cpu_next_pwrst(wakeup_cpu, PWRDM_POWER_ON);
 
 	if (omap_mpuss_read_prev_context_state()) {
@@ -472,7 +470,7 @@ int omap_enter_lowpower(unsigned int cpu, unsigned int power_state)
 	}
 
 sar_save_failed:
-	pwrdm_post_transition(mpuss_pd);
+	pwrdm_post_transition(NULL);
 
 	return 0;
 }
