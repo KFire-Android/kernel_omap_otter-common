@@ -206,11 +206,6 @@ static void __init omap5sevm_ti_st_init(void)
 	omap_mux_init_gpio(OMAP5_BT_NSHUTDOWN_GPIO,
 		OMAP_PIN_OUTPUT | OMAP_PIN_INPUT_PULLUP);
 	wake_lock_init(&st_wk_lock, WAKE_LOCK_SUSPEND, "st_wake_lock");
-	/* Mux configure OMAP5 UART5/WL UART */
-	omap_mux_init_signal("uart5_rx.uart5_rx", OMAP_PIN_INPUT_PULLUP);
-	omap_mux_init_signal("uart5_tx.uart5_tx", OMAP_PIN_OUTPUT);
-	omap_mux_init_signal("uart5_cts.uart5_cts", OMAP_PIN_INPUT_PULLUP);
-	omap_mux_init_signal("uart5_rts.uart5_rts", OMAP_PIN_OUTPUT);
 
 	platform_add_devices(omap5evm_wilink_devs,
 				ARRAY_SIZE(omap5evm_wilink_devs));
