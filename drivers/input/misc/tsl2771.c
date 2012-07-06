@@ -766,7 +766,7 @@ static int __devinit tsl2771_driver_probe(struct i2c_client *client,
 		}
 	}
 
-	ret = gpio_request_one(data->client->irq, GPIOF_IN, "sensor");
+	ret = gpio_request_one(data->client->irq, GPIOF_IN, "tsl2771");
 	if (ret) {
 		dev_err(&data->client->dev, "sensor: gpio request failure\n");
 		return ret;
