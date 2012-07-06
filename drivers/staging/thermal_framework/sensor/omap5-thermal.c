@@ -50,9 +50,15 @@ static void report_temperature_delayed_work_fn(struct work_struct *work)
 
 	therm_data->therm_fw.current_temp = temp;
 	ret = thermal_sensor_set_temp(&therm_data->therm_fw);
-
+	/*
+	 * Currently there are no governor/cooling devices identified for
+	 * Core domain. This results in repetitive error messages on console,
+	 * whenever there is an temperature report update.
+	 * Once the governor/cooling devices are identified/added, need to make
+	 * the debug statement as dev_err.
+	 */
 	if (ret)
-		dev_err(therm_data->bg_ptr->dev, "Fail to set temp\n");
+		pr_err_once("%s: Fail to set temp\n", __func__);
 
 	return;
 }

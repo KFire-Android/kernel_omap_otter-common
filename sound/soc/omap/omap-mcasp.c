@@ -627,6 +627,7 @@ static __devinit int omap_mcasp_probe(struct platform_device *pdev)
 		ret = -EBUSY;
 		goto err_res;
 	}
+	mcasp->res = res;
 
 	mcasp->base = ioremap(res->start, resource_size(res));
 	if (!mcasp->base) {
@@ -685,12 +686,14 @@ err_res:
 static __devexit int omap_mcasp_remove(struct platform_device *pdev)
 {
 	struct omap_mcasp *mcasp = dev_get_drvdata(&pdev->dev);
+	struct resource *res = mcasp->res;
 
 	snd_soc_unregister_dai(&pdev->dev);
 	pm_runtime_disable(&pdev->dev);
 	clk_put(mcasp->fclk);
 	free_irq(mcasp->irq, (void *)mcasp);
 	iounmap(mcasp->base);
+	release_mem_region(res->start, resource_size(res));
 	kfree(mcasp);
 
 	return 0;

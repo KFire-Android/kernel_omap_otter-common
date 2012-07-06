@@ -36,6 +36,7 @@
 #define MONITOR_ZONE	2
 #define SAFE_ZONE	1
 #define NO_ACTION	0
+#define MAX_NO_MON_ZONES PANIC_ZONE
 #define OMAP_FATAL_TEMP 125000
 #define OMAP_PANIC_TEMP 110000
 #define OMAP_ALERT_TEMP 100000
@@ -55,9 +56,29 @@ enum governor_instances {
 	OMAP_GOV_MAX_INSTANCE,
 };
 
+#define OMAP_THERMAL_ZONE_NAME_SZ	10
+struct omap_thermal_zone {
+	char name[OMAP_THERMAL_ZONE_NAME_SZ];
+	unsigned int cooling_increment;
+	int temp_lower;
+	int temp_upper;
+	int update_rate;
+	int average_rate;
+};
+#define OMAP_THERMAL_ZONE(n, i, l, u, r, a)		\
+{							\
+	.name				= n,		\
+	.cooling_increment		= (i),		\
+	.temp_lower			= (l),		\
+	.temp_upper			= (u),		\
+	.update_rate			= (r),		\
+	.average_rate			= (a),		\
+}
+
 struct omap_governor {
 	struct thermal_dev *temp_sensor;
 	struct thermal_dev thermal_fw;
+	struct omap_thermal_zone omap_thermal_zones[MAX_NO_MON_ZONES];
 	void (*update_temp_thresh) (struct thermal_dev *, int min, int max);
 	int report_rate;
 	int panic_zone_reached;
@@ -81,26 +102,8 @@ struct omap_governor {
 	struct notifier_block pm_notifier;
 };
 
-#define OMAP_THERMAL_ZONE_NAME_SZ	10
-struct omap_thermal_zone {
-	const char name[OMAP_THERMAL_ZONE_NAME_SZ];
-	unsigned int cooling_increment;
-	int temp_lower;
-	int temp_upper;
-	int update_rate;
-	int average_rate;
-};
-#define OMAP_THERMAL_ZONE(n, i, l, u, r, a)		\
-{							\
-	.name				= n,		\
-	.cooling_increment		= (i),		\
-	.temp_lower			= (l),		\
-	.temp_upper			= (u),		\
-	.update_rate			= (r),		\
-	.average_rate			= (a),		\
-}
-
-static struct omap_thermal_zone omap_thermal_zones[] = {
+/* Initial set of thersholds for different thermal zones */
+static struct omap_thermal_zone omap_thermal_init_zones[] __initdata = {
 	OMAP_THERMAL_ZONE("safe", 0, OMAP_SAFE_TEMP, OMAP_MONITOR_TEMP,
 			FAST_TEMP_MONITORING_RATE, NORMAL_TEMP_MONITORING_RATE),
 	OMAP_THERMAL_ZONE("monitor", 0,
@@ -326,7 +329,8 @@ static int omap_thermal_manager(struct omap_governor *omap_gov,
 				omap_gov->panic_threshold;
 		if (temp_upper >= OMAP_FATAL_TEMP)
 			temp_upper = OMAP_FATAL_TEMP;
-		omap_thermal_zones[PANIC_ZONE - 1].temp_upper = temp_upper;
+		omap_gov->omap_thermal_zones[PANIC_ZONE - 1].temp_upper =
+								temp_upper;
 		zone = PANIC_ZONE;
 	} else if (cpu_temp < (omap_gov->panic_threshold - HYSTERESIS_VALUE)) {
 		if (cpu_temp >= omap_gov->alert_threshold) {
@@ -367,7 +371,7 @@ static int omap_thermal_manager(struct omap_governor *omap_gov,
 	if (zone != NO_ACTION) {
 		struct omap_thermal_zone *therm_zone;
 
-		therm_zone = &omap_thermal_zones[zone - 1];
+		therm_zone = &omap_gov->omap_thermal_zones[zone - 1];
 		if ((omap_gov->prev_zone != zone) || (zone == PANIC_ZONE)) {
 			pr_info("%s:sensor %d avg sensor %d pcb ",
 				 __func__, temp,
@@ -544,6 +548,11 @@ static int option_alert_set(void *data, u64 val)
 	}
 	/* Change the ALERT Threshold value */
 	omap_gov->alert_threshold = val;
+	/* Also update the governor zone array */
+	omap_gov->omap_thermal_zones[MONITOR_ZONE - 1].temp_upper =
+						omap_gov->alert_threshold;
+	omap_gov->omap_thermal_zones[ALERT_ZONE - 1].temp_lower =
+				omap_gov->alert_threshold - HYSTERESIS_VALUE;
 
 	/* Skip sensor update if no sensor is present */
 	if (!IS_ERR_OR_NULL(omap_gov->temp_sensor))
@@ -578,6 +587,11 @@ static int option_panic_set(void *data, u64 val)
 	}
 	/* Change the PANIC Threshold value */
 	omap_gov->panic_threshold = val;
+	/* Also update the governor zone array */
+	omap_gov->omap_thermal_zones[ALERT_ZONE - 1].temp_upper =
+						omap_gov->panic_threshold;
+	omap_gov->omap_thermal_zones[PANIC_ZONE - 1].temp_lower =
+				omap_gov->panic_threshold - HYSTERESIS_VALUE;
 
 	/* Skip sensor update if no sensor is present */
 	if (!IS_ERR_OR_NULL(omap_gov->temp_sensor))
@@ -679,6 +693,9 @@ static int __init omap_governor_init(void)
 	}
 
 	/* Initializing CPU governor */
+	memcpy(omap_gov_instance[OMAP_GOV_CPU_INSTANCE]->omap_thermal_zones,
+		omap_thermal_init_zones, sizeof(omap_thermal_init_zones));
+
 	omap_gov_instance[OMAP_GOV_CPU_INSTANCE]->thermal_fw.name =
 							"omap_cpu_governor";
 	omap_gov_instance[OMAP_GOV_CPU_INSTANCE]->thermal_fw.domain_name =
@@ -688,6 +705,9 @@ static int __init omap_governor_init(void)
 	thermal_governor_dev_register(
 			&omap_gov_instance[OMAP_GOV_CPU_INSTANCE]->thermal_fw);
 	/* Initializing GPU governor */
+	memcpy(omap_gov_instance[OMAP_GOV_GPU_INSTANCE]->omap_thermal_zones,
+		omap_thermal_init_zones, sizeof(omap_thermal_init_zones));
+
 	omap_gov_instance[OMAP_GOV_GPU_INSTANCE]->thermal_fw.name =
 							"omap_gpu_governor";
 	omap_gov_instance[OMAP_GOV_GPU_INSTANCE]->thermal_fw.domain_name =

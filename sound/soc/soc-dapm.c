@@ -285,11 +285,9 @@ static int snd_soc_dapm_set_bias_level(struct snd_soc_dapm_context *dapm,
 	if (ret != 0)
 		goto out;
 
-	if (dapm->codec) {
-		if (dapm->codec->driver->set_bias_level)
-			ret = dapm->codec->driver->set_bias_level(dapm->codec,
-								  level);
-	} else
+	if (dapm->codec && dapm->codec->driver->set_bias_level)
+		ret = dapm->codec->driver->set_bias_level(dapm->codec, level);
+	else
 		dapm->bias_level = level;
 
 	if (ret != 0)
@@ -2015,6 +2013,7 @@ static void dapm_free_widgets(struct snd_soc_dapm_context *dapm)
 			kfree(p);
 		}
 		kfree(w->kcontrols);
+		kfree(w->sname);
 		kfree(w->name);
 		kfree(w);
 	}
@@ -2901,14 +2900,12 @@ snd_soc_dapm_new_control(struct snd_soc_dapm_context *dapm,
 		snprintf((char *)w->name, name_len, "%s", widget->name);
 
 	if (widget->sname) {
-		name_len = strlen(widget->sname) + 1;
-		w->sname = kmalloc(name_len, GFP_KERNEL);
+		w->sname = kstrdup(widget->sname, GFP_KERNEL);
 		if (w->sname == NULL) {
 			kfree(w->name);
 			kfree(w);
 			return NULL;
 		}
-		snprintf((char *)w->sname, name_len, "%s", widget->sname);
 	}
 
 	switch (w->id) {

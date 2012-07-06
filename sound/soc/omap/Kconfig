@@ -18,8 +18,16 @@ config SND_OMAP_SOC_MCPDM
 config SND_OMAP_SOC_HDMI
 	tristate
 
+config SND_OMAP_SOC_ABE_VXREC
+	tristate
+
+config SND_OMAP_SOC_ABE_ECHO
+	tristate
+
 config SND_OMAP_SOC_ABE
 	tristate
+	select SND_OMAP_SOC_ABE_VXREC
+	select SND_OMAP_SOC_ABE_ECHO
 
 config SND_OMAP_SOC_N810
 	tristate "SoC Audio support for Nokia N810"
