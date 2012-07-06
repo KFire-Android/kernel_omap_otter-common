@@ -224,7 +224,7 @@ static int omap_abe_mcbsp_hw_params(struct snd_pcm_substream *substream,
 		return ret;
 	}
 
-	if (params != NULL) {
+	if (rtd->dai_link->no_pcm) {
 		struct omap_mcbsp *mcbsp = snd_soc_dai_get_drvdata(cpu_dai);
 		/* Configure McBSP internal buffer usage */
 		/* this need to be done for playback and/or record */
