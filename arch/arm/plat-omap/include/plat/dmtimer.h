@@ -353,13 +353,20 @@ static inline void __omap_dm_timer_reset(struct omap_dm_timer *timer,
 		l |= 1 << 2;
 
 	__raw_writel(l, timer->io_base + OMAP_TIMER_OCP_CFG_OFFSET);
+}
+
+static inline void __omap_dm_timer_enable_posted(struct omap_dm_timer *timer)
+{
+	if (timer->posted)
+		return;
 
 	if (timer->errata & OMAP_TIMER_ERRATA_I767)
 		return;
 
-	/* Match hardware reset default of posted mode */
 	__omap_dm_timer_write(timer, OMAP_TIMER_IF_CTRL_REG,
 					OMAP_TIMER_CTRL_POSTED, 0);
+	timer->context.tsicr = OMAP_TIMER_CTRL_POSTED;
+	timer->posted = 1;
 }
 
 static inline void
