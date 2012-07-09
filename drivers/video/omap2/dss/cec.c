@@ -449,7 +449,7 @@ static int __init cec_init(void)
 		&cec_hpd_cb);
 	mutex_init(&cec.lock);
 	cec.switch_state = 0;
-	cec.rx_switch.name = "hdmi_cec";
+	cec.rx_switch.name = "cec";
 	r = switch_dev_register(&cec.rx_switch);
 	if (r)
 		goto error_event;
