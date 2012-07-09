@@ -521,6 +521,8 @@ static int omap_i2c_bus_clear(struct omap_i2c_dev *dev)
 	 * at least 9 clock pulses on SCL. Put the I2C in a test mode so it
 	 * will output a continuous clock on SCL.
 	 */
+	disable_irq(dev->irq);
+
 	w = omap_i2c_read_reg(dev, OMAP_I2C_SYSTEST_REG);
 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
 	omap_i2c_write_reg(dev, OMAP_I2C_SYSTEST_REG,
@@ -530,6 +532,9 @@ static int omap_i2c_bus_clear(struct omap_i2c_dev *dev)
 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
 	omap_i2c_reset(dev);
 	omap_i2c_init(dev);
+
+	enable_irq(dev->irq);
+
 	return omap_i2c_wait_for_bb(dev);
 }
 
