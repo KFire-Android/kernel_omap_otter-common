@@ -390,6 +390,7 @@ struct tiler_block *tiler_reserve_2d(enum tiler_fmt fmt, uint16_t w,
 	struct tiler_block *block;
 	u32 min_align = 128;
 	int ret;
+	size_t slot_bytes;
 
 	/* check for valid format and overflow for w/h */
 	if (!validfmt(fmt) || !w || !h ||
@@ -409,15 +410,17 @@ struct tiler_block *tiler_reserve_2d(enum tiler_fmt fmt, uint16_t w,
 	block->stride = round_up(geom[fmt].cpp * w, PAGE_SIZE);
 
 	/* convert alignment to slots */
-	min_align = max(min_align, (geom[fmt].slot_w * geom[fmt].cpp));
+	slot_bytes = geom[fmt].slot_w * geom[fmt].cpp;
+	min_align = max(min_align, slot_bytes);
 	align = ALIGN(align, min_align);
-	align /= geom[fmt].slot_w * geom[fmt].cpp;
+	align /= slot_bytes;
 
 	/* convert width/height to slots */
 	w = DIV_ROUND_UP(w, geom[fmt].slot_w);
 	h = DIV_ROUND_UP(h, geom[fmt].slot_h);
 
-	ret = tcm_reserve_2d(containers[fmt], w, h, align, &block->area);
+	ret = tcm_reserve_2d(containers[fmt], w, h, align, -1, slot_bytes,
+			&block->area);
 	if (ret) {
 		kfree(block);
 		return ERR_PTR(-ENOMEM);
@@ -942,8 +945,7 @@ static int omap_dmm_probe(struct platform_device *dev)
 	/* init containers */
 	for (i = 0; i < omap_dmm->num_lut; i++) {
 		omap_dmm->tcm[i] = sita_init(omap_dmm->container_width,
-						omap_dmm->container_height,
-						NULL);
+						omap_dmm->container_height);
 
 		if (!omap_dmm->tcm[i]) {
 			dev_err(&dev->dev, "failed to allocate container\n");

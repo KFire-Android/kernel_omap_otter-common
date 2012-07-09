@@ -60,18 +60,17 @@ struct tcm {
 	u32 *lut;		/* ptr to LUT table */
 	int lut_id;		/* Lookup table identifier */
 
-	/* 'pvt' structure shall contain any tcm details (attr) along with
-	linked list of allocated areas and mutex for mutually exclusive access
-	to the list.  It may also contain copies of width and height to notice
-	any changes to the publicly available width and height fields. */
-	void *pvt;
+	spinlock_t lock;
+	unsigned long *bitmap;
+	size_t map_size;
 
 	/* function table */
-	s32 (*reserve_2d)(struct tcm *tcm, u16 height, u16 width, u8 align,
-			  struct tcm_area *area);
+	s32 (*reserve_2d)(struct tcm *tcm, u16 height, u16 width, u16 align,
+				int16_t offset, uint16_t slot_bytes,
+				struct tcm_area *area);
 	s32 (*reserve_1d)(struct tcm *tcm, u32 slots, struct tcm_area *area);
-	s32 (*free)      (struct tcm *tcm, struct tcm_area *area);
-	void (*deinit)   (struct tcm *tcm);
+	s32 (*free)(struct tcm *tcm, struct tcm_area *area);
+	void (*deinit)(struct tcm *tcm);
 };
 
 /*=============================================================================
@@ -90,7 +89,7 @@ struct tcm {
  *
  */
 
-struct tcm *sita_init(u16 width, u16 height, struct tcm_pt *attr);
+struct tcm *sita_init(u16 width, u16 height);
 
 
 /**
@@ -128,7 +127,9 @@ static inline void tcm_deinit(struct tcm *tcm)
  *	    allocation.
  */
 static inline s32 tcm_reserve_2d(struct tcm *tcm, u16 width, u16 height,
-				 u16 align, struct tcm_area *area)
+				u16 align,
+				int16_t offset, uint16_t slot_bytes,
+				struct tcm_area *area)
 {
 	/* perform rudimentary error checking */
 	s32 res = tcm  == NULL ? -ENODEV :
@@ -139,7 +140,8 @@ static inline s32 tcm_reserve_2d(struct tcm *tcm, u16 width, u16 height,
 
 	if (!res) {
 		area->is2d = true;
-		res = tcm->reserve_2d(tcm, height, width, align, area);
+		res = tcm->reserve_2d(tcm, height, width, align, offset,
+					slot_bytes, area);
 		area->tcm = res ? NULL : tcm;
 	}
 

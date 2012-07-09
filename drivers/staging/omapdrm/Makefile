@@ -18,7 +18,7 @@ omapdrm-y := omap_drv.o \
 omapdrm-y += omap_gem_helpers.o
 
 omap-dmm-tiler-y := omap_dmm_tiler.o \
-	tcm-sita.o
+	sita.o
 
 obj-$(CONFIG_DRM_OMAP_DMM_TILER) += omap-dmm-tiler.o
 obj-$(CONFIG_DRM_OMAP_DISPLAY)	+= omapdrm.o
