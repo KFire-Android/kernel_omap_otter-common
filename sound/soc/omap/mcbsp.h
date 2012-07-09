@@ -317,6 +317,7 @@ struct omap_mcbsp {
 	unsigned int in_freq;
 	int clk_div;
 	int wlen;
+	u8 fck_src;
 };
 
 void omap_mcbsp_config(struct omap_mcbsp *mcbsp,

@@ -729,6 +729,11 @@ void omap_mcbsp_stop(struct omap_mcbsp *mcbsp, int tx, int rx)
 int omap2_mcbsp_set_clks_src(struct omap_mcbsp *mcbsp, u8 fck_src_id)
 {
 	const char *src;
+	int ret;
+
+	/* avoid redundant reparenting which fails when module is running */
+	if (mcbsp->fck_src == fck_src_id)
+		return 0;
 
 	if (fck_src_id == MCBSP_CLKS_PAD_SRC)
 		src = "clks_ext";
@@ -738,9 +743,14 @@ int omap2_mcbsp_set_clks_src(struct omap_mcbsp *mcbsp, u8 fck_src_id)
 		return -EINVAL;
 
 	if (mcbsp->pdata->set_clk_src)
-		return mcbsp->pdata->set_clk_src(mcbsp->dev, mcbsp->fclk, src);
+		ret = mcbsp->pdata->set_clk_src(mcbsp->dev, mcbsp->fclk, src);
 	else
-		return -EINVAL;
+		ret = -EINVAL;
+
+	if (!ret)
+		mcbsp->fck_src = fck_src_id;
+
+	return ret;
 }
 
 int omap_mcbsp_6pin_src_mux(struct omap_mcbsp *mcbsp, u8 mux)
