@@ -307,7 +307,7 @@ void omap_sram_idle(void)
 			omap3_enable_io_chain();
 	}
 
-	pwrdm_pre_transition();
+	pwrdm_pre_transition(NULL);
 
 	/* PER */
 	if (per_next_state < PWRDM_POWER_ON) {
@@ -372,7 +372,7 @@ void omap_sram_idle(void)
 	}
 	omap3_intc_resume_idle();
 
-	pwrdm_post_transition();
+	pwrdm_post_transition(NULL);
 
 	/* PER */
 	if (per_next_state < PWRDM_POWER_ON) {
