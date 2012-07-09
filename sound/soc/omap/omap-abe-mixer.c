@@ -180,13 +180,13 @@ static int put_mixer(struct snd_kcontrol *kcontrol,
 	omap_abe_pm_runtime_get_sync(abe);
 
 	if (ucontrol->value.integer.value[0]) {
-		abe->opp.widget[mc->reg] |= ucontrol->value.integer.value[0]<<mc->shift;
+		abe->opp.widget[mc->reg] |= BIT(OMAP_ABE_MIX_SHIFT(mc->shift));
 		snd_soc_dapm_mixer_update_power(widget, kcontrol, 1);
-		omap_aess_enable_gain(abe->aess, mc->reg);
+		omap_aess_enable_gain(abe->aess, mc->shift);
 	} else {
-		abe->opp.widget[mc->reg] &= ~(0x1<<mc->shift);
+		abe->opp.widget[mc->reg] &= ~BIT(OMAP_ABE_MIX_SHIFT(mc->shift));
 		snd_soc_dapm_mixer_update_power(widget, kcontrol, 0);
-		omap_aess_disable_gain(abe->aess, mc->reg);
+		omap_aess_disable_gain(abe->aess, mc->shift);
 	}
 
 	omap_abe_pm_runtime_put_sync(abe);
@@ -203,7 +203,8 @@ static int abe_get_mixer(struct snd_kcontrol *kcontrol,
 	struct snd_soc_platform *platform = widget->platform;
 	struct omap_abe *abe = snd_soc_platform_get_drvdata(platform);
 
-	ucontrol->value.integer.value[0] = (abe->opp.widget[mc->reg]>>mc->shift) & 0x1;
+	ucontrol->value.integer.value[0] =
+		!!(abe->opp.widget[mc->reg] & BIT(OMAP_ABE_MIX_SHIFT(mc->shift)));
 
 	return 0;
 }
@@ -286,7 +287,7 @@ static int ul_mux_put_route(struct snd_kcontrol *kcontrol,
 	int reg = e->reg - OMAP_ABE_MUX(0);
 
 	if (mux > OMAP_ABE_ROUTES_UL) {
-		pr_err("inavlid mux %d\n", mux);
+		dev_err(platform->dev, "invalid mux %d\n", mux);
 		return 0;
 	}
 
@@ -305,10 +306,7 @@ static int ul_mux_put_route(struct snd_kcontrol *kcontrol,
 	/* 2nd arg here is unused */
 	omap_aess_set_router_configuration(abe->aess, UPROUTE, 0, (u32 *)abe->mixer.route_ul);
 
-	if (router[mux] != ZERO_labelID)
-		abe->opp.widget[e->reg] = e->shift_l;
-	else
-		abe->opp.widget[e->reg] = 0;
+	abe->opp.widget[e->reg] = mux;
 
 	snd_soc_dapm_mux_update_power(widget, kcontrol, mux, e);
 	omap_abe_pm_runtime_put_sync(abe);
@@ -325,28 +323,11 @@ static int ul_mux_get_route(struct snd_kcontrol *kcontrol,
 	struct omap_abe *abe = snd_soc_platform_get_drvdata(platform);
 	struct soc_enum *e =
 		(struct soc_enum *)kcontrol->private_value;
-	int reg = e->reg - OMAP_ABE_MUX(0), i, rval = 0;
 
-	/* TODO: remove the gap */
-	if (reg < 8) {
-		/* 0  .. 9   = MM_UL */
-		rval = abe->mixer.route_ul[reg];
-	} else if (reg < 12) {
-		/* 10 .. 11  = MM_UL2 */
-		/* 12 .. 13  = VX_UL */
-		rval = abe->mixer.route_ul[reg + 2];
-	}
+	ucontrol->value.integer.value[0] = abe->opp.widget[e->reg];
 
-	for (i = 0; i < ARRAY_SIZE(router); i++) {
-		if (router[i] == rval) {
-			ucontrol->value.integer.value[0] = i;
-			return 0;
-		}
-	}
-
-	return 1;
+	return 0;
 }
-
 
 static int abe_put_switch(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol)
@@ -361,10 +342,10 @@ static int abe_put_switch(struct snd_kcontrol *kcontrol,
 	omap_abe_pm_runtime_get_sync(abe);
 
 	if (ucontrol->value.integer.value[0]) {
-		abe->opp.widget[mc->reg] |= ucontrol->value.integer.value[0]<<mc->shift;
+		abe->opp.widget[mc->reg] |= BIT(mc->shift);
 		snd_soc_dapm_mixer_update_power(widget, kcontrol, 1);
 	} else {
-		abe->opp.widget[mc->reg] &= ~(0x1<<mc->shift);
+		abe->opp.widget[mc->reg] &= ~BIT(mc->shift);
 		snd_soc_dapm_mixer_update_power(widget, kcontrol, 0);
 	}
 	omap_abe_pm_runtime_put_sync(abe);
@@ -372,6 +353,21 @@ static int abe_put_switch(struct snd_kcontrol *kcontrol,
 	return 1;
 }
 
+static int abe_get_switch(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_dapm_widget_list *wlist = snd_kcontrol_chip(kcontrol);
+	struct snd_soc_dapm_widget *widget = wlist->widgets[0];
+	struct soc_mixer_control *mc =
+		(struct soc_mixer_control *)kcontrol->private_value;
+	struct snd_soc_platform *platform = widget->platform;
+	struct omap_abe *abe = snd_soc_platform_get_drvdata(platform);
+
+	ucontrol->value.integer.value[0] =
+		!!(abe->opp.widget[mc->reg] & BIT(mc->shift));
+
+	return 0;
+}
 
 static int volume_put_mixer(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol)
@@ -618,80 +614,102 @@ static const struct snd_kcontrol_new mm_vx1_control =
 
 /* DL1 mixer paths */
 static const struct snd_kcontrol_new dl1_mixer_controls[] = {
-	SOC_SINGLE_EXT("Tones", OMAP_AESS_MIXDL1_TONES, 0, 1, 0,
+	SOC_SINGLE_EXT("Tones",
+		OMAP_ABE_MIX, OMAP_AESS_MIXDL1_TONES, 1, 0,
 		abe_get_mixer, put_mixer),
-	SOC_SINGLE_EXT("Voice", OMAP_AESS_MIXDL1_VX_DL, 0, 1, 0,
+	SOC_SINGLE_EXT("Voice",
+		OMAP_ABE_MIX, OMAP_AESS_MIXDL1_VX_DL, 1, 0,
 		abe_get_mixer, put_mixer),
-	SOC_SINGLE_EXT("Capture", OMAP_AESS_MIXDL1_MM_UL2, 0, 1, 0,
+	SOC_SINGLE_EXT("Capture",
+		OMAP_ABE_MIX, OMAP_AESS_MIXDL1_MM_UL2, 1, 0,
 		abe_get_mixer, put_mixer),
-	SOC_SINGLE_EXT("Multimedia", OMAP_AESS_MIXDL1_MM_DL, 0, 1, 0,
+	SOC_SINGLE_EXT("Multimedia",
+		OMAP_ABE_MIX, OMAP_AESS_MIXDL1_MM_DL, 1, 0,
 		abe_get_mixer, put_mixer),
 };
 
 /* DL2 mixer paths */
 static const struct snd_kcontrol_new dl2_mixer_controls[] = {
-	SOC_SINGLE_EXT("Tones", OMAP_AESS_MIXDL2_TONES, 0, 1, 0,
+	SOC_SINGLE_EXT("Tones",
+		OMAP_ABE_MIX, OMAP_AESS_MIXDL2_TONES, 1, 0,
 		abe_get_mixer, put_mixer),
-	SOC_SINGLE_EXT("Voice", OMAP_AESS_MIXDL2_VX_DL, 0, 1, 0,
+	SOC_SINGLE_EXT("Voice",
+		OMAP_ABE_MIX, OMAP_AESS_MIXDL2_VX_DL, 1, 0,
 		abe_get_mixer, put_mixer),
-	SOC_SINGLE_EXT("Capture", OMAP_AESS_MIXDL2_MM_UL2, 0, 1, 0,
+	SOC_SINGLE_EXT("Capture",
+		OMAP_ABE_MIX, OMAP_AESS_MIXDL2_MM_UL2, 1, 0,
 		abe_get_mixer, put_mixer),
-	SOC_SINGLE_EXT("Multimedia", OMAP_AESS_MIXDL2_MM_DL, 0, 1, 0,
+	SOC_SINGLE_EXT("Multimedia",
+		OMAP_ABE_MIX, OMAP_AESS_MIXDL2_MM_DL, 1, 0,
 		abe_get_mixer, put_mixer),
 };
 
 /* AUDUL ("Voice Capture Mixer") mixer paths */
 static const struct snd_kcontrol_new audio_ul_mixer_controls[] = {
-	SOC_SINGLE_EXT("Tones Playback", OMAP_AESS_MIXAUDUL_TONES, 0, 1, 0,
+	SOC_SINGLE_EXT("Tones Playback",
+		OMAP_ABE_MIX, OMAP_AESS_MIXAUDUL_TONES, 1, 0,
 		abe_get_mixer, put_mixer),
-	SOC_SINGLE_EXT("Media Playback", OMAP_AESS_MIXAUDUL_MM_DL, 0, 1, 0,
+	SOC_SINGLE_EXT("Media Playback",
+		OMAP_ABE_MIX, OMAP_AESS_MIXAUDUL_MM_DL, 1, 0,
 		abe_get_mixer, put_mixer),
-	SOC_SINGLE_EXT("Capture", OMAP_AESS_MIXAUDUL_UPLINK, 0, 1, 0,
+	SOC_SINGLE_EXT("Capture",
+		OMAP_ABE_MIX, OMAP_AESS_MIXAUDUL_UPLINK, 1, 0,
 		abe_get_mixer, put_mixer),
 };
 
 /* VXREC ("Capture Mixer")  mixer paths */
 static const struct snd_kcontrol_new vx_rec_mixer_controls[] = {
-	SOC_SINGLE_EXT("Tones", OMAP_AESS_MIXVXREC_TONES, 0, 1, 0,
+	SOC_SINGLE_EXT("Tones",
+		OMAP_ABE_MIX, OMAP_AESS_MIXVXREC_TONES, 1, 0,
 		abe_get_mixer, put_mixer),
-	SOC_SINGLE_EXT("Voice Playback", OMAP_AESS_MIXVXREC_VX_DL,
-		0, 1, 0, abe_get_mixer, put_mixer),
-	SOC_SINGLE_EXT("Voice Capture", OMAP_AESS_MIXVXREC_VX_UL,
-		0, 1, 0, abe_get_mixer, put_mixer),
-	SOC_SINGLE_EXT("Media Playback", OMAP_AESS_MIXVXREC_MM_DL,
-		0, 1, 0, abe_get_mixer, put_mixer),
+	SOC_SINGLE_EXT("Voice Playback",
+		OMAP_ABE_MIX, OMAP_AESS_MIXVXREC_VX_DL, 1, 0,
+		abe_get_mixer, put_mixer),
+	SOC_SINGLE_EXT("Voice Capture",
+		OMAP_ABE_MIX, OMAP_AESS_MIXVXREC_VX_UL, 1, 0,
+		abe_get_mixer, put_mixer),
+	SOC_SINGLE_EXT("Media Playback",
+		OMAP_ABE_MIX, OMAP_AESS_MIXVXREC_MM_DL, 1, 0,
+		abe_get_mixer, put_mixer),
 };
 
 /* SDT ("Sidetone Mixer") mixer paths */
 static const struct snd_kcontrol_new sdt_mixer_controls[] = {
-	SOC_SINGLE_EXT("Capture", OMAP_AESS_MIXSDT_UL, 0, 1, 0,
+	SOC_SINGLE_EXT("Capture",
+		OMAP_ABE_MIX, OMAP_AESS_MIXSDT_UL, 1, 0,
 		abe_get_mixer, put_mixer),
-	SOC_SINGLE_EXT("Playback", OMAP_AESS_MIXSDT_DL, 0, 1, 0,
+	SOC_SINGLE_EXT("Playback",
+		OMAP_ABE_MIX, OMAP_AESS_MIXSDT_DL, 1, 0,
 		abe_get_mixer, put_mixer),
 };
 
 /* ECHO ("Echo Mixer") mixer paths */
 static const struct snd_kcontrol_new echo_mixer_controls[] = {
-	SOC_SINGLE_EXT("DL1", OMAP_AESS_MIXECHO_DL1, 0, 1, 0,
+	SOC_SINGLE_EXT("DL1",
+		OMAP_ABE_MIX, OMAP_AESS_MIXECHO_DL1, 1, 0,
 		abe_get_mixer, put_mixer),
-	SOC_SINGLE_EXT("DL2", OMAP_AESS_MIXECHO_DL2, 0, 1, 0,
+	SOC_SINGLE_EXT("DL2",
+		OMAP_ABE_MIX, OMAP_AESS_MIXECHO_DL2, 1, 0,
 		abe_get_mixer, put_mixer),
 };
 
 /* Virtual PDM_DL Switch */
 static const struct snd_kcontrol_new pdm_dl1_switch_controls =
-	SOC_SINGLE_EXT("Switch", OMAP_ABE_VIRTUAL_SWITCH, MIX_SWITCH_PDM_DL, 1, 0,
-			abe_get_mixer, abe_put_switch);
+	SOC_SINGLE_EXT("Switch",
+		OMAP_ABE_VIRTUAL_SWITCH, MIX_SWITCH_PDM_DL, 1, 0,
+		abe_get_switch, abe_put_switch);
 
 /* Virtual BT_VX_DL Switch */
 static const struct snd_kcontrol_new bt_vx_dl_switch_controls =
-	SOC_SINGLE_EXT("Switch", OMAP_ABE_VIRTUAL_SWITCH, MIX_SWITCH_BT_VX_DL, 1, 0,
-			abe_get_mixer, abe_put_switch);
+	SOC_SINGLE_EXT("Switch",
+		OMAP_ABE_VIRTUAL_SWITCH, MIX_SWITCH_BT_VX_DL, 1, 0,
+		abe_get_switch, abe_put_switch);
 
 /* Virtual MM_EXT_DL Switch */
 static const struct snd_kcontrol_new mm_ext_dl_switch_controls =
-	SOC_SINGLE_EXT("Switch", OMAP_ABE_VIRTUAL_SWITCH, MIX_SWITCH_MM_EXT_DL, 1, 0,
-			abe_get_mixer, abe_put_switch);
+	SOC_SINGLE_EXT("Switch",
+		OMAP_ABE_VIRTUAL_SWITCH, MIX_SWITCH_MM_EXT_DL, 1, 0,
+		abe_get_switch, abe_put_switch);
 
 static const struct snd_kcontrol_new abe_controls[] = {
 	/* DL1 mixer gains */

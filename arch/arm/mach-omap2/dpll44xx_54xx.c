@@ -77,16 +77,16 @@ int omap4_core_dpll_m2_set_rate(struct clk *clk, unsigned long rate)
 	/* Configures MEMIF domain in SW_WKUP */
 	clkdm_wakeup(l3_emif_clkdm);
 
-	/* DDR frequency is half of M2 output in OMAP4 */
-	if (cpu_is_omap44xx())
-		validrate >>= 1;
-
 	/*
 	* Program EMIF timing parameters in EMIF shadow registers
-	* for targetted DRR clock.
-	* DDR Clock = core_dpll_m2 / 2
+	* for targeted DRR clock.
 	*/
-	notify.rate = validrate;
+	/* DDR frequency is half of M2 output in OMAP4 */
+	if (cpu_is_omap44xx())
+		/* DDR Clock = core_dpll_m2 / 2 */
+		notify.rate = validrate >> 1;
+	else
+		notify.rate = validrate;
 	srcu_notifier_call_chain(&core_dpll_change_notify_list,
 				 OMAP_CORE_DPLL_PRECHANGE, (void *)&notify);
 
