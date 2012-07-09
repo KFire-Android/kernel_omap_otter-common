@@ -423,6 +423,13 @@ void if_hsi_get_fifo_occupancy(int ch, size_t *occ)
 	hsi_ioctl(channel->dev, HSI_IOCTL_GET_FIFO_OCCUPANCY, occ);
 }
 
+void if_hsi_get_tx_state_port(int ch, bool *state)
+{
+	struct if_hsi_channel *channel;
+	channel = &hsi_iface.channels[ch];
+	hsi_ioctl(channel->dev, HSI_IOCTL_GET_TX_STATE_PORT, state);
+}
+
 void if_hsi_cancel_read(int ch)
 {
 	struct if_hsi_channel *channel;

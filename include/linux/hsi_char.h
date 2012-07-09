@@ -49,6 +49,7 @@
 #define CS_GET_SPEED		CS_IOW(16, unsigned long)
 #define CS_SET_CLK_FORCE_ON	CS_IO(17)
 #define CS_SET_CLK_DYNAMIC	CS_IO(18)
+#define CS_GET_TX_STATE_PORT	CS_IOR(19, bool)
 
 #define CS_SET_MPU_OPP		CS_IOR(17, unsigned long)
 #define CS_GET_MPU_OPP		CS_IOW(18, unsigned long)

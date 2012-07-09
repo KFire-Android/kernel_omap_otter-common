@@ -77,6 +77,7 @@ enum {
 	HSI_IOCTL_GET_HSI_LATENCY, /* Get HSI latency */
 	HSI_IOCTL_SET_MPU_LATENCY, /* Change MPU latency for high tput */
 	HSI_IOCTL_GET_MPU_LATENCY, /* Get MPU latency */
+	HSI_IOCTL_GET_TX_STATE_PORT, /* Get HST FSM state for a given port */
 };
 
 /* Forward references */

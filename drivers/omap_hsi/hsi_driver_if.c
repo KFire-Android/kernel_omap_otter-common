@@ -913,6 +913,9 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 		}
 		*(size_t *)arg = hsi_get_rx_fifo_occupancy(hsi_ctrl, fifo);
 		break;
+	case HSI_IOCTL_GET_TX_STATE_PORT:
+		*(bool *)arg = hsi_is_hst_port_busy(pport);
+		break;
 	case HSI_IOCTL_SET_WAKE_RX_3WIRES_MODE:
 		dev_info(hsi_ctrl->dev,
 			 "Entering RX wakeup in 3 wires mode (no CAWAKE)\n");
