@@ -458,7 +458,8 @@ int omapdss_hdmi_read_edid(u8 *buf, int len);
 bool omapdss_hdmi_detect(void);
 int hdmi_panel_init(void);
 void hdmi_panel_exit(void);
-#ifdef CONFIG_OMAP4_DSS_HDMI_AUDIO
+#if defined(CONFIG_OMAP4_DSS_HDMI_AUDIO) || \
+	defined(CONFIG_OMAP5_DSS_HDMI_AUDIO)
 int hdmi_audio_enable(void);
 void hdmi_audio_disable(void);
 int hdmi_audio_start(void);

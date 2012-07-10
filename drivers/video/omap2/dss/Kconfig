@@ -67,6 +67,10 @@ config OMAP4_DSS_HDMI
 config OMAP4_DSS_HDMI_AUDIO
 	bool
 
+config OMAP5_DSS_HDMI_AUDIO
+	bool
+	depends on OMAP5_DSS_HDMI
+
 config OMAP5_DSS_HDMI
 	bool "OMAP5 HDMI support"
 	depends on SOC_OMAP5
