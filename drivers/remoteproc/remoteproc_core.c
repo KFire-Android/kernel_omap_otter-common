@@ -267,8 +267,6 @@ void rproc_error_reporter(struct rproc *rproc, enum rproc_err type)
 	dev_err(dev, "fatal error #%u detected in %s: error type %s\n",
 		++rproc->crash_cnt, rproc->name, rproc_err_to_string(type));
 
-	rproc->state = RPROC_CRASHED;
-
 	/*
 	 * as this function can be called from a ISR or a atomic context
 	 * we need to create a workqueue to handle the error
@@ -1790,6 +1788,14 @@ static void rproc_error_handler_work(struct work_struct *work)
 
 	dev_dbg(dev, "enter %s\n", __func__);
 
+	mutex_lock(&rproc->lock);
+	if (rproc->state == RPROC_CRASHED || rproc->state == RPROC_OFFLINE) {
+		mutex_unlock(&rproc->lock);
+		return;
+	}
+
+	rproc->state = RPROC_CRASHED;
+	mutex_unlock(&rproc->lock);
 	/*
 	 * if recovery enabled reset all virtio devices, so that all rpmsg
 	 * drivers can be restarted in order to make them functional again
