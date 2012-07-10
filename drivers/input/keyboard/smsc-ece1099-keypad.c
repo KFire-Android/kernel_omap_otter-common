@@ -21,29 +21,67 @@
 #include <linux/i2c/smsc.h>
 #include <linux/delay.h>
 
-#define SMSC_KSO_SELECT        0x40
-#define SMSC_KSI_INPUT         0x41
-#define SMSC_KSI_STATUS        0x42
-#define SMSC_KSI_MASK          0x43
-#define SMSC_RESET             0xF5
-#define SMSC_TEST              0xF6
-#define SMSC_GRP_INT           0xF9
-#define SMSC_CLK_CTRL          0xFA
-#define SMSC_WKUP_CTRL         0xFB
-#define SMSC_DEVICE_ID         0xFC
-#define SMSC_DEV_VERSION       0xFD
-#define SMSC_VENDOR_ID_LSB     0xFE
-#define SMSC_VENDOR_ID_MSB     0xFF
+/* ECE1099 Register summary */
+#define SMSC_GPIO_G1_INPUT	0x00
+#define SMSC_GPIO_G2_INPUT	0x01
+#define SMSC_GPIO_G3_INPUT	0x02
+#define SMSC_GPIO_G4_INPUT	0x03
+#define SMSC_GPIO_G1_OUTPUT	0x05
+#define SMSC_GPIO_G2_OUTPUT	0x06
+#define SMSC_GPIO_G3_OUTPUT	0x07
+#define SMSC_GPIO_G4_OUTPUT	0x08
+#define SMSC_GPIO_G1_INT_MASK	0x37
+#define SMSC_GPIO_G2_INT_MASK	0x38
+#define SMSC_GPIO_G3_INT_MASK	0x39
+#define SMSC_GPIO_G4_INT_MASK	0x3A
+#define SMSC_GPIO_G1_BASEADDR	0x0A
+#define SMSC_GPIO_G2_BASEADDR	0x12
+#define SMSC_GPIO_G3_BASEADDR	0x1A
+#define SMSC_GPIO_G4_BASEADDR	0x22
+#define SMSC_GPIO_G1_INT_STAT	0x32
+#define SMSC_GPIO_G2_INT_STAT	0x33
+#define SMSC_GPIO_G3_INT_STAT	0x34
+#define SMSC_GPIO_G4_INT_STAT	0x35
+#define SMSC_KSO_SELECT		0x40
+#define SMSC_KSI_INPUT		0x41
+#define SMSC_KSI_STATUS		0x42
+#define SMSC_KSI_MASK		0x43
+#define SMSC_RESET		0xF5
+#define SMSC_TEST		0xF6
+#define SMSC_GRP_INT		0xF9
+#define SMSC_CLK_CTRL		0xFA
+#define SMSC_WKUP_CTRL		0xFB
+#define SMSC_DEVICE_ID		0xFC
+#define SMSC_DEV_VERSION	0xFD
+#define SMSC_VENDOR_ID_LSB	0xFE
+#define SMSC_VENDOR_ID_MSB	0xFF
 
-#define SMSC_GPIO_KSO		0x70
-#define SMSC_GPIO_KSI		0x51
+/* GPIO configuration register flags */
+#define SMSC_GPIO_PU		(1 << 0)
+#define SMSC_GPIO_POL		(1 << 2)
+#define SMSC_GPIO_IRQ_RISING	(0x1 << 3)
+#define SMSC_GPIO_IRQ_FALLING	(0x2 << 3)
+#define SMSC_GPIO_IRQ_EDGE	(0x3 << 3)
+#define SMSC_GPIO_OUT_CONF	(1 << 4)
+#define SMSC_GPIO_DIR		(1 << 5)
+#define SMSC_GPIO_ALT_FN	(1 << 6)
+
+/* ECE1099 Register Clock control flags */
+#define SMSC_CLOCK_INT_SMSBUS	(0x3 << 0)
+#define SMSC_CLOCK_INT_BCLINK	(0x2 << 0)
+#define SMSC_CLOCK_OSC		(1 << 2)
+#define SMSC_CLOCK_ARA		(1 << 4)
+
+/* Miscellaneaous register masks */
 #define SMSC_KSO_ALL_LOW	0x20
 #define SMSC_SET_LOW_PWR	0x0B
 #define SMSC_SET_HIGH		0xFF
+#define SMSC_SET_LOW		0x00
 #define SMSC_KSO_EVAL		0x00
 
 #define KEYPRESS_TIME          200
 #define ROW_SHIFT              4
+#define GPIO_BRANK_SIZE		7
 
 struct smsc_keypad {
 	unsigned int last_key_state[16];
@@ -91,8 +129,10 @@ static void smsc_kp_scan(struct smsc_keypad *kp)
 	unsigned int bits_changed;
 	int this_ms;
 
-	smsc_write_data(SMSC_KSI_MASK, 0x00);
-	smsc_write_data(SMSC_KSI_STATUS, 0xFF);
+	/* Disable smsc keypad interrupts */
+	smsc_write_data(SMSC_KSI_MASK, SMSC_SET_LOW);
+	/* Clear all KSI Interrupts */
+	smsc_write_data(SMSC_KSI_STATUS, SMSC_SET_HIGH);
 
 
 	/* Scan for row and column */
@@ -100,7 +140,7 @@ static void smsc_kp_scan(struct smsc_keypad *kp)
 		smsc_write_data(SMSC_KSO_SELECT, SMSC_KSO_EVAL + i);
 		/* Read Row Status */
 		temp = smsc_read_data(SMSC_KSI_INPUT);
-		if (temp != 0xFF) {
+		if (temp != SMSC_SET_HIGH) {
 			col = i;
 			for (j = 0; j < kp->rows; j++) {
 				if ((temp & 0x01) == 0x00) {
@@ -126,8 +166,8 @@ static void smsc_kp_scan(struct smsc_keypad *kp)
 		}
 	}
 	input_sync(input);
-	smsc_write_data(SMSC_KSI_MASK, 0xFF);
 
+	smsc_write_data(SMSC_KSI_MASK, SMSC_SET_HIGH);
 	/* Set up Low Power Mode (Wake-up) (0xFB) */
 	smsc_write_data(SMSC_WKUP_CTRL, SMSC_SET_LOW_PWR);
 	/*Enable Keypad Scan (generate interrupt on key press) (0x40)*/
@@ -150,35 +190,41 @@ static irqreturn_t do_kp_irq(int irq, void *_kp)
 
 static int  __devinit smsc_kp_initialize(struct smsc_keypad *kp)
 {
-	int smsc_reg;
+	int gpio, mask, reg;
 
-	/* Mask all GPIO interrupts (0x37-0x3B) */
-	for (smsc_reg = 0x37; smsc_reg < 0x3B; smsc_reg++)
-		smsc_write_data(smsc_reg, 0);
+	/* Mask all GPIO interrupts */
+	for (reg = SMSC_GPIO_G1_INT_MASK; reg <= SMSC_GPIO_G4_INT_MASK; reg++)
+		smsc_write_data(reg, SMSC_SET_LOW);
 
-	/* Set all outputs high (0x05-0x09) */
-	for (smsc_reg = 0x05; smsc_reg < 0x09; smsc_reg++)
-		smsc_write_data(smsc_reg, SMSC_SET_HIGH);
+	/* Set all GPIO outputs high */
+	for (reg = SMSC_GPIO_G1_INT_STAT; reg <= SMSC_GPIO_G4_OUTPUT; reg++)
+		smsc_write_data(reg, SMSC_SET_HIGH);
 
-	/* Set all rows as KS I (inputs ) (0x012-0x19)
-		(GPIO[17-10] => KSI[7-0]) */
-	for (smsc_reg = 0x12; smsc_reg <= 0x19; smsc_reg++)
-		smsc_write_data(smsc_reg, SMSC_GPIO_KSI);
+	/* Configure GPIO Group 2 as the keypad matrix rows (KSI) */
+	for (gpio = 0; gpio <= GPIO_BRANK_SIZE; gpio++) {
+		mask = (SMSC_GPIO_PU | SMSC_GPIO_IRQ_FALLING |
+			  SMSC_GPIO_ALT_FN);
+		mask &= ~SMSC_GPIO_DIR;
+		smsc_write_data((SMSC_GPIO_G2_BASEADDR + gpio), mask);
+	}
 
-	/*Set all Keypad Columns as KSO (outputs ) (0x20-0x37)
-		(GPIO[37-20] => KSO[15-0]) */
-	for (smsc_reg = 0x1A ; smsc_reg <= 0x29; smsc_reg++)
-		smsc_write_data(smsc_reg, SMSC_GPIO_KSO);
+	/* Configure GPIO Group 3 and 4 as the keypad matrix columns (KSO) */
+	/* Each GPIO banks has 8 configurable GPIOs */
+	for (gpio = 0; gpio <= GPIO_BRANK_SIZE; gpio++) {
+		mask = (SMSC_GPIO_ALT_FN | SMSC_GPIO_DIR | SMSC_GPIO_OUT_CONF);
+		smsc_write_data((SMSC_GPIO_G3_BASEADDR + gpio), mask);
+		smsc_write_data((SMSC_GPIO_G4_BASEADDR + gpio), mask);
+	}
 
-	/* Clear all GPIO interrupts (0x32-0x36) */
-	for (smsc_reg = 0x32; smsc_reg < 0x36; smsc_reg++)
-		smsc_write_data(smsc_reg, SMSC_SET_HIGH);
+	/* Clear all GPIO interrupt status */
+	for (reg = SMSC_GPIO_G1_INT_STAT; reg <= SMSC_GPIO_G4_INT_STAT; reg++)
+		smsc_write_data(reg, SMSC_SET_HIGH);
 
-	/* Clear all KSI Interrupts (0x42) */
+	/* Clear all KSI Interrupts */
 	smsc_write_data(SMSC_KSI_STATUS, SMSC_SET_HIGH);
-	/* Set up Low Power Mode (Wake-up) (0xFB) */
+	/* Set up Low Power Mode (Wake-up) */
 	smsc_write_data(SMSC_WKUP_CTRL, SMSC_SET_LOW_PWR);
-	/* Enable Keypad Scan (generate interrupt on key press) (0x40) */
+	/* Enable Keypad Scan (generate interrupt on key press) */
 	smsc_write_data(SMSC_KSO_SELECT, SMSC_KSO_ALL_LOW);
 
 	return 0;
@@ -214,7 +260,7 @@ smsc_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	kp->rows = pdata->rows;
 	kp->cols = pdata->cols;
 
-	for (col = 0; col < 16; col++) {
+	for (col = 0; col < kp->cols; col++) {
 		kp->last_key_state[col] = 0;
 		kp->last_key_ms[col] = 0;
 	}
@@ -271,7 +317,8 @@ smsc_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		goto err2;
 	}
 
-	ret = smsc_write_data(SMSC_CLK_CTRL, 0x13);
+	ret  = smsc_write_data(SMSC_CLK_CTRL,
+			(SMSC_CLOCK_ARA | SMSC_CLOCK_INT_SMSBUS));
 	if (ret < 0)
 		goto err3;
 
@@ -302,7 +349,7 @@ smsc_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	}
 
 	/* Enable smsc keypad interrupts */
-	ret = smsc_write_data(SMSC_KSI_MASK, 0xff);
+	ret = smsc_write_data(SMSC_KSI_MASK, SMSC_SET_HIGH);
 	if (ret < 0)
 		goto err5;
 
@@ -328,7 +375,7 @@ static int smsc_remove(struct i2c_client *client)
 {
 	struct smsc_keypad *kp = i2c_get_clientdata(client);
 
-	smsc_write_data(SMSC_CLK_CTRL, 0x0);
+	smsc_write_data(SMSC_CLK_CTRL, SMSC_SET_LOW);
 	free_irq(client->irq, NULL);
 	gpio_free(client->irq);
 	input_unregister_device(kp->input);
