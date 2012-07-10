@@ -581,14 +581,24 @@ static void omap_aess_init_atc(struct omap_aess *abe, u32 id)
  */
 int omap_aess_disable_data_transfer(struct omap_aess *abe, u32 id)
 {
+	struct omap_aess_io_task *io_task;
 
 	switch (id) {
 	case OMAP_ABE_MM_DL_PORT:
-		abe->MultiFrame[18][1] = 0;
+		if (abe_port[id].format.f == 44100)
+			io_task = &aess_port_mm_dl_441k_pp;
+		else
+			io_task = &aess_port_mm_dl_48k;
+		omap_aess_update_io_task(abe, io_task, 0);
 		break;
 	default:
 		break;
 	}
+
+	omap_aess_update_scheduling_table1(abe, &(abe_port_init[id].task), 0);
+
+	omap_aess_mem_write(abe, omap_aess_map[OMAP_AESS_DMEM_MULTIFRAME_ID],
+			    (u32 *) abe->MultiFrame);
 
 	/* local host variable status= "port is running" */
 	abe_port[id].status = OMAP_ABE_PORT_ACTIVITY_IDLE;
