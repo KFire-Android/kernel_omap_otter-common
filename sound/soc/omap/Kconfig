@@ -113,13 +113,14 @@ config SND_OMAP_SOC_OMAP_ABE_TWL6040
 
 config SND_OMAP_SOC_OMAP_HDMI
 	tristate "SoC Audio support for Texas Instruments OMAP HDMI"
-	depends on SND_OMAP_SOC && OMAP4_DSS_HDMI && OMAP2_DSS
+	depends on SND_OMAP_SOC && (OMAP4_DSS_HDMI || OMAP5_DSS_HDMI) && OMAP2_DSS
 	select SND_OMAP_SOC_HDMI
 	select SND_SOC_OMAP_HDMI_CODEC
-	select OMAP4_DSS_HDMI_AUDIO
+	select OMAP4_DSS_HDMI_AUDIO if OMAP4_DSS_HDMI
+	select OMAP5_DSS_HDMI_AUDIO if OMAP5_DSS_HDMI
 	help
 	  Say Y if you want to add support for SoC HDMI audio on Texas Instruments
-	  OMAP4 chips
+	  OMAP chips
 
 config SND_OMAP_SOC_OMAP3_PANDORA
 	tristate "SoC Audio support for OMAP3 Pandora"
