@@ -75,7 +75,10 @@ static int case_read_average_temp(struct case_temp_sensor *temp_sensor,
 	if (sensor_temp < 0)
 		return -EINVAL;
 
-	if (temp_sensor->sample_idx == temp_sensor->average_number) {
+	mutex_lock(&temp_sensor->sensor_mutex);
+
+	if (temp_sensor->sample_idx >= temp_sensor->average_number ||
+	    temp_sensor->sample_idx >= AVERAGE_NUMBER_MAX) {
 		temp_sensor->avg_is_valid = 1;
 		temp_sensor->sample_idx = 0;
 	}
@@ -95,6 +98,8 @@ static int case_read_average_temp(struct case_temp_sensor *temp_sensor,
 		pr_debug("sensor_temp_table[%d] = %d\n", i,
 			temp_sensor->sensor_temp_table[i]);
 	}
+
+	mutex_unlock(&temp_sensor->sensor_mutex);
 
 	return temp_sensor->window_sum / tmp;
 }
@@ -221,8 +226,13 @@ static int average_number_set(void *data, u64 val)
 {
 	struct case_temp_sensor *temp_sensor = (struct case_temp_sensor *)data;
 
+	val = clamp((int)val, 1, AVERAGE_NUMBER_MAX);
+
 	mutex_lock(&temp_sensor->sensor_mutex);
 	temp_sensor->average_number = (int)val;
+	temp_sensor->sample_idx = 0;
+	temp_sensor->avg_is_valid = 0;
+	temp_sensor->window_sum = 0;
 	mutex_unlock(&temp_sensor->sensor_mutex);
 
 	return 0;
