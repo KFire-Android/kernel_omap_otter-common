@@ -891,12 +891,14 @@ static struct omap_dss_board_info omap5evm_dss_data = {
 /* Mounted on Base-Board */
 static struct pca953x_platform_data omap5evm_gpio_expander_info = {
 	.gpio_base	= OMAP_MAX_GPIO_LINES,
+	.irq_base	= OMAP_TCA6424_IRQ_BASE,
 };
 
 static struct i2c_board_info __initdata omap5evm_i2c_5_boardinfo[] = {
 	{
 		I2C_BOARD_INFO("tca6424", 0x22),
 		.platform_data = &omap5evm_gpio_expander_info,
+		.irq = 32,
 	},
 };
 
