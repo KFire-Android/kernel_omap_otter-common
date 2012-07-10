@@ -350,7 +350,9 @@ int ti_hdmi_4xxx_phy_enable(struct hdmi_ip_data *ip_data)
 	hdmi_write_reg(phy_base, HDMI_TXPHY_DIGITAL_CTRL, 0xF0000000);
 
 	/* Setup max LDO voltage */
-	REG_FLD_MOD(phy_base, HDMI_TXPHY_POWER_CTRL, 0xB, 3, 0);
+	/* This register need not be set for OMAP5 as it is unused*/
+	if (cpu_is_omap44xx())
+		REG_FLD_MOD(phy_base, HDMI_TXPHY_POWER_CTRL, 0xB, 3, 0);
 
 	/* Write to phy address 3 to change the polarity control */
 	REG_FLD_MOD(phy_base, HDMI_TXPHY_PAD_CFG_CTRL, 0x1, 27, 27);
