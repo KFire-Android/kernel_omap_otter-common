@@ -22,6 +22,10 @@
 #define _TI_HDMI_H
 
 struct hdmi_ip_data;
+#if defined(CONFIG_OMAP4_DSS_HDMI_AUDIO) || \
+	defined(CONFIG_OMAP5_DSS_HDMI_AUDIO)
+struct hdmi_audio_dma;
+#endif
 
 enum hdmi_pll_pwr {
 	HDMI_PLLPWRCMD_ALLOFF = 0,
@@ -202,6 +206,8 @@ void ti_hdmi_4xxx_phy_dump(struct hdmi_ip_data *ip_data, struct seq_file *s);
 #if defined(CONFIG_OMAP4_DSS_HDMI_AUDIO) || \
 	defined(CONFIG_OMAP5_DSS_HDMI_AUDIO)
 int hdmi_compute_acr(u32 sample_freq, u32 *n, u32 *cts);
+void ti_hdmi_4xxx_wp_audio_config_dma(struct hdmi_ip_data *ip_data,
+					struct hdmi_audio_dma *aud_dma);
 #endif
 #if defined(CONFIG_OMAP4_DSS_HDMI_AUDIO)
 int ti_hdmi_4xxx_wp_audio_enable(struct hdmi_ip_data *ip_data);
