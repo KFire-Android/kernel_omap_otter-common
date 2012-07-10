@@ -192,7 +192,8 @@ static int  __init omap_serial_fill_default_pads(struct omap_board_data *bdata,
 	return -ENODEV;
 }
 #else
-static int __init omap_serial_fill_default_pads(struct omap_board_data *bdata
+static inline int __init omap_serial_fill_default_pads(
+					struct omap_board_data *bdata,
 					struct omap_uart_state *uart)
 {
 	return 0;
