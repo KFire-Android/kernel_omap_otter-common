@@ -45,7 +45,7 @@
 * defines to set the version number. Else set these values to 0.
 */
 #define S_VERSION_ENG 0
-#define S_VERSION_PATCH 4
+#define S_VERSION_PATCH 6
 
 #ifdef S_VERSION_BUILD
 /* TRICK: detect if S_VERSION is defined but empty */
