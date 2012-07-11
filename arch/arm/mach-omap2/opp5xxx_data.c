@@ -178,7 +178,7 @@ static struct device_info dsp_dev_info = {
 
 static struct device_info gpu_dev_info = {
 	.hwmod_name	= "gpu",
-	.clk_name	= "dpll_per_h14x2_ck",
+	.clk_name	= "dpll_core_h14x2_ck",
 	.voltdm_name	= "mm",
 };
 
@@ -254,9 +254,9 @@ static struct omap_opp_def __initdata omap54xx_opp_def_list[] = {
 	OPP_INITIALIZER(&dsp_dev_info, false, 532000000, OMAP5430_VDD_MM_OPP_OD),
 
 	/* SGX OPP1 - OPPLOW */
-	OPP_INITIALIZER(&gpu_dev_info, true, 192000000, OMAP5430_VDD_MM_OPP_LOW),
+	OPP_INITIALIZER(&gpu_dev_info, true, 177000000, OMAP5430_VDD_MM_OPP_LOW),
 	/* SGX OPP2 - OPPNOM */
-	OPP_INITIALIZER(&gpu_dev_info, true, 384000000, OMAP5430_VDD_MM_OPP_NOM),
+	OPP_INITIALIZER(&gpu_dev_info, true, 354000000, OMAP5430_VDD_MM_OPP_NOM),
 	/* SGX OPP3 - OPPOV */
 	OPP_INITIALIZER(&gpu_dev_info, false, 532000000, OMAP5430_VDD_MM_OPP_OD),
 };
@@ -303,6 +303,10 @@ static int __init omap5_opp_init(void)
 		opp_def_list_enable_opp(omap54xx_opp_def_list,
 					ARRAY_SIZE(omap54xx_opp_def_list),
 					&dsp_dev_info,
+					532000000, true);
+		opp_def_list_enable_opp(omap54xx_opp_def_list,
+					ARRAY_SIZE(omap54xx_opp_def_list),
+					&gpu_dev_info,
 					532000000, true);
 	}
 

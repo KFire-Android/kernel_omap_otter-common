@@ -144,9 +144,9 @@ static struct virt_l3_clk_data omap5_virt_l3_clk_data[] = {
 		.clk_name	=  "dpll_core_m3x2_ck"
 	},
 
-	{	.opp50_rate = 212800000,
-		.opp100_rate = 425600000,
-		.clk_name	=  "dpll_core_h14x2_ck"
+	{	.opp50_rate = 192000000,
+		.opp100_rate = 384000000,
+		.clk_name	=  "dpll_per_h14x2_ck"
 	},
 	{	.opp50_rate = 192000000,
 		.opp100_rate = 256000000,
