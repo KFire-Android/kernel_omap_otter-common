@@ -1316,6 +1316,13 @@ static int configure_dispc(void)
 			case OMAP_WB_LCD1:
 			case OMAP_WB_LCD2:
 			case OMAP_WB_TV:
+				if (wbc->mode == OMAP_WB_MEM2MEM_MODE) {
+					mc = &dss_cache.manager_cache[
+						wbc->source - OMAP_WB_LCD1];
+					if (!mc->shadow_dirty)
+						break;
+				}
+
 				dispc_enable_plane(OMAP_DSS_WB, 1);
 				/* WB GO bit has to be used only in case of
 				 * capture mode and not in memory mode
