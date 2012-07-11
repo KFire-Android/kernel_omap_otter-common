@@ -59,7 +59,7 @@ struct smsc_keypad {
 
 static struct i2c_client *kp_client;
 
-int smsc_write_data(int reg, int reg_data)
+static int smsc_write_data(int reg, int reg_data)
 {
 	int ret;
 
@@ -70,7 +70,7 @@ int smsc_write_data(int reg, int reg_data)
 	return ret;
 }
 
-int smsc_read_data(int reg)
+static int smsc_read_data(int reg)
 {
 	int ret;
 
