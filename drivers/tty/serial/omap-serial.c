@@ -1488,14 +1488,6 @@ int omap_uart_recalibrate_baud_cb(struct notifier_block *nb,
 	case CLK_PRE_RATE_CHANGE:
 		for (portid = 0 ; portid < OMAP_MAX_HSUART_PORTS ; portid++) {
 			up = ui[portid];
-			/* If Console, Stop from here, till the Frequencies
-			 * Change.
-			 */
-			if (omap_is_console_port(&up->port)) {
-				while (is_console_locked())
-					usleep_range(100, 300);
-				console_stop(up->port.cons);
-			}
 			/* If the device uses the RTS based controlling,
 			 * Pull Up the signal to stop transaction. As the
 			 * Clocks are not disabled. It even if the data
@@ -1570,9 +1562,6 @@ int omap_uart_recalibrate_baud_cb(struct notifier_block *nb,
 						up->mdr1);
 				serial_omap_port_disable(up);
 			}
-
-			if (omap_is_console_port(&up->port))
-				console_start(up->port.cons);
 
 			if (up->rts_mux_driver_control)
 				omap_rts_mux_write(0, up->port.line);

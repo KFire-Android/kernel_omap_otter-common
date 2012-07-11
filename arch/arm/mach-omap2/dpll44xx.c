@@ -17,6 +17,7 @@
 #include <linux/spinlock.h>
 
 #ifdef CONFIG_OMAP4_DPLL_CASCADING
+#include <linux/console.h>
 #include <linux/slab.h>
 #include <linux/cpufreq.h>
 #include "dvfs.h"
@@ -1490,6 +1491,14 @@ int omap4_dpll_cascading_blocker_hold(struct device *dev)
 	if (!dev)
 		return -EINVAL;
 
+	/*
+	 * We need take a console lock due to change uart frequency.
+	 * We cannot do it under omap_dvfs_lock because it can lead to
+	 * deadlock in situation when some thread has taken the console
+	 * lock and trying to scale waiting for the omap_dvfs_lock that has
+	 * been taken already by dpll_cascading.
+	 */
+	console_lock();
 	mutex_lock(&omap_dvfs_lock);
 
 	if (list_empty(&dpll_cascading_blocker_list))
@@ -1522,6 +1531,7 @@ int omap4_dpll_cascading_blocker_hold(struct device *dev)
 	}
 out:
 	mutex_unlock(&omap_dvfs_lock);
+	console_unlock();
 	return ret;
 }
 EXPORT_SYMBOL(omap4_dpll_cascading_blocker_hold);
@@ -1539,6 +1549,14 @@ int omap4_dpll_cascading_blocker_release(struct device *dev)
 	if (!dev)
 		return -EINVAL;
 
+	/*
+	 * We need take a console lock due to change uart frequency.
+	 * We cannot do it under omap_dvfs_lock because it can lead to
+	 * deadlock in situation when some thread has taken the console
+	 * lock and trying to scale waiting for the omap_dvfs_lock that has
+	 * been taken already by dpll_cascading.
+	 */
+	console_lock();
 	mutex_lock(&omap_dvfs_lock);
 
 	/* bail early if list is empty */
@@ -1574,6 +1592,7 @@ int omap4_dpll_cascading_blocker_release(struct device *dev)
 	}
 out:
 	mutex_unlock(&omap_dvfs_lock);
+	console_unlock();
 	return ret;
 }
 EXPORT_SYMBOL(omap4_dpll_cascading_blocker_release);
