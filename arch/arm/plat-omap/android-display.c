@@ -55,6 +55,14 @@ static int __init get_default_display(char *str)
 }
 early_param("omapdss.def_disp", get_default_display);
 
+bool omap_android_display_is_default(struct omap_dss_device *device)
+{
+	if (!strcmp(default_display, device->name))
+		return true;
+	else
+		return false;
+}
+
 static unsigned int hdmi_width, hdmi_height;
 static int __init get_hdmi_options(char *str)
 {
