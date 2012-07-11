@@ -838,14 +838,17 @@ static int aes_dma_start(struct aes_hwa_ctx *ctx)
 
 		if (!(ctx->next_req->flags & CRYPTO_TFM_REQ_DMA_VISIBLE)) {
 			err = dma_map_sg(NULL, req->src, 1, DMA_TO_DEVICE);
-			if (!err)
+			if (!err) {
 				/* Silently fail for now... */
+				spin_unlock_irqrestore(&ctx->lock, flags);
 				return 0;
+			}
 
 			err = dma_map_sg(NULL, req->dst, 1, DMA_FROM_DEVICE);
 			if (!err) {
 				dma_unmap_sg(NULL, req->src, 1, DMA_TO_DEVICE);
 				/* Silently fail for now... */
+				spin_unlock_irqrestore(&ctx->lock, flags);
 				return 0;
 			}
 
