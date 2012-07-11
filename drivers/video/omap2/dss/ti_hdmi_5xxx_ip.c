@@ -27,6 +27,8 @@
 #include <linux/delay.h>
 #include <linux/string.h>
 #include <linux/seq_file.h>
+#include <linux/i2c.h>
+#include <drm/drm_edid.h>
 #if defined(CONFIG_OMAP5_DSS_HDMI_AUDIO)
 #include <sound/asoundef.h>
 #endif
@@ -41,6 +43,11 @@
 
 #define HDMI_CORE_PRODUCT_ID1_HDCP 0xC1
 #define HDMI_CORE_A_HDCPCFG0_HDCP_EN_MASK 0x4
+
+#define RETRY_CNT		3
+#define OMAP2_L4_IO_OFFSET	0xb2000000
+#define CONTROL_CORE_PAD0_HDMI_DDC_SCL_PAD1_HDMI_DDC_SDA \
+				(OMAP2_L4_IO_OFFSET + 0x4A002940)
 
 static const struct csc_table csc_table_deepcolor[4] = {
 	/* HDMI_DEEP_COLOR_24BIT */
@@ -60,6 +67,101 @@ static const struct csc_table csc_table_deepcolor[4] = {
 		0, 8192, 0, 0,
 		0, 0, 8192, 0},
 };
+
+static int panel_hdmi_i2c_read(struct i2c_adapter *adapter,
+	unsigned char *buf, u16 count, u8 ext)
+{
+	int r, retries;
+	u8 segptr = ext / 2;
+	u8 offset = ext * EDID_LENGTH;
+
+	for (retries = RETRY_CNT; retries > 0; retries--) {
+
+		if (ext >= 2) {
+			struct i2c_msg msgs_extended[] = {
+				{
+					.addr   = 0x30,
+					.flags  = 0,
+					.len    = 1,
+					.buf    = &segptr,
+				},
+				{
+					.addr   = DDC_ADDR,
+					.flags  = 0,
+					.len    = 1,
+					.buf    = &offset,
+				},
+				{
+					.addr   = DDC_ADDR,
+					.flags  = I2C_M_RD,
+					.len    = count,
+					.buf    = buf,
+				}
+			};
+
+			r = i2c_transfer(adapter, msgs_extended, 3);
+			if (r == 3)
+				return 0;
+
+		} else {
+			struct i2c_msg msgs[] = {
+				{
+					.addr   = DDC_ADDR,
+					.flags  = 0,
+					.len    = 1,
+					.buf    = &offset,
+				},
+				{
+					.addr   = DDC_ADDR,
+					.flags  = I2C_M_RD,
+					.len    = count,
+					.buf    = buf,
+				}
+			};
+
+			r = i2c_transfer(adapter, msgs, 2);
+			if (r == 2)
+				return 0;
+		}
+
+		if (r != -EAGAIN)
+			break;
+	}
+
+	return r < 0 ? r : -EIO;
+}
+
+static int panel_hdmi_read_edid(u8 *edid, int len)
+{
+	struct i2c_adapter *adapter;
+	int r = 0, n = 0, i = 0;
+	int max_ext_blocks = (len / 128) - 1;
+
+	adapter = i2c_get_adapter(0);
+	if (!adapter) {
+		pr_err("panel_dvi_read_edid: Failed to get I2C adapter, bus 0\n");
+		return -EINVAL;
+	}
+
+	r = panel_hdmi_i2c_read(adapter, edid, EDID_LENGTH, 0);
+	if (r) {
+		return r;
+	} else {
+		/*Multiblock read*/
+		n = edid[0x7e];
+
+		if (n > max_ext_blocks)
+			n = max_ext_blocks;
+		for (i = 1; i <= n; i++) {
+			r = panel_hdmi_i2c_read(adapter, edid + i*EDID_LENGTH,
+				EDID_LENGTH, i);
+			if (r)
+				return r;
+		}
+	}
+
+	return r;
+}
 
 static inline void hdmi_write_reg(void __iomem *base_addr,
 		const unsigned long idx, u32 val)
@@ -186,22 +288,39 @@ int ti_hdmi_5xxx_read_edid(struct hdmi_ip_data *ip_data,
 	if (len < 128)
 		return -EINVAL;
 
-	hdmi_core_ddc_init(ip_data);
-
-	r = hdmi_core_ddc_edid(ip_data, edid, 0);
-	if (r)
+	if ((omap_rev() == OMAP5430_REV_ES1_0) ||
+		(omap_rev() == OMAP5432_REV_ES1_0)) {
+		/*
+		 * Set PAD0_HDMI_DDC_SCL_PAD1_HDMI_DDC_SDA:
+		 * - Use GPIO7_194 and GPIO7_195
+		 * - pull-up/down enabled
+		 *   - pull-up selected
+		 */
+		__raw_writel(0x011E011E,
+				CONTROL_CORE_PAD0_HDMI_DDC_SCL_PAD1_HDMI_DDC_SDA);
+		r = panel_hdmi_read_edid(edid, len);
+		/* Use hdmi_ddc_scl and hdmi_ddc_sda for hdcp */
+		__raw_writel(0x01000100,
+				CONTROL_CORE_PAD0_HDMI_DDC_SCL_PAD1_HDMI_DDC_SDA);
 		return r;
+	} else {
 
-	l = 128;
+		hdmi_core_ddc_init(ip_data);
 
-	if (len >= 128 * 2 && edid[0x7e] > 0) {
-		r = hdmi_core_ddc_edid(ip_data, edid + 0x80, 1);
+		r = hdmi_core_ddc_edid(ip_data, edid, 0);
 		if (r)
 			return r;
-		l += 128;
-	}
 
-	return l;
+		l = 128;
+
+		if (len >= 128 * 2 && edid[0x7e] > 0) {
+			r = hdmi_core_ddc_edid(ip_data, edid + 0x80, 1);
+			if (r)
+				return r;
+			l += 128;
+		}
+		return 0;
+	}
 }
 void ti_hdmi_5xxx_core_dump(struct hdmi_ip_data *ip_data, struct seq_file *s)
 {
