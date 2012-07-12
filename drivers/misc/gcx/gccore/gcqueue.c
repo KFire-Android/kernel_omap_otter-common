@@ -184,6 +184,19 @@ exit:
 	return gcerror;
 }
 
+enum gcerror gcqueue_free_event(struct gcqueue *gcqueue,
+				struct gcevent *gcevent)
+{
+	GCENTER(GCZONE_EVENT);
+
+	GCLOCK(&gcqueue->vaceventlock);
+	list_move(&gcevent->link, &gcqueue->vacevents);
+	GCUNLOCK(&gcqueue->vaceventlock);
+
+	GCEXIT(GCZONE_EVENT);
+	return GCERR_NONE;
+}
+
 enum gcerror gcqueue_alloc_cmdbuf(struct gcqueue *gcqueue,
 				  struct gccmdbuf **gccmdbuf)
 {
@@ -224,15 +237,30 @@ exit:
 	return gcerror;
 }
 
-void gcqueue_free_cmdbuf(struct gcqueue *gcqueue, struct gccmdbuf *gccmdbuf)
+void gcqueue_free_cmdbuf(struct gcqueue *gcqueue,
+			 struct gccmdbuf *gccmdbuf,
+			 unsigned int *flags)
 {
+	struct list_head *head;
+	struct gcevent *gcevent;
+
 	GCENTERARG(GCZONE_QUEUE, "queue entry = 0x%08X\n",
 		   (unsigned int) gccmdbuf);
 
-	/* Move all event entries to the vacant list. */
-	GCLOCK(&gcqueue->vaceventlock);
-	list_splice_init(&gccmdbuf->events, &gcqueue->vacevents);
-	GCUNLOCK(&gcqueue->vaceventlock);
+	/* Have events? */
+	if (!list_empty(&gccmdbuf->events)) {
+		/* Events not expected? */
+		if (flags == NULL)
+			GCERR("buffer has events.\n");
+
+		/* Execute and free all events. */
+		while (!list_empty(&gccmdbuf->events)) {
+			head = gccmdbuf->events.next;
+			gcevent = list_entry(head, struct gcevent, link);
+			gcevent->handler(gcevent, flags);
+			gcqueue_free_event(gcqueue, gcevent);
+		}
+	}
 
 	/* Move the queue entry to the vacant list. */
 	GCLOCK(&gcqueue->vacqueuelock);
@@ -515,7 +543,6 @@ static int gccmdthread(void *_gccorecontext)
 	unsigned int i, triggered, ints2process, intmask;
 	struct list_head *head;
 	struct gccmdbuf *headcmdbuf;
-	struct gcevent *gcevent;
 	unsigned int flags;
 	unsigned int dmapc, pc1, pc2;
 
@@ -605,11 +632,8 @@ static int gccmdthread(void *_gccorecontext)
 				GCDBG(GCZONE_THREAD,
 				      "buffer has no interrupt.\n");
 
-				if (!list_empty(&headcmdbuf->events))
-					GCERR("buffer has events.\n");
-
 				/* Free the entry. */
-				gcqueue_free_cmdbuf(gcqueue, headcmdbuf);
+				gcqueue_free_cmdbuf(gcqueue, headcmdbuf, NULL);
 				continue;
 			}
 
@@ -641,16 +665,8 @@ static int gccmdthread(void *_gccorecontext)
 			/* Free the interrupt. */
 			free_interrupt(gcqueue, headcmdbuf->interrupt);
 
-			/* Execute events if any. */
-			list_for_each(head, &headcmdbuf->events) {
-				gcevent = list_entry(head,
-						     struct gcevent,
-						     link);
-				gcevent->handler(gcevent, &flags);
-			}
-
-			/* Free the entry. */
-			gcqueue_free_cmdbuf(gcqueue, headcmdbuf);
+			/* Execute events if any and free the entry. */
+			gcqueue_free_cmdbuf(gcqueue, headcmdbuf, &flags);
 		}
 
 		GCUNLOCK(&gcqueue->queuelock);
@@ -669,14 +685,9 @@ static int gccmdthread(void *_gccorecontext)
 							struct gccmdbuf,
 							link);
 
-				list_for_each(head, &headcmdbuf->events) {
-					gcevent = list_entry(head,
-							     struct gcevent,
-							     link);
-					gcevent->handler(gcevent, &flags);
-				}
-
-				gcqueue_free_cmdbuf(gcqueue, headcmdbuf);
+				/* Execute events if any and free the entry. */
+				gcqueue_free_cmdbuf(gcqueue, headcmdbuf,
+						    &flags);
 			}
 
 			GCUNLOCK(&gcqueue->queuelock);
@@ -774,6 +785,8 @@ static int gccmdthread(void *_gccorecontext)
 			 * in progress or scheduled. */
 			timeout = msecs_to_jiffies(GC_TIMEOUT);
 		} else {
+			GCLOCK(&gcqueue->queuelock);
+
 			GCDBG(GCZONE_THREAD,
 			      "timedout while waiting for ready signal.\n");
 
@@ -801,18 +814,17 @@ static int gccmdthread(void *_gccorecontext)
 			GCDBG(GCZONE_THREAD,
 			      "execution finished, shutting down.\n");
 
-			GCLOCK(&gcqueue->queuelock);
-
 			/* Free the queue. */
 			while (!list_empty(&gcqueue->queue)) {
 				head = gcqueue->queue.next;
 				headcmdbuf = list_entry(head,
 							struct gccmdbuf,
 							link);
-				gcqueue_free_cmdbuf(gcqueue, headcmdbuf);
-			}
 
-			GCUNLOCK(&gcqueue->queuelock);
+				/* Free the entry. */
+				gcqueue_free_cmdbuf(gcqueue, headcmdbuf,
+						    NULL);
+			}
 
 			/* Convert WAIT to END. */
 			gcqueue->gcmoterminator->u2.end.cmd.raw
@@ -831,6 +843,8 @@ static int gccmdthread(void *_gccorecontext)
 
 			/* Set timeout to infinity. */
 			timeout = MAX_SCHEDULE_TIMEOUT;
+
+			GCUNLOCK(&gcqueue->queuelock);
 		}
 	}
 
@@ -1022,14 +1036,14 @@ enum gcerror gcqueue_stop(struct gccorecontext *gccorecontext)
 	while (!list_empty(&gcqueue->cmdbufhead)) {
 		head = gcqueue->cmdbufhead.next;
 		gccmdbuf = list_entry(head, struct gccmdbuf, link);
-		gcqueue_free_cmdbuf(gcqueue, gccmdbuf);
+		gcqueue_free_cmdbuf(gcqueue, gccmdbuf, NULL);
 	}
 
 	/* Free command queue entries. */
 	while (!list_empty(&gcqueue->queue)) {
 		head = gcqueue->queue.next;
 		gccmdbuf = list_entry(head, struct gccmdbuf, link);
-		gcqueue_free_cmdbuf(gcqueue, gccmdbuf);
+		gcqueue_free_cmdbuf(gcqueue, gccmdbuf, NULL);
 	}
 
 	/* Free vacant entry lists. */

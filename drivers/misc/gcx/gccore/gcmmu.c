@@ -73,7 +73,10 @@ static void event_enable_mmu(struct gcevent *gcevent, unsigned int *flags)
 
 	/* After MMU command buffer is processed, FE will stop.
 	 * Let the control thread know that FE needs to be restarted. */
-	*flags |= GC_CMDBUF_START_FE;
+	if (flags == NULL)
+		GCERR("flags are not set.\n");
+	else
+		*flags |= GC_CMDBUF_START_FE;
 
 	GCEXIT(GCZONE_INIT);
 }
@@ -622,17 +625,17 @@ enum gcerror gcmmu_enable(struct gccorecontext *gccorecontext,
 		if (gcerror != GCERR_NONE)
 			goto fail;
 
-		/* Attach records. */
-		list_add_tail(&gcevent->link, &gccmdbuf->events);
-		list_add(&gccmdbuf->link, &gcqueue->queue);
-
-		/* Initialize the event and add to the list. */
-		gcevent->handler = event_enable_mmu;
-
 		/* Get free interrupt. */
 		gcerror = gcqueue_alloc_int(gcqueue, &gccmdbuf->interrupt);
 		if (gcerror != GCERR_NONE)
 			goto fail;
+
+		/* Initialize the event and add to the list. */
+		gcevent->handler = event_enable_mmu;
+
+		/* Attach records. */
+		list_add_tail(&gcevent->link, &gccmdbuf->events);
+		list_add(&gccmdbuf->link, &gcqueue->queue);
 
 		/* Program the safe zone and the master table address. */
 		gcmommuinit = (struct gcmommuinit *) gcmmu->cmdbuflog;
@@ -669,8 +672,11 @@ enum gcerror gcmmu_enable(struct gccorecontext *gccorecontext,
 	return GCERR_NONE;
 
 fail:
+	if (gcevent != NULL)
+		gcqueue_free_event(gcqueue, gcevent);
+
 	if (gccmdbuf != NULL)
-		gcqueue_free_cmdbuf(gcqueue, gccmdbuf);
+		gcqueue_free_cmdbuf(gcqueue, gccmdbuf, NULL);
 
 	GCEXITARG(GCZONE_CONTEXT, "gcerror = 0x%08X\n", gcerror);
 	return gcerror;
