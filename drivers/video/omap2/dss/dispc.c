@@ -2159,7 +2159,9 @@ int dispc_ovl_setup(enum omap_plane plane, struct omap_overlay_info *oi,
 
 	/* Errata OMAP5 ES1.0: Premultiply alpha global condition issue */
 	global_alpha = oi->global_alpha;
-	if ((omap_rev() == OMAP5430_REV_ES1_0) && oi->pre_mult_alpha &&
+	if ((omap_rev() == OMAP5430_REV_ES1_0 ||
+			omap_rev() == OMAP5432_REV_ES1_0)
+			&& oi->pre_mult_alpha &&
 			global_alpha == 0xFF &&	!cconv) {
 		if (oi->color_mode == OMAP_DSS_COLOR_ARGB16 ||
 		    oi->color_mode == OMAP_DSS_COLOR_ARGB32 ||
