@@ -210,9 +210,14 @@ enum gcerror gcqueue_execute(struct gccorecontext *gccorecontext,
 
 enum gcerror gcqueue_alloc_event(struct gcqueue *gcqueue,
 				 struct gcevent **gcevent);
+enum gcerror gcqueue_free_event(struct gcqueue *gcqueue,
+				struct gcevent *gcevent);
+
 enum gcerror gcqueue_alloc_cmdbuf(struct gcqueue *gcqueue,
 				  struct gccmdbuf **gccmdbuf);
-void gcqueue_free_cmdbuf(struct gcqueue *gcqueue, struct gccmdbuf *gccmdbuf);
+void gcqueue_free_cmdbuf(struct gcqueue *gcqueue,
+			 struct gccmdbuf *gccmdbuf,
+			 unsigned int *flags);
 
 enum gcerror gcqueue_alloc_int(struct gcqueue *gcqueue,
 			       unsigned int *interrupt);
