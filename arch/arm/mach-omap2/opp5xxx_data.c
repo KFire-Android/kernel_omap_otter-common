@@ -20,8 +20,12 @@
  * GNU General Public License for more details.
  */
 #include <linux/module.h>
+#include <linux/opp.h>
+#include <linux/clk.h>
 
 #include <plat/cpu.h>
+#include <plat/omap_device.h>
+#include <plat/clock.h>
 
 #include "control.h"
 #include "omap_opp_data.h"
@@ -108,7 +112,7 @@ struct omap_vdd_dep_info omap54xx_vddmm_dep_info[] = {
 
 static struct device_info mpu_dev_info = {
 	.hwmod_name	= "mpu",
-	.clk_name	= "dpll_mpu_ck",
+	.clk_name	= "virt_dpll_mpu_ck",
 	.voltdm_name	= "mpu",
 };
 
@@ -162,19 +166,19 @@ static struct device_info mmc2_dev_info = {
 
 static struct device_info iva_dev_info = {
 	.hwmod_name	= "iva",
-	.clk_name	= "dpll_iva_h12x2_ck",
+	.clk_name	= "virt_dpll_iva_ck",
 	.voltdm_name	= "mm",
 };
 
 static struct device_info dsp_dev_info = {
 	.hwmod_name	= "dsp_c0",
-	.clk_name	= "dpll_iva_h11x2_ck",
+	.clk_name	= "virt_dpll_dsp_ck",
 	.voltdm_name	= "mm",
 };
 
 static struct device_info gpu_dev_info = {
 	.hwmod_name	= "gpu",
-	.clk_name	= "dpll_per_h14x2_ck",
+	.clk_name	= "dpll_core_h14x2_ck",
 	.voltdm_name	= "mm",
 };
 
@@ -242,20 +246,38 @@ static struct omap_opp_def __initdata omap54xx_opp_def_list[] = {
 	/* IVA OPP3 - OPP-OD */
 	OPP_INITIALIZER(&iva_dev_info, false, 532000000, OMAP5430_VDD_MM_OPP_OD),
 
-	/* DSP OPP1 - OPP50 */
+	/* DSP OPP1 - OPPLOW */
 	OPP_INITIALIZER(&dsp_dev_info, true, 233000000, OMAP5430_VDD_MM_OPP_LOW),
-	/* DSP OPP2 - OPP100 */
+	/* DSP OPP2 - OPPNOM */
 	OPP_INITIALIZER(&dsp_dev_info, true, 466000000, OMAP5430_VDD_MM_OPP_NOM),
-	/* DSP OPP3 - OPPTB */
+	/* DSP OPP3 - OPP-OD */
 	OPP_INITIALIZER(&dsp_dev_info, false, 532000000, OMAP5430_VDD_MM_OPP_OD),
 
 	/* SGX OPP1 - OPPLOW */
-	OPP_INITIALIZER(&gpu_dev_info, true, 192000000, OMAP5430_VDD_MM_OPP_LOW),
+	OPP_INITIALIZER(&gpu_dev_info, true, 177000000, OMAP5430_VDD_MM_OPP_LOW),
 	/* SGX OPP2 - OPPNOM */
-	OPP_INITIALIZER(&gpu_dev_info, true, 384000000, OMAP5430_VDD_MM_OPP_NOM),
+	OPP_INITIALIZER(&gpu_dev_info, true, 354000000, OMAP5430_VDD_MM_OPP_NOM),
 	/* SGX OPP3 - OPPOV */
 	OPP_INITIALIZER(&gpu_dev_info, false, 532000000, OMAP5430_VDD_MM_OPP_OD),
 };
+
+static int __init opp_def_list_enable_opp(struct omap_opp_def *list,
+					  unsigned int size,
+					  struct device_info *dev_info,
+					  unsigned long opp_freq, bool state)
+{
+	int i;
+	for (i = 0; i < size; i++) {
+		struct omap_opp_def *entry = &list[i];
+		if (entry->dev_info == dev_info && entry->freq == opp_freq) {
+			entry->default_available = state;
+			return 0;
+		}
+	}
+	WARN(1, "Unable to find opp for %s, frequency %ld\n",
+	     dev_info->hwmod_name, opp_freq);
+	return -EINVAL;
+}
 
 /**
  * omap5_opp_init() - initialize omap4 opp table
@@ -266,6 +288,27 @@ static int __init omap5_opp_init(void)
 
 	if (!cpu_is_omap54xx())
 		return r;
+
+	if (omap5_has_opp_high()) {
+		opp_def_list_enable_opp(omap54xx_opp_def_list,
+					ARRAY_SIZE(omap54xx_opp_def_list),
+					&mpu_dev_info,
+					1100000000, true);
+
+		opp_def_list_enable_opp(omap54xx_opp_def_list,
+					ARRAY_SIZE(omap54xx_opp_def_list),
+					&iva_dev_info,
+					532000000, true);
+
+		opp_def_list_enable_opp(omap54xx_opp_def_list,
+					ARRAY_SIZE(omap54xx_opp_def_list),
+					&dsp_dev_info,
+					532000000, true);
+		opp_def_list_enable_opp(omap54xx_opp_def_list,
+					ARRAY_SIZE(omap54xx_opp_def_list),
+					&gpu_dev_info,
+					532000000, true);
+	}
 
 	r = omap_init_opp_table(omap54xx_opp_def_list,
 			ARRAY_SIZE(omap54xx_opp_def_list));

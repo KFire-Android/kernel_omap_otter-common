@@ -521,10 +521,9 @@ static void __init omap_init_gpu(void)
 			goto exit_hyd;
 		}
 
-		pck = clk_get(&pdev->dev, "dpll_per_h14x2_ck");
+		pck = clk_get(&pdev->dev, "dpll_core_h14x2_ck");
 		if (IS_ERR_OR_NULL(pck)) {
-			WARN(1, "%s: Requesting GPU per clock failed. \
-				GPU may be unstable\n", __func__);
+			WARN(1, "Requesting GPU core clock failed.\n");
 			goto exit_dpll;
 		}
 		orig_cck_parent = clk_get_parent(cck);
