@@ -466,6 +466,17 @@ static void __init prcm_setup_regs(void)
 			OMAP4430_PRM_DEVICE_INST,
 			OMAP4_PRM_LDO_SRAM_IVA_SETUP_OFFSET);
 	}
+
+	/*
+	 * Toggle CLKREQ in RET and OFF states
+	 * 0x2: CLKREQ is de-asserted when system clock is not
+	 * required by any function in the device and if all voltage
+	 * domains are in RET or OFF state.
+	 */
+	omap4_prminst_write_inst_reg(0x2, OMAP4430_PRM_PARTITION,
+				     OMAP4430_PRM_DEVICE_INST,
+				     OMAP4_PRM_CLKREQCTRL_OFFSET);
+
 	/*
 	 * De-assert PWRREQ signal in Device OFF state
 	 * 0x3: PWRREQ is de-asserted if all voltage domain are in
