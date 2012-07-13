@@ -27,10 +27,11 @@
 
 static void __iomem *_prm_bases[OMAP4_MAX_PRCM_PARTITIONS];
 
-void omap4_prm_base_init(void)
+void omap4_prm_base_init(struct omap_globals *omap2_globals)
 {
-	_prm_bases[OMAP4430_PRM_PARTITION] = prm_base;
-	_prm_bases[OMAP4430_PRCM_MPU_PARTITION] = prcm_mpu_base;
+	_prm_bases[OMAP4430_PRM_PARTITION] = omap2_globals->prm;
+	_prm_bases[OMAP4430_PRCM_MPU_PARTITION] = omap2_globals->prcm_mpu;
+	_prm_bases[OMAP4430_SCRM_PARTITION] = omap2_globals->scrm;
 }
 
 /* Read a register in a PRM instance */

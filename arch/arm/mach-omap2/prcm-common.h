@@ -421,14 +421,6 @@ extern void __iomem *cm2_base;
 
 extern void __iomem *prcm_mpu_base;
 
-#if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_ARCH_OMAP5)
-extern void omap4_prm_base_init(void);
-extern void omap4_cm_base_init(void);
-#else
-void omap4_prm_base_init(void) {}
-void omap4_cm_base_init(void) {}
-#endif
-
 /**
  * struct omap_prcm_irq - describes a PRCM interrupt bit
  * @name: a short name describing the interrupt type, e.g. "wkup" or "io"
