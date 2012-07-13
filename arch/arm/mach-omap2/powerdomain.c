@@ -19,6 +19,7 @@
 #include <linux/list.h>
 #include <linux/errno.h>
 #include <linux/string.h>
+#include <linux/ratelimit.h>
 #include <trace/events/power.h>
 
 #include "cm2xxx_3xxx.h"
@@ -148,8 +149,12 @@ static int _pwrdm_state_switch(struct powerdomain *pwrdm, int flag)
 
 	int prev, state, trace_state = 0;
 
-	if (pwrdm == NULL)
+	if (pwrdm == NULL) {
+		WARN_ONCE(1, "null pwrdm\n");
+		pr_err_ratelimited("%s: powerdomain: null pwrdm param\n",
+				   __func__);
 		return -EINVAL;
+	}
 
 	state = pwrdm_read_pwrst(pwrdm);
 
@@ -176,6 +181,8 @@ static int _pwrdm_state_switch(struct powerdomain *pwrdm, int flag)
 		}
 		break;
 	default:
+		pr_err_ratelimited("%s: powerdomain %s: bad flag %d\n",
+				   __func__, pwrdm->name, flag);
 		return -EINVAL;
 	}
 
@@ -484,8 +491,11 @@ int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 pwrst)
 	u8 curr_pwrst, next_pwrst;
 	int sleep_switch = -1, ret = 0, hwsup = 0;
 
-	if (!pwrdm || IS_ERR(pwrdm))
+	if (!pwrdm || IS_ERR(pwrdm)) {
+		pr_err_ratelimited("%s: powerdomain: bad pwrdm\n",
+				   __func__);
 		return -EINVAL;
+	}
 
 	spin_lock(&pwrdm->lock);
 
@@ -553,8 +563,11 @@ int pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst)
 	if (!pwrdm)
 		return -EINVAL;
 
-	if (!(pwrdm->pwrsts & (1 << pwrst)))
+	if (!(pwrdm->pwrsts & (1 << pwrst))) {
+		pr_err_ratelimited("%s: powerdomain %s: bad pwrst %d\n",
+				   __func__, pwrdm->name, pwrst);
 		return -EINVAL;
+	}
 
 	pr_debug("powerdomain: setting next powerstate for %s to %0x\n",
 		 pwrdm->name, pwrst);
@@ -655,8 +668,11 @@ int pwrdm_set_logic_retst(struct powerdomain *pwrdm, u8 pwrst)
 	if (!pwrdm)
 		return -EINVAL;
 
-	if (!(pwrdm->pwrsts_logic_ret & (1 << pwrst)))
+	if (!(pwrdm->pwrsts_logic_ret & (1 << pwrst))) {
+		pr_err_ratelimited("%s: powerdomain %s: bad pwrst %d\n",
+				   __func__, pwrdm->name, pwrst);
 		return -EINVAL;
+	}
 
 	pr_debug("powerdomain: setting next logic powerstate for %s to %0x\n",
 		 pwrdm->name, pwrst);
@@ -689,11 +705,17 @@ int pwrdm_set_mem_onst(struct powerdomain *pwrdm, u8 bank, u8 pwrst)
 	if (!pwrdm)
 		return -EINVAL;
 
-	if (pwrdm->banks < (bank + 1))
+	if (pwrdm->banks < (bank + 1)) {
+		pr_err_ratelimited("%s: powerdomain %s: bad bank %d\n",
+				   __func__, pwrdm->name, bank);
 		return -EEXIST;
+	}
 
-	if (!(pwrdm->pwrsts_mem_on[bank] & (1 << pwrst)))
+	if (!(pwrdm->pwrsts_mem_on[bank] & (1 << pwrst))) {
+		pr_err_ratelimited("%s: powerdomain %s: bank %d bad pwrst %d\n",
+				   __func__, pwrdm->name, bank, pwrst);
 		return -EINVAL;
+	}
 
 	pr_debug("powerdomain: setting next memory powerstate for domain %s "
 		 "bank %0x while pwrdm-ON to %0x\n", pwrdm->name, bank, pwrst);
@@ -727,11 +749,17 @@ int pwrdm_set_mem_retst(struct powerdomain *pwrdm, u8 bank, u8 pwrst)
 	if (!pwrdm)
 		return -EINVAL;
 
-	if (pwrdm->banks < (bank + 1))
+	if (pwrdm->banks < (bank + 1)) {
+		pr_err_ratelimited("%s: powerdomain %s: bad bank %d\n",
+				   __func__, pwrdm->name, bank);
 		return -EEXIST;
+	}
 
-	if (!(pwrdm->pwrsts_mem_ret[bank] & (1 << pwrst)))
+	if (!(pwrdm->pwrsts_mem_ret[bank] & (1 << pwrst))) {
+		pr_err_ratelimited("%s: powerdomain %s: bank %d bad pwrst %d\n",
+				   __func__, pwrdm->name, bank, pwrst);
 		return -EINVAL;
+	}
 
 	pr_debug("powerdomain: setting next memory powerstate for domain %s "
 		 "bank %0x while pwrdm-RET to %0x\n", pwrdm->name, bank, pwrst);
@@ -823,8 +851,11 @@ int pwrdm_read_mem_pwrst(struct powerdomain *pwrdm, u8 bank)
 	if (!pwrdm)
 		return ret;
 
-	if (pwrdm->banks < (bank + 1))
+	if (pwrdm->banks < (bank + 1)) {
+		pr_err_ratelimited("%s: powerdomain %s: bad bank %d\n",
+				   __func__, pwrdm->name, bank);
 		return ret;
+	}
 
 	if (pwrdm->flags & PWRDM_HAS_MPU_QUIRK)
 		bank = 1;
@@ -853,8 +884,11 @@ int pwrdm_read_prev_mem_pwrst(struct powerdomain *pwrdm, u8 bank)
 	if (!pwrdm)
 		return ret;
 
-	if (pwrdm->banks < (bank + 1))
+	if (pwrdm->banks < (bank + 1)) {
+		pr_err_ratelimited("%s: powerdomain %s: bad bank %d\n",
+				   __func__, pwrdm->name, bank);
 		return ret;
+	}
 
 	if (pwrdm->flags & PWRDM_HAS_MPU_QUIRK)
 		bank = 1;
@@ -882,8 +916,11 @@ int pwrdm_read_mem_retst(struct powerdomain *pwrdm, u8 bank)
 	if (!pwrdm)
 		return ret;
 
-	if (pwrdm->banks < (bank + 1))
+	if (pwrdm->banks < (bank + 1)) {
+		pr_err_ratelimited("%s: powerdomain %s: bad bank %d\n",
+				   __func__, pwrdm->name, bank);
 		return ret;
+	}
 
 	if (arch_pwrdm && arch_pwrdm->pwrdm_read_mem_retst)
 		ret = arch_pwrdm->pwrdm_read_mem_retst(pwrdm, bank);
@@ -939,8 +976,11 @@ int pwrdm_enable_hdwr_sar(struct powerdomain *pwrdm)
 	if (!pwrdm)
 		return ret;
 
-	if (!(pwrdm->flags & PWRDM_HAS_HDWR_SAR))
+	if (!(pwrdm->flags & PWRDM_HAS_HDWR_SAR)) {
+		pr_err_ratelimited("%s: powerdomain %s: no HDSAR in flag %d\n",
+				   __func__, pwrdm->name, pwrdm->flags);
 		return ret;
+	}
 
 	pr_debug("powerdomain: %s: setting SAVEANDRESTORE bit\n",
 		 pwrdm->name);
@@ -969,8 +1009,11 @@ int pwrdm_disable_hdwr_sar(struct powerdomain *pwrdm)
 	if (!pwrdm)
 		return ret;
 
-	if (!(pwrdm->flags & PWRDM_HAS_HDWR_SAR))
+	if (!(pwrdm->flags & PWRDM_HAS_HDWR_SAR)) {
+		pr_err_ratelimited("%s: powerdomain %s: no HDSAR in flag %d\n",
+				   __func__, pwrdm->name, pwrdm->flags);
 		return ret;
+	}
 
 	pr_debug("powerdomain: %s: clearing SAVEANDRESTORE bit\n",
 		 pwrdm->name);
@@ -1010,8 +1053,11 @@ int pwrdm_set_lowpwrstchange(struct powerdomain *pwrdm)
 	if (!pwrdm)
 		return -EINVAL;
 
-	if (!(pwrdm->flags & PWRDM_HAS_LOWPOWERSTATECHANGE))
+	if (!(pwrdm->flags & PWRDM_HAS_LOWPOWERSTATECHANGE)) {
+		pr_err_ratelimited("%s: powerdomain %s:no lowpwrch in flag%d\n",
+				   __func__, pwrdm->name, pwrdm->flags);
 		return -EINVAL;
+	}
 
 	pr_debug("powerdomain: %s: setting LOWPOWERSTATECHANGE bit\n",
 		 pwrdm->name);
@@ -1182,9 +1228,11 @@ int pwrdm_enable_force_off(struct powerdomain *pwrdm)
 	if (!pwrdm)
 		return ret;
 
-	if (!(pwrdm->flags & PWRDM_HAS_FORCE_OFF))
+	if (!(pwrdm->flags & PWRDM_HAS_FORCE_OFF)) {
+		pr_err_ratelimited("%s: powerdomain %s:no forceoff in flag%d\n",
+				   __func__, pwrdm->name, pwrdm->flags);
 		return ret;
-
+	}
 
 	pr_debug("powerdomain: %s: setting FORCE OFF bit\n",
 		 pwrdm->name);
@@ -1215,9 +1263,11 @@ int pwrdm_disable_force_off(struct powerdomain *pwrdm)
 	if (!pwrdm)
 		return ret;
 
-	if (!(pwrdm->flags & PWRDM_HAS_FORCE_OFF))
+	if (!(pwrdm->flags & PWRDM_HAS_FORCE_OFF)) {
+		pr_err_ratelimited("%s: powerdomain %s:no forceoff in flag%d\n",
+				   __func__, pwrdm->name, pwrdm->flags);
 		return ret;
-
+	}
 
 	pr_debug("powerdomain: %s: clearing FORCE OFF bit\n",
 		 pwrdm->name);
