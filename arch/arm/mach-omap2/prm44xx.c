@@ -53,13 +53,13 @@ static struct omap_prcm_irq_setup omap4_prcm_irq_setup = {
 /* Read a register in a CM/PRM instance in the PRM module */
 u32 omap4_prm_read_inst_reg(s16 inst, u16 reg)
 {
-	return __raw_readl(OMAP44XX_PRM_REGADDR(inst, reg));
+	return __raw_readl(prm_base + inst + reg);
 }
 
 /* Write into a register in a CM/PRM instance in the PRM module */
 void omap4_prm_write_inst_reg(u32 val, s16 inst, u16 reg)
 {
-	__raw_writel(val, OMAP44XX_PRM_REGADDR(inst, reg));
+	__raw_writel(val, prm_base + inst + reg);
 }
 
 /* Read-modify-write a register in a PRM module. Caller must lock */
@@ -201,10 +201,10 @@ void omap44xx_prm_save_and_clear_irqen(u32 *saved_mask)
 {
 	saved_mask[0] =
 		omap4_prm_read_inst_reg(OMAP4430_PRM_OCP_SOCKET_INST,
-					OMAP4_PRM_IRQSTATUS_MPU_OFFSET);
+					OMAP4_PRM_IRQENABLE_MPU_OFFSET);
 	saved_mask[1] =
 		omap4_prm_read_inst_reg(OMAP4430_PRM_OCP_SOCKET_INST,
-					OMAP4_PRM_IRQSTATUS_MPU_2_OFFSET);
+					OMAP4_PRM_IRQENABLE_MPU_2_OFFSET);
 
 	omap4_prm_write_inst_reg(0, OMAP4430_PRM_OCP_SOCKET_INST,
 				 OMAP4_PRM_IRQENABLE_MPU_OFFSET);
@@ -234,10 +234,78 @@ void omap44xx_prm_restore_irqen(u32 *saved_mask)
 				 OMAP4_PRM_IRQENABLE_MPU_2_OFFSET);
 }
 
+/**
+ * omap44xx_prm_reconfigure_io_chain - clear latches and reconfigure I/O chain
+ *
+ * Clear any previously-latched I/O wakeup events and ensure that the
+ * I/O wakeup gates are aligned with the current mux settings.  Works
+ * by asserting WUCLKIN, waiting for WUCLKOUT to be asserted, and then
+ * deasserting WUCLKIN and waiting for WUCLKOUT to be deasserted.
+ * No return value. XXX Are the final two steps necessary?
+ */
+void omap44xx_prm_reconfigure_io_chain(void)
+{
+	int i = 0;
+
+	/* Trigger WUCLKIN enable */
+	omap4_prm_rmw_inst_reg_bits(OMAP4430_WUCLK_CTRL_MASK,
+			OMAP4430_WUCLK_CTRL_MASK, OMAP4430_PRM_DEVICE_INST,
+			OMAP4_PRM_IO_PMCTRL_OFFSET);
+	omap_test_timeout(
+		(((omap4_prm_read_inst_reg(OMAP4430_PRM_DEVICE_INST,
+			OMAP4_PRM_IO_PMCTRL_OFFSET) &
+			OMAP4430_WUCLK_STATUS_MASK) >>
+			OMAP4430_WUCLK_STATUS_SHIFT) == 1),
+		MAX_IOPAD_LATCH_TIME, i);
+	if (i == MAX_IOPAD_LATCH_TIME)
+		pr_warn("PRM: I/O chain clock line assertion timed out\n");
+
+	/* Trigger WUCLKIN disable */
+	omap4_prm_rmw_inst_reg_bits(OMAP4430_WUCLK_CTRL_MASK, 0x0,
+			OMAP4430_PRM_DEVICE_INST, OMAP4_PRM_IO_PMCTRL_OFFSET);
+	omap_test_timeout(
+		(((omap4_prm_read_inst_reg(OMAP4430_PRM_DEVICE_INST,
+			OMAP4_PRM_IO_PMCTRL_OFFSET) &
+			OMAP4430_WUCLK_STATUS_MASK) >>
+			OMAP4430_WUCLK_STATUS_SHIFT) == 0),
+		MAX_IOPAD_LATCH_TIME, i);
+	if (i == MAX_IOPAD_LATCH_TIME)
+		pr_warn("PRM: I/O chain clock line deassertion timed out\n");
+
+	return;
+}
+
+/**
+ * omap44xx_prm_enable_io_wakeup - enable wakeup events from I/O wakeup latches
+ *
+ * Activates the I/O wakeup event latches and allows events logged by
+ * those latches to signal a wakeup event to the PRCM.  For I/O wakeups
+ * to occur, WAKEUPENABLE bits must be set in the pad mux registers, and
+ * omap44xx_prm_reconfigure_io_chain() must be called.  No return value.
+ */
+static void __init omap44xx_prm_enable_io_wakeup(void)
+{
+	omap4_prm_rmw_inst_reg_bits(OMAP4430_GLOBAL_WUEN_MASK,
+			OMAP4430_GLOBAL_WUEN_MASK, OMAP4430_PRM_DEVICE_INST,
+			OMAP4_PRM_IO_PMCTRL_OFFSET);
+}
+
 static int __init omap4xxx_prcm_init(void)
 {
-	if (cpu_is_omap44xx())
-		return omap_prcm_register_chain_handler(&omap4_prcm_irq_setup);
-	return 0;
+	int ret = 0;
+
+	if (cpu_is_omap44xx() || cpu_is_omap54xx()) {
+		ret = omap_prcm_register_chain_handler(&omap4_prcm_irq_setup);
+		/*
+		 * Don't enable daisy chain, if failed to register
+		 * chain interrupt handler.
+		 */
+		if (ret) {
+			WARN(1, "PRM: Failed to register chain handler!!!");
+			return ret;
+		}
+		omap44xx_prm_enable_io_wakeup();
+	}
+	return ret;
 }
 subsys_initcall(omap4xxx_prcm_init);
