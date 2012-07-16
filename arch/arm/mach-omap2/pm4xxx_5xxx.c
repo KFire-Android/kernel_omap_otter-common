@@ -213,17 +213,14 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
 	/*
 	 * Skip CPU0 and CPU1 power domains. CPU1 is programmed
 	 * through hotplug path and CPU0 explicitly programmed
-	 * further down in the code path
+	 * further down in the code path - program the init state
+	 * explicitly, but we won't manage the power state for
+	 * suspend path
 	 */
-	if (!strncmp(pwrdm->name, "cpu", 3))
-		return 0;
-
-	/*
-	 * FIXME: Remove this check when core retention is supported
-	 * Only MPUSS power domain is added in the list.
-	 */
-	if (strcmp(pwrdm->name, "mpu_pwrdm"))
-		return 0;
+	if (!strncmp(pwrdm->name, "cpu", 3)) {
+		program_state = PWRDM_POWER_ON;
+		goto do_program_state;
+	}
 
 	pwrst = kzalloc(sizeof(struct power_state), GFP_ATOMIC);
 	if (!pwrst)
@@ -242,12 +239,25 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
 	list_add(&pwrst->node, &pwrst_list);
 
 	/*
+	 * Only MPUSS and core power domain is added in the list. MPUSS/core
+	 * is also controlled in CPUidle, so don't explicitly program the
+	 * power state for MPUSS, we will set it to ON instead of deepest
+	 * power state.
+	 */
+	if (!strcmp(pwrdm->name, "mpu_pwrdm") ||
+	    !strcmp(pwrdm->name, "core_pwrdm")) {
+		program_state = PWRDM_POWER_ON;
+		goto do_program_state;
+	}
+
+	/*
 	 * What state to program every Power domain can enter deepest to when
 	 * not in suspend state?
 	 */
 	program_state = pwrdm_get_achievable_pwrst(pwrdm, PWRDM_POWER_OSWR);
 
-	return omap_set_pwrdm_state(pwrst->pwrdm, program_state);
+do_program_state:
+	return omap_set_pwrdm_state(pwrdm, program_state);
 }
 
 /**
