@@ -20,6 +20,7 @@
 #include <linux/input/matrix_keypad.h>
 #include <linux/i2c/smsc.h>
 #include <linux/delay.h>
+#include <linux/workqueue.h>
 
 /* ECE1099 Register summary */
 #define SMSC_GPIO_G1_INPUT	0x00
@@ -79,14 +80,13 @@
 #define SMSC_SET_LOW		0x00
 #define SMSC_KSO_EVAL		0x00
 
-#define KEYPRESS_TIME          200
-#define ROW_SHIFT              4
+#define KEY_PRESSED		0x01
+#define ROW_SHIFT		4
 #define GPIO_BRANK_SIZE		7
+#define KEY_POLL_TIME		20
 
 struct smsc_keypad {
 	unsigned int last_key_state[16];
-	unsigned int last_col;
-	unsigned int last_key_ms[16];
 	unsigned short  keymap[128];
 	struct i2c_client *client;
 	struct input_dev *input;
@@ -94,6 +94,7 @@ struct smsc_keypad {
 	unsigned irq;
 	unsigned gpio;
 	struct device *dbg_dev;
+	struct delayed_work input_work;
 };
 
 static struct i2c_client *kp_client;
@@ -120,72 +121,67 @@ static int smsc_read_data(int reg)
 	return ret;
 }
 
-static void smsc_kp_scan(struct smsc_keypad *kp)
+static void smsc_kp_scan(struct work_struct *work)
 {
+	struct smsc_keypad *kp = container_of((struct delayed_work *)work,
+				struct smsc_keypad,
+				input_work);
 	struct input_dev *input = kp->input;
-	int i, j;
+	int code, ksi;
 	int row, col;
-	int temp, code;
 	unsigned int new_state[16];
-	unsigned int bits_changed;
-	int this_ms;
-
-	/* Disable smsc keypad interrupts */
-	smsc_write_data(SMSC_KSI_MASK, SMSC_SET_LOW);
-	/* Clear all KSI Interrupts */
-	smsc_write_data(SMSC_KSI_STATUS, SMSC_SET_HIGH);
-
+	unsigned int changed;
+	int key_down = SMSC_SET_HIGH;
 
 	/* Scan for row and column */
-	for (i = 0; i < kp->cols; i++) {
-		smsc_write_data(SMSC_KSO_SELECT, SMSC_KSO_EVAL + i);
+	for (col = 0; col < kp->cols; col++) {
+		smsc_write_data(SMSC_KSO_SELECT, SMSC_KSO_EVAL + col);
 		/* Read Row Status */
-		temp = smsc_read_data(SMSC_KSI_INPUT);
-		if (temp != SMSC_SET_HIGH) {
-			col = i;
-			for (j = 0; j < kp->rows; j++) {
-				if ((temp & 0x01) == 0x00) {
-					row = j;
-					new_state[col] =  (1 << row);
-					bits_changed =
-						kp->last_key_state[col] ^ new_state[col];
-					this_ms = jiffies_to_msecs(jiffies);
-					if (bits_changed != 0 || (!bits_changed &&
-						((this_ms - kp->last_key_ms[col]) >= KEYPRESS_TIME))) {
-						code = MATRIX_SCAN_CODE(row, col, ROW_SHIFT);
-						input_event(input, EV_MSC, MSC_SCAN, code);
-						input_report_key(input, kp->keymap[code], 1);
-						input_report_key(input, kp->keymap[code], 0);
-						kp->last_key_state[col] = new_state[col];
-						if (kp->last_col != col)
-							kp->last_key_state[kp->last_col] = 0;
-						kp->last_key_ms[col] = this_ms;
-					}
-				}
-				temp = temp >> 1;
+		ksi = smsc_read_data(SMSC_KSI_INPUT);
+		new_state[col] = (~ksi & SMSC_SET_HIGH);
+		changed = kp->last_key_state[col] ^ new_state[col];
+		key_down &= ksi;
+
+		if (!changed)
+			continue;
+		for (row = 0; row < kp->rows; row++) {
+			if (((changed >> row) & KEY_PRESSED)) {
+				code = MATRIX_SCAN_CODE(row, col, ROW_SHIFT);
+				input_event(input, EV_MSC, MSC_SCAN, code);
+				input_report_key(input, kp->keymap[code],
+						((~ksi >> row) & KEY_PRESSED));
+				kp->last_key_state[col] = new_state[col];
 			}
 		}
 	}
 	input_sync(input);
 
-	/*Enable Keypad Scan (generate interrupt on key press) */
-	smsc_write_data(SMSC_KSO_SELECT, SMSC_KSO_ALL_LOW);
-	/* Clear all KSI Interrupts */
-	smsc_write_data(SMSC_KSI_STATUS, SMSC_SET_HIGH);
-	/* Enable keypad interrupts */
-	smsc_write_data(SMSC_KSI_MASK, SMSC_SET_HIGH);
+	/* Is there a key down? */
+	if (key_down != SMSC_SET_HIGH) {
+		schedule_delayed_work(&kp->input_work,
+				msecs_to_jiffies(KEY_POLL_TIME));
+	} else {
+		/*Enable Keypad Scan (generate interrupt on key press) */
+		smsc_write_data(SMSC_KSO_SELECT, SMSC_KSO_ALL_LOW);
+		/* Clear all KSI Interrupts */
+		smsc_write_data(SMSC_KSI_STATUS, SMSC_SET_HIGH);
+		/* Enable keypad interrupts */
+		smsc_write_data(SMSC_KSI_MASK, SMSC_SET_HIGH);
+	}
 }
 
 static irqreturn_t do_kp_irq(int irq, void *_kp)
 {
 	struct smsc_keypad *kp = _kp;
-	int int_status;
 
-	int_status = smsc_read_data(SMSC_KSI_STATUS);
-	if (!int_status)
-		return IRQ_NONE;
+	cancel_delayed_work(&kp->input_work);
 
-	smsc_kp_scan(kp);
+	/* Disable keypad interrupts */
+	smsc_write_data(SMSC_KSI_MASK, SMSC_SET_LOW);
+	/* Clear all KSI Interrupts */
+	smsc_write_data(SMSC_KSI_STATUS, SMSC_SET_HIGH);
+
+	schedule_delayed_work(&kp->input_work, 0);
 
 	return IRQ_HANDLED;
 }
@@ -303,10 +299,8 @@ smsc_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	kp->rows = pdata->rows;
 	kp->cols = pdata->cols;
 
-	for (col = 0; col < kp->cols; col++) {
+	for (col = 0; col < kp->cols; col++)
 		kp->last_key_state[col] = 0;
-		kp->last_key_ms[col] = 0;
-	}
 
 	/* setup input device */
 	 __set_bit(EV_KEY, input->evbit);
@@ -389,6 +383,8 @@ smsc_probe(struct i2c_client *client, const struct i2c_device_id *id)
 
 	i2c_set_clientdata(client, kp);
 
+	INIT_DELAYED_WORK(&kp->input_work, smsc_kp_scan);
+
 	return 0;
 
 err4:
@@ -418,6 +414,27 @@ static int smsc_remove(struct i2c_client *client)
 	return 0;
 }
 
+#ifdef CONFIG_PM
+static int smsc_kp_suspend(struct device *dev)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct smsc_keypad *kp = platform_get_drvdata(pdev);
+
+	cancel_delayed_work(&kp->input_work);
+
+	return 0;
+}
+
+static int smsc_kp_resume(struct device *dev)
+{
+	return 0;
+}
+
+static UNIVERSAL_DEV_PM_OPS(smsc_kp_pm, smsc_kp_suspend, smsc_kp_resume, NULL);
+#else
+static UNIVERSAL_DEV_PM_OPS(smsc_kp_pm, NULL, NULL, NULL);
+#endif
+
 static const struct i2c_device_id smsc_id[] = {
 	{ "smsc", 0 },
 	{ }
@@ -427,6 +444,7 @@ static struct i2c_driver smsc_driver = {
 	.driver = {
 		.name	= "smsc-keypad",
 		.owner  = THIS_MODULE,
+		.pm	= &smsc_kp_pm
 	},
 	.probe		= smsc_probe,
 	.remove		= smsc_remove,
