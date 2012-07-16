@@ -1334,6 +1334,7 @@ static int configure_dispc(void)
 				break;
 			}
 		} else if (wbc->dirty && !wbc->enabled) {
+
 			if (wbc->mode == OMAP_WB_MEM2MEM_MODE &&
 				wbc->source >= OMAP_WB_GFX) {
 				/* This is a workaround. According to TRM
@@ -1343,8 +1344,35 @@ static int configure_dispc(void)
 				 * dummy enable and disable of WB.
 				 */
 				dispc_enable_plane(OMAP_DSS_WB, 1);
-			}
-			dispc_enable_plane(OMAP_DSS_WB, 0);
+				dispc_enable_plane(OMAP_DSS_WB, 0);
+			} else if (wbc->mode == OMAP_WB_MEM2MEM_MODE &&
+					wbc->source < OMAP_WB_GFX) {
+				/* This is a workaround that prevents SYNC_LOST
+				 * on changing pipe channelout from manager
+				 * which was used as a source of wb to another
+				 * manager. Manager could free pipes after wb
+				 * will send SYNC message but that will start
+				 * wb capture. To prevent that we reconnect the
+				 * pipe from the manager to wb and do a dummy
+				 * enabling and disabling of wb - the pipe will
+				 * be freed and capture won't start because
+				 * source pipe is switched off. */
+				for (i = 0; i < num_ovls; ++i) {
+					oc = &dss_cache.overlay_cache[i];
+					if (oc->channel == wbc->source &&
+						!oc->enabled) {
+						dispc_setup_wb_source(
+							OMAP_DSS_GFX + i);
+						dispc_set_wb_channel_out(i);
+						dispc_enable_plane(
+							OMAP_DSS_WB, 1);
+						dispc_enable_plane(
+							OMAP_DSS_WB, 0);
+					}
+				}
+			} else
+				/* capture mode case */
+				dispc_enable_plane(OMAP_DSS_WB, 0);
 			wbc->dirty = false;
 		}
 	}
