@@ -74,6 +74,15 @@ static u8 pm44xx_54xx_errata;
 					OMAP44xx_54xx_PM_ERRATUM_##erratum)
 
 #ifdef CONFIG_SUSPEND
+/* Names of various power states achievable */
+static char *power_state_names[] = {
+	[PWRDM_POWER_OFF] = "OFF",
+	[PWRDM_POWER_INACTIVE] = "INACTIVE",
+	[PWRDM_POWER_ON] = "ON",
+	[PWRDM_POWER_CSWR] = "CSWR",
+	[PWRDM_POWER_OSWR] = "OSWR",
+};
+
 static int omap4_5_pm_suspend(void)
 {
 	struct power_state *pwrst;
@@ -109,10 +118,15 @@ static int omap4_5_pm_suspend(void)
 	/* Restore next powerdomain state */
 	list_for_each_entry(pwrst, &pwrst_list, node) {
 		state = pwrdm_read_prev_pwrst(pwrst->pwrdm);
-		if (state > pwrst->next_state) {
-			pr_info("Powerdomain (%s) didn't enter "
-			       "target state %d\n",
-			       pwrst->pwrdm->name, pwrst->next_state);
+		if (state == PWRDM_POWER_ON || state > pwrst->next_state) {
+			int now_state = pwrdm_read_pwrst(pwrst->pwrdm);
+			pr_info("Powerdomain (%s) didn't enter target state %s "
+				"(achieved=%s current=%s saved=%s)\n",
+				pwrst->pwrdm->name,
+				power_state_names[pwrst->next_state],
+				power_state_names[state],
+				power_state_names[now_state],
+				power_state_names[pwrst->saved_state]);
 			ret = -1;
 		}
 		omap_set_pwrdm_state(pwrst->pwrdm, pwrst->saved_state);
