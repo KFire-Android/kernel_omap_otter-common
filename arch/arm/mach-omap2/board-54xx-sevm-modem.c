@@ -59,44 +59,12 @@ static int __init omap5evm_modem_switch(int new_state)
 static void __init omap5evm_modem_pad_conf(void)
 {
 	/*
-	 * HSI pad conf: hsi2_ca/ac_wake/flag/data/ready
-	 * Also configure gpio_66, input from modem
+	 * Modem pad conf:
+	 * HSI pads are already configured by HSI driver
+	 * I2S pads are already configured by audio soc driver
 	 */
 
 	pr_info("Update PADs for modem connection\n");
-
-	omap_mux_init_signal("hsi2_cawake", \
-		OMAP_PIN_INPUT_PULLDOWN | \
-		OMAP_PIN_OFF_NONE | \
-		OMAP_PIN_OFF_WAKEUPENABLE);
-
-	omap_mux_init_signal("hsi2_caflag", \
-		OMAP_PIN_INPUT | \
-		OMAP_PIN_OFF_NONE);
-
-	omap_mux_init_signal("hsi2_cadata", \
-		OMAP_PIN_INPUT_PULLDOWN | \
-		OMAP_PIN_OFF_NONE);
-
-	omap_mux_init_signal("hsi2_acready", \
-		OMAP_PIN_OUTPUT | \
-		OMAP_PIN_OFF_OUTPUT_LOW);
-
-	omap_mux_init_signal("hsi2_acwake", \
-		OMAP_PIN_OUTPUT | \
-		OMAP_PIN_OFF_NONE);
-
-	omap_mux_init_signal("hsi2_acdata", \
-		OMAP_PIN_OUTPUT | \
-		OMAP_PIN_OFF_NONE);
-
-	omap_mux_init_signal("hsi2_acflag", \
-		OMAP_PIN_OUTPUT | \
-		OMAP_PIN_OFF_NONE);
-
-	omap_mux_init_signal("hsi2_caready", \
-		OMAP_PIN_INPUT | \
-		OMAP_PIN_OFF_NONE);
 
 	omap_mux_init_signal("gpio3_66", \
 		OMAP_PIN_INPUT_PULLDOWN | \
