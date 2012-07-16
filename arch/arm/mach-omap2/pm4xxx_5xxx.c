@@ -91,8 +91,16 @@ static int omap4_5_pm_suspend(void)
 	u32 cpu_id = smp_processor_id();
 
 	/* Save current powerdomain state */
-	list_for_each_entry(pwrst, &pwrst_list, node)
-		pwrst->saved_state = pwrdm_read_next_pwrst(pwrst->pwrdm);
+	list_for_each_entry(pwrst, &pwrst_list, node) {
+		/*
+		 * Core PD next state is programmed to OFF in pm_enter,
+		 * we want to wake and restore to ON state
+		 */
+		if (!strcmp(pwrst->pwrdm->name, "core_pwrdm"))
+			pwrst->saved_state = PWRDM_POWER_ON;
+		else
+			pwrst->saved_state = pwrdm_read_next_pwrst(pwrst->pwrdm);
+	}
 
 	/* Set targeted power domain states by suspend */
 	list_for_each_entry(pwrst, &pwrst_list, node) {
@@ -101,6 +109,10 @@ static int omap4_5_pm_suspend(void)
 					     PWRDM_POWER_OFF :
 					     PWRDM_POWER_OSWR;
 		}
+
+		/* Core next power domain is already programmed in pm_enter */
+		if (!strcmp(pwrst->pwrdm->name, "core_pwrdm"))
+			continue;
 
 		omap_set_pwrdm_state(pwrst->pwrdm, pwrst->next_state);
 	}

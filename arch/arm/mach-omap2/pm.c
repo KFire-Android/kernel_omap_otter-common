@@ -34,6 +34,7 @@
 #include "twl-common.h"
 
 static struct device *l3_dev;
+static struct powerdomain *core_pd;
 
 /*
  * omap_pm_suspend: points to a function that does the SoC-specific
@@ -302,6 +303,17 @@ static int omap_pm_begin(suspend_state_t state)
 
 	if (cpu_is_omap34xx())
 		omap_prcm_irq_prepare();
+
+	/*
+	 * As DEV OFF is overloaded as a part of CORE power domain
+	 * as an EXTRA OFF mode. This will be set when CORE is
+	 * programmed to POWER_OFF and will be disabled when
+	 * programmed to anything other than OFF state.
+	 */
+	if ((cpu_is_omap44xx() || cpu_is_omap54xx()) &&
+	    off_mode_enabled)
+		omap_set_pwrdm_state(core_pd, PWRDM_POWER_OFF);
+
 	return 0;
 }
 
@@ -493,6 +505,12 @@ static int __init omap2_common_pm_late_init(void)
 #ifdef CONFIG_SUSPEND
 	suspend_set_ops(&omap_pm_ops);
 #endif
+
+	core_pd = pwrdm_lookup("core_pwrdm");
+	if (!core_pd) {
+		pr_err("Failed to lookup CORE power domain\n");
+		return -ENODEV;
+	}
 
 	return 0;
 }
