@@ -598,18 +598,16 @@ static void fm_irq_send_flag_getcmd(struct fmdev *fmdev)
 static void fm_irq_handle_flag_getcmd_resp(struct fmdev *fmdev)
 {
 	struct sk_buff *skb;
-	struct fm_event_msg_hdr *fm_evt_hdr;
 
 	if (check_cmdresp_status(fmdev, &skb))
 		return;
 
-	fm_evt_hdr = (void *)skb->data;
-
 	/* Skip header info and copy only response data */
 	skb_pull(skb, sizeof(struct fm_event_msg_hdr));
-	memcpy(&fmdev->irq_info.flag, skb->data, fm_evt_hdr->dlen);
 
-	fmdev->irq_info.flag = be16_to_cpu(fmdev->irq_info.flag);
+	/* Copy 16 bit flag register value from skb->data */
+	fmdev->irq_info.flag = (u16) ((skb->data[0] << 8) | skb->data[1]);
+
 	fmdbg("irq: flag register(0x%x)\n", fmdev->irq_info.flag);
 
 	/* Continue next function in interrupt handler table */
