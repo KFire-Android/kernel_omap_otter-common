@@ -43,52 +43,270 @@
 #define OMAP_HSI_HWMOD_NAME			"hsi"
 #define OMAP_HSI_HWMOD_CLASSNAME		"hsi"
 
+#define HSI_SIGNALS_PER_PORT		8 /* 4 for C=>A and 4 for A=>C */
+
 #ifdef CONFIG_OMAP_MUX
 /* OMAP44xx MUX settings for HSI port 1 & 2 */
-static struct omap_device_pad omap44xx_hsi_ports_pads[] __initdata = {
+static struct omap_device_pad __initdata
+			omap44xx_hsi_ports_pads[2][HSI_SIGNALS_PER_PORT] = {
 	{
-		.name = "hsi1_cawake",
-		.flags  = OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
-		.enable = (OMAP_MUX_MODE1 | OMAP_PIN_INPUT_PULLDOWN) &
-			  ~OMAP_WAKEUP_EN,
-		.idle   = OMAP_MUX_MODE1 | OMAP_PIN_INPUT_PULLDOWN |
-			  OMAP_WAKEUP_EN,
-		.off    = OMAP_MUX_MODE1 | OMAP_PIN_OFF_NONE |
-			  OMAP_WAKEUP_EN,
+	/* OMAP44xx MUX settings for HSI port 1 */
+		{
+			.name = "hsi1_cawake",
+			.flags  = OMAP_DEVICE_PAD_REMUX |
+				  OMAP_DEVICE_PAD_WAKEUP,
+			.enable = (OMAP_MUX_MODE1 | OMAP_PIN_INPUT_PULLDOWN) &
+				  ~OMAP_WAKEUP_EN,
+			.idle   = OMAP_MUX_MODE1 | OMAP_PIN_INPUT_PULLDOWN |
+				  OMAP_WAKEUP_EN,
+			.off    = OMAP_MUX_MODE1 | OMAP_PIN_OFF_NONE |
+				  OMAP_WAKEUP_EN,
+		},
+
+		{
+			.name = "hsi1_caflag",
+			.enable = OMAP_MUX_MODE1 | \
+				  OMAP_PIN_INPUT | \
+				  OMAP_PIN_OFF_NONE,
+		},
+
+		{
+			.name = "hsi1_cadata",
+			.enable = OMAP_MUX_MODE1 | \
+				  OMAP_PIN_INPUT_PULLDOWN | \
+				  OMAP_PIN_OFF_NONE,
+		},
+
+		{
+			.name = "hsi1_acready",
+			.enable = OMAP_MUX_MODE1 | \
+				  OMAP_PIN_OUTPUT | \
+				  OMAP_PIN_OFF_OUTPUT_LOW,
+		},
+
+		{
+			.name = "hsi1_acwake",
+			.enable = OMAP_MUX_MODE1 | \
+				  OMAP_PIN_OUTPUT | \
+				  OMAP_PIN_OFF_NONE,
+		},
+
+		{
+			.name = "hsi1_acdata",
+			.enable = OMAP_MUX_MODE1 | \
+				  OMAP_PIN_OUTPUT | \
+				  OMAP_PIN_OFF_NONE,
+		},
+
+		{
+			.name = "hsi1_acflag",
+			.enable = OMAP_MUX_MODE1 | \
+				  OMAP_PIN_OUTPUT | \
+				  OMAP_PIN_OFF_NONE,
+		},
+
+		{
+			.name = "hsi1_caready",
+			.enable = OMAP_MUX_MODE1 | \
+				  OMAP_PIN_INPUT | \
+				  OMAP_PIN_OFF_NONE,
+		},
 	},
+
+	/* OMAP44xx MUX settings for HSI port 2 */
 	{
-		.name = "hsi2_cawake",
-		.flags  = OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
-		.enable = (OMAP_MUX_MODE4 | OMAP_PIN_INPUT_PULLDOWN) &
-			  ~OMAP_WAKEUP_EN,
-		.idle   = OMAP_MUX_MODE4 | OMAP_PIN_INPUT_PULLDOWN |
-			  OMAP_WAKEUP_EN,
-		.off    = OMAP_MUX_MODE4 | OMAP_PIN_OFF_NONE |
-			  OMAP_WAKEUP_EN,
+		{
+			.name = "hsi2_cawake",
+			.flags  = OMAP_DEVICE_PAD_REMUX |
+				  OMAP_DEVICE_PAD_WAKEUP,
+			.enable = (OMAP_MUX_MODE4 | OMAP_PIN_INPUT_PULLDOWN) &
+				  ~OMAP_WAKEUP_EN,
+			.idle   = OMAP_MUX_MODE4 | OMAP_PIN_INPUT_PULLDOWN |
+				  OMAP_WAKEUP_EN,
+			.off    = OMAP_MUX_MODE4 | OMAP_PIN_OFF_NONE |
+				  OMAP_WAKEUP_EN,
+		},
+
+		{
+			.name = "hsi2_caflag",
+			.enable = OMAP_MUX_MODE4 | \
+				  OMAP_PIN_INPUT | \
+				  OMAP_PIN_OFF_NONE,
+		},
+
+		{
+			.name = "hsi2_cadata",
+			.enable = OMAP_MUX_MODE4 | \
+				  OMAP_PIN_INPUT_PULLDOWN | \
+				  OMAP_PIN_OFF_NONE,
+		},
+
+		{
+			.name = "hsi2_acready",
+			.enable = OMAP_MUX_MODE4 | \
+				  OMAP_PIN_OUTPUT | \
+				  OMAP_PIN_OFF_OUTPUT_LOW,
+		},
+
+		{
+			.name = "hsi2_acwake",
+			.enable = OMAP_MUX_MODE4 | \
+				  OMAP_PIN_OUTPUT | \
+				  OMAP_PIN_OFF_NONE,
+		},
+
+		{
+			.name = "hsi2_acdata",
+			.enable = OMAP_MUX_MODE4 | \
+				  OMAP_PIN_OUTPUT | \
+				  OMAP_PIN_OFF_NONE,
+		},
+
+		{
+			.name = "hsi2_acflag",
+			.enable = OMAP_MUX_MODE4 | \
+				  OMAP_PIN_OUTPUT | \
+				  OMAP_PIN_OFF_NONE,
+		},
+
+		{
+			.name = "hsi2_caready",
+			.enable = OMAP_MUX_MODE4 | \
+				  OMAP_PIN_INPUT | \
+				  OMAP_PIN_OFF_NONE,
+		},
 	},
 };
 
 /* OMAP54xx MUX settings for HSI port 1 & 2 */
-static struct omap_device_pad omap54xx_hsi_ports_pads[] __initdata = {
+static struct omap_device_pad __initdata
+			omap54xx_hsi_ports_pads[2][HSI_SIGNALS_PER_PORT] = {
 	{
-		.name = "hsi1_cawake",
-		.flags  = OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
-		.enable = (OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLDOWN) &
-			  ~OMAP_WAKEUP_EN,
-		.idle   = OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLDOWN |
-			  OMAP_WAKEUP_EN,
-		.off    = OMAP_MUX_MODE0 | OMAP_PIN_OFF_NONE |
-			  OMAP_WAKEUP_EN,
+	/* OMAP54xx MUX settings for HSI port 1 */
+		{
+			.name = "hsi1_cawake",
+			.flags  = OMAP_DEVICE_PAD_REMUX |
+				  OMAP_DEVICE_PAD_WAKEUP,
+			.enable = (OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLDOWN) &
+				  ~OMAP_WAKEUP_EN,
+			.idle   = OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLDOWN |
+				  OMAP_WAKEUP_EN,
+			.off    = OMAP_MUX_MODE0 | OMAP_PIN_OFF_NONE |
+				  OMAP_WAKEUP_EN,
+		},
+
+		{
+			.name = "hsi1_caflag",
+			.enable = OMAP_MUX_MODE0 | \
+				  OMAP_PIN_INPUT | \
+				  OMAP_PIN_OFF_NONE,
+		},
+
+		{
+			.name = "hsi1_cadata",
+			.enable = OMAP_MUX_MODE0 | \
+				  OMAP_PIN_INPUT_PULLDOWN | \
+				  OMAP_PIN_OFF_NONE,
+		},
+
+		{
+			.name = "hsi1_acready",
+			.enable = OMAP_MUX_MODE0 | \
+				  OMAP_PIN_OUTPUT | \
+				  OMAP_PIN_OFF_OUTPUT_LOW,
+		},
+
+		{
+			.name = "hsi1_acwake",
+			.enable = OMAP_MUX_MODE0 | \
+				  OMAP_PIN_OUTPUT | \
+				  OMAP_PIN_OFF_NONE,
+		},
+
+		{
+			.name = "hsi1_acdata",
+			.enable = OMAP_MUX_MODE0 | \
+				  OMAP_PIN_OUTPUT | \
+				  OMAP_PIN_OFF_NONE,
+		},
+
+		{
+			.name = "hsi1_acflag",
+			.enable = OMAP_MUX_MODE0 | \
+				  OMAP_PIN_OUTPUT | \
+				  OMAP_PIN_OFF_NONE,
+		},
+
+		{
+			.name = "hsi1_caready",
+			.enable = OMAP_MUX_MODE0 | \
+				  OMAP_PIN_INPUT | \
+				  OMAP_PIN_OFF_NONE,
+		},
 	},
+
+	/* OMAP54xx MUX settings for HSI port 2 */
 	{
-		.name = "hsi2_cawake",
-		.flags  = OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
-		.enable = (OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLDOWN) &
-			  ~OMAP_WAKEUP_EN,
-		.idle   = OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLDOWN |
-			  OMAP_WAKEUP_EN,
-		.off    = OMAP_MUX_MODE0 | OMAP_PIN_OFF_NONE |
-			  OMAP_WAKEUP_EN,
+		{
+			.name = "hsi2_cawake",
+			.flags  = OMAP_DEVICE_PAD_REMUX |
+				  OMAP_DEVICE_PAD_WAKEUP,
+			.enable = (OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLDOWN) &
+				  ~OMAP_WAKEUP_EN,
+			.idle   = OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLDOWN |
+				  OMAP_WAKEUP_EN,
+			.off    = OMAP_MUX_MODE0 | OMAP_PIN_OFF_NONE |
+				  OMAP_WAKEUP_EN,
+		},
+
+		{
+			.name = "hsi2_caflag",
+			.enable = OMAP_MUX_MODE0 | \
+				  OMAP_PIN_INPUT | \
+				  OMAP_PIN_OFF_NONE,
+		},
+
+		{
+			.name = "hsi2_cadata",
+			.enable = OMAP_MUX_MODE0 | \
+				  OMAP_PIN_INPUT_PULLDOWN | \
+				  OMAP_PIN_OFF_NONE,
+		},
+
+		{
+			.name = "hsi2_acready",
+			.enable = OMAP_MUX_MODE0 | \
+				  OMAP_PIN_OUTPUT | \
+				  OMAP_PIN_OFF_OUTPUT_LOW,
+		},
+
+		{
+			.name = "hsi2_acwake",
+			.enable = OMAP_MUX_MODE0 | \
+				  OMAP_PIN_OUTPUT | \
+				  OMAP_PIN_OFF_NONE,
+		},
+
+		{
+			.name = "hsi2_acdata",
+			.enable = OMAP_MUX_MODE0 | \
+				  OMAP_PIN_OUTPUT | \
+				  OMAP_PIN_OFF_NONE,
+		},
+
+		{
+			.name = "hsi2_acflag",
+			.enable = OMAP_MUX_MODE0 | \
+				  OMAP_PIN_OUTPUT | \
+				  OMAP_PIN_OFF_NONE,
+		},
+
+		{
+			.name = "hsi2_caready",
+			.enable = OMAP_MUX_MODE0 | \
+				  OMAP_PIN_INPUT | \
+				  OMAP_PIN_OFF_NONE,
+		},
 	},
 };
 
@@ -96,7 +314,7 @@ static struct omap_hwmod_mux_info * __init
 omap_hsi_fill_default_pads(struct hsi_platform_data *pdata)
 {
 	struct omap_device_pad	*pads_to_mux;
-	struct omap_device_pad	*omap_pads;
+	struct omap_device_pad	(*omap_pads)[HSI_SIGNALS_PER_PORT];
 
 	if ((pdata->ctx->pctx[0].port_number > 2) ||
 	    ((pdata->num_ports == 2) &&
@@ -115,12 +333,13 @@ omap_hsi_fill_default_pads(struct hsi_platform_data *pdata)
 
 	if (pdata->num_ports == 1) {
 		/* Mux only port corresponding to first index */
-		pads_to_mux = &omap_pads[pdata->ctx->pctx[0].port_number - 1];
+		pads_to_mux =
+			&omap_pads[pdata->ctx->pctx[0].port_number - 1][0];
 		pr_info("%s: Muxed hsi port %d\n", __func__,
 			pdata->ctx->pctx[0].port_number);
 	} else if (pdata->num_ports == 2) {
 		/* Mux all ports */
-		pads_to_mux = &omap_pads[0];
+		pads_to_mux = &omap_pads[0][0];
 		pr_info("%s: Muxed hsi ports 1 & 2\n", __func__);
 	} else {
 		pr_err("%s: invalid port number %d\n", __func__,
@@ -128,7 +347,8 @@ omap_hsi_fill_default_pads(struct hsi_platform_data *pdata)
 		return NULL;
 	}
 
-	return omap_hwmod_mux_init(pads_to_mux, pdata->num_ports);
+	return omap_hwmod_mux_init(pads_to_mux, pdata->num_ports * \
+							HSI_SIGNALS_PER_PORT);
 }
 #else
 static struct omap_hwmod_mux_info * __init
