@@ -190,44 +190,84 @@ static irqreturn_t do_kp_irq(int irq, void *_kp)
 
 static int  __devinit smsc_kp_initialize(struct smsc_keypad *kp)
 {
+	int ret = 0;
 	int gpio, mask, reg;
 
-	/* Mask all GPIO interrupts */
-	for (reg = SMSC_GPIO_G1_INT_MASK; reg <= SMSC_GPIO_G4_INT_MASK; reg++)
-		smsc_write_data(reg, SMSC_SET_LOW);
-
-	/* Set all GPIO outputs high */
-	for (reg = SMSC_GPIO_G1_INT_STAT; reg <= SMSC_GPIO_G4_OUTPUT; reg++)
-		smsc_write_data(reg, SMSC_SET_HIGH);
-
-	/* Configure GPIO Group 2 as the keypad matrix rows (KSI) */
-	for (gpio = 0; gpio <= GPIO_BRANK_SIZE; gpio++) {
-		mask = (SMSC_GPIO_PU | SMSC_GPIO_IRQ_FALLING |
-			  SMSC_GPIO_ALT_FN);
-		mask &= ~SMSC_GPIO_DIR;
-		smsc_write_data((SMSC_GPIO_G2_BASEADDR + gpio), mask);
-	}
-
-	/* Configure GPIO Group 3 and 4 as the keypad matrix columns (KSO) */
-	/* Each GPIO banks has 8 configurable GPIOs */
-	for (gpio = 0; gpio <= GPIO_BRANK_SIZE; gpio++) {
-		mask = (SMSC_GPIO_ALT_FN | SMSC_GPIO_DIR | SMSC_GPIO_OUT_CONF);
-		smsc_write_data((SMSC_GPIO_G3_BASEADDR + gpio), mask);
-		smsc_write_data((SMSC_GPIO_G4_BASEADDR + gpio), mask);
+	/* Disable all GPIO interrupts */
+	for (reg = SMSC_GPIO_G1_INT_MASK; reg <= SMSC_GPIO_G4_INT_MASK; reg++) {
+		ret = smsc_write_data(reg, SMSC_SET_LOW);
+		if (ret < 0)
+			goto exit;
 	}
 
 	/* Clear all GPIO interrupt status */
-	for (reg = SMSC_GPIO_G1_INT_STAT; reg <= SMSC_GPIO_G4_INT_STAT; reg++)
-		smsc_write_data(reg, SMSC_SET_HIGH);
+	for (reg = SMSC_GPIO_G1_INT_STAT; reg <= SMSC_GPIO_G4_INT_STAT; reg++) {
+		ret = smsc_write_data(reg, SMSC_SET_HIGH);
+		if (ret < 0)
+			goto exit;
+	}
 
-	/* Clear all KSI Interrupts */
-	smsc_write_data(SMSC_KSI_STATUS, SMSC_SET_HIGH);
+	/* Configure the Interface Selection */
+	ret = mask = smsc_read_data(SMSC_CLK_CTRL);
+	if (ret < 0)
+		goto exit;
+	mask |= SMSC_CLOCK_INT_SMSBUS;
+	ret  = smsc_write_data(SMSC_CLK_CTRL, mask);
+	if (ret < 0)
+		goto exit;
+
+	/* Set the SMBus Alert Response Address */
+	ret = mask = smsc_read_data(SMSC_CLK_CTRL);
+	if (ret < 0)
+		goto exit;
+	mask |= SMSC_CLOCK_ARA;
+	ret  = smsc_write_data(SMSC_CLK_CTRL, mask);
+	if (ret < 0)
+		goto exit;
+
+	/* Configure GPIO Group 2 as the keypad matrix rows (KSI) */
+	mask = (SMSC_GPIO_PU | SMSC_GPIO_IRQ_FALLING | SMSC_GPIO_ALT_FN);
+	mask &= ~SMSC_GPIO_DIR;
+	for (gpio = 0; gpio <= GPIO_BRANK_SIZE; gpio++) {
+		ret = smsc_write_data((SMSC_GPIO_G2_BASEADDR + gpio), mask);
+		if (ret < 0)
+			goto exit;
+	}
+
+	/* Configure GPIO Group 1,3 and 4 as the keypad matrix columns (KSO) */
+	mask = (SMSC_GPIO_ALT_FN | SMSC_GPIO_DIR | SMSC_GPIO_OUT_CONF);
+	for (gpio = 0; gpio <= GPIO_BRANK_SIZE; gpio++) {
+		ret = smsc_write_data((SMSC_GPIO_G1_BASEADDR + gpio), mask);
+		if (ret < 0)
+			goto exit;
+		ret = smsc_write_data((SMSC_GPIO_G3_BASEADDR + gpio), mask);
+		if (ret < 0)
+			goto exit;
+		ret = smsc_write_data((SMSC_GPIO_G4_BASEADDR + gpio), mask);
+		if (ret < 0)
+			goto exit;
+	}
+
 	/* Set up Low Power Mode (Wake-up) */
-	smsc_write_data(SMSC_WKUP_CTRL, SMSC_SET_LOW_PWR);
+	ret = smsc_write_data(SMSC_WKUP_CTRL, SMSC_SET_LOW_PWR);
+	if (ret < 0)
+		goto exit;
+
+	/* Enable smsc keypad interrupts */
+	ret = smsc_write_data(SMSC_KSI_MASK, SMSC_SET_HIGH);
+	if (ret < 0)
+		goto exit;
+
 	/* Enable Keypad Scan (generate interrupt on key press) */
-	smsc_write_data(SMSC_KSO_SELECT, SMSC_KSO_ALL_LOW);
+	ret = smsc_write_data(SMSC_KSO_SELECT, SMSC_KSO_ALL_LOW);
+	if (ret < 0)
+		goto exit;
 
 	return 0;
+
+exit:
+	dev_err(&kp->client->dev, "fail to configure the keyboard\n");
+	return ret;
 }
 
 static int __devinit
@@ -316,11 +356,6 @@ smsc_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		goto err2;
 	}
 
-	ret  = smsc_write_data(SMSC_CLK_CTRL,
-			(SMSC_CLOCK_ARA | SMSC_CLOCK_INT_SMSBUS));
-	if (ret < 0)
-		goto err3;
-
 	ret = smsc_kp_initialize(kp);
 	if (ret)
 		goto err3;
@@ -347,17 +382,10 @@ smsc_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		goto err4;
 	}
 
-	/* Enable smsc keypad interrupts */
-	ret = smsc_write_data(SMSC_KSI_MASK, SMSC_SET_HIGH);
-	if (ret < 0)
-		goto err5;
-
 	i2c_set_clientdata(client, kp);
 
 	return 0;
 
-err5:
-	free_irq(client->irq, NULL);
 err4:
 	gpio_free(client->irq);
 err3:
