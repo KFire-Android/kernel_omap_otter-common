@@ -293,9 +293,8 @@ smsc_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	ret = smsc_read_data(SMSC_VENDOR_ID_MSB);
 	input->id.vendor |= (ret << 8);
 
-	dev_info(&client->dev, "SMSC: Device ID: %d, Version No.:"
-		" %d, Vendor ID: 0x%x\n", input->id.product, input->id.version,
-		input->id.vendor);
+	dev_info(&client->dev, "SMSC: Device ID: %d, Version No.: %d, Vendor ID: 0x%x\n",
+		input->id.product, input->id.version, input->id.vendor);
 
 	/* Enable auto repeat feature of Linux input subsystem */
 	if (pdata->rep)
