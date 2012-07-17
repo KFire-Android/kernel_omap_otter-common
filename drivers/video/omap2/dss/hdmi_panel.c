@@ -270,9 +270,11 @@ err:
 static void hdmi_panel_disable(struct omap_dss_device *dssdev)
 {
 	mutex_lock(&hdmi.hdmi_lock);
-	hdmi_inform_power_on_to_cec(false);
-	if (dssdev->state == OMAP_DSS_DISPLAY_ACTIVE)
+
+	if (dssdev->state == OMAP_DSS_DISPLAY_ACTIVE) {
+		hdmi_inform_power_on_to_cec(false);
 		omapdss_hdmi_display_disable(dssdev);
+	}
 
 	dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
 
