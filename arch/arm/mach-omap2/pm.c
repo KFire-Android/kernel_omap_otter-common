@@ -73,7 +73,7 @@ void omap_pm_get_oscillator(u32 *tstart, u32 *tshut)
 	*tshut = oscillator.shutdown_time;
 }
 
-static struct omap_device_pm_latency iva_seq_pm_lats[] = {
+static struct omap_device_pm_latency iva_pm_lats[] = {
 	{
 		/* iva seqs need to be put under hard reset */
 		.deactivate_func = omap_device_shutdown_hwmods,
@@ -119,11 +119,12 @@ static void __init omap2_init_processor_devices(void)
 	if (cpu_is_omap44xx() || cpu_is_omap54xx()) {
 		_init_omap_device("l3_main_1");
 		_init_omap_device("dsp");
-		_init_omap_device("iva");
-		_init_omap_device_lats("iva_seq0", iva_seq_pm_lats,
-						ARRAY_SIZE(iva_seq_pm_lats));
-		_init_omap_device_lats("iva_seq1", iva_seq_pm_lats,
-						ARRAY_SIZE(iva_seq_pm_lats));
+		_init_omap_device_lats("iva", iva_pm_lats,
+						ARRAY_SIZE(iva_pm_lats));
+		_init_omap_device_lats("iva_seq0", iva_pm_lats,
+						ARRAY_SIZE(iva_pm_lats));
+		_init_omap_device_lats("iva_seq1", iva_pm_lats,
+						ARRAY_SIZE(iva_pm_lats));
 	} else {
 		_init_omap_device("l3_main");
 	}
