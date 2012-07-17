@@ -203,6 +203,7 @@ struct fm_event_msg_hdr {
 /* Band types */
 #define FM_BAND_EUROPE_US	0
 #define FM_BAND_JAPAN		1
+#define FM_BAND_RUSSIAN		2
 
 /* Seek directions */
 #define FM_SEARCH_DIRECTION_DOWN	0
