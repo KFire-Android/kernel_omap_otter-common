@@ -55,8 +55,7 @@ static struct powerdomain core_44xx_pwrdm = {
 		[3] = PWRSTS_ON,	/* ducati_l2ram */
 		[4] = PWRSTS_ON,	/* ducati_unicache */
 	},
-	.flags		  = PWRDM_HAS_LOWPOWERSTATECHANGE |
-			    PWRDM_HAS_EXTRA_OFF_ENABLE,
+	.flags		  = PWRDM_HAS_LOWPOWERSTATECHANGE,
 };
 
 /* gfx_44xx_pwrdm: 3D accelerator power domain */

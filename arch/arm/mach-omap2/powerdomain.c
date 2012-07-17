@@ -627,20 +627,11 @@ int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 pwrst)
 {
 	u8 curr_pwrst, next_pwrst;
 	int sleep_switch = -1, ret = 0, hwsup = 0;
-	bool extra_off_enable = false;
-	bool has_extra_off = false;
 
 	if (!pwrdm || IS_ERR(pwrdm)) {
 		pr_err_ratelimited("%s: powerdomain: bad pwrdm\n",
 				   __func__);
 		return -EINVAL;
-	}
-
-	/* Check if powerdomain has extra off mode handling */
-	if (pwrdm->flags & PWRDM_HAS_EXTRA_OFF_ENABLE) {
-		has_extra_off = true;
-		if (pwrst == PWRDM_POWER_OFF)
-			extra_off_enable = true;
 	}
 
 	pwrst = pwrdm_get_achievable_pwrst(pwrdm, pwrst);
@@ -692,9 +683,6 @@ int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 pwrst)
 		pwrdm_state_switch(pwrdm);
 		break;
 	}
-
-	if (has_extra_off && arch_pwrdm && arch_pwrdm->pwrdm_enable_off)
-		arch_pwrdm->pwrdm_enable_off(pwrdm, extra_off_enable);
 
 out:
 	spin_unlock(&pwrdm->lock);
@@ -771,11 +759,6 @@ int pwrdm_read_next_pwrst(struct powerdomain *pwrdm)
 	if (!pwrdm)
 		return -EINVAL;
 
-	if (pwrdm->flags & PWRDM_HAS_EXTRA_OFF_ENABLE && arch_pwrdm &&
-	    arch_pwrdm->pwrdm_read_next_off &&
-	    arch_pwrdm->pwrdm_read_next_off(pwrdm))
-		return PWRDM_POWER_OFF;
-
 	if (arch_pwrdm && arch_pwrdm->pwrdm_read_next_pwrst)
 		ret = arch_pwrdm->pwrdm_read_next_pwrst(pwrdm);
 
@@ -850,6 +833,39 @@ int pwrdm_read_prev_pwrst(struct powerdomain *pwrdm)
 	}
 
 	return ret;
+}
+
+/**
+ * pwrdm_read_device_off_state - Read device off state
+ *
+ * Reads the device OFF state. Returns 1 if set else zero if
+ * device off is not set. And return invalid if arch_pwrdm
+ * is not popluated with read_next_off api.
+ */
+int pwrdm_read_device_off_state(void)
+{
+	int ret = -EINVAL;
+
+	if (arch_pwrdm && arch_pwrdm->pwrdm_read_next_off)
+		ret = arch_pwrdm->pwrdm_read_next_off();
+
+	return ret;
+}
+
+/**
+ * pwrdm_enable_off_mode - Set device off state
+ * @enable:	true - sets device level OFF mode configuration,
+ *		false - unsets the OFF mode configuration
+ *
+ * This enables DEVICE OFF bit for OMAPs which support
+ * Device OFF.
+ */
+void pwrdm_enable_off_mode(bool enable)
+{
+	if (arch_pwrdm && arch_pwrdm->pwrdm_read_next_off)
+		arch_pwrdm->pwrdm_enable_off(enable);
+
+	return;
 }
 
 /**

@@ -385,26 +385,23 @@ static bool omap4_pwrdm_lost_context_rff(struct powerdomain *pwrdm)
 
 /**
  * omap4_device_set_next_state_off - setup device off state
- * @pwrdm: struct powerdomain * to target powerdomain
  * @enable: true if off-mode should be enabled
  *
  * When Device OFF is enabled, Device is allowed to perform
  * transition to off mode as soon as all power domains in MPU, IVA
  * and CORE voltage are in OFF or OSWR state (open switch retention)
  */
-static void omap4_device_set_next_state_off(struct powerdomain *pwrdm,
-					    bool enable)
+static void omap4_device_set_next_state_off(bool enable)
 {
 	u8 val = enable ? 0x1 : 0x0;
-	u16 offset, inst;
-
-	if (!(pwrdm->flags & PWRDM_HAS_EXTRA_OFF_ENABLE))
-		return;
+	u16 offset, inst, partition;
 
 	if (cpu_is_omap44xx()) {
+		partition = OMAP4430_PRM_PARTITION;
 		offset = OMAP4_PRM_DEVICE_OFF_CTRL_OFFSET;
 		inst = OMAP4430_PRM_DEVICE_INST;
 	} else if (cpu_is_omap54xx()) {
+		partition = OMAP54XX_PRM_PARTITION;
 		offset = OMAP54XX_PRM_DEVICE_OFF_CTRL_OFFSET;
 		inst = OMAP54XX_PRM_DEVICE_INST;
 	} else {
@@ -412,37 +409,35 @@ static void omap4_device_set_next_state_off(struct powerdomain *pwrdm,
 	}
 
 	omap4_prminst_write_inst_reg(val << OMAP4430_DEVICE_OFF_ENABLE_SHIFT,
-				     pwrdm->prcm_partition,
+				     partition,
 				     inst, offset);
 }
 
 
 /**
  * omap4_device_read_next_state_off - read device off state
- * @pwrdm: struct powerdomain * to target powerdomain
  *
  * Checks if device off is enabled or not.
  * Returns true if enabled, false otherwise.
  */
-static bool omap4_device_read_next_state_off(struct powerdomain *pwrdm)
+static bool omap4_device_read_next_state_off(void)
 {
 	u32 val;
-	u16 offset, inst;
-
-	if (!(pwrdm->flags & PWRDM_HAS_EXTRA_OFF_ENABLE))
-		return false;
+	u16 offset, inst, partition;
 
 	if (cpu_is_omap44xx()) {
+		partition = OMAP4430_PRM_PARTITION;
 		offset = OMAP4_PRM_DEVICE_OFF_CTRL_OFFSET;
 		inst = OMAP4430_PRM_DEVICE_INST;
 	} else if (cpu_is_omap54xx()) {
+		partition = OMAP54XX_PRM_PARTITION;
 		offset = OMAP54XX_PRM_DEVICE_OFF_CTRL_OFFSET;
 		inst = OMAP54XX_PRM_DEVICE_INST;
 	} else {
 		return false;
 	}
 
-	val = omap4_prminst_read_inst_reg(pwrdm->prcm_partition,
+	val = omap4_prminst_read_inst_reg(partition,
 					  inst, offset);
 
 	val &= OMAP4430_DEVICE_OFF_ENABLE_MASK;

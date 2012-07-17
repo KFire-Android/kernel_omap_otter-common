@@ -68,14 +68,6 @@
 #define PWRDM_HAS_FORCE_OFF		(1 << 3)
 
 /*
- * OMAP4+ has device off feature, which must be enabled separately in
- * addition to power domain next state setup. This feature is overloaded
- * as EXTRA_OFF_ENABLE for core_pwrdm, and is implemented on top of
- * functional power state
- */
-#define PWRDM_HAS_EXTRA_OFF_ENABLE	(1 << 4)
-
-/*
  * Number of memory banks that are power-controllable.	On OMAP4430, the
  * maximum is 5.
  */
@@ -201,8 +193,8 @@ struct pwrdm_ops {
 	int	(*pwrdm_enable_force_off)(struct powerdomain *pwrdm);
 	int	(*pwrdm_disable_force_off)(struct powerdomain *pwrdm);
 	bool	(*pwrdm_lost_context_rff)(struct powerdomain *pwrdm);
-	void	(*pwrdm_enable_off)(struct powerdomain *pwrdm, bool enable);
-	bool	(*pwrdm_read_next_off)(struct powerdomain *pwrdm);
+	void	(*pwrdm_enable_off)(bool enable);
+	bool	(*pwrdm_read_next_off)(void);
 };
 
 int pwrdm_register_platform_funcs(struct pwrdm_ops *custom_funcs);
@@ -234,6 +226,8 @@ int pwrdm_read_next_pwrst(struct powerdomain *pwrdm);
 int pwrdm_read_pwrst(struct powerdomain *pwrdm);
 int pwrdm_read_prev_pwrst(struct powerdomain *pwrdm);
 int pwrdm_clear_all_prev_pwrst(struct powerdomain *pwrdm);
+int pwrdm_read_device_off_state(void);
+void pwrdm_enable_off_mode(bool enable);
 
 int pwrdm_enable_hdwr_sar(struct powerdomain *pwrdm);
 int pwrdm_disable_hdwr_sar(struct powerdomain *pwrdm);

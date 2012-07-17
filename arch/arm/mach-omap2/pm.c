@@ -304,21 +304,19 @@ static int omap_pm_begin(suspend_state_t state)
 	if (cpu_is_omap34xx())
 		omap_prcm_irq_prepare();
 
-	/*
-	 * As DEV OFF is overloaded as a part of CORE power domain
-	 * as an EXTRA OFF mode. This will be set when CORE is
-	 * programmed to POWER_OFF and will be disabled when
-	 * programmed to anything other than OFF state.
-	 */
-	if ((cpu_is_omap44xx() || cpu_is_omap54xx()) &&
-	    off_mode_enabled)
-		omap_set_pwrdm_state(core_pd, PWRDM_POWER_OFF);
+	/* Enable DEV OFF */
+	if (off_mode_enabled && (cpu_is_omap44xx() || cpu_is_omap54xx()))
+		pwrdm_enable_off_mode(true);
 
 	return 0;
 }
 
 static void omap_pm_end(void)
 {
+	/* Disable DEV OFF */
+	if (off_mode_enabled && (cpu_is_omap44xx() || cpu_is_omap54xx()))
+		pwrdm_enable_off_mode(false);
+
 	enable_hlt();
 	return;
 }

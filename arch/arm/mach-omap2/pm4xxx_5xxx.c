@@ -92,28 +92,11 @@ static int omap4_5_pm_suspend(void)
 
 	/* Save current powerdomain state */
 	list_for_each_entry(pwrst, &pwrst_list, node) {
-		/*
-		 * Core PD next state is programmed to OFF in pm_enter,
-		 * we want to wake and restore to ON state
-		 */
-		if (!strcmp(pwrst->pwrdm->name, "core_pwrdm"))
-			pwrst->saved_state = PWRDM_POWER_ON;
-		else
-			pwrst->saved_state = pwrdm_read_next_pwrst(pwrst->pwrdm);
+		pwrst->saved_state = pwrdm_read_next_pwrst(pwrst->pwrdm);
 	}
 
 	/* Set targeted power domain states by suspend */
 	list_for_each_entry(pwrst, &pwrst_list, node) {
-		if (pwrst->pwrdm->flags & PWRDM_HAS_EXTRA_OFF_ENABLE) {
-			pwrst->next_state = (off_mode_enabled) ?
-					     PWRDM_POWER_OFF :
-					     PWRDM_POWER_OSWR;
-		}
-
-		/* Core next power domain is already programmed in pm_enter */
-		if (!strcmp(pwrst->pwrdm->name, "core_pwrdm"))
-			continue;
-
 		omap_set_pwrdm_state(pwrst->pwrdm, pwrst->next_state);
 	}
 
@@ -269,8 +252,6 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
 
 	/* Program power domain to what state on suspend */
 	pwrst->next_state = pwrdm_get_achievable_pwrst(pwrdm, PWRDM_POWER_OFF);
-	if (pwrdm->flags & PWRDM_HAS_EXTRA_OFF_ENABLE)
-		pwrst->next_state = PWRDM_POWER_OFF;
 
 	pr_debug("Default setup powerdomain %s: next_state =%d\n", pwrdm->name,
 		 pwrst->next_state);

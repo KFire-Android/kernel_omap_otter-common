@@ -58,7 +58,6 @@ static unsigned int secure_hw_api_index;
 static unsigned int secure_hal_save_all_api_index;
 static unsigned int secure_ram_api_index;
 
-static struct powerdomain *core_pd;
 static struct omap_hwmod *l3_main_3_oh;
 
 /*
@@ -307,7 +306,7 @@ static void irq_save_context(void)
 /*
  * Clear WakeupGen SAR backup status.
  */
-void irq_sar_clear(void)
+static void irq_sar_clear(void)
 {
 	u32 val;
 	u32 offset = SAR_BACKUP_STATUS_OFFSET;
@@ -354,7 +353,7 @@ static void save_secure_all(void)
 
 static void irq_save_secure_context(void)
 {
-	if (core_pd && pwrdm_read_next_pwrst(core_pd) == PWRDM_POWER_OFF)
+	if (pwrdm_read_device_off_state())
 		save_secure_all();
 	else
 		irq_save_secure_gic();
@@ -530,12 +529,6 @@ int __init omap_wakeupgen_init(void)
 
 	irq_hotplug_init();
 	irq_pm_init();
-
-	core_pd = pwrdm_lookup("core_pwrdm");
-	if (!core_pd) {
-		pr_err("wakeupgen: unable to get core_pwrdm\n");
-		return -EINVAL;
-	}
 
 	return 0;
 }
