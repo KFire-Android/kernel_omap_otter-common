@@ -275,6 +275,10 @@ again:
 			/* Calculate frequency index to write */
 			next_frq = (fmdev->rx.freq -
 					fmdev->rx.region.bot_freq) / FM_FREQ_MUL;
+
+			/* If no valid chanel then report default frequency */
+			wrap_around = 0;
+
 			goto again;
 		}
 	} else {
