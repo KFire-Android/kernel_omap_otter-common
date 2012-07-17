@@ -62,6 +62,7 @@ static void __init omap5evm_modem_pad_conf(void)
 {
 	/*
 	 * Modem pad conf:
+	 * UART pads are already configured by serial driver
 	 * HSI pads are already configured by HSI driver
 	 * I2S pads are already configured by audio soc driver
 	 */
@@ -73,13 +74,7 @@ static void __init omap5evm_modem_pad_conf(void)
 		OMAP_PIN_OFF_NONE | \
 		OMAP_PIN_OFF_WAKEUPENABLE);
 
-	omap_mux_init_signal("uart1_rx", \
-		OMAP_PIN_INPUT | \
-		OMAP_PIN_OFF_NONE);
 
-	omap_mux_init_signal("uart1_tx", \
-		OMAP_PIN_OUTPUT | \
-		OMAP_PIN_OFF_NONE);
 }
 
 /*
