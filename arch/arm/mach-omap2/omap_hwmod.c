@@ -1656,6 +1656,9 @@ static void _omap4_update_context_lost(struct omap_hwmod *oh)
  */
 static int _omap4_get_context_lost(struct omap_hwmod *oh)
 {
+	if (oh->prcm.omap4.context_offs == USHRT_MAX)
+		_omap4_inc_context_loss(&oh->prcm.omap4.context_lost_counter);
+
 	return oh->prcm.omap4.context_lost_counter;
 }
 
