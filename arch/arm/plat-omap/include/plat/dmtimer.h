@@ -36,6 +36,7 @@
 #include <linux/delay.h>
 #include <linux/io.h>
 #include <linux/platform_device.h>
+#include <plat/cpu.h>
 
 #ifndef __ASM_ARCH_DMTIMER_H
 #define __ASM_ARCH_DMTIMER_H
@@ -65,6 +66,9 @@
 #define OMAP_TIMER_SECURE				0x80000000
 #define OMAP_TIMER_ALWON				0x40000000
 #define OMAP_TIMER_HAS_PWM				0x20000000
+
+/* timer errata flags */
+#define OMAP_TIMER_ERRATA_I767				0x80000000
 
 struct omap_timer_capability_dev_attr {
 	u32 timer_capability;
@@ -275,6 +279,7 @@ struct omap_dm_timer {
 	bool loses_context;
 	int ctx_loss_count;
 	int revision;
+	u32 errata;
 	struct platform_device *pdev;
 	struct list_head node;
 
@@ -349,9 +354,26 @@ static inline void __omap_dm_timer_reset(struct omap_dm_timer *timer,
 
 	__raw_writel(l, timer->io_base + OMAP_TIMER_OCP_CFG_OFFSET);
 
+	if (timer->errata & OMAP_TIMER_ERRATA_I767)
+		return;
+
 	/* Match hardware reset default of posted mode */
 	__omap_dm_timer_write(timer, OMAP_TIMER_IF_CTRL_REG,
 					OMAP_TIMER_CTRL_POSTED, 0);
+}
+
+static inline void
+__omap_dm_timer_populate_errata(struct omap_dm_timer *timer, u32 override)
+ {
+	timer->errata = 0;
+
+	if (cpu_class_is_omap1() || cpu_is_omap24xx())
+		return;
+
+	if (override & OMAP_TIMER_ERRATA_I767)
+		return;
+
+	timer->errata = OMAP_TIMER_ERRATA_I767;
 }
 
 static inline int __omap_dm_timer_set_source(struct clk *timer_fck,

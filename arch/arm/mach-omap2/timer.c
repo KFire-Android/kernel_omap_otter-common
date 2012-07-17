@@ -226,6 +226,12 @@ static void __init omap2_gp_clockevent_init(int gptimer_id,
 {
 	int res;
 
+	/*
+	 * For clock-event timers we never read the timer
+	 * counter and therefore we can ignore errata i767.
+	 */
+	__omap_dm_timer_populate_errata(&clkev, OMAP_TIMER_ERRATA_I767);
+
 	res = omap_dm_timer_init_one(&clkev, gptimer_id, fck_source);
 	BUG_ON(res);
 
@@ -297,6 +303,8 @@ static void __init omap2_gp_clocksource_init(int gptimer_id,
 						const char *fck_source)
 {
 	int res;
+
+	__omap_dm_timer_populate_errata(&clksrc, 0);
 
 	res = omap_dm_timer_init_one(&clksrc, gptimer_id, fck_source);
 	BUG_ON(res);

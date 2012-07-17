@@ -668,6 +668,8 @@ static int __devinit omap_dm_timer_probe(struct platform_device *pdev)
 	timer->loses_context = pdata->loses_context;
 	timer->get_context_loss_count = pdata->get_context_loss_count;
 
+	__omap_dm_timer_populate_errata(timer, 0);
+
 	/* Skip pm_runtime_enable for OMAP1 */
 	if (!pdata->needs_manual_reset) {
 		pm_runtime_enable(dev);
