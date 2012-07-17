@@ -181,29 +181,41 @@ static irqreturn_t palmas_id_wakeup_irq(int irq, void *_palmas_usb)
 	palmas_usb_read(palmas_usb->palmas, PALMAS_USB_ID_INT_LATCH_SET, &set);
 
 	if (set & USB_ID_INT_SRC_ID_GND) {
-		regulator_enable(palmas_usb->vbus_reg);
-		palmas_usb_write(palmas_usb->palmas,
+		if (palmas_usb->linkstat != OMAP_DWC3_ID_GROUND) {
+			regulator_enable(palmas_usb->vbus_reg);
+			palmas_usb_write(palmas_usb->palmas,
 						PALMAS_USB_ID_INT_EN_HI_SET,
 					    USB_ID_INT_EN_HI_SET_ID_FLOAT);
-		palmas_usb_write(palmas_usb->palmas,
+			palmas_usb_write(palmas_usb->palmas,
 						PALMAS_USB_ID_INT_EN_HI_CLR,
 						USB_ID_INT_EN_HI_CLR_ID_GND);
-		status = OMAP_DWC3_ID_GROUND;
+			status = OMAP_DWC3_ID_GROUND;
+			palmas_usb->linkstat = status;
+		} else {
+			dev_dbg(palmas_usb->dev, "Spurious ID GND detected\n");
+		}
 	} else if (set & USB_ID_INT_SRC_ID_FLOAT) {
-		palmas_usb_write(palmas_usb->palmas,
+		if (palmas_usb->linkstat == OMAP_DWC3_ID_GROUND) {
+			palmas_usb_write(palmas_usb->palmas,
 						PALMAS_USB_ID_INT_EN_HI_SET,
 						USB_ID_INT_EN_HI_SET_ID_GND);
-		palmas_usb_write(palmas_usb->palmas,
+			palmas_usb_write(palmas_usb->palmas,
 						PALMAS_USB_ID_INT_EN_HI_CLR,
 						USB_ID_INT_EN_HI_CLR_ID_FLOAT);
-		regulator_disable(palmas_usb->vbus_reg);
-		status = OMAP_DWC3_ID_FLOAT;
+			regulator_disable(palmas_usb->vbus_reg);
+			status = OMAP_DWC3_ID_FLOAT;
+			palmas_usb->linkstat = status;
+		} else {
+			dev_dbg(palmas_usb->dev, "Spurious ID FLOAT detected\n");
+		}
 	}
 
-	palmas_usb->linkstat = status;
-	omap_dwc3_mailbox(status);
+	if (status != OMAP_DWC3_UNKNOWN) {
+		omap_dwc3_mailbox(status);
+		return IRQ_HANDLED;
+	}
 
-	return IRQ_HANDLED;
+	return IRQ_NONE;
 }
 
 static int palmas_enable_irq(struct palmas_usb *palmas_usb)
