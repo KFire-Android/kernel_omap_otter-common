@@ -124,6 +124,7 @@ struct fm_irq {
 /* RDS info */
 struct fm_rds {
 	u8 flag;	/* RX RDS on/off status */
+	u8 pause;       /* RX RDS Pause */
 	u8 last_blk_idx;	/* Last received RDS block */
 
 	/* RDS buffer */
@@ -166,6 +167,10 @@ struct fm_rx {
 	u8 af_mode;	/* Alternate frequency on/off */
 	struct tuned_station_info stat_info;
 	struct fm_rds rds;
+	bool comp_scan_status;  /* Complete scan status */
+	u8 no_of_chans;         /* Number stations found */
+	u32 stat_found[410];    /* Stations found */
+	bool comp_scan_done;    /* FR/SCAN DONE event indicator */
 };
 
 #define FMTX_RDS_TXT_STR_SIZE	25
