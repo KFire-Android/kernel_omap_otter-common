@@ -3366,8 +3366,9 @@ static void dispc_error_worker(struct work_struct *work)
 	for (i = 0; i < omap_dss_get_num_overlays(); ++i) {
 		struct omap_overlay *ovl;
 		unsigned bit;
-
 		ovl = omap_dss_get_overlay(i);
+		if (!ovl)
+			continue;
 		bit = fifo_underflow_bits[i];
 
 		if (bit & errors) {
@@ -3399,12 +3400,14 @@ static void dispc_error_worker(struct work_struct *work)
 		if (bit & errors) {
 			struct omap_dss_device *dssdev = mgr->device;
 			bool enable;
+			if (dssdev && dssdev->state != OMAP_DSS_DISPLAY_ACTIVE)
+				break;
 
 			pr_err_ratelimited("SYNC_LOST on channel %s, restarting"
 					" the output with video overlays "
 					"disabled\n", mgr->name);
 
-			enable = dssdev->state == OMAP_DSS_DISPLAY_ACTIVE;
+			enable = dssdev->state;
 
 			mgr->device->sync_lost_error = true;
 			dssdev->driver->disable(dssdev);
@@ -3413,7 +3416,8 @@ static void dispc_error_worker(struct work_struct *work)
 			for (i = 0; i < omap_dss_get_num_overlays(); ++i) {
 				struct omap_overlay *ovl;
 				ovl = omap_dss_get_overlay(i);
-
+				if (!ovl)
+					continue;
 				if (ovl->id != OMAP_DSS_GFX &&
 						ovl->manager == mgr)
 					dispc_ovl_enable(ovl->id, false);
@@ -3421,8 +3425,7 @@ static void dispc_error_worker(struct work_struct *work)
 
 			dispc_mgr_go(mgr->id);
 			mdelay(50);
-
-			if (enable)
+			if (enable && dssdev->driver && dssdev->driver->enable)
 				dssdev->driver->enable(dssdev);
 		}
 	}
@@ -3432,7 +3435,7 @@ static void dispc_error_worker(struct work_struct *work)
 		for (i = 0; i < omap_dss_get_num_overlay_managers(); ++i) {
 			struct omap_overlay_manager *mgr;
 			mgr = omap_dss_get_overlay_manager(i);
-			if (mgr->device && mgr->device->driver)
+			if (mgr && mgr->device && mgr->device->driver)
 				mgr->device->driver->disable(mgr->device);
 		}
 	}
