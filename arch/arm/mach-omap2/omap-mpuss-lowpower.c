@@ -159,7 +159,7 @@ static inline void set_cpu_next_pwrst(unsigned int cpu_id,
 {
 	struct omap4_cpu_pm_info *pm_info = &per_cpu(omap4_pm_info, cpu_id);
 
-	pwrdm_set_next_pwrst(pm_info->pwrdm, power_state);
+	omap_set_pwrdm_state(pm_info->pwrdm, power_state);
 }
 
 /*
@@ -584,7 +584,7 @@ int __init omap_mpuss_init(void)
 	cpu_clear_prev_logic_pwrst(0);
 
 	/* Initialise CPU0 power domain state to ON */
-	pwrdm_set_next_pwrst(pm_info->pwrdm, PWRDM_POWER_ON);
+	omap_set_pwrdm_state(pm_info->pwrdm, PWRDM_POWER_ON);
 
 	if (cpu_is_omap44xx()) {
 		cpu_wakeup_addr = CPU1_WAKEUP_NS_PA_ADDR_OFFSET;
@@ -615,7 +615,7 @@ int __init omap_mpuss_init(void)
 	cpu_clear_prev_logic_pwrst(1);
 
 	/* Initialise CPU1 power domain state to ON */
-	pwrdm_set_next_pwrst(pm_info->pwrdm, PWRDM_POWER_ON);
+	omap_set_pwrdm_state(pm_info->pwrdm, PWRDM_POWER_ON);
 
 	mpuss_pd = pwrdm_lookup("mpu_pwrdm");
 	if (!mpuss_pd) {
