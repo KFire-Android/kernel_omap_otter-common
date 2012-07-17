@@ -66,7 +66,6 @@ struct gccorecontext {
 	/* Power mode flags. */
 	bool clockenabled;
 	bool pulseskipping;
-	bool forceoff;
 
 	/* MMU and command buffer managers. */
 	struct gcmmu gcmmu;
@@ -80,6 +79,8 @@ struct gccorecontext {
 	int opp_count;
 	unsigned long *opp_freqs;
 	unsigned long  cur_freq;
+
+	bool suspend_requested;
 };
 
 
