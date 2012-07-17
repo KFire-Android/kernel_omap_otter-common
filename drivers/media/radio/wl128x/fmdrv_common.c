@@ -842,12 +842,17 @@ static void fm_irq_handle_rds_finish(struct fmdev *fmdev)
 
 static void fm_irq_handle_tune_op_ended(struct fmdev *fmdev)
 {
-	if (fmdev->irq_info.flag & (FM_FR_EVENT | FM_BL_EVENT) & fmdev->
-	    irq_info.mask) {
+	if (fmdev->irq_info.flag & (FM_FR_EVENT | FM_BL_EVENT |
+			FM_SCAN_DONE_EVENT) & fmdev->irq_info.mask) {
 		fmdbg("irq: tune ended/bandlimit reached\n");
 		if (test_and_clear_bit(FM_AF_SWITCH_INPROGRESS, &fmdev->flag)) {
 			fmdev->irq_info.stage = FM_AF_JUMP_RD_FREQ_IDX;
 		} else {
+			if (fmdev->rx.comp_scan_status) {
+				fmdbg("irq: complete scan done\n");
+				fmdev->rx.comp_scan_done = 1;
+			}
+
 			complete(&fmdev->maintask_comp);
 			fmdev->irq_info.stage = FM_HW_POWER_ENB_IDX;
 		}

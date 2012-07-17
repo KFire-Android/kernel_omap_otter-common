@@ -166,18 +166,70 @@ static u32 fm_rx_set_channel_spacing(struct fmdev *fmdev, u32 spacing)
 }
 
 u32 fm_rx_seek(struct fmdev *fmdev, u32 seek_upward,
-		u32 wrap_around, u32 spacing)
+		u32 wrap_around, u32 spacing, u32 comp_scan)
 {
 	u32 resp_len;
 	u16 curr_frq, next_frq, last_frq;
-	u16 payload, int_reason, intr_flag;
-	u16 offset, space_idx;
+	u16 payload, int_reason;
+	u16 offset, space_idx, no_stations, chnl_found[410];
 	unsigned long timeleft;
-	u32 ret;
+	u32 ret, i;
+	static int intr_flag;
+
+	if (comp_scan == COMP_SCAN_STOP) {
+		/* Stop Complete Scan */
+		if (fmdev->rx.comp_scan_status == COMP_SCAN_START &&
+				fmdev->rx.comp_scan_done == false) {
+			payload = FM_TUNER_STOP_SEARCH_MODE;
+			ret = fmc_send_cmd(fmdev, STOP_SEARCH, REG_WR, &payload,
+					sizeof(payload), NULL, NULL);
+			if (ret < false)
+				return ret;
+		}
+
+		return 0;
+	} else if (comp_scan == COMP_SCAN_READ) {
+		/* Read Complete Scan results */
+		ret = fmc_send_cmd(fmdev, TUNE_VALIDITY_CHECK, REG_RD, NULL,
+				sizeof(no_stations), &no_stations, &resp_len);
+		if (ret < false)
+			return ret;
+
+		no_stations = be16_to_cpu(no_stations);
+		no_stations = no_stations & 63;
+		fmdev->rx.no_of_chans = no_stations;
+		if (fmdev->rx.no_of_chans == false)
+			return 0;
+
+		ret = fmc_send_cmd(fmdev, RDS_DATA_GET, REG_RD, NULL,
+				no_stations * 2, chnl_found, &resp_len);
+		if (ret < false)
+			return ret;
+
+		fmdbg("Complete Scan results\n");
+		memset(fmdev->rx.stat_found, 0, sizeof(fmdev->rx.stat_found));
+		for (i = 0; i < no_stations; i++) {
+			fmdev->rx.stat_found[i] = (u32) ((chnl_found[i] * 50) +
+					fmdev->rx.region.bot_freq);
+			fmdbg("channel[%d]-%d\n", i+1, fmdev->rx.stat_found[i]);
+		}
+
+		/* Re-enable default FM interrupts */
+		int_reason = fmdev->irq_info.flag &
+			(FM_TUNE_COMPLETE | FM_BAND_LIMIT);
+		fmdev->irq_info.mask = intr_flag;
+		payload = fmdev->irq_info.mask;
+		ret = fmc_send_cmd(fmdev, INT_MASK_SET, REG_WR, &payload,
+				sizeof(payload), NULL, NULL);
+		if (ret < false)
+			return ret;
+
+		goto exit;
+	}
 
 	/* Set channel spacing */
 	ret = fm_rx_set_channel_spacing(fmdev, spacing);
-	if (ret < 0) {
+	if (ret < false) {
 		fmerr("Failed to set channel spacing\n");
 		return ret;
 	}
@@ -185,7 +237,7 @@ u32 fm_rx_seek(struct fmdev *fmdev, u32 seek_upward,
 	/* Read the current frequency from chip */
 	ret = fmc_send_cmd(fmdev, FREQ_SET, REG_RD, NULL,
 			sizeof(curr_frq), &curr_frq, &resp_len);
-	if (ret < 0)
+	if (ret < false)
 		return ret;
 
 	curr_frq = be16_to_cpu(curr_frq);
@@ -205,43 +257,70 @@ u32 fm_rx_seek(struct fmdev *fmdev, u32 seek_upward,
 	if ((short)next_frq < 0)
 		next_frq = last_frq - offset;
 	else if (next_frq > last_frq)
-		next_frq = 0 + offset;
+		next_frq = offset;
 
 again:
 	/* Set calculated next frequency to perform seek */
 	payload = next_frq;
 	ret = fmc_send_cmd(fmdev, FREQ_SET, REG_WR, &payload,
 			sizeof(payload), NULL, NULL);
-	if (ret < 0)
+	if (ret < false)
 		return ret;
 
 	/* Set search direction (0:Seek Down, 1:Seek Up) */
 	payload = (seek_upward ? FM_SEARCH_DIRECTION_UP : FM_SEARCH_DIRECTION_DOWN);
 	ret = fmc_send_cmd(fmdev, SEARCH_DIR_SET, REG_WR, &payload,
 			sizeof(payload), NULL, NULL);
-	if (ret < 0)
+	if (ret < false)
 		return ret;
 
 	/* Read flags - just to clear any pending interrupts if we had */
 	ret = fmc_send_cmd(fmdev, FLAG_GET, REG_RD, NULL, 2, NULL, NULL);
-	if (ret < 0)
+	if (ret < false)
 		return ret;
 
 	/* Enable FR, BL interrupts */
 	intr_flag = fmdev->irq_info.mask;
-	fmdev->irq_info.mask = (FM_FR_EVENT | FM_BL_EVENT);
+	fmdev->irq_info.mask = (FM_FR_EVENT | FM_BL_EVENT | FM_SCAN_DONE_EVENT);
 	payload = fmdev->irq_info.mask;
 	ret = fmc_send_cmd(fmdev, INT_MASK_SET, REG_WR, &payload,
 			sizeof(payload), NULL, NULL);
-	if (ret < 0)
+	if (ret < false)
 		return ret;
 
-	/* Start seek */
-	payload = FM_TUNER_AUTONOMOUS_SEARCH_MODE;
-	ret = fmc_send_cmd(fmdev, TUNER_MODE_SET, REG_WR, &payload,
-			sizeof(payload), NULL, NULL);
-	if (ret < 0)
-		return ret;
+	if (comp_scan == SEEK_START) {
+		/* Start Seek */
+		payload = FM_TUNER_AUTONOMOUS_SEARCH_MODE;
+		ret = fmc_send_cmd(fmdev, TUNER_MODE_SET, REG_WR, &payload,
+				sizeof(payload), NULL, NULL);
+		if (ret < false)
+			return ret;
+
+	} else if (comp_scan == COMP_SCAN_START) {
+		/* Pause RDS reception before Starting Complete Scan */
+		if (fmdev->rx.rds.flag == true) {
+			fmdev->rx.rds.pause = true;
+			ret = fmc_set_rds_mode(fmdev, FM_RDS_DISABLE);
+			if (ret < false)
+				fmerr("Failed to set RX RDS mode\n");
+		}
+
+		/* Clear RDS data present in chip */
+		fmc_send_cmd(fmdev, RDS_DATA_GET, REG_RD, NULL,
+				(FM_RX_RDS_FIFO_THRESHOLD * 3), NULL, NULL);
+
+		/* Start Complete Scan */
+		payload = FM_TUNER_BULK_SEARCH_MODE;
+		ret = fmc_send_cmd(fmdev, TUNER_MODE_SET, REG_WR, &payload,
+				sizeof(payload), NULL, NULL);
+		if (ret < false)
+			return ret;
+
+		fmdev->rx.comp_scan_status = true;
+		fmdev->rx.comp_scan_done = false;
+		return 0;
+	}
+
 
 	/* Wait for tune ended/band limit reached interrupt */
 	init_completion(&fmdev->maintask_comp);
@@ -293,6 +372,8 @@ again:
 				((u32)curr_frq * FM_FREQ_MUL));
 
 	}
+
+exit:
 	/* Reset RDS cache and current station pointers */
 	fm_rx_reset_rds_cache(fmdev);
 	fm_rx_reset_station_info(fmdev);
