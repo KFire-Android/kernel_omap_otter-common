@@ -425,9 +425,9 @@ static void hdmi_set_timings(struct omap_dss_device *dssdev,
 	mutex_lock(&hdmi.hdmi_lock);
 
 	dssdev->panel.timings = *timings;
-	omapdss_hdmi_display_set_timing(dssdev);
 
 	mutex_unlock(&hdmi.hdmi_lock);
+	omapdss_hdmi_display_set_timing(dssdev);
 }
 
 static int hdmi_check_timings(struct omap_dss_device *dssdev,
