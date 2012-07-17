@@ -182,7 +182,7 @@ static ssize_t store_fmrx_band(struct device *dev,
 	if (strict_strtoul(buf, 0, &fm_band))
 		return -EINVAL;
 
-	if (fm_band < 0 || fm_band > 1)
+	if (fm_band < FM_BAND_EUROPE_US || fm_band > FM_BAND_RUSSIAN)
 		return -EINVAL;
 
 	ret = fm_rx_set_region(fmdev, fm_band);

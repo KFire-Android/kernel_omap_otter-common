@@ -354,7 +354,7 @@ void fm_rx_get_region(struct fmdev *fmdev, u8 *region)
 	*region = fmdev->rx.region.fm_band;
 }
 
-/* Sets band (0-Europe/US; 1-Japan) */
+/* Sets band (0-Europe/US; 1-Japan; 2-Russian) */
 u32 fm_rx_set_region(struct fmdev *fmdev, u8 region_to_set)
 {
 	u16 payload;
@@ -362,7 +362,8 @@ u32 fm_rx_set_region(struct fmdev *fmdev, u8 region_to_set)
 	u32 ret;
 
 	if (region_to_set != FM_BAND_EUROPE_US &&
-	    region_to_set != FM_BAND_JAPAN) {
+	    region_to_set != FM_BAND_JAPAN &&
+	    region_to_set != FM_BAND_RUSSIAN) {
 		fmerr("Invalid band\n");
 		return -EINVAL;
 	}
