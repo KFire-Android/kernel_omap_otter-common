@@ -141,12 +141,13 @@ struct gcqueue {
 	struct gcmoterminator *gcmoterminator;
 
 	/* GPU running state. */
-	bool stopped;
+	struct completion stopped;
 
 	/* Command buffer thread and thread control completions. */
 	struct task_struct *cmdthread;
 	struct completion ready;
 	struct completion stop;
+	struct completion sleep;
 
 	/* Stall completion; used to imitate synchronous behaviour. */
 	struct completion stall;
@@ -221,5 +222,7 @@ void gcqueue_free_cmdbuf(struct gcqueue *gcqueue,
 
 enum gcerror gcqueue_alloc_int(struct gcqueue *gcqueue,
 			       unsigned int *interrupt);
+
+enum gcerror gcqueue_wait_idle(struct gccorecontext *gccorecontext);
 
 #endif
