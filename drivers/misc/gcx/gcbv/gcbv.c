@@ -358,9 +358,6 @@ struct gccallbackinfo {
 
 /* Driver context. */
 struct gccontext {
-	/* Pipe initialization. */
-	int initdone;
-
 	/* Last generated error message. */
 	char bverrorstr[128];
 
@@ -2924,33 +2921,12 @@ static enum bverror set_dst(struct bvbltparams *bltparams,
 			    struct bvbuffmap *dstmap)
 {
 	enum bverror bverror = BVERR_NONE;
-	struct gcmoclip *gcmoclip;
 	struct gcmodst *gcmodst;
 
 	GCENTER(GCZONE_DEST);
 
 	/* Did destination surface change? */
 	if ((batch->batchflags & BVBATCH_DST) != 0) {
-		/* Perform initialization. */
-		if (gccontext.initdone == 0) {
-			/* Allocate command buffer. */
-			bverror = claim_buffer(bltparams, batch,
-					       sizeof(struct gcmoclip),
-					       (void **) &gcmoclip);
-			if (bverror != BVERR_NONE)
-				goto exit;
-
-			/* Set clipping. */
-			gcmoclip->lt_ldst = gcmoclip_lt_ldst;
-			gcmoclip->lt.raw = 0;
-			gcmoclip->rb.raw = 0;
-			gcmoclip->rb.reg.right = GC_CLIP_RESET_RIGHT;
-			gcmoclip->rb.reg.bottom = GC_CLIP_RESET_BOTTOM;
-
-			/* Mark as initialized. */
-			gccontext.initdone = 1;
-		}
-
 		/* Allocate command buffer. */
 		bverror = claim_buffer(bltparams, batch,
 				       sizeof(struct gcmodst),
@@ -2973,6 +2949,13 @@ static enum bverror set_dst(struct bvbltparams *bltparams,
 		gcmodst->rotationheight_ldst = gcmodst_rotationheight_ldst;
 		gcmodst->rotationheight.raw = 0;
 		gcmodst->rotationheight.reg.height = batch->physheight;
+
+		/* Set clipping. */
+		gcmodst->clip_ldst = gcmodst_clip_ldst;
+		gcmodst->cliplt.raw = 0;
+		gcmodst->cliprb.raw = 0;
+		gcmodst->cliprb.reg.right = GC_CLIP_RESET_RIGHT;
+		gcmodst->cliprb.reg.bottom = GC_CLIP_RESET_BOTTOM;
 	}
 
 exit:

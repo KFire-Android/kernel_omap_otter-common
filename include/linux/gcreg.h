@@ -8376,33 +8376,6 @@ struct gcmommuflush {
 };
 
 /*******************************************************************************
-** Modular operations: clip
-*/
-
-static const struct gccmdldstate gcmoclip_lt_ldst =
-	GCLDSTATE(gcregClipTopLeftRegAddrs, 2);
-
-struct gcmoclip {
-	/* gcregClipTopLeftRegAddrs */
-	struct gccmdldstate lt_ldst;
-
-		/* gcregClipTopLeftRegAddrs */
-		union {
-			struct gcregcliplt reg;
-			unsigned int raw;
-		} lt;
-
-		/* gcregClipBottomRight */
-		union {
-			struct gcregcliprb reg;
-			unsigned int raw;
-		} rb;
-
-		/* Alignment filler. */
-		unsigned int _filler;
-};
-
-/*******************************************************************************
 ** Modular operations: dst
 */
 
@@ -8411,6 +8384,9 @@ static const struct gccmdldstate gcmodst_address_ldst =
 
 static const struct gccmdldstate gcmodst_rotationheight_ldst =
 	GCLDSTATE(gcregDstRotationHeightRegAddrs, 1);
+
+static const struct gccmdldstate gcmodst_clip_ldst =
+	GCLDSTATE(gcregClipTopLeftRegAddrs, 2);
 
 struct gcmodst {
 	/* gcregDestAddressRegAddrs */
@@ -8436,6 +8412,24 @@ struct gcmodst {
 			struct gcregdstrotationheight reg;
 			unsigned int raw;
 		} rotationheight;
+
+	/* gcregClipTopLeftRegAddrs */
+	struct gccmdldstate clip_ldst;
+
+		/* gcregClipTopLeftRegAddrs */
+		union {
+			struct gcregcliplt reg;
+			unsigned int raw;
+		} cliplt;
+
+		/* gcregClipBottomRight */
+		union {
+			struct gcregcliprb reg;
+			unsigned int raw;
+		} cliprb;
+
+		/* Alignment filler. */
+		unsigned int _filler;
 };
 
 /*******************************************************************************
