@@ -163,6 +163,7 @@ extern int thermal_cooling_dev_register(struct thermal_dev *tdev);
 extern void thermal_cooling_dev_unregister(struct thermal_dev *tdev);
 extern int thermal_governor_dev_register(struct thermal_dev *tdev);
 extern void thermal_governor_dev_unregister(struct thermal_dev *tdev);
+extern int thermal_check_domain(const char *domain_name);
 #else
 static inline int thermal_request_temp(struct thermal_dev *tdev)
 {
@@ -216,6 +217,10 @@ static inline int thermal_governor_dev_register(struct thermal_dev *tdev)
 }
 static inline void thermal_governor_dev_unregister(struct thermal_dev *tdev)
 {
+}
+static inline int thermal_check_domain(const char *domain_name)
+{
+	return -ENODEV;
 }
 #endif
 

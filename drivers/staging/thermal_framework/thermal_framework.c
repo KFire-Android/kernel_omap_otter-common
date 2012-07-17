@@ -529,6 +529,26 @@ static struct thermal_domain *thermal_domain_add(const char *name)
 }
 
 /**
+ * thermal_check_domain() - Checks to see if a domain exists
+ *
+ * @domain_name: The name of the domain for validation.
+ *
+ * Returns 0 if the domain exists.
+ * ENODEV if the domain does not exist.
+ */
+int thermal_check_domain(const char *domain_name)
+{
+	struct thermal_domain *thermal_domain;
+	int ret = 0;
+
+	thermal_domain = thermal_domain_find(domain_name);
+	if (!thermal_domain)
+		ret = -ENODEV;
+
+	return ret;
+}
+
+/**
  * thermal_lookup_temp() - Requests the thermal sensor to report it's current
  *			    temperature to the governor.
  *
