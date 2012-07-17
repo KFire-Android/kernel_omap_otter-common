@@ -1606,6 +1606,18 @@ static void _reconfigure_io_chain(void)
 	spin_unlock_irqrestore(&io_chain_lock, flags);
 }
 
+static inline void _omap4_inc_context_loss(unsigned int *v)
+{
+
+	/*
+	 * Context loss count has to be a non-negative value.
+	 * Clear the sign bit to get a value range from 0 to
+	 * INT_MAX.
+	 */
+	*v = (*v + 1) & INT_MAX;
+	*v = *v ? *v : 1;
+}
+
 /**
  * _omap4_update_context_lost - increment hwmod context loss counter if
  * hwmod context was lost, and clear hardware context loss reg
@@ -1629,7 +1641,7 @@ static void _omap4_update_context_lost(struct omap_hwmod *oh)
 	if (!r)
 		return;
 
-	oh->prcm.omap4.context_lost_counter++;
+	_omap4_inc_context_loss(&oh->prcm.omap4.context_lost_counter);
 
 	omap4_prminst_write_inst_reg(r, oh->clkdm->pwrdm.ptr->prcm_partition,
 				     oh->clkdm->pwrdm.ptr->prcm_offs,
