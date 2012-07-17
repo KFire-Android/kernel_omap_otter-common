@@ -985,25 +985,34 @@ static int configure_overlay(enum omap_plane plane)
 	u16 x_decim, y_decim;
 	bool five_taps;
 	u16 orig_w, orig_h, orig_outw, orig_outh;
-	bool source_of_wb = false;
+	bool m2m_with_ovl = false;
+	bool m2m_with_mgr = false;
 
 	DSSDBGF("%d", plane);
 
 	c = &dss_cache.overlay_cache[plane];
 
-	/* check if this overlay is source for wb, ignore mgr sources here*/
+	if (!c->enabled) {
+		dispc_enable_plane(plane, 0);
+		return 0;
+	}
+
 	if (dss_has_feature(FEAT_OVL_WB)) {
+		/* check if this overlay is source for wb, ignore mgr sources
+		 * here */
 		wbc = &dss_cache.writeback_cache;
 		if (wbc->enabled && omap_dss_check_wb(wbc, plane, -1)) {
 			DSSDBG("wb->enabled=%d for plane:%d\n",
 						wbc->enabled, plane);
-			source_of_wb = true;
+			m2m_with_ovl = true;
 		}
-	}
-
-	if (!c->enabled) {
-		dispc_enable_plane(plane, 0);
-		return 0;
+		/* check if this overlay is source for manager, which is source
+		 * for wb, ignore ovl sources */
+		if (wbc->enabled && omap_dss_check_wb(wbc, -1, c->channel)) {
+			DSSDBG("check wb mgr wb->enabled=%d for plane:%d\n",
+							wbc->enabled, plane);
+			m2m_with_mgr = true;
+		}
 	}
 
 	mc = &dss_cache.manager_cache[c->channel];
@@ -1133,7 +1142,8 @@ static int configure_overlay(enum omap_plane plane)
 			c->global_alpha,
 			c->pre_mult_alpha,
 			c->channel,
-			c->p_uv_addr);
+			c->p_uv_addr,
+			m2m_with_ovl || m2m_with_mgr);
 
 	if (r) {
 		/* this shouldn't happen */
@@ -1152,7 +1162,7 @@ static int configure_overlay(enum omap_plane plane)
 	if (plane != OMAP_DSS_GFX)
 		_dispc_setup_color_conv_coef(plane, &c->cconv);
 
-	if (!source_of_wb)
+	if (!m2m_with_ovl)
 		dispc_set_channel_out(plane, c->channel);
 	else
 		dispc_set_wb_channel_out(plane);
@@ -1306,6 +1316,13 @@ static int configure_dispc(void)
 			case OMAP_WB_LCD1:
 			case OMAP_WB_LCD2:
 			case OMAP_WB_TV:
+				if (wbc->mode == OMAP_WB_MEM2MEM_MODE) {
+					mc = &dss_cache.manager_cache[
+						wbc->source - OMAP_WB_LCD1];
+					if (!mc->shadow_dirty)
+						break;
+				}
+
 				dispc_enable_plane(OMAP_DSS_WB, 1);
 				/* WB GO bit has to be used only in case of
 				 * capture mode and not in memory mode
@@ -1868,7 +1885,28 @@ static int omap_dss_mgr_apply(struct omap_overlay_manager *mgr)
 
 	spin_lock_irqsave(&dss_cache.lock, flags);
 
-	if (!mgr->device || mgr->device->state != OMAP_DSS_DISPLAY_ACTIVE) {
+	if (!mgr->device || (mgr->device->state != OMAP_DSS_DISPLAY_ACTIVE &&
+							!mgr->info.wb_only)) {
+		struct writeback_cache_data *wbc;
+
+		if (dss_has_feature(FEAT_OVL_WB))
+			wbc = &dss_cache.writeback_cache;
+		else
+			wbc = NULL;
+
+		/* in case, if WB was configured with MEM2MEM with manager
+		 * mode, but manager, which is source for WB, is not marked as
+		 * wb_only, then skip apply operation. We have such case, when
+		 * composition was sent to disable pipes, which are sources for
+		 * WB.
+		 */
+		if (wbc && wbc->mode == OMAP_WB_MEM2MEM_MODE &&
+				wbc->source == mgr->id && mgr->device &&
+			mgr->device->state != OMAP_DSS_DISPLAY_ACTIVE) {
+			r = 0;
+			goto done;
+		}
+
 		pr_info_ratelimited("cannot apply mgr(%s) on inactive device\n",
 								mgr->name);
 		r = -ENODEV;
@@ -2102,6 +2140,17 @@ int omap_dss_wb_apply(struct omap_overlay_manager *mgr,
 	if (!wb) {
 		printk(KERN_ERR "[%s][%d] No WB!\n", __FILE__, __LINE__);
 		return -EINVAL;
+	}
+
+	/* skip composition, if manager is enabled. It happens when HDMI/TV
+	 * physical layer is activated in the time, when MEM2MEM with manager
+	 * mode is used.
+	 */
+	if (wb->info.source == OMAP_WB_TV &&
+			dispc_is_channel_enabled(OMAP_DSS_CHANNEL_DIGIT) &&
+				wb->info.mode == OMAP_WB_MEM2MEM_MODE) {
+		DSSERR("manager %d busy, dropping\n", mgr->id);
+		return -EBUSY;
 	}
 
 	spin_lock_irqsave(&dss_cache.lock, flags);

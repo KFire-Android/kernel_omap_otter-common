@@ -2352,7 +2352,8 @@ int dispc_setup_plane(enum omap_plane plane,
 		enum omap_dss_rotation_type rotation_type,
 		u8 rotation, bool mirror,
 		u8 global_alpha, u8 pre_mult_alpha,
-		enum omap_channel channel, u32 puv_addr)
+		enum omap_channel channel, u32 puv_addr,
+		bool source_of_wb)
 {
 	const int maxdownscale = cpu_is_omap24xx() ? 2 : 4;
 	bool fieldmode = 0;
@@ -2366,6 +2367,8 @@ int dispc_setup_plane(enum omap_plane plane,
 		(OMAP_DSS_COLOR_YUV2 | OMAP_DSS_COLOR_UYVY)) ? 2 : 1;
 	unsigned long tiler_width, tiler_height;
 	u32 fifo_high, fifo_low;
+	unsigned long flags;
+	u32 udf_mask;
 
 	DSSDBG("dispc_setup_plane %d, pa %x, sw %d, %d,%d, %d/%dx%d/%d -> "
 	       "%dx%d, ilace %d, cmode %x, rot %d, mir %d chan %d %dtap\n",
@@ -2377,6 +2380,49 @@ int dispc_setup_plane(enum omap_plane plane,
 
 	if (paddr == 0)
 		return -EINVAL;
+
+	/* make sure UDF is disabled for ovls that are source for WB - Errata */
+	switch (plane) {
+	case OMAP_DSS_GFX:
+		udf_mask = DISPC_IRQ_GFX_FIFO_UNDERFLOW;
+		break;
+	case OMAP_DSS_VIDEO1:
+		udf_mask = DISPC_IRQ_VID1_FIFO_UNDERFLOW;
+		break;
+	case OMAP_DSS_VIDEO2:
+		udf_mask = DISPC_IRQ_VID2_FIFO_UNDERFLOW;
+		break;
+	case OMAP_DSS_VIDEO3:
+		udf_mask = DISPC_IRQ_VID3_FIFO_UNDERFLOW;
+		break;
+	default:
+		udf_mask = 0;
+	}
+
+	if (source_of_wb) {
+		/* if the ovl UDF is enabled, disable it */
+		if (dispc.irq_error_mask & udf_mask) {
+			DSSDBG("%s: disable irq irq_error_mask:0x%x "
+				"mask:0x%x\n", __func__, dispc.irq_error_mask,
+								udf_mask);
+			spin_lock_irqsave(&dispc.irq_lock, flags);
+			dispc.irq_error_mask &= ~udf_mask;
+			_omap_dispc_set_irqs();
+			spin_unlock_irqrestore(&dispc.irq_lock, flags);
+		}
+	} else {
+		/* enable UDF if irq_error_mask needs it and its currently
+		 * disabled */
+		if (!(dispc.irq_error_mask & udf_mask)) {
+			DSSDBG("%s: enable irq irq_error_mask:0x%x "
+				"mask:0x%x\n", __func__, dispc.irq_error_mask,
+								udf_mask);
+			spin_lock_irqsave(&dispc.irq_lock, flags);
+			dispc.irq_error_mask |= udf_mask;
+			_omap_dispc_set_irqs();
+			spin_unlock_irqrestore(&dispc.irq_lock, flags);
+		}
+	}
 
 	if (ilace && height == out_height)
 		fieldmode = 1;
@@ -2633,6 +2679,18 @@ int dispc_setup_wb(struct writeback_cache_data *wb)
 		REG_FLD_MOD(DISPC_OVL_ATTRIBUTES(plane), 1, 18, 16);
 	else
 		REG_FLD_MOD(DISPC_OVL_ATTRIBUTES(plane), source, 18, 16);
+
+	/* change resolution of manager if it works in MEM2MEM mode */
+	if (wb->mode == OMAP_WB_MEM2MEM_MODE) {
+		if (source == OMAP_WB_TV)
+			dispc_set_digit_size(out_width, out_height);
+		else if (source == OMAP_WB_LCD2)
+			dispc_set_lcd_size(OMAP_DSS_CHANNEL_LCD2, out_width,
+								out_height);
+		else if (source == OMAP_WB_LCD1)
+			dispc_set_lcd_size(OMAP_DSS_CHANNEL_LCD, out_width,
+								out_height);
+	}
 
 	/*
 	 * configure wb mode:

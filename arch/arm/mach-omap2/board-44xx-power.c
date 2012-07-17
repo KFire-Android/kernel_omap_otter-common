@@ -345,6 +345,7 @@ static struct twl4030_bci_platform_data bci_data = {
 	.low_bat_voltagemV		= 3300,
 	.battery_tmp_tbl		= batt_table,
 	.tblsize			= ARRAY_SIZE(batt_table),
+	.sense_resistor_mohm		= 10,
 };
 
 static struct twl4030_usb_data omap4_usbphy_data = {

@@ -192,6 +192,24 @@ static int _update_sysc_cache(struct omap_hwmod *oh)
 
 	return 0;
 }
+/**
+ * _write_sysconfig_raw - write a value to the module's OCP_SYSCONFIG register
+ * @v: OCP_SYSCONFIG value to write
+ * @oh: struct omap_hwmod *
+ *
+ * Write @v into the module class' OCP_SYSCONFIG register, if it has
+ * one.  No return value. No sysc cache update.
+ */
+static void _write_sysconfig_raw(u32 v, struct omap_hwmod *oh)
+{
+	if (!oh->class->sysc) {
+		WARN(1, "omap_hwmod: %s: cannot write OCP_SYSCONFIG: not defined on hwmod's class\n", oh->name);
+		return;
+	}
+
+	omap_hwmod_write(v, oh, oh->class->sysc->sysc_offs);
+}
+
 
 /**
  * _write_sysconfig - write a value to the module's OCP_SYSCONFIG register
@@ -199,20 +217,14 @@ static int _update_sysc_cache(struct omap_hwmod *oh)
  * @oh: struct omap_hwmod *
  *
  * Write @v into the module class' OCP_SYSCONFIG register, if it has
- * one.  No return value.
+ * one.  No return value. Update sysc cache.
  */
 static void _write_sysconfig(u32 v, struct omap_hwmod *oh)
 {
-	if (!oh->class->sysc) {
-		WARN(1, "omap_hwmod: %s: cannot write OCP_SYSCONFIG: not defined on hwmod's class\n", oh->name);
-		return;
-	}
-
-	/* XXX ensure module interface clock is up */
+	_write_sysconfig_raw(v, oh);
 
 	/* Module might have lost context, always update cache and register */
 	oh->_sysc_cache = v;
-	omap_hwmod_write(v, oh, oh->class->sysc->sysc_offs);
 }
 
 /**
@@ -1179,7 +1191,7 @@ static int _ocp_softreset(struct omap_hwmod *oh)
 	ret = _set_softreset(oh, &v);
 	if (ret)
 		goto dis_opt_clks;
-	_write_sysconfig(v, oh);
+	_write_sysconfig_raw(v, oh);
 
 	if (oh->class->sysc->srst_udelay)
 		udelay(oh->class->sysc->srst_udelay);
@@ -1265,21 +1277,23 @@ static int _enable(struct omap_hwmod *oh)
 
 	pr_debug("omap_hwmod: %s: enabling\n", oh->name);
 
-	/*
-	 * If an IP contains only one HW reset line, then de-assert it in order
-	 * to allow to enable the clocks. Otherwise the PRCM will return
-	 * Intransition status, and the init will failed.
-	 */
-	if ((oh->_state == _HWMOD_STATE_INITIALIZED ||
-	     oh->_state == _HWMOD_STATE_DISABLED) && oh->rst_lines_cnt == 1)
-		_deassert_hardreset(oh, oh->rst_lines[0].name);
-
 	_add_initiator_dep(oh, mpu_oh);
 	if (oh->_clk && oh->_clk->clkdm) {
 		hwsup = clkdm_is_idle(oh->_clk->clkdm);
 		clkdm_wakeup(oh->_clk->clkdm);
 	}
 	_enable_clocks(oh);
+
+	/*
+	 * If an IP contains only one HW reset line, then de-assert it to have
+	 * the module functional. deassert_hardreset is currently limited only
+	 * to processor device-like IPs - IPU, DSP and IVA, so we can safely
+	 * call it after enabling clocks.
+	 */
+	if ((oh->_state == _HWMOD_STATE_INITIALIZED ||
+	     oh->_state == _HWMOD_STATE_DISABLED) && oh->rst_lines_cnt == 1)
+		_deassert_hardreset(oh, oh->rst_lines[0].name);
+
 	r = _wait_target_ready(oh);
 	if (!r) {
 		if (oh->_clk && oh->_clk->clkdm && hwsup)
@@ -1632,7 +1646,8 @@ int omap_hwmod_softreset(struct omap_hwmod *oh)
 	ret = _set_softreset(oh, &v);
 	if (ret)
 		goto error;
-	_write_sysconfig(v, oh);
+	/* Use raw write here to avoid sysc cache update */
+	_write_sysconfig_raw(v, oh);
 
 error:
 	return ret;
