@@ -659,7 +659,12 @@ int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 pwrst)
 		goto out;
 
 	if (curr_pwrst != PWRDM_POWER_ON) {
-		if ((curr_pwrst > pwrst) &&
+		int curr_pwrst_idx;
+		int pwrst_idx;
+
+		curr_pwrst_idx = _pwrdm_state_idx_lookup[curr_pwrst];
+		pwrst_idx = _pwrdm_state_idx_lookup[pwrst];
+		if ((curr_pwrst_idx > pwrst_idx) &&
 		    (pwrdm->flags & PWRDM_HAS_LOWPOWERSTATECHANGE)) {
 			sleep_switch = LOWPOWERSTATE_SWITCH;
 		} else {
