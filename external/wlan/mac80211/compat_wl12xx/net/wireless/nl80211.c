@@ -5911,6 +5911,8 @@ static int nl80211_get_wowlan(struct sk_buff *skb, struct genl_info *info)
 				NLA_PUT(msg, NL80211_WOWLAN_PKTPAT_PATTERN,
 					pat_len,
 					rdev->wowlan->patterns[i].pattern);
+				NLA_PUT_U8(msg, NL80211_WOWLAN_PKTPAT_ACTION,
+					   rdev->wowlan->patterns[i].action);
 				nla_nest_end(msg, nl_pat);
 			}
 			nla_nest_end(msg, nl_pats);
@@ -6018,6 +6020,8 @@ static int nl80211_set_wowlan(struct sk_buff *skb, struct genl_info *info)
 
 		nla_for_each_nested(pat, tb[NL80211_WOWLAN_TRIG_PKT_PATTERN],
 				    rem) {
+			u8 action = NL80211_WOWLAN_ACTION_ALLOW;
+
 			nla_parse(pat_tb, MAX_NL80211_WOWLAN_PKTPAT,
 				  nla_data(pat), nla_len(pat), NULL);
 			err = -EINVAL;
@@ -6032,7 +6036,13 @@ static int nl80211_set_wowlan(struct sk_buff *skb, struct genl_info *info)
 			if (pat_len > wowlan->pattern_max_len ||
 			    pat_len < wowlan->pattern_min_len)
 				goto error;
-
+			if (pat_tb[NL80211_WOWLAN_PKTPAT_ACTION]) {
+				action = nla_get_u8(
+					pat_tb[NL80211_WOWLAN_PKTPAT_ACTION]);
+				if (action > MAX_NL80211_WOWLAN_ACTION)
+					goto error;
+			}
+			new_triggers.patterns[i].action = action;
 			new_triggers.patterns[i].mask =
 				kmalloc(mask_len + pat_len, GFP_KERNEL);
 			if (!new_triggers.patterns[i].mask) {

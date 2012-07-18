@@ -979,6 +979,13 @@ struct conf_conn_settings {
 	 * Range: u16
 	 */
 	u8 max_listen_interval;
+
+	/*
+	 * Specifies the timeout in which the host will allow the chip to go
+	 * into ELP. Mainly needed for TX traffic to prevent the host from
+	 * interrogating the FW status for each packets.
+	 */
+	u16 elp_timeout;
 };
 
 enum {

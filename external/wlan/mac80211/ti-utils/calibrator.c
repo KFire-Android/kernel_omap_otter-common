@@ -527,3 +527,13 @@ int main(int argc, char **argv)
 
 	return err;
 }
+
+void str2mac(unsigned char *pmac, char *pch)
+{
+	int i;
+
+	for (i = 0; i < MAC_ADDR_LEN; i++) {
+		pmac[i] = (unsigned char)strtoul(pch, &pch, 16);
+		pch++;
+	}
+}

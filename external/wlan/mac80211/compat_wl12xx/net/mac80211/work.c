@@ -619,7 +619,8 @@ ieee80211_rx_mgmt_auth(struct ieee80211_work *wk,
 	auth_transaction = le16_to_cpu(mgmt->u.auth.auth_transaction);
 	status_code = le16_to_cpu(mgmt->u.auth.status_code);
 
-	if (auth_alg != wk->probe_auth.algorithm ||
+	if ((auth_alg != wk->probe_auth.algorithm &&
+	     status_code != WLAN_STATUS_NOT_SUPPORTED_AUTH_ALG) ||
 	    auth_transaction != wk->probe_auth.transaction)
 		return WORK_ACT_NONE;
 

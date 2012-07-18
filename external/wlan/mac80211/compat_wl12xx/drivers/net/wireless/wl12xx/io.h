@@ -48,37 +48,69 @@ extern struct wl1271_partition_set wl12xx_part_table[PART_TABLE_LEN];
 struct wl1271;
 
 void wl1271_disable_interrupts(struct wl1271 *wl);
+void wlcore_disable_interrupts_nosync(struct wl1271 *wl);
 void wl1271_enable_interrupts(struct wl1271 *wl);
+void wlcore_synchronize_interrupts(struct wl1271 *wl);
 
 void wl1271_io_reset(struct wl1271 *wl);
 void wl1271_io_init(struct wl1271 *wl);
 
 /* Raw target IO, address is not translated */
-static inline void wl1271_raw_write(struct wl1271 *wl, int addr, void *buf,
-				    size_t len, bool fixed)
+static inline int __must_check wl1271_raw_write(struct wl1271 *wl, int addr,
+						void *buf, size_t len, bool
+						fixed)
 {
-	wl->if_ops->write(wl->dev, addr, buf, len, fixed);
+	int ret;
+
+	if (test_bit(WL1271_FLAG_IO_FAILED, &wl->flags))
+		return -EIO;
+
+	ret = wl->if_ops->write(wl->dev, addr, buf, len, fixed);
+	if (ret && wl->state != WL1271_STATE_OFF)
+		set_bit(WL1271_FLAG_IO_FAILED, &wl->flags);
+
+	return ret;
 }
 
-static inline void wl1271_raw_read(struct wl1271 *wl, int addr, void *buf,
-				   size_t len, bool fixed)
+static inline int __must_check wl1271_raw_read(struct wl1271 *wl, int addr,
+					       void *buf, size_t len, bool
+					       fixed)
 {
-	wl->if_ops->read(wl->dev, addr, buf, len, fixed);
+	int ret;
+
+	if (test_bit(WL1271_FLAG_IO_FAILED, &wl->flags))
+		return -EIO;
+
+	ret = wl->if_ops->read(wl->dev, addr, buf, len, fixed);
+	if (ret && wl->state != WL1271_STATE_OFF)
+		set_bit(WL1271_FLAG_IO_FAILED, &wl->flags);
+
+	return ret;
 }
 
-static inline u32 wl1271_raw_read32(struct wl1271 *wl, int addr)
+static inline int __must_check wl1271_raw_read32(struct wl1271 *wl, int addr,
+						 u32 *val)
 {
-	wl1271_raw_read(wl, addr, &wl->buffer_32,
-			    sizeof(wl->buffer_32), false);
+	int ret;
 
-	return le32_to_cpu(wl->buffer_32);
+	ret = wl1271_raw_read(wl, addr, &wl->buffer_32, sizeof(wl->buffer_32),
+			      false);
+	if (ret < 0)
+		goto out;
+
+	if (val)
+		*val = le32_to_cpu(wl->buffer_32);
+
+out:
+	return ret;
 }
 
-static inline void wl1271_raw_write32(struct wl1271 *wl, int addr, u32 val)
+static inline int __must_check wl1271_raw_write32(struct wl1271 *wl, int addr,
+						  u32 val)
 {
 	wl->buffer_32 = cpu_to_le32(val);
-	wl1271_raw_write(wl, addr, &wl->buffer_32,
-			     sizeof(wl->buffer_32), false);
+	return wl1271_raw_write(wl, addr, &wl->buffer_32,
+				sizeof(wl->buffer_32), false);
 }
 
 /* Translated target IO */
@@ -105,28 +137,29 @@ static inline int wl1271_translate_addr(struct wl1271 *wl, int addr)
 		return addr - wl->part.mem.start;
 }
 
-static inline void wl1271_read(struct wl1271 *wl, int addr, void *buf,
-			       size_t len, bool fixed)
+static inline int __must_check wl1271_read(struct wl1271 *wl, int addr,
+					   void *buf, size_t len, bool fixed)
 {
 	int physical;
 
 	physical = wl1271_translate_addr(wl, addr);
 
-	wl1271_raw_read(wl, physical, buf, len, fixed);
+	return wl1271_raw_read(wl, physical, buf, len, fixed);
 }
 
-static inline void wl1271_write(struct wl1271 *wl, int addr, void *buf,
-				size_t len, bool fixed)
+static inline int __must_check wl1271_write(struct wl1271 *wl, int addr,
+					    void *buf, size_t len, bool fixed)
 {
 	int physical;
 
 	physical = wl1271_translate_addr(wl, addr);
 
-	wl1271_raw_write(wl, physical, buf, len, fixed);
+	return wl1271_raw_write(wl, physical, buf, len, fixed);
 }
 
-static inline void wl1271_read_hwaddr(struct wl1271 *wl, int hwaddr,
-				      void *buf, size_t len, bool fixed)
+static inline int __must_check wl1271_read_hwaddr(struct wl1271 *wl,
+						  int hwaddr, void *buf,
+						  size_t len, bool fixed)
 {
 	int physical;
 	int addr;
@@ -136,17 +169,19 @@ static inline void wl1271_read_hwaddr(struct wl1271 *wl, int hwaddr,
 
 	physical = wl1271_translate_addr(wl, addr);
 
-	wl1271_raw_read(wl, physical, buf, len, fixed);
+	return wl1271_raw_read(wl, physical, buf, len, fixed);
 }
 
-static inline u32 wl1271_read32(struct wl1271 *wl, int addr)
+static inline int __must_check wl1271_read32(struct wl1271 *wl, int addr,
+					     u32 *val)
 {
-	return wl1271_raw_read32(wl, wl1271_translate_addr(wl, addr));
+	return wl1271_raw_read32(wl, wl1271_translate_addr(wl, addr), val);
 }
 
-static inline void wl1271_write32(struct wl1271 *wl, int addr, u32 val)
+static inline int __must_check wl1271_write32(struct wl1271 *wl, int addr,
+					      u32 val)
 {
-	wl1271_raw_write32(wl, wl1271_translate_addr(wl, addr), val);
+	return wl1271_raw_write32(wl, wl1271_translate_addr(wl, addr), val);
 }
 
 static inline void wl1271_power_off(struct wl1271 *wl)
@@ -172,8 +207,8 @@ static inline int wl1271_power_on(struct wl1271 *wl)
 
 
 /* Top Register IO */
-void wl1271_top_reg_write(struct wl1271 *wl, int addr, u16 val);
-u16 wl1271_top_reg_read(struct wl1271 *wl, int addr);
+int __must_check wl1271_top_reg_write(struct wl1271 *wl, int addr, u16 val);
+int __must_check wl1271_top_reg_read(struct wl1271 *wl, int addr, u16 *out);
 
 int wl1271_set_partition(struct wl1271 *wl,
 			 struct wl1271_partition_set *p);

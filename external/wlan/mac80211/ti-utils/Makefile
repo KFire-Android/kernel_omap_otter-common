@@ -5,7 +5,7 @@ CFLAGS += -DCONFIG_LIBNL20 -I$(NFSROOT)/usr/include -I$(NFSROOT)/include
 LDFLAGS += -L$(NFSROOT)/lib
 LIBS += -lnl -lnl-genl -lm
 
-OBJS = nvs.o misc_cmds.o calibrator.o plt.o ini.o
+OBJS = nvs.o misc_cmds.o calibrator.o plt.o wl18xx_plt.o ini.o
 
 %.o: %.c calibrator.h nl80211.h plt.h nvs_dual_band.h
 	$(CC) $(CFLAGS) -c -o $@ $<

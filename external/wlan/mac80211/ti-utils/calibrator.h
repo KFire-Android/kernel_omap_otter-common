@@ -148,6 +148,7 @@ enum print_ie_type {
 void print_ies(unsigned char *ie, int ielen, bool unknown,
 	       enum print_ie_type ptype);
 
+void str2mac(unsigned char *pmac, char *pch);
 
 DECLARE_SECTION(set);
 DECLARE_SECTION(get);
