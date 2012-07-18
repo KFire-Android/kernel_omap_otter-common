@@ -242,7 +242,11 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
 	struct power_state *pwrst;
 	unsigned int program_state;
 
-	if (!pwrdm->pwrsts)
+	/*
+	 * If there are no pwrsts OR we have ONLY_ON pwrst, dont bother
+	 * controlling it
+	 */
+	if (!pwrdm->pwrsts || PWRSTS_ON == pwrdm->pwrsts)
 		return 0;
 
 	/*
