@@ -648,10 +648,16 @@ int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 pwrst)
 	spin_lock(&pwrdm->lock);
 
 	next_pwrst = pwrdm_read_next_pwrst(pwrdm);
-	if (next_pwrst == pwrst)
+	curr_pwrst = pwrdm_read_pwrst(pwrdm);
+	/*
+	 * we do not need to do anything IFF it is SURE that
+	 * current power domain state is the same and the programmed
+	 * next power domain state and that is the same state that
+	 * we have been asked to go to
+	 */
+	if (curr_pwrst == next_pwrst && next_pwrst == pwrst)
 		goto out;
 
-	curr_pwrst = pwrdm_read_pwrst(pwrdm);
 	if (curr_pwrst != PWRDM_POWER_ON) {
 		if ((curr_pwrst > pwrst) &&
 		    (pwrdm->flags & PWRDM_HAS_LOWPOWERSTATECHANGE)) {
