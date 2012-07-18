@@ -57,12 +57,13 @@ static struct powerdomain core_44xx_pwrdm = {
 	},
 	.flags		  = PWRDM_HAS_LOWPOWERSTATECHANGE,
 	.wakeup_lat = {
+		/* CPUIdle and suspend controls this explicitly */
 		[PWRDM_POWER_OFF] = UNSUP_STATE,
-		[PWRDM_POWER_OSWR] = 600,
-		[PWRDM_POWER_CSWR] = 300,
+		[PWRDM_POWER_OSWR] = UNSUP_STATE,
+		[PWRDM_POWER_CSWR] = UNSUP_STATE,
 		[PWRDM_POWER_RET] = UNSUP_STATE,
 		[PWRDM_POWER_INACTIVE] = UNSUP_STATE,
-		[PWRDM_POWER_ON] = 0,
+		[PWRDM_POWER_ON] = UNSUP_STATE,
 	},
 };
 
@@ -207,12 +208,13 @@ static struct powerdomain cpu0_44xx_pwrdm = {
 		[0] = PWRSTS_ON,	/* cpu0_l1 */
 	},
 	.wakeup_lat = {
-		[PWRDM_POWER_OFF] = 1000,
-		[PWRDM_POWER_OSWR] = 600,
-		[PWRDM_POWER_CSWR] = 300,
+		/* CPUIdle and suspend controls this explicitly */
+		[PWRDM_POWER_OFF] = UNSUP_STATE,
+		[PWRDM_POWER_OSWR] = UNSUP_STATE,
+		[PWRDM_POWER_CSWR] = UNSUP_STATE,
 		[PWRDM_POWER_RET] = UNSUP_STATE,
 		[PWRDM_POWER_INACTIVE] = UNSUP_STATE,
-		[PWRDM_POWER_ON] = 0,
+		[PWRDM_POWER_ON] = UNSUP_STATE,
 	},
 };
 
@@ -232,12 +234,13 @@ static struct powerdomain cpu1_44xx_pwrdm = {
 		[0] = PWRSTS_ON,	/* cpu1_l1 */
 	},
 	.wakeup_lat = {
-		[PWRDM_POWER_OFF] = 1000,
-		[PWRDM_POWER_OSWR] = 600,
-		[PWRDM_POWER_CSWR] = 300,
+		/* CPUIdle and suspend controls this explicitly */
+		[PWRDM_POWER_OFF] = UNSUP_STATE,
+		[PWRDM_POWER_OSWR] = UNSUP_STATE,
+		[PWRDM_POWER_CSWR] = UNSUP_STATE,
 		[PWRDM_POWER_RET] = UNSUP_STATE,
 		[PWRDM_POWER_INACTIVE] = UNSUP_STATE,
-		[PWRDM_POWER_ON] = 0,
+		[PWRDM_POWER_ON] = UNSUP_STATE,
 	},
 };
 
@@ -278,12 +281,13 @@ static struct powerdomain mpu_44xx_pwrdm = {
 		[2] = PWRSTS_ON,	/* mpu_ram */
 	},
 	.wakeup_lat = {
-		[PWRDM_POWER_OFF] = 1000,
-		[PWRDM_POWER_OSWR] = 600,
-		[PWRDM_POWER_CSWR] = 300,
+		/* CPUIdle and suspend controls this explicitly */
+		[PWRDM_POWER_OFF] = UNSUP_STATE,
+		[PWRDM_POWER_OSWR] = UNSUP_STATE,
+		[PWRDM_POWER_CSWR] = UNSUP_STATE,
 		[PWRDM_POWER_RET] = UNSUP_STATE,
 		[PWRDM_POWER_INACTIVE] = UNSUP_STATE,
-		[PWRDM_POWER_ON] = 0,
+		[PWRDM_POWER_ON] = UNSUP_STATE,
 	}
 };
 
