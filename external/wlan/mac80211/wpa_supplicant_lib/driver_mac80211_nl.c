@@ -151,6 +151,12 @@ struct rx_filter {
 
 	/* mask_len - The number of bytes used in mask */
 	u8 mask_len;
+
+	/* action - can be either NL80211_WOWLAN_ACTION_ALLOW or DROP.
+	 * Allow this pattern (and wakeup in case of suspend) or drop
+	 * packets containing it despite matching another wowlan pattern.
+	 */
+	u8 action;
 };
 
 static u8 *nl80211_rx_filter_get_pattern(struct rx_filter *filter, void *arg)
@@ -187,6 +193,7 @@ static struct rx_filter rx_filters[] = {
 	 .mask = { BIT(0) | BIT(1) | BIT(2) | BIT(3) | BIT(4) | BIT(5) },
 	 .mask_len = 1,
 	 .get_pattern_handler = nl80211_self_filter_get_pattern_handler,
+	 .action = NL80211_WOWLAN_ACTION_ALLOW,
 	},
 
 	/* ID 1 */
@@ -195,6 +202,7 @@ static struct rx_filter rx_filters[] = {
 	 .pattern_len = 6,
 	 .mask = { BIT(0) | BIT(1) | BIT(2) | BIT(3) | BIT(4) | BIT(5) },
 	 .mask_len = 1,
+	 .action = NL80211_WOWLAN_ACTION_ALLOW,
 	},
 
 	/* ID 2 */
@@ -203,6 +211,7 @@ static struct rx_filter rx_filters[] = {
 	 .pattern_len = 3,
 	 .mask = { BIT(0) | BIT(1) | BIT(2) },
 	 .mask_len = 1,
+	 .action = NL80211_WOWLAN_ACTION_ALLOW,
 	},
 
 	/* ID 3 */
@@ -211,6 +220,7 @@ static struct rx_filter rx_filters[] = {
 	 .pattern_len = 2,
 	 .mask = { BIT(0) | BIT(1) },
 	 .mask_len = 1,
+	 .action = NL80211_WOWLAN_ACTION_ALLOW,
 	},
 
 	/* ID 4 */
@@ -227,6 +237,7 @@ static struct rx_filter rx_filters[] = {
 		   0,                                 	/* OCTET 4 */
 		   BIT(4) | BIT(5) },                 	/* OCTET 5 */
 	 .mask_len = 5,
+	 .action = NL80211_WOWLAN_ACTION_ALLOW,
 	},
 	/* ID 5 */
 	{.name = "arp",
@@ -236,6 +247,7 @@ static struct rx_filter rx_filters[] = {
 	 .mask = { 0,                                    /* OCTET 1 */
 		   BIT(4) | BIT(5) },                    /* OCTET 2 */
 	 .mask_len = 2,
+	 .action = NL80211_WOWLAN_ACTION_ALLOW,
 	},
 
 	/* ID 6 */
@@ -252,7 +264,26 @@ static struct rx_filter rx_filters[] = {
 		   BIT(6) | BIT(7),                      /* OCTET 4 */
 		   BIT(0) | BIT(1) | BIT(4) | BIT(5) },  /* OCTET 5 */
 	 .mask_len = 5,
+	 .action = NL80211_WOWLAN_ACTION_ALLOW,
 	},
+
+	/* This is an example of an exception pattern which matches
+	 * any ICMP packet directed at 00:11:11:11:11:11
+	 */
+
+	/* ID 7 */
+	{.name = "blacklist",
+	 .pattern = {0   , 0x11, 0x11, 0x11, 0x11, 0x11, 0   , 0   ,
+		     0   , 0   , 0   , 0   , 0   , 0   , 0x45, 0   ,
+		     0   , 0   , 0   , 0   , 0   , 0   , 0   , 0x1 },
+	 .pattern_len = 24,
+	 .mask = { BIT(0) | BIT(1) | BIT(2) | BIT(3) | BIT(4) | BIT(5),
+		   BIT(6),
+		   BIT(7) },
+	 .mask_len = 3,
+	 .action = NL80211_WOWLAN_ACTION_DROP,
+	},
+
 };
 
 #define NR_RX_FILTERS			(sizeof(rx_filters) / sizeof(struct rx_filter))
@@ -313,6 +344,9 @@ static int nl80211_set_wowlan_triggers(struct i802_bss *bss, int enable)
 				NLA_PUT(pats, NL80211_WOWLAN_PKTPAT_PATTERN,
 					rx_filter->pattern_len,
 					pattern);
+
+				NLA_PUT_U8(pats, NL80211_WOWLAN_PKTPAT_ACTION,
+					rx_filter->action);
 
 				nla_nest_end(pats, pat);
 			}

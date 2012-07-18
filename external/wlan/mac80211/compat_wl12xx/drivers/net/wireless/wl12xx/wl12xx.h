@@ -226,10 +226,10 @@ struct wl1271_scan {
 };
 
 struct wl1271_if_operations {
-	void (*read)(struct device *child, int addr, void *buf, size_t len,
-		     bool fixed);
-	void (*write)(struct device *child, int addr, void *buf, size_t len,
-		     bool fixed);
+	int __must_check (*read)(struct device *child, int addr, void *buf,
+				 size_t len, bool fixed);
+	int __must_check (*write)(struct device *child, int addr, void *buf,
+				  size_t len, bool fixed);
 	void (*reset)(struct device *child);
 	void (*init)(struct device *child);
 	int (*power)(struct device *child, bool enable);
@@ -265,6 +265,7 @@ enum wl12xx_flags {
 	WL1271_FLAG_RECOVERY_IN_PROGRESS,
 	WL1271_FLAG_VIF_CHANGE_IN_PROGRESS,
 	WL1271_FLAG_INTENDED_FW_RECOVERY,
+	WL1271_FLAG_IO_FAILED,
 };
 
 enum wl12xx_vif_flags {
@@ -302,7 +303,7 @@ struct ap_peers {
 	struct ieee80211_hw *hw;
 };
 
-#define WL1271_MAX_RX_FILTERS 5
+#define WL1271_MAX_RX_FILTERS 7
 #define WL1271_RX_FILTER_MAX_FIELDS 8
 
 #define WL1271_RX_FILTER_ETH_HEADER_SIZE 14
@@ -480,6 +481,7 @@ struct wl1271 {
 #ifdef CONFIG_HAS_WAKELOCK
 	struct wake_lock wake_lock;
 	struct wake_lock rx_wake;
+	struct wake_lock recovery_wake;
 #endif
 
 	struct wl1271_stats stats;
@@ -729,6 +731,7 @@ int wl1271_op_sta_add_locked(struct ieee80211_hw *hw,
 void wl12xx_update_sta_state(struct wl1271 *wl,
 			     struct ieee80211_sta *sta,
 			     enum ieee80211_sta_state state);
+int wl12xx_init_pll_clock(struct wl1271 *wl, int *selected_clock);
 
 #define JOIN_TIMEOUT 5000 /* 5000 milliseconds to join */
 

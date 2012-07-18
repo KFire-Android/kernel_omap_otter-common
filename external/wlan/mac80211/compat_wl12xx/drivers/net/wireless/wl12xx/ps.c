@@ -34,6 +34,7 @@ void wl1271_elp_work(struct work_struct *work)
 	struct delayed_work *dwork;
 	struct wl1271 *wl;
 	struct wl12xx_vif *wlvif;
+	int ret;
 
 	dwork = container_of(work, struct delayed_work, work);
 	wl = container_of(dwork, struct wl1271, elp_work);
@@ -62,7 +63,13 @@ void wl1271_elp_work(struct work_struct *work)
 	}
 
 	wl1271_debug(DEBUG_PSM, "chip to elp");
-	wl1271_raw_write32(wl, HW_ACCESS_ELP_CTRL_REG_ADDR, ELPCTRL_SLEEP);
+	ret = wl1271_raw_write32(wl, HW_ACCESS_ELP_CTRL_REG_ADDR,
+				 ELPCTRL_SLEEP);
+	if (ret < 0) {
+		wl12xx_queue_recovery_work(wl);
+		goto out;
+	}
+
 	set_bit(WL1271_FLAG_IN_ELP, &wl->flags);
 
 out:
@@ -93,7 +100,7 @@ void wl1271_ps_elp_sleep(struct wl1271 *wl)
 	if (wl->conf.conn.forced_ps)
 		timeout = ELP_ENTRY_DELAY;
 	else
-		timeout = wl->conf.conn.dynamic_ps_timeout;
+		timeout = wl->conf.conn.elp_timeout;
 
 	ieee80211_queue_delayed_work(wl->hw, &wl->elp_work,
 				     msecs_to_jiffies(timeout));
@@ -133,7 +140,12 @@ int wl1271_ps_elp_wakeup(struct wl1271 *wl)
 		wl->elp_compl = &compl;
 	spin_unlock_irqrestore(&wl->wl_lock, flags);
 
-	wl1271_raw_write32(wl, HW_ACCESS_ELP_CTRL_REG_ADDR, ELPCTRL_WAKE_UP);
+	ret = wl1271_raw_write32(wl, HW_ACCESS_ELP_CTRL_REG_ADDR,
+				 ELPCTRL_WAKE_UP);
+	if (ret < 0) {
+		wl12xx_queue_recovery_work(wl);
+		goto err;
+	}
 
 	if (!pending) {
 		ret = wait_for_completion_timeout(

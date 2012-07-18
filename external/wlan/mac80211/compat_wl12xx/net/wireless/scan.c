@@ -730,7 +730,7 @@ cfg80211_bss_insert(struct cfg80211_registered_device *dev,
 {
 	list_add_tail(&res->list, &dev->bss_list);
 	if (alias)
-		list_add_tail(&alias->list_aliases, &res->list_aliases);
+		list_add_tail(&res->list_aliases, &alias->list_aliases);
 	rb_insert_bss(dev, res);
 }
 

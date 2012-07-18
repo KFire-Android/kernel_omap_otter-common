@@ -190,7 +190,7 @@ static int wl1271_rx_handle_data(struct wl1271 *wl, u8 *data, u32 length,
 	return is_data;
 }
 
-void wl12xx_rx(struct wl1271 *wl, struct wl12xx_fw_status *status)
+int wl12xx_rx(struct wl1271 *wl, struct wl12xx_fw_status *status)
 {
 	struct wl1271_acx_mem_map *wl_mem_map = wl->target_mem_map;
 	unsigned long active_hlids[BITS_TO_LONGS(WL12XX_MAX_LINKS)] = {0};
@@ -203,6 +203,7 @@ void wl12xx_rx(struct wl1271 *wl, struct wl12xx_fw_status *status)
 	u32 pkt_offset;
 	u8 hlid;
 	bool unaligned = false;
+	int ret = 0;
 
 	while (drv_rx_counter != fw_rx_counter) {
 		buf_size = 0;
@@ -236,14 +237,18 @@ void wl12xx_rx(struct wl1271 *wl, struct wl12xx_fw_status *status)
 			wl->rx_mem_pool_addr.addr_extra =
 				wl->rx_mem_pool_addr.addr + 4;
 
-			wl1271_write(wl, WL1271_SLV_REG_DATA,
-				     &wl->rx_mem_pool_addr,
-				     sizeof(wl->rx_mem_pool_addr), false);
+			ret = wl1271_write(wl, WL1271_SLV_REG_DATA,
+					   &wl->rx_mem_pool_addr,
+					   sizeof(wl->rx_mem_pool_addr), false);
+			if (ret < 0)
+				goto out;
 		}
 
 		/* Read all available packets at once */
-		wl1271_read(wl, WL1271_SLV_MEM_DATA, wl->aggr_buf,
-				buf_size, true);
+		ret = wl1271_read(wl, WL1271_SLV_MEM_DATA, wl->aggr_buf,
+				  buf_size, true);
+		if (ret < 0)
+			goto out;
 
 		/* Split data into separate packets */
 		pkt_offset = 0;
@@ -282,10 +287,17 @@ void wl12xx_rx(struct wl1271 *wl, struct wl12xx_fw_status *status)
 	 * Write the driver's packet counter to the FW. This is only required
 	 * for older hardware revisions
 	 */
-	if (wl->quirks & WL12XX_QUIRK_END_OF_TRANSACTION)
-		wl1271_write32(wl, RX_DRIVER_COUNTER_ADDRESS, wl->rx_counter);
+	if (wl->quirks & WL12XX_QUIRK_END_OF_TRANSACTION) {
+		ret = wl1271_write32(wl, RX_DRIVER_COUNTER_ADDRESS,
+				     wl->rx_counter);
+		if (ret < 0)
+			goto out;
+	}
 
 	wl12xx_rearm_rx_streaming(wl, active_hlids);
+
+out:
+	return ret;
 }
 
 /*
@@ -338,13 +350,19 @@ int wl1271_rx_data_filter_enable(struct wl1271 *wl,
 }
 
 /* Unset any active filters */
-void wl1271_rx_data_filters_clear_all(struct wl1271 *wl)
+int wl1271_rx_data_filters_clear_all(struct wl1271 *wl)
 {
 	int i;
+	int ret = 0;
 
 	for (i = 0; i < WL1271_MAX_RX_FILTERS; i++) {
 		if (!wl->rx_data_filters_status[i])
 			continue;
-		wl1271_rx_data_filter_enable(wl, i, 0, NULL);
+		ret = wl1271_rx_data_filter_enable(wl, i, 0, NULL);
+		if (ret < 0)
+			goto out;
 	}
+
+out:
+	return ret;
 }

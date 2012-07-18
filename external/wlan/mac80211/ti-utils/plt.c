@@ -83,16 +83,6 @@ out:
 	return ret;
 }
 
-static void str2mac(unsigned char *pmac, char *pch)
-{
-	int i;
-
-	for (i = 0; i < MAC_ADDR_LEN; i++) {
-		pmac[i] = (unsigned char)strtoul(pch, &pch, 16);
-		pch++;
-	}
-}
-
 static int plt_power_mode(struct nl80211_state *state, struct nl_cb *cb,
 			  struct nl_msg *msg, int argc, char **argv)
 {
