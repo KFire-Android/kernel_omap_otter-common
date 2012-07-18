@@ -57,12 +57,13 @@ static struct powerdomain core_54xx_pwrdm = {
 	},
 	.flags		  = PWRDM_HAS_LOWPOWERSTATECHANGE,
 	.wakeup_lat = {
+		/* CPUIdle and suspend controls this explicitly */
 		[PWRDM_POWER_OFF] = UNSUP_STATE,
-		[PWRDM_POWER_OSWR] = 1200,
-		[PWRDM_POWER_CSWR] = 768,
+		[PWRDM_POWER_OSWR] = UNSUP_STATE,
+		[PWRDM_POWER_CSWR] = UNSUP_STATE,
 		[PWRDM_POWER_RET] = UNSUP_STATE,
-		[PWRDM_POWER_INACTIVE] = 20,
-		[PWRDM_POWER_ON] = 4,
+		[PWRDM_POWER_INACTIVE] = UNSUP_STATE,
+		[PWRDM_POWER_ON] = UNSUP_STATE,
 	},
 };
 
@@ -145,12 +146,13 @@ static struct powerdomain cpu0_54xx_pwrdm = {
 		[0] = PWRSTS_ON,	/* cpu0_l1 */
 	},
 	.wakeup_lat = {
+		/* CPUIdle and suspend controls this explicitly */
 		[PWRDM_POWER_OFF] = UNSUP_STATE,
 		[PWRDM_POWER_OSWR] = UNSUP_STATE,
-		[PWRDM_POWER_CSWR] = 768,
+		[PWRDM_POWER_CSWR] = UNSUP_STATE,
 		[PWRDM_POWER_RET] = UNSUP_STATE,
-		[PWRDM_POWER_INACTIVE] = 20,
-		[PWRDM_POWER_ON] = 4,
+		[PWRDM_POWER_INACTIVE] = UNSUP_STATE,
+		[PWRDM_POWER_ON] = UNSUP_STATE,
 	}
 };
 
@@ -171,12 +173,13 @@ static struct powerdomain cpu1_54xx_pwrdm = {
 	},
 	.flags		  = PWRDM_HAS_FORCE_OFF,
 	.wakeup_lat = {
+		/* CPUIdle and suspend controls this explicitly */
 		[PWRDM_POWER_OFF] = UNSUP_STATE,
 		[PWRDM_POWER_OSWR] = UNSUP_STATE,
-		[PWRDM_POWER_CSWR] = 768,
+		[PWRDM_POWER_CSWR] = UNSUP_STATE,
 		[PWRDM_POWER_RET] = UNSUP_STATE,
-		[PWRDM_POWER_INACTIVE] = 20,
-		[PWRDM_POWER_ON] = 4,
+		[PWRDM_POWER_INACTIVE] = UNSUP_STATE,
+		[PWRDM_POWER_ON] = UNSUP_STATE,
 	},
 };
 
@@ -223,12 +226,13 @@ static struct powerdomain mpu_54xx_pwrdm = {
 		[1] = PWRSTS_OFF_RET,	/* mpu_ram */
 	},
 	.wakeup_lat = {
+		/* CPUIdle and suspend controls this explicitly */
 		[PWRDM_POWER_OFF] = UNSUP_STATE,
 		[PWRDM_POWER_OSWR] = UNSUP_STATE,
-		[PWRDM_POWER_CSWR] = 768,
+		[PWRDM_POWER_CSWR] = UNSUP_STATE,
 		[PWRDM_POWER_RET] = UNSUP_STATE,
-		[PWRDM_POWER_INACTIVE] = 20,
-		[PWRDM_POWER_ON] = 4,
+		[PWRDM_POWER_INACTIVE] = UNSUP_STATE,
+		[PWRDM_POWER_ON] = UNSUP_STATE,
 	},
 };
 
