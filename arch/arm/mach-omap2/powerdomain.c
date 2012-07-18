@@ -288,6 +288,12 @@ static int _pwrdm_wakeuplat_update_pwrst(struct powerdomain *pwrdm,
 		}
 	}
 
+	if (state_idx == PWRDM_MAX_POWER_PWRSTS) {
+		WARN(1, "%s: NO matching pwrst (powerdomain %s, min_lat=%ld)\n",
+		     __func__, pwrdm->name, min_latency);
+		return -EINVAL;
+	}
+
 	pwrdm->wkup_lat_next_state = new_state;
 	ret = omap_set_pwrdm_state(pwrdm, new_state);
 
