@@ -91,12 +91,13 @@ static struct powerdomain mpu_3xxx_pwrdm = {
 		[0] = PWRSTS_OFF_ON,
 	},
 	.wakeup_lat = {
-		[PWRDM_POWER_OFF] = 1830,
+		/* CPUIdle and suspend controls this explicitly */
+		[PWRDM_POWER_OFF] = UNSUP_STATE,
 		[PWRDM_POWER_OSWR] = UNSUP_STATE,
-		[PWRDM_POWER_CSWR] = 121,
+		[PWRDM_POWER_CSWR] = UNSUP_STATE,
 		[PWRDM_POWER_RET] = UNSUP_STATE,
 		[PWRDM_POWER_INACTIVE] = UNSUP_STATE,
-		[PWRDM_POWER_ON] = 0,
+		[PWRDM_POWER_ON] = UNSUP_STATE,
 	},
 	.voltdm           = { .name = "mpu_iva" },
 };
@@ -126,12 +127,13 @@ static struct powerdomain core_3xxx_pre_es3_1_pwrdm = {
 		[1] = PWRSTS_OFF_RET_ON, /* MEM2ONSTATE */
 	},
 	.wakeup_lat = {
-		[PWRDM_POWER_OFF] = 3082,
+		/* CPUIdle and suspend controls this explicitly */
+		[PWRDM_POWER_OFF] = UNSUP_STATE,
 		[PWRDM_POWER_OSWR] = UNSUP_STATE,
-		[PWRDM_POWER_CSWR] = 153,
+		[PWRDM_POWER_CSWR] = UNSUP_STATE,
 		[PWRDM_POWER_RET] = UNSUP_STATE,
 		[PWRDM_POWER_INACTIVE] = UNSUP_STATE,
-		[PWRDM_POWER_ON] = 0,
+		[PWRDM_POWER_ON] = UNSUP_STATE,
 	},
 	.voltdm           = { .name = "core" },
 };
@@ -156,12 +158,13 @@ static struct powerdomain core_3xxx_es3_1_pwrdm = {
 		[1] = PWRSTS_OFF_RET_ON, /* MEM2ONSTATE */
 	},
 	.wakeup_lat = {
-		[PWRDM_POWER_OFF] = 3082,
+		/* CPUIdle and suspend controls this explicitly */
+		[PWRDM_POWER_OFF] = UNSUP_STATE,
 		[PWRDM_POWER_OSWR] = UNSUP_STATE,
-		[PWRDM_POWER_CSWR] = 153,
+		[PWRDM_POWER_CSWR] = UNSUP_STATE,
 		[PWRDM_POWER_RET] = UNSUP_STATE,
 		[PWRDM_POWER_INACTIVE] = UNSUP_STATE,
-		[PWRDM_POWER_ON] = 0,
+		[PWRDM_POWER_ON] = UNSUP_STATE,
 	},
 	.voltdm           = { .name = "core" },
 };
