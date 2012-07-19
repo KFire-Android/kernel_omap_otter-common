@@ -94,6 +94,8 @@ extern void omap5_cpu_resume(void);
 static DEFINE_PER_CPU(struct omap4_cpu_pm_info, omap4_pm_info);
 static struct powerdomain *mpuss_pd, *core_pd;
 static void __iomem *sar_base;
+static unsigned int cpu0_context_offset;
+static unsigned int cpu1_context_offset;
 
 static int default_finish_suspend(unsigned long cpu_state)
 {
@@ -249,14 +251,14 @@ static inline void cpu_clear_prev_logic_pwrst(unsigned int cpu_id)
 
 	if (cpu_id) {
 		reg = omap4_prcm_mpu_read_inst_reg(OMAP4430_PRCM_MPU_CPU1_INST,
-					OMAP4_RM_CPU1_CPU1_CONTEXT_OFFSET);
+					cpu1_context_offset);
 		omap4_prcm_mpu_write_inst_reg(reg, OMAP4430_PRCM_MPU_CPU1_INST,
-					OMAP4_RM_CPU1_CPU1_CONTEXT_OFFSET);
+					cpu1_context_offset);
 	} else {
 		reg = omap4_prcm_mpu_read_inst_reg(OMAP4430_PRCM_MPU_CPU0_INST,
-					OMAP4_RM_CPU0_CPU0_CONTEXT_OFFSET);
+					cpu0_context_offset);
 		omap4_prcm_mpu_write_inst_reg(reg, OMAP4430_PRCM_MPU_CPU0_INST,
-					OMAP4_RM_CPU0_CPU0_CONTEXT_OFFSET);
+					cpu0_context_offset);
 	}
 }
 
@@ -559,8 +561,12 @@ int __init omap_mpuss_init(void)
 	/* Initilaise per CPU PM information */
 	if (cpu_is_omap44xx()) {
 		cpu_wakeup_addr = CPU0_WAKEUP_NS_PA_ADDR_OFFSET;
+		cpu0_context_offset = OMAP4_RM_CPU0_CPU0_CONTEXT_OFFSET;
+		cpu1_context_offset = OMAP4_RM_CPU1_CPU1_CONTEXT_OFFSET;
 	} else if (cpu_is_omap54xx()) {
 		cpu_wakeup_addr = OMAP5_CPU0_WAKEUP_NS_PA_ADDR_OFFSET;
+		cpu0_context_offset = OMAP54XX_RM_CPU0_CPU0_CONTEXT_OFFSET;
+		cpu1_context_offset = OMAP54XX_RM_CPU1_CPU1_CONTEXT_OFFSET;
 	}
 
 	pm_info = &per_cpu(omap4_pm_info, 0x0);
