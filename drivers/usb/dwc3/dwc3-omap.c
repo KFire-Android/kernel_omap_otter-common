@@ -44,6 +44,7 @@
 #include <linux/platform_device.h>
 #include <linux/platform_data/dwc3-omap.h>
 #include <linux/pm_runtime.h>
+#include <linux/pm_qos.h>
 #include <linux/dma-mapping.h>
 #include <linux/ioport.h>
 #include <linux/io.h>
@@ -114,6 +115,9 @@
 /* Delay for runtime fw to enable all the modules */
 #define MAILBOX_WORK_DELAY	300
 
+/* USB3 DRD IP requires L3 clocked @ 250MHz+ */
+# define PM_QOS_MEMORY_THROUGHPUT_USB3		(250 * 4 * 1000)
+
 struct dwc3_omap {
 	/* device lock */
 	spinlock_t		lock;
@@ -133,6 +137,7 @@ struct dwc3_omap {
 
 	struct delayed_work     omap_dwc3_mailbox_work;
 	struct workqueue_struct	*workqueue;
+	struct pm_qos_request	pm_qos_request;
 };
 
 struct dwc3_omap		*_omap;
@@ -173,6 +178,10 @@ static void omap_dwc3_set_mailbox(struct dwc3_omap *omap)
 		val |= USBOTGSS_UTMI_OTG_STATUS_SESSVALID
 				| USBOTGSS_UTMI_OTG_STATUS_POWERPRESENT;
 		dwc3_omap_writel(omap->base, USBOTGSS_UTMI_OTG_STATUS, val);
+
+		pm_qos_update_request(&omap->pm_qos_request,
+						PM_QOS_MEMORY_THROUGHPUT_USB3);
+
 		pm_runtime_put_sync(omap->dev);
 		break;
 
@@ -194,6 +203,10 @@ static void omap_dwc3_set_mailbox(struct dwc3_omap *omap)
 				| USBOTGSS_UTMI_OTG_STATUS_SESSVALID
 				| USBOTGSS_UTMI_OTG_STATUS_POWERPRESENT;
 		dwc3_omap_writel(omap->base, USBOTGSS_UTMI_OTG_STATUS, val);
+
+		pm_qos_update_request(&omap->pm_qos_request,
+						PM_QOS_MEMORY_THROUGHPUT_USB3);
+
 		pm_runtime_put_sync(omap->dev);
 		break;
 
@@ -202,6 +215,9 @@ static void omap_dwc3_set_mailbox(struct dwc3_omap *omap)
 		dev_dbg(omap->dev, "VBUS Disconnect\n");
 
 		dwc->is_connected = false;
+
+		pm_qos_update_request(&omap->pm_qos_request,
+							PM_QOS_DEFAULT_VALUE);
 
 		ret = pm_runtime_get_sync(omap->dev);
 		if (ret < 0) {
@@ -511,6 +527,9 @@ static int __devinit dwc3_omap_probe(struct platform_device *pdev)
 		goto err2;
 	}
 
+	pm_qos_add_request(&omap->pm_qos_request, PM_QOS_MEMORY_THROUGHPUT,
+				PM_QOS_MEMORY_THROUGHPUT_DEFAULT_VALUE);
+
 	return 0;
 
 err2:
@@ -525,6 +544,8 @@ err1:
 static int __devexit dwc3_omap_remove(struct platform_device *pdev)
 {
 	struct dwc3_omap	*omap = platform_get_drvdata(pdev);
+
+	pm_qos_remove_request(&omap->pm_qos_request);
 
 	platform_device_unregister(omap->dwc3);
 
