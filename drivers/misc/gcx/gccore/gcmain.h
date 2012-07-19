@@ -76,11 +76,10 @@ struct gccorecontext {
 	struct list_head mmuctxvac;
 	GCLOCK_TYPE mmucontextlock;
 
+	/* Device frequency scaling. */
 	int opp_count;
 	unsigned long *opp_freqs;
 	unsigned long  cur_freq;
-
-	bool suspend_requested;
 };
 
 
