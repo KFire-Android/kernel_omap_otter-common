@@ -48,6 +48,7 @@
 
 #define GPIO_ETH_NRESET		15	/* USBB3 to SMSC LAN9730 */
 #define GPIO_HUB_NRESET		80	/* USBB2 to SMSC 3530 HUB */
+#define GPIO_EXT_INT_PIN	99
 #define HDMI_GPIO_HPD		193
 
 #ifdef CONFIG_OMAP_MUX
@@ -55,6 +56,8 @@ static struct omap_board_mux board_mux[] __initdata = {
 	OMAP5_MUX(FREF_CLK1_OUT, OMAP_PIN_INPUT_PULLUP),
 	OMAP5_MUX(USBB2_HSIC_STROBE, OMAP_PIN_INPUT | OMAP_MUX_MODE0),
 	OMAP5_MUX(USBB2_HSIC_DATA, OMAP_PIN_INPUT | OMAP_MUX_MODE0),
+	OMAP5_MUX(ABEDMIC_DIN3,
+		OMAP_PIN_INPUT_PULLUP | OMAP_PIN_OFF_NONE | OMAP_MUX_MODE6),
 	{ .reg_offset = OMAP_MUX_TERMINATOR },
 };
 #else
@@ -622,6 +625,7 @@ static struct i2c_board_info __initdata omap5evm_i2c_5_boardinfo[] = {
 	{
 		I2C_BOARD_INFO("tca6424", 0x22),
 		.platform_data = &omap5evm_gpio_expander_info,
+		.irq = GPIO_EXT_INT_PIN,
 	},
 };
 
