@@ -41,6 +41,8 @@
 #define HDMI_CORE_CEC_RETRY    200
 #define HDMI_CEC_TX_CMD_RETRY  400
 
+#define HDMI_WP_SYSCONFIG_SMART_IDLE 0x3
+
 static inline void hdmi_write_reg(void __iomem *base_addr,
 				const u16 idx, u32 val)
 {
@@ -377,6 +379,31 @@ void ti_hdmi_4xxx_phy_disable(struct hdmi_ip_data *ip_data)
 
 	hdmi_set_phy_pwr(ip_data, HDMI_PHYPWRCMD_OFF);
 	ip_data->phy_tx_enabled = false;
+}
+
+int hdmi_ti_4xxx_set_wait_soft_reset(struct hdmi_ip_data *ip_data)
+{
+
+	/* reset Wrapper */
+	REG_FLD_MOD(hdmi_wp_base(ip_data), HDMI_WP_SYSCONFIG, 0x1, 0, 0);
+
+	/* wait till SOFTRESET == 0 */
+	if (hdmi_wait_for_bit_change(hdmi_wp_base(ip_data),
+					HDMI_WP_SYSCONFIG, 0, 0, 0) != 0) {
+		pr_err("SYSCONFIG[SOFTRESET] bit not set to 0\n");
+		return -ETIMEDOUT;
+	}
+
+	/* Make madule smart and wakeup capable*/
+	REG_FLD_MOD(hdmi_wp_base(ip_data), HDMI_WP_SYSCONFIG,
+		HDMI_WP_SYSCONFIG_SMART_IDLE, 3, 2);
+
+	return 0;
+}
+
+int hdmi_ti_4xxx_wp_get_video_state(struct hdmi_ip_data *ip_data)
+{
+	return REG_GET(hdmi_wp_base(ip_data), HDMI_WP_VIDEO_CFG, 31, 31);
 }
 
 static int hdmi_core_ddc_init(struct hdmi_ip_data *ip_data)

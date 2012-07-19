@@ -81,6 +81,8 @@ static struct {
 	void (*hdmi_cec_enable_cb)(int status);
 	void (*hdmi_cec_irq_cb)(void);
 	void (*hdmi_cec_hpd)(int phy_addr, int status);
+	void (*hdmi_start_frame_cb)(void);
+	bool (*hdmi_power_on_cb)(void);
 } hdmi;
 
 static const u8 edid_header[8] = {0x0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x0};
@@ -363,6 +365,16 @@ static void hdmi_compute_pll(struct omap_dss_device *dssdev, int phy,
 	DSSDBG("range = %d sd = %d\n", pi->dcofreq, pi->regsd);
 }
 
+static void hdmi_load_hdcp_keys(struct omap_dss_device *dssdev)
+{
+	DSSDBG("hdmi_load_hdcp_keys\n");
+	/* load the keys and reset the wrapper to populate the AKSV registers*/
+	if (hdmi.hdmi_power_on_cb()) {
+		hdmi_ti_4xxx_set_wait_soft_reset(&hdmi.ip_data);
+		DSSINFO("HDMI_WRAPPER RESET DONE\n");
+	}
+}
+
 static int hdmi_power_on(struct omap_dss_device *dssdev)
 {
 	int r;
@@ -417,6 +429,8 @@ static int hdmi_power_on(struct omap_dss_device *dssdev)
 
 	hdmi.ip_data.ops->video_enable(&hdmi.ip_data, 0);
 
+	hdmi_load_hdcp_keys(dssdev);
+
 	/* config the PLL and PHY hdmi_set_pll_pwrfirst */
 	r = hdmi.ip_data.ops->pll_enable(&hdmi.ip_data);
 	if (r) {
@@ -452,6 +466,9 @@ static int hdmi_power_on(struct omap_dss_device *dssdev)
 
 	hdmi.ip_data.ops->video_enable(&hdmi.ip_data, 1);
 
+	if (hdmi.hdmi_start_frame_cb)
+		(*hdmi.hdmi_start_frame_cb)();
+
 	r = dss_mgr_enable(dssdev->manager);
 	if (r)
 		goto err_mgr_enable;
@@ -482,6 +499,20 @@ static void hdmi_power_off(struct omap_dss_device *dssdev)
 	hdmi_runtime_put();
 
 	hdmi.ip_data.cfg.deep_color = HDMI_DEEP_COLOR_24BIT;
+}
+
+int omapdss_hdmi_register_hdcp_callbacks(void (*hdmi_start_frame_cb)(void),
+				 bool (*hdmi_power_on_cb)(void))
+{
+	hdmi.hdmi_start_frame_cb = hdmi_start_frame_cb;
+	hdmi.hdmi_power_on_cb = hdmi_power_on_cb;
+
+	return hdmi_ti_4xxx_wp_get_video_state(&hdmi.ip_data);
+}
+
+struct hdmi_ip_data *get_hdmi_ip_data(void)
+{
+	return &hdmi.ip_data;
 }
 
 int omapdss_hdmi_set_deepcolor(struct omap_dss_device *dssdev, int val,
