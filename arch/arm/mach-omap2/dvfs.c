@@ -668,7 +668,7 @@ static int _dvfs_scale(struct device *req_dev, struct device *target_dev,
 		temp_dev = list_entry(dev_list, struct omap_vdd_dev_list, node);
 		dev = temp_dev->dev;
 		rcu_read_lock();
-		opp = _volt_to_opp(dev, new_volt);
+		opp = _volt_to_opp(dev, omap_get_nominal_voltage(new_vdata));
 		if (!IS_ERR(opp))
 			freq = opp_get_freq(opp);
 		rcu_read_unlock();
