@@ -332,6 +332,7 @@ struct dsi_data {
 	unsigned num_lanes_used;
 
 	unsigned scp_clk_refcount;
+	int num_line_buffers;
 };
 
 struct dsi_packet_sent_handler_data {
@@ -3745,7 +3746,7 @@ static void dsi_set_hs_tx_timeout(struct platform_device *dsidev,
 static void dsi_config_vp_num_line_buffers(struct omap_dss_device *dssdev)
 {
 	struct platform_device *dsidev = dsi_get_dsidev_from_dssdev(dssdev);
-	int num_line_buffers;
+	struct dsi_data *dsi = dsi_get_dsidrv_data(dsidev);
 
 	if (dssdev->panel.dsi_mode == OMAP_DSS_DSI_VIDEO_MODE) {
 		int bpp = dsi_get_pixel_size(dssdev->panel.dsi_pix_fmt);
@@ -3756,16 +3757,16 @@ static void dsi_config_vp_num_line_buffers(struct omap_dss_device *dssdev)
 		 * port's line buffer size
 		 */
 		if (line_buf_size <= timings->x_res * bpp / 8)
-			num_line_buffers = 0;
+			dsi->num_line_buffers = 0;
 		else
-			num_line_buffers = 2;
+			dsi->num_line_buffers = 2;
 	} else {
 		/* Use maximum number of line buffers in command mode */
-		num_line_buffers = 2;
+		dsi->num_line_buffers = 2;
 	}
 
 	/* LINE_BUFFER */
-	REG_FLD_MOD(dsidev, DSI_CTRL, num_line_buffers, 13, 12);
+	REG_FLD_MOD(dsidev, DSI_CTRL, dsi->num_line_buffers, 13, 12);
 }
 
 static void dsi_config_vp_sync_events(struct omap_dss_device *dssdev)
@@ -3808,6 +3809,50 @@ static void dsi_config_blanking_modes(struct omap_dss_device *dssdev)
 	r = FLD_MOD(r, hbp_blanking_mode, 22, 22);	/* HBP_BLANKING */
 	r = FLD_MOD(r, hsa_blanking_mode, 23, 23);	/* HSA_BLANKING */
 	dsi_write_reg(dsidev, DSI_CTRL, r);
+}
+
+static void dsi_check_dispc_hsync_period(struct omap_dss_device *dssdev)
+{
+	struct platform_device *dsidev = dsi_get_dsidev_from_dssdev(dssdev);
+	struct dsi_data *dsi = dsi_get_dsidrv_data(dsidev);
+	unsigned long dsi_fclk;
+	int num_line_buffers = dsi->num_line_buffers;
+	unsigned long dispc_hsync = dssdev->panel.timings.hsw;
+	unsigned long pix_clk = dssdev->panel.timings.pixel_clock;
+	unsigned long pcd;
+	dsi_fclk = dsi_get_pll_hsdiv_dsi_rate(dsidev);
+	pcd = dssdev->clocks.dispc.channel.pck_div;
+
+	/* OMAP4xx / OMAP5 ES1.0 Errata i483: DSI engine
+	 is not always detecting the first VSYNC HSYNC
+	signals received on the video port in video mode.
+
+	Workaround proposed: Because before first
+	VSYNC rising edge, one HSYNC is transmitted
+	and clock is transmitted during that HSYNC period,
+	the workaround is to have the HSYNC period of
+	DISPC longer than the timing described below:
+	* Config with line buffers:
+		3 VP_PCLK + 6 VP_CLK + 6 DSI_CLK
+	* Config w/o line buffers:
+		3 VP_PCLK + 2 VP_CLK
+	*/
+
+	if ((cpu_is_omap54xx() && (omap_rev() == OMAP5430_REV_ES1_0 ||
+		omap_rev() == OMAP5432_REV_ES1_0)) || cpu_is_omap44xx()) {
+		if (pcd == 0 || dsi_fclk == 0) {
+			DSSERR("dsi_fclk or pck_div should not be null");
+			return;
+		}
+		if (num_line_buffers) {
+			if (dispc_hsync <
+				(3 + 6/pcd + ((6*pix_clk*1000)/dsi_fclk)))
+				DSSERR("HSYNC period less than expected");
+		} else {
+			if (dispc_hsync < (3 + 2/pcd))
+				DSSERR("HSYNC period less than expected");
+		}
+	}
 }
 
 static int dsi_proto_config(struct omap_dss_device *dssdev)
@@ -3868,6 +3913,7 @@ static int dsi_proto_config(struct omap_dss_device *dssdev)
 	if (dssdev->panel.dsi_mode == OMAP_DSS_DSI_VIDEO_MODE) {
 		dsi_config_vp_sync_events(dssdev);
 		dsi_config_blanking_modes(dssdev);
+		dsi_check_dispc_hsync_period(dssdev);
 	}
 
 	dsi_vc_initial_config(dsidev, 0);
