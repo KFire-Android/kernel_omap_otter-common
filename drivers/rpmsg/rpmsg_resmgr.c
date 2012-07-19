@@ -321,6 +321,51 @@ err_module:
 	return ret;
 }
 
+static int _request_data(struct device *dev, struct rprm_elem *e,
+				u32 type, char data[], int len)
+{
+	int ret = 0;
+	unsigned long freq;
+
+	switch (type) {
+	case RPRM_MAX_FREQ:
+		if (len != sizeof freq) {
+			ret = -EINVAL;
+			break;
+		}
+		if (e->res->ops->get_max_freq) {
+			freq = e->res->ops->get_max_freq(e->handle);
+			memcpy(data, &freq, len);
+		} else
+			ret = -EINVAL;
+		break;
+	default:
+		dev_err(dev, "%s: invalid data request %d!\n", __func__, type);
+		ret = -EINVAL;
+	}
+	return ret;
+}
+
+static int rprm_req_data(struct rprm *rprm, u32 res_id, u32 type,
+				char data[], int len)
+{
+	int ret = 0;
+	struct rprm_elem *e;
+	struct device *dev = &rprm->rpdev->dev;
+
+	mutex_lock(&rprm->lock);
+	e = idr_find(&rprm->id_list, res_id);
+	if (!e) {
+		ret = -ENOENT;
+		goto out;
+	}
+
+	ret = _request_data(dev, e, type, data, len);
+out:
+	mutex_unlock(&rprm->lock);
+	return ret;
+}
+
 static void rprm_cb(struct rpmsg_channel *rpdev, void *data, int len,
 			void *priv, u32 src)
 {
@@ -330,6 +375,7 @@ static void rprm_cb(struct rpmsg_channel *rpdev, void *data, int len,
 	struct rprm_request *req;
 	struct rprm_release *rel;
 	struct rprm_constraint *c;
+	struct rprm_request_data *rd;
 	char ack_msg[MAX_MSG];
 	struct rprm_ack *ack = (void *)ack_msg;
 	struct rprm_request_ack *rack = (void *)ack->data;
@@ -412,6 +458,18 @@ static void rprm_cb(struct rpmsg_channel *rpdev, void *data, int len,
 
 		len = sizeof *c;
 		memcpy(ack->data, c, len);
+		break;
+	case RPRM_REQ_DATA:
+		len -= sizeof(*rd);
+		if (len < 0) {
+			dev_err(dev, "Bad request data message\n");
+			ret = -EINVAL;
+			break;
+		}
+		rd = (void *)msg->data;
+		ret = rprm_req_data(rprm, rd->res_id, rd->type, ack->data, len);
+		if (ret)
+			dev_err(dev, "request data failed! ret %d\n", ret);
 		break;
 	default:
 		dev_err(dev, "Unknow action %d\n", msg->action);

@@ -50,6 +50,7 @@ enum rprm_action {
 	RPRM_RELEASE		= 3,
 	RPRM_SET_CONSTRAINTS	= 4,
 	RPRM_CLEAR_CONSTRAINTS	= 5,
+	RPRM_REQ_DATA		= 6,
 };
 
 /*
@@ -65,14 +66,24 @@ enum rprm_constraint_type {
 	RPRM_BANDWIDTH		= 0x4,
 };
 
+/*
+ * enum rprm_request_data_type - RPMSG request data types
+ * @RPRM_MAX_FREQ:	request maximum frequency
+ *
+ */
+enum rprm_request_data_type {
+	RPRM_MAX_FREQ		= 0,
+};
+
 /**
  * struct rprm_res_ops - resource-specific device operations
- * @start:	request a resource
- * @stop:	release a resource
- * @get_info:	get properties of the resource into a buffer
- * @scale:	set a scale constraint
- * @latency:	set a latency constraint
- * @bandwidth:	set a bandwidth constraint
+ * @start:		request a resource
+ * @stop:		release a resource
+ * @get_info:		get properties of the resource into a buffer
+ * @scale:		set a scale constraint
+ * @latency:		set a latency constraint
+ * @bandwidth:		set a bandwidth constraint
+ * @get_max_freq:	get the maximum frequency of the resuource
  */
 struct rprm_res_ops {
 	int (*request)(void **handle, void *args, size_t len);
@@ -81,6 +92,7 @@ struct rprm_res_ops {
 	int (*scale)(struct device *rdev, void *handle, unsigned long val);
 	int (*latency)(struct device *rdev, void *handle, unsigned long val);
 	int (*bandwidth)(struct device *rdev, void *handle, unsigned long val);
+	unsigned long (*get_max_freq)(void *handle);
 };
 
 /**
@@ -137,6 +149,18 @@ struct rprm_release {
 struct rprm_constraint {
 	u32 res_id;
 	struct rprm_constraints_data cdata;
+} __packed;
+
+/**
+ * struct rprm_constraint - header of a constraint action
+ * @res_id:	id of the resource
+ * @type:	type of requested data
+ * @data:	pointer to get the requested data
+ */
+struct rprm_request_data {
+	u32 res_id;
+	u32 type;
+	char data[];
 } __packed;
 
 /**
