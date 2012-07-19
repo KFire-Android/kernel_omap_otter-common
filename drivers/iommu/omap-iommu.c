@@ -88,28 +88,99 @@ void omap_uninstall_iommu_arch(const struct iommu_functions *ops)
 EXPORT_SYMBOL_GPL(omap_uninstall_iommu_arch);
 
 /**
- * omap_iommu_save_ctx - Save registers for pm off-mode support
+ * omap_iommu_save_ctx - Deprecated API
  * @dev:	client device
+ *
+ * Preserve for link compatibility with old platforms,
+ * work is done in runtime_suspend callback.
  **/
 void omap_iommu_save_ctx(struct device *dev)
 {
-	struct omap_iommu *obj = dev_to_omap_iommu(dev);
-
-	arch_iommu->save_ctx(obj);
 }
 EXPORT_SYMBOL_GPL(omap_iommu_save_ctx);
 
 /**
- * omap_iommu_restore_ctx - Restore registers for pm off-mode support
+ * omap_iommu_restore_ctx - Deprecated API
  * @dev:	client device
+ *
+ * Preserve for link compatibility with old platforms,
+ * work is done in runtime_resume callback.
  **/
 void omap_iommu_restore_ctx(struct device *dev)
 {
-	struct omap_iommu *obj = dev_to_omap_iommu(dev);
-
-	arch_iommu->restore_ctx(obj);
 }
 EXPORT_SYMBOL_GPL(omap_iommu_restore_ctx);
+
+/**
+ * omap_iommu_runtime_suspend - save iommu context
+ * @dev:	client device
+ *
+ * Preserve critical mmu registers and prepare to power down.
+ **/
+static int omap_iommu_runtime_suspend(struct device *dev)
+{
+	struct omap_iommu *obj = to_iommu(dev);
+	dev_dbg(obj->dev, "%s: %s\n", __func__, obj->name);
+
+	if (arch_iommu && arch_iommu->save_ctx)
+		arch_iommu->save_ctx(obj);
+
+	return 0;
+}
+
+/**
+ * omap_iommu_runtime_resume - restore iommu context
+ * @dev:	client device
+ *
+ * Restore critical mmu registers and re-enable the iommu.
+ **/
+static int omap_iommu_runtime_resume(struct device *dev)
+{
+	struct omap_iommu *obj = to_iommu(dev);
+	dev_dbg(obj->dev, "%s: %s\n", __func__, obj->name);
+
+	if (!arch_iommu)
+		return 0;
+
+	if (arch_iommu->restore_ctx)
+		arch_iommu->restore_ctx(obj);
+
+	/*
+	 * FIXME: iommu_enable is being called here to reconfigure and
+	 * re-enable iommu (restore back to original configuration).
+	 * This is to be moved back to iommu_enable code, once the
+	 * arch-specific restore code (currently a stub) is properly
+	 * implemented.
+	 */
+	if (arch_iommu->enable)
+		arch_iommu->enable(obj);
+
+	return 0;
+}
+
+/**
+ * omap_iommu_domain_idle - Allow iommu domain to go to a low power state
+ * @domain: pointer to generic iommu structure
+ **/
+static void omap_iommu_domain_idle(struct iommu_domain *domain)
+{
+	struct omap_iommu_domain *omap_domain = domain->priv;
+	struct omap_iommu *oiommu = omap_domain->iommu_dev;
+
+	pm_runtime_put(oiommu->dev);
+}
+
+/**
+ * omap_iommu_domain_activate - Restore registers for pm off-mode support
+ * @domain: pointer to generic iommu structure
+ **/
+static void omap_iommu_domain_activate(struct iommu_domain *domain)
+{
+	struct omap_iommu_domain *omap_domain = domain->priv;
+	struct omap_iommu *oiommu = omap_domain->iommu_dev;
+
+	pm_runtime_get_sync(oiommu->dev);
+}
 
 /**
  * omap_iommu_arch_version - Return running iommu arch version
@@ -122,8 +193,6 @@ EXPORT_SYMBOL_GPL(omap_iommu_arch_version);
 
 static int iommu_enable(struct omap_iommu *obj)
 {
-	int err;
-
 	if (!obj)
 		return -EINVAL;
 
@@ -132,9 +201,7 @@ static int iommu_enable(struct omap_iommu *obj)
 
 	pm_runtime_get_sync(obj->dev);
 
-	err = arch_iommu->enable(obj);
-
-	return err;
+	return 0;
 }
 
 static void iommu_disable(struct omap_iommu *obj)
@@ -982,11 +1049,17 @@ static int __devexit omap_iommu_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static const struct dev_pm_ops omap_iommu_pm_ops = {
+	.runtime_suspend = omap_iommu_runtime_suspend,
+	.runtime_resume = omap_iommu_runtime_resume,
+};
+
 static struct platform_driver omap_iommu_driver = {
 	.probe	= omap_iommu_probe,
 	.remove	= __devexit_p(omap_iommu_remove),
 	.driver	= {
 		.name	= "omap-iommu",
+		.pm	= &omap_iommu_pm_ops,
 	},
 };
 
@@ -1184,6 +1257,8 @@ static struct iommu_ops omap_iommu_ops = {
 	.domain_destroy	= omap_iommu_domain_destroy,
 	.attach_dev	= omap_iommu_attach_dev,
 	.detach_dev	= omap_iommu_detach_dev,
+	.domain_activate = omap_iommu_domain_activate,
+	.domain_idle	= omap_iommu_domain_idle,
 	.map		= omap_iommu_map,
 	.unmap		= omap_iommu_unmap,
 	.iova_to_phys	= omap_iommu_iova_to_phys,
