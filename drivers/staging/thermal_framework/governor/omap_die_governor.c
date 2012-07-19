@@ -87,6 +87,7 @@ struct omap_governor {
 	int hotspot_temp_lower;
 	int hotspot_temp;
 	int pcb_temp;
+	bool pcb_sensor_available;
 	int sensor_temp;
 	int absolute_delta;
 	int average_period;
@@ -199,11 +200,9 @@ static signed int convert_omap_sensor_temp_to_hotspot_temp(
 				struct omap_governor *omap_gov, int sensor_temp)
 {
 	int absolute_delta;
-	int pcb_temp;
 
-	pcb_temp = thermal_lookup_temp("pcb");
-	if (pcb_temp >= 0 && (omap_gov->avg_is_valid == 1)) {
-		omap_gov->pcb_temp = pcb_temp;
+	if (omap_gov->pcb_sensor_available && (omap_gov->avg_is_valid == 1)) {
+		omap_gov->pcb_temp  = thermal_lookup_temp("pcb");
 		if (omap_gov->pcb_temp < 0)
 			return sensor_temp + omap_gov->absolute_delta;
 
@@ -250,7 +249,7 @@ static signed int convert_omap_sensor_temp_to_hotspot_temp(
 static signed hotspot_temp_to_sensor_temp(struct omap_governor *omap_gov,
 							int hot_spot_temp)
 {
-	if (thermal_lookup_temp("pcb") >= 0 && (omap_gov->avg_is_valid == 1))
+	if (omap_gov->pcb_sensor_available && (omap_gov->avg_is_valid == 1))
 		return hot_spot_temp - omap_gov->absolute_delta;
 	else
 		return ((hot_spot_temp - omap_gov->omap_gradient_const) *
@@ -288,7 +287,8 @@ static int omap_enter_zone(struct omap_governor *omap_gov,
 
 	omap_gov->hotspot_temp_lower = temp_lower;
 	omap_gov->hotspot_temp_upper = temp_upper;
-	if (thermal_lookup_temp("pcb") >= 0)
+
+	if (omap_gov->pcb_sensor_available)
 		omap_gov->average_period = zone->average_rate;
 
 	return 0;
@@ -470,6 +470,10 @@ static int omap_process_temp(struct thermal_dev *gov,
 
 	pr_debug("%s: Received temp %i\n", __func__, temp);
 	omap_gov->temp_sensor = temp_sensor;
+	if (!omap_gov->pcb_sensor_available &&
+		(thermal_check_domain("pcb") == 0))
+		omap_gov->pcb_sensor_available = true;
+
 	return omap_thermal_manager(omap_gov, cooling_list, temp);
 }
 
@@ -671,6 +675,7 @@ static int __init omap_governor_init(void)
 		omap_gov_instance[i]->avg_is_valid = 0;
 		omap_gov_instance[i]->hotspot_temp = 0;
 		omap_gov_instance[i]->panic_zone_reached = 0;
+		omap_gov_instance[i]->pcb_sensor_available = false;
 		omap_gov_instance[i]->alert_threshold = OMAP_ALERT_TEMP;
 		omap_gov_instance[i]->panic_threshold = OMAP_PANIC_TEMP;
 		omap_gov_instance[i]->omap_gradient_slope =
@@ -679,7 +684,6 @@ static int __init omap_governor_init(void)
 		omap_gov_instance[i]->omap_gradient_const =
 			thermal_get_offset(&omap_gov_instance[i]->thermal_fw,
 									NULL);
-
 		INIT_DELAYED_WORK(&omap_gov_instance[i]->
 					average_gov_sensor_work,
 					average_sensor_delayed_work_fn);
