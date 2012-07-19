@@ -46,48 +46,27 @@ GCDBG_FILTERDEF(ioctl, GCZONE_NONE,
 		"ioctl",
 		"callback")
 
+static GCDEFINE_LOCK(g_fixuplock);
+static GCDEFINE_LOCK(g_bufferlock);
+static GCDEFINE_LOCK(g_unmaplock);
+
+static LIST_HEAD(g_buffervac);		/* gcbuffer */
+static LIST_HEAD(g_fixupvac);		/* gcfixup */
+static LIST_HEAD(g_unmapvac);		/* gcschedunmap */
+
 
 /*******************************************************************************
  * Command buffer copy management.
  */
-
-static GCLOCK_TYPE g_lock;
-struct gcbuffer *g_buffervacant;
-struct gcfixup *g_fixupvacant;
-
-static enum gcerror alloc_buffer(struct gcbuffer **gcbuffer)
-{
-	enum gcerror gcerror = GCERR_NONE;
-	struct gcbuffer *temp;
-
-	if (g_buffervacant == NULL) {
-		temp = kmalloc(sizeof(struct gcbuffer), GFP_KERNEL);
-		if (temp == NULL) {
-			GCERR("out of memory.\n");
-			gcerror = GCERR_SETGRP(GCERR_OODM,
-					       GCERR_IOCTL_BUF_ALLOC);
-			goto exit;
-		}
-	} else {
-		temp = g_buffervacant;
-		g_buffervacant = g_buffervacant->next;
-	}
-
-	temp->fixuphead = NULL;
-	temp->next = NULL;
-
-	*gcbuffer = temp;
-
-exit:
-	return gcerror;
-}
 
 static enum gcerror alloc_fixup(struct gcfixup **gcfixup)
 {
 	enum gcerror gcerror = GCERR_NONE;
 	struct gcfixup *temp;
 
-	if (g_fixupvacant == NULL) {
+	GCLOCK(&g_fixuplock);
+
+	if (list_empty(&g_fixupvac)) {
 		temp = kmalloc(sizeof(struct gcfixup), GFP_KERNEL);
 		if (temp == NULL) {
 			GCERR("out of memory.\n");
@@ -96,55 +75,118 @@ static enum gcerror alloc_fixup(struct gcfixup **gcfixup)
 			goto exit;
 		}
 	} else {
-		temp = g_fixupvacant;
-		g_fixupvacant = g_fixupvacant->next;
+		struct list_head *head;
+		head = g_fixupvac.next;
+		temp = list_entry(head, struct gcfixup, link);
+		list_del(head);
 	}
 
+	GCUNLOCK(&g_fixuplock);
+
+	INIT_LIST_HEAD(&temp->link);
 	*gcfixup = temp;
 
 exit:
 	return gcerror;
 }
 
-static void free_buffer_tree(struct gcbuffer *gcbuffer)
+static void free_fixup(struct gcfixup *gcfixup)
 {
-	struct gcbuffer *prev;
-	struct gcbuffer *curr;
-
-	prev = NULL;
-	curr = gcbuffer;
-	while (curr != NULL) {
-		if (curr->fixuphead != NULL) {
-			curr->fixuptail->next = g_fixupvacant;
-			g_fixupvacant = curr->fixuphead;
-		}
-
-		prev = curr;
-		curr = curr->next;
-	}
-
-	prev->next = g_buffervacant;
-	g_buffervacant = gcbuffer;
+	GCLOCK(&g_fixuplock);
+	list_move(&gcfixup->link, &g_fixupvac);
+	GCUNLOCK(&g_fixuplock);
 }
 
-static void destroy_buffer(void)
+static void free_fixup_list(struct list_head *fixuplist)
 {
-	struct gcbuffer *currbuffer, *tempbuffer;
-	struct gcfixup *currfixup, *tempfixup;
+	GCLOCK(&g_fixuplock);
+	list_splice_init(fixuplist, &g_fixupvac);
+	GCUNLOCK(&g_fixuplock);
+}
 
-	currbuffer = g_buffervacant;
-	while (currbuffer != NULL) {
-		tempbuffer = currbuffer;
-		currbuffer = currbuffer->next;
-		kfree(tempbuffer);
+static void free_vacant_fixups(void)
+{
+	struct list_head *head;
+	struct gcfixup *gcfixup;
+
+	GCLOCK(&g_fixuplock);
+	while (!list_empty(&g_fixupvac)) {
+		head = g_fixupvac.next;
+		gcfixup = list_entry(head, struct gcfixup, link);
+		list_del(head);
+		kfree(gcfixup);
+	}
+	GCUNLOCK(&g_fixuplock);
+}
+
+static enum gcerror alloc_buffer(struct gcbuffer **gcbuffer)
+{
+	enum gcerror gcerror = GCERR_NONE;
+	struct gcbuffer *temp;
+
+	GCLOCK(&g_bufferlock);
+
+	if (list_empty(&g_buffervac)) {
+		temp = kmalloc(sizeof(struct gcbuffer), GFP_KERNEL);
+		if (temp == NULL) {
+			GCERR("out of memory.\n");
+			gcerror = GCERR_SETGRP(GCERR_OODM,
+					       GCERR_IOCTL_BUF_ALLOC);
+			goto exit;
+		}
+	} else {
+		struct list_head *head;
+		head = g_buffervac.next;
+		temp = list_entry(head, struct gcbuffer, link);
+		list_del(head);
 	}
 
-	currfixup = g_fixupvacant;
-	while (currfixup != NULL) {
-		tempfixup = currfixup;
-		currfixup = currfixup->next;
-		kfree(tempfixup);
+	GCUNLOCK(&g_bufferlock);
+
+	INIT_LIST_HEAD(&temp->fixup);
+	INIT_LIST_HEAD(&temp->link);
+	*gcbuffer = temp;
+
+exit:
+	return gcerror;
+}
+
+static void free_buffer(struct gcbuffer *gcbuffer)
+{
+	/* Free fixups. */
+	free_fixup_list(&gcbuffer->fixup);
+
+	/* Free the buffer. */
+	GCLOCK(&g_bufferlock);
+	list_move(&gcbuffer->link, &g_buffervac);
+	GCUNLOCK(&g_bufferlock);
+}
+
+static void free_buffer_list(struct list_head *bufferlist)
+{
+	struct list_head *head;
+	struct gcbuffer *gcbuffer;
+
+	while (!list_empty(bufferlist)) {
+		head = bufferlist->next;
+		gcbuffer = list_entry(head, struct gcbuffer, link);
+		free_buffer(gcbuffer);
 	}
+}
+
+static void free_vacant_buffers(void)
+{
+	struct list_head *head;
+	struct gcbuffer *gcbuffer;
+
+	GCLOCK(&g_bufferlock);
+	while (!list_empty(&g_buffervac)) {
+		head = g_buffervac.next;
+		gcbuffer = list_entry(head, struct gcbuffer, link);
+		list_del(head);
+		kfree(gcbuffer);
+	}
+	GCUNLOCK(&g_bufferlock);
 }
 
 
@@ -152,12 +194,12 @@ static void destroy_buffer(void)
  * Unmap list management.
  */
 
-static LIST_HEAD(g_unmapvac);
-
 static enum gcerror alloc_schedunmap(struct gcschedunmap **gcschedunmap)
 {
 	enum gcerror gcerror = GCERR_NONE;
 	struct gcschedunmap *temp;
+
+	GCLOCK(&g_unmaplock);
 
 	if (list_empty(&g_unmapvac)) {
 		temp = kmalloc(sizeof(struct gcschedunmap), GFP_KERNEL);
@@ -174,23 +216,42 @@ static enum gcerror alloc_schedunmap(struct gcschedunmap **gcschedunmap)
 		list_del(head);
 	}
 
+	GCUNLOCK(&g_unmaplock);
+
+	INIT_LIST_HEAD(&temp->link);
 	*gcschedunmap = temp;
 
 exit:
 	return gcerror;
 }
 
-static void destroy_unmap(void)
+static void free_schedunmap(struct gcschedunmap *gcschedunmap)
+{
+	GCLOCK(&g_unmaplock);
+	list_move(&gcschedunmap->link, &g_unmapvac);
+	GCUNLOCK(&g_unmaplock);
+}
+
+static void free_schedunmap_list(struct list_head *schedunmaplist)
+{
+	GCLOCK(&g_unmaplock);
+	list_splice_init(schedunmaplist, &g_unmapvac);
+	GCUNLOCK(&g_unmaplock);
+}
+
+static void free_vacant_unmap(void)
 {
 	struct list_head *head;
 	struct gcschedunmap *gcschedunmap;
 
+	GCLOCK(&g_unmaplock);
 	while (!list_empty(&g_unmapvac)) {
 		head = g_unmapvac.next;
 		gcschedunmap = list_entry(head, struct gcschedunmap, link);
 		list_del(head);
 		kfree(gcschedunmap);
 	}
+	GCUNLOCK(&g_unmaplock);
 }
 
 
@@ -385,18 +446,23 @@ static void destroy_callback(void)
 static int gc_commit_wrapper(struct gccommit *gccommit)
 {
 	int ret = 0;
-	bool locked = false;
+	bool buffercopied = false;
 	bool unmapcopied = false;
 	struct gccommit cpcommit;
-	struct gcbuffer *cpbuffer = NULL, *gcbuffer;
-	struct gcbuffer *headbuffer = NULL, *tailbuffer;
-	struct gcfixup *cpfixup = NULL, *gcfixup;
-	struct gcfixupentry *gcfixupentry;
-	struct gcschedunmap *cpschedunmap, *gcschedunmap;
 	struct gccallbackinfo *gccallbackinfo;
-	struct list_head *head;
-	LIST_HEAD(cpunmap);
+
+	struct list_head *gcbufferhead;
+	struct gcbuffer *cpbuffer, *gcbuffer;
+	LIST_HEAD(cpbufferlist);
+
+	struct list_head *gcfixuphead;
+	struct gcfixup *cpfixup, *gcfixup;
+	struct gcfixupentry *gcfixupentry;
 	int tablesize;
+
+	struct list_head *gcschedunmaphead;
+	struct gcschedunmap *cpschedunmap, *gcschedunmap;
+	LIST_HEAD(cpunmaplist);
 
 	GCENTER(GCZONE_COMMIT);
 
@@ -407,12 +473,10 @@ static int gc_commit_wrapper(struct gccommit *gccommit)
 		goto exit;
 	}
 
-	GCLOCK(&g_lock);
-	locked = true;
-
-	/* Make a copy of the user buffer structures. */
-	gcbuffer = cpcommit.buffer;
-	while (gcbuffer != NULL) {
+	/* Make a copy of the user buffer list. */
+	gcbufferhead = cpcommit.buffer.next;
+	while (gcbufferhead != &gccommit->buffer) {
+		gcbuffer = list_entry(gcbufferhead, struct gcbuffer, link);
 		GCDBG(GCZONE_COMMIT, "copying buffer 0x%08X.\n",
 		      (unsigned int) gcbuffer);
 
@@ -421,31 +485,26 @@ static int gc_commit_wrapper(struct gccommit *gccommit)
 		if (cpcommit.gcerror != GCERR_NONE)
 			goto exit;
 
-		/* Add to the list. */
-		if (headbuffer == NULL)
-			headbuffer = cpbuffer;
-		else
-			tailbuffer->next = cpbuffer;
-		tailbuffer = cpbuffer;
-
 		/* Get the data from the user. */
 		if (copy_from_user(cpbuffer, gcbuffer,
 				   sizeof(struct gcbuffer))) {
+			free_buffer(cpbuffer);
 			GCERR("failed to read data.\n");
 			cpcommit.gcerror = GCERR_USER_READ;
 			goto exit;
 		}
 
 		/* Get the next user buffer. */
-		gcbuffer = cpbuffer->next;
-		cpbuffer->next = NULL;
+		gcbufferhead = cpbuffer->link.next;
 
-		/* Get fixups and reset them in the kernel copy. */
-		gcfixup = cpbuffer->fixuphead;
-		cpbuffer->fixuphead = NULL;
+		/* Add the buffer to the list. */
+		list_add_tail(&cpbuffer->link, &cpbufferlist);
 
 		/* Copy all fixups. */
-		while (gcfixup != NULL) {
+		gcfixuphead = cpbuffer->fixup.next;
+		INIT_LIST_HEAD(&cpbuffer->fixup);
+		while (gcfixuphead != &gcbuffer->fixup) {
+			gcfixup = list_entry(gcfixuphead, struct gcfixup, link);
 			GCDBG(GCZONE_COMMIT, "copying fixup 0x%08X.\n",
 			      (unsigned int) gcfixup);
 
@@ -454,27 +513,23 @@ static int gc_commit_wrapper(struct gccommit *gccommit)
 			if (cpcommit.gcerror != GCERR_NONE)
 				goto exit;
 
-			/* Add to the list. */
-			if (cpbuffer->fixuphead == NULL)
-				cpbuffer->fixuphead = cpfixup;
-			else
-				cpbuffer->fixuptail->next = cpfixup;
-			cpbuffer->fixuptail = cpfixup;
-
 			/* Get the size of the fixup array. */
 			if (copy_from_user(cpfixup, gcfixup,
 					   offsetof(struct gcfixup, fixup))) {
+				free_fixup(cpfixup);
 				GCERR("failed to read data.\n");
 				cpcommit.gcerror = GCERR_USER_READ;
 				goto exit;
 			}
 
+			/* Get the next fixup. */
+			gcfixuphead = cpfixup->link.next;
+
+			/* Add to the list. */
+			list_add_tail(&cpfixup->link, &cpbuffer->fixup);
+
 			/* Get the fixup array. */
 			gcfixupentry = gcfixup->fixup;
-
-			/* Get the next fixup. */
-			gcfixup = cpfixup->next;
-			cpfixup->next = NULL;
 
 			/* Compute the size of the fixup table. */
 			tablesize = cpfixup->count
@@ -490,12 +545,19 @@ static int gc_commit_wrapper(struct gccommit *gccommit)
 		}
 	}
 
+	/* Move the local list to the commit structure. */
+	INIT_LIST_HEAD(&cpcommit.buffer);
+	list_splice_init(&cpbufferlist, &cpcommit.buffer);
+	buffercopied = true;
+
 	/* Copy scheduled unmappings to the local list. */
 	GCDBG(GCZONE_COMMIT, "copying unmaps.\n");
-	head = cpcommit.unmap.next;
-	while (head != &gccommit->unmap) {
+	gcschedunmaphead = cpcommit.unmap.next;
+	while (gcschedunmaphead != &gccommit->unmap) {
 		/* Get a pointer to the user structure. */
-		gcschedunmap = list_entry(head, struct gcschedunmap, link);
+		gcschedunmap = list_entry(gcschedunmaphead,
+					  struct gcschedunmap,
+					  link);
 		GCDBG(GCZONE_COMMIT, "unmap 0x%08X.\n",
 		      (unsigned int) gcschedunmap);
 
@@ -507,26 +569,23 @@ static int gc_commit_wrapper(struct gccommit *gccommit)
 		/* Copy unmap record from user. */
 		if (copy_from_user(cpschedunmap, gcschedunmap,
 				   sizeof(struct gcschedunmap))) {
-			list_add(&cpschedunmap->link, &cpunmap);
+			free_schedunmap(cpschedunmap);
 			GCERR("failed to read data.\n");
 			cpcommit.gcerror = GCERR_USER_READ;
 			goto exit;
 		}
 
 		/* Get the next record. */
-		head = cpschedunmap->link.next;
+		gcschedunmaphead = cpschedunmap->link.next;
 
 		/* Append to the list. */
-		list_add_tail(&cpschedunmap->link, &cpunmap);
+		list_add_tail(&cpschedunmap->link, &cpunmaplist);
 	}
 
 	/* Move the local list to the commit structure. */
 	INIT_LIST_HEAD(&cpcommit.unmap);
-	list_splice_init(&cpunmap, &cpcommit.unmap);
+	list_splice_init(&cpunmaplist, &cpcommit.unmap);
 	unmapcopied = true;
-
-	GCUNLOCK(&g_lock);
-	locked = false;
 
 	/* Setup callback. */
 	if (cpcommit.callback != NULL) {
@@ -550,7 +609,6 @@ static int gc_commit_wrapper(struct gccommit *gccommit)
 	}
 
 	/* Call the core driver. */
-	cpcommit.buffer = headbuffer;
 	gc_commit(&cpcommit, true);
 
 exit:
@@ -561,12 +619,8 @@ exit:
 	}
 
 	/* Free temporary resources. */
-	if (!locked)
-		GCLOCK(&g_lock);
-	if (headbuffer != NULL)
-		free_buffer_tree(headbuffer);
-	list_splice(unmapcopied ? &cpcommit.unmap : &cpunmap, &g_unmapvac);
-	GCUNLOCK(&g_lock);
+	free_buffer_list(buffercopied ? &cpcommit.buffer : &cpbufferlist);
+	free_schedunmap_list(unmapcopied ? &cpcommit.unmap : &cpunmaplist);
 
 	GCEXIT(GCZONE_COMMIT);
 	return ret;
@@ -959,7 +1013,6 @@ static int mod_init(void)
 		goto failed;
 	}
 
-	GCLOCK_INIT(&g_lock);
 	GCDBG_REGISTER(ioctl);
 
 	GCDBG(GCZONE_INIT, "device number = %d\n", dev_major);
@@ -997,8 +1050,9 @@ static void mod_exit(void)
 	platform_driver_unregister(&gcx_drv);
 	driver_remove_file(&gcx_drv.driver, &driver_attr_version);
 
-	destroy_buffer();
-	destroy_unmap();
+	free_vacant_buffers();
+	free_vacant_fixups();
+	free_vacant_unmap();
 	destroy_callback();
 }
 

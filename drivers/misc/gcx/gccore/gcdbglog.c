@@ -66,6 +66,9 @@
 /* Specifies spacing for thread messages. */
 #define GC_THREAD_INDENT	0
 
+/* Print the timestamp. */
+#define GC_SHOW_TIME		1
+
 /* When set to non-zero, specifies how many prints are accumulated in the
  * buffer before the buffer is flushed. */
 #define GC_SHOW_DUMP_LINE	1
@@ -120,6 +123,10 @@
 	(g_initdone && ((filter == NULL) || ((filter->zone & zone) != 0)))
 #endif
 
+#if GC_SHOW_TIME
+#define GC_TIME_FORMAT "[%5ld.%ld] "
+#endif
+
 #if GC_SHOW_DUMP_LINE
 #define GC_DUMPLINE_FORMAT "[%12d] "
 #endif
@@ -155,12 +162,16 @@ struct itemstring {
 	enum itemtype itemtype;
 	int indent;
 
-#if GC_SHOW_PID
-	struct task_struct *task;
+#if GC_SHOW_TIME
+	struct timespec timestamp;
 #endif
 
 #if GC_SHOW_DUMP_LINE
 	unsigned int dumpline;
+#endif
+
+#if GC_SHOW_PID
+	struct task_struct *task;
 #endif
 
 	const char *message;
@@ -375,6 +386,13 @@ static void gc_print_string(struct seq_file *s, struct itemstring *str)
 {
 	int len = 0;
 	char buffer[GC_MAXSTR_LENGTH];
+
+#if GC_SHOW_TIME
+	len += snprintf(buffer + len, sizeof(buffer) - len - GC_EOL_RESERVE,
+			GC_TIME_FORMAT,
+			str->timestamp.tv_sec,
+			str->timestamp.tv_nsec);
+#endif
 
 #if GC_SHOW_DUMP_LINE
 	len += snprintf(buffer + len, sizeof(buffer) - len - GC_EOL_RESERVE,
@@ -1148,12 +1166,16 @@ static void gc_append_string(struct buffout *buffout,
 	item->messagedata = *(va_list *) &messagedata;
 	item->datasize = itemstring->datasize;
 
-#if GC_SHOW_PID
-	item->task = itemstring->task;
+#if GC_SHOW_TIME
+	item->timestamp = itemstring->timestamp;
 #endif
 
 #if GC_SHOW_DUMP_LINE
 	item->dumpline = itemstring->dumpline;
+#endif
+
+#if GC_SHOW_PID
+	item->task = itemstring->task;
 #endif
 
 	/* Copy argument value. */
@@ -1258,12 +1280,16 @@ static void gc_print(struct buffout *buffout, unsigned int argsize,
 	itemstring.messagedata = args;
 	itemstring.datasize = argsize;
 
-#if GC_SHOW_PID
-	itemstring.task = threadinfo->task;
+#if GC_SHOW_TIME
+	ktime_get_ts(&itemstring.timestamp);
 #endif
 
 #if GC_SHOW_DUMP_LINE
 	itemstring.dumpline = ++buffout->dumpline;
+#endif
+
+#if GC_SHOW_PID
+	itemstring.task = threadinfo->task;
 #endif
 
 	/* Print the message. */

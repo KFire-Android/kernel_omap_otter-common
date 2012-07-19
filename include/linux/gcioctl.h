@@ -51,8 +51,8 @@ struct gccommit {
 	enum gcpipe entrypipe;
 	enum gcpipe exitpipe;
 
-	/* Pointer to the list of command buffers to be executed. */
-	struct gcbuffer *buffer;
+	/* List of command buffers to be executed (gcbuffer). */
+	struct list_head buffer;
 
 	/* Pointer to the callback function to be called when the GPU completes
 	 * execution of all buffers specified in this call. This member can be
@@ -74,9 +74,8 @@ struct gccommit {
 /* Command buffer header. */
 #define GC_BUFFER_SIZE (32 * 1024)
 struct gcbuffer {
-	/* Pointers to the head and tail of the command buffer fixup list. */
-	struct gcfixup *fixuphead;
-	struct gcfixup *fixuptail;
+	/* Fixup list (gcfixup). */
+	struct list_head fixup;
 
 	/* Number of pixels to be rendered. */
 	unsigned int pixelcount;
@@ -88,9 +87,8 @@ struct gcbuffer {
 	/* Number of bytes available in the buffer for allocation. */
 	unsigned int available;
 
-	/* Pointer to the next commmand buffer.
-	 * TODO: change to kernel style linked list. */
-	struct gcbuffer *next;
+	/* Commmand buffer list (gcbuffer). */
+	struct list_head link;
 };
 
 /* Fixup entry. */
@@ -105,9 +103,8 @@ struct gcfixupentry {
 /* Address fixup array. */
 #define GC_FIXUP_MAX 1024
 struct gcfixup {
-	/* Pointer to the next fixup array.
-	 * TODO: change to kernel style linked list. */
-	struct gcfixup *next;
+	/* Fixup list (gcfixup). */
+	struct list_head link;
 
 	/* Fixup array. */
 	unsigned int count;
@@ -119,7 +116,7 @@ struct gcschedunmap {
 	/* Map handle. */
 	unsigned long handle;
 
-	/* Previous/next unmapping info. */
+	/* Previous/next unmapping info (gcschedunmap). */
 	struct list_head link;
 };
 

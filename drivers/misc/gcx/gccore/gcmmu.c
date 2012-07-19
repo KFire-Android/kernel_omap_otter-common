@@ -1194,9 +1194,12 @@ void gcmmu_flush_finalize(struct gccmdbuf *gccmdbuf,
 	GCEXIT(GCZONE_FLUSH);
 }
 
-enum gcerror gcmmu_fixup(struct gcfixup *fixup, unsigned int *data)
+enum gcerror gcmmu_fixup(struct list_head *fixuplist,
+			 unsigned int *data)
 {
 	enum gcerror gcerror = GCERR_NONE;
+	struct list_head *head;
+	struct gcfixup *gcfixup;
 	struct gcfixupentry *table;
 	struct gcmmuarena *arena;
 	unsigned int dataoffset;
@@ -1205,20 +1208,15 @@ enum gcerror gcmmu_fixup(struct gcfixup *fixup, unsigned int *data)
 	GCENTER(GCZONE_FIXUP);
 
 	/* Process fixups. */
-	while (fixup != NULL) {
-		/* Verify fixup pointer. */
-		if (!virt_addr_valid(fixup)) {
-			GCERR("bad fixup @ 0x%08X\n", (unsigned int) fixup);
-			gcerror = GCERR_OODM;
-			goto exit;
-		}
+	list_for_each(head, fixuplist) {
+		gcfixup = list_entry(head, struct gcfixup, link);
 
 		GCDBG(GCZONE_FIXUP, "%d fixup(s) @ 0x%08X\n",
-			fixup->count, (unsigned int) fixup);
+			gcfixup->count, (unsigned int) gcfixup);
 
 		/* Apply fixups. */
-		table = fixup->fixup;
-		for (i = 0; i < fixup->count; i += 1) {
+		table = gcfixup->fixup;
+		for (i = 0; i < gcfixup->count; i += 1) {
 			GCDBG(GCZONE_FIXUP, "#%d\n", i);
 			GCDBG(GCZONE_FIXUP, "  buffer offset = 0x%08X\n",
 				table->dataoffset * 4);
@@ -1249,9 +1247,6 @@ enum gcerror gcmmu_fixup(struct gcfixup *fixup, unsigned int *data)
 
 			table += 1;
 		}
-
-		/* Get the next fixup. */
-		fixup = fixup->next;
 	}
 
 exit:

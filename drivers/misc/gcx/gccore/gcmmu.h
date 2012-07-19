@@ -265,6 +265,7 @@ void gcmmu_flush_finalize(struct gccmdbuf *openentry,
 			  struct gcmommuflush *flushlogical,
 			  unsigned int flushaddress);
 
-enum gcerror gcmmu_fixup(struct gcfixup *fixup, unsigned int *data);
+enum gcerror gcmmu_fixup(struct list_head *fixuplist,
+			 unsigned int *data);
 
 #endif
