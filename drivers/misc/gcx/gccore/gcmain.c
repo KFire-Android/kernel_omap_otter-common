@@ -515,8 +515,8 @@ void gc_commit(struct gccommit *gccommit, bool fromuser)
 	gccorecontext->gcpipe = gccommit->exitpipe;
 
 	/* Go through all buffers one at a time. */
-	gcbuffer = gccommit->buffer;
-	while (gcbuffer != NULL) {
+	list_for_each(head, &gccommit->buffer) {
+		gcbuffer = list_entry(head, struct gcbuffer, link);
 		GCDBG(GCZONE_COMMIT, "gcbuffer = 0x%08X\n",
 			(unsigned int) gcbuffer);
 
@@ -552,12 +552,9 @@ void gc_commit(struct gccommit *gccommit, bool fromuser)
 		}
 
 		/* Process fixups. */
-		gccommit->gcerror = gcmmu_fixup(gcbuffer->fixuphead, logical);
+		gccommit->gcerror = gcmmu_fixup(&gcbuffer->fixup, logical);
 		if (gccommit->gcerror != GCERR_NONE)
 			goto exit;
-
-		/* Get the next buffer. */
-		gcbuffer = gcbuffer->next;
 	}
 
 	/* Add the callback. */
