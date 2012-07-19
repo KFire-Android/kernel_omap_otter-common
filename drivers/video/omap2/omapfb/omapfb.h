@@ -148,9 +148,9 @@ void omapfb_stop_auto_update(struct omapfb2_device *fbdev,
 		struct omap_dss_device *display);
 int omapfb_get_update_mode(struct fb_info *fbi, enum omapfb_update_mode *mode);
 int omapfb_set_update_mode(struct fb_info *fbi, enum omapfb_update_mode mode);
-int omapfb_enable_vsync(struct omapfb2_device *fbdev);
-void omapfb_disable_vsync(struct omapfb2_device *fbdev);
 
+int omapfb_enable_vsync(struct omapfb2_device *fbdev, enum omap_channel ch,
+			bool enable);
 void get_fb_resolution(struct omap_dss_device *dssdev,
 		u16 *xres, u16 *yres);
 
