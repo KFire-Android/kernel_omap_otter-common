@@ -46,10 +46,9 @@
 #include <video/omap-panel-generic-dpi.h>
 
 
-/* USBB3 to SMSC LAN9730 */
-#define GPIO_ETH_NRESET 15
-/* USBB2 to SMSC 3530 HUB */
-#define GPIO_HUB_NRESET 80
+#define GPIO_ETH_NRESET		15	/* USBB3 to SMSC LAN9730 */
+#define GPIO_HUB_NRESET		80	/* USBB2 to SMSC 3530 HUB */
+#define HDMI_GPIO_HPD		193
 
 #ifdef CONFIG_OMAP_MUX
 static struct omap_board_mux board_mux[] __initdata = {
@@ -93,7 +92,6 @@ static struct omap2_hsmmc_info mmc[] = {
 	{}	/* Terminator */
 };
 
-#define HDMI_GPIO_HPD 193
 
 #ifdef CONFIG_OMAP5_SEVM_PALMAS
 #define OMAP5_GPIO_END	0
