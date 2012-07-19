@@ -132,8 +132,8 @@ int dss_mode_to_fb_mode(enum omap_color_mode dssmode,
 int omapfb_setup_overlay(struct fb_info *fbi, struct omap_overlay *ovl,
 		u16 posx, u16 posy, u16 outw, u16 outh);
 
-int omapfb_enable_vsync(struct omapfb2_device *fbdev);
-void omapfb_disable_vsync(struct omapfb2_device *fbdev);
+int omapfb_enable_vsync(struct omapfb2_device *fbdev, enum omap_channel ch,
+			bool enable);
 void get_fb_resolution(struct omap_dss_device *dssdev,
 		u16 *xres, u16 *yres);
 
