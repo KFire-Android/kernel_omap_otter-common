@@ -252,5 +252,47 @@ extern u32 omap2_pwrdm_get_mem_bank_stst_mask(u8 bank);
 extern struct powerdomain wkup_omap2_pwrdm;
 extern struct powerdomain gfx_omap2_pwrdm;
 
+#define PWRDM_COMPARE_PWRST_EQ	(0x1 << 0)
+#define PWRDM_COMPARE_PWRST_GT	(0x1 << 1)
+#define PWRDM_COMPARE_PWRST_LT	(0x1 << 2)
+/* Do not use the internal function, use the exposed API */
+extern bool _pwrdm_state_compare_int(int a, int b, u8 flag);
 
+/*
+ * The following inlines are strongly encouraged to be
+ * used in-order to compare powerdomain states.
+ * pwrdm_power_state_eq(a, b) return true if a == b
+ * pwrdm_power_state_gt(a, b) return true if a > b
+ * pwrdm_power_state_ge(a, b) return true if a >= b
+ * pwrdm_power_state_lt(a, b) return true if a < b
+ * pwrdm_power_state_le(a, b) return true if a <= b
+ *
+ * IMPORTANT: For performance reasons,No verification of powerdomains are done
+ * Do not use with private macro definition of internal state
+ */
+static inline bool pwrdm_power_state_eq(int a, int b)
+{
+	return _pwrdm_state_compare_int(a, b, PWRDM_COMPARE_PWRST_EQ);
+}
+static inline bool pwrdm_power_state_gt(int a, int b)
+{
+	return _pwrdm_state_compare_int(a, b, PWRDM_COMPARE_PWRST_GT);
+}
+static inline bool pwrdm_power_state_ge(int a, int b)
+{
+	return _pwrdm_state_compare_int(a, b,
+					PWRDM_COMPARE_PWRST_GT |
+					PWRDM_COMPARE_PWRST_EQ);
+}
+static inline bool pwrdm_power_state_lt(int a, int b)
+{
+	return _pwrdm_state_compare_int(a, b, PWRDM_COMPARE_PWRST_LT);
+}
+
+static inline bool pwrdm_power_state_le(int a, int b)
+{
+	return _pwrdm_state_compare_int(a, b,
+					PWRDM_COMPARE_PWRST_LT |
+					PWRDM_COMPARE_PWRST_EQ);
+}
 #endif

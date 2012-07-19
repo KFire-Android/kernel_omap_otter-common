@@ -44,6 +44,14 @@ enum {
 	PWRDM_STATE_PREV,
 };
 
+static unsigned char _pwrdm_state_idx_lookup[] = {
+	[PWRDM_POWER_OFF] = 1,
+	[PWRDM_POWER_OSWR] = 2,
+	[PWRDM_POWER_CSWR] = 3,
+	[PWRDM_POWER_INACTIVE] = 4,
+	[PWRDM_POWER_ON] = 5,
+};
+
 /* Fwd declarations */
 static __maybe_unused int pwrdm_set_mem_onst(struct powerdomain *pwrdm, u8 bank,
 					     u8 pwrst);
@@ -225,6 +233,21 @@ static int _pwrdm_post_transition_cb(struct powerdomain *pwrdm, void *unused)
 }
 
 /* Public functions */
+
+bool _pwrdm_state_compare_int(int a, int b, u8 flag)
+{
+	int a_idx = _pwrdm_state_idx_lookup[a];
+	int b_idx = _pwrdm_state_idx_lookup[b];
+
+	if (flag & PWRDM_COMPARE_PWRST_EQ && a_idx == b_idx)
+		return true;
+	if (flag & PWRDM_COMPARE_PWRST_GT && a_idx > b_idx)
+		return true;
+	if (flag & PWRDM_COMPARE_PWRST_LT && a_idx < b_idx)
+		return true;
+
+	return false;
+}
 
 /**
  * pwrdm_register_platform_funcs - register powerdomain implementation fns
