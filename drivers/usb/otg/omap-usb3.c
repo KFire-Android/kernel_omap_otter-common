@@ -194,6 +194,13 @@ static int omap_usb3_init(struct usb_phy *x)
 	struct omap_usb	*phy = phy_to_omapusb(x);
 
 	omap_usb_dpll_lock(phy);
+	omap5_usb_phy_partial_powerup(phy->control_dev);
+	/*
+	 * Give enough time for the PHY to partially power-up before
+	 * powering it up completely. delay value suggested by the HW
+	 * team.
+	 */
+	mdelay(100);
 	omap5_usb_phy_power(phy->control_dev, 1);
 
 	return 0;
