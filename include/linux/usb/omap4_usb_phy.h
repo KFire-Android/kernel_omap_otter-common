@@ -44,11 +44,14 @@
 #define	USB3_PHY_TX_RX_POWERON		0x3
 #define	USB3_PHY_TX_RX_POWEROFF		0x0
 
+#define	USB3_PHY_PARTIAL_RX_POWERON	(0x1 << 6)
+
 /* USB-PHY helpers */
 #if (defined(CONFIG_OMAP4_USB_PHY)) || (defined(CONFIG_OMAP4_USB_PHY_MODULE))
 extern int omap4_usb_phy_mailbox(struct device *dev, u32 val);
 extern int omap4_usb_phy_power(struct device *dev, bool on);
 extern int omap5_usb_phy_power(struct device *dev, bool on);
+extern int omap5_usb_phy_partial_powerup(struct device *dev);
 #else
 static int omap4_usb_phy_mailbox(struct device *dev, u32 val)
 {
@@ -59,6 +62,10 @@ static int omap4_usb_phy_power(struct device *dev, bool on)
 	return 0;
 }
 static int omap5_usb_phy_power(struct device *dev, bool on)
+{
+	return 0;
+}
+static int omap5_usb_phy_partial_powerup(struct device *dev)
 {
 	return 0;
 }

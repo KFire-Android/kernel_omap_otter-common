@@ -108,6 +108,8 @@ static int omap4_clkdm_clk_disable(struct clockdomain *clkdm)
 
 	if (!hwsup && (clkdm->flags & CLKDM_CAN_FORCE_SLEEP))
 		omap4_clkdm_sleep(clkdm);
+	else if (clkdm->flags & CLKDM_CAN_HWSUP)
+		omap4_clkdm_allow_idle(clkdm);
 
 	return 0;
 }

@@ -93,13 +93,15 @@ static int __devinit omap_usb_phy_probe(struct platform_device *pdev)
 }
 
 /**
- * omap5_usb_phy_power - power on/off the serializer using control module
+ * omap5_usb_phy_partial_powerup - power on the serializer using control module
  * @dev: struct device *
- * @on: 0 to off and 1 to on based on powering on or off the PHY
  *
- * omap_usb3 can call this API to power on or off the PHY.
+ * After the dwc3 module is disabled and enabled again the synchronization
+ * between dwc3 and phy goes bad and the device does not get enumerated
+ * in superspeed mode. After some trials it was found powering up TX and
+ * part of RX PHY helped to solve the issue.
  */
-int omap5_usb_phy_power(struct device *dev, bool on)
+int omap5_usb_phy_partial_powerup(struct device *dev)
 {
 	int ret;
 	u32 val;
@@ -121,10 +123,38 @@ int omap5_usb_phy_power(struct device *dev, bool on)
 		return ret;
 	}
 
+	val &= ~(USB_PWRCTL_CLK_CMD_MASK | USB_PWRCTL_CLK_FREQ_MASK);
+	val |= (USB3_PHY_PARTIAL_RX_POWERON | USB3_PHY_TX_RX_POWERON)
+		<< USB_PWRCTL_CLK_CMD_SHIFT;
+	val |= rate << USB_PWRCTL_CLK_FREQ_SHIFT;
+
+	ret = omap_control_writel(dev, val, CONTROL_PHY_POWER_USB);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(omap5_usb_phy_partial_powerup);
+
+/**
+ * omap5_usb_phy_power - power on/off the serializer using control module
+ * @dev: struct device *
+ * @on: 0 to off and 1 to on based on powering on or off the PHY
+ *
+ * omap_usb3 can call this API to power on or off the PHY.
+ */
+int omap5_usb_phy_power(struct device *dev, bool on)
+{
+	int ret;
+	u32 val;
+
+	ret = omap_control_readl(dev, CONTROL_PHY_POWER_USB, &val);
+	if (ret) {
+		pr_err("%s: unable to read register\n", __func__);
+		return ret;
+	}
+
 	if (on) {
-		val &= ~(USB_PWRCTL_CLK_CMD_MASK | USB_PWRCTL_CLK_FREQ_MASK);
+		val &= ~USB_PWRCTL_CLK_CMD_MASK;
 		val |= USB3_PHY_TX_RX_POWERON << USB_PWRCTL_CLK_CMD_SHIFT;
-		val |= rate << USB_PWRCTL_CLK_FREQ_SHIFT;
 	} else {
 		val &= ~USB_PWRCTL_CLK_CMD_MASK;
 		val |= USB3_PHY_TX_RX_POWEROFF << USB_PWRCTL_CLK_CMD_SHIFT;
