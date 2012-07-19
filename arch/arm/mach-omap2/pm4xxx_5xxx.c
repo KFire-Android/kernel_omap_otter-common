@@ -87,18 +87,38 @@ static char *power_state_names[] = {
 static int omap4_5_pm_suspend(void)
 {
 	struct power_state *pwrst;
-	int state, ret = 0;
+	int prev_state, curr_state, ret = 0, r;
 	u32 cpu_id = smp_processor_id();
 
 	/* Save current powerdomain state */
 	list_for_each_entry(pwrst, &pwrst_list, node) {
+		curr_state = pwrdm_read_pwrst(pwrst->pwrdm);
 		pwrst->saved_state = pwrdm_read_next_pwrst(pwrst->pwrdm);
+		/*
+		 * warn that we might not actually achieve OFF mode
+		 * TODO: Consider this for detection and potential abort
+		 * of un-successful OFF mode transition
+		 * MPU PD is expected to be mismatched due to CPUIdle
+		 * deciding not to precisely program the next_state
+		 * We will over-ride it here anyway, but this is not
+		 * expected to be done for other power domains.
+		 * TODO: consider static dependencies as well here.
+		 */
+		if (strcmp(pwrst->pwrdm->name, "mpu_pwrdm") &&
+		    pwrdm_power_state_gt(curr_state,
+					 pwrst->saved_state)) {
+			pr_debug("Powerdomain(%s) may fail enter target %s "
+				"(current=%s next_state=%s) OR static dep?\n",
+				pwrst->pwrdm->name,
+				power_state_names[pwrst->next_state],
+				power_state_names[curr_state],
+				power_state_names[pwrst->saved_state]);
+		}
 	}
 
 	/* Set targeted power domain states by suspend */
-	list_for_each_entry(pwrst, &pwrst_list, node) {
+	list_for_each_entry(pwrst, &pwrst_list, node)
 		omap_set_pwrdm_state(pwrst->pwrdm, pwrst->next_state);
-	}
 
 	/*
 	 * For MPUSS to hit power domain retention(CSWR or OSWR),
@@ -114,19 +134,39 @@ static int omap4_5_pm_suspend(void)
 
 	/* Restore next powerdomain state */
 	list_for_each_entry(pwrst, &pwrst_list, node) {
-		state = pwrdm_read_prev_pwrst(pwrst->pwrdm);
-		if (state == PWRDM_POWER_ON || state > pwrst->next_state) {
-			int now_state = pwrdm_read_pwrst(pwrst->pwrdm);
+		prev_state = pwrdm_read_prev_pwrst(pwrst->pwrdm);
+		curr_state = pwrdm_read_pwrst(pwrst->pwrdm);
+		if (pwrdm_power_state_gt(prev_state, pwrst->next_state)) {
 			pr_info("Powerdomain (%s) didn't enter target state %s "
 				"(achieved=%s current=%s saved=%s)\n",
 				pwrst->pwrdm->name,
 				power_state_names[pwrst->next_state],
-				power_state_names[state],
-				power_state_names[now_state],
+				power_state_names[prev_state],
+				power_state_names[curr_state],
 				power_state_names[pwrst->saved_state]);
 			ret = -1;
 		}
-		omap_set_pwrdm_state(pwrst->pwrdm, pwrst->saved_state);
+		/*
+		 * If current state is lower or equal to saved state
+		 * just program next_pwrst, but dont need to force the
+		 * transition
+		 */
+		if (!pwrdm_power_state_eq(pwrst->saved_state, PWRDM_POWER_ON) &&
+		    pwrdm_power_state_le(curr_state, pwrst->saved_state))
+			r = pwrdm_set_next_pwrst(pwrst->pwrdm,
+						 pwrst->saved_state);
+		else
+			r = omap_set_pwrdm_state(pwrst->pwrdm,
+						 pwrst->saved_state);
+		if (r)
+			pr_err("Powerdomain (%s) restore to %s Fail(%d)"
+				"(attempted=%s achieved=%s current=%s)\n",
+				pwrst->pwrdm->name,
+				power_state_names[pwrst->saved_state],
+				r,
+				power_state_names[pwrst->next_state],
+				power_state_names[prev_state],
+				power_state_names[curr_state]);
 	}
 	if (ret)
 		pr_crit("Could not enter target state in pm_suspend\n");
