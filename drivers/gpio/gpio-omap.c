@@ -81,6 +81,8 @@ struct gpio_bank {
 
 	void (*set_dataout)(struct gpio_bank *bank, int gpio, int enable);
 	int (*get_context_loss_count)(struct device *dev);
+	int (*do_reset)(struct device *dev, bool context_lost,
+			bool *should_restore_context);
 
 	struct omap_gpio_reg_offs *regs;
 };
@@ -1153,6 +1155,8 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
 	if (bank->loses_context)
 		bank->get_context_loss_count = pdata->get_context_loss_count;
 
+	bank->do_reset = pdata->do_module_reset;
+
 	pm_runtime_put(bank->dev);
 
 	list_add_tail(&bank->node, &omap_gpio_list);
@@ -1249,6 +1253,7 @@ static int omap_gpio_runtime_resume(struct device *dev)
 	int context_lost_cnt_after;
 	u32 l = 0, gen, gen0, gen1;
 	unsigned long flags;
+	bool should_restore_context = false;
 
 	spin_lock_irqsave(&bank->lock, flags);
 	_gpio_dbck_enable(bank);
@@ -1268,10 +1273,29 @@ static int omap_gpio_runtime_resume(struct device *dev)
 		context_lost_cnt_after =
 			bank->get_context_loss_count(bank->dev);
 		if (context_lost_cnt_after != bank->context_loss_count ||
-						!context_lost_cnt_after) {
-			omap_gpio_restore_context(bank);
-		}
+						!context_lost_cnt_after)
+			should_restore_context = true;
 	}
+
+	/*
+	 * If bank requires reset to be done, then it should be done
+	 * prior to restore, and let arch code deal with decision
+	 * if certain module can or should restore or not.
+	 */
+	if (bank->do_reset) {
+		int r;
+		bool can_loose_context;
+
+		can_loose_context = bank->get_context_loss_count ? true : false;
+		r = bank->do_reset(dev, can_loose_context,
+				   &should_restore_context);
+		if (r)
+			dev_err(dev, "Bank reset fail(%d)!\n", r);
+		/* Fall through anyway and hope it recovers.. */
+	}
+
+	if (should_restore_context)
+		omap_gpio_restore_context(bank);
 
 	/*
 	 * WA for GPIO pins 140 (BT) & 142 (WLAN) used as output pins
