@@ -163,6 +163,9 @@ enum {
 #define OMAP_I2C_SYSTEST_SDA_I		(1 << 1)	/* SDA line sense in */
 #define OMAP_I2C_SYSTEST_SDA_O		(1 << 0)	/* SDA line drive out */
 
+/* I2C System Status Register */
+#define OMAP_I2C_SYSS_RDONE		BIT(0)		/* Reset done */
+
 /* Errata definitions */
 #define I2C_OMAP_ERRATA_I207		(1 << 0)
 #define I2C_OMAP3_1P153			(1 << 1)
@@ -303,6 +306,8 @@ static void omap_i2c_unidle(struct omap_i2c_dev *dev)
 	pm_runtime_get_sync(&pdev->dev);
 
 	if (cpu_is_omap34xx() || cpu_is_omap44xx()) {
+		unsigned long delay;
+
 		omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
 		omap_i2c_write_reg(dev, OMAP_I2C_PSC_REG, dev->pscstate);
 		omap_i2c_write_reg(dev, OMAP_I2C_SCLL_REG, dev->scllstate);
@@ -310,6 +315,16 @@ static void omap_i2c_unidle(struct omap_i2c_dev *dev)
 		omap_i2c_write_reg(dev, OMAP_I2C_BUF_REG, dev->bufstate);
 		omap_i2c_write_reg(dev, OMAP_I2C_WE_REG, dev->westate);
 		omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
+
+		delay = jiffies + OMAP_I2C_TIMEOUT;
+		while (!(omap_i2c_read_reg(dev, OMAP_I2C_SYSS_REG)
+				& OMAP_I2C_SYSS_RDONE)) {
+			if (time_after(jiffies, delay)) {
+				dev_err(dev->dev, "omap i2c unidle timeout\n");
+				return;
+			}
+			cpu_relax();
+		}
 	}
 	dev->idle = 0;
 
