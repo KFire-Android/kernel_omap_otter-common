@@ -67,7 +67,10 @@ GCDBG_FILTERDEF(queue, GCZONE_NONE,
 
 /* GPU timeout in milliseconds. The timeout value controls when the power
  * on the GPU is pulled if there is no activity in progress or scheduled. */
-#define GC_TIMEOUT		1000
+#define GC_THREAD_TIMEOUT	1000
+
+/* Time in milliseconds to wait for GPU to become idle. */
+#define GC_IDLE_TIMEOUT		100
 
 /* The size of storage buffer. */
 #define GC_STORAGE_SIZE		((GC_BUFFER_SIZE * GC_CMDBUF_FACTOR + \
@@ -488,7 +491,7 @@ static enum gcerror append_cmdbuf(
 	gcqueue->gcmoterminator = tailcmdbuf->gcmoterminator;
 
 	/* Start the GPU if not already running. */
-	if (gcqueue->stopped) {
+	if (try_wait_for_completion(&gcqueue->stopped)) {
 		GCDBG(GCZONE_THREAD, "GPU is currently stopped - starting.\n");
 
 		/* Enable power to the chip. */
@@ -520,9 +523,6 @@ static enum gcerror append_cmdbuf(
 					   ENABLE, ENABLE) |
 			     GCSETFIELD(0, GCREG_CMD_BUFFER_CTRL,
 					PREFETCH, headcmdbuf->count));
-
-		/* Set running state. */
-		gcqueue->stopped = false;
 
 		/* Release the command buffer thread. */
 		complete(&gcqueue->ready);
@@ -570,13 +570,6 @@ static int gccmdthread(void *_gccorecontext)
 		signaled = wait_for_completion_timeout(&gcqueue->ready,
 						       timeout);
 		GCDBG(GCZONE_THREAD, "wait(ready) = %d.\n", signaled);
-
-		/* Is termination requested? */
-		if (try_wait_for_completion(&gcqueue->stop)) {
-			GCDBG(GCZONE_THREAD,
-			      "terminating command queue thread.\n");
-			break;
-		}
 
 		/* Get triggered interrupts. */
 		ints2process = triggered = atomic_read(&gcqueue->triggered);
@@ -779,19 +772,23 @@ static int gccmdthread(void *_gccorecontext)
 			continue;
 		}
 
-		if (signaled) {
+		if (signaled && !gccorecontext->suspend_requested) {
 			/* The timeout value controls when the power
 			 * on the GPU is pulled if there is no activity
 			 * in progress or scheduled. */
-			timeout = msecs_to_jiffies(GC_TIMEOUT);
+			timeout = msecs_to_jiffies(GC_THREAD_TIMEOUT);
 		} else {
 			GCLOCK(&gcqueue->queuelock);
 
-			GCDBG(GCZONE_THREAD,
-			      "timedout while waiting for ready signal.\n");
+			if (gccorecontext->suspend_requested)
+				GCDBG(GCZONE_THREAD, "suspend requested\n");
+
+			if (!signaled)
+				GCDBG(GCZONE_THREAD,
+				      "timedout while waiting for ready signal.\n");
 
 			if (gcqueue->gcmoterminator == NULL) {
-				GCERR("unexpected condition.\n");
+				GCUNLOCK(&gcqueue->queuelock);
 				continue;
 			}
 
@@ -834,17 +831,22 @@ static int gccmdthread(void *_gccorecontext)
 			gcqueue->gcmoterminator = NULL;
 
 			/* Go to suspend. */
-			gcpwr_set(gccorecontext,
-				  gccorecontext->forceoff
-					? GCPWR_OFF : GCPWR_LOW);
+			gcpwr_set(gccorecontext, GCPWR_OFF);
 
-			/* Set running state. */
-			gcqueue->stopped = true;
+			/* Set idle state. */
+			complete(&gcqueue->stopped);
 
 			/* Set timeout to infinity. */
 			timeout = MAX_SCHEDULE_TIMEOUT;
 
 			GCUNLOCK(&gcqueue->queuelock);
+
+			/* Is termination requested? */
+			if (try_wait_for_completion(&gcqueue->stop)) {
+				GCDBG(GCZONE_THREAD,
+				      "terminating command queue thread.\n");
+				break;
+			}
 		}
 	}
 
@@ -921,7 +923,11 @@ enum gcerror gcqueue_start(struct gccorecontext *gccorecontext)
 		complete(&gcqueue->freeint);
 
 	/* Set GPU running state. */
-	gcqueue->stopped = true;
+	init_completion(&gcqueue->stopped);
+	complete(&gcqueue->stopped);
+
+	/* Initialize sleep completion. */
+	init_completion(&gcqueue->sleep);
 
 	/* Initialize thread control completions. */
 	init_completion(&gcqueue->ready);
@@ -1578,5 +1584,44 @@ enum gcerror gcqueue_execute(struct gccorecontext *gccorecontext,
 exit:
 	GCEXITARG(GCZONE_EXEC, "gc%s = 0x%08X\n",
 		(gcerror == GCERR_NONE) ? "result" : "error", gcerror);
+	return gcerror;
+}
+
+enum gcerror gcqueue_wait_idle(struct gccorecontext *gccorecontext)
+{
+	enum gcerror gcerror = GCERR_NONE;
+	struct gcqueue *gcqueue = &gccorecontext->gcqueue;
+	unsigned long timeout;
+	unsigned int count, limit;
+
+	GCENTER(GCZONE_THREAD);
+
+	/* indicate shutdown immediately */
+	gccorecontext->suspend_requested = true;
+	complete(&gcqueue->ready);
+
+	/* Convert timeout to jiffies. */
+	timeout = msecs_to_jiffies(GC_IDLE_TIMEOUT);
+
+	/* Compute the maximum number of attempts. */
+	limit = 5000 / GC_IDLE_TIMEOUT;
+
+	/* Wait for GPU to stop. */
+	count = 0;
+	while (!completion_done(&gcqueue->stopped)) {
+		/* Not stopped, sleep. */
+		wait_for_completion_timeout(&gcqueue->sleep, timeout);
+
+		/* Waiting too long? */
+		if (++count == limit) {
+			GCERR("wait for idle takes too long.\n");
+			gcerror = GCERR_TIMEOUT;
+			break;
+		}
+	}
+
+	gccorecontext->suspend_requested = false;
+
+	GCEXIT(GCZONE_THREAD);
 	return gcerror;
 }
