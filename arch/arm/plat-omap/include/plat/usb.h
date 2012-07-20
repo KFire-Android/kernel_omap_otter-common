@@ -7,6 +7,7 @@
 #include <linux/platform_device.h>
 #include <linux/usb/musb.h>
 #include <plat/board.h>
+#include <linux/pm_qos.h>
 
 #define OMAP3_HS_USB_PORTS	3
 
@@ -50,6 +51,7 @@ struct ehci_hcd_omap_platform_data {
 	int				reset_gpio_port[OMAP3_HS_USB_PORTS];
 	struct regulator		*regulator[OMAP3_HS_USB_PORTS];
 	unsigned			phy_reset:1;
+	struct pm_qos_request		pm_qos_request;
 };
 
 struct ohci_hcd_omap_platform_data {
