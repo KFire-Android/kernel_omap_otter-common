@@ -118,6 +118,7 @@ static void __init omap2_init_processor_devices(void)
 
 	if (cpu_is_omap44xx() || cpu_is_omap54xx()) {
 		_init_omap_device("l3_main_1");
+#ifndef CONFIG_OMAP_PM_STANDALONE
 		_init_omap_device("dsp");
 		_init_omap_device_lats("iva", iva_pm_lats,
 						ARRAY_SIZE(iva_pm_lats));
@@ -125,6 +126,7 @@ static void __init omap2_init_processor_devices(void)
 						ARRAY_SIZE(iva_pm_lats));
 		_init_omap_device_lats("iva_seq1", iva_pm_lats,
 						ARRAY_SIZE(iva_pm_lats));
+#endif
 	} else {
 		_init_omap_device("l3_main");
 	}

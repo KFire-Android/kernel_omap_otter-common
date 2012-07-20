@@ -430,6 +430,18 @@ config OMAP_TPS6236X
 	  TPS62361 is a PMIC used with OMAP4460 to supply MPU VDD voltage.
 	  Rest of the VDDs continue to be supplied via TWL6030.
 
+config OMAP_PM_STANDALONE
+        bool "Minimal OMAP PM"
+	depends on ARCH_OMAP5
+	help
+	  Enable this option to enable Power Management with minimal set of
+	  drivers. This will disable few hwmod data and force reset of few other
+	  IP blocks at boot for the ones that are not mandatory for operation
+	  with a minimal system such as ramdisk. Examples at this point are:
+	  dsp, iva, abe, aess, dmic, gpu, ipu, mcpdm, sata.
+	  THIS MUST BE DISABLED on production devices and is purely intended
+	  to work with minimal debug environment.
+
 endmenu
 
 endif
