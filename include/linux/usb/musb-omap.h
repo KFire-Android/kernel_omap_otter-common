@@ -20,7 +20,7 @@ enum omap_musb_vbus_id_status {
 
 #if (defined(CONFIG_USB_MUSB_OMAP2PLUS) || \
 				defined(CONFIG_USB_MUSB_OMAP2PLUS_MODULE))
-int omap_musb_mailbox(enum omap_musb_vbus_id_status status);
+extern int omap_musb_mailbox(enum omap_musb_vbus_id_status status);
 #else
 static inline int omap_musb_mailbox(enum omap_musb_vbus_id_status status)
 {
