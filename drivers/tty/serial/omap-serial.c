@@ -71,6 +71,9 @@
 #define OMAP_UART_MVR_MAJ_SHIFT		8
 #define OMAP_UART_MVR_MIN_MASK		0x3f
 
+#define UART_OMAP_IIR_ID               0x3e
+#define UART_OMAP_IIR_RX_TIMEOUT       0xc
+
 static struct uart_omap_port *ui[OMAP_MAX_HSUART_PORTS];
 
 /* Forward declaration of functions */
@@ -411,7 +414,9 @@ static inline irqreturn_t serial_omap_irq(int irq, void *dev_id)
 {
 	struct uart_omap_port *up = dev_id;
 	unsigned int iir, lsr;
+	unsigned int int_id;
 	unsigned long flags;
+	int ret = IRQ_HANDLED;
 
 	pm_runtime_get_sync(&up->pdev->dev);
 	iir = serial_in(up, UART_IIR);
@@ -421,9 +426,12 @@ static inline irqreturn_t serial_omap_irq(int irq, void *dev_id)
 		return IRQ_NONE;
 	}
 
+	int_id = iir & UART_OMAP_IIR_ID;
+
 	spin_lock_irqsave(&up->port.lock, flags);
 	lsr = serial_in(up, UART_LSR);
-	if (iir & UART_IIR_RLSI) {
+	if (int_id == UART_IIR_RDI || int_id == UART_OMAP_IIR_RX_TIMEOUT ||
+		int_id == UART_IIR_RLSI) {
 		if (!up->use_dma) {
 			if (lsr & UART_LSR_DR)
 				receive_chars(up, &lsr);
@@ -437,15 +445,19 @@ static inline irqreturn_t serial_omap_irq(int irq, void *dev_id)
 	}
 
 	check_modem_status(up);
-	if ((lsr & UART_LSR_THRE) && (iir & UART_IIR_THRI))
-		transmit_chars(up);
+	if (int_id == UART_IIR_THRI) {
+		if (lsr & UART_LSR_THRE)
+			transmit_chars(up);
+		else
+			ret = IRQ_NONE;
+	}
 
 	spin_unlock_irqrestore(&up->port.lock, flags);
 	pm_runtime_mark_last_busy(&up->pdev->dev);
 	pm_runtime_put_autosuspend(&up->pdev->dev);
 
 	up->port_activity = jiffies;
-	return IRQ_HANDLED;
+	return ret;
 }
 
 static unsigned int serial_omap_tx_empty(struct uart_port *port)
