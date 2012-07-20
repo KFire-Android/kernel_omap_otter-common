@@ -91,7 +91,8 @@ struct smsc_keypad {
 	struct i2c_client *client;
 	struct input_dev *input;
 	int rows, cols;
-	unsigned        irq;
+	unsigned irq;
+	unsigned gpio;
 	struct device *dbg_dev;
 };
 
@@ -294,6 +295,7 @@ smsc_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	if (!input)
 		goto err1;
 
+	kp->gpio = client->irq;
 	/* Get the debug Device */
 	kp->dbg_dev = &client->dev;
 	kp->input = input;
@@ -363,7 +365,7 @@ smsc_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	matrix_keypad_build_keymap(pdata->keymap_data, ROW_SHIFT,
 			input->keycode, input->keybit);
 
-	ret = gpio_request_one(client->irq, GPIOF_IN, "smsc_keypad");
+	ret = gpio_request_one(kp->gpio, GPIOF_IN, "smsc_keypad");
 	if (ret) {
 		dev_err(&client->dev, "keypad: gpio request failure\n");
 		goto err3;
@@ -373,7 +375,9 @@ smsc_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	* This ISR will always execute in kernel thread context because of
 	* the need to access the SMSC over the I2C bus.
 	*/
-	ret = request_threaded_irq(gpio_to_irq(client->irq), NULL, do_kp_irq,
+	kp->irq = gpio_to_irq(kp->gpio);
+
+	ret = request_threaded_irq(kp->irq, NULL, do_kp_irq,
 		IRQF_DISABLED | IRQF_TRIGGER_LOW | IRQF_ONESHOT,
 							client->name, kp);
 	if (ret) {
@@ -387,7 +391,8 @@ smsc_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	return 0;
 
 err4:
-	gpio_free(client->irq);
+	free_irq(kp->irq, NULL);
+	gpio_free(kp->gpio);
 err3:
 	input_unregister_device(input);
 err2:
@@ -403,8 +408,8 @@ static int smsc_remove(struct i2c_client *client)
 	struct smsc_keypad *kp = i2c_get_clientdata(client);
 
 	smsc_write_data(SMSC_CLK_CTRL, SMSC_SET_LOW);
-	free_irq(client->irq, NULL);
-	gpio_free(client->irq);
+	free_irq(kp->irq, NULL);
+	gpio_free(kp->gpio);
 	input_unregister_device(kp->input);
 	input_free_device(kp->input);
 	kfree(kp);
