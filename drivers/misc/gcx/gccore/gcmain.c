@@ -813,7 +813,7 @@ static int gc_remove(struct platform_device *pdev)
 static int gc_suspend(struct platform_device *pdev, pm_message_t s)
 {
 	GCENTER(GCZONE_POWER);
-	gcpwr_set(&g_context, GCPWR_OFF);
+	gcqueue_wait_idle(&g_context);
 	GCEXIT(GCZONE_POWER);
 	return 0;
 }
@@ -843,28 +843,14 @@ static struct platform_driver plat_drv = {
 #include <linux/earlysuspend.h>
 static void gc_early_suspend(struct early_suspend *h)
 {
-	struct gccorecontext *gccorecontext = &g_context;
-
 	GCENTER(GCZONE_POWER);
-
-	GCLOCK(&gccorecontext->mmucontextlock);
-	gccorecontext->forceoff = true;
-	gcpwr_set(gccorecontext, GCPWR_OFF);
-	GCUNLOCK(&gccorecontext->mmucontextlock);
-
+	gcqueue_wait_idle(&g_context);
 	GCEXIT(GCZONE_POWER);
 }
 
 static void gc_late_resume(struct early_suspend *h)
 {
-	struct gccorecontext *gccorecontext = &g_context;
-
 	GCENTER(GCZONE_POWER);
-
-	GCLOCK(&gccorecontext->mmucontextlock);
-	gccorecontext->forceoff = false;
-	GCUNLOCK(&gccorecontext->mmucontextlock);
-
 	GCEXIT(GCZONE_POWER);
 }
 
@@ -961,7 +947,6 @@ static void gc_exit(struct gccorecontext *gccorecontext)
 		gcmmu_exit(gccorecontext);
 
 		/* Disable power. */
-		gcpwr_set(gccorecontext, GCPWR_OFF);
 		pm_runtime_disable(gccorecontext->device);
 
 		if (gccorecontext->platdriver) {
