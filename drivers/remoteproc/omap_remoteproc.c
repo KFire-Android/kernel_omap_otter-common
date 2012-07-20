@@ -42,13 +42,27 @@
 /* 1 sec is fair enough time for suspending an OMAP device */
 #define DEF_SUSPEND_TIMEOUT 1000
 
+
+/**
+ * union oproc_pm_qos - holds the pm qos structure
+ *			ipu being in core domain uses pm_qos API
+ *			dsp can use the dev_pm_qos APIs
+ * @pm_qos:	element associated with the pm_qos requests
+ * @dev_pm_qos:	element associated with the dev_pm_qos requests
+ *
+ */
+union oproc_pm_qos {
+	struct pm_qos_request pm_qos;
+	struct dev_pm_qos_request dev_pm_qos;
+};
+
 /**
  * struct omap_rproc - omap remote processor state
  * @mbox: omap mailbox handle
  * @nb: notifier block that will be invoked on inbound mailbox messages
  * @rproc: rproc handle
  * @boot_reg: virtual address of the register where the bootaddr is stored
- * @qos_req: for requesting latency constraints for rproc
+ * @lat_req: for requesting latency constraints for rproc
  * @bw_req: for requesting L3 bandwidth constraints on behalf of rproc
  * @pm_comp: completion needed for suspend respond
  * @idle: address to the idle register
@@ -63,7 +77,7 @@ struct omap_rproc {
 	struct notifier_block nb;
 	struct rproc *rproc;
 	void __iomem *boot_reg;
-	struct dev_pm_qos_request qos_req;
+	union oproc_pm_qos lat_req;
 	struct pm_qos_request bw_req;
 	atomic_t thrd_cnt;
 	struct completion pm_comp;
@@ -176,19 +190,27 @@ omap_rproc_set_latency(struct device *dev, struct rproc *rproc, long val)
 	struct platform_device *pdev = to_platform_device(rproc->dev.parent);
 	struct omap_rproc_pdata *pdata = pdev->dev.platform_data;
 	struct omap_rproc *oproc = rproc->priv;
-	int ret;
+	int ret = 0;
 
 	/* Call device specific api if any */
 	if (pdata->ops && pdata->ops->set_latency)
 		return pdata->ops->set_latency(dev, rproc, val);
 
-	ret = dev_pm_qos_update_request(&oproc->qos_req, val);
-	/*
-	 * dev_pm_qos_update_request returns 0 or 1 on success depending
-	 * on if the constraint changed or not (same request). So, return
-	 * 0 in both cases
-	 */
-	return ret - ret == 1;
+	if (!strcmp(rproc->name, "ipu_c0"))
+		/* calling the C-state API for ipu since it is in core pd */
+		pm_qos_update_request(&oproc->lat_req.pm_qos, val);
+	else {
+		ret = dev_pm_qos_update_request(
+				&oproc->lat_req.dev_pm_qos, val);
+		/*
+		 * dev_pm_qos_update_request returns 0 or 1 on success depending
+		 * on if the constraint changed or not (same request). So,
+		 * return 0 in both cases
+		 */
+		ret = ret > 0 ? 0 : ret;
+	}
+
+	return ret;
 }
 
 static int
@@ -487,6 +509,31 @@ static struct rproc_ops omap_rproc_ops = {
 	.set_frequency	= omap_rproc_set_frequency,
 };
 
+static inline int omap_rproc_add_lat_request(struct omap_rproc *oproc)
+{
+	struct rproc *rproc = oproc->rproc;
+	int ret = 0;
+
+	if (!strcmp(rproc->name, "ipu_c0"))
+		pm_qos_add_request(&oproc->lat_req.pm_qos,
+				PM_QOS_CPU_DMA_LATENCY, PM_QOS_DEFAULT_VALUE);
+	else
+		ret = dev_pm_qos_add_request(rproc->dev.parent,
+			&oproc->lat_req.dev_pm_qos, PM_QOS_DEFAULT_VALUE);
+
+	return ret;
+}
+
+static inline void omap_rproc_remove_lat_request(struct omap_rproc *oproc)
+{
+	struct rproc *rproc = oproc->rproc;
+
+	if (!strcmp(rproc->name, "ipu_c0"))
+		pm_qos_remove_request(&oproc->lat_req.pm_qos);
+	else
+		dev_pm_qos_remove_request(&oproc->lat_req.dev_pm_qos);
+}
+
 static int __devinit omap_rproc_probe(struct platform_device *pdev)
 {
 	struct omap_rproc_pdata *pdata = pdev->dev.platform_data;
@@ -524,8 +571,8 @@ static int __devinit omap_rproc_probe(struct platform_device *pdev)
 	}
 
 	platform_set_drvdata(pdev, rproc);
-	ret = dev_pm_qos_add_request(&pdev->dev, &oproc->qos_req,
-			PM_QOS_DEFAULT_VALUE);
+
+	ret = omap_rproc_add_lat_request(oproc);
 	if (ret)
 		goto iounmap;
 
@@ -540,7 +587,7 @@ static int __devinit omap_rproc_probe(struct platform_device *pdev)
 
 remove_req:
 	pm_qos_remove_request(&oproc->bw_req);
-	dev_pm_qos_remove_request(&oproc->qos_req);
+	omap_rproc_remove_lat_request(oproc);
 iounmap:
 	if (oproc->idle)
 		iounmap(oproc->idle);
@@ -563,7 +610,7 @@ static int __devexit omap_rproc_remove(struct platform_device *pdev)
 		iounmap(oproc->boot_reg);
 
 	pm_qos_remove_request(&oproc->bw_req);
-	dev_pm_qos_remove_request(&oproc->qos_req);
+	omap_rproc_remove_lat_request(oproc);
 	return rproc_unregister(rproc);
 }
 
