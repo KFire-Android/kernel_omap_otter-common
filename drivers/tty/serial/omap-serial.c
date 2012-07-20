@@ -1092,9 +1092,22 @@ serial_omap_console_write(struct console *co, const char *s,
 	struct uart_omap_port *up = serial_omap_console_ports[co->index];
 	unsigned long flags;
 	unsigned int ier;
-	int locked = 1;
+	int console_lock = 0, locked = 1;
 
-	pm_runtime_get_sync(&up->pdev->dev);
+	if (console_trylock())
+		console_lock = 1;
+
+	/*
+	 * If console_lock is not available and we are in suspending
+	 * state then we can avoid the console usage scenario
+	 * as this may introduce recursive prints.
+	 * Basically this scenario occurs during boot while
+	 * printing debug bootlogs.
+	 */
+
+	if (!console_lock &&
+		up->pdev->dev.power.runtime_status == RPM_SUSPENDING)
+		return;
 
 	local_irq_save(flags);
 	if (up->port.sysrq)
@@ -1103,6 +1116,8 @@ serial_omap_console_write(struct console *co, const char *s,
 		locked = spin_trylock(&up->port.lock);
 	else
 		spin_lock(&up->port.lock);
+
+	pm_runtime_get_sync(&up->pdev->dev);
 
 	/*
 	 * First save the IER then disable the interrupts
@@ -1127,6 +1142,9 @@ serial_omap_console_write(struct console *co, const char *s,
 	 */
 	if (up->msr_saved_flags)
 		check_modem_status(up);
+
+	if (console_lock)
+		console_unlock();
 
 	pm_runtime_mark_last_busy(&up->pdev->dev);
 	pm_runtime_put_autosuspend(&up->pdev->dev);
