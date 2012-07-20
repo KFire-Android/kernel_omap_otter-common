@@ -149,6 +149,9 @@ struct gcqueue {
 	struct completion stop;
 	struct completion sleep;
 
+	/* Suspend request flag. */
+	bool suspend;
+
 	/* Stall completion; used to imitate synchronous behaviour. */
 	struct completion stall;
 

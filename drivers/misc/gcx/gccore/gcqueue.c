@@ -772,7 +772,7 @@ static int gccmdthread(void *_gccorecontext)
 			continue;
 		}
 
-		if (signaled && !gccorecontext->suspend_requested) {
+		if (signaled && !gcqueue->suspend) {
 			/* The timeout value controls when the power
 			 * on the GPU is pulled if there is no activity
 			 * in progress or scheduled. */
@@ -780,12 +780,11 @@ static int gccmdthread(void *_gccorecontext)
 		} else {
 			GCLOCK(&gcqueue->queuelock);
 
-			if (gccorecontext->suspend_requested)
+			if (gcqueue->suspend)
 				GCDBG(GCZONE_THREAD, "suspend requested\n");
 
 			if (!signaled)
-				GCDBG(GCZONE_THREAD,
-				      "timedout while waiting for ready signal.\n");
+				GCDBG(GCZONE_THREAD, "thread timedout.\n");
 
 			if (gcqueue->gcmoterminator == NULL) {
 				GCUNLOCK(&gcqueue->queuelock);
@@ -805,6 +804,10 @@ static int gccmdthread(void *_gccorecontext)
 				GCDBG(GCZONE_THREAD,
 				      "execution hasn't reached the end; "
 				      "large amount of work?\n");
+				GCDBG(GCZONE_THREAD,
+				      "current location @ 0x%08X.\n",
+				      dmapc);
+				GCUNLOCK(&gcqueue->queuelock);
 				continue;
 			}
 
@@ -1596,8 +1599,8 @@ enum gcerror gcqueue_wait_idle(struct gccorecontext *gccorecontext)
 
 	GCENTER(GCZONE_THREAD);
 
-	/* indicate shutdown immediately */
-	gccorecontext->suspend_requested = true;
+	/* Indicate shutdown immediately. */
+	gcqueue->suspend = true;
 	complete(&gcqueue->ready);
 
 	/* Convert timeout to jiffies. */
@@ -1620,7 +1623,8 @@ enum gcerror gcqueue_wait_idle(struct gccorecontext *gccorecontext)
 		}
 	}
 
-	gccorecontext->suspend_requested = false;
+	/* Reset suspend flag. */
+	gcqueue->suspend = false;
 
 	GCEXIT(GCZONE_THREAD);
 	return gcerror;
