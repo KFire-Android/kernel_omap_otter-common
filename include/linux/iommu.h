@@ -55,6 +55,8 @@ struct iommu_domain {
  * @domain_destroy: destroy iommu domain
  * @attach_dev: attach device to an iommu domain
  * @detach_dev: detach device from an iommu domain
+ * @domain_activate: enable iommu pm domain and restore configuration registers
+ * @domain_idle: save iommu configuration registers and idle pm domain
  * @map: map a physically contiguous memory region to an iommu domain
  * @unmap: unmap a physically contiguous memory region from an iommu domain
  * @iova_to_phys: translate iova to physical address
@@ -67,6 +69,8 @@ struct iommu_ops {
 	void (*domain_destroy)(struct iommu_domain *domain);
 	int (*attach_dev)(struct iommu_domain *domain, struct device *dev);
 	void (*detach_dev)(struct iommu_domain *domain, struct device *dev);
+	void (*domain_activate)(struct iommu_domain *domain);
+	void (*domain_idle)(struct iommu_domain *domain);
 	int (*map)(struct iommu_domain *domain, unsigned long iova,
 		   phys_addr_t paddr, size_t size, int prot);
 	size_t (*unmap)(struct iommu_domain *domain, unsigned long iova,
@@ -87,6 +91,8 @@ extern int iommu_attach_device(struct iommu_domain *domain,
 			       struct device *dev);
 extern void iommu_detach_device(struct iommu_domain *domain,
 				struct device *dev);
+extern void iommu_domain_activate(struct iommu_domain *domain);
+extern void iommu_domain_idle(struct iommu_domain *domain);
 extern int iommu_map(struct iommu_domain *domain, unsigned long iova,
 		     phys_addr_t paddr, size_t size, int prot);
 extern size_t iommu_unmap(struct iommu_domain *domain, unsigned long iova,

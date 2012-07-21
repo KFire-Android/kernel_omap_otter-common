@@ -192,6 +192,20 @@ void iommu_detach_device(struct iommu_domain *domain, struct device *dev)
 }
 EXPORT_SYMBOL_GPL(iommu_detach_device);
 
+void iommu_domain_activate(struct iommu_domain *domain)
+{
+	if (likely(domain->ops->domain_activate != NULL))
+		domain->ops->domain_activate(domain);
+}
+EXPORT_SYMBOL_GPL(iommu_domain_activate);
+
+void iommu_domain_idle(struct iommu_domain *domain)
+{
+	if (likely(domain->ops->domain_idle != NULL))
+		domain->ops->domain_idle(domain);
+}
+EXPORT_SYMBOL_GPL(iommu_domain_idle);
+
 phys_addr_t iommu_iova_to_phys(struct iommu_domain *domain,
 			       unsigned long iova)
 {
