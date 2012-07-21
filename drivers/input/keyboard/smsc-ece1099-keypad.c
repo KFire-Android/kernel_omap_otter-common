@@ -168,11 +168,12 @@ static void smsc_kp_scan(struct smsc_keypad *kp)
 	}
 	input_sync(input);
 
-	smsc_write_data(SMSC_KSI_MASK, SMSC_SET_HIGH);
-	/* Set up Low Power Mode (Wake-up) (0xFB) */
-	smsc_write_data(SMSC_WKUP_CTRL, SMSC_SET_LOW_PWR);
-	/*Enable Keypad Scan (generate interrupt on key press) (0x40)*/
+	/*Enable Keypad Scan (generate interrupt on key press) */
 	smsc_write_data(SMSC_KSO_SELECT, SMSC_KSO_ALL_LOW);
+	/* Clear all KSI Interrupts */
+	smsc_write_data(SMSC_KSI_STATUS, SMSC_SET_HIGH);
+	/* Enable keypad interrupts */
+	smsc_write_data(SMSC_KSI_MASK, SMSC_SET_HIGH);
 }
 
 static irqreturn_t do_kp_irq(int irq, void *_kp)
