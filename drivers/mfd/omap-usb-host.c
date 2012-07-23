@@ -833,18 +833,19 @@ static void omap_usbhs_init(struct device *dev)
 	spin_lock_irqsave(&omap->lock, flags);
 
 	if (pdata->ehci_data->phy_reset) {
-		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[0])) {
-			gpio_request(pdata->ehci_data->reset_gpio_port[0],
-						"USB1 PHY reset");
-			gpio_direction_output
-				(pdata->ehci_data->reset_gpio_port[0], 0);
-		}
+		int i;
 
-		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[1])) {
-			gpio_request(pdata->ehci_data->reset_gpio_port[1],
-						"USB2 PHY reset");
-			gpio_direction_output
-				(pdata->ehci_data->reset_gpio_port[1], 0);
+		static char gpio_label[ARRAY_SIZE(pdata->ehci_data->reset_gpio_port)][20];
+
+		for (i = 0; i < ARRAY_SIZE(pdata->ehci_data->reset_gpio_port); i++) {
+			if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[i])) {
+				snprintf(gpio_label[i], ARRAY_SIZE(gpio_label[i]),
+						"USB%d PHY reset", i);
+				gpio_request(pdata->ehci_data->reset_gpio_port[i],
+							gpio_label[i]);
+				gpio_direction_output
+					(pdata->ehci_data->reset_gpio_port[i], 0);
+			}
 		}
 
 		/* Hold the PHY in RESET for enough time till DIR is high */
@@ -949,18 +950,19 @@ static void omap_usbhs_init(struct device *dev)
 	}
 
 	if (pdata->ehci_data->phy_reset) {
-		/* Hold the PHY in RESET for enough time till
+		int i;
+
+		/*
+		 * Hold the PHY in RESET for enough time till
 		 * PHY is settled and ready
 		 */
 		udelay(10);
 
-		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[0]))
-			gpio_set_value
-				(pdata->ehci_data->reset_gpio_port[0], 1);
-
-		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[1]))
-			gpio_set_value
-				(pdata->ehci_data->reset_gpio_port[1], 1);
+		for (i = 0; i < ARRAY_SIZE(pdata->ehci_data->reset_gpio_port); i++) {
+			if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[i]))
+				gpio_set_value
+					(pdata->ehci_data->reset_gpio_port[i], 1);
+		}
 	}
 
 	spin_unlock_irqrestore(&omap->lock, flags);
@@ -975,11 +977,12 @@ static void omap_usbhs_deinit(struct device *dev)
 	dev_dbg(dev, "stopping TI HSUSB Controller\n");
 
 	if (pdata->ehci_data->phy_reset) {
-		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[0]))
-			gpio_free(pdata->ehci_data->reset_gpio_port[0]);
+		int i;
 
-		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[1]))
-			gpio_free(pdata->ehci_data->reset_gpio_port[1]);
+		for (i = 0; i < ARRAY_SIZE(pdata->ehci_data->reset_gpio_port); i++) {
+			if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[i]))
+				gpio_free(pdata->ehci_data->reset_gpio_port[i]);
+		}
 	}
 }
 
