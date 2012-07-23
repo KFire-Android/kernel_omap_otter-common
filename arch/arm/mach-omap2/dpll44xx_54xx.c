@@ -32,6 +32,8 @@
 #include "iomap.h"
 #include "common.h"
 #include "cm2_44xx.h"
+#include "cm2_54xx.h"
+
 #include "prcm44xx.h"
 #include "cminst44xx.h"
 #include "cm44xx.h"
@@ -121,7 +123,7 @@ static struct omap4_dpll_regs omap4_omap5_dpll_regs_usb = {
 };
 
 /* PER DPLL */
-static struct omap4_dpll_regs omap4_omap5_dpll_regs_per = {
+static struct omap4_dpll_regs omap4_dpll_regs_per = {
 	.name		= "per",
 	.mod_partition	= OMAP4430_CM2_PARTITION,
 	.mod_inst	= OMAP4430_CM2_CKGEN_INST,
@@ -137,14 +139,41 @@ static struct omap4_dpll_regs omap4_omap5_dpll_regs_per = {
 	.div_m7		= {.offset = OMAP4_CM_DIV_M7_DPLL_PER_OFFSET},
 };
 
-static struct omap4_dpll_regs *dpll_regs[] = {
+/* PER DPLL */
+static struct omap4_dpll_regs omap5_dpll_regs_per = {
+	.name		= "per",
+	.mod_partition	= OMAP4430_CM2_PARTITION,
+	.mod_inst	= OMAP4430_CM2_CKGEN_INST,
+	.clkmode	= {.offset = OMAP4_CM_CLKMODE_DPLL_PER_OFFSET},
+	.autoidle	= {.offset = OMAP4_CM_AUTOIDLE_DPLL_PER_OFFSET},
+	.idlest		= {.offset = OMAP4_CM_IDLEST_DPLL_PER_OFFSET},
+	.clksel		= {.offset = OMAP4_CM_CLKSEL_DPLL_PER_OFFSET},
+	.div_m2		= {.offset = OMAP4_CM_DIV_M2_DPLL_PER_OFFSET},
+	.div_m3		= {.offset = OMAP4_CM_DIV_M3_DPLL_PER_OFFSET},
+	.div_m4		= {.offset = OMAP54XX_CM_DIV_H11_DPLL_PER_OFFSET},
+	.div_m5		= {.offset = OMAP54XX_CM_DIV_H12_DPLL_PER_OFFSET},
+	.div_m6		= {.offset = OMAP54XX_CM_DIV_H14_DPLL_PER_OFFSET},
+};
+
+static struct omap4_dpll_regs *omap4_dpll_regs[] = {
 	&omap4_omap5_dpll_regs_mpu,
 	&omap4_omap5_dpll_regs_iva,
 	&omap4_omap5_dpll_regs_abe,
 	&omap4_omap5_dpll_regs_usb,
-	&omap4_omap5_dpll_regs_per,
+	&omap4_dpll_regs_per,
 	NULL,
 };
+
+static struct omap4_dpll_regs *omap5_dpll_regs[] = {
+	&omap4_omap5_dpll_regs_mpu,
+	&omap4_omap5_dpll_regs_iva,
+	&omap4_omap5_dpll_regs_abe,
+	&omap4_omap5_dpll_regs_usb,
+	&omap5_dpll_regs_per,
+	NULL,
+};
+
+static struct omap4_dpll_regs **omap_dpll_regs;
 
 static int dpll_dump_level;
 #define DPLL_DUMP_LEVEL_BEFORE	(1 << 0)
@@ -157,6 +186,16 @@ module_param(dpll_dump_level, int, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(dpll_dump_level,
 		 "DUMP dpll: (1)before,(2)after suspend,(4)around restore");
 #endif
+
+static int __init __init_dpll_list(void)
+{
+	if (cpu_is_omap54xx())
+		omap_dpll_regs = omap5_dpll_regs;
+	else if (cpu_is_omap44xx())
+		omap_dpll_regs = omap4_dpll_regs;
+	return 0;
+}
+core_initcall(__init_dpll_list);
 
 /**
  * omap4_core_dpll_m2_set_rate - set CORE DPLL M2 divider
@@ -800,7 +839,7 @@ static void omap4_dpll_dump_regs(struct omap4_dpll_regs *dpll_reg)
  */
 void omap4_dpll_prepare_off(void)
 {
-	struct omap4_dpll_regs **dpll_regs_list = dpll_regs;
+	struct omap4_dpll_regs **dpll_regs_list = omap_dpll_regs;
 
 	if (dpll_dump_level & DPLL_DUMP_LEVEL_BEFORE)
 		pr_warn("========= Before suspending(Begin) ==============\n");
@@ -888,7 +927,7 @@ static inline void omap4_dpll_restore_reg(struct omap4_dpll_regs *dpll_reg,
  */
 void omap4_dpll_resume_off(void)
 {
-	struct omap4_dpll_regs **dpll_regs_list = dpll_regs;
+	struct omap4_dpll_regs **dpll_regs_list = omap_dpll_regs;
 
 	if (dpll_dump_level & DPLL_DUMP_LEVEL_AFTER)
 		pr_warn("========= After suspending(Begin) ==============\n");
