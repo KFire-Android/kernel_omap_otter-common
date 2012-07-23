@@ -1369,10 +1369,10 @@ static struct snd_soc_dai_link omap_abe_no_dmic_dai[] = {
 		.platform_name = "aess",
 
 		/* FM */
-		.codec_dai_name = "FM Digital",
+		.codec_dai_name = "snd-soc-dummy-dai",
+		.codec_name = "snd-soc-dummy",
 
 		.no_pcm = 1, /* don't create ALSA pcm for this */
-		/* .no_codec = 1, */ /* TODO: have a dummy CODEC */
 		.be_hw_params_fixup = mcbsp_be_hw_params_fixup,
 		.ops = &omap_abe_mcbsp_ops,
 		.be_id = OMAP_ABE_DAI_MM_FM,
