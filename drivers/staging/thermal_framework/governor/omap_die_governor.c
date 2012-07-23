@@ -201,7 +201,10 @@ static signed int convert_omap_sensor_temp_to_hotspot_temp(
 {
 	int absolute_delta;
 
-	if (omap_gov->pcb_sensor_available && (omap_gov->avg_is_valid == 1)) {
+	/* PCB sensor inputs are required only for CPU domain */
+	if ((!strcmp(omap_gov->thermal_fw.domain_name, "cpu")) &&
+		omap_gov->pcb_sensor_available &&
+		(omap_gov->avg_is_valid == 1)) {
 		omap_gov->pcb_temp  = thermal_lookup_temp("pcb");
 		if (omap_gov->pcb_temp < 0)
 			return sensor_temp + omap_gov->absolute_delta;
@@ -249,7 +252,9 @@ static signed int convert_omap_sensor_temp_to_hotspot_temp(
 static signed hotspot_temp_to_sensor_temp(struct omap_governor *omap_gov,
 							int hot_spot_temp)
 {
-	if (omap_gov->pcb_sensor_available && (omap_gov->avg_is_valid == 1))
+	/* PCB sensor inputs are required only for CPU domain */
+	if ((!strcmp(omap_gov->thermal_fw.domain_name, "cpu")) &&
+		omap_gov->pcb_sensor_available && (omap_gov->avg_is_valid == 1))
 		return hot_spot_temp - omap_gov->absolute_delta;
 	else
 		return ((hot_spot_temp - omap_gov->omap_gradient_const) *
@@ -288,7 +293,9 @@ static int omap_enter_zone(struct omap_governor *omap_gov,
 	omap_gov->hotspot_temp_lower = temp_lower;
 	omap_gov->hotspot_temp_upper = temp_upper;
 
-	if (omap_gov->pcb_sensor_available)
+	/* PCB sensor inputs are required only for CPU domain */
+	if ((!strcmp(omap_gov->thermal_fw.domain_name, "cpu")) &&
+		omap_gov->pcb_sensor_available)
 		omap_gov->average_period = zone->average_rate;
 
 	return 0;

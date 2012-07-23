@@ -4139,6 +4139,76 @@ static void dsi_proto_timings(struct omap_dss_device *dssdev)
 	}
 }
 
+static void  dsi_handle_lcd_en_timing_pre(struct omap_dss_device *dssdev)
+{
+	struct platform_device *dsidev = dsi_get_dsidev_from_dssdev(dssdev);
+
+	/* This needs to be OMAP5 ES1 only */
+	if (!(cpu_is_omap54xx() && ((omap_rev() <= OMAP5430_REV_ES1_0) ||
+		omap_rev() == OMAP5432_REV_ES1_0)))
+		return;
+
+	/*
+	 * LCD EN timing doesn't occur if LCD and DISPC clock sources are
+	 * same
+	 */
+	if (dssdev->clocks.dispc.dispc_fclk_src ==
+			dssdev->clocks.dispc.channel.lcd_clk_src)
+		return;
+
+	if (dssdev->clocks.dispc.channel.lcd_clk_src ==
+			OMAP_DSS_CLK_SRC_FCK) {
+		/* Set DISPC clock source to DSS_FCLK */
+		dss_select_dispc_clk_source(OMAP_DSS_CLK_SRC_FCK);
+
+	} else {
+		/* Disable M4(HSDIV_DISPC) clock */
+		REG_FLD_MOD(dsidev, DSI_PLL_CONFIGURATION2, 0, 16, 16);
+
+		if (REG_GET(dsidev, DSI_PLL_STATUS, 7, 7) == 0)
+			return;
+
+		if (wait_for_bit_change(dsidev, DSI_PLL_STATUS, 7, 1) != 0) {
+			DSSERR("M4 clock not becoming inactive\n");
+			return;
+		}
+	}
+}
+
+static void dsi_handle_lcd_en_timing_post(struct omap_dss_device *dssdev)
+{
+	struct platform_device *dsidev = dsi_get_dsidev_from_dssdev(dssdev);
+
+	/* This needs to be OMAP5 ES1 only */
+	if (!(cpu_is_omap54xx() && ((omap_rev() <= OMAP5430_REV_ES1_0) ||
+		(omap_rev() == OMAP5432_REV_ES1_0))))
+		return;
+
+	/*
+	 * LCD EN timing issue doesn't occur if LCD and DISPC clock sources are
+	 * the same
+	 */
+	if (dssdev->clocks.dispc.dispc_fclk_src ==
+			dssdev->clocks.dispc.channel.lcd_clk_src)
+		return;
+
+	if (dssdev->clocks.dispc.channel.lcd_clk_src ==
+			OMAP_DSS_CLK_SRC_FCK) {
+		/* switch back to original clock source for DISPC_FCLK */
+		dss_select_dispc_clk_source(dssdev->
+			clocks.dispc.dispc_fclk_src);
+
+	} else {
+		/* Enable M4(HSDIV_DISPC) clock */
+		REG_FLD_MOD(dsidev, DSI_PLL_CONFIGURATION2, 1, 16, 16);
+
+		if (REG_GET(dsidev, DSI_PLL_STATUS, 7, 7) == 1)
+			return;
+
+		dsi_wait_pll_hsdiv_dispc_active(dsidev);
+	}
+}
+
 int dsi_enable_video_output(struct omap_dss_device *dssdev, int channel)
 {
 	struct platform_device *dsidev = dsi_get_dsidev_from_dssdev(dssdev);
@@ -4180,6 +4250,7 @@ int dsi_enable_video_output(struct omap_dss_device *dssdev, int channel)
 		dsi_if_enable(dsidev, true);
 	}
 
+	dsi_handle_lcd_en_timing_pre(dssdev);
 	r = dss_mgr_enable(dssdev->manager);
 	if (r) {
 		if (dssdev->panel.dsi_mode == OMAP_DSS_DSI_VIDEO_MODE) {
@@ -4189,7 +4260,7 @@ int dsi_enable_video_output(struct omap_dss_device *dssdev, int channel)
 
 		return r;
 	}
-
+	dsi_handle_lcd_en_timing_post(dssdev);
 	return 0;
 }
 EXPORT_SYMBOL(dsi_enable_video_output);
@@ -4208,8 +4279,9 @@ void dsi_disable_video_output(struct omap_dss_device *dssdev, int channel)
 		dsi_vc_enable(dsidev, channel, true);
 		dsi_if_enable(dsidev, true);
 	}
-
+	dsi_handle_lcd_en_timing_pre(dssdev);
 	dss_mgr_disable(dssdev->manager);
+	dsi_handle_lcd_en_timing_post(dssdev);
 }
 EXPORT_SYMBOL(dsi_disable_video_output);
 
@@ -4276,8 +4348,10 @@ static void dsi_update_screen_dispc(struct omap_dss_device *dssdev,
 	r = schedule_delayed_work(&dsi->framedone_timeout_work,
 		msecs_to_jiffies(250));
 	BUG_ON(r == 0);
+	dsi_handle_lcd_en_timing_pre(dssdev);
 
 	dss_mgr_start_update(dssdev->manager);
+	dsi_handle_lcd_en_timing_post(dssdev);
 
 	if (dsi->te_enabled) {
 		/* disable LP_RX_TO, so that we can receive TE.  Time to wait
