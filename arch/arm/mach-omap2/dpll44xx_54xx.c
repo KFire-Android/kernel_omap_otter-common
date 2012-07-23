@@ -69,65 +69,81 @@ struct omap4_dpll_regs {
 	struct dpll_reg clkdcoldo;
 };
 
-static struct omap4_dpll_regs dpll_regs[] = {
-	/* MPU DPLL */
-	{ .name		= "mpu",
-	  .mod_partition = OMAP4430_CM1_PARTITION,
-	  .mod_inst	= OMAP4430_CM1_CKGEN_INST,
-	  .clkmode	= {.offset = OMAP4_CM_CLKMODE_DPLL_MPU_OFFSET},
-	  .autoidle	= {.offset = OMAP4_CM_AUTOIDLE_DPLL_MPU_OFFSET},
-	  .idlest	= {.offset = OMAP4_CM_IDLEST_DPLL_MPU_OFFSET},
-	  .clksel	= {.offset = OMAP4_CM_CLKSEL_DPLL_MPU_OFFSET},
-	  .div_m2	= {.offset = OMAP4_CM_DIV_M2_DPLL_MPU_OFFSET},
-	},
-	/* IVA DPLL */
-	{ .name		= "iva",
-	  .mod_partition = OMAP4430_CM1_PARTITION,
-	  .mod_inst	= OMAP4430_CM1_CKGEN_INST,
-	  .clkmode	= {.offset = OMAP4_CM_CLKMODE_DPLL_IVA_OFFSET},
-	  .autoidle	= {.offset = OMAP4_CM_AUTOIDLE_DPLL_IVA_OFFSET},
-	  .idlest	= {.offset = OMAP4_CM_IDLEST_DPLL_IVA_OFFSET},
-	  .clksel	= {.offset = OMAP4_CM_CLKSEL_DPLL_IVA_OFFSET},
-	  .div_m4	= {.offset = OMAP4_CM_DIV_M4_DPLL_IVA_OFFSET},
-	  .div_m5	= {.offset = OMAP4_CM_DIV_M5_DPLL_IVA_OFFSET},
-	},
-	/* ABE DPLL */
-	{ .name		= "abe",
-	  .mod_partition = OMAP4430_CM1_PARTITION,
-	  .mod_inst	= OMAP4430_CM1_CKGEN_INST,
-	  .clkmode	= {.offset = OMAP4_CM_CLKMODE_DPLL_ABE_OFFSET},
-	  .autoidle	= {.offset = OMAP4_CM_AUTOIDLE_DPLL_ABE_OFFSET},
-	  .idlest	= {.offset = OMAP4_CM_IDLEST_DPLL_ABE_OFFSET},
-	  .clksel	= {.offset = OMAP4_CM_CLKSEL_DPLL_ABE_OFFSET},
-	  .div_m2	= {.offset = OMAP4_CM_DIV_M2_DPLL_ABE_OFFSET},
-	  .div_m3	= {.offset = OMAP4_CM_DIV_M3_DPLL_ABE_OFFSET},
-	},
-	/* USB DPLL */
-	{ .name		= "usb",
-	  .mod_partition = OMAP4430_CM2_PARTITION,
-	  .mod_inst	= OMAP4430_CM2_CKGEN_INST,
-	  .clkmode	= {.offset = OMAP4_CM_CLKMODE_DPLL_USB_OFFSET},
-	  .autoidle	= {.offset = OMAP4_CM_AUTOIDLE_DPLL_USB_OFFSET},
-	  .idlest	= {.offset = OMAP4_CM_IDLEST_DPLL_USB_OFFSET},
-	  .clksel	= {.offset = OMAP4_CM_CLKSEL_DPLL_USB_OFFSET},
-	  .div_m2	= {.offset = OMAP4_CM_DIV_M2_DPLL_USB_OFFSET},
-	  .clkdcoldo	= {.offset = OMAP4_CM_CLKDCOLDO_DPLL_USB_OFFSET},
-	 },
-	/* PER DPLL */
-	{ .name		= "per",
-	  .mod_partition = OMAP4430_CM2_PARTITION,
-	  .mod_inst	= OMAP4430_CM2_CKGEN_INST,
-	  .clkmode	= {.offset = OMAP4_CM_CLKMODE_DPLL_PER_OFFSET},
-	  .autoidle	= {.offset = OMAP4_CM_AUTOIDLE_DPLL_PER_OFFSET},
-	  .idlest	= {.offset = OMAP4_CM_IDLEST_DPLL_PER_OFFSET},
-	  .clksel	= {.offset = OMAP4_CM_CLKSEL_DPLL_PER_OFFSET},
-	  .div_m2	= {.offset = OMAP4_CM_DIV_M2_DPLL_PER_OFFSET},
-	  .div_m3	= {.offset = OMAP4_CM_DIV_M3_DPLL_PER_OFFSET},
-	  .div_m4	= {.offset = OMAP4_CM_DIV_M4_DPLL_PER_OFFSET},
-	  .div_m5	= {.offset = OMAP4_CM_DIV_M5_DPLL_PER_OFFSET},
-	  .div_m6	= {.offset = OMAP4_CM_DIV_M6_DPLL_PER_OFFSET},
-	  .div_m7	= {.offset = OMAP4_CM_DIV_M7_DPLL_PER_OFFSET},
-	},
+/* MPU DPLL */
+static struct omap4_dpll_regs omap4_omap5_dpll_regs_mpu = {
+	.name		= "mpu",
+	.mod_partition	= OMAP4430_CM1_PARTITION,
+	.mod_inst	= OMAP4430_CM1_CKGEN_INST,
+	.clkmode	= {.offset = OMAP4_CM_CLKMODE_DPLL_MPU_OFFSET},
+	.autoidle	= {.offset = OMAP4_CM_AUTOIDLE_DPLL_MPU_OFFSET},
+	.idlest		= {.offset = OMAP4_CM_IDLEST_DPLL_MPU_OFFSET},
+	.clksel		= {.offset = OMAP4_CM_CLKSEL_DPLL_MPU_OFFSET},
+	.div_m2		= {.offset = OMAP4_CM_DIV_M2_DPLL_MPU_OFFSET},
+};
+
+/* IVA DPLL */
+static struct omap4_dpll_regs omap4_omap5_dpll_regs_iva = {
+	.name		= "iva",
+	.mod_partition	= OMAP4430_CM1_PARTITION,
+	.mod_inst	= OMAP4430_CM1_CKGEN_INST,
+	.clkmode	= {.offset = OMAP4_CM_CLKMODE_DPLL_IVA_OFFSET},
+	.autoidle	= {.offset = OMAP4_CM_AUTOIDLE_DPLL_IVA_OFFSET},
+	.idlest		= {.offset = OMAP4_CM_IDLEST_DPLL_IVA_OFFSET},
+	.clksel		= {.offset = OMAP4_CM_CLKSEL_DPLL_IVA_OFFSET},
+	.div_m4		= {.offset = OMAP4_CM_DIV_M4_DPLL_IVA_OFFSET},
+	.div_m5		= {.offset = OMAP4_CM_DIV_M5_DPLL_IVA_OFFSET},
+};
+
+/* ABE DPLL */
+static struct omap4_dpll_regs omap4_omap5_dpll_regs_abe = {
+	.name		= "abe",
+	.mod_partition	= OMAP4430_CM1_PARTITION,
+	.mod_inst	= OMAP4430_CM1_CKGEN_INST,
+	.clkmode	= {.offset = OMAP4_CM_CLKMODE_DPLL_ABE_OFFSET},
+	.autoidle	= {.offset = OMAP4_CM_AUTOIDLE_DPLL_ABE_OFFSET},
+	.idlest		= {.offset = OMAP4_CM_IDLEST_DPLL_ABE_OFFSET},
+	.clksel		= {.offset = OMAP4_CM_CLKSEL_DPLL_ABE_OFFSET},
+	.div_m2		= {.offset = OMAP4_CM_DIV_M2_DPLL_ABE_OFFSET},
+	.div_m3		= {.offset = OMAP4_CM_DIV_M3_DPLL_ABE_OFFSET},
+};
+
+/* USB DPLL */
+static struct omap4_dpll_regs omap4_omap5_dpll_regs_usb = {
+	.name		= "usb",
+	.mod_partition	= OMAP4430_CM2_PARTITION,
+	.mod_inst	= OMAP4430_CM2_CKGEN_INST,
+	.clkmode	= {.offset = OMAP4_CM_CLKMODE_DPLL_USB_OFFSET},
+	.autoidle	= {.offset = OMAP4_CM_AUTOIDLE_DPLL_USB_OFFSET},
+	.idlest		= {.offset = OMAP4_CM_IDLEST_DPLL_USB_OFFSET},
+	.clksel		= {.offset = OMAP4_CM_CLKSEL_DPLL_USB_OFFSET},
+	.div_m2		= {.offset = OMAP4_CM_DIV_M2_DPLL_USB_OFFSET},
+	.clkdcoldo	= {.offset = OMAP4_CM_CLKDCOLDO_DPLL_USB_OFFSET},
+};
+
+/* PER DPLL */
+static struct omap4_dpll_regs omap4_omap5_dpll_regs_per = {
+	.name		= "per",
+	.mod_partition	= OMAP4430_CM2_PARTITION,
+	.mod_inst	= OMAP4430_CM2_CKGEN_INST,
+	.clkmode	= {.offset = OMAP4_CM_CLKMODE_DPLL_PER_OFFSET},
+	.autoidle	= {.offset = OMAP4_CM_AUTOIDLE_DPLL_PER_OFFSET},
+	.idlest		= {.offset = OMAP4_CM_IDLEST_DPLL_PER_OFFSET},
+	.clksel		= {.offset = OMAP4_CM_CLKSEL_DPLL_PER_OFFSET},
+	.div_m2		= {.offset = OMAP4_CM_DIV_M2_DPLL_PER_OFFSET},
+	.div_m3		= {.offset = OMAP4_CM_DIV_M3_DPLL_PER_OFFSET},
+	.div_m4		= {.offset = OMAP4_CM_DIV_M4_DPLL_PER_OFFSET},
+	.div_m5		= {.offset = OMAP4_CM_DIV_M5_DPLL_PER_OFFSET},
+	.div_m6		= {.offset = OMAP4_CM_DIV_M6_DPLL_PER_OFFSET},
+	.div_m7		= {.offset = OMAP4_CM_DIV_M7_DPLL_PER_OFFSET},
+};
+
+static struct omap4_dpll_regs *dpll_regs[] = {
+	&omap4_omap5_dpll_regs_mpu,
+	&omap4_omap5_dpll_regs_iva,
+	&omap4_omap5_dpll_regs_abe,
+	&omap4_omap5_dpll_regs_usb,
+	&omap4_omap5_dpll_regs_per,
+	NULL,
 };
 
 static int dpll_dump_level;
@@ -784,13 +800,14 @@ static void omap4_dpll_dump_regs(struct omap4_dpll_regs *dpll_reg)
  */
 void omap4_dpll_prepare_off(void)
 {
-	u32 i;
-	struct omap4_dpll_regs *dpll_reg = dpll_regs;
+	struct omap4_dpll_regs **dpll_regs_list = dpll_regs;
 
 	if (dpll_dump_level & DPLL_DUMP_LEVEL_BEFORE)
 		pr_warn("========= Before suspending(Begin) ==============\n");
 
-	for (i = 0; i < ARRAY_SIZE(dpll_regs); i++, dpll_reg++) {
+	while (NULL != *dpll_regs_list) {
+		struct omap4_dpll_regs *dpll_reg = *dpll_regs_list;
+
 		omap4_dpll_store_reg(dpll_reg, &dpll_reg->clkmode);
 		omap4_dpll_store_reg(dpll_reg, &dpll_reg->autoidle);
 		omap4_dpll_store_reg(dpll_reg, &dpll_reg->clksel);
@@ -805,6 +822,8 @@ void omap4_dpll_prepare_off(void)
 
 		if (dpll_dump_level & DPLL_DUMP_LEVEL_BEFORE)
 			omap4_dpll_dump_regs(dpll_reg);
+
+		dpll_regs_list++;
 	}
 
 	if (dpll_dump_level & DPLL_DUMP_LEVEL_BEFORE)
@@ -869,13 +888,13 @@ static inline void omap4_dpll_restore_reg(struct omap4_dpll_regs *dpll_reg,
  */
 void omap4_dpll_resume_off(void)
 {
-	u32 i;
-	struct omap4_dpll_regs *dpll_reg = dpll_regs;
+	struct omap4_dpll_regs **dpll_regs_list = dpll_regs;
 
 	if (dpll_dump_level & DPLL_DUMP_LEVEL_AFTER)
 		pr_warn("========= After suspending(Begin) ==============\n");
 
-	for (i = 0; i < ARRAY_SIZE(dpll_regs); i++, dpll_reg++) {
+	while (NULL != *dpll_regs_list) {
+		struct omap4_dpll_regs *dpll_reg = *dpll_regs_list;
 
 		if (dpll_dump_level & DPLL_DUMP_LEVEL_RESTORE) {
 			pr_warn("DUMP before restore dpll %s:\n",
@@ -905,6 +924,8 @@ void omap4_dpll_resume_off(void)
 				dpll_reg->name);
 			omap4_dpll_dump_regs(dpll_reg);
 		}
+
+		dpll_regs_list++;
 	}
 
 	if (dpll_dump_level & DPLL_DUMP_LEVEL_AFTER)
