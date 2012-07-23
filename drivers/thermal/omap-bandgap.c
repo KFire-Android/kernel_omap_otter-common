@@ -1167,8 +1167,8 @@ static struct omap_bandgap_data omap5430_data = {
 			.registers = &omap5430_gpu_temp_sensor_registers,
 			.ts_data = &omap5430_gpu_temp_sensor_data,
 			.domain = "gpu",
-			.slope = 0,
-			.constant_offset = 7000,
+			.slope = 64,
+			.constant_offset = -980,
 		},
 		{
 			.registers = &omap5430_core_temp_sensor_registers,
