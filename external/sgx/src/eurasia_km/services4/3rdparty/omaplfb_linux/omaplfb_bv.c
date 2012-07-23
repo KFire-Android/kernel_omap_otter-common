@@ -42,6 +42,12 @@ extern struct ion_client *gpsIONClient;
  * Are the blit framebuffers in VRAM?
  */
 #define OMAPLFB_BLT_FBS_VRAM 1
+/*
+ * GC needs buffers aligned to 8 pixels, we need the clear buffer honor this
+ * requirement, a 32bpp buffer with 8 pixels for the destination is enough.
+ */
+#define OMAPLFB_GCSTRIDE_PIXEL_ALIGN	8
+#define OMAPLFB_CLRBUFF_SZ		OMAPLFB_GCSTRIDE_PIXEL_ALIGN * 4
 
 #define OMAPLFB_COMMAND_COUNT		1
 
@@ -138,6 +144,13 @@ static OMAPLFB_ERROR InitBltFBsCommon(OMAPLFB_DEVINFO *psDevInfo)
 	{
 		return OMAPLFB_ERROR_INIT_FAILURE;
 	}
+
+	psPVRFBInfo->pvClearBuffer = kzalloc(OMAPLFB_CLRBUFF_SZ, GFP_KERNEL);
+	if (!psPVRFBInfo->pvClearBuffer)
+	{
+		return OMAPLFB_ERROR_INIT_FAILURE;
+	}
+
 	/* Freeing of resources is handled in deinit code */
 	return OMAPLFB_OK;
 }
@@ -372,57 +385,6 @@ static struct bvbuffdesc *GetBvDescriptor(OMAPLFB_DEVINFO *psDevInfo, PDC_MEM_IN
 	return pBvDesc;
 }
 
-static int bvrect_same_origin(struct bvrect *rect1, struct bvrect *rect2)
-{
-	return rect1->left == rect2->left && rect1->top == rect2->top;
-}
-
-static int bvrect_same_size(struct bvrect *rect1, struct bvrect *rect2)
-{
-	return rect1->width == rect2->width && rect1->height == rect2->height;
-}
-
-static void OMAPLFBDoBatching(struct rgz_blt_entry *prev_entry,
-	struct rgz_blt_entry *cur_entry, int is_last_blit)
-{
-	struct bvbltparams *cur_bltparams = &cur_entry->bp;
-	struct bvbltparams *prev_bltparams;
-
-	/* Override any batch flags coming from HWC */
-	cur_bltparams->flags &= ~BVFLAG_BATCH_MASK;
-
-	if (!prev_entry)
-	{
-		cur_bltparams->flags |= BVFLAG_BATCH_BEGIN;
-		return;
-	}
-	else if (is_last_blit)
-	{
-		cur_bltparams->flags |= BVFLAG_BATCH_END;
-	}
-	else
-	{
-		cur_bltparams->flags |= BVFLAG_BATCH_CONTINUE;
-	}
-
-	/*
-	 * On the first blit we don't need to set all flags but the delta on
-	 * consequent blits
-	 */
-	prev_bltparams = &prev_entry->bp;
-	cur_bltparams->batch = prev_bltparams->batch;
-	cur_bltparams->batchflags =
-		(prev_bltparams->dstgeom->format == cur_bltparams->dstgeom->format ? 0 : BVBATCH_DST) |
-		(prev_bltparams->src1.desc == cur_bltparams->src1.desc ? 0 : BVBATCH_SRC1) |
-		(prev_bltparams->src2.desc == cur_bltparams->src2.desc ? 0 : BVBATCH_SRC2) |
-		(bvrect_same_origin(&prev_bltparams->src1rect, &cur_bltparams->src1rect) ? 0 : BVBATCH_SRC1RECT_ORIGIN) |
-		(bvrect_same_origin(&prev_bltparams->src2rect, &cur_bltparams->src2rect) ? 0 : BVBATCH_SRC2RECT_ORIGIN) |
-		(bvrect_same_origin(&prev_bltparams->dstrect, &cur_bltparams->dstrect) ? 0 : BVBATCH_DSTRECT_ORIGIN) |
-		(bvrect_same_size(&prev_bltparams->src1rect, &cur_bltparams->src1rect) ? 0 : BVBATCH_SRC1RECT_SIZE) |
-		(bvrect_same_size(&prev_bltparams->src2rect, &cur_bltparams->src2rect) ? 0 : BVBATCH_SRC2RECT_SIZE) |
-		(bvrect_same_size(&prev_bltparams->dstrect, &cur_bltparams->dstrect) ? 0 : BVBATCH_DSTRECT_SIZE);
-}
-
 static void OMAPLFBSetNV12Params(struct bvsurfgeom *geom, struct bvbuffdesc *desc)
 {
 	if (geom->format != OCDFMT_NV12)
@@ -439,7 +401,8 @@ void OMAPLFBDoBlits(OMAPLFB_DEVINFO *psDevInfo, PDC_MEM_INFO *ppsMemInfos, struc
 	OMAPLFB_FBINFO *psPVRFBInfo = &psDevInfo->sFBInfo;
 	int rgz_items = blit_data->rgz_items;
 	int j;
-	struct rgz_blt_entry *prev_entry = NULL;
+	void* lastBatch = NULL;
+	unsigned int batchFlags;
 
 	/* DSS pipes are setup up to this point, we can begin blitting here */
 	entry_list = (struct rgz_blt_entry *) (blit_data->rgz_blts);
@@ -460,14 +423,11 @@ void OMAPLFBDoBlits(OMAPLFB_DEVINFO *psDevInfo, PDC_MEM_INFO *ppsMemInfos, struc
 		meminfo_ix = (unsigned int)entry->src1desc.auxptr;
 		if (meminfo_ix == -1)
 		{
-			/* Making fill with transparent pixels, avoid mapping
-			 * src1 this will change when the HWC starts to use
-			 * HWC_BLT_FLAG_CLR
-			 */
-			static unsigned int pixel = 0;
+			/* Making fill with transparent pixels, fixup stride and clear buffer */
 			entry->bp.src1geom = &entry->src1geom;
+			entry->bp.src1geom->virtstride = OMAPLFB_CLRBUFF_SZ;
 			entry->bp.src1.desc = &entry->src1desc;
-			entry->bp.src1.desc->virtaddr = (void*)&pixel;
+			entry->bp.src1.desc->virtaddr = psPVRFBInfo->pvClearBuffer;
 		}
 		else if (meminfo_ix & HWC_BLT_DESC_FLAG)
 		{
@@ -538,13 +498,6 @@ void OMAPLFBDoBlits(OMAPLFB_DEVINFO *psDevInfo, PDC_MEM_INFO *ppsMemInfos, struc
 			entry->bp.src2.desc = NULL;
 		}
 
-		/* Use batching when there is more than one blit per frame */
-		if (rgz_items > 1)
-		{
-			OMAPLFBDoBatching(prev_entry, entry, j >= rgz_items - 1);
-			prev_entry = entry;
-		}
-
 		if (debugbv)
 		{
 			iSrc1DescInfo = (unsigned int)entry->src1desc.auxptr;
@@ -552,10 +505,25 @@ void OMAPLFBDoBlits(OMAPLFB_DEVINFO *psDevInfo, PDC_MEM_INFO *ppsMemInfos, struc
 			print_bvparams(&entry->bp, iSrc1DescInfo, iSrc2DescInfo);
 		}
 
+		batchFlags = entry->bp.flags & BVFLAG_BATCH_MASK;
+		switch (batchFlags) {
+		case BVFLAG_BATCH_CONTINUE:
+		case BVFLAG_BATCH_END:
+			entry->bp.batch = lastBatch;
+			break;
+		case BVFLAG_BATCH_BEGIN:
+			entry->bp.batch = NULL;
+		}
+
 		bv_error = bv_entry->bv_blt(&entry->bp);
 		if (bv_error)
 			printk(KERN_ERR "%s: blit failed %d\n",
 					__func__, bv_error);
+
+		if (batchFlags == BVFLAG_BATCH_BEGIN) {
+			/* cache the batch handle */
+			lastBatch = entry->bp.batch;
+		}
 	}
 }
 
@@ -573,6 +541,11 @@ void OMAPLFBDeInitBltFBs(OMAPLFB_DEVINFO *psDevInfo)
 	if (!gbBvInterfacePresent)
 	{
 		return;
+	}
+
+	if (psPVRFBInfo->pvClearBuffer) {
+		kfree(psPVRFBInfo->pvClearBuffer);
+		psPVRFBInfo->pvClearBuffer = NULL;
 	}
 
 	if (psPVRFBInfo->psBltFBsBvHndl)

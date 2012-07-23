@@ -147,6 +147,8 @@ typedef struct OMAPLFB_FBINFO_TAG
 	/* The current blit buffer index */
 	unsigned int        iBltFBsIdx;
 	IMG_UINT            uiBltFBsByteStride;
+	/* Buffer used to clear the screen */
+	void                *pvClearBuffer;
 #endif
 	IMG_UINT32          uiBytesPerPixel;
 }OMAPLFB_FBINFO;
