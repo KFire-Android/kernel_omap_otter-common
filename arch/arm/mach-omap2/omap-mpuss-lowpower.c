@@ -435,6 +435,21 @@ int omap_enter_lowpower(unsigned int cpu, unsigned int power_state)
 		save_state = 2;
 	}
 
+	/*
+	 * Abort suspend if pending interrupt and we are going to device off.
+	 * Here, save_state for CPU0 should be 3.
+	 * Further, we should do this as late as possible. This is the latest
+	 * point before configuring powerstate that we can abort cleanly
+	 * in C code. there is ofcourse a risk of an interrupt between here
+	 * and WFI in finish_suspend - unless we move verify code to assembly
+	 * handling this, there is no sureshot guarentee(even then, we can only
+	 * reduce the window, not 100% eliminate a window). The current
+	 * location should take care of most events.
+	 */
+	if (save_state == 3 &&
+	    omap_wakeupgen_check_interrupts("Aborting Suspend"))
+		goto abort_suspend;
+
 	cpu_clear_prev_logic_pwrst(cpu);
 	set_cpu_next_pwrst(cpu, power_state);
 	set_cpu_wakeup_addr(cpu, virt_to_phys(omap_pm_ops.resume));
@@ -457,11 +472,15 @@ int omap_enter_lowpower(unsigned int cpu, unsigned int power_state)
 	wakeup_cpu = smp_processor_id();
 	set_cpu_next_pwrst(wakeup_cpu, PWRDM_POWER_ON);
 
+	if (save_state == 3)
+		omap_wakeupgen_check_interrupts("At Resume");
+
 	if (omap_mpuss_read_prev_context_state()) {
 		restore_ivahd_tesla_regs();
 		restore_l3instr_regs();
 	}
 
+abort_suspend:
 	if (save_state == 3 &&
 	    pwrdm_read_prev_pwrst(core_pd) == PWRDM_POWER_OFF) {
 		omap4_dpll_resume_off();

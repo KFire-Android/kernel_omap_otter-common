@@ -20,6 +20,7 @@
 #include <linux/init.h>
 #include <linux/io.h>
 #include <linux/irq.h>
+#include <linux/interrupt.h>
 #include <linux/platform_device.h>
 #include <linux/cpu.h>
 #include <linux/notifier.h>
@@ -52,6 +53,7 @@ static void __iomem *sar_base;
 static DEFINE_SPINLOCK(wakeupgen_lock);
 static unsigned int irq_target_cpu[NR_IRQS];
 static unsigned int irq_banks = MAX_NR_REG_BANKS;
+static unsigned int spi_irq_banks = MAX_NR_REG_BANKS;
 static unsigned int max_irqs = MAX_IRQS;
 static unsigned int secure_api_index;
 static unsigned int secure_hw_api_index;
@@ -425,6 +427,87 @@ void __iomem *omap_get_wakeupgen_base(void)
 	return wakeupgen_base;
 }
 
+/**
+ * omap_wakeupgen_check_interrupts() - sanity check for pending interrupts
+ * @report_string:	what is used to report
+ *
+ * Return false if there are no pending interrupts, else, if there
+ * are pending interrupts, return true.
+ *
+ * NOTE: if report_string is not NULL, then logic will search beyond
+ * the first occurance and report all such pending events. if report_string
+ * is NULL, search returns true at the very first occurance of event.
+ */
+bool omap_wakeupgen_check_interrupts(char *report_string)
+{
+	int i, k;
+	u32 gica, wakea_c0, wakea_c1;
+	int ret = false;
+
+	for (i = 0; i < spi_irq_banks - 1; i++) {
+		gica = gic_readl(GIC_DIST_PENDING_SET, i + 1);
+		wakea_c0 = wakeupgen_readl(i, 0);
+		wakea_c1 = wakeupgen_readl(i, 1);
+
+		/* If there is nothing pending, nothing to report */
+		if (!gica)
+			continue;
+
+		/* report register dump for debug */
+		pr_debug("%s: %s: IRQ Bank = %d GIC Pending status=0x%08x "
+		       "GIC Enable = 0x%08x Wakeupgen Config ="
+		       "cpu0=0x%08x cpu1=0x%08x\n",
+		       __func__, report_string, i, gica,
+		       gic_readl(GIC_DIST_ENABLE_SET, i + 1),
+		       wakea_c0, wakea_c1);
+
+		k = 0;
+		while (gica) {
+			if (gica & 0x1) {
+				struct irq_desc *desc;
+				const char *name, *wc0, *wc1;
+				int irq;
+
+				/* Return true if pending interrupts */
+				ret = true;
+
+				/*
+				 * we need to search for more ONLY if
+				 * there is something to report
+				 */
+				if (!report_string)
+					goto quit_search;
+
+				/* Grab the current wakeup state for CPU0,1 */
+				wc0 = (wakea_c0 & 0x1) ? "yes" : "no";
+				wc1 = (wakea_c1 & 0x1) ? "yes" : "no";
+				/* Since we skip GIC PPI and SGI, base 32 */
+				irq = 32 + i * 32 + k;
+				desc = irq_to_desc(irq);
+
+				if (desc && desc->action &&
+				    desc->action->name)
+					name = desc->action->name;
+				else
+					name = "unknown?";
+
+				pr_info("%s: IRQ %d(%s)(OMAP-IRQ=%d) Pending! "
+					"Wakeup Enable: CPU0=%s, CPU1=%s\n",
+					report_string, irq, name,
+					(irq - 32), wc0, wc1);
+
+			}
+			k++;
+			gica >>= 1;
+			wakea_c0 >>= 1;
+			wakea_c1 >>= 1;
+		}
+	}
+
+quit_search:
+	return ret;
+}
+
 /*
  * Initialise the wakeupgen module.
  */
@@ -432,7 +515,7 @@ int __init omap_wakeupgen_init(void)
 {
 	int i;
 	unsigned int boot_cpu = smp_processor_id();
-	int max_spi_reg;
+	unsigned int max_spi_reg;
 
 	/* Not supported on OMAP4 ES1.0 silicon */
 	if (omap_rev() == OMAP4430_REV_ES1_0) {
@@ -490,6 +573,8 @@ int __init omap_wakeupgen_init(void)
 	 * from reserved register writes since its well within 1020.
 	 */
 	max_spi_reg = gic_readl(GIC_DIST_CTR, 0) & 0x1f;
+
+	spi_irq_banks = min(max_spi_reg, irq_banks);
 
 	/*
 	 * Set CPU0 GIC backup flag permanently for omap4460 GP,
