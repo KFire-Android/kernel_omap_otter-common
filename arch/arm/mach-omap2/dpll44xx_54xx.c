@@ -10,6 +10,7 @@
  */
 
 #include <linux/kernel.h>
+#include <linux/module.h>
 #include <linux/errno.h>
 #include <linux/clk.h>
 #include <linux/io.h>
@@ -128,6 +129,18 @@ static struct omap4_dpll_regs dpll_regs[] = {
 	  .div_m7	= {.offset = OMAP4_CM_DIV_M7_DPLL_PER_OFFSET},
 	},
 };
+
+static int dpll_dump_level;
+#define DPLL_DUMP_LEVEL_BEFORE	(1 << 0)
+#define DPLL_DUMP_LEVEL_AFTER	(1 << 1)
+#define DPLL_DUMP_LEVEL_RESTORE	(1 << 2)
+
+/* Enable control only if PM advanced debug is active in build */
+#ifdef CONFIG_PM_ADVANCED_DEBUG
+module_param(dpll_dump_level, int, S_IRUGO | S_IWUSR);
+MODULE_PARM_DESC(dpll_dump_level,
+		 "DUMP dpll: (1)before,(2)after suspend,(4)around restore");
+#endif
 
 /**
  * omap4_core_dpll_m2_set_rate - set CORE DPLL M2 divider
@@ -718,32 +731,6 @@ static inline void omap4_dpll_store_reg(struct omap4_dpll_regs *dpll_reg,
 }
 
 /**
- * omap4_dpll_prepare_off - stores DPLL settings before off mode
- *
- * Saves all DPLL register settings. This must be called before
- * entering device off.
- */
-void omap4_dpll_prepare_off(void)
-{
-	u32 i;
-	struct omap4_dpll_regs *dpll_reg = dpll_regs;
-
-	for (i = 0; i < ARRAY_SIZE(dpll_regs); i++, dpll_reg++) {
-		omap4_dpll_store_reg(dpll_reg, &dpll_reg->clkmode);
-		omap4_dpll_store_reg(dpll_reg, &dpll_reg->autoidle);
-		omap4_dpll_store_reg(dpll_reg, &dpll_reg->clksel);
-		omap4_dpll_store_reg(dpll_reg, &dpll_reg->div_m2);
-		omap4_dpll_store_reg(dpll_reg, &dpll_reg->div_m3);
-		omap4_dpll_store_reg(dpll_reg, &dpll_reg->div_m4);
-		omap4_dpll_store_reg(dpll_reg, &dpll_reg->div_m5);
-		omap4_dpll_store_reg(dpll_reg, &dpll_reg->div_m6);
-		omap4_dpll_store_reg(dpll_reg, &dpll_reg->div_m7);
-		omap4_dpll_store_reg(dpll_reg, &dpll_reg->clkdcoldo);
-		omap4_dpll_store_reg(dpll_reg, &dpll_reg->idlest);
-	}
-}
-
-/**
  * omap4_dpll_print_reg - dump out a single DPLL register value
  * @dpll_reg: register to dump
  * @name: name of the register
@@ -769,8 +756,8 @@ static void omap4_dpll_print_reg(struct omap4_dpll_regs *dpll_reg, char *name,
  */
 static void omap4_dpll_dump_regs(struct omap4_dpll_regs *dpll_reg)
 {
-	pr_warn("%s: Unable to lock dpll %s[part=%x inst=%x]:\n",
-		__func__, dpll_reg->name, dpll_reg->mod_partition,
+	pr_warn("DPLL: Dump of dpll %s[part=%x inst=%x]:\n",
+		dpll_reg->name, dpll_reg->mod_partition,
 		dpll_reg->mod_inst);
 	omap4_dpll_print_reg(dpll_reg, "clksel", &dpll_reg->clksel);
 	omap4_dpll_print_reg(dpll_reg, "div_m2", &dpll_reg->div_m2);
@@ -787,6 +774,41 @@ static void omap4_dpll_dump_regs(struct omap4_dpll_regs *dpll_reg)
 			dpll_reg->idlest.offset,
 			dpll_reg->idlest.val,
 			omap4_dpll_read_reg(dpll_reg, &dpll_reg->idlest));
+}
+
+/**
+ * omap4_dpll_prepare_off - stores DPLL settings before off mode
+ *
+ * Saves all DPLL register settings. This must be called before
+ * entering device off.
+ */
+void omap4_dpll_prepare_off(void)
+{
+	u32 i;
+	struct omap4_dpll_regs *dpll_reg = dpll_regs;
+
+	if (dpll_dump_level & DPLL_DUMP_LEVEL_BEFORE)
+		pr_warn("========= Before suspending(Begin) ==============\n");
+
+	for (i = 0; i < ARRAY_SIZE(dpll_regs); i++, dpll_reg++) {
+		omap4_dpll_store_reg(dpll_reg, &dpll_reg->clkmode);
+		omap4_dpll_store_reg(dpll_reg, &dpll_reg->autoidle);
+		omap4_dpll_store_reg(dpll_reg, &dpll_reg->clksel);
+		omap4_dpll_store_reg(dpll_reg, &dpll_reg->div_m2);
+		omap4_dpll_store_reg(dpll_reg, &dpll_reg->div_m3);
+		omap4_dpll_store_reg(dpll_reg, &dpll_reg->div_m4);
+		omap4_dpll_store_reg(dpll_reg, &dpll_reg->div_m5);
+		omap4_dpll_store_reg(dpll_reg, &dpll_reg->div_m6);
+		omap4_dpll_store_reg(dpll_reg, &dpll_reg->div_m7);
+		omap4_dpll_store_reg(dpll_reg, &dpll_reg->clkdcoldo);
+		omap4_dpll_store_reg(dpll_reg, &dpll_reg->idlest);
+
+		if (dpll_dump_level & DPLL_DUMP_LEVEL_BEFORE)
+			omap4_dpll_dump_regs(dpll_reg);
+	}
+
+	if (dpll_dump_level & DPLL_DUMP_LEVEL_BEFORE)
+		pr_warn("========= Before suspending(End) ==============\n");
 }
 
 /**
@@ -813,6 +835,9 @@ static void omap4_wait_dpll_lock(struct omap4_dpll_regs *dpll_reg)
 			break;
 		if (j == MAX_DPLL_WAIT_TRIES) {
 			/* If we are unable to lock, warn and move on.. */
+			pr_warn("%s: Unable to lock dpll %s[part=%x inst=%x]:\n",
+				__func__, dpll_reg->name,
+				dpll_reg->mod_partition, dpll_reg->mod_inst);
 			omap4_dpll_dump_regs(dpll_reg);
 			break;
 		}
@@ -847,7 +872,17 @@ void omap4_dpll_resume_off(void)
 	u32 i;
 	struct omap4_dpll_regs *dpll_reg = dpll_regs;
 
+	if (dpll_dump_level & DPLL_DUMP_LEVEL_AFTER)
+		pr_warn("========= After suspending(Begin) ==============\n");
+
 	for (i = 0; i < ARRAY_SIZE(dpll_regs); i++, dpll_reg++) {
+
+		if (dpll_dump_level & DPLL_DUMP_LEVEL_RESTORE) {
+			pr_warn("DUMP before restore dpll %s:\n",
+				dpll_reg->name);
+			omap4_dpll_dump_regs(dpll_reg);
+		}
+
 		omap4_dpll_restore_reg(dpll_reg, &dpll_reg->clksel);
 		omap4_dpll_restore_reg(dpll_reg, &dpll_reg->div_m2);
 		omap4_dpll_restore_reg(dpll_reg, &dpll_reg->div_m3);
@@ -864,7 +899,16 @@ void omap4_dpll_resume_off(void)
 
 		/* Restore autoidle settings after the dpll is locked */
 		omap4_dpll_restore_reg(dpll_reg, &dpll_reg->autoidle);
+
+		if (dpll_dump_level & DPLL_DUMP_LEVEL_RESTORE) {
+			pr_warn("DUMP after restore dpll %s:\n",
+				dpll_reg->name);
+			omap4_dpll_dump_regs(dpll_reg);
+		}
 	}
+
+	if (dpll_dump_level & DPLL_DUMP_LEVEL_AFTER)
+		pr_warn("========= After suspending(End) ==============\n");
 }
 
 int omap4_core_dpll_register_notifier(struct notifier_block *nb)
