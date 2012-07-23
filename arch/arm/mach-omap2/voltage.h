@@ -75,6 +75,7 @@ struct omap_vfsm_instance {
  * @volt_data: voltage table having the distinct voltages supported
  *             by the domain and other associated per voltage data.
  * @change_notify_list: notifiers that need to be told on pre and post change
+ * @auto_ret: does voltage domain can use auto_ret feature
  */
 struct voltagedomain {
 	char *name;
@@ -111,6 +112,7 @@ struct voltagedomain {
 	struct dentry *debug_dir;
 	/* spinlock for voltage usecount */
 	spinlock_t lock;
+	bool auto_ret;
 };
 
 /**

@@ -50,6 +50,7 @@ static struct voltagedomain omap5_voltdm_mpu = {
 	.vfsm = &omap5_vdd_mpu_vfsm,
 	.vp = &omap5_vp_mpu,
 	.vdd = &omap5_vdd_mpu_info,
+	.auto_ret = true,
 };
 
 static struct voltagedomain omap5_voltdm_mm = {
@@ -62,6 +63,8 @@ static struct voltagedomain omap5_voltdm_mm = {
 	.vfsm = &omap5_vdd_mm_vfsm,
 	.vp = &omap5_vp_mm,
 	.vdd = &omap5_vdd_mm_info,
+	/* disable auto_ret for mm domain due to known issues */
+	.auto_ret = false,
 };
 
 static struct voltagedomain omap5_voltdm_core = {
@@ -74,6 +77,7 @@ static struct voltagedomain omap5_voltdm_core = {
 	.vfsm = &omap5_vdd_core_vfsm,
 	.vp = &omap5_vp_core,
 	.vdd = &omap5_vdd_core_info,
+	.auto_ret = true,
 };
 
 static struct voltagedomain omap5_voltdm_wkup = {
