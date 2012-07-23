@@ -50,6 +50,7 @@
 #include <linux/io.h>
 #include <linux/of.h>
 #include <linux/delay.h>
+#include <linux/wakelock.h>
 
 #include "core.h"
 
@@ -138,6 +139,7 @@ struct dwc3_omap {
 	struct delayed_work     omap_dwc3_mailbox_work;
 	struct workqueue_struct	*workqueue;
 	struct pm_qos_request	pm_qos_request;
+	struct wake_lock	dwc_wakelock;
 };
 
 struct dwc3_omap		*_omap;
@@ -242,6 +244,8 @@ static void omap_dwc3_set_mailbox(struct dwc3_omap *omap)
 		msleep(25);
 		dwc3_core_shutdown(&omap->dwc3->dev);
 
+		wake_unlock(&omap->dwc_wakelock);
+
 		break;
 
 	default:
@@ -259,8 +263,10 @@ void omap_dwc3_mailbox(enum omap_dwc3_vbus_id_status status)
 
 	omap->status = status;
 
-	if (status == OMAP_DWC3_ID_GROUND || status == OMAP_DWC3_VBUS_VALID)
+	if (status == OMAP_DWC3_ID_GROUND || status == OMAP_DWC3_VBUS_VALID) {
 		dwc->is_connected = true;
+		wake_lock(&omap->dwc_wakelock);
+	}
 
 #ifdef CONFIG_PM
 	if (omap->dev->power.disable_depth)
@@ -530,6 +536,8 @@ static int __devinit dwc3_omap_probe(struct platform_device *pdev)
 	pm_qos_add_request(&omap->pm_qos_request, PM_QOS_MEMORY_THROUGHPUT,
 				PM_QOS_MEMORY_THROUGHPUT_DEFAULT_VALUE);
 
+	wake_lock_init(&omap->dwc_wakelock, WAKE_LOCK_SUSPEND, "usb3_dwc");
+
 	return 0;
 
 err2:
@@ -546,6 +554,8 @@ static int __devexit dwc3_omap_remove(struct platform_device *pdev)
 	struct dwc3_omap	*omap = platform_get_drvdata(pdev);
 
 	pm_qos_remove_request(&omap->pm_qos_request);
+
+	wake_lock_destroy(&omap->dwc_wakelock);
 
 	platform_device_unregister(omap->dwc3);
 
