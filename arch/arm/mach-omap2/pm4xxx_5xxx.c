@@ -516,6 +516,16 @@ static void __init omap4_scrm_setup_timings(void)
 		OMAP4_DOWNTIME_MASK);
 	omap4_prminst_write_inst_reg(val, OMAP4430_SCRM_PARTITION, 0x0,
 				     OMAP4_SCRM_CLKSETUPTIME_OFFSET);
+
+	/* Setup max PMIC startup/shutdown time */
+	omap_pm_get_oscillator_voltage_ramp_time(&tstart, &tshut);
+
+	val = omap4_usec_to_val_scrm(tstart, OMAP4_WAKEUPTIME_SHIFT,
+		OMAP4_WAKEUPTIME_MASK);
+	val |= omap4_usec_to_val_scrm(tshut, OMAP4_SLEEPTIME_SHIFT,
+		OMAP4_SLEEPTIME_MASK);
+	omap4_prminst_write_inst_reg(val, OMAP4430_SCRM_PARTITION, 0x0,
+				     OMAP4_SCRM_PMICSETUPTIME_OFFSET);
 }
 
 /**
