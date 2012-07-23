@@ -22,10 +22,7 @@
 #include "vc.h"
 #include "prm-regbits-34xx.h"
 #include "prm-regbits-44xx.h"
-#include "prm44xx.h"
 #include "pm.h"
-#include "scrm44xx.h"
-#include "scrm54xx.h"
 #include "common.h"
 
 /**
@@ -436,30 +433,6 @@ static u32 omap4_calc_volt_ramp(struct voltagedomain *voltdm, u32 voltage_diff,
 }
 
 /**
- * omap4_usec_to_val_scrm - convert microsecond value to SCRM module bitfield
- * @usec: microseconds
- * @shift: number of bits to shift left
- * @mask: bitfield mask
- *
- * Converts microsecond value to OMAP4 SCRM bitfield. Bitfield is
- * shifted to requested position, and checked agains the mask value.
- * If larger, forced to the max value of the field (i.e. the mask itself.)
- * Returns the SCRM bitfield value.
- */
-static u32 omap4_usec_to_val_scrm(u32 usec, int shift, u32 mask)
-{
-	u32 val;
-
-	val = omap_usec_to_32k(usec) << shift;
-
-	/* Check for overflow, if yes, force to max value */
-	if (val > mask)
-		val = mask;
-
-	return val;
-}
-
-/**
  * omap4_set_volt_ramp_time - set voltage ramp timings for a channel
  * @voltdm: channel to configure
  * @off_mode: whether off-mode values are used
@@ -500,22 +473,8 @@ static void omap4_set_volt_ramp_time(struct voltagedomain *voltdm,
 
 static void omap4_set_timings(struct voltagedomain *voltdm)
 {
-	u32 val;
-	u32 tstart, tshut;
-
 	omap4_set_volt_ramp_time(voltdm, true);
 	omap4_set_volt_ramp_time(voltdm, false);
-
-	omap_pm_get_oscillator(&tstart, &tshut);
-
-	val = omap4_usec_to_val_scrm(tstart, OMAP4_SETUPTIME_SHIFT,
-		OMAP4_SETUPTIME_MASK);
-	val |= omap4_usec_to_val_scrm(tshut, OMAP4_DOWNTIME_SHIFT,
-		OMAP4_DOWNTIME_MASK);
-	if (cpu_is_omap54xx())
-		__raw_writel(val, OMAP5_SCRM_CLKSETUPTIME);
-	else
-		__raw_writel(val, OMAP4_SCRM_CLKSETUPTIME);
 }
 
 /* OMAP4 specific voltage init functions */

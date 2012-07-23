@@ -34,6 +34,7 @@
 #include "prcm44xx.h"
 #include "prm-regbits-44xx.h"
 #include "prminst44xx.h"
+#include "scrm44xx.h"
 #include "pm.h"
 #include "voltage.h"
 #include "prcm-debug.h"
@@ -478,6 +479,46 @@ static void __init prcm_setup_regs(void)
 }
 
 /**
+ * omap4_usec_to_val_scrm - convert microsecond value to SCRM module bitfield
+ * @usec: microseconds
+ * @shift: number of bits to shift left
+ * @mask: bitfield mask
+ *
+ * Converts microsecond value to OMAP4 SCRM bitfield. Bitfield is
+ * shifted to requested position, and checked agains the mask value.
+ * If larger, forced to the max value of the field (i.e. the mask itself.)
+ * Returns the SCRM bitfield value.
+ */
+static u32 omap4_usec_to_val_scrm(u32 usec, int shift, u32 mask)
+{
+	u32 val;
+
+	val = omap_usec_to_32k(usec) << shift;
+
+	/* Check for overflow, if yes, force to max value */
+	if (val > mask)
+		val = mask;
+
+	return val;
+}
+
+static void __init omap4_scrm_setup_timings(void)
+{
+	u32 val;
+	u32 tstart, tshut;
+
+	/* Setup clksetup/clkshoutdown time for oscillator */
+	omap_pm_get_oscillator(&tstart, &tshut);
+
+	val = omap4_usec_to_val_scrm(tstart, OMAP4_SETUPTIME_SHIFT,
+		OMAP4_SETUPTIME_MASK);
+	val |= omap4_usec_to_val_scrm(tshut, OMAP4_DOWNTIME_SHIFT,
+		OMAP4_DOWNTIME_MASK);
+	omap4_prminst_write_inst_reg(val, OMAP4430_SCRM_PARTITION, 0x0,
+				     OMAP4_SCRM_CLKSETUPTIME_OFFSET);
+}
+
+/**
  * omap_pm_init - Init routine for OMAP4 PM
  *
  * Initializes all powerdomain and clockdomain target states
@@ -535,6 +576,9 @@ static int __init omap_pm_init(void)
 		iounmap(emif1);
 		iounmap(emif2);
 	}
+
+	/* setup platform related pmic/oscillator timings */
+	omap4_scrm_setup_timings();
 
 	ret = pwrdm_for_each(pwrdms_setup, NULL);
 	if (ret) {
