@@ -1791,6 +1791,7 @@ static int _enable(struct omap_hwmod *oh)
  */
 static int _idle(struct omap_hwmod *oh)
 {
+	int r, hwsup = 0;
 	pr_debug("omap_hwmod: %s: idling\n", oh->name);
 
 	if (oh->_state != _HWMOD_STATE_ENABLED) {
@@ -1802,6 +1803,20 @@ static int _idle(struct omap_hwmod *oh)
 	if (oh->class->sysc)
 		_idle_sysc(oh);
 	_del_initiator_dep(oh, mpu_oh);
+	if (oh->clkdm && (oh->prcm.omap4.modulemode == MODULEMODE_HWCTRL)) {
+		/*
+		 * For modules with modulemode configured as "auto"
+		 * the clockdomain must be in SW_WKUP before disabling
+		 * a module completely.
+		 */
+		hwsup = clkdm_in_hwsup(oh->clkdm);
+		r = clkdm_hwmod_enable(oh->clkdm, oh);
+		if (r) {
+			WARN(1, "omap_hwmod: %s: could not enable clockdomain %s: %d\n",
+			     oh->name, oh->clkdm->name, r);
+			return r;
+		}
+	}
 
 	_omap4_disable_module(oh);
 
@@ -1812,8 +1827,11 @@ static int _idle(struct omap_hwmod *oh)
 	 * transition to complete properly.
 	 */
 	_disable_clocks(oh);
-	if (oh->clkdm)
+	if (oh->clkdm) {
+		if (hwsup)
+			clkdm_allow_idle(oh->clkdm);
 		clkdm_hwmod_disable(oh->clkdm, oh);
+	}
 
 	/* Mux pins for device idle if populated */
 	if (oh->mux && oh->mux->pads_dynamic) {
@@ -1873,7 +1891,7 @@ int omap_hwmod_set_ocp_autoidle(struct omap_hwmod *oh, u8 autoidle)
  */
 static int _shutdown(struct omap_hwmod *oh)
 {
-	int ret;
+	int ret, hwsup = 0;
 	u8 prev_state;
 
 	if (oh->_state != _HWMOD_STATE_IDLE &&
@@ -1906,11 +1924,29 @@ static int _shutdown(struct omap_hwmod *oh)
 	/* clocks and deps are already disabled in idle */
 	if (oh->_state == _HWMOD_STATE_ENABLED) {
 		_del_initiator_dep(oh, mpu_oh);
+		if (oh->clkdm &&
+		    oh->prcm.omap4.modulemode == MODULEMODE_HWCTRL) {
+			/*
+			 * For modules with modulemode configured as "auto"
+			 * the clockdomain must be in SW_WKUP before disabling
+			 * a module completely.
+			 */
+			hwsup = clkdm_in_hwsup(oh->clkdm);
+			ret = clkdm_hwmod_enable(oh->clkdm, oh);
+			if (ret) {
+				WARN(1, "omap_hwmod: %s: could not enable clockdomain %s: %d\n",
+				     oh->name, oh->clkdm->name, ret);
+				return ret;
+			}
+		}
 		/* XXX what about the other system initiators here? dma, dsp */
 		_omap4_disable_module(oh);
 		_disable_clocks(oh);
-		if (oh->clkdm)
+		if (oh->clkdm) {
+			if (hwsup)
+				clkdm_allow_idle(oh->clkdm);
 			clkdm_hwmod_disable(oh->clkdm, oh);
+		}
 	}
 	/* XXX Should this code also force-disable the optional clocks? */
 
