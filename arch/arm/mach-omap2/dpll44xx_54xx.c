@@ -81,6 +81,7 @@ static struct omap4_dpll_regs omap4_omap5_dpll_regs_mpu = {
 	.idlest		= {.offset = OMAP4_CM_IDLEST_DPLL_MPU_OFFSET},
 	.clksel		= {.offset = OMAP4_CM_CLKSEL_DPLL_MPU_OFFSET},
 	.div_m2		= {.offset = OMAP4_CM_DIV_M2_DPLL_MPU_OFFSET},
+	.div_m3		= {.offset = OMAP4_CM_BYPCLK_DPLL_MPU_OFFSET},
 };
 
 /* IVA DPLL */
@@ -94,6 +95,7 @@ static struct omap4_dpll_regs omap4_omap5_dpll_regs_iva = {
 	.clksel		= {.offset = OMAP4_CM_CLKSEL_DPLL_IVA_OFFSET},
 	.div_m4		= {.offset = OMAP4_CM_DIV_M4_DPLL_IVA_OFFSET},
 	.div_m5		= {.offset = OMAP4_CM_DIV_M5_DPLL_IVA_OFFSET},
+	.div_m6		= {.offset = OMAP4_CM_BYPCLK_DPLL_IVA_OFFSET},
 };
 
 /* ABE DPLL */
