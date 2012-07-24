@@ -1693,6 +1693,23 @@ static int omapfb_allocate_all_fbs(struct omapfb2_device *fbdev)
 		memset(&vram_paddrs, 0, sizeof(vram_paddrs));
 	}
 
+	if (fbdev->dev->platform_data) {
+		struct omapfb_platform_data *opd;
+		opd = fbdev->dev->platform_data;
+		for (i = 0; i < opd->mem_desc.region_cnt; ++i) {
+			if (!vram_sizes[i]) {
+				unsigned long size;
+				unsigned long paddr;
+
+				size = opd->mem_desc.region[i].size;
+				paddr = opd->mem_desc.region[i].paddr;
+
+				vram_sizes[i] = size;
+				vram_paddrs[i] = paddr;
+			}
+		}
+	}
+
 	for (i = 0; i < fbdev->num_fbs; i++) {
 		/* allocate memory automatically only for fb0, or if
 		 * excplicitly defined with vram or plat data option */
