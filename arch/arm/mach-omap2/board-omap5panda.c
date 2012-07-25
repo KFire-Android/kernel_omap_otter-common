@@ -64,16 +64,6 @@ static struct omap_board_mux board_mux[] __initdata = {
 #define board_mux NULL
 #endif
 
-#if defined(CONFIG_TI_EMIF) || defined(CONFIG_TI_EMIF_MODULE)
-#ifndef CONFIG_MACH_OMAP_5430ZEBU
-static struct __devinitdata emif_custom_configs custom_configs = {
-	.mask	= EMIF_CUSTOM_CONFIG_LPMODE,
-	.lpmode	= EMIF_LP_MODE_DISABLE
-};
-#endif
-#endif
-
-
 static struct omap2_hsmmc_info mmc[] = {
 	{
 		.mmc		= 2,
@@ -775,22 +765,6 @@ static void __init omap_ehci_ohci_init(void)
 
 static void __init omap_5_panda_init(void)
 {
-
-#if defined(CONFIG_TI_EMIF) || defined(CONFIG_TI_EMIF_MODULE)
-#ifndef CONFIG_MACH_OMAP_5430ZEBU
-	omap_emif_set_device_details(1, &lpddr2_elpida_4G_S4_x2_info,
-			lpddr2_elpida_4G_S4_timings,
-			ARRAY_SIZE(lpddr2_elpida_4G_S4_timings),
-			&lpddr2_elpida_S4_min_tck,
-			&custom_configs);
-
-	omap_emif_set_device_details(2, &lpddr2_elpida_4G_S4_x2_info,
-			lpddr2_elpida_4G_S4_timings,
-			ARRAY_SIZE(lpddr2_elpida_4G_S4_timings),
-			&lpddr2_elpida_S4_min_tck,
-			&custom_configs);
-#endif
-#endif
 	omap5_mux_init(board_mux, NULL, OMAP_PACKAGE_CBL);
 	omap_sdrc_init(NULL, NULL);
 	omap5pandai2c_init();
