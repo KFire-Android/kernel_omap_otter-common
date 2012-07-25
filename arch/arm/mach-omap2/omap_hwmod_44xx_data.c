@@ -4672,9 +4672,25 @@ static struct omap_hwmod_ocp_if omap44xx_l4_per__dss_dsi2 = {
 
 static struct omap_hwmod_addr_space omap44xx_dss_hdmi_dma_addrs[] = {
 	{
+		.name		= "hdmi_wp",
 		.pa_start	= 0x58006000,
-		.pa_end		= 0x58006fff,
+		.pa_end		= 0x580060ff,
 		.flags		= ADDR_TYPE_RT
+	},
+	{
+		.name		= "pllctrl",
+		.pa_start	= 0x58006200,
+		.pa_end		= 0x5800623f,
+	},
+	{
+		.name		= "hdmitxphy",
+		.pa_start	= 0x58006300,
+		.pa_end		= 0x5800633f,
+	},
+	{
+		.name		= "hdmi_core",
+		.pa_start	= 0x58006400,
+		.pa_end		= 0x58006dff,
 	},
 	{ }
 };
