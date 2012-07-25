@@ -19,7 +19,8 @@
 
 #include <linux/types.h>
 #include <linux/list.h>
-
+#include <linux/plist.h>
+#include <linux/spinlock.h>
 #include <linux/atomic.h>
 
 #include <plat/cpu.h>
@@ -28,11 +29,18 @@
 
 /* Powerdomain basic power states */
 #define PWRDM_POWER_OFF		0x0
-#define PWRDM_POWER_RET		0x1
 #define PWRDM_POWER_INACTIVE	0x2
 #define PWRDM_POWER_ON		0x3
+#define PWRDM_POWER_CSWR	0x4
+#define PWRDM_POWER_OSWR	0x5
 
 #define PWRDM_MAX_PWRSTS	4
+
+/* Maximum number of power domain states - including OSWR */
+#define PWRDM_MAX_POWER_PWRSTS	6
+
+/* Unsupported power latency state for a power domain */
+#define UNSUP_STATE		-1
 
 /* Powerdomain allowable state bitfields */
 #define PWRSTS_ON		(1 << PWRDM_POWER_ON)
@@ -93,6 +101,7 @@ struct powerdomain;
  * @name: Powerdomain name
  * @voltdm: voltagedomain containing this powerdomain
  * @prcm_offs: the address offset from CM_BASE/PRM_BASE
+ * @context_offs: the address offset for the CONTEXT register
  * @prcm_partition: (OMAP4 only) the PRCM partition ID containing @prcm_offs
  * @pwrsts: Possible powerdomain power states
  * @pwrsts_logic_ret: Possible logic power states when pwrdm in RETENTION
@@ -107,6 +116,8 @@ struct powerdomain;
  * @state_counter:
  * @timer:
  * @state_timer:
+ * @lock: lock to keep the pwrdm structure access sanity.
+ * @wkup_lat_plist_lock: Lock to control access to Latency and updates
  *
  * @prcm_partition possible values are defined in mach-omap2/prcm44xx.h.
  */
@@ -117,6 +128,7 @@ struct powerdomain {
 		struct voltagedomain *ptr;
 	} voltdm;
 	const s16 prcm_offs;
+	const s16 context_offs;
 	const u8 pwrsts;
 	const u8 pwrsts_logic_ret;
 	const u8 flags;
@@ -127,6 +139,8 @@ struct powerdomain {
 	struct clockdomain *pwrdm_clkdms[PWRDM_MAX_CLKDMS];
 	struct list_head node;
 	struct list_head voltdm_node;
+	/* Lock to secure accesses around pwrdm data structure updates */
+	spinlock_t lock;
 	int state;
 	unsigned state_counter[PWRDM_MAX_PWRSTS];
 	unsigned ret_logic_off_counter;
@@ -136,6 +150,17 @@ struct powerdomain {
 	s64 timer;
 	s64 state_timer[PWRDM_MAX_PWRSTS];
 #endif
+	const s32 wakeup_lat[PWRDM_MAX_POWER_PWRSTS];
+	struct plist_head wkup_lat_plist_head;
+	/* Lock to control access to latency list */
+	struct mutex wkup_lat_plist_lock;
+	int wkup_lat_next_state;
+};
+
+/* Linked list for the wake-up latency constraints */
+struct pwrdm_wkup_constraints_entry {
+	void			*cookie;
+	struct plist_node	node;
 };
 
 /**
@@ -160,6 +185,10 @@ struct powerdomain {
  * @pwrdm_wait_transition: Wait for a pd state transition to complete
  * @pwrdm_enable_force_off: Enable force off transition feature for the pd
  * @pwrdm_disable_force_off: Disable force off transition feature for the pd
+ * @pwrdm_lost_context_rff: Check if pd has lost RFF context (entered off)
+ * @pwrdm_lost_context_rff: Check if pd has lost RFF context (omap4+ device off)
+ * @pwrdm_enable_off: Extra off mode enable for pd (omap4+ device off)
+ * @pwrdm_read_next_off: Check if pd next state is off (omap4+ device off)
  */
 struct pwrdm_ops {
 	int	(*pwrdm_set_next_pwrst)(struct powerdomain *pwrdm, u8 pwrst);
@@ -182,6 +211,9 @@ struct pwrdm_ops {
 	int	(*pwrdm_wait_transition)(struct powerdomain *pwrdm);
 	int	(*pwrdm_enable_force_off)(struct powerdomain *pwrdm);
 	int	(*pwrdm_disable_force_off)(struct powerdomain *pwrdm);
+	bool	(*pwrdm_lost_context_rff)(struct powerdomain *pwrdm);
+	void	(*pwrdm_enable_off)(bool enable);
+	bool	(*pwrdm_read_next_off)(void);
 };
 
 int pwrdm_register_platform_funcs(struct pwrdm_ops *custom_funcs);
@@ -204,22 +236,17 @@ struct voltagedomain *pwrdm_get_voltdm(struct powerdomain *pwrdm);
 
 int pwrdm_get_mem_bank_count(struct powerdomain *pwrdm);
 
+int pwrdm_get_achievable_pwrst(struct powerdomain *pwrdm, u8 req_pwrst);
+
+int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 state);
+
 int pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst);
 int pwrdm_read_next_pwrst(struct powerdomain *pwrdm);
 int pwrdm_read_pwrst(struct powerdomain *pwrdm);
 int pwrdm_read_prev_pwrst(struct powerdomain *pwrdm);
 int pwrdm_clear_all_prev_pwrst(struct powerdomain *pwrdm);
-
-int pwrdm_set_logic_retst(struct powerdomain *pwrdm, u8 pwrst);
-int pwrdm_set_mem_onst(struct powerdomain *pwrdm, u8 bank, u8 pwrst);
-int pwrdm_set_mem_retst(struct powerdomain *pwrdm, u8 bank, u8 pwrst);
-
-int pwrdm_read_logic_pwrst(struct powerdomain *pwrdm);
-int pwrdm_read_prev_logic_pwrst(struct powerdomain *pwrdm);
-int pwrdm_read_logic_retst(struct powerdomain *pwrdm);
-int pwrdm_read_mem_pwrst(struct powerdomain *pwrdm, u8 bank);
-int pwrdm_read_prev_mem_pwrst(struct powerdomain *pwrdm, u8 bank);
-int pwrdm_read_mem_retst(struct powerdomain *pwrdm, u8 bank);
+int pwrdm_read_device_off_state(void);
+void pwrdm_enable_off_mode(bool enable);
 
 int pwrdm_enable_hdwr_sar(struct powerdomain *pwrdm);
 int pwrdm_disable_hdwr_sar(struct powerdomain *pwrdm);
@@ -232,11 +259,17 @@ int pwrdm_clkdm_state_switch(struct clockdomain *clkdm);
 int pwrdm_pre_transition(struct powerdomain *pwrdm);
 int pwrdm_post_transition(struct powerdomain *pwrdm);
 int pwrdm_set_lowpwrstchange(struct powerdomain *pwrdm);
+
+int pwrdm_wakeuplat_update_constraint(struct powerdomain *pwrdm, void *cookie,
+				      long min_latency);
+int pwrdm_wakeuplat_remove_constraint(struct powerdomain *pwrdm, void *cookie);
+
 int pwrdm_get_context_loss_count(struct powerdomain *pwrdm);
 bool pwrdm_can_ever_lose_context(struct powerdomain *pwrdm);
 int pwrdm_enable_force_off(struct powerdomain *pwrdm);
 int pwrdm_disable_force_off(struct powerdomain *pwrdm);
 
+int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 state);
 extern void omap242x_powerdomains_init(void);
 extern void omap243x_powerdomains_init(void);
 extern void omap3xxx_powerdomains_init(void);
@@ -256,5 +289,47 @@ extern u32 omap2_pwrdm_get_mem_bank_stst_mask(u8 bank);
 extern struct powerdomain wkup_omap2_pwrdm;
 extern struct powerdomain gfx_omap2_pwrdm;
 
+#define PWRDM_COMPARE_PWRST_EQ	(0x1 << 0)
+#define PWRDM_COMPARE_PWRST_GT	(0x1 << 1)
+#define PWRDM_COMPARE_PWRST_LT	(0x1 << 2)
+/* Do not use the internal function, use the exposed API */
+extern bool _pwrdm_state_compare_int(int a, int b, u8 flag);
 
+/*
+ * The following inlines are strongly encouraged to be
+ * used in-order to compare powerdomain states.
+ * pwrdm_power_state_eq(a, b) return true if a == b
+ * pwrdm_power_state_gt(a, b) return true if a > b
+ * pwrdm_power_state_ge(a, b) return true if a >= b
+ * pwrdm_power_state_lt(a, b) return true if a < b
+ * pwrdm_power_state_le(a, b) return true if a <= b
+ *
+ * IMPORTANT: For performance reasons,No verification of powerdomains are done
+ * Do not use with private macro definition of internal state
+ */
+static inline bool pwrdm_power_state_eq(int a, int b)
+{
+	return _pwrdm_state_compare_int(a, b, PWRDM_COMPARE_PWRST_EQ);
+}
+static inline bool pwrdm_power_state_gt(int a, int b)
+{
+	return _pwrdm_state_compare_int(a, b, PWRDM_COMPARE_PWRST_GT);
+}
+static inline bool pwrdm_power_state_ge(int a, int b)
+{
+	return _pwrdm_state_compare_int(a, b,
+					PWRDM_COMPARE_PWRST_GT |
+					PWRDM_COMPARE_PWRST_EQ);
+}
+static inline bool pwrdm_power_state_lt(int a, int b)
+{
+	return _pwrdm_state_compare_int(a, b, PWRDM_COMPARE_PWRST_LT);
+}
+
+static inline bool pwrdm_power_state_le(int a, int b)
+{
+	return _pwrdm_state_compare_int(a, b,
+					PWRDM_COMPARE_PWRST_LT |
+					PWRDM_COMPARE_PWRST_EQ);
+}
 #endif

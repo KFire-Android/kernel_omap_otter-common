@@ -17,8 +17,11 @@
 #include <linux/kernel.h>
 #include <linux/types.h>
 #include <linux/list.h>
+#include <linux/slab.h>
 #include <linux/errno.h>
 #include <linux/string.h>
+#include <linux/ratelimit.h>
+#include <linux/pm_qos.h>
 #include <trace/events/power.h>
 
 #include "cm2xxx_3xxx.h"
@@ -30,6 +33,7 @@
 #include <asm/cpu.h>
 #include <plat/cpu.h>
 #include "powerdomain.h"
+#include "powerdomain-private.h"
 #include "clockdomain.h"
 #include <plat/prcm.h>
 
@@ -42,6 +46,37 @@ enum {
 	PWRDM_STATE_PREV,
 };
 
+static unsigned char _pwrdm_state_idx_lookup[] = {
+	[PWRDM_POWER_OFF] = 1,
+	[PWRDM_POWER_OSWR] = 2,
+	[PWRDM_POWER_CSWR] = 3,
+	[PWRDM_POWER_INACTIVE] = 4,
+	[PWRDM_POWER_ON] = 5,
+};
+
+/* index to state lookup table */
+static unsigned char _pwrdm_idx_state_lookup[] = {
+	[1] = PWRDM_POWER_OFF,
+	[2] = PWRDM_POWER_OSWR,
+	[3] = PWRDM_POWER_CSWR,
+	[4] = PWRDM_POWER_INACTIVE,
+	[5] = PWRDM_POWER_ON,
+};
+
+/* Fwd declarations */
+static __maybe_unused int pwrdm_set_mem_onst(struct powerdomain *pwrdm, u8 bank,
+					     u8 pwrst);
+static __maybe_unused int pwrdm_read_mem_pwrst(struct powerdomain *pwrdm,
+					       u8 bank);
+static int pwrdm_set_mem_retst(struct powerdomain *pwrdm, u8 bank, u8 pwrst);
+static __maybe_unused int pwrdm_read_mem_retst(struct powerdomain *pwrdm,
+					       u8 bank);
+static int pwrdm_read_prev_mem_pwrst(struct powerdomain *pwrdm, u8 bank);
+
+static int pwrdm_set_logic_retst(struct powerdomain *pwrdm, u8 pwrst);
+static int pwrdm_read_logic_retst(struct powerdomain *pwrdm);
+static int pwrdm_read_logic_pwrst(struct powerdomain *pwrdm);
+static int pwrdm_read_prev_logic_pwrst(struct powerdomain *pwrdm);
 
 /* pwrdm_list contains all registered struct powerdomains */
 static LIST_HEAD(pwrdm_list);
@@ -102,6 +137,7 @@ static int _pwrdm_register(struct powerdomain *pwrdm)
 	INIT_LIST_HEAD(&pwrdm->voltdm_node);
 	voltdm_add_pwrdm(voltdm, pwrdm);
 
+	spin_lock_init(&pwrdm->lock);
 	list_add(&pwrdm->node, &pwrdm_list);
 
 	/* Initialize the powerdomain's state counter */
@@ -112,9 +148,15 @@ static int _pwrdm_register(struct powerdomain *pwrdm)
 	for (i = 0; i < pwrdm->banks; i++)
 		pwrdm->ret_mem_off_counter[i] = 0;
 
+	/* Initialize the per-device wake-up constraints framework data */
+	mutex_init(&pwrdm->wkup_lat_plist_lock);
+	plist_head_init(&pwrdm->wkup_lat_plist_head);
+	pwrdm->wkup_lat_next_state = PWRDM_POWER_OFF;
+
+	/* Initialize the pwrdm state */
 	pwrdm_wait_transition(pwrdm);
 	pwrdm->state = pwrdm_read_pwrst(pwrdm);
-	pwrdm->state_counter[pwrdm->state] = 1;
+	pwrdm->state_counter[_PWRDM_STATE_COUNT_IDX(pwrdm->state)] = 1;
 
 	pr_debug("powerdomain: registered %s\n", pwrdm->name);
 
@@ -130,7 +172,7 @@ static void _update_logic_membank_counters(struct powerdomain *pwrdm)
 
 	/* Fake logic off counter */
 	if ((pwrdm->pwrsts_logic_ret == PWRSTS_OFF_RET) &&
-		(pwrdm_read_logic_retst(pwrdm) == PWRDM_POWER_OFF))
+		(prev_logic_pwrst == PWRDM_POWER_OFF))
 		pwrdm->ret_logic_off_counter++;
 
 	for (i = 0; i < pwrdm->banks; i++) {
@@ -147,8 +189,12 @@ static int _pwrdm_state_switch(struct powerdomain *pwrdm, int flag)
 
 	int prev, state, trace_state = 0;
 
-	if (pwrdm == NULL)
+	if (pwrdm == NULL) {
+		WARN_ONCE(1, "null pwrdm\n");
+		pr_err_ratelimited("%s: powerdomain: null pwrdm param\n",
+				   __func__);
 		return -EINVAL;
+	}
 
 	state = pwrdm_read_pwrst(pwrdm);
 
@@ -159,8 +205,8 @@ static int _pwrdm_state_switch(struct powerdomain *pwrdm, int flag)
 	case PWRDM_STATE_PREV:
 		prev = pwrdm_read_prev_pwrst(pwrdm);
 		if (pwrdm->state != prev)
-			pwrdm->state_counter[prev]++;
-		if (prev == PWRDM_POWER_RET)
+			pwrdm->state_counter[_PWRDM_STATE_COUNT_IDX(prev)]++;
+		if (prev == PWRDM_POWER_OSWR)
 			_update_logic_membank_counters(pwrdm);
 		/*
 		 * If the power domain did not hit the desired state,
@@ -175,11 +221,13 @@ static int _pwrdm_state_switch(struct powerdomain *pwrdm, int flag)
 		}
 		break;
 	default:
+		pr_err_ratelimited("%s: powerdomain %s: bad flag %d\n",
+				   __func__, pwrdm->name, flag);
 		return -EINVAL;
 	}
 
 	if (state != prev)
-		pwrdm->state_counter[state]++;
+		pwrdm->state_counter[_PWRDM_STATE_COUNT_IDX(state)]++;
 
 	pm_dbg_update_time(pwrdm, prev);
 
@@ -201,7 +249,78 @@ static int _pwrdm_post_transition_cb(struct powerdomain *pwrdm, void *unused)
 	return 0;
 }
 
+/**
+ * _pwrdm_wakeuplat_update_pwrst - Update power domain power state if needed
+ * @pwrdm: struct powerdomain * to which requesting device belongs to.
+ * @min_latency: the allowed wake-up latency for the given power domain. A
+ *  value of PM_QOS_DEV_LAT_DEFAULT_VALUE means 'no constraint' on the pwrdm.
+ *
+ * Finds the power domain next power state that fulfills the constraint.
+ * Programs a new target state if it is different from current power state.
+ * The power domains get the next power state programmed directly in the
+ * registers.
+ *
+ * Returns 0 in case of success, -EINVAL in case of invalid parameters,
+ * or the return value from omap_set_pwrdm_state.
+ */
+static int _pwrdm_wakeuplat_update_pwrst(struct powerdomain *pwrdm,
+					 long min_latency)
+{
+	int ret = 0, state, state_idx, new_state = PWRDM_POWER_ON;
+
+	/*
+	 * Find the next supported power state with
+	 *  wakeup latency <= min_latency.
+	 * Pick the lower state if no constraint on the pwrdm
+	 *  (min_latency == PM_QOS_DEV_LAT_DEFAULT_VALUE).
+	 * Skip the states marked as unsupported (UNSUP_STATE).
+	 * If no power state found, fall back to PWRDM_POWER_ON.
+	 */
+	for (state_idx = 1; state_idx < PWRDM_MAX_POWER_PWRSTS; state_idx++) {
+		state = _pwrdm_idx_state_lookup[state_idx];
+
+		if (pwrdm->wakeup_lat[state] == UNSUP_STATE)
+			continue;
+		if (min_latency == PM_QOS_DEV_LAT_DEFAULT_VALUE ||
+		    pwrdm->wakeup_lat[state] <= min_latency) {
+			new_state = state;
+			break;
+		}
+	}
+
+	if (state_idx == PWRDM_MAX_POWER_PWRSTS) {
+		WARN(1, "%s: NO matching pwrst (powerdomain %s, min_lat=%ld)\n",
+		     __func__, pwrdm->name, min_latency);
+		return -EINVAL;
+	}
+
+	pwrdm->wkup_lat_next_state = new_state;
+	ret = omap_set_pwrdm_state(pwrdm, new_state);
+
+	pr_debug("%s: pwrst for %s: curr=%d, next=%d, min_latency=%ld, new_state=%d\n",
+		 __func__, pwrdm->name, pwrdm_read_pwrst(pwrdm),
+		 pwrdm_read_next_pwrst(pwrdm), min_latency, new_state);
+
+	return ret;
+}
+
+
 /* Public functions */
+
+bool _pwrdm_state_compare_int(int a, int b, u8 flag)
+{
+	int a_idx = _pwrdm_state_idx_lookup[a];
+	int b_idx = _pwrdm_state_idx_lookup[b];
+
+	if (flag & PWRDM_COMPARE_PWRST_EQ && a_idx == b_idx)
+		return true;
+	if (flag & PWRDM_COMPARE_PWRST_GT && a_idx > b_idx)
+		return true;
+	if (flag & PWRDM_COMPARE_PWRST_LT && a_idx < b_idx)
+		return true;
+
+	return false;
+}
 
 /**
  * pwrdm_register_platform_funcs - register powerdomain implementation fns
@@ -466,6 +585,183 @@ int pwrdm_get_mem_bank_count(struct powerdomain *pwrdm)
 	return pwrdm->banks;
 }
 
+static int _match_pwrst(u32 pwrsts, u8 pwrst, u8 default_pwrst)
+{
+	bool found = true;
+	int new_pwrst = pwrst;
+
+	/* Search down */
+	while (!(pwrsts & (1 << new_pwrst))) {
+		if (new_pwrst == PWRDM_POWER_OFF) {
+			found = false;
+			break;
+		}
+		new_pwrst--;
+	}
+
+	if (found)
+		goto done;
+
+	/* Search up */
+	new_pwrst = pwrst;
+	while (!(pwrsts & (1 << new_pwrst))) {
+		if (new_pwrst == default_pwrst)
+			break;
+		new_pwrst++;
+	}
+done:
+	return new_pwrst;
+}
+
+/**
+ * pwrdm_get_achievable_pwrst() - Provide achievable pwrst
+ * @pwrdm: struct powerdomain * to check on
+ * @req_pwrst: minimum state we would like to hit
+ * (one of the PWRDM_POWER* macros)
+ *
+ * Power domains have varied capabilities. When attempting a low power
+ * state such as OFF/RET, a specific min requested state may not be
+ * supported on the power domain. This is because a combination
+ * of system power states where the parent PD's state is not in line
+ * with expectation can result in system instabilities.
+ *
+ * The achievable power state is first looked for in the lower power
+ * states in order to maximize the power savings, then if not found
+ * in the higher power states.
+ *
+ * Returns the achievable functional power state, or -EINVAL in case of
+ * invalid parameters.
+ */
+int pwrdm_get_achievable_pwrst(struct powerdomain *pwrdm, u8 req_pwrst)
+{
+	int pwrst = req_pwrst;
+	int logic = PWRDM_POWER_RET;
+	int new_pwrst, new_logic;
+
+	if (!pwrdm || IS_ERR(pwrdm)) {
+		pr_err("%s: invalid params: pwrdm=%p, req_pwrst=%0x\n",
+		       __func__, pwrdm, req_pwrst);
+		return -EINVAL;
+	}
+
+	switch (req_pwrst) {
+	case PWRDM_POWER_OFF:
+		logic = PWRDM_POWER_OFF;
+		break;
+	case PWRDM_POWER_OSWR:
+		logic = PWRDM_POWER_OFF;
+		/* Fall through */
+	case PWRDM_POWER_CSWR:
+		pwrst = PWRDM_POWER_RET;
+		break;
+	}
+
+	/*
+	 * If no lower power state found, fallback to the higher
+	 * power states.
+	 * PWRDM_POWER_ON is always valid.
+	 */
+	new_pwrst = _match_pwrst(pwrdm->pwrsts, pwrst,
+				 PWRDM_POWER_ON);
+	/*
+	 * If no lower logic state found, fallback to the higher
+	 * logic states.
+	 * PWRDM_POWER_RET is always valid.
+	 */
+	new_logic = _match_pwrst(pwrdm->pwrsts_logic_ret, logic,
+				 PWRDM_POWER_RET);
+
+	if (new_pwrst == PWRDM_POWER_RET) {
+		if (new_logic == PWRDM_POWER_OFF)
+			new_pwrst = PWRDM_POWER_OSWR;
+		else
+			new_pwrst = PWRDM_POWER_CSWR;
+	}
+
+	pr_debug("%s(%s, req_pwrst=%0x) returns %0x\n", __func__,
+		 pwrdm->name, req_pwrst, new_pwrst);
+
+	return new_pwrst;
+}
+
+/* Types of sleep_switch used in omap_set_pwrdm_state */
+#define FORCEWAKEUP_SWITCH	0
+#define LOWPOWERSTATE_SWITCH	1
+
+/**
+ * omap_set_pwrdm_state - program next powerdomain power state
+ * @pwrdm: struct powerdomain * to set
+ * @pwrst: one of the PWRDM_POWER_* macros
+ *
+ * This programs the pwrdm next state, sets the dependencies
+ * and waits for the state to be applied.
+ */
+int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 pwrst)
+{
+	u8 curr_pwrst, next_pwrst;
+	int sleep_switch = -1, ret = 0, hwsup = 0;
+
+	if (!pwrdm || IS_ERR(pwrdm)) {
+		pr_err_ratelimited("%s: powerdomain: bad pwrdm\n",
+				   __func__);
+		return -EINVAL;
+	}
+
+	pwrst = pwrdm_get_achievable_pwrst(pwrdm, pwrst);
+
+	spin_lock(&pwrdm->lock);
+
+	next_pwrst = pwrdm_read_next_pwrst(pwrdm);
+	curr_pwrst = pwrdm_read_pwrst(pwrdm);
+	/*
+	 * we do not need to do anything IFF it is SURE that
+	 * current power domain state is the same and the programmed
+	 * next power domain state and that is the same state that
+	 * we have been asked to go to
+	 */
+	if (curr_pwrst == next_pwrst && next_pwrst == pwrst)
+		goto out;
+
+	if (curr_pwrst != PWRDM_POWER_ON) {
+		int curr_pwrst_idx;
+		int pwrst_idx;
+
+		curr_pwrst_idx = _pwrdm_state_idx_lookup[curr_pwrst];
+		pwrst_idx = _pwrdm_state_idx_lookup[pwrst];
+		if ((curr_pwrst_idx > pwrst_idx) &&
+		    (pwrdm->flags & PWRDM_HAS_LOWPOWERSTATECHANGE)) {
+			sleep_switch = LOWPOWERSTATE_SWITCH;
+		} else {
+			hwsup = clkdm_in_hwsup(pwrdm->pwrdm_clkdms[0]);
+			clkdm_wakeup(pwrdm->pwrdm_clkdms[0]);
+			sleep_switch = FORCEWAKEUP_SWITCH;
+		}
+	}
+
+	ret = pwrdm_set_next_pwrst(pwrdm, pwrst);
+	if (ret)
+		pr_err("%s: unable to set power state of powerdomain: %s\n",
+		       __func__, pwrdm->name);
+
+	switch (sleep_switch) {
+	case FORCEWAKEUP_SWITCH:
+		if (hwsup)
+			clkdm_allow_idle(pwrdm->pwrdm_clkdms[0]);
+		else
+			clkdm_sleep(pwrdm->pwrdm_clkdms[0]);
+		break;
+	case LOWPOWERSTATE_SWITCH:
+		pwrdm_set_lowpwrstchange(pwrdm);
+		pwrdm_wait_transition(pwrdm);
+		pwrdm_state_switch(pwrdm);
+		break;
+	}
+
+out:
+	spin_unlock(&pwrdm->lock);
+	return ret;
+}
+
 /**
  * pwrdm_set_next_pwrst - set next powerdomain power state
  * @pwrdm: struct powerdomain * to set
@@ -480,22 +776,42 @@ int pwrdm_get_mem_bank_count(struct powerdomain *pwrdm)
 int pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst)
 {
 	int ret = -EINVAL;
+	u8 logic_pwrst = PWRDM_POWER_RET, set_pwrst = pwrst;
 
 	if (!pwrdm)
 		return -EINVAL;
 
-	if (!(pwrdm->pwrsts & (1 << pwrst)))
+	switch (pwrst) {
+	case PWRDM_POWER_CSWR:
+	case PWRDM_POWER_OSWR:
+		set_pwrst = PWRDM_POWER_RET;
+		if (pwrst == PWRDM_POWER_OSWR)
+			logic_pwrst = PWRDM_POWER_OFF;
+		break;
+	}
+
+	if (!(pwrdm->pwrsts & (1 << set_pwrst))) {
+		pr_err_ratelimited("%s: powerdomain %s: bad pwrst %d\n",
+				   __func__, pwrdm->name, pwrst);
 		return -EINVAL;
+	}
 
 	pr_debug("powerdomain: setting next powerstate for %s to %0x\n",
 		 pwrdm->name, pwrst);
+
+	switch (pwrst) {
+	case PWRDM_POWER_CSWR:
+	case PWRDM_POWER_OSWR:
+		pwrdm_set_logic_retst(pwrdm, logic_pwrst);
+		break;
+	}
 
 	if (arch_pwrdm && arch_pwrdm->pwrdm_set_next_pwrst) {
 		/* Trace the pwrdm desired target state */
 		trace_power_domain_target(pwrdm->name, pwrst,
 					  smp_processor_id());
 		/* Program the pwrdm desired target state */
-		ret = arch_pwrdm->pwrdm_set_next_pwrst(pwrdm, pwrst);
+		ret = arch_pwrdm->pwrdm_set_next_pwrst(pwrdm, set_pwrst);
 	}
 
 	return ret;
@@ -519,6 +835,12 @@ int pwrdm_read_next_pwrst(struct powerdomain *pwrdm)
 	if (arch_pwrdm && arch_pwrdm->pwrdm_read_next_pwrst)
 		ret = arch_pwrdm->pwrdm_read_next_pwrst(pwrdm);
 
+	if (ret == PWRDM_POWER_RET) {
+		if (pwrdm_read_logic_retst(pwrdm) == PWRDM_POWER_OFF)
+			ret = PWRDM_POWER_OSWR;
+		else
+			ret = PWRDM_POWER_CSWR;
+	}
 	return ret;
 }
 
@@ -544,6 +866,13 @@ int pwrdm_read_pwrst(struct powerdomain *pwrdm)
 	if (arch_pwrdm && arch_pwrdm->pwrdm_read_pwrst)
 		ret = arch_pwrdm->pwrdm_read_pwrst(pwrdm);
 
+	if (ret == PWRDM_POWER_RET) {
+		if (pwrdm_read_logic_pwrst(pwrdm) == PWRDM_POWER_OFF)
+			ret = PWRDM_POWER_OSWR;
+		else
+			ret = PWRDM_POWER_CSWR;
+	}
+
 	return ret;
 }
 
@@ -562,10 +891,54 @@ int pwrdm_read_prev_pwrst(struct powerdomain *pwrdm)
 	if (!pwrdm)
 		return -EINVAL;
 
+	if (arch_pwrdm && arch_pwrdm->pwrdm_lost_context_rff &&
+	    arch_pwrdm->pwrdm_lost_context_rff(pwrdm))
+		return PWRDM_POWER_OFF;
+
 	if (arch_pwrdm && arch_pwrdm->pwrdm_read_prev_pwrst)
 		ret = arch_pwrdm->pwrdm_read_prev_pwrst(pwrdm);
 
+	if (ret == PWRDM_POWER_RET) {
+		if (pwrdm_read_prev_logic_pwrst(pwrdm) == PWRDM_POWER_OFF)
+			ret = PWRDM_POWER_OSWR;
+		else
+			ret = PWRDM_POWER_CSWR;
+	}
+
 	return ret;
+}
+
+/**
+ * pwrdm_read_device_off_state - Read device off state
+ *
+ * Reads the device OFF state. Returns 1 if set else zero if
+ * device off is not set. And return invalid if arch_pwrdm
+ * is not popluated with read_next_off api.
+ */
+int pwrdm_read_device_off_state(void)
+{
+	int ret = -EINVAL;
+
+	if (arch_pwrdm && arch_pwrdm->pwrdm_read_next_off)
+		ret = arch_pwrdm->pwrdm_read_next_off();
+
+	return ret;
+}
+
+/**
+ * pwrdm_enable_off_mode - Set device off state
+ * @enable:	true - sets device level OFF mode configuration,
+ *		false - unsets the OFF mode configuration
+ *
+ * This enables DEVICE OFF bit for OMAPs which support
+ * Device OFF.
+ */
+void pwrdm_enable_off_mode(bool enable)
+{
+	if (arch_pwrdm && arch_pwrdm->pwrdm_read_next_off)
+		arch_pwrdm->pwrdm_enable_off(enable);
+
+	return;
 }
 
 /**
@@ -579,15 +952,18 @@ int pwrdm_read_prev_pwrst(struct powerdomain *pwrdm)
  * -EINVAL if the powerdomain pointer is null or the target power
  * state is not not supported, or returns 0 upon success.
  */
-int pwrdm_set_logic_retst(struct powerdomain *pwrdm, u8 pwrst)
+static int pwrdm_set_logic_retst(struct powerdomain *pwrdm, u8 pwrst)
 {
 	int ret = -EINVAL;
 
 	if (!pwrdm)
 		return -EINVAL;
 
-	if (!(pwrdm->pwrsts_logic_ret & (1 << pwrst)))
+	if (!(pwrdm->pwrsts_logic_ret & (1 << pwrst))) {
+		pr_err_ratelimited("%s: powerdomain %s: bad pwrst %d\n",
+				   __func__, pwrdm->name, pwrst);
 		return -EINVAL;
+	}
 
 	pr_debug("powerdomain: setting next logic powerstate for %s to %0x\n",
 		 pwrdm->name, pwrst);
@@ -613,18 +989,25 @@ int pwrdm_set_logic_retst(struct powerdomain *pwrdm, u8 pwrst)
  * bank does not exist or is not controllable, or returns 0 upon
  * success.
  */
-int pwrdm_set_mem_onst(struct powerdomain *pwrdm, u8 bank, u8 pwrst)
+static __maybe_unused int pwrdm_set_mem_onst(struct powerdomain *pwrdm, u8 bank,
+					     u8 pwrst)
 {
 	int ret = -EINVAL;
 
 	if (!pwrdm)
 		return -EINVAL;
 
-	if (pwrdm->banks < (bank + 1))
+	if (pwrdm->banks < (bank + 1)) {
+		pr_err_ratelimited("%s: powerdomain %s: bad bank %d\n",
+				   __func__, pwrdm->name, bank);
 		return -EEXIST;
+	}
 
-	if (!(pwrdm->pwrsts_mem_on[bank] & (1 << pwrst)))
+	if (!(pwrdm->pwrsts_mem_on[bank] & (1 << pwrst))) {
+		pr_err_ratelimited("%s: powerdomain %s: bank %d bad pwrst %d\n",
+				   __func__, pwrdm->name, bank, pwrst);
 		return -EINVAL;
+	}
 
 	pr_debug("powerdomain: setting next memory powerstate for domain %s "
 		 "bank %0x while pwrdm-ON to %0x\n", pwrdm->name, bank, pwrst);
@@ -651,18 +1034,25 @@ int pwrdm_set_mem_onst(struct powerdomain *pwrdm, u8 bank, u8 pwrst)
  * bank does not exist or is not controllable, or returns 0 upon
  * success.
  */
-int pwrdm_set_mem_retst(struct powerdomain *pwrdm, u8 bank, u8 pwrst)
+static __maybe_unused int pwrdm_set_mem_retst(struct powerdomain *pwrdm,
+					      u8 bank, u8 pwrst)
 {
 	int ret = -EINVAL;
 
 	if (!pwrdm)
 		return -EINVAL;
 
-	if (pwrdm->banks < (bank + 1))
+	if (pwrdm->banks < (bank + 1)) {
+		pr_err_ratelimited("%s: powerdomain %s: bad bank %d\n",
+				   __func__, pwrdm->name, bank);
 		return -EEXIST;
+	}
 
-	if (!(pwrdm->pwrsts_mem_ret[bank] & (1 << pwrst)))
+	if (!(pwrdm->pwrsts_mem_ret[bank] & (1 << pwrst))) {
+		pr_err_ratelimited("%s: powerdomain %s: bank %d bad pwrst %d\n",
+				   __func__, pwrdm->name, bank, pwrst);
 		return -EINVAL;
+	}
 
 	pr_debug("powerdomain: setting next memory powerstate for domain %s "
 		 "bank %0x while pwrdm-RET to %0x\n", pwrdm->name, bank, pwrst);
@@ -682,7 +1072,7 @@ int pwrdm_set_mem_retst(struct powerdomain *pwrdm, u8 bank, u8 pwrst)
  * if the powerdomain pointer is null or returns the logic retention
  * power state upon success.
  */
-int pwrdm_read_logic_pwrst(struct powerdomain *pwrdm)
+static int pwrdm_read_logic_pwrst(struct powerdomain *pwrdm)
 {
 	int ret = -EINVAL;
 
@@ -703,7 +1093,7 @@ int pwrdm_read_logic_pwrst(struct powerdomain *pwrdm)
  * -EINVAL if the powerdomain pointer is null or returns the previous
  * logic power state upon success.
  */
-int pwrdm_read_prev_logic_pwrst(struct powerdomain *pwrdm)
+static int pwrdm_read_prev_logic_pwrst(struct powerdomain *pwrdm)
 {
 	int ret = -EINVAL;
 
@@ -724,7 +1114,7 @@ int pwrdm_read_prev_logic_pwrst(struct powerdomain *pwrdm)
  * if the powerdomain pointer is null or returns the next logic
  * power state upon success.
  */
-int pwrdm_read_logic_retst(struct powerdomain *pwrdm)
+static int pwrdm_read_logic_retst(struct powerdomain *pwrdm)
 {
 	int ret = -EINVAL;
 
@@ -747,15 +1137,19 @@ int pwrdm_read_logic_retst(struct powerdomain *pwrdm)
  * the target memory bank does not exist or is not controllable, or
  * returns the current memory power state upon success.
  */
-int pwrdm_read_mem_pwrst(struct powerdomain *pwrdm, u8 bank)
+static __maybe_unused int pwrdm_read_mem_pwrst(struct powerdomain *pwrdm,
+					       u8 bank)
 {
 	int ret = -EINVAL;
 
 	if (!pwrdm)
 		return ret;
 
-	if (pwrdm->banks < (bank + 1))
+	if (pwrdm->banks < (bank + 1)) {
+		pr_err_ratelimited("%s: powerdomain %s: bad bank %d\n",
+				   __func__, pwrdm->name, bank);
 		return ret;
+	}
 
 	if (pwrdm->flags & PWRDM_HAS_MPU_QUIRK)
 		bank = 1;
@@ -777,15 +1171,18 @@ int pwrdm_read_mem_pwrst(struct powerdomain *pwrdm, u8 bank)
  * controllable, or returns the previous memory power state upon
  * success.
  */
-int pwrdm_read_prev_mem_pwrst(struct powerdomain *pwrdm, u8 bank)
+static int pwrdm_read_prev_mem_pwrst(struct powerdomain *pwrdm, u8 bank)
 {
 	int ret = -EINVAL;
 
 	if (!pwrdm)
 		return ret;
 
-	if (pwrdm->banks < (bank + 1))
+	if (pwrdm->banks < (bank + 1)) {
+		pr_err_ratelimited("%s: powerdomain %s: bad bank %d\n",
+				   __func__, pwrdm->name, bank);
 		return ret;
+	}
 
 	if (pwrdm->flags & PWRDM_HAS_MPU_QUIRK)
 		bank = 1;
@@ -806,15 +1203,19 @@ int pwrdm_read_prev_mem_pwrst(struct powerdomain *pwrdm, u8 bank)
  * the target memory bank does not exist or is not controllable, or
  * returns the next memory power state upon success.
  */
-int pwrdm_read_mem_retst(struct powerdomain *pwrdm, u8 bank)
+static __maybe_unused int pwrdm_read_mem_retst(struct powerdomain *pwrdm,
+					       u8 bank)
 {
 	int ret = -EINVAL;
 
 	if (!pwrdm)
 		return ret;
 
-	if (pwrdm->banks < (bank + 1))
+	if (pwrdm->banks < (bank + 1)) {
+		pr_err_ratelimited("%s: powerdomain %s: bad bank %d\n",
+				   __func__, pwrdm->name, bank);
 		return ret;
+	}
 
 	if (arch_pwrdm && arch_pwrdm->pwrdm_read_mem_retst)
 		ret = arch_pwrdm->pwrdm_read_mem_retst(pwrdm, bank);
@@ -870,8 +1271,11 @@ int pwrdm_enable_hdwr_sar(struct powerdomain *pwrdm)
 	if (!pwrdm)
 		return ret;
 
-	if (!(pwrdm->flags & PWRDM_HAS_HDWR_SAR))
+	if (!(pwrdm->flags & PWRDM_HAS_HDWR_SAR)) {
+		pr_err_ratelimited("%s: powerdomain %s: no HDSAR in flag %d\n",
+				   __func__, pwrdm->name, pwrdm->flags);
 		return ret;
+	}
 
 	pr_debug("powerdomain: %s: setting SAVEANDRESTORE bit\n",
 		 pwrdm->name);
@@ -900,8 +1304,11 @@ int pwrdm_disable_hdwr_sar(struct powerdomain *pwrdm)
 	if (!pwrdm)
 		return ret;
 
-	if (!(pwrdm->flags & PWRDM_HAS_HDWR_SAR))
+	if (!(pwrdm->flags & PWRDM_HAS_HDWR_SAR)) {
+		pr_err_ratelimited("%s: powerdomain %s: no HDSAR in flag %d\n",
+				   __func__, pwrdm->name, pwrdm->flags);
 		return ret;
+	}
 
 	pr_debug("powerdomain: %s: clearing SAVEANDRESTORE bit\n",
 		 pwrdm->name);
@@ -941,8 +1348,11 @@ int pwrdm_set_lowpwrstchange(struct powerdomain *pwrdm)
 	if (!pwrdm)
 		return -EINVAL;
 
-	if (!(pwrdm->flags & PWRDM_HAS_LOWPOWERSTATECHANGE))
+	if (!(pwrdm->flags & PWRDM_HAS_LOWPOWERSTATECHANGE)) {
+		pr_err_ratelimited("%s: powerdomain %s:no lowpwrch in flag%d\n",
+				   __func__, pwrdm->name, pwrdm->flags);
 		return -EINVAL;
+	}
 
 	pr_debug("powerdomain: %s: setting LOWPOWERSTATECHANGE bit\n",
 		 pwrdm->name);
@@ -1015,6 +1425,171 @@ int pwrdm_post_transition(struct powerdomain *pwrdm)
 		pwrdm_for_each(_pwrdm_post_transition_cb, NULL);
 
 	return 0;
+}
+
+/**
+ * pwrdm_wakeuplat_update_constraint - Set or update a powerdomain wakeup
+ *  latency constraint and apply it
+ * @pwrdm: struct powerdomain * which the constraint applies to
+ * @cookie: constraint identifier, used for tracking
+ * @min_latency: minimum wakeup latency constraint (in microseconds) for
+ *  the given pwrdm
+ *
+ * Tracks the constraints by @cookie.
+ * Constraint set/update: Adds a new entry to powerdomain's wake-up latency
+ * constraint list. If the constraint identifier already exists in the list,
+ * the old value is overwritten.
+ *
+ * Applies the aggregated constraint value for the given pwrdm by calling
+ * _pwrdm_wakeuplat_update_pwrst.
+ *
+ * Returns 0 upon success, -ENOMEM in case of memory shortage, -EINVAL in
+ * case of invalid latency value, or the return value from
+ * _pwrdm_wakeuplat_update_pwrst.
+ *
+ * The caller must check the validity of the parameters.
+ */
+int pwrdm_wakeuplat_update_constraint(struct powerdomain *pwrdm, void *cookie,
+				      long min_latency)
+{
+	struct pwrdm_wkup_constraints_entry *tmp_user, *new_user, *user = NULL;
+	long value = PM_QOS_DEV_LAT_DEFAULT_VALUE;
+	int free_new_user = 0;
+
+	if (!pwrdm) {
+		WARN(1, "powerdomain: %s: NULL pwrdm parameter!\n", __func__);
+		return -EINVAL;
+	}
+
+	pr_debug("powerdomain: %s: pwrdm %s, cookie=0x%p, min_latency=%ld\n",
+		 __func__, pwrdm->name, cookie, min_latency);
+
+	if (min_latency <= PM_QOS_DEV_LAT_DEFAULT_VALUE) {
+		pr_warn("%s: min_latency >= PM_QOS_DEV_LAT_DEFAULT_VALUE\n",
+			__func__);
+		return -EINVAL;
+	}
+
+	/* Allocate a new entry for insertion in the list */
+	new_user = kzalloc(sizeof(struct pwrdm_wkup_constraints_entry),
+			   GFP_KERNEL);
+	if (!new_user) {
+		pr_err("%s: FATAL ERROR: kzalloc failed\n", __func__);
+		return -ENOMEM;
+	}
+
+	mutex_lock(&pwrdm->wkup_lat_plist_lock);
+
+	/* Check if there already is a constraint for cookie */
+	plist_for_each_entry(tmp_user, &pwrdm->wkup_lat_plist_head, node) {
+		if (tmp_user->cookie == cookie) {
+			user = tmp_user;
+			break;
+		}
+	}
+
+	/* If nothing to update, job done */
+	if (user && (user->node.prio == min_latency))
+		goto out;
+
+	if (!user) {
+		/* Add new entry to the list */
+		user = new_user;
+		user->cookie = cookie;
+	} else {
+		/* Update existing entry */
+		plist_del(&user->node, &pwrdm->wkup_lat_plist_head);
+		free_new_user = 1;
+	}
+
+	plist_node_init(&user->node, min_latency);
+	plist_add(&user->node, &pwrdm->wkup_lat_plist_head);
+
+	/* Find the aggregated constraint value from the list */
+	if (!plist_head_empty(&pwrdm->wkup_lat_plist_head))
+		value = plist_first(&pwrdm->wkup_lat_plist_head)->prio;
+
+	mutex_unlock(&pwrdm->wkup_lat_plist_lock);
+
+	/* Free the newly allocated entry if not in use */
+	if (free_new_user)
+		kfree(new_user);
+
+	/* Apply the constraint to the pwrdm */
+	pr_debug("powerdomain: %s: pwrdm %s, value=%ld\n",
+		 __func__, pwrdm->name, value);
+	return _pwrdm_wakeuplat_update_pwrst(pwrdm, value);
+
+out:
+	mutex_unlock(&pwrdm->wkup_lat_plist_lock);
+	return 0;
+}
+
+/**
+ * pwrdm_wakeuplat_remove_constraint - Release a powerdomain wakeup latency
+ *  constraint and apply it
+ * @pwrdm: struct powerdomain * which the constraint applies to
+ * @cookie: constraint identifier, used for tracking
+ *
+ * Tracks the constraints by @cookie.
+ * Constraint removal: Removes the identifier's entry from powerdomain's
+ * wakeup latency constraint list.
+ *
+ * Applies the aggregated constraint value for the given pwrdm by calling
+ * _pwrdm_wakeuplat_update_pwrst.
+ *
+ * Returns 0 upon success, -EINVAL in case the constraint to remove is not
+ * existing, or the return value from _pwrdm_wakeuplat_update_pwrst.
+ *
+ * The caller must check the validity of the parameters.
+ */
+int pwrdm_wakeuplat_remove_constraint(struct powerdomain *pwrdm, void *cookie)
+{
+	struct pwrdm_wkup_constraints_entry *tmp_user, *user = NULL;
+	long value = PM_QOS_DEV_LAT_DEFAULT_VALUE;
+
+	if (!pwrdm) {
+		WARN(1, "powerdomain: %s: NULL pwrdm parameter!\n", __func__);
+		return -EINVAL;
+	}
+
+	pr_debug("powerdomain: %s: pwrdm %s, cookie=0x%p\n",
+		 __func__, pwrdm->name, cookie);
+
+	mutex_lock(&pwrdm->wkup_lat_plist_lock);
+
+	/* Check if there is a constraint for cookie */
+	plist_for_each_entry(tmp_user, &pwrdm->wkup_lat_plist_head, node) {
+		if (tmp_user->cookie == cookie) {
+			user = tmp_user;
+			break;
+		}
+	}
+
+	/* If constraint not existing or list empty, return -EINVAL */
+	if (!user)
+		goto out;
+
+	/* Remove the constraint from the list */
+	plist_del(&user->node, &pwrdm->wkup_lat_plist_head);
+
+	/* Find the aggregated constraint value from the list */
+	if (!plist_head_empty(&pwrdm->wkup_lat_plist_head))
+		value = plist_first(&pwrdm->wkup_lat_plist_head)->prio;
+
+	mutex_unlock(&pwrdm->wkup_lat_plist_lock);
+
+	/* Release the constraint memory */
+	kfree(user);
+
+	/* Apply the constraint to the pwrdm */
+	pr_debug("powerdomain: %s: pwrdm %s, value=%ld\n",
+		 __func__, pwrdm->name, value);
+	return _pwrdm_wakeuplat_update_pwrst(pwrdm, value);
+
+out:
+	mutex_unlock(&pwrdm->wkup_lat_plist_lock);
+	return -EINVAL;
 }
 
 /**
@@ -1113,9 +1688,11 @@ int pwrdm_enable_force_off(struct powerdomain *pwrdm)
 	if (!pwrdm)
 		return ret;
 
-	if (!(pwrdm->flags & PWRDM_HAS_FORCE_OFF))
+	if (!(pwrdm->flags & PWRDM_HAS_FORCE_OFF)) {
+		pr_err_ratelimited("%s: powerdomain %s:no forceoff in flag%d\n",
+				   __func__, pwrdm->name, pwrdm->flags);
 		return ret;
-
+	}
 
 	pr_debug("powerdomain: %s: setting FORCE OFF bit\n",
 		 pwrdm->name);
@@ -1146,9 +1723,11 @@ int pwrdm_disable_force_off(struct powerdomain *pwrdm)
 	if (!pwrdm)
 		return ret;
 
-	if (!(pwrdm->flags & PWRDM_HAS_FORCE_OFF))
+	if (!(pwrdm->flags & PWRDM_HAS_FORCE_OFF)) {
+		pr_err_ratelimited("%s: powerdomain %s:no forceoff in flag%d\n",
+				   __func__, pwrdm->name, pwrdm->flags);
 		return ret;
-
+	}
 
 	pr_debug("powerdomain: %s: clearing FORCE OFF bit\n",
 		 pwrdm->name);

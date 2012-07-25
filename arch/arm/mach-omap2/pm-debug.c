@@ -37,7 +37,9 @@
 #include "cm2xxx_3xxx.h"
 #include "prm2xxx_3xxx.h"
 #include "pm.h"
+#include "powerdomain-private.h"
 
+u32 omap4_device_off_counter;
 u32 enable_off_mode;
 u32 wakeup_timer_seconds = 0;
 
@@ -71,7 +73,7 @@ void pm_dbg_update_time(struct powerdomain *pwrdm, int prev)
 	/* Update timer for previous state */
 	t = sched_clock();
 
-	pwrdm->state_timer[prev] += t - pwrdm->timer;
+	pwrdm->state_timer[_PWRDM_STATE_COUNT_IDX(prev)] += t - pwrdm->timer;
 
 	pwrdm->timer = t;
 }
@@ -96,19 +98,23 @@ static int clkdm_dbg_show_counter(struct clockdomain *clkdm, void *user)
 static int pwrdm_dbg_show_counter(struct powerdomain *pwrdm, void *user)
 {
 	struct seq_file *s = (struct seq_file *)user;
-	int i;
+	int i, exp_state_idx, cur_state_idx;
 
 	if (strcmp(pwrdm->name, "emu_pwrdm") == 0 ||
 		strcmp(pwrdm->name, "wkup_pwrdm") == 0 ||
 		strncmp(pwrdm->name, "dpll", 4) == 0)
 		return 0;
 
-	if (pwrdm->state != pwrdm_read_pwrst(pwrdm))
-		printk(KERN_ERR "pwrdm state mismatch(%s) %d != %d\n",
-			pwrdm->name, pwrdm->state, pwrdm_read_pwrst(pwrdm));
+	exp_state_idx = _PWRDM_STATE_COUNT_IDX(pwrdm->state);
+	cur_state_idx = _PWRDM_STATE_COUNT_IDX(pwrdm_read_pwrst(pwrdm));
+	if (exp_state_idx != cur_state_idx)
+		pr_err("%s: pwrdm state mismatch(%s) %s != %s\n", __func__,
+		       pwrdm->name,
+		       pwrdm_state_names[exp_state_idx],
+		       pwrdm_state_names[cur_state_idx]);
 
-	seq_printf(s, "%s (%s)", pwrdm->name,
-			pwrdm_state_names[pwrdm->state]);
+
+	seq_printf(s, "%s (%s)", pwrdm->name, pwrdm_state_names[exp_state_idx]);
 	for (i = 0; i < PWRDM_MAX_PWRSTS; i++)
 		seq_printf(s, ",%s:%d", pwrdm_state_names[i],
 			pwrdm->state_counter[i]);
@@ -136,7 +142,7 @@ static int pwrdm_dbg_show_timer(struct powerdomain *pwrdm, void *user)
 	pwrdm_state_switch(pwrdm);
 
 	seq_printf(s, "%s (%s)", pwrdm->name,
-		pwrdm_state_names[pwrdm->state]);
+		pwrdm_state_names[_PWRDM_STATE_COUNT_IDX(pwrdm->state)]);
 
 	for (i = 0; i < 4; i++)
 		seq_printf(s, ",%s:%lld", pwrdm_state_names[i],
@@ -149,6 +155,10 @@ static int pwrdm_dbg_show_timer(struct powerdomain *pwrdm, void *user)
 static int pm_dbg_show_counters(struct seq_file *s, void *unused)
 {
 	pwrdm_for_each(pwrdm_dbg_show_counter, s);
+
+	if (cpu_is_omap44xx() || cpu_is_omap54xx())
+		seq_printf(s, "DEVICE-OFF:%d\n", omap4_device_off_counter);
+
 	clkdm_for_each(clkdm_dbg_show_counter, s);
 
 	return 0;

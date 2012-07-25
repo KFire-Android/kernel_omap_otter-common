@@ -1148,40 +1148,6 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
 
 #ifdef CONFIG_ARCH_OMAP2PLUS
 
-static int omap_gpio_suspend(struct device *dev)
-{
-	struct platform_device *pdev = to_platform_device(dev);
-	struct gpio_bank *bank = platform_get_drvdata(pdev);
-
-	/* WA for GPIO pins 140 (BT) & 142 (WLAN) used as output pins
-	 * due to h/w bug in GPIO module (Bug ID: OMAP5430-1.0BUG01667)
-	 * On OMAP5 ES1.0 the pins do not maintain their level in OFF.
-	 * This WA changes the direction to input while in OFF and back
-	 * to input in resume. This is fixed in ES2.0
-	 */
-	if ((cpu_is_omap54xx() && (omap_rev() <= OMAP5430_REV_ES1_0)) \
-		&& (bank->id == 4)) {
-		_set_gpio_direction(bank, GPIO_INDEX(bank, 142), 1);
-		_set_gpio_direction(bank, GPIO_INDEX(bank, 140), 1);
-	}
-
-	return 0;
-}
-
-static int omap_gpio_resume(struct device *dev)
-{
-	struct platform_device *pdev = to_platform_device(dev);
-	struct gpio_bank *bank = platform_get_drvdata(pdev);
-
-	if ((cpu_is_omap54xx() && (omap_rev() <= OMAP5430_REV_ES1_0)) \
-		&& (bank->id == 4)) {
-		_set_gpio_direction(bank, GPIO_INDEX(bank, 142), 0);
-		_set_gpio_direction(bank, GPIO_INDEX(bank, 140), 0);
-	}
-
-	return 0;
-}
-
 #if defined(CONFIG_PM_RUNTIME)
 static void omap_gpio_restore_context(struct gpio_bank *bank);
 
@@ -1244,6 +1210,21 @@ update_gpio_context_count:
 	if (bank->get_context_loss_count)
 		bank->context_loss_count =
 				bank->get_context_loss_count(bank->dev);
+
+	/*
+	 * WA for GPIO pins 140 (BT) & 142 (WLAN) used as output pins
+	 * due to h/w bug in GPIO module (Bug ID: OMAP5430-1.0BUG01667)
+	 * On OMAP5 ES1.0 the pins do not maintain their level in OFF.
+	 * This WA changes the direction to input while in OFF and back
+	 * to input in resume. This is fixed in ES2.0
+	 */
+	if (cpu_is_omap54xx() &&
+	    (omap_rev() == OMAP5430_REV_ES1_0 ||
+	     omap_rev() == OMAP5432_REV_ES1_0) &&
+	    bank->id == 4) {
+		_set_gpio_direction(bank, GPIO_INDEX(bank, 142), 1);
+		_set_gpio_direction(bank, GPIO_INDEX(bank, 140), 1);
+	}
 
 	_gpio_dbck_disable(bank);
 	spin_unlock_irqrestore(&bank->lock, flags);
@@ -1345,6 +1326,21 @@ static int omap_gpio_runtime_resume(struct device *dev)
 	}
 
 	bank->workaround_enabled = false;
+
+	/*
+	 * WA for GPIO pins 140 (BT) & 142 (WLAN) used as output pins
+	 * due to h/w bug in GPIO module (Bug ID: OMAP5430-1.0BUG01667)
+	 * On OMAP5 ES1.0 the pins do not maintain their level in OFF.
+	 * Change the direct back to o/p in resume.
+	 */
+	if (cpu_is_omap54xx() &&
+	    (omap_rev() == OMAP5430_REV_ES1_0 ||
+	     omap_rev() == OMAP5432_REV_ES1_0) &&
+	    bank->id == 4) {
+		_set_gpio_direction(bank, GPIO_INDEX(bank, 142), 0);
+		_set_gpio_direction(bank, GPIO_INDEX(bank, 140), 0);
+	}
+
 	spin_unlock_irqrestore(&bank->lock, flags);
 
 	return 0;
@@ -1413,14 +1409,11 @@ static void omap_gpio_restore_context(struct gpio_bank *bank)
 }
 #endif /* CONFIG_PM_RUNTIME */
 #else
-#define omap_gpio_suspend NULL
-#define omap_gpio_resume NULL
 #define omap_gpio_runtime_suspend NULL
 #define omap_gpio_runtime_resume NULL
 #endif
 
 static const struct dev_pm_ops gpio_pm_ops = {
-	SET_SYSTEM_SLEEP_PM_OPS(omap_gpio_suspend, omap_gpio_resume)
 	SET_RUNTIME_PM_OPS(omap_gpio_runtime_suspend, omap_gpio_runtime_resume,
 									NULL)
 };

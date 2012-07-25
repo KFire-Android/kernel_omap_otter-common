@@ -26,7 +26,7 @@
 #include <plat/omap-pm.h>
 #include <plat/omap_device.h>
 
-static bool off_mode_enabled;
+bool off_mode_enabled = true;
 static int dummy_context_loss_counter;
 
 /*

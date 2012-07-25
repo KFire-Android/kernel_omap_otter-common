@@ -50,8 +50,10 @@
 #define OMAP5_MON_L2AUX_CTRL_INDEX	0x104
 
 /* Secure PPA(Primary Protected Application) APIs */
+#define OMAP4_PPA_SERVICE_0		0x21
 #define OMAP4_PPA_L2_POR_INDEX		0x23
 #define OMAP4_PPA_CPU_ACTRL_SMP_INDEX	0x25
+#define OMAP5_PPA_SERVICE_0		0x203
 
 #ifndef __ASSEMBLER__
 
