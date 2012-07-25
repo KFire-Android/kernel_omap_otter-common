@@ -671,5 +671,29 @@ int dss_ovl_check(struct omap_overlay *ovl,
 		return -EINVAL;
 	}
 
+	if (dssdev->type == OMAP_DISPLAY_TYPE_DSI) {
+		/*
+		 * OMAP44xx/ OMAP5 ES1.0 Errata i339: DSI: Minimum of 2 pixels
+		 * should be transferred through DISPC Video Port. Minimum
+		 * number of pixels from the video port should be at least 2
+		 * (greater than 1). Image with less than 2 pixels is
+		 * not expected to be used in a real applicative use case.
+		 *
+		 * The WA proposed is to use the OCP L4 slave port through CPU
+		 * or sDMA while sending one pixel. But we avoid supporting
+		 * less than 2 pixels transfers itself. The reason is that this
+		 * is non-realistic case but the implementation to support this
+		 * is slightly complex.
+		 */
+		if (((cpu_is_omap54xx() && (omap_rev() <= OMAP5430_REV_ES1_0
+			|| omap_rev() == OMAP5432_REV_ES1_0))
+			|| cpu_is_omap44xx()) &&
+			(info->width * info->height < 2)) {
+			DSSWARN("check_overlay: too small frame %d*%d\n",
+				info->width, info->height);
+			return -EINVAL;
+		}
+	}
+
 	return 0;
 }
