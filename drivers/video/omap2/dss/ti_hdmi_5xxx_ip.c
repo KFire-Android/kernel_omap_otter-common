@@ -893,6 +893,8 @@ int ti_hdmi_5xxx_irq_handler(struct hdmi_ip_data *ip_data)
 int ti_hdmi_5xxx_irq_process(struct hdmi_ip_data *ip_data)
 {
 	void __iomem *core_sys_base = hdmi_core_sys_base(ip_data);
+	u32 val;
+
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_IH_FC_STAT0, 0xff, 7, 0);
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_IH_FC_STAT1, 0xff, 7, 0);
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_IH_FC_STAT2, 0xff, 7, 0);
@@ -902,6 +904,24 @@ int ti_hdmi_5xxx_irq_process(struct hdmi_ip_data *ip_data)
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_IH_VP_STAT0, 0xff, 7, 0);
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_IH_I2CMPHY_STAT0, 0xff, 7, 0);
 
+	val = hdmi_read_reg(core_sys_base, HDMI_CORE_A_APIINTSTAT);
+	if (val & 0x2) {
+		/* request memory access */
+		REG_FLD_MOD(core_sys_base, HDMI_CORE_A_KSVMEMCTRL, 1, 0, 0);
+		REG_FLD_MOD(core_sys_base, HDMI_CORE_A_APIINTCLR, 1, 1, 1);
+	} else if (val & 0x1) {
+		/* request granted */
+		if (hdmi_read_reg(core_sys_base, HDMI_CORE_A_KSVMEMCTRL) &
+				0x2) {
+			complete(&ip_data->ksvlist_arrived);
+		}
+		REG_FLD_MOD(core_sys_base, HDMI_CORE_A_APIINTCLR, 1, 0, 0);
+	} else {
+		REG_FLD_MOD(core_sys_base, HDMI_CORE_A_APIINTCLR, val, 7, 0);
+	}
+
+	if (val)
+		DSSDBG("HDCP Interrupt : 0x%x\n", val);
 	return 0;
 }
 

@@ -269,6 +269,7 @@ struct hdmi_ip_data {
 	bool set_mode;
 	wait_queue_head_t tx_complete;/*ti signal TX complete*/
 	int cec_int;
+	struct completion ksvlist_arrived;
 };
 int ti_hdmi_4xxx_phy_enable(struct hdmi_ip_data *ip_data);
 void ti_hdmi_4xxx_phy_disable(struct hdmi_ip_data *ip_data);

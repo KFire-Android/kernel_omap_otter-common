@@ -508,13 +508,11 @@ static void hdmi_power_off(struct omap_dss_device *dssdev)
 	hdmi.ip_data.cfg.deep_color = HDMI_DEEP_COLOR_24BIT;
 }
 
-int omapdss_hdmi_register_hdcp_callbacks(void (*hdmi_start_frame_cb)(void),
+void omapdss_hdmi_register_hdcp_callbacks(void (*hdmi_start_frame_cb)(void),
 				 bool (*hdmi_power_on_cb)(void))
 {
 	hdmi.hdmi_start_frame_cb = hdmi_start_frame_cb;
 	hdmi.hdmi_power_on_cb = hdmi_power_on_cb;
-
-	return hdmi_ti_4xxx_wp_get_video_state(&hdmi.ip_data);
 }
 
 struct hdmi_ip_data *get_hdmi_ip_data(void)

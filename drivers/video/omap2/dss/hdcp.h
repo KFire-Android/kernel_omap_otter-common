@@ -32,6 +32,9 @@
 /* HDCP key size in 32-bit words */
 #define DESHDCP_KEY_SIZE 160
 
+#define MAX_SHA_DATA_SIZE	645
+#define MAX_SHA_VPRIME_SIZE	20
+
 struct hdcp_encrypt_control {
 	uint32_t in_key[DESHDCP_KEY_SIZE];
 	uint32_t *out_key;
@@ -41,6 +44,40 @@ struct hdcp_enable_control {
 	uint32_t key[DESHDCP_KEY_SIZE];
 	int nb_retry;
 };
+
+struct hdcp_sha_in {
+	uint8_t data[MAX_SHA_DATA_SIZE];
+	uint32_t byte_counter;
+	uint8_t vprime[MAX_SHA_VPRIME_SIZE];
+};
+
+struct hdcp_wait_control {
+	uint32_t event;
+	struct hdcp_sha_in *data;
+};
+
+/* HDCP ioctl */
+
+#define HDCP_IOCTL_MAGIC 'h'
+
+#define HDCP_WAIT_EVENT _IOWR(HDCP_IOCTL_MAGIC, 0, \
+				struct hdcp_wait_control)
+#define HDCP_DONE	_IOW(HDCP_IOCTL_MAGIC, 1, uint32_t)
+
+/* Status / error codes */
+#define HDCP_OK			0
+#define HDCP_3DES_ERROR		1
+#define HDCP_AUTH_FAILURE	2
+
+
+
+/* HDCP events */
+#define HDCP_EVENT_STEP2	(1 << 0x1)
+#define HDCP_EVENT_EXIT		(1 << 0x2)
+
+/* HDCP user space status */
+#define HDCP_US_NO_ERR		(0 << 8)
+#define HDCP_US_FAILURE		(1 << 8)
 
 #ifdef __KERNEL__
 
@@ -60,6 +97,8 @@ struct hdcp_enable_control {
 /*----------------------*/
 #define DSS_SS_FROM_L3__DESHDCP 0x58007000
 
+#define HDMI_CORE 0x58060000
+
 /* DESHDCP registers */
 #define DESHDCP__DHDCP_CTRL   0x020
 #define DESHDCP__DHDCP_DATA_L 0x024
@@ -72,24 +111,9 @@ struct hdcp_enable_control {
 #define DESHDCP__DHDCP_CTRL__OUTPUT_READY_POS_F 0
 #define DESHDCP__DHDCP_CTRL__OUTPUT_READY_POS_L 0
 
-enum hdcp_repeater {
-	HDCP_RECEIVER = 0,
-	HDCP_REPEATER = 1
-};
-
-enum encryption_state {
-	HDCP_ENC_OFF = 0x0,
-	HDCP_ENC_ON  = 0x1
-};
-
 /***************************/
 /* Definitions             */
 /***************************/
-
-/* Status / error codes */
-#define HDCP_OK			0
-#define HDCP_3DES_ERROR		1
-#define HDCP_AUTH_FAILURE	2
 
 /* FIXME: should be 300ms delay between HDMI start frame event and HDCP enable
  * (to respect 7 VSYNC delay in 24 Hz)
@@ -127,7 +151,6 @@ enum encryption_state {
 
 #define HDCP_WARN(format, ...) \
 		printk(KERN_WARNING "HDCP: " format "\n", ## __VA_ARGS__)
-
 #ifdef HDCP_DEBUG
 #define HDCP_DBG(format, ...) \
 		printk(KERN_DEBUG "HDCP: " format "\n", ## __VA_ARGS__)
