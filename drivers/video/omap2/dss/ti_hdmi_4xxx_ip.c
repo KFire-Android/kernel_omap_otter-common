@@ -38,6 +38,10 @@
 #include "dss.h"
 #include "dss_features.h"
 
+/* define here the required offset inside the core address space */
+#define HDMI_CORE_SYS 0
+#define HDMI_CORE_AV 0x500
+
 static inline void hdmi_write_reg(void __iomem *base_addr,
 				const u16 idx, u32 val)
 {
@@ -57,22 +61,22 @@ static inline void __iomem *hdmi_wp_base(struct hdmi_ip_data *ip_data)
 
 static inline void __iomem *hdmi_phy_base(struct hdmi_ip_data *ip_data)
 {
-	return ip_data->base_wp + ip_data->phy_offset;
+	return ip_data->base_txphyctrl;
 }
 
 static inline void __iomem *hdmi_pll_base(struct hdmi_ip_data *ip_data)
 {
-	return ip_data->base_wp + ip_data->pll_offset;
+	return ip_data->base_pllctrl;
 }
 
 static inline void __iomem *hdmi_av_base(struct hdmi_ip_data *ip_data)
 {
-	return ip_data->base_wp + ip_data->core_av_offset;
+	return ip_data->base_core + HDMI_CORE_AV;
 }
 
 static inline void __iomem *hdmi_core_sys_base(struct hdmi_ip_data *ip_data)
 {
-	return ip_data->base_wp + ip_data->core_sys_offset;
+	return ip_data->base_core + HDMI_CORE_SYS;
 }
 
 static inline int hdmi_wait_for_bit_change(void __iomem *base_addr,
