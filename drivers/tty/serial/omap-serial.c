@@ -129,6 +129,25 @@ serial_omap_get_divisor(struct uart_port *port, unsigned int baud)
 	return port->uartclk/(baud * divisor);
 }
 
+static inline void serial_omap_port_disable(struct uart_omap_port *up)
+{
+	if (up->suspended) {
+		/*
+		 * If the port has been suspended by system-wide suspend,
+		 * put it back to low power mode immediately.
+		 */
+		pm_runtime_put_sync_suspend(&up->pdev->dev);
+	} else {
+		pm_runtime_mark_last_busy(&up->pdev->dev);
+		pm_runtime_put_autosuspend(&up->pdev->dev);
+	}
+}
+
+static inline void serial_omap_port_enable(struct uart_omap_port *up)
+{
+	pm_runtime_get_sync(&up->pdev->dev);
+}
+
 static void serial_omap_stop_rxdma(struct uart_omap_port *up)
 {
 	if (up->uart_dma.rx_dma_used) {
@@ -137,8 +156,7 @@ static void serial_omap_stop_rxdma(struct uart_omap_port *up)
 		omap_free_dma(up->uart_dma.rx_dma_channel);
 		up->uart_dma.rx_dma_channel = OMAP_UART_DMA_CH_FREE;
 		up->uart_dma.rx_dma_used = false;
-		pm_runtime_mark_last_busy(&up->pdev->dev);
-		pm_runtime_put_autosuspend(&up->pdev->dev);
+		serial_omap_port_disable(up);
 	}
 }
 
@@ -148,10 +166,10 @@ static void serial_omap_enable_ms(struct uart_port *port)
 
 	dev_dbg(up->port.dev, "serial_omap_enable_ms+%d\n", up->port.line);
 
-	pm_runtime_get_sync(&up->pdev->dev);
+	serial_omap_port_enable(up);
 	up->ier |= UART_IER_MSI;
 	serial_out(up, UART_IER, up->ier);
-	pm_runtime_put(&up->pdev->dev);
+	serial_omap_port_disable(up);
 }
 
 static void serial_omap_stop_tx(struct uart_port *port)
@@ -170,10 +188,10 @@ static void serial_omap_stop_tx(struct uart_port *port)
 		omap_stop_dma(up->uart_dma.tx_dma_channel);
 		omap_free_dma(up->uart_dma.tx_dma_channel);
 		up->uart_dma.tx_dma_channel = OMAP_UART_DMA_CH_FREE;
-	} else {
-		pm_runtime_get_sync(&up->pdev->dev);
+		serial_omap_port_disable(up);
 	}
 
+	serial_omap_port_enable(up);
 	if (up->ier & UART_IER_THRI) {
 		up->ier &= ~UART_IER_THRI;
 		serial_out(up, UART_IER, up->ier);
@@ -182,22 +200,20 @@ static void serial_omap_stop_tx(struct uart_port *port)
 	if (!up->use_dma && pdata && pdata->set_forceidle)
 		pdata->set_forceidle(up->pdev);
 
-	pm_runtime_mark_last_busy(&up->pdev->dev);
-	pm_runtime_put_autosuspend(&up->pdev->dev);
+	serial_omap_port_disable(up);
 }
 
 static void serial_omap_stop_rx(struct uart_port *port)
 {
 	struct uart_omap_port *up = (struct uart_omap_port *)port;
 
-	pm_runtime_get_sync(&up->pdev->dev);
+	serial_omap_port_enable(up);
 	if (up->use_dma)
 		serial_omap_stop_rxdma(up);
 	up->ier &= ~UART_IER_RLSI;
 	up->port.read_status_mask &= ~UART_LSR_DR;
 	serial_out(up, UART_IER, up->ier);
-	pm_runtime_mark_last_busy(&up->pdev->dev);
-	pm_runtime_put_autosuspend(&up->pdev->dev);
+	serial_omap_port_disable(up);
 }
 
 static inline void receive_chars(struct uart_omap_port *up,
@@ -316,12 +332,11 @@ static void serial_omap_start_tx(struct uart_port *port)
 	int ret = 0;
 
 	if (!up->use_dma) {
-		pm_runtime_get_sync(&up->pdev->dev);
+		serial_omap_port_enable(up);
 		serial_omap_enable_ier_thri(up);
 		if (pdata && pdata->set_noidle)
 			pdata->set_noidle(up->pdev);
-		pm_runtime_mark_last_busy(&up->pdev->dev);
-		pm_runtime_put_autosuspend(&up->pdev->dev);
+		serial_omap_port_disable(up);
 		return;
 	}
 
@@ -331,7 +346,7 @@ static void serial_omap_start_tx(struct uart_port *port)
 	xmit = &up->port.state->xmit;
 
 	if (up->uart_dma.tx_dma_channel == OMAP_UART_DMA_CH_FREE) {
-		pm_runtime_get_sync(&up->pdev->dev);
+		serial_omap_port_enable(up);
 		ret = omap_request_dma(up->uart_dma.uart_dma_tx,
 				"UART Tx DMA",
 				(void *)uart_tx_dma_callback, up,
@@ -339,8 +354,7 @@ static void serial_omap_start_tx(struct uart_port *port)
 
 		if (ret < 0) {
 			serial_omap_enable_ier_thri(up);
-			pm_runtime_mark_last_busy(&up->pdev->dev);
-			pm_runtime_put_autosuspend(&up->pdev->dev);
+			serial_omap_port_disable(up);
 			return;
 		}
 	}
@@ -418,11 +432,10 @@ static inline irqreturn_t serial_omap_irq(int irq, void *dev_id)
 	unsigned long flags;
 	int ret = IRQ_HANDLED;
 
-	pm_runtime_get_sync(&up->pdev->dev);
+	serial_omap_port_enable(up);
 	iir = serial_in(up, UART_IIR);
 	if (iir & UART_IIR_NO_INT) {
-		pm_runtime_mark_last_busy(&up->pdev->dev);
-		pm_runtime_put_autosuspend(&up->pdev->dev);
+		serial_omap_port_disable(up);
 		return IRQ_NONE;
 	}
 
@@ -453,8 +466,7 @@ static inline irqreturn_t serial_omap_irq(int irq, void *dev_id)
 	}
 
 	spin_unlock_irqrestore(&up->port.lock, flags);
-	pm_runtime_mark_last_busy(&up->pdev->dev);
-	pm_runtime_put_autosuspend(&up->pdev->dev);
+	serial_omap_port_disable(up);
 
 	up->port_activity = jiffies;
 	return ret;
@@ -466,12 +478,12 @@ static unsigned int serial_omap_tx_empty(struct uart_port *port)
 	unsigned long flags = 0;
 	unsigned int ret = 0;
 
-	pm_runtime_get_sync(&up->pdev->dev);
+	serial_omap_port_enable(up);
 	dev_dbg(up->port.dev, "serial_omap_tx_empty+%d\n", up->port.line);
 	spin_lock_irqsave(&up->port.lock, flags);
 	ret = serial_in(up, UART_LSR) & UART_LSR_TEMT ? TIOCSER_TEMT : 0;
 	spin_unlock_irqrestore(&up->port.lock, flags);
-	pm_runtime_put(&up->pdev->dev);
+	serial_omap_port_disable(up);
 	return ret;
 }
 
@@ -481,9 +493,9 @@ static unsigned int serial_omap_get_mctrl(struct uart_port *port)
 	unsigned int status;
 	unsigned int ret = 0;
 
-	pm_runtime_get_sync(&up->pdev->dev);
+	serial_omap_port_enable(up);
 	status = check_modem_status(up);
-	pm_runtime_put(&up->pdev->dev);
+	serial_omap_port_disable(up);
 
 	dev_dbg(up->port.dev, "serial_omap_get_mctrl+%d\n", up->port.line);
 
@@ -515,11 +527,11 @@ static void serial_omap_set_mctrl(struct uart_port *port, unsigned int mctrl)
 	if (mctrl & TIOCM_LOOP)
 		mcr |= UART_MCR_LOOP;
 
-	pm_runtime_get_sync(&up->pdev->dev);
+	serial_omap_port_enable(up);
 	up->mcr = serial_in(up, UART_MCR);
 	up->mcr |= mcr;
 	serial_out(up, UART_MCR, up->mcr);
-	pm_runtime_put(&up->pdev->dev);
+	serial_omap_port_disable(up);
 }
 
 static void serial_omap_break_ctl(struct uart_port *port, int break_state)
@@ -528,7 +540,7 @@ static void serial_omap_break_ctl(struct uart_port *port, int break_state)
 	unsigned long flags = 0;
 
 	dev_dbg(up->port.dev, "serial_omap_break_ctl+%d\n", up->port.line);
-	pm_runtime_get_sync(&up->pdev->dev);
+	serial_omap_port_enable(up);
 	spin_lock_irqsave(&up->port.lock, flags);
 	if (break_state == -1)
 		up->lcr |= UART_LCR_SBC;
@@ -536,7 +548,7 @@ static void serial_omap_break_ctl(struct uart_port *port, int break_state)
 		up->lcr &= ~UART_LCR_SBC;
 	serial_out(up, UART_LCR, up->lcr);
 	spin_unlock_irqrestore(&up->port.lock, flags);
-	pm_runtime_put(&up->pdev->dev);
+	serial_omap_port_disable(up);
 }
 
 static int serial_omap_startup(struct uart_port *port)
@@ -555,7 +567,7 @@ static int serial_omap_startup(struct uart_port *port)
 
 	dev_dbg(up->port.dev, "serial_omap_startup+%d\n", up->port.line);
 
-	pm_runtime_get_sync(&up->pdev->dev);
+	serial_omap_port_enable(up);
 	/*
 	 * Clear the FIFO buffers and disable them.
 	 * (they will be reenabled in set_termios())
@@ -615,8 +627,7 @@ static int serial_omap_startup(struct uart_port *port)
 
 	serial_out(up, UART_OMAP_WER, up->wer);
 
-	pm_runtime_mark_last_busy(&up->pdev->dev);
-	pm_runtime_put_autosuspend(&up->pdev->dev);
+	serial_omap_port_disable(up);
 	up->port_activity = jiffies;
 	return 0;
 }
@@ -628,7 +639,7 @@ static void serial_omap_shutdown(struct uart_port *port)
 
 	dev_dbg(up->port.dev, "serial_omap_shutdown+%d\n", up->port.line);
 
-	pm_runtime_get_sync(&up->pdev->dev);
+	serial_omap_port_enable(up);
 	/*
 	 * Disable interrupts from this port
 	 */
@@ -663,7 +674,7 @@ static void serial_omap_shutdown(struct uart_port *port)
 		up->uart_dma.rx_buf = NULL;
 	}
 
-	pm_runtime_put(&up->pdev->dev);
+	serial_omap_port_disable(up);
 	free_irq(up->port.irq, up);
 }
 
@@ -789,7 +800,7 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
 	 * Ok, we're now changing the port state. Do it with
 	 * interrupts disabled.
 	 */
-	pm_runtime_get_sync(&up->pdev->dev);
+	serial_omap_port_enable(up);
 	spin_lock_irqsave(&up->port.lock, flags);
 
 	/*
@@ -944,7 +955,7 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
 	}
 
 	spin_unlock_irqrestore(&up->port.lock, flags);
-	pm_runtime_put(&up->pdev->dev);
+	serial_omap_port_disable(up);
 	dev_dbg(up->port.dev, "serial_omap_set_termios+%d\n", up->port.line);
 }
 
@@ -954,9 +965,9 @@ static int serial_omap_set_wake(struct uart_port *port, unsigned int state)
 	struct omap_uart_port_info *pdata = up->pdev->dev.platform_data;
 
 	if (pdata->enable_wakeup) {
-		pm_runtime_get_sync(&up->pdev->dev);
+		serial_omap_port_enable(up);
 		pdata->enable_wakeup(up->pdev, state ? true : false);
-		pm_runtime_put(&up->pdev->dev);
+		serial_omap_port_disable(up);
 	}
 
 	return 0;
@@ -972,7 +983,7 @@ serial_omap_pm(struct uart_port *port, unsigned int state,
 
 	dev_dbg(up->port.dev, "serial_omap_pm+%d\n", up->port.line);
 
-	pm_runtime_get_sync(&up->pdev->dev);
+	serial_omap_port_enable(up);
 	serial_out(up, UART_LCR, UART_LCR_CONF_MODE_B);
 	efr = serial_in(up, UART_EFR);
 	serial_out(up, UART_EFR, efr | UART_EFR_ECB);
@@ -986,7 +997,7 @@ serial_omap_pm(struct uart_port *port, unsigned int state,
 	if (!state && pdata->enable_wakeup)
 		pdata->enable_wakeup(up->pdev, true);
 
-	pm_runtime_put(&up->pdev->dev);
+	serial_omap_port_disable(up);
 }
 
 static void serial_omap_release_port(struct uart_port *port)
@@ -1065,10 +1076,10 @@ static void serial_omap_poll_put_char(struct uart_port *port, unsigned char ch)
 {
 	struct uart_omap_port *up = (struct uart_omap_port *)port;
 
-	pm_runtime_get_sync(&up->pdev->dev);
+	serial_omap_port_enable(up);
 	wait_for_xmitr(up);
 	serial_out(up, UART_TX, ch);
-	pm_runtime_put(&up->pdev->dev);
+	serial_omap_port_disable(up);
 }
 
 static int serial_omap_poll_get_char(struct uart_port *port)
@@ -1076,7 +1087,7 @@ static int serial_omap_poll_get_char(struct uart_port *port)
 	struct uart_omap_port *up = (struct uart_omap_port *)port;
 	unsigned int status;
 
-	pm_runtime_get_sync(&up->pdev->dev);
+	serial_omap_port_enable(up);
 	status = serial_in(up, UART_LSR);
 	if (!(status & UART_LSR_DR)) {
 		pm_runtime_put(&up->pdev->dev);
@@ -1084,7 +1095,7 @@ static int serial_omap_poll_get_char(struct uart_port *port)
 	}
 
 	status = serial_in(up, UART_RX);
-	pm_runtime_put(&up->pdev->dev);
+	serial_omap_port_disable(up);
 	return status;
 }
 
@@ -1136,7 +1147,7 @@ serial_omap_console_write(struct console *co, const char *s,
 	else
 		spin_lock(&up->port.lock);
 
-	pm_runtime_get_sync(&up->pdev->dev);
+	serial_omap_port_enable(up);
 
 	/*
 	 * First save the IER then disable the interrupts
@@ -1165,8 +1176,7 @@ serial_omap_console_write(struct console *co, const char *s,
 	if (console_lock)
 		console_unlock();
 
-	pm_runtime_mark_last_busy(&up->pdev->dev);
-	pm_runtime_put_autosuspend(&up->pdev->dev);
+	serial_omap_port_disable(up);
 	if (locked)
 		spin_unlock(&up->port.lock);
 	local_irq_restore(flags);
@@ -1342,7 +1352,7 @@ static int serial_omap_start_rxdma(struct uart_omap_port *up)
 	int ret = 0;
 
 	if (up->uart_dma.rx_dma_channel == -1) {
-		pm_runtime_get_sync(&up->pdev->dev);
+		serial_omap_port_enable(up);
 		ret = omap_request_dma(up->uart_dma.uart_dma_rx,
 				"UART Rx DMA",
 				(void *)uart_rx_dma_callback, up,
@@ -1614,8 +1624,8 @@ static int __devinit serial_omap_probe(struct platform_device *pdev)
 
 	pm_runtime_irq_safe(&pdev->dev);
 	pm_runtime_enable(&pdev->dev);
-	pm_runtime_get_sync(&pdev->dev);
 
+	serial_omap_port_enable(up);
 	omap_serial_fill_features_erratas(up);
 
 	ui[up->port.line] = up;
@@ -1628,7 +1638,7 @@ static int __devinit serial_omap_probe(struct platform_device *pdev)
 	if (omap_up_info->enable_wakeup)
 		omap_up_info->enable_wakeup(pdev, false);
 
-	pm_runtime_put(&pdev->dev);
+	serial_omap_port_disable(up);
 	platform_set_drvdata(pdev, up);
 	return 0;
 
@@ -1843,7 +1853,7 @@ int omap_serial_ext_uart_enable(u8 port_id)
 		err = -ENODEV;
 	} else {
 		up = ui[port_id];
-		pm_runtime_get_sync(&up->pdev->dev);
+		serial_omap_port_enable(up);
 	}
 	return err;
 }
@@ -1858,8 +1868,7 @@ int omap_serial_ext_uart_disable(u8 port_id)
 		err = -ENODEV;
 	} else {
 		up = ui[port_id];
-		pm_runtime_mark_last_busy(&up->pdev->dev);
-		pm_runtime_put_autosuspend(&up->pdev->dev);
+		serial_omap_port_disable(up);
 	}
 	return err;
 }
