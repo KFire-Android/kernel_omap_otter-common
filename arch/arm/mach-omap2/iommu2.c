@@ -286,32 +286,6 @@ out:
 	return p - buf;
 }
 
-static void omap2_iommu_save_ctx(struct omap_iommu *obj)
-{
-	int i;
-	u32 *p = obj->ctx;
-
-	for (i = 0; i < (MMU_REG_SIZE / sizeof(u32)); i++) {
-		p[i] = iommu_read_reg(obj, i * sizeof(u32));
-		dev_dbg(obj->dev, "%s\t[%02d] %08x\n", __func__, i, p[i]);
-	}
-
-	BUG_ON(p[0] != IOMMU_ARCH_VERSION);
-}
-
-static void omap2_iommu_restore_ctx(struct omap_iommu *obj)
-{
-	int i;
-	u32 *p = obj->ctx;
-
-	for (i = 0; i < (MMU_REG_SIZE / sizeof(u32)); i++) {
-		iommu_write_reg(obj, p[i], i * sizeof(u32));
-		dev_dbg(obj->dev, "%s\t[%02d] %08x\n", __func__, i, p[i]);
-	}
-
-	BUG_ON(p[0] != IOMMU_ARCH_VERSION);
-}
-
 static void omap2_cr_to_e(struct cr_regs *cr, struct iotlb_entry *e)
 {
 	e->da		= cr->cam & MMU_CAM_VATAG_MASK;
@@ -342,8 +316,6 @@ static const struct iommu_functions omap2_iommu_ops = {
 
 	.get_pte_attr	= omap2_get_pte_attr,
 
-	.save_ctx	= omap2_iommu_save_ctx,
-	.restore_ctx	= omap2_iommu_restore_ctx,
 	.dump_ctx	= omap2_iommu_dump_ctx,
 };
 

@@ -569,6 +569,21 @@ static int _device_bandwidth(struct device *rdev, void *handle,
 	return 0;
 }
 
+static unsigned long _get_max_freq(void *handle)
+{
+	struct rprm_gen_device_handle *obj = handle;
+	struct opp *opp;
+	unsigned long maxfreq = ULONG_MAX;
+
+	rcu_read_lock();
+	opp = opp_find_freq_floor(obj->dev, &maxfreq);
+	if (IS_ERR(opp))
+		maxfreq = 0;
+	rcu_read_unlock();
+
+	return maxfreq;
+}
+
 static int rprm_iva_request(void **handle, void *data, size_t len)
 {
 	static struct device *dev;
@@ -663,6 +678,7 @@ static struct rprm_res_ops iva_ops = {
 	.latency = _device_latency,
 	.bandwidth = _device_bandwidth,
 	.scale = _device_scale,
+	.get_max_freq = _get_max_freq,
 };
 
 static struct rprm_res_ops iva_seq0_ops = {
@@ -681,6 +697,7 @@ static struct rprm_res_ops fdif_ops = {
 	.latency = _device_latency,
 	.bandwidth = _device_bandwidth,
 	.scale = _device_scale,
+	.get_max_freq = _get_max_freq,
 };
 
 static struct rprm_res_ops sl2if_ops = {
@@ -693,6 +710,7 @@ static struct rprm_res_ops iss_ops = {
 	.release = rprm_iss_release,
 	.latency = _device_latency,
 	.bandwidth = _device_bandwidth,
+	.get_max_freq = _get_max_freq,
 };
 
 static struct rprm_res omap_res[] = {
