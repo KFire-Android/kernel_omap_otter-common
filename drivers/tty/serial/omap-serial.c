@@ -1437,7 +1437,7 @@ static void uart_tx_dma_callback(int lch, u16 ch_status, void *data)
 	return;
 }
 
-static void omap_serial_fill_features_erratas(struct uart_omap_port *up)
+static void __devinit omap_serial_fill_features_erratas(struct uart_omap_port *up)
 {
 	u32 mvr, scheme;
 	u16 revision, major, minor;
@@ -1492,7 +1492,7 @@ static void omap_serial_fill_features_erratas(struct uart_omap_port *up)
 	}
 }
 
-static struct omap_uart_port_info *of_get_uart_port_info(struct device *dev)
+static __devinit struct omap_uart_port_info *of_get_uart_port_info(struct device *dev)
 {
 	struct omap_uart_port_info *omap_up_info;
 
