@@ -1,0 +1,12 @@
+#
+# Thermal cooling devices configuration
+#
+
+config DUMMY_USER_COOLING
+	tristate "Dummy cooling device support"
+	depends on THERMAL_FRAMEWORK
+	help
+	  Enabling this config will give support for the a cooling
+	  device which will be sending sysfs notifications to user
+	  userspace, so that applications thermal aware can be interrupted
+	  when there is a change in the cooling level for a specific domain.

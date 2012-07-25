@@ -28,3 +28,4 @@ config OMAP_THERMAL
 
 source "drivers/staging/thermal_framework/governor/Kconfig"
 source "drivers/staging/thermal_framework/sensor/Kconfig"
+source "drivers/staging/thermal_framework/cooling_devices/Kconfig"
