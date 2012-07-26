@@ -6,3 +6,4 @@ obj-$(CONFIG_FB_OMAP2) += omapfb/
 obj-$(CONFIG_OMAP4_HDCP) += hdcp/
 obj-y += displays/
 obj-y += dsscomp/
+obj-$(CONFIG_OMAPLFB) += omaplfb/
