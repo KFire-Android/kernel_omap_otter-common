@@ -1123,7 +1123,7 @@ static int __init rpmsg_init(void)
 
 	return ret;
 }
-module_init(rpmsg_init);
+subsys_initcall(rpmsg_init);
 
 static void __exit rpmsg_fini(void)
 {
