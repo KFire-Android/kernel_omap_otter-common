@@ -28,6 +28,9 @@
 
 #include <plat/iopgtable.h>
 
+#define dev_to_pm_constraint(dev) (((struct iommu_platform_data *)	\
+					dev->platform_data)->pm_constraint)
+
 #define for_each_iotlb_cr(obj, n, __i, cr)				\
 	for (__i = 0;							\
 	     (__i < (n)) && (cr = __iotlb_read_cr((obj), __i), true);	\
@@ -88,28 +91,142 @@ void omap_uninstall_iommu_arch(const struct iommu_functions *ops)
 EXPORT_SYMBOL_GPL(omap_uninstall_iommu_arch);
 
 /**
- * omap_iommu_save_ctx - Save registers for pm off-mode support
+ * omap_iommu_save_ctx - Deprecated API
  * @dev:	client device
+ *
+ * Preserve for link compatibility with old platforms,
+ * work is done in runtime_suspend callback.
  **/
 void omap_iommu_save_ctx(struct device *dev)
 {
-	struct omap_iommu *obj = dev_to_omap_iommu(dev);
-
-	arch_iommu->save_ctx(obj);
 }
 EXPORT_SYMBOL_GPL(omap_iommu_save_ctx);
 
 /**
- * omap_iommu_restore_ctx - Restore registers for pm off-mode support
+ * omap_iommu_restore_ctx - Deprecated API
  * @dev:	client device
+ *
+ * Preserve for link compatibility with old platforms,
+ * work is done in runtime_resume callback.
  **/
 void omap_iommu_restore_ctx(struct device *dev)
 {
-	struct omap_iommu *obj = dev_to_omap_iommu(dev);
-
-	arch_iommu->restore_ctx(obj);
 }
 EXPORT_SYMBOL_GPL(omap_iommu_restore_ctx);
+
+static inline
+void omap_iommu_remove_latency_req(struct omap_iommu *oiommu)
+{
+	if (!strcmp(oiommu->name, "ipu"))
+		pm_qos_remove_request(&oiommu->qos_request.pm_qos);
+	else if (dev_pm_qos_remove_request(&oiommu->qos_request.dev_pm_qos) < 0)
+		dev_err(oiommu->dev, "failed to remove latency constraint\n");
+}
+
+static inline
+int omap_iommu_update_latency(struct omap_iommu *oiommu, int val)
+{
+	int ret = 0;
+
+	if (!strcmp(oiommu->name, "ipu"))
+		pm_qos_update_request(&oiommu->qos_request.pm_qos, val);
+	else {
+		ret = dev_pm_qos_update_request(
+					&oiommu->qos_request.dev_pm_qos, val);
+		ret = ret > 0 ? 0 : ret;
+		if (ret)
+			dev_err(oiommu->dev,
+			"failed to update latency constraint, val = %d\n", val);
+	}
+
+	return ret;
+}
+
+/**
+ * omap_iommu_runtime_suspend - save iommu context
+ * @dev:	client device
+ *
+ * Preserve critical mmu registers and prepare to power down.
+ **/
+static int omap_iommu_runtime_suspend(struct device *dev)
+{
+	struct omap_iommu *obj = to_iommu(dev);
+	int pm_constraint, ret = 0;
+
+	dev_dbg(obj->dev, "%s: %s\n", __func__, obj->name);
+
+	if (arch_iommu && arch_iommu->save_ctx)
+		arch_iommu->save_ctx(obj);
+
+	pm_constraint = dev_to_pm_constraint(dev);
+	if (pm_constraint)
+		ret = omap_iommu_update_latency(obj, PM_QOS_DEFAULT_VALUE);
+
+	return ret;
+}
+
+/**
+ * omap_iommu_runtime_resume - restore iommu context
+ * @dev:	client device
+ *
+ * Restore critical mmu registers and re-enable the iommu.
+ **/
+static int omap_iommu_runtime_resume(struct device *dev)
+{
+	struct omap_iommu *obj = to_iommu(dev);
+	int pm_constraint, ret = 0;
+
+	dev_dbg(obj->dev, "%s: %s\n", __func__, obj->name);
+
+	if (!arch_iommu)
+		return 0;
+
+	pm_constraint = dev_to_pm_constraint(dev);
+	if (pm_constraint) {
+		ret = omap_iommu_update_latency(obj, pm_constraint);
+		if (ret)
+			return ret;
+	}
+
+	if (arch_iommu->restore_ctx)
+		arch_iommu->restore_ctx(obj);
+
+	/*
+	 * FIXME: iommu_enable is being called here to reconfigure and
+	 * re-enable iommu (restore back to original configuration).
+	 * This is to be moved back to iommu_enable code, once the
+	 * arch-specific restore code (currently a stub) is properly
+	 * implemented.
+	 */
+	if (arch_iommu->enable)
+		arch_iommu->enable(obj);
+
+	return 0;
+}
+
+/**
+ * omap_iommu_domain_idle - Allow iommu domain to go to a low power state
+ * @domain: pointer to generic iommu structure
+ **/
+static void omap_iommu_domain_idle(struct iommu_domain *domain)
+{
+	struct omap_iommu_domain *omap_domain = domain->priv;
+	struct omap_iommu *oiommu = omap_domain->iommu_dev;
+
+	pm_runtime_put(oiommu->dev);
+}
+
+/**
+ * omap_iommu_domain_activate - Restore registers for pm off-mode support
+ * @domain: pointer to generic iommu structure
+ **/
+static void omap_iommu_domain_activate(struct iommu_domain *domain)
+{
+	struct omap_iommu_domain *omap_domain = domain->priv;
+	struct omap_iommu *oiommu = omap_domain->iommu_dev;
+
+	pm_runtime_get_sync(oiommu->dev);
+}
 
 /**
  * omap_iommu_arch_version - Return running iommu arch version
@@ -122,8 +239,6 @@ EXPORT_SYMBOL_GPL(omap_iommu_arch_version);
 
 static int iommu_enable(struct omap_iommu *obj)
 {
-	int err;
-
 	if (!obj)
 		return -EINVAL;
 
@@ -132,9 +247,7 @@ static int iommu_enable(struct omap_iommu *obj)
 
 	pm_runtime_get_sync(obj->dev);
 
-	err = arch_iommu->enable(obj);
-
-	return err;
+	return 0;
 }
 
 static void iommu_disable(struct omap_iommu *obj)
@@ -824,6 +937,7 @@ static struct omap_iommu *omap_iommu_attach(const char *name, u32 *iopgd)
 	int err = -ENOMEM;
 	struct device *dev;
 	struct omap_iommu *obj;
+	int pm_constraint;
 
 	dev = driver_find_device(&omap_iommu_driver.driver, NULL,
 				(void *)name,
@@ -840,6 +954,13 @@ static struct omap_iommu *omap_iommu_attach(const char *name, u32 *iopgd)
 		dev_err(dev, "%s: already attached!\n", obj->name);
 		err = -EBUSY;
 		goto err_enable;
+	}
+
+	pm_constraint = dev_to_pm_constraint(dev);
+	if (pm_constraint) {
+		err = omap_iommu_update_latency(obj, pm_constraint);
+		if (err)
+			goto err_enable;
 	}
 
 	obj->iopgd = iopgd;
@@ -860,7 +981,10 @@ err_module:
 	if (obj->refcount == 1)
 		iommu_disable(obj);
 err_enable:
-	obj->refcount--;
+	if (!--obj->refcount) {
+		if (pm_constraint)
+			omap_iommu_update_latency(obj, PM_QOS_DEFAULT_VALUE);
+	}
 	spin_unlock(&obj->iommu_lock);
 	return ERR_PTR(err);
 }
@@ -871,14 +995,19 @@ err_enable:
  **/
 static void omap_iommu_detach(struct omap_iommu *obj)
 {
+	int pm_constraint;
+
 	if (!obj || IS_ERR(obj))
 		return;
 
 	spin_lock(&obj->iommu_lock);
 
-	if (--obj->refcount == 0)
+	if (--obj->refcount == 0) {
 		iommu_disable(obj);
-
+		pm_constraint = dev_to_pm_constraint(obj->dev);
+		if (pm_constraint)
+			omap_iommu_update_latency(obj, PM_QOS_DEFAULT_VALUE);
+	}
 	module_put(obj->owner);
 
 	obj->iopgd = NULL;
@@ -915,17 +1044,30 @@ static int __devinit omap_iommu_probe(struct platform_device *pdev)
 	spin_lock_init(&obj->page_table_lock);
 	INIT_LIST_HEAD(&obj->mmap);
 
+	if (!strcmp(obj->name, "ipu"))
+		pm_qos_add_request(&obj->qos_request.pm_qos,
+				PM_QOS_CPU_DMA_LATENCY, PM_QOS_DEFAULT_VALUE);
+	else {
+		err = dev_pm_qos_add_request(obj->dev,
+			&obj->qos_request.dev_pm_qos, PM_QOS_DEFAULT_VALUE);
+		if (err < 0) {
+			dev_err(&pdev->dev, "failed to add constraint %d\n",
+									err);
+			goto err_mem;
+		}
+	}
+
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!res) {
 		err = -ENODEV;
-		goto err_mem;
+		goto err_rel_constraint;
 	}
 
 	res = request_mem_region(res->start, resource_size(res),
 				 dev_name(&pdev->dev));
 	if (!res) {
 		err = -EIO;
-		goto err_mem;
+		goto err_rel_constraint;
 	}
 
 	obj->regbase = ioremap(res->start, resource_size(res));
@@ -954,6 +1096,8 @@ err_irq:
 	iounmap(obj->regbase);
 err_ioremap:
 	release_mem_region(res->start, resource_size(res));
+err_rel_constraint:
+	omap_iommu_remove_latency_req(obj);
 err_mem:
 	kfree(obj);
 	return err;
@@ -975,6 +1119,8 @@ static int __devexit omap_iommu_remove(struct platform_device *pdev)
 	release_mem_region(res->start, resource_size(res));
 	iounmap(obj->regbase);
 
+	omap_iommu_remove_latency_req(obj);
+
 	pm_runtime_disable(obj->dev);
 
 	dev_info(&pdev->dev, "%s removed\n", obj->name);
@@ -982,11 +1128,17 @@ static int __devexit omap_iommu_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static const struct dev_pm_ops omap_iommu_pm_ops = {
+	.runtime_suspend = omap_iommu_runtime_suspend,
+	.runtime_resume = omap_iommu_runtime_resume,
+};
+
 static struct platform_driver omap_iommu_driver = {
 	.probe	= omap_iommu_probe,
 	.remove	= __devexit_p(omap_iommu_remove),
 	.driver	= {
 		.name	= "omap-iommu",
+		.pm	= &omap_iommu_pm_ops,
 	},
 };
 
@@ -1184,6 +1336,8 @@ static struct iommu_ops omap_iommu_ops = {
 	.domain_destroy	= omap_iommu_domain_destroy,
 	.attach_dev	= omap_iommu_attach_dev,
 	.detach_dev	= omap_iommu_detach_dev,
+	.domain_activate = omap_iommu_domain_activate,
+	.domain_idle	= omap_iommu_domain_idle,
 	.map		= omap_iommu_map,
 	.unmap		= omap_iommu_unmap,
 	.iova_to_phys	= omap_iommu_iova_to_phys,

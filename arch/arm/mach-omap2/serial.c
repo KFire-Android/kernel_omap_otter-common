@@ -150,7 +150,7 @@ omap_serial_fill_uart_tx_rx_pads(struct omap_board_data *bdata,
 	bdata->pads_cnt = ARRAY_SIZE(uart->default_omap_uart_pads);
 }
 
-static int  __init omap_serial_fill_default_pads(struct omap_board_data *bdata,
+static void  __init omap_serial_check_wakeup(struct omap_board_data *bdata,
 						struct omap_uart_state *uart)
 {
 	struct omap_mux_partition *tx_partition = NULL, *rx_partition = NULL;
@@ -185,11 +185,11 @@ static int  __init omap_serial_fill_default_pads(struct omap_board_data *bdata,
 		 */
 		if (!(rx_mode & 0x07) && !(tx_mode & 0x07)) {
 			omap_serial_fill_uart_tx_rx_pads(bdata, uart);
-			return 0;
+			return;
 		}
 	}
 
-	return -ENODEV;
+	return;
 }
 #else
 static inline int __init omap_serial_fill_default_pads(
@@ -198,6 +198,8 @@ static inline int __init omap_serial_fill_default_pads(
 {
 	return 0;
 }
+static void __init omap_serial_check_wakeup(struct omap_board_data *bdata
+					    struct omap_uart_state *uart) {}
 #endif
 
 static char *cmdline_find_option(char *str)
@@ -353,8 +355,7 @@ void __init omap_serial_board_init(struct omap_uart_port_info *info)
 		bdata.pads = NULL;
 		bdata.pads_cnt = 0;
 
-		if (omap_serial_fill_default_pads(&bdata, uart))
-			continue;
+		omap_serial_check_wakeup(&bdata, uart);
 
 		if (!info)
 			omap_serial_init_port(&bdata, NULL);

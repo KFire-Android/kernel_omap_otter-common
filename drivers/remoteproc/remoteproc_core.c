@@ -83,6 +83,24 @@ static const char * const rproc_err_names[] = {
 	[RPROC_ERR_WATCHDOG]	= "watchdog fired",
 };
 
+static void rproc_activate_iommu(struct rproc *rproc)
+{
+	struct iommu_domain *domain = rproc->domain;
+
+	dev_dbg(&rproc->dev, "activating iommu\n");
+	if (domain)
+		iommu_domain_activate(domain);
+}
+
+static void rproc_idle_iommu(struct rproc *rproc)
+{
+	struct iommu_domain *domain = rproc->domain;
+
+	dev_dbg(&rproc->dev, "de-activating iommu\n");
+	if (domain)
+		iommu_domain_idle(domain);
+}
+
 static int rproc_resume(struct device *dev)
 {
 	struct rproc *rproc = dev_to_rproc(dev);
@@ -114,12 +132,15 @@ static int rproc_resume(struct device *dev)
 	/*
 	 * if a system suspend request came when rproc was running, the
 	 * rproc was forced to go to suspend by the system suspend callback.
-	 * However, the rproc runtime status is still active. In this
-	 * case we only need to wake up the rproc and update rproc state
+	 * However, the rproc runtime status is still active. In this case,
+	 * we only need to wake up the rproc, its associated iommu and update
+	 * the rproc state
 	 */
+	rproc_activate_iommu(rproc);
 	if (rproc->ops->resume) {
 		ret = rproc->ops->resume(rproc);
 		if (ret) {
+			rproc_idle_iommu(rproc);
 			dev_err(dev, "resume failed %d\n", ret);
 			goto out;
 		}
@@ -152,6 +173,7 @@ static int rproc_suspend(struct device *dev)
 			goto out;
 		}
 	}
+	rproc_idle_iommu(rproc);
 
 	/*
 	 * rproc was not already suspended, so we forced the suspend and
@@ -186,9 +208,11 @@ static int rproc_runtime_resume(struct device *dev)
 		return -EAGAIN;
 	}
 
+	rproc_activate_iommu(rproc);
 	if (rproc->ops->resume) {
 		ret = rproc->ops->resume(rproc);
 		if (ret) {
+			rproc_idle_iommu(rproc);
 			dev_err(dev, "resume failed %d\n", ret);
 			goto out;
 		}
@@ -214,6 +238,7 @@ static int rproc_runtime_suspend(struct device *dev)
 		if (ret)
 			goto abort;
 	}
+	rproc_idle_iommu(rproc);
 
 	rproc->state = RPROC_SUSPENDED;
 out:

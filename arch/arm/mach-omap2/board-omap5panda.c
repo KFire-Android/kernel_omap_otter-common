@@ -53,32 +53,25 @@
 
 #define OMAP5_SEVM_FB_RAM_SIZE       SZ_8M /* 1280×800*4 * 2 */
 
-/* USBB3 to SMSC LAN9730 */
-#define GPIO_ETH_NRESET 15
-/* USBB2 to SMSC 3530 HUB */
-#define GPIO_HUB_NRESET 80
-
+#define GPIO_ETH_NRESET		15	/* USBB3 to SMSC LAN9730 */
+#define GPIO_HUB_NRESET		80	/* USBB2 to SMSC 3530 HUB */
+#define GPIO_EXT_INT_PIN	99
+#define HDMI_GPIO_HPD		193
+#define HDMI_GPIO_CT_CP_HPD	256
+#define HDMI_GPIO_LS_OE		257
 
 #ifdef CONFIG_OMAP_MUX
 static struct omap_board_mux board_mux[] __initdata = {
 	OMAP5_MUX(FREF_CLK1_OUT, OMAP_PIN_INPUT_PULLUP),
 	OMAP5_MUX(USBB2_HSIC_STROBE, OMAP_PIN_INPUT | OMAP_MUX_MODE0),
 	OMAP5_MUX(USBB2_HSIC_DATA, OMAP_PIN_INPUT | OMAP_MUX_MODE0),
+	OMAP5_MUX(ABEDMIC_DIN3,
+		OMAP_PIN_INPUT_PULLUP | OMAP_PIN_OFF_NONE | OMAP_MUX_MODE6),
 	{ .reg_offset = OMAP_MUX_TERMINATOR },
 };
 #else
 #define board_mux NULL
 #endif
-
-#if defined(CONFIG_TI_EMIF) || defined(CONFIG_TI_EMIF_MODULE)
-#ifndef CONFIG_MACH_OMAP_5430ZEBU
-static struct __devinitdata emif_custom_configs custom_configs = {
-	.mask	= EMIF_CUSTOM_CONFIG_LPMODE,
-	.lpmode	= EMIF_LP_MODE_DISABLE
-};
-#endif
-#endif
-
 
 static struct omap2_hsmmc_info mmc[] = {
 	{
@@ -101,9 +94,6 @@ static struct omap2_hsmmc_info mmc[] = {
 	{}	/* Terminator */
 };
 
-#define HDMI_GPIO_HPD 193
-#define HDMI_GPIO_CT_CP_HPD	256
-#define HDMI_GPIO_LS_OE		257
 
 #ifdef CONFIG_OMAP5_SEVM_PALMAS
 #define OMAP5_GPIO_END	0
@@ -634,6 +624,7 @@ static struct i2c_board_info __initdata omap5evm_i2c_5_boardinfo[] = {
 	{
 		I2C_BOARD_INFO("tca6424", 0x22),
 		.platform_data = &omap5evm_gpio_expander_info,
+		.irq = GPIO_EXT_INT_PIN,
 	},
 };
 
@@ -780,22 +771,6 @@ static void __init omap_ehci_ohci_init(void)
 
 static void __init omap_5_panda_init(void)
 {
-
-#if defined(CONFIG_TI_EMIF) || defined(CONFIG_TI_EMIF_MODULE)
-#ifndef CONFIG_MACH_OMAP_5430ZEBU
-	omap_emif_set_device_details(1, &lpddr2_elpida_4G_S4_x2_info,
-			lpddr2_elpida_4G_S4_timings,
-			ARRAY_SIZE(lpddr2_elpida_4G_S4_timings),
-			&lpddr2_elpida_S4_min_tck,
-			&custom_configs);
-
-	omap_emif_set_device_details(2, &lpddr2_elpida_4G_S4_x2_info,
-			lpddr2_elpida_4G_S4_timings,
-			ARRAY_SIZE(lpddr2_elpida_4G_S4_timings),
-			&lpddr2_elpida_S4_min_tck,
-			&custom_configs);
-#endif
-#endif
 	omap5_mux_init(board_mux, NULL, OMAP_PACKAGE_CBL);
 	omap_sdrc_init(NULL, NULL);
 	omap_create_board_props();

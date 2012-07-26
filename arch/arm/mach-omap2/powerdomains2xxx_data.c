@@ -15,6 +15,7 @@
 #include <linux/init.h>
 
 #include "powerdomain.h"
+#include "powerdomain-private.h"
 #include "powerdomains2xxx_3xxx_data.h"
 
 #include "prcm-common.h"

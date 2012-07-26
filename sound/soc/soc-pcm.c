@@ -368,17 +368,17 @@ dynamic:
 config_err:
 	if (codec_dai->driver->ops->shutdown)
 		codec_dai->driver->ops->shutdown(substream, codec_dai);
-	pm_runtime_put(codec_dai->dev);
+	pm_runtime_put_sync(codec_dai->dev);
 
 codec_dai_err:
 	if (platform->driver->ops && platform->driver->ops->close)
 		platform->driver->ops->close(substream);
-	pm_runtime_put(platform->dev);
+	pm_runtime_put_sync(platform->dev);
 
 platform_err:
 	if (cpu_dai->driver->ops->shutdown)
 		cpu_dai->driver->ops->shutdown(substream, cpu_dai);
-	pm_runtime_put(cpu_dai->dev);
+	pm_runtime_put_sync(cpu_dai->dev);
 
 cpu_err:
 	if (rtd->dai_link->ops && rtd->dai_link->ops->shutdown)
@@ -461,15 +461,15 @@ static int soc_pcm_close(struct snd_pcm_substream *substream)
 
 	if (cpu_dai->driver->ops->shutdown)
 		cpu_dai->driver->ops->shutdown(substream, cpu_dai);
-	pm_runtime_put(cpu_dai->dev);
+	pm_runtime_put_sync(cpu_dai->dev);
 
 	if (codec_dai->driver->ops->shutdown)
 		codec_dai->driver->ops->shutdown(substream, codec_dai);
-	pm_runtime_put(codec_dai->dev);
+	pm_runtime_put_sync(codec_dai->dev);
 
 	if (platform->driver->ops && platform->driver->ops->close)
 		platform->driver->ops->close(substream);
-	pm_runtime_put(platform->dev);
+	pm_runtime_put_sync(platform->dev);
 
 	if (rtd->dai_link->ops && rtd->dai_link->ops->shutdown)
 		rtd->dai_link->ops->shutdown(substream);

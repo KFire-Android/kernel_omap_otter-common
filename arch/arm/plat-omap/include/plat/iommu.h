@@ -13,6 +13,8 @@
 #ifndef __MACH_IOMMU_H
 #define __MACH_IOMMU_H
 
+#include <linux/pm_qos.h>
+
 struct iotlb_entry {
 	u32 da;
 	u32 pa;
@@ -23,6 +25,11 @@ struct iotlb_entry {
 			u32 endian, elsz, mixed;
 		};
 	};
+};
+
+union iommu_qos {
+	struct pm_qos_request pm_qos;
+	struct dev_pm_qos_request dev_pm_qos;
 };
 
 struct omap_iommu {
@@ -51,6 +58,7 @@ struct omap_iommu {
 	void *ctx; /* iommu context: registres saved area */
 	u32 da_start;
 	u32 da_end;
+	union iommu_qos	qos_request;
 };
 
 struct cr_regs {
@@ -110,12 +118,15 @@ struct iommu_functions {
  *			look-aside buffer (TLB).
  * @has_bus_err_back:	flag to indicate if the mmu has Bus-error back
  *			response enable functionality.
+ * @pm_constraint:	constraint value to ensure minimum latency for the
+ *			module.
  */
 struct omap_mmu_dev_attr {
 	u32 da_start;
 	u32 da_end;
 	int nr_tlb_entries;
 	int has_bus_err_back;
+	int pm_constraint;
 };
 
 struct iommu_platform_data {
@@ -124,6 +135,7 @@ struct iommu_platform_data {
 	u32 da_start;
 	u32 da_end;
 	int has_bus_err_back;
+	int pm_constraint;
 };
 
 /**

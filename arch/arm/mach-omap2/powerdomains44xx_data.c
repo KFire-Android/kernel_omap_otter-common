@@ -23,6 +23,7 @@
 #include <linux/init.h>
 
 #include "powerdomain.h"
+#include "powerdomain-private.h"
 
 #include "prcm-common.h"
 #include "prcm44xx.h"
@@ -36,6 +37,7 @@ static struct powerdomain core_44xx_pwrdm = {
 	.voltdm		  = { .name = "core" },
 	.prcm_offs	  = OMAP4430_PRM_CORE_INST,
 	.prcm_partition	  = OMAP4430_PRM_PARTITION,
+	.context_offs	  = OMAP4_RM_L3_1_L3_1_CONTEXT_OFFSET,
 	.pwrsts		  = PWRSTS_RET_ON,
 	.pwrsts_logic_ret = PWRSTS_OFF_RET,
 	.banks		  = 5,
@@ -54,6 +56,15 @@ static struct powerdomain core_44xx_pwrdm = {
 		[4] = PWRSTS_ON,	/* ducati_unicache */
 	},
 	.flags		  = PWRDM_HAS_LOWPOWERSTATECHANGE,
+	.wakeup_lat = {
+		/* CPUIdle and suspend controls this explicitly */
+		[PWRDM_POWER_OFF] = UNSUP_STATE,
+		[PWRDM_POWER_OSWR] = UNSUP_STATE,
+		[PWRDM_POWER_CSWR] = UNSUP_STATE,
+		[PWRDM_POWER_RET] = UNSUP_STATE,
+		[PWRDM_POWER_INACTIVE] = UNSUP_STATE,
+		[PWRDM_POWER_ON] = UNSUP_STATE,
+	},
 };
 
 /* gfx_44xx_pwrdm: 3D accelerator power domain */
@@ -71,6 +82,14 @@ static struct powerdomain gfx_44xx_pwrdm = {
 		[0] = PWRSTS_ON,	/* gfx_mem */
 	},
 	.flags		  = PWRDM_HAS_LOWPOWERSTATECHANGE,
+	.wakeup_lat = {
+		[PWRDM_POWER_OFF] = 1000,
+		[PWRDM_POWER_OSWR] = UNSUP_STATE,
+		[PWRDM_POWER_CSWR] = UNSUP_STATE,
+		[PWRDM_POWER_RET] = UNSUP_STATE,
+		[PWRDM_POWER_INACTIVE] = UNSUP_STATE,
+		[PWRDM_POWER_ON] = 0,
+	},
 };
 
 /* abe_44xx_pwrdm: Audio back end power domain */
@@ -91,6 +110,14 @@ static struct powerdomain abe_44xx_pwrdm = {
 		[1] = PWRSTS_ON,	/* periphmem */
 	},
 	.flags		  = PWRDM_HAS_LOWPOWERSTATECHANGE,
+	.wakeup_lat = {
+		[PWRDM_POWER_OFF] = 1000,
+		[PWRDM_POWER_OSWR] = 600,
+		[PWRDM_POWER_CSWR] = 300,
+		[PWRDM_POWER_RET] = UNSUP_STATE,
+		[PWRDM_POWER_INACTIVE] = UNSUP_STATE,
+		[PWRDM_POWER_ON] = 0,
+	},
 };
 
 /* dss_44xx_pwrdm: Display subsystem power domain */
@@ -109,6 +136,14 @@ static struct powerdomain dss_44xx_pwrdm = {
 		[0] = PWRSTS_ON,	/* dss_mem */
 	},
 	.flags		  = PWRDM_HAS_LOWPOWERSTATECHANGE,
+	.wakeup_lat = {
+		[PWRDM_POWER_OFF] = 1000,
+		[PWRDM_POWER_OSWR] = UNSUP_STATE,
+		[PWRDM_POWER_CSWR] = 300,
+		[PWRDM_POWER_RET] = UNSUP_STATE,
+		[PWRDM_POWER_INACTIVE] = UNSUP_STATE,
+		[PWRDM_POWER_ON] = 0,
+	},
 };
 
 /* tesla_44xx_pwrdm: Tesla processor power domain */
@@ -131,6 +166,14 @@ static struct powerdomain tesla_44xx_pwrdm = {
 		[2] = PWRSTS_ON,	/* tesla_l2 */
 	},
 	.flags		  = PWRDM_HAS_LOWPOWERSTATECHANGE,
+	.wakeup_lat = {
+		[PWRDM_POWER_OFF] = 1000,
+		[PWRDM_POWER_OSWR] = 600,
+		[PWRDM_POWER_CSWR] = 300,
+		[PWRDM_POWER_RET] = UNSUP_STATE,
+		[PWRDM_POWER_INACTIVE] = UNSUP_STATE,
+		[PWRDM_POWER_ON] = 0,
+	},
 };
 
 /* wkup_44xx_pwrdm: Wake-up power domain */
@@ -164,6 +207,15 @@ static struct powerdomain cpu0_44xx_pwrdm = {
 	.pwrsts_mem_on	= {
 		[0] = PWRSTS_ON,	/* cpu0_l1 */
 	},
+	.wakeup_lat = {
+		/* CPUIdle and suspend controls this explicitly */
+		[PWRDM_POWER_OFF] = UNSUP_STATE,
+		[PWRDM_POWER_OSWR] = UNSUP_STATE,
+		[PWRDM_POWER_CSWR] = UNSUP_STATE,
+		[PWRDM_POWER_RET] = UNSUP_STATE,
+		[PWRDM_POWER_INACTIVE] = UNSUP_STATE,
+		[PWRDM_POWER_ON] = UNSUP_STATE,
+	},
 };
 
 /* cpu1_44xx_pwrdm: MPU1 processor and Neon coprocessor power domain */
@@ -180,6 +232,15 @@ static struct powerdomain cpu1_44xx_pwrdm = {
 	},
 	.pwrsts_mem_on	= {
 		[0] = PWRSTS_ON,	/* cpu1_l1 */
+	},
+	.wakeup_lat = {
+		/* CPUIdle and suspend controls this explicitly */
+		[PWRDM_POWER_OFF] = UNSUP_STATE,
+		[PWRDM_POWER_OSWR] = UNSUP_STATE,
+		[PWRDM_POWER_CSWR] = UNSUP_STATE,
+		[PWRDM_POWER_RET] = UNSUP_STATE,
+		[PWRDM_POWER_INACTIVE] = UNSUP_STATE,
+		[PWRDM_POWER_ON] = UNSUP_STATE,
 	},
 };
 
@@ -205,6 +266,7 @@ static struct powerdomain mpu_44xx_pwrdm = {
 	.voltdm		  = { .name = "mpu" },
 	.prcm_offs	  = OMAP4430_PRM_MPU_INST,
 	.prcm_partition	  = OMAP4430_PRM_PARTITION,
+	.context_offs	  = OMAP4_RM_MPU_MPU_CONTEXT_OFFSET,
 	.pwrsts		  = PWRSTS_RET_ON,
 	.pwrsts_logic_ret = PWRSTS_OFF_RET,
 	.banks		  = 3,
@@ -218,6 +280,15 @@ static struct powerdomain mpu_44xx_pwrdm = {
 		[1] = PWRSTS_ON,	/* mpu_l2 */
 		[2] = PWRSTS_ON,	/* mpu_ram */
 	},
+	.wakeup_lat = {
+		/* CPUIdle and suspend controls this explicitly */
+		[PWRDM_POWER_OFF] = UNSUP_STATE,
+		[PWRDM_POWER_OSWR] = UNSUP_STATE,
+		[PWRDM_POWER_CSWR] = UNSUP_STATE,
+		[PWRDM_POWER_RET] = UNSUP_STATE,
+		[PWRDM_POWER_INACTIVE] = UNSUP_STATE,
+		[PWRDM_POWER_ON] = UNSUP_STATE,
+	}
 };
 
 /* ivahd_44xx_pwrdm: IVA-HD power domain */
@@ -242,6 +313,14 @@ static struct powerdomain ivahd_44xx_pwrdm = {
 		[3] = PWRSTS_ON,	/* tcm2_mem */
 	},
 	.flags		  = PWRDM_HAS_LOWPOWERSTATECHANGE,
+	.wakeup_lat = {
+		[PWRDM_POWER_OFF] = 1000,
+		[PWRDM_POWER_OSWR] = UNSUP_STATE,
+		[PWRDM_POWER_CSWR] = 300,
+		[PWRDM_POWER_RET] = UNSUP_STATE,
+		[PWRDM_POWER_INACTIVE] = UNSUP_STATE,
+		[PWRDM_POWER_ON] = 0,
+	},
 };
 
 /* cam_44xx_pwrdm: Camera subsystem power domain */
@@ -259,6 +338,14 @@ static struct powerdomain cam_44xx_pwrdm = {
 		[0] = PWRSTS_ON,	/* cam_mem */
 	},
 	.flags		  = PWRDM_HAS_LOWPOWERSTATECHANGE,
+	.wakeup_lat = {
+		[PWRDM_POWER_OFF] = 1000,
+		[PWRDM_POWER_OSWR] = UNSUP_STATE,
+		[PWRDM_POWER_CSWR] = UNSUP_STATE,
+		[PWRDM_POWER_RET] = UNSUP_STATE,
+		[PWRDM_POWER_INACTIVE] = UNSUP_STATE,
+		[PWRDM_POWER_ON] = 0,
+	}
 };
 
 /* l3init_44xx_pwrdm: L3 initators pheripherals power domain  */
@@ -276,7 +363,15 @@ static struct powerdomain l3init_44xx_pwrdm = {
 	.pwrsts_mem_on	= {
 		[0] = PWRSTS_ON,	/* l3init_bank1 */
 	},
-	.flags		  = PWRDM_HAS_LOWPOWERSTATECHANGE,
+	.flags		  = PWRDM_HAS_LOWPOWERSTATECHANGE | PWRDM_HAS_HDWR_SAR,
+	.wakeup_lat = {
+		[PWRDM_POWER_OFF] = 1000,
+		[PWRDM_POWER_OSWR] = 600,
+		[PWRDM_POWER_CSWR] = 300,
+		[PWRDM_POWER_RET] = UNSUP_STATE,
+		[PWRDM_POWER_INACTIVE] = UNSUP_STATE,
+		[PWRDM_POWER_ON] = 0,
+	},
 };
 
 /* l4per_44xx_pwrdm: Target peripherals power domain */
@@ -297,6 +392,14 @@ static struct powerdomain l4per_44xx_pwrdm = {
 		[1] = PWRSTS_ON,	/* retained_bank */
 	},
 	.flags		  = PWRDM_HAS_LOWPOWERSTATECHANGE,
+	.wakeup_lat = {
+		[PWRDM_POWER_OFF] = UNSUP_STATE,
+		[PWRDM_POWER_OSWR] = 600,
+		[PWRDM_POWER_CSWR] = 300,
+		[PWRDM_POWER_RET] = UNSUP_STATE,
+		[PWRDM_POWER_INACTIVE] = UNSUP_STATE,
+		[PWRDM_POWER_ON] = 0,
+	},
 };
 
 /*

@@ -56,6 +56,9 @@
 #define	EHCI_INSNREG05_ULPI_EXTREGADD_SHIFT		8
 #define	EHCI_INSNREG05_ULPI_WRDATA_SHIFT		0
 
+/* EHCI-HSIC module requires L3 clocked @ 250MHz+ */
+#define PM_QOS_MEMORY_THROUGHPUT_USBHOST         (250 * 4 * 1000)
+
 /*-------------------------------------------------------------------------*/
 
 static const struct hc_driver ehci_omap_hc_driver;
@@ -279,6 +282,8 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
 	/* root ports should always stay powered */
 	ehci_port_power(omap_ehci, 1);
 
+	pm_qos_add_request(&pdata->pm_qos_request, PM_QOS_MEMORY_THROUGHPUT,
+				PM_QOS_MEMORY_THROUGHPUT_DEFAULT_VALUE);
 	return 0;
 
 err_add_hcd:
@@ -309,6 +314,7 @@ static int ehci_hcd_omap_remove(struct platform_device *pdev)
 	disable_put_regulator(dev->platform_data);
 	iounmap(hcd->regs);
 	usb_put_hcd(hcd);
+	pm_qos_remove_request(&pdata->pm_qos_request);
 	pm_runtime_put_sync(dev);
 	pm_runtime_disable(dev);
 
@@ -336,6 +342,8 @@ static void ehci_hcd_omap_shutdown(struct platform_device *pdev)
 static int ehci_omap_bus_suspend(struct usb_hcd *hcd)
 {
 	struct device *dev = hcd->self.controller;
+	struct ehci_hcd_omap_platform_data *pdata = dev->platform_data;
+
 	int ret = 0;
 
 	dev_dbg(dev, "ehci_omap_bus_suspend\n");
@@ -349,24 +357,23 @@ static int ehci_omap_bus_suspend(struct usb_hcd *hcd)
 
 	pm_runtime_put(dev);
 
-	omap_pm_set_min_bus_tput(dev,
-			OCP_INITIATOR_AGENT,
-			-1);
+	pm_qos_update_request(&pdata->pm_qos_request,
+					PM_QOS_DEFAULT_VALUE);
 	return ret;
 }
 
 static int ehci_omap_bus_resume(struct usb_hcd *hcd)
 {
 	struct device *dev = hcd->self.controller;
+	struct ehci_hcd_omap_platform_data *pdata = dev->platform_data;
 
 	dev_dbg(dev, "ehci_omap_bus_resume\n");
 
 	if (pm_runtime_suspended(dev))
 		pm_runtime_get_sync(dev);
 
-	omap_pm_set_min_bus_tput(dev,
-			OCP_INITIATOR_AGENT,
-			(200*1000*4));
+	pm_qos_update_request(&pdata->pm_qos_request,
+					PM_QOS_MEMORY_THROUGHPUT_USBHOST);
 
 	return ehci_bus_resume(hcd);
 }

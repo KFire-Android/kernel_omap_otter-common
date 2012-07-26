@@ -32,6 +32,7 @@
 #include <linux/module.h>
 #include <linux/pm.h>
 #include <linux/pm_runtime.h>
+#include <linux/pm_qos.h>
 
 #include <plat/mailbox.h>
 
@@ -39,6 +40,10 @@ static struct omap_mbox **mboxes;
 
 static int mbox_configured;
 static DEFINE_MUTEX(mbox_configured_lock);
+static struct pm_qos_request mbox_qos_request;
+
+#define SET_MPU_CORE_CONSTRAINT 10
+#define CLEAR_MPU_CORE_CONSTRAINT PM_QOS_DEFAULT_VALUE
 
 static unsigned int mbox_kfifo_size = CONFIG_OMAP_MBOX_KFIFO_SIZE;
 module_param(mbox_kfifo_size, uint, S_IRUGO);
@@ -294,23 +299,15 @@ static int omap_mbox_startup(struct omap_mbox *mbox)
 {
 	int ret = 0;
 	struct omap_mbox_queue *mq;
-	int fail_constraint = 0;
 
 	mutex_lock(&mbox_configured_lock);
 
 	omap_mbox_enable(mbox);
 
 	if (!mbox_configured++) {
-		if (mbox->pm_constraint) {
-			ret = dev_pm_qos_update_request(&mbox->qos_request,
-					mbox->pm_constraint);
-			if (ret < 0) {
-				fail_constraint = 1;
-				dev_err(mbox->dev,
-					"failed to update qos constraint\n");
-				goto fail_startup;
-			}
-		}
+		if (mbox->pm_constraint)
+			pm_qos_update_request(&mbox_qos_request,
+					SET_MPU_CORE_CONSTRAINT);
 		if (likely(mbox->ops->startup)) {
 			ret = mbox->ops->startup(mbox);
 			if (unlikely(ret))
@@ -355,14 +352,9 @@ fail_alloc_txq:
 		mbox->ops->shutdown(mbox);
 	mbox->use_count--;
 fail_startup:
-	if (!--mbox_configured)
-		if (mbox->pm_constraint && !fail_constraint) {
-			if (dev_pm_qos_update_request(&mbox->qos_request,
-					 PM_QOS_DEFAULT_VALUE) < 0)
-				dev_err(mbox->dev,
-					"failed to relax qos constraint\n");
-
-		}
+	if (!--mbox_configured && mbox->pm_constraint)
+		pm_qos_update_request(&mbox_qos_request,
+					 CLEAR_MPU_CORE_CONSTRAINT);
 	mutex_unlock(&mbox_configured_lock);
 	return ret;
 }
@@ -382,11 +374,9 @@ static void omap_mbox_fini(struct omap_mbox *mbox)
 	if (likely(mbox->ops->shutdown)) {
 		if (!--mbox_configured) {
 			mbox->ops->shutdown(mbox);
-			if (mbox->pm_constraint &&
-				(dev_pm_qos_update_request(&mbox->qos_request,
-						PM_QOS_DEFAULT_VALUE) < 0))
-				dev_err(mbox->dev,
-					"failed to relax qos constraint\n");
+			if (mbox->pm_constraint)
+				pm_qos_update_request(&mbox_qos_request,
+						CLEAR_MPU_CORE_CONSTRAINT);
 		}
 	}
 
@@ -464,11 +454,6 @@ int omap_mbox_register(struct device *parent, struct omap_mbox **list)
 			goto err_out;
 		}
 
-		ret = dev_pm_qos_add_request(parent, &mbox->qos_request,
-						PM_QOS_DEFAULT_VALUE);
-		if (ret < 0)
-			goto err_out;
-
 		BLOCKING_INIT_NOTIFIER_HEAD(&mbox->notifier);
 	}
 
@@ -477,10 +462,8 @@ int omap_mbox_register(struct device *parent, struct omap_mbox **list)
 	return 0;
 
 err_out:
-	while (i--) {
-		dev_pm_qos_remove_request(&mboxes[i]->qos_request);
+	while (i--)
 		device_unregister(mboxes[i]->dev);
-	}
 	return ret;
 }
 EXPORT_SYMBOL(omap_mbox_register);
@@ -492,10 +475,9 @@ int omap_mbox_unregister(struct device *parent)
 	if (!mboxes)
 		return -EINVAL;
 
-	for (i = 0; mboxes[i]; i++) {
-		dev_pm_qos_remove_request(&mboxes[i]->qos_request);
+	for (i = 0; mboxes[i]; i++)
 		device_unregister(mboxes[i]->dev);
-	}
+
 	mboxes = NULL;
 
 	pm_runtime_disable(parent);
@@ -516,12 +498,17 @@ static int __init omap_mbox_init(void)
 	mbox_kfifo_size = ALIGN(mbox_kfifo_size, sizeof(mbox_msg_t));
 	mbox_kfifo_size = max_t(unsigned int, mbox_kfifo_size,
 							sizeof(mbox_msg_t));
+
+	pm_qos_add_request(&mbox_qos_request, PM_QOS_CPU_DMA_LATENCY,
+							PM_QOS_DEFAULT_VALUE);
+
 	return 0;
 }
 subsys_initcall(omap_mbox_init);
 
 static void __exit omap_mbox_exit(void)
 {
+	pm_qos_remove_request(&mbox_qos_request);
 	class_unregister(&omap_mbox_class);
 }
 module_exit(omap_mbox_exit);

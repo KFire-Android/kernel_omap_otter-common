@@ -175,8 +175,8 @@ static int next_valid_state(struct cpuidle_device *dev,
 	struct cpuidle_state_usage *curr_usage = &dev->states_usage[index];
 	struct cpuidle_state *curr = &drv->states[index];
 	struct omap3_idle_statedata *cx = cpuidle_get_statedata(curr_usage);
-	u32 mpu_deepest_state = PWRDM_POWER_RET;
-	u32 core_deepest_state = PWRDM_POWER_RET;
+	u32 mpu_deepest_state = PWRDM_POWER_CSWR;
+	u32 core_deepest_state = PWRDM_POWER_CSWR;
 	int next_index = -1;
 
 	if (enable_off_mode) {
@@ -277,8 +277,8 @@ static int omap3_enter_idle_bm(struct cpuidle_device *dev,
 	core_next_state = cx->core_state;
 	per_next_state = per_saved_state = pwrdm_read_next_pwrst(per_pd);
 	if ((per_next_state == PWRDM_POWER_OFF) &&
-	    (core_next_state > PWRDM_POWER_RET))
-		per_next_state = PWRDM_POWER_RET;
+	    (core_next_state > PWRDM_POWER_CSWR))
+		per_next_state = PWRDM_POWER_CSWR;
 
 	/* Are we changing PER target state? */
 	if (per_next_state != per_saved_state)
@@ -388,7 +388,7 @@ int __init omap3_idle_init(void)
 	/* C3 . MPU CSWR + Core inactive */
 	_fill_cstate(drv, 2, "MPU RET + CORE ON");
 	cx = _fill_cstate_usage(dev, 2);
-	cx->mpu_state = PWRDM_POWER_RET;
+	cx->mpu_state = PWRDM_POWER_CSWR;
 	cx->core_state = PWRDM_POWER_ON;
 
 	/* C4 . MPU OFF + Core inactive */
@@ -400,14 +400,14 @@ int __init omap3_idle_init(void)
 	/* C5 . MPU RET + Core RET */
 	_fill_cstate(drv, 4, "MPU RET + CORE RET");
 	cx = _fill_cstate_usage(dev, 4);
-	cx->mpu_state = PWRDM_POWER_RET;
-	cx->core_state = PWRDM_POWER_RET;
+	cx->mpu_state = PWRDM_POWER_CSWR;
+	cx->core_state = PWRDM_POWER_CSWR;
 
 	/* C6 . MPU OFF + Core RET */
 	_fill_cstate(drv, 5, "MPU OFF + CORE RET");
 	cx = _fill_cstate_usage(dev, 5);
 	cx->mpu_state = PWRDM_POWER_OFF;
-	cx->core_state = PWRDM_POWER_RET;
+	cx->core_state = PWRDM_POWER_CSWR;
 
 	/* C7 . MPU OFF + Core OFF */
 	_fill_cstate(drv, 6, "MPU OFF + CORE OFF");

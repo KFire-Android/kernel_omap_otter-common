@@ -144,6 +144,7 @@
 #include "powerdomain.h"
 #include <plat/clock.h>
 #include <plat/omap_hwmod.h>
+#include <plat/omap_device.h>
 #include <plat/prcm.h>
 
 #include "cm2xxx_3xxx.h"
@@ -162,6 +163,13 @@
 
 /* omap_hwmod_list contains all registered struct omap_hwmods */
 static LIST_HEAD(omap_hwmod_list);
+
+struct hwmod_ops {
+	void	(*hwmod_update_context_lost)(struct omap_hwmod *oh);
+	int	(*hwmod_get_context_lost)(struct omap_hwmod *oh);
+};
+
+static struct hwmod_ops *arch_hwmod;
 
 /* mpu_oh: used to add/remove MPU initiator from sleepdep list */
 static struct omap_hwmod *mpu_oh;
@@ -1599,6 +1607,67 @@ static void _reconfigure_io_chain(void)
 	spin_unlock_irqrestore(&io_chain_lock, flags);
 }
 
+static inline void _omap4_inc_context_loss(unsigned int *v)
+{
+
+	/*
+	 * Context loss count has to be a non-negative value.
+	 * Clear the sign bit to get a value range from 0 to
+	 * INT_MAX.
+	 */
+	*v = (*v + 1) & INT_MAX;
+	*v = *v ? *v : 1;
+}
+
+/**
+ * _omap4_update_context_lost - increment hwmod context loss counter if
+ * hwmod context was lost, and clear hardware context loss reg
+ * @oh: hwmod to check for context loss
+ *
+ * If the PRCM indicates that the hwmod @oh lost context, increment
+ * our in-memory context loss counter, and clear the RM_*_CONTEXT
+ * bits. No return value.
+ */
+static void _omap4_update_context_lost(struct omap_hwmod *oh)
+{
+	u32 r;
+
+	if (oh->prcm.omap4.context_offs == USHRT_MAX)
+		return;
+
+	r = omap4_prminst_read_inst_reg(oh->clkdm->pwrdm.ptr->prcm_partition,
+					oh->clkdm->pwrdm.ptr->prcm_offs,
+					oh->prcm.omap4.context_offs);
+
+	if (!r)
+		return;
+
+	_omap4_inc_context_loss(&oh->prcm.omap4.context_lost_counter);
+
+	omap4_prminst_write_inst_reg(r, oh->clkdm->pwrdm.ptr->prcm_partition,
+				     oh->clkdm->pwrdm.ptr->prcm_offs,
+				     oh->prcm.omap4.context_offs);
+}
+
+/**
+ * _omap4_get_context_lost - get context loss counter for a hwmod
+ * @oh:	hwmod to provide for context loss count for
+ *
+ * Returns the in-memory context loss counter for a hwmod.
+ */
+static int _omap4_get_context_lost(struct omap_hwmod *oh)
+{
+	if (oh->prcm.omap4.context_offs == USHRT_MAX)
+		_omap4_inc_context_loss(&oh->prcm.omap4.context_lost_counter);
+
+	return oh->prcm.omap4.context_lost_counter;
+}
+
+static struct hwmod_ops omap4_hwmod_ops = {
+	.hwmod_update_context_lost	= _omap4_update_context_lost,
+	.hwmod_get_context_lost		= _omap4_get_context_lost,
+};
+
 /**
  * _enable - enable an omap_hwmod
  * @oh: struct omap_hwmod *
@@ -1678,6 +1747,9 @@ static int _enable(struct omap_hwmod *oh)
 	if ((oh->_state == _HWMOD_STATE_INITIALIZED ||
 	     oh->_state == _HWMOD_STATE_DISABLED) && oh->rst_lines_cnt == 1)
 		_deassert_hardreset(oh, oh->rst_lines[0].name);
+
+	if (arch_hwmod && arch_hwmod->hwmod_update_context_lost)
+		arch_hwmod->hwmod_update_context_lost(oh);
 
 	r = _wait_target_ready(oh);
 	if (!r) {
@@ -2222,6 +2294,9 @@ static int __init omap_hwmod_setup_all(void)
 {
 	int r;
 
+	if (cpu_is_omap44xx() || cpu_is_omap54xx())
+		arch_hwmod = &omap4_hwmod_ops;
+
 	if (!mpu_oh) {
 		pr_err("omap_hwmod: %s: MPU initiator hwmod %s not yet registered\n",
 		       __func__, MPU_INITIATOR_NAME);
@@ -2317,6 +2392,7 @@ int omap_hwmod_enable_clocks(struct omap_hwmod *oh)
 
 	spin_lock_irqsave(&oh->_lock, flags);
 	_enable_clocks(oh);
+	_enable_module(oh);
 	spin_unlock_irqrestore(&oh->_lock, flags);
 
 	return 0;
@@ -2334,6 +2410,7 @@ int omap_hwmod_disable_clocks(struct omap_hwmod *oh)
 
 	spin_lock_irqsave(&oh->_lock, flags);
 	_disable_clocks(oh);
+	_omap4_disable_module(oh);
 	spin_unlock_irqrestore(&oh->_lock, flags);
 
 	return 0;
@@ -2490,7 +2567,9 @@ struct powerdomain *omap_hwmod_get_pwrdm(struct omap_hwmod *oh)
 	if (!oh)
 		return NULL;
 
-	if (oh->_clk) {
+	if (oh->clkdm) {
+		return oh->clkdm->pwrdm.ptr;
+	} else if (oh->_clk) {
 		c = oh->_clk;
 	} else {
 		if (oh->_int_flags & _HWMOD_NO_MPU_PORT)
@@ -2805,19 +2884,64 @@ ohsps_unlock:
 }
 
 /**
+ * omap_hwmod_set_wakeuplat_constraint - Set or update a wake-up latency
+ * constraint
+ * @oh: struct omap_hwmod* to which the target device belongs to.
+ * @cookie: identifier of the constraints list for @oh.
+ * @min_latency: the minimum allowed wake-up latency for @oh.
+ *
+ * Returns the return value from pwrdm_wakeuplat_update_constraint(),
+ * or -EINVAL in case of invalid parameters.
+ */
+int omap_hwmod_set_wakeuplat_constraint(struct omap_hwmod *oh, void *cookie,
+					long min_latency)
+{
+	struct powerdomain *pwrdm = omap_hwmod_get_pwrdm(oh);
+
+	if (!pwrdm)
+		return -EINVAL;
+
+	return pwrdm_wakeuplat_update_constraint(pwrdm, cookie, min_latency);
+}
+
+/**
+ * omap_hwmod_remove_wakeuplat_constraint - Release a wake-up latency
+ * constraint
+ * @oh: struct omap_hwmod* to which the target device belongs to.
+ * @cookie: identifier of the constraints list for @oh.
+ *
+ * Removes a wakeup latency contraint.  Returns the return value from
+ * pwrdm_wakeuplat_remove_constraint(), or -EINVAL in case of invalid
+ * parameters.
+ */
+int omap_hwmod_remove_wakeuplat_constraint(struct omap_hwmod *oh, void *cookie)
+{
+	struct powerdomain *pwrdm = omap_hwmod_get_pwrdm(oh);
+
+	if (!pwrdm)
+		return -EINVAL;
+
+	return pwrdm_wakeuplat_remove_constraint(pwrdm, cookie);
+}
+
+/**
  * omap_hwmod_get_context_loss_count - get lost context count
  * @oh: struct omap_hwmod *
  *
- * Query the powerdomain of of @oh to get the context loss
- * count for this device.
+ * Returns the context loss count of associated @oh
+ * upon success, or zero if no context loss data is available.
  *
- * Returns the context loss count of the powerdomain assocated with @oh
- * upon success, or zero if no powerdomain exists for @oh.
+ * On OMAP4, this queries the per-hwmod context loss register,
+ * assuming one exists.  If not, or on OMAP2/3, this queries the
+ * enclosing powerdomain context loss count.
  */
 int omap_hwmod_get_context_loss_count(struct omap_hwmod *oh)
 {
 	struct powerdomain *pwrdm;
 	int ret = 0;
+
+	if (arch_hwmod && arch_hwmod->hwmod_get_context_lost)
+		return arch_hwmod->hwmod_get_context_lost(oh);
 
 	pwrdm = omap_hwmod_get_pwrdm(oh);
 	if (pwrdm)

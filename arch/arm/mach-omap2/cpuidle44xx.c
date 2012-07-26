@@ -28,7 +28,6 @@
 /* Machine specific information to be recorded in the C-state driver_data */
 struct omap4_idle_statedata {
 	u32 cpu_state;
-	u32 mpu_logic_state;
 	u32 mpu_state;
 	u8 valid;
 };
@@ -114,16 +113,14 @@ static int omap4_enter_idle_coupled(struct cpuidle_device *dev,
 	cpu_pm_enter();
 
 	if (dev->cpu == 0) {
-		pwrdm_set_logic_retst(mpu_pd, cx->mpu_logic_state);
 		omap_set_pwrdm_state(mpu_pd, cx->mpu_state);
 
 		/*
 		 * Call idle CPU cluster PM enter notifier chain
 		 * to save GIC and wakeupgen context.
 		 */
-		if ((cx->mpu_state == PWRDM_POWER_RET) &&
-			(cx->mpu_logic_state == PWRDM_POWER_OFF))
-				cpu_cluster_pm_enter();
+		if (cx->mpu_state == PWRDM_POWER_OSWR)
+			cpu_cluster_pm_enter();
 	}
 
 	omap_enter_lowpower(dev->cpu, cx->cpu_state);
@@ -237,7 +234,6 @@ int __init omap4_idle_init(void)
 		cx->valid = 1;	/* C1 is always valid */
 		cx->cpu_state = PWRDM_POWER_ON;
 		cx->mpu_state = PWRDM_POWER_ON;
-		cx->mpu_logic_state = PWRDM_POWER_RET;
 		dev->state_count++;
 		drv->state_count++;
 
@@ -245,8 +241,7 @@ int __init omap4_idle_init(void)
 		_fill_cstate(drv, 1, "MPUSS CSWR", CPUIDLE_FLAG_COUPLED);
 		cx = _fill_cstate_usage(dev, 1);
 		cx->cpu_state = PWRDM_POWER_OFF;
-		cx->mpu_state = PWRDM_POWER_RET;
-		cx->mpu_logic_state = PWRDM_POWER_RET;
+		cx->mpu_state = PWRDM_POWER_CSWR;
 		dev->state_count++;
 		drv->state_count++;
 
@@ -254,8 +249,7 @@ int __init omap4_idle_init(void)
 		_fill_cstate(drv, 2, "MPUSS OSWR", CPUIDLE_FLAG_COUPLED);
 		cx = _fill_cstate_usage(dev, 2);
 		cx->cpu_state = PWRDM_POWER_OFF;
-		cx->mpu_state = PWRDM_POWER_RET;
-		cx->mpu_logic_state = PWRDM_POWER_OFF;
+		cx->mpu_state = PWRDM_POWER_OSWR;
 		dev->state_count++;
 		drv->state_count++;
 

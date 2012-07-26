@@ -34,6 +34,7 @@
 #include "twl-common.h"
 
 static struct device *l3_dev;
+static struct powerdomain *core_pd;
 
 /*
  * omap_pm_suspend: points to a function that does the SoC-specific
@@ -118,6 +119,7 @@ static void __init omap2_init_processor_devices(void)
 
 	if (cpu_is_omap44xx() || cpu_is_omap54xx()) {
 		_init_omap_device("l3_main_1");
+#ifndef CONFIG_OMAP_PM_STANDALONE
 		_init_omap_device("dsp");
 		_init_omap_device_lats("iva", iva_pm_lats,
 						ARRAY_SIZE(iva_pm_lats));
@@ -125,14 +127,11 @@ static void __init omap2_init_processor_devices(void)
 						ARRAY_SIZE(iva_pm_lats));
 		_init_omap_device_lats("iva_seq1", iva_pm_lats,
 						ARRAY_SIZE(iva_pm_lats));
+#endif
 	} else {
 		_init_omap_device("l3_main");
 	}
 }
-
-/* Types of sleep_switch used in omap_set_pwrdm_state */
-#define FORCEWAKEUP_SWITCH	0
-#define LOWPOWERSTATE_SWITCH	1
 
 int __init omap_pm_clkdms_setup(struct clockdomain *clkdm, void *unused)
 {
@@ -143,64 +142,6 @@ int __init omap_pm_clkdms_setup(struct clockdomain *clkdm, void *unused)
 		clkdm_sleep(clkdm);
 	return 0;
 }
-
-/*
- * This sets pwrdm state (other than mpu & core. Currently only ON &
- * RET are supported.
- */
-int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 pwrst)
-{
-	u8 curr_pwrst, next_pwrst;
-	int sleep_switch = -1, ret = 0, hwsup = 0;
-
-	if (!pwrdm || IS_ERR(pwrdm))
-		return -EINVAL;
-
-	while (!(pwrdm->pwrsts & (1 << pwrst))) {
-		if (pwrst == PWRDM_POWER_OFF)
-			return ret;
-		pwrst--;
-	}
-
-	next_pwrst = pwrdm_read_next_pwrst(pwrdm);
-	if (next_pwrst == pwrst)
-		return ret;
-
-	curr_pwrst = pwrdm_read_pwrst(pwrdm);
-	if (curr_pwrst < PWRDM_POWER_ON) {
-		if ((curr_pwrst > pwrst) &&
-			(pwrdm->flags & PWRDM_HAS_LOWPOWERSTATECHANGE)) {
-			sleep_switch = LOWPOWERSTATE_SWITCH;
-		} else {
-			hwsup = clkdm_in_hwsup(pwrdm->pwrdm_clkdms[0]);
-			clkdm_wakeup(pwrdm->pwrdm_clkdms[0]);
-			sleep_switch = FORCEWAKEUP_SWITCH;
-		}
-	}
-
-	ret = pwrdm_set_next_pwrst(pwrdm, pwrst);
-	if (ret)
-		pr_err("%s: unable to set power state of powerdomain: %s\n",
-		       __func__, pwrdm->name);
-
-	switch (sleep_switch) {
-	case FORCEWAKEUP_SWITCH:
-		if (hwsup)
-			clkdm_allow_idle(pwrdm->pwrdm_clkdms[0]);
-		else
-			clkdm_sleep(pwrdm->pwrdm_clkdms[0]);
-		break;
-	case LOWPOWERSTATE_SWITCH:
-		pwrdm_set_lowpwrstchange(pwrdm);
-		pwrdm_wait_transition(pwrdm);
-		pwrdm_state_switch(pwrdm);
-		break;
-	}
-
-	return ret;
-}
-
-
 
 /*
  * This API is to be called during init to set the various voltage
@@ -348,13 +289,34 @@ static int omap_pm_enter(suspend_state_t suspend_state)
 static int omap_pm_begin(suspend_state_t state)
 {
 	disable_hlt();
+
+	/*
+	 * If any device was in the middle of a scale operation
+	 * then abort, as we cannot predict which part of the scale
+	 * operation we interrupted.
+	 */
+	if (omap_dvfs_is_any_dev_scaling()) {
+		pr_err("%s: oops.. middle of scale op.. aborting suspend\n",
+		       __func__);
+		return -EBUSY;
+	}
+
 	if (cpu_is_omap34xx())
 		omap_prcm_irq_prepare();
+
+	/* Enable DEV OFF */
+	if (off_mode_enabled && (cpu_is_omap44xx() || cpu_is_omap54xx()))
+		pwrdm_enable_off_mode(true);
+
 	return 0;
 }
 
 static void omap_pm_end(void)
 {
+	/* Disable DEV OFF */
+	if (off_mode_enabled && (cpu_is_omap44xx() || cpu_is_omap54xx()))
+		pwrdm_enable_off_mode(false);
+
 	enable_hlt();
 	return;
 }
@@ -541,6 +503,12 @@ static int __init omap2_common_pm_late_init(void)
 #ifdef CONFIG_SUSPEND
 	suspend_set_ops(&omap_pm_ops);
 #endif
+
+	core_pd = pwrdm_lookup("core_pwrdm");
+	if (!core_pd) {
+		pr_err("Failed to lookup CORE power domain\n");
+		return -ENODEV;
+	}
 
 	return 0;
 }
