@@ -50,13 +50,13 @@ struct hdcp_data {
 	 */
 	struct hdcp_delayed_work *pending_wq_event;
 	struct workqueue_struct *workqueue;
+	struct miscdevice *mdev;
 	bool hdcp_keys_loaded;
 	int hdcp_up_event;
 	int hdcp_down_event;
 	int hdcp_wait_re_entrance;
 };
 
-static struct miscdevice mdev;
 static struct hdcp_data *hdcp;
 
 static void hdcp_work_queue(struct work_struct *work);
@@ -472,7 +472,7 @@ static int hdcp_load_keys(void)
 	HDCP_DBG("%s\n", __func__);
 
 	ret = request_firmware_nowait(THIS_MODULE, FW_ACTION_HOTPLUG,
-					"hdcp.keys", mdev.this_device,
+					"hdcp.keys", hdcp->mdev->this_device,
 					GFP_KERNEL, hdcp, hdcp_load_keys_cb);
 	if (ret < 0) {
 		HDCP_ERR("request_firmware_nowait failed: %d\n", ret);
@@ -500,6 +500,12 @@ static int __init hdcp_init(void)
 		return -ENOMEM;
 	}
 
+	hdcp->mdev = kzalloc(sizeof(struct miscdevice), GFP_KERNEL);
+	if (!hdcp->mdev) {
+		HDCP_ERR("Could not allocate misc device memory\n");
+		goto err_alloc_mdev;
+	}
+
 	/* Map DESHDCP in kernel address space */
 	hdcp->deshdcp_base_addr = ioremap(DSS_SS_FROM_L3__DESHDCP, 0x34);
 
@@ -510,14 +516,14 @@ static int __init hdcp_init(void)
 
 	mutex_init(&hdcp->lock);
 
-	mdev.minor = MISC_DYNAMIC_MINOR;
-	mdev.name = "hdcp";
-	mdev.mode = 0666;
-	mdev.fops = &hdcp_fops;
+	hdcp->mdev->minor = MISC_DYNAMIC_MINOR;
+	hdcp->mdev->name = "hdcp";
+	hdcp->mdev->mode = 0666;
+	hdcp->mdev->fops = &hdcp_fops;
 
-	if (misc_register(&mdev)) {
+	if (misc_register(hdcp->mdev)) {
 		HDCP_ERR("Could not add character driver\n");
-		goto err_register;
+		goto err_misc_register;
 	}
 
 	hdcp->workqueue = create_singlethread_workqueue("hdcp");
@@ -541,15 +547,17 @@ err_runtime:
 	destroy_workqueue(hdcp->workqueue);
 
 err_add_driver:
-	misc_deregister(&mdev);
+	misc_deregister(hdcp->mdev);
 
-err_register:
+err_misc_register:
 	mutex_destroy(&hdcp->lock);
 
 	iounmap(hdcp->deshdcp_base_addr);
 
 err_map_deshdcp:
+	kfree(hdcp->mdev);
 
+err_alloc_mdev:
 	kfree(hdcp);
 	return -EFAULT;
 }
@@ -573,7 +581,8 @@ static void __exit hdcp_exit(void)
 	hdmi_runtime_put();
 
 err_handling:
-	misc_deregister(&mdev);
+	misc_deregister(hdcp->mdev);
+	kfree(hdcp->mdev);
 
 	iounmap(hdcp->deshdcp_base_addr);
 
