@@ -1208,6 +1208,11 @@ struct omap_aess_io_task aess_port_tones_dl_48k = {
 static struct omap_aess_task task_aess_enable_tones_dl_441k_port[] = {
 	{
 		.frame = 20,
+		.slot = 0,
+		.task = ABE_TASK_ID(C_ABE_FW_TASK_IO_TONES_DL),
+	},
+	{
+		.frame = 20,
 		.slot = 1,
 		.task = ABE_TASK_ID(C_ABE_FW_TASK_SRC44P1_TONES_1211),
 	},
