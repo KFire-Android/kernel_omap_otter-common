@@ -586,11 +586,10 @@ int __init omap_mpuss_init(void)
 	/* Initialise CPU0 power domain state to ON */
 	omap_set_pwrdm_state(pm_info->pwrdm, PWRDM_POWER_ON);
 
-	if (cpu_is_omap44xx()) {
+	if (cpu_is_omap44xx())
 		cpu_wakeup_addr = CPU1_WAKEUP_NS_PA_ADDR_OFFSET;
-	} else if (cpu_is_omap54xx()) {
+	else if (cpu_is_omap54xx())
 		cpu_wakeup_addr = OMAP5_CPU1_WAKEUP_NS_PA_ADDR_OFFSET;
-	}
 
 	pm_info = &per_cpu(omap4_pm_info, 0x1);
 	pm_info->scu_sar_addr = sar_base + SCU_OFFSET1;

@@ -379,7 +379,7 @@ static inline int omap4_init_static_deps(void)
 
 static inline int omap5_init_static_deps(void)
 {
-	struct clockdomain *mpuss_clkdm, *emif_clkdm, *dss_clkdm;
+	struct clockdomain *mpuss_clkdm, *emif_clkdm, *dss_clkdm, *wkupaon_clkdm;
 	int ret;
 
 	/*
@@ -387,16 +387,25 @@ static inline int omap5_init_static_deps(void)
 	 * doesn't work as expected. The hardware recommendation is to
 	 * enable static dependencies for these to avoid system
 	 * lock ups or random crashes.
+	 * The L4 wakeup depedency is added to workaround the OCP sync hardware
+	 * BUG with 32K synctimer which lead to incorrect timer value read
+	 * from the 32K counter. The BUG applies for GPTIMER1 and WDT2 which
+	 * are part of L4 wakeup clockdomain.
 	 */
 	mpuss_clkdm = clkdm_lookup("mpu_clkdm");
 	emif_clkdm = clkdm_lookup("emif_clkdm");
 	dss_clkdm = clkdm_lookup("dss_clkdm");
-	if (!mpuss_clkdm || !emif_clkdm || !dss_clkdm)
+	wkupaon_clkdm = clkdm_lookup("wkupaon_clkdm");
+	if (!mpuss_clkdm || !emif_clkdm || !dss_clkdm || !wkupaon_clkdm)
 		return -EINVAL;
 
 	ret = clkdm_add_wkdep(mpuss_clkdm, emif_clkdm);
 	if (ret)
 		pr_err("Failed to add MPUSS -> emif wakeup dependency\n");
+
+	ret |= clkdm_add_wkdep(mpuss_clkdm, wkupaon_clkdm);
+	if (ret)
+		pr_err("Failed to add MPUSS -> L4PER/WKUPAON wakeup dependency\n");
 
 	ret |= clkdm_add_wkdep(dss_clkdm, emif_clkdm);
 	if (ret)
