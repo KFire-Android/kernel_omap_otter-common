@@ -77,7 +77,8 @@ static struct omap2_hsmmc_info mmc[] = {
 	},
 	{
 		.mmc		= 1,
-		.caps		= MMC_CAP_4_BIT_DATA,
+		.caps		= MMC_CAP_4_BIT_DATA | MMC_CAP_UHS_SDR12 |
+					MMC_CAP_UHS_SDR25 | MMC_CAP_UHS_DDR50,
 		.gpio_cd	= 67,
 		.gpio_wp	= -EINVAL,
 		.ocr_mask	= MMC_VDD_29_30,
