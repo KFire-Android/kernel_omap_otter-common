@@ -436,7 +436,7 @@ static inline irqreturn_t serial_omap_irq(int irq, void *dev_id)
 	iir = serial_in(up, UART_IIR);
 	if (iir & UART_IIR_NO_INT) {
 		serial_omap_port_disable(up);
-		return IRQ_NONE;
+		return IRQ_HANDLED;
 	}
 
 	int_id = iir & UART_OMAP_IIR_ID;
@@ -461,8 +461,6 @@ static inline irqreturn_t serial_omap_irq(int irq, void *dev_id)
 	if (int_id == UART_IIR_THRI) {
 		if (lsr & UART_LSR_THRE)
 			transmit_chars(up);
-		else
-			ret = IRQ_NONE;
 	}
 
 	spin_unlock_irqrestore(&up->port.lock, flags);
