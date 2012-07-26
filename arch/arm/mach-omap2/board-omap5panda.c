@@ -186,6 +186,7 @@ static struct palmas_reg_init omap5_ldo8_init = {
 static struct palmas_reg_init omap5_ldo9_init = {
 	.warm_reset = 0,
 	.mode_sleep = 0,
+	.no_bypass = 1,
 };
 
 static struct palmas_reg_init omap5_ldoln_init = {
@@ -428,15 +429,21 @@ static struct regulator_init_data omap5_ldo8 = {
 	},
 };
 
+static struct regulator_consumer_supply omap5_mmc1_io_supply[] = {
+	REGULATOR_SUPPLY("vmmc_aux", "omap_hsmmc.0"),
+};
 static struct regulator_init_data omap5_ldo9 = {
 	.constraints = {
 		.min_uV			= 1800000,
-		.max_uV			= 1800000,
+		.max_uV			= 3300000,
 		.valid_modes_mask	= REGULATOR_MODE_NORMAL
 					| REGULATOR_MODE_STANDBY,
-		.valid_ops_mask		= REGULATOR_CHANGE_MODE
+		.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE
+					| REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
 	},
+	.num_consumer_supplies	= ARRAY_SIZE(omap5_mmc1_io_supply),
+	.consumer_supplies	= omap5_mmc1_io_supply,
 };
 
 static struct regulator_init_data omap5_ldoln = {
