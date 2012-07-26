@@ -321,30 +321,25 @@ int __init omap5_idle_init(void)
 		drv.state_count++;
 
 		/* C2 - CPU0 CSWR + CPU1 CSWR + MPU CSWR */
-		if (cpuidle_params_table[1].valid) {
-			_fill_cstate(&drv, 1, "MPUSS OSWR", 0);
-			cx = _fill_cstate_usage(dev, 1);
-			if (cx != NULL) {
-				cx->cpu_state = PWRDM_POWER_CSWR;
-				cx->mpu_state = PWRDM_POWER_CSWR;
-				atomic_set(&cx->mpu_state_vote, 0);
-				dev->state_count++;
-				drv.state_count++;
-			}
+		_fill_cstate(&drv, 1, "MPUSS OSWR", 0);
+		cx = _fill_cstate_usage(dev, 1);
+		if (cx != NULL) {
+			cx->cpu_state = PWRDM_POWER_CSWR;
+			cx->mpu_state = PWRDM_POWER_CSWR;
+			atomic_set(&cx->mpu_state_vote, 0);
+			dev->state_count++;
+			drv.state_count++;
 		}
 
 		/* C3 - CPU0 OFF + CPU1 OFF + MPU OSWR */
-		if (cpuidle_params_table[2].valid) {
-			_fill_cstate(&drv, 2, "MPUSS OSWR",
-				     CPUIDLE_FLAG_COUPLED);
-			cx = _fill_cstate_usage(dev, 2);
-			if (cx != NULL) {
-				cx->cpu_state = PWRDM_POWER_OFF;
-				cx->mpu_state = PWRDM_POWER_OSWR;
-				atomic_set(&cx->mpu_state_vote, 0);
-				dev->state_count++;
-				drv.state_count++;
-			}
+		_fill_cstate(&drv, 2, "MPUSS OSWR", CPUIDLE_FLAG_COUPLED);
+		cx = _fill_cstate_usage(dev, 2);
+		if (cx != NULL) {
+			cx->cpu_state = PWRDM_POWER_OFF;
+			cx->mpu_state = PWRDM_POWER_OSWR;
+			atomic_set(&cx->mpu_state_vote, 0);
+			dev->state_count++;
+			drv.state_count++;
 		}
 
 		/* Setup the brodcast device */
