@@ -735,6 +735,7 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
 			struct ktermios *old)
 {
 	struct uart_omap_port *up = (struct uart_omap_port *)port;
+	struct omap_uart_port_info *pdata = up->pdev->dev.platform_data;
 	unsigned char cval = 0;
 	unsigned char efr = 0;
 	unsigned long flags = 0;
@@ -935,6 +936,12 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
 	serial_omap_set_mctrl(&up->port, up->port.mctrl);
 	/* Software Flow Control Configuration */
 	serial_omap_configure_xonxoff(up, termios);
+
+	/* Now we are ready for RX data: enable rts line */
+	if (pdata->rts_mux_write && up->rts_pullup_in_suspend) {
+		pdata->rts_mux_write(0, up->port.line);
+		up->rts_pullup_in_suspend = 0;
+	}
 
 	spin_unlock_irqrestore(&up->port.lock, flags);
 	pm_runtime_put(&up->pdev->dev);
@@ -1250,6 +1257,12 @@ static int serial_omap_suspend(struct device *dev)
 	struct omap_uart_port_info *pdata = dev->platform_data;
 
 	if (up) {
+		disable_irq(up->port.irq);
+		if (pdata->rts_mux_write) {
+			up->rts_pullup_in_suspend = 1;
+			pdata->rts_mux_write(MUX_PULL_UP, up->port.line);
+		}
+		up->suspended = true;
 		uart_suspend_port(&serial_omap_reg, &up->port);
 		flush_work_sync(&up->qos_work);
 
@@ -1264,8 +1277,11 @@ static int serial_omap_resume(struct device *dev)
 {
 	struct uart_omap_port *up = dev_get_drvdata(dev);
 
-	if (up)
+	if (up) {
 		uart_resume_port(&serial_omap_reg, &up->port);
+		up->suspended = false;
+		enable_irq(up->port.irq);
+	}
 	return 0;
 }
 #endif
@@ -1562,6 +1578,9 @@ static int __devinit serial_omap_probe(struct platform_device *pdev)
 
 	up->port.flags = omap_up_info->flags;
 	up->port.uartclk = omap_up_info->uartclk;
+
+	up->rts_pullup_in_suspend = 0;
+
 	if (!up->port.uartclk) {
 		up->port.uartclk = DEFAULT_CLK_SPEED;
 		dev_warn(&pdev->dev, "No clock speed specified: using default:"
@@ -1716,6 +1735,12 @@ static int serial_omap_runtime_suspend(struct device *dev)
 	if (pdata->get_context_loss_count)
 		up->context_loss_cnt = pdata->get_context_loss_count(dev);
 
+	if (pdata->rts_mux_write) {
+		pdata->rts_mux_write(MUX_PULL_UP, up->port.line);
+		/* wait a few bytes to allow current transmission to complete */
+		udelay(300);
+	}
+
 	/* Errata i291 */
 	if (up->use_dma && pdata->set_forceidle &&
 			(up->errata & UART_ERRATA_i291_DMA_FORCEIDLE))
@@ -1750,6 +1775,9 @@ static int serial_omap_runtime_resume(struct device *dev)
 		if (up->use_dma && pdata->set_noidle &&
 				(up->errata & UART_ERRATA_i291_DMA_FORCEIDLE))
 			pdata->set_noidle(up->pdev);
+
+		if (pdata->rts_mux_write && (!up->rts_pullup_in_suspend))
+			pdata->rts_mux_write(0, up->port.line);
 
 		up->latency = up->calc_latency;
 		schedule_work(&up->qos_work);

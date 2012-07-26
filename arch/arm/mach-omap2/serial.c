@@ -209,6 +209,37 @@ static char *cmdline_find_option(char *str)
 	return strstr(saved_command_line, str);
 }
 
+static struct omap_hwmod *omap_uart_hwmod_lookup(int num)
+{
+	struct omap_hwmod *oh;
+	char oh_name[MAX_UART_HWMOD_NAME_LEN];
+
+	snprintf(oh_name, MAX_UART_HWMOD_NAME_LEN, "uart%d", num + 1);
+	oh = omap_hwmod_lookup(oh_name);
+	WARN(IS_ERR(oh), "Could not lookup hmwod info for %s\n",
+					oh_name);
+	return oh;
+}
+
+static void omap_rts_mux_write(u16 val, int num)
+{
+	struct omap_hwmod *oh;
+	int i;
+
+	oh = omap_uart_hwmod_lookup(num);
+	if (!oh)
+		return;
+
+	for (i = 0; i < oh->mux->nr_pads ; i++) {
+		if (strstr(oh->mux->pads[i].name, "rts")) {
+			omap_mux_write(oh->mux->pads[i].partition,
+					val,
+					oh->mux->pads[i].mux[0].reg_offset);
+			break;
+		}
+	}
+}
+
 static int __init omap_serial_early_init(void)
 {
 	do {
@@ -313,6 +344,10 @@ void __init omap_serial_init_port(struct omap_board_data *bdata,
 	omap_up.dma_rx_timeout = info->dma_rx_timeout;
 	omap_up.dma_rx_poll_rate = info->dma_rx_poll_rate;
 	omap_up.autosuspend_timeout = info->autosuspend_timeout;
+	if (info->rts_mux_driver_control)
+		omap_up.rts_mux_write = omap_rts_mux_write;
+	else
+		omap_up.rts_mux_write = NULL;
 
 	pdata = &omap_up;
 	pdata_size = sizeof(struct omap_uart_port_info);

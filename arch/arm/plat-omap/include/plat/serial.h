@@ -120,6 +120,9 @@ extern void omap_serial_init(void);
 extern void omap_serial_board_init(struct omap_uart_port_info *platform_data);
 extern void omap_serial_init_port(struct omap_board_data *bdata,
 		struct omap_uart_port_info *platform_data);
+
+#define MUX_PULL_UP	((1<<8) | (1<<4) | (1<<3) | (7))
+
 #endif
 
 #endif
