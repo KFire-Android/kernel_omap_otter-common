@@ -1,0 +1,6 @@
+config OMAPLFB
+        bool "In-kernel omaplfb: interface between display and kernel side PowerVR graphics driver"
+        depends on OMAP2_DSS && DSSCOMP
+	default y
+	help
+	  Support for in-kernel omaplfb. This is used by PVR kernel module.
