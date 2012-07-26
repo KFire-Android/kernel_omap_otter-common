@@ -49,6 +49,7 @@
 #define GPIO_ETH_NRESET		15	/* USBB3 to SMSC LAN9730 */
 #define GPIO_HUB_NRESET		80	/* USBB2 to SMSC 3530 HUB */
 #define GPIO_EXT_INT_PIN	99
+#define GPIO_SDCARD_DETECT	152
 #define HDMI_GPIO_HPD		193
 
 #ifdef CONFIG_OMAP_MUX
@@ -79,7 +80,7 @@ static struct omap2_hsmmc_info mmc[] = {
 		.mmc		= 1,
 		.caps		= MMC_CAP_4_BIT_DATA | MMC_CAP_UHS_SDR12 |
 					MMC_CAP_UHS_SDR25 | MMC_CAP_UHS_DDR50,
-		.gpio_cd	= 67,
+		.gpio_cd	= GPIO_SDCARD_DETECT,
 		.gpio_wp	= -EINVAL,
 		.ocr_mask	= MMC_VDD_29_30,
 	},
