@@ -144,6 +144,8 @@ static ssize_t rproc_recovery_write(struct file *filp,
 		rproc->recovery_disabled = false;
 	else if (!strncmp(buf, "disabled", count))
 		rproc->recovery_disabled = true;
+	else if (!strncmp(buf, "recover", count))
+		rproc_recover(rproc);
 
 out:
 	return count;
