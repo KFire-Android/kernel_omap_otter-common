@@ -1488,7 +1488,6 @@ static int dwc3_gadget_pullup(struct usb_gadget *g, int is_on)
 	int			ret = 0;
 	struct dwc3		*dwc = gadget_to_dwc(g);
 	unsigned long		flags;
-	int			ret;
 
 	is_on = !!is_on;
 
