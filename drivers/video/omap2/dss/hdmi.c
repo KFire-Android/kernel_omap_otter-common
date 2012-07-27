@@ -1085,6 +1085,7 @@ static void hdmi_put_clocks(void)
 #if defined(CONFIG_OMAP4_DSS_HDMI_AUDIO)
 int hdmi_compute_acr(u32 sample_freq, u32 *n, u32 *cts)
 {
+	int dc;
 	u32 deep_color;
 	bool deep_color_correct = false;
 	u32 pclk = hdmi.dssdev->panel.timings.pixel_clock;
@@ -1092,9 +1093,19 @@ int hdmi_compute_acr(u32 sample_freq, u32 *n, u32 *cts)
 	if (n == NULL || cts == NULL)
 		return -EINVAL;
 
-
-	/* TODO: When implemented, query deep color mode here. */
-	deep_color = 100;
+	dc = omapdss_hdmi_get_deepcolor();
+	switch (dc) {
+	case HDMI_DEEP_COLOR_36BIT:
+		deep_color = 150;
+		break;
+	case HDMI_DEEP_COLOR_30BIT:
+		deep_color = 125;
+		break;
+	case HDMI_DEEP_COLOR_24BIT:
+	default:
+		deep_color = 100;
+		break;
+	}
 
 	/*
 	 * When using deep color, the default N value (as in the HDMI
