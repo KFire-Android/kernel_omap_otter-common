@@ -57,6 +57,7 @@
 #define	OMAP_TLL_SHARED_CONF_FCLK_IS_ON			(1 << 0)
 
 #define	OMAP_TLL_CHANNEL_CONF(num)			(0x040 + 0x004 * num)
+#define	OMAP_TLL_CHANNEL_CONF_CHANMODE_MASK		(3 << 1)
 #define OMAP_TLL_CHANNEL_CONF_FSLSMODE_SHIFT		24
 #define	OMAP_TLL_CHANNEL_CONF_ULPINOBITSTUFF		(1 << 11)
 #define	OMAP_TLL_CHANNEL_CONF_ULPI_ULPIAUTOIDLE		(1 << 10)
@@ -64,6 +65,7 @@
 #define	OMAP_TLL_CHANNEL_CONF_ULPIDDRMODE		(1 << 8)
 #define OMAP_TLL_CHANNEL_CONF_CHANMODE_FSLS		(1 << 1)
 #define	OMAP_TLL_CHANNEL_CONF_CHANEN			(1 << 0)
+#define	OMAP_TLL_CHANNEL_CONF_CHANMODE_TRANSPARENT_UTMI	(2 << 1)
 
 #define OMAP_TLL_FSLSMODE_6PIN_PHY_DAT_SE0		0x0
 #define OMAP_TLL_FSLSMODE_6PIN_PHY_DP_DM		0x1
@@ -156,6 +158,11 @@ struct usbhs_hcd_omap {
 	struct clk			*usbhost_p2_fck;
 	struct clk			*usbtll_p2_fck;
 	struct clk			*init_60m_fclk;
+
+	struct clk			*hsic_p1_fck;
+	struct clk			*hsic_p1_480m_fck;
+	struct clk			*hsic_p2_fck;
+	struct clk			*hsic_p2_480m_fck;
 
 	void __iomem			*uhh_base;
 	void __iomem			*tll_base;
@@ -414,6 +421,36 @@ static int __devinit usbhs_omap_probe(struct platform_device *pdev)
 		goto err_usbtll_p2_fck;
 	}
 
+	omap->hsic_p1_fck = clk_get(dev, "usb_host_hs_hsic60m_p1_clk");
+	if (IS_ERR(omap->hsic_p1_fck)) {
+		ret = PTR_ERR(omap->hsic_p1_fck);
+		dev_err(dev, "usb_host_hs_hsic60m_p1_clk failed error:%d\n",
+				ret);
+		goto err_init_60m_fclk;
+	}
+
+	omap->hsic_p1_480m_fck = clk_get(dev, "usb_host_hs_hsic480m_p1_clk");
+	if (IS_ERR(omap->hsic_p1_480m_fck)) {
+		ret = PTR_ERR(omap->hsic_p1_480m_fck);
+		dev_err(dev, "usb_host_hs_hsic480m_p1_clk failed error:%d\n",
+				ret);
+		goto err_hsic_p1_fck;
+	}
+
+	omap->hsic_p2_fck = clk_get(dev, "usb_host_hs_hsic60m_p2_clk");
+	if (IS_ERR(omap->hsic_p2_fck)) {
+		ret = PTR_ERR(omap->hsic_p2_fck);
+		dev_err(dev, "Unable to get usb_host_hs_hsic60m_p2_clk\n");
+		goto err_hsic_p1_480m_fck;
+	}
+
+	omap->hsic_p2_480m_fck = clk_get(dev, "usb_host_hs_hsic480m_p2_clk");
+	if (IS_ERR(omap->hsic_p1_480m_fck)) {
+		ret = PTR_ERR(omap->hsic_p1_480m_fck);
+		dev_err(dev, "Unable to get usb_host_hs_hsic480m_p2_clk\n");
+		goto err_hsic_p2_fck;
+	}
+
 	if (is_ehci_phy_mode(pdata->port_mode[0])) {
 		/* for OMAP3 , the clk set paretn fails */
 		ret = clk_set_parent(omap->utmi_p1_fck,
@@ -447,14 +484,14 @@ static int __devinit usbhs_omap_probe(struct platform_device *pdev)
 	if (!res) {
 		dev_err(dev, "UHH EHCI get resource failed\n");
 		ret = -ENODEV;
-		goto err_init_60m_fclk;
+		goto err_hsic_p2_480m_fck;
 	}
 
 	omap->uhh_base = ioremap(res->start, resource_size(res));
 	if (!omap->uhh_base) {
 		dev_err(dev, "UHH ioremap failed\n");
 		ret = -ENOMEM;
-		goto err_init_60m_fclk;
+		goto err_hsic_p2_480m_fck;
 	}
 
 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "tll");
@@ -488,6 +525,18 @@ err_alloc:
 
 err_tll:
 	iounmap(omap->uhh_base);
+
+err_hsic_p2_480m_fck:
+	clk_put(omap->hsic_p2_480m_fck);
+
+err_hsic_p2_fck:
+	clk_put(omap->hsic_p2_fck);
+
+err_hsic_p1_480m_fck:
+	clk_put(omap->hsic_p1_480m_fck);
+
+err_hsic_p1_fck:
+	clk_put(omap->hsic_p1_fck);
 
 err_init_60m_fclk:
 	clk_put(omap->init_60m_fclk);
@@ -538,6 +587,10 @@ static int __devexit usbhs_omap_remove(struct platform_device *pdev)
 	omap_usbhs_deinit(&pdev->dev);
 	iounmap(omap->tll_base);
 	iounmap(omap->uhh_base);
+	clk_put(omap->hsic_p2_480m_fck);
+	clk_put(omap->hsic_p2_fck);
+	clk_put(omap->hsic_p1_480m_fck);
+	clk_put(omap->hsic_p1_fck);
 	clk_put(omap->init_60m_fclk);
 	clk_put(omap->usbtll_p2_fck);
 	clk_put(omap->usbhost_p2_fck);
@@ -660,6 +713,30 @@ static void usbhs_omap_tll_init(struct device *dev, u8 tll_channel_count)
 	}
 }
 
+static void usbhs_omap_hsic_init(struct device *dev, u8 hsic_channel_count)
+{
+	struct usbhs_hcd_omap *omap = dev_get_drvdata(dev);
+	struct usbhs_omap_platform_data	*pdata = dev->platform_data;
+	u32 reg;
+	int i;
+
+	/* Program Common TLL register */
+	reg = usbhs_read(omap->tll_base, OMAP_TLL_SHARED_CONF);
+	reg |= OMAP_TLL_SHARED_CONF_FCLK_IS_ON;
+	usbhs_write(omap->tll_base, OMAP_TLL_SHARED_CONF, reg);
+
+	/* Enable channels now */
+	for (i = 0; i < hsic_channel_count; i++) {
+		if (pdata->port_mode[i] == OMAP_EHCI_PORT_MODE_HSIC) {
+			reg = usbhs_read(omap->tll_base, OMAP_TLL_CHANNEL_CONF(i));
+			reg &= ~OMAP_TLL_CHANNEL_CONF_CHANMODE_MASK;
+			reg |= OMAP_TLL_CHANNEL_CONF_CHANMODE_TRANSPARENT_UTMI
+					| OMAP_TLL_CHANNEL_CONF_CHANEN;
+			usbhs_write(omap->tll_base, OMAP_TLL_CHANNEL_CONF(i), reg);
+		}
+	}
+}
+
 static int usbhs_runtime_resume(struct device *dev)
 {
 	struct usbhs_hcd_omap		*omap = dev_get_drvdata(dev);
@@ -673,13 +750,27 @@ static int usbhs_runtime_resume(struct device *dev)
 	}
 
 	if (is_omap_usbhs_rev2(omap)) {
-		if (is_ehci_tll_mode(pdata->port_mode[0])) {
-			clk_enable(omap->usbhost_p1_fck);
-			clk_enable(omap->usbtll_p1_fck);
+		switch (pdata->port_mode[0]) {
+			case OMAP_EHCI_PORT_MODE_HSIC:
+				clk_enable(omap->hsic_p1_fck);
+				clk_enable(omap->hsic_p1_480m_fck);
+			case OMAP_EHCI_PORT_MODE_TLL:
+				clk_enable(omap->usbhost_p1_fck);
+				clk_enable(omap->usbtll_p1_fck);
+				break;
+			default:
+				break;
 		}
-		if (is_ehci_tll_mode(pdata->port_mode[1])) {
-			clk_enable(omap->usbhost_p2_fck);
-			clk_enable(omap->usbtll_p2_fck);
+		switch (pdata->port_mode[1]) {
+			case OMAP_EHCI_PORT_MODE_HSIC:
+				clk_enable(omap->hsic_p2_fck);
+				clk_enable(omap->hsic_p2_480m_fck);
+			case OMAP_EHCI_PORT_MODE_TLL:
+				clk_enable(omap->usbhost_p2_fck);
+				clk_enable(omap->usbtll_p2_fck);
+				break;
+			default:
+				break;
 		}
 		clk_enable(omap->utmi_p1_fck);
 		clk_enable(omap->utmi_p2_fck);
@@ -700,13 +791,27 @@ static int usbhs_runtime_suspend(struct device *dev)
 	}
 
 	if (is_omap_usbhs_rev2(omap)) {
-		if (is_ehci_tll_mode(pdata->port_mode[0])) {
-			clk_disable(omap->usbhost_p1_fck);
-			clk_disable(omap->usbtll_p1_fck);
+		switch (pdata->port_mode[0]) {
+			case OMAP_EHCI_PORT_MODE_HSIC:
+				clk_disable(omap->hsic_p1_fck);
+				clk_disable(omap->hsic_p1_480m_fck);
+			case OMAP_EHCI_PORT_MODE_TLL:
+				clk_disable(omap->usbhost_p1_fck);
+				clk_disable(omap->usbtll_p1_fck);
+				break;
+			default:
+				break;
 		}
-		if (is_ehci_tll_mode(pdata->port_mode[1])) {
-			clk_disable(omap->usbhost_p2_fck);
-			clk_disable(omap->usbtll_p2_fck);
+		switch (pdata->port_mode[1]) {
+			case OMAP_EHCI_PORT_MODE_HSIC:
+				clk_disable(omap->hsic_p2_fck);
+				clk_disable(omap->hsic_p2_480m_fck);
+			case OMAP_EHCI_PORT_MODE_TLL:
+				clk_disable(omap->usbhost_p2_fck);
+				clk_disable(omap->usbtll_p2_fck);
+				break;
+			default:
+				break;
 		}
 		clk_disable(omap->utmi_p2_fck);
 		clk_disable(omap->utmi_p1_fck);
@@ -831,6 +936,16 @@ static void omap_usbhs_init(struct device *dev)
 			usbhs_omap_tll_init(dev, OMAP_REV2_TLL_CHANNEL_COUNT);
 		else
 			usbhs_omap_tll_init(dev, OMAP_TLL_CHANNEL_COUNT);
+	}
+
+	if (is_ehci_hsic_mode(pdata->port_mode[0]) ||
+		is_ehci_hsic_mode(pdata->port_mode[1])) {
+
+		if (is_omap_usbhs_rev2(omap))
+			usbhs_omap_hsic_init(dev, OMAP_REV2_TLL_CHANNEL_COUNT);
+		else
+			dev_dbg(dev, "HSIC is not supported on revision 0x%x\n",
+					omap->usbhs_rev);
 	}
 
 	if (pdata->ehci_data->phy_reset) {

@@ -168,6 +168,21 @@ static struct omap_device_pad port1_tll_pads[] __initdata = {
 	},
 };
 
+static struct omap_device_pad port1_hsic_pads[] __initdata = {
+	{
+		.name = "usbb1_hsic_data.usbb1_hsic_data",
+		.flags  = OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
+		.enable = (OMAP_PIN_OUTPUT | OMAP_MUX_MODE0) & ~(OMAP_WAKEUP_EN),
+		.idle = OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
+	},
+	{
+		.name = "usbb1_hsic_strobe.usbb1_hsic_strobe",
+		.flags  = OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
+		.enable = (OMAP_PIN_OUTPUT | OMAP_MUX_MODE0) & ~(OMAP_WAKEUP_EN),
+		.idle = OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
+	},
+};
+
 static struct omap_device_pad port2_phy_pads[] __initdata = {
 	{
 		.name = "usbb2_ulpitll_stp.usbb2_ulpiphy_stp",
@@ -269,6 +284,21 @@ static struct omap_device_pad port2_tll_pads[] __initdata = {
 	{
 		.name = "usbb2_ulpitll_dat7.usbb2_ulpitll_dat7",
 		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE0,
+	},
+};
+
+static struct omap_device_pad port2_hsic_pads[] __initdata = {
+	{
+		.name = "usbb2_hsic_data.usbb2_hsic_data",
+		.flags  = OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
+		.enable = (OMAP_PIN_OUTPUT | OMAP_MUX_MODE0) & ~(OMAP_WAKEUP_EN),
+		.idle = OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
+	},
+	{
+		.name = "usbb2_hsic_strobe.usbb2_hsic_strobe",
+		.flags  = OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
+		.enable = (OMAP_PIN_OUTPUT | OMAP_MUX_MODE0) & ~(OMAP_WAKEUP_EN),
+		.idle = OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
 	},
 };
 
@@ -612,6 +642,23 @@ setup_4430ehci_io_mux(const enum usbhs_omap_port_mode *port_mode)
 			omap4_ctrl_pad_writel(val, OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_SMART2IO_PADCONF_2);
 		}
 			break;
+	case OMAP_EHCI_PORT_MODE_HSIC:
+		/*
+		 * HSIC pads have special register for setting up
+		 * OFF mode / PU / PD settings
+		 */
+		val = omap4_ctrl_pad_readl(OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_USBB_HSIC);
+		val &= ~OMAP4_USBB1_HSIC_DATA_OFFMODE_WD_ENABLE_MASK &
+				~OMAP4_USBB1_HSIC_STROBE_OFFMODE_WD_ENABLE_MASK;
+		val |= OMAP4_USBB1_HSIC_DATA_OFFMODE_WD_ENABLE_MASK |
+				OMAP4_USBB1_HSIC_STROBE_OFFMODE_WD_ENABLE_MASK |
+				(0x3 << OMAP4_USBB1_HSIC_DATA_OFFMODE_WD_SHIFT) |
+				(0x3 << OMAP4_USBB1_HSIC_STROBE_OFFMODE_WD_SHIFT);
+		omap4_ctrl_pad_writel(val, OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_USBB_HSIC);
+
+		pads = port1_hsic_pads;
+		pads_cnt = ARRAY_SIZE(port1_hsic_pads);
+			break;
 	case OMAP_USBHS_PORT_MODE_UNUSED:
 	default:
 			break;
@@ -631,6 +678,23 @@ setup_4430ehci_io_mux(const enum usbhs_omap_port_mode *port_mode)
 			val |= OMAP4_USBB2_DR0_DS_MASK;
 			omap4_ctrl_pad_writel(val, OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_SMART2IO_PADCONF_2);
 		}
+			break;
+	case OMAP_EHCI_PORT_MODE_HSIC:
+		/*
+		 * HSIC pads have special register for setting up
+		 * OFF mode / PU / PD settings
+		 */
+		val = omap4_ctrl_pad_readl(OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_USBB_HSIC);
+		val &= ~OMAP4_USBB2_HSIC_DATA_OFFMODE_WD_ENABLE_MASK &
+				~OMAP4_USBB2_HSIC_STROBE_OFFMODE_WD_ENABLE_MASK;
+		val |= OMAP4_USBB2_HSIC_DATA_OFFMODE_WD_ENABLE_MASK |
+				OMAP4_USBB2_HSIC_STROBE_OFFMODE_WD_ENABLE_MASK |
+				(0x3 << OMAP4_USBB2_HSIC_DATA_OFFMODE_WD_SHIFT) |
+				(0x3 << OMAP4_USBB2_HSIC_STROBE_OFFMODE_WD_SHIFT);
+		omap4_ctrl_pad_writel(val, OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_USBB_HSIC);
+
+		pads = port2_hsic_pads;
+		pads_cnt = ARRAY_SIZE(port2_hsic_pads);
 			break;
 	case OMAP_USBHS_PORT_MODE_UNUSED:
 	default:
