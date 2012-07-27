@@ -29,6 +29,7 @@
 #include <linux/i2c/twl.h>
 #include <linux/mfd/twl6040.h>
 #include <linux/platform_data/omap-abe-twl6040.h>
+#include <linux/omapfb.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
@@ -56,7 +57,8 @@
 
 #include <drm/drm_edid.h>
 
-#define OMAP5_SEVM_FB_RAM_SIZE       SZ_8M /* 1280×800*4 * 2 */
+#include <plat/sgx_omaplfb.h>
+#define OMAP5_SEVM_FB_RAM_SIZE       (SZ_16M + SZ_4M) /* 1280×800*4 * 2 */
 
 #define GPIO_ETH_NRESET		15	/* USBB3 to SMSC LAN9730 */
 #define GPIO_HUB_NRESET		80	/* USBB2 to SMSC 3530 HUB */
@@ -824,9 +826,28 @@ static void omap5panda_hdmi_init(void)
 	omap_hdmi_init(0);
 }
 
+static struct omapfb_platform_data panda_fb_pdata = {
+	.mem_desc = {
+		.region_cnt = 1,
+		.region = {
+			[0] = {
+				.size = OMAP5_SEVM_FB_RAM_SIZE,
+			},
+		},
+	},
+};
+
 static void __init omap5panda_display_init(void)
 {
+	struct sgx_omaplfb_config data = {
+		.tiler2d_buffers = 0,
+		.swap_chain_length = 2,
+		.vram_buffers = 2,
+	};
+
+	omapfb_set_platform_data(&panda_fb_pdata);
 	omap_vram_set_sdram_vram(OMAP5_SEVM_FB_RAM_SIZE, 0);
+	sgx_omaplfb_set(0, &data);
 
 	i2c_register_board_info(0, hdmi_i2c_eeprom,
 			ARRAY_SIZE(hdmi_i2c_eeprom));
