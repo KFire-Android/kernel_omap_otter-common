@@ -17,6 +17,7 @@
 
 #include <linux/slab.h>
 #include <linux/module.h>
+#include <linux/vmalloc.h>
 #include <linux/dma-mapping.h>
 #include <linux/list.h>
 #include <linux/gcx.h>
@@ -43,14 +44,32 @@
  * Core driver API definitions.
  */
 
-#define gc_map_wrapper(gcmap) \
-	gc_map(gcmap, false)
+#define gc_getcaps_wrapper(gcicaps) \
+	gc_caps(gcicaps)
 
-#define gc_unmap_wrapper(gcmap) \
-	gc_unmap(gcmap, false)
+#define gc_commit_wrapper(gcicommit) \
+	gc_commit(gcicommit, false)
 
-#define gc_commit_wrapper(gccommit) \
-	gc_commit(gccommit, false)
+#define gc_map_wrapper(gcimap) \
+	gc_map(gcimap, false)
+
+#define gc_unmap_wrapper(gcimap) \
+	gc_unmap(gcimap, false)
+
+#define gc_callback_wrapper(gcicallbackarm) \
+	gc_callback(gcicallbackarm, false)
+
+
+/*******************************************************************************
+ * Surface allocation.
+ */
+
+enum bverror allocate_surface(struct bvbuffdesc **bvbuffdesc,
+			      void **buffer,
+			      unsigned int size);
+
+void free_surface(struct bvbuffdesc *bvbuffdesc,
+		  void *buffer);
 
 
 /*******************************************************************************

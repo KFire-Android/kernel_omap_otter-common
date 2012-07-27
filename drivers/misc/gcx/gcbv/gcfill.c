@@ -144,13 +144,13 @@ static unsigned int getinternalcolor(void *ptr, struct bvformatxlate *format)
 	return dstpixel;
 }
 
-enum bverror do_fill(struct bvbltparams *bltparams,
+enum bverror do_fill(struct bvbltparams *bvbltparams,
 		     struct gcbatch *batch,
-		     struct srcinfo *srcinfo)
+		     struct surfaceinfo *srcinfo)
 {
 	enum bverror bverror;
 	struct gccontext *gccontext = get_context();
-	int dstbyteshift;
+	struct surfaceinfo *dstinfo;
 	struct gcmofill *gcmofill;
 	unsigned char *fillcolorptr;
 	struct bvbuffmap *dstmap = NULL;
@@ -158,35 +158,35 @@ enum bverror do_fill(struct bvbltparams *bltparams,
 	GCENTER(GCZONE_FILL);
 
 	/* Finish previous batch if any. */
-	bverror = batch->batchend(bltparams, batch);
+	bverror = batch->batchend(bvbltparams, batch);
 	if (bverror != BVERR_NONE)
 		goto exit;
 
-	/* Compute the surface offset in bytes. */
-	dstbyteshift = batch->dstalign * (int) batch->dstformat->bitspp / 8;
+	/* Get a shortcut to the destination surface. */
+	dstinfo = &batch->dstinfo;
 
 	/* Verify if the destination parameter have been modified. */
-	if ((batch->dstbyteshift != dstbyteshift) ||
-	    (batch->physwidth != batch->dstphyswidth) ||
-	    (batch->physheight != batch->dstphysheight)) {
+	if ((batch->dstbyteshift != dstinfo->bytealign) ||
+	    (batch->physwidth != dstinfo->physwidth) ||
+	    (batch->physheight != dstinfo->physheight)) {
 		/* Set new values. */
-		batch->dstbyteshift = dstbyteshift;
-		batch->physwidth = batch->dstphyswidth;
-		batch->physheight = batch->dstphysheight;
+		batch->dstbyteshift = dstinfo->bytealign;
+		batch->physwidth = dstinfo->physwidth;
+		batch->physheight = dstinfo->physheight;
 
 		/* Mark as modified. */
 		batch->batchflags |= BVBATCH_DST;
 	}
 
 	/* Map the destination. */
-	bverror = do_map(bltparams->dstdesc, batch, &dstmap);
+	bverror = do_map(bvbltparams->dstdesc, batch, &dstmap);
 	if (bverror != BVERR_NONE) {
-		bltparams->errdesc = gccontext->bverrorstr;
+		bvbltparams->errdesc = gccontext->bverrorstr;
 		goto exit;
 	}
 
 	/* Set the new destination. */
-	bverror = set_dst(bltparams, batch, dstmap);
+	bverror = set_dst(bvbltparams, batch, dstmap);
 	if (bverror != BVERR_NONE)
 		goto exit;
 
@@ -199,7 +199,7 @@ enum bverror do_fill(struct bvbltparams *bltparams,
 	** Allocate command buffer.
 	*/
 
-	bverror = claim_buffer(bltparams, batch,
+	bverror = claim_buffer(bvbltparams, batch,
 			       sizeof(struct gcmofill),
 			       (void **) &gcmofill);
 	if (bverror != BVERR_NONE)
@@ -232,8 +232,8 @@ enum bverror do_fill(struct bvbltparams *bltparams,
 
 	fillcolorptr
 		= (unsigned char *) srcinfo->buf.desc->virtaddr
-		+ srcinfo->rect->top * srcinfo->geom->virtstride
-		+ srcinfo->rect->left * srcinfo->format->bitspp / 8;
+		+ srcinfo->rect.top * srcinfo->geom->virtstride
+		+ srcinfo->rect.left * srcinfo->format->bitspp / 8;
 
 	gcmofill->clearcolor_ldst = gcmofill_clearcolor_ldst;
 	gcmofill->clearcolor.raw = getinternalcolor(fillcolorptr,
@@ -246,24 +246,24 @@ enum bverror do_fill(struct bvbltparams *bltparams,
 	/* Set destination configuration. */
 	gcmofill->dstconfig_ldst = gcmofill_dstconfig_ldst;
 	gcmofill->dstconfig.raw = 0;
-	gcmofill->dstconfig.reg.swizzle = batch->dstformat->swizzle;
-	gcmofill->dstconfig.reg.format = batch->dstformat->format;
+	gcmofill->dstconfig.reg.swizzle = dstinfo->format->swizzle;
+	gcmofill->dstconfig.reg.format = dstinfo->format->format;
 	gcmofill->dstconfig.reg.command = GCREG_DEST_CONFIG_COMMAND_CLEAR;
 
 	/* Set ROP3. */
 	gcmofill->rop_ldst = gcmofill_rop_ldst;
 	gcmofill->rop.raw = 0;
 	gcmofill->rop.reg.type = GCREG_ROP_TYPE_ROP3;
-	gcmofill->rop.reg.fg = (unsigned char) bltparams->op.rop;
+	gcmofill->rop.reg.fg = (unsigned char) bvbltparams->op.rop;
 
 	/* Set START_DE command. */
 	gcmofill->startde.cmd.fld = gcfldstartde;
 
 	/* Set destination rectangle. */
-	gcmofill->rect.left = batch->clippedleft + batch->dstoffsetX;
-	gcmofill->rect.top = batch->clippedtop + batch->dstoffsetY;
-	gcmofill->rect.right = batch->clippedright + batch->dstoffsetX;
-	gcmofill->rect.bottom = batch->clippedbottom + batch->dstoffsetY;
+	gcmofill->rect.left = batch->dstclipped.left + batch->dstoffsetX;
+	gcmofill->rect.top = batch->dstclipped.top + batch->dstoffsetY;
+	gcmofill->rect.right = batch->dstclipped.right + batch->dstoffsetX;
+	gcmofill->rect.bottom = batch->dstclipped.bottom + batch->dstoffsetY;
 
 exit:
 	GCEXITARG(GCZONE_FILL, "bv%s = %d\n",

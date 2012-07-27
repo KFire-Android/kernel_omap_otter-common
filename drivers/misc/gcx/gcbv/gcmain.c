@@ -12,8 +12,7 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#include <plat/cpu.h>
-#include "gcmain.h"
+#include "gcbv.h"
 
 
 /*******************************************************************************
@@ -96,6 +95,107 @@ unsigned char gcfp2norm8(float value)
 	mantissa = (mantissa * 255) >> 8;
 
 	return (unsigned char) mantissa;
+}
+
+
+/*******************************************************************************
+ * Surface allocation.
+ */
+
+enum bverror allocate_surface(struct bvbuffdesc **bvbuffdesc,
+			      void **buffer,
+			      unsigned int size)
+{
+	enum bverror bverror;
+	struct bvbuffdesc *tempbuffdesc = NULL;
+	void *tempbuff = NULL;
+	unsigned long *temparray = NULL;
+	struct bvphysdesc *tempphysdesc = NULL;
+	unsigned char *pageaddr;
+	unsigned int i;
+
+	/* Allocate surface buffer descriptor. */
+	tempbuffdesc = vmalloc(sizeof(struct bvbuffdesc));
+	if (tempbuffdesc == NULL) {
+		BVSETERROR(BVERR_OOM, "failed to allocate surface");
+		goto exit;
+	}
+
+	/* Initialize buffer descriptor. */
+	tempbuffdesc->structsize = sizeof(struct bvbuffdesc);
+	tempbuffdesc->virtaddr = NULL;
+	tempbuffdesc->length = size;
+	tempbuffdesc->map = NULL;
+	tempbuffdesc->auxtype = BVAT_PHYSDESC;
+	tempbuffdesc->auxptr = NULL;
+
+	/* Allocate the surface. */
+	tempbuff = vmalloc(size);
+	if (tempbuff == NULL) {
+		BVSETERROR(BVERR_OOM, "failed to allocate surface");
+		goto exit;
+	}
+	tempbuffdesc->virtaddr = tempbuff;
+
+	/* Allocate the physical descriptor. */
+	tempphysdesc = vmalloc(sizeof(struct bvphysdesc));
+	if (tempphysdesc == NULL) {
+		BVSETERROR(BVERR_OOM, "failed to allocate surface");
+		goto exit;
+	}
+	tempbuffdesc->auxptr = tempphysdesc;
+
+	/* Initialize physical descriptor. */
+	tempphysdesc->structsize = sizeof(struct bvphysdesc);
+	tempphysdesc->pagesize = PAGE_SIZE;
+	tempphysdesc->pagearray = NULL;
+	tempphysdesc->pagecount = (size + PAGE_SIZE - 1) / PAGE_SIZE;
+	tempphysdesc->pageoffset = 0;
+
+	/* Allocate array of pages. */
+	temparray = vmalloc(tempphysdesc->pagecount * sizeof(unsigned long));
+	if (temparray == NULL) {
+		BVSETERROR(BVERR_OOM, "failed to allocate surface");
+		goto exit;
+	}
+	tempphysdesc->pagearray = temparray;
+
+	/* Initialize the array. */
+	pageaddr = (unsigned char *) tempbuff;
+	for (i = 0; i < tempphysdesc->pagecount; i += 1) {
+		temparray[i] = PFN_PHYS(vmalloc_to_pfn(pageaddr));
+		pageaddr += PAGE_SIZE;
+	}
+
+	/* Set return pointers. */
+	*bvbuffdesc = tempbuffdesc;
+	*buffer = tempbuff;
+	return BVERR_NONE;
+
+exit:
+	free_surface(tempbuffdesc, tempbuff);
+	return bverror;
+}
+
+void free_surface(struct bvbuffdesc *bvbuffdesc,
+		  void *buffer)
+{
+	if (bvbuffdesc != NULL) {
+		if (bvbuffdesc->virtaddr != NULL)
+			vfree(bvbuffdesc->virtaddr);
+
+		if (bvbuffdesc->auxptr != NULL) {
+			struct bvphysdesc *bvphysdesc;
+
+			bvphysdesc = (struct bvphysdesc *) bvbuffdesc->auxptr;
+			if (bvphysdesc->pagearray != NULL)
+				vfree(bvphysdesc->pagearray);
+
+			vfree(bvphysdesc);
+		}
+
+		vfree(bvbuffdesc);
+	}
 }
 
 

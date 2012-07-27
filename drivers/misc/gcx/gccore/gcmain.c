@@ -31,6 +31,7 @@
 #define GCZONE_COMMIT		(1 << 3)
 #define GCZONE_MAPPING		(1 << 4)
 #define GCZONE_PROBE		(1 << 5)
+#define GCZONE_CALLBACK		(1 << 6)
 
 GCDBG_FILTERDEF(core, GCZONE_NONE,
 		"init",
@@ -38,7 +39,8 @@ GCDBG_FILTERDEF(core, GCZONE_NONE,
 		"power",
 		"commit",
 		"mapping",
-		"probe")
+		"probe",
+		"callback")
 
 
 #if !defined(GC_ENABLE_SUSPEND)
@@ -58,8 +60,8 @@ static struct gccorecontext g_context;
  */
 
 static enum gcerror find_context(struct gccorecontext *gccorecontext,
-					bool fromuser,
-					struct gcmmucontext **gcmmucontext)
+				 bool fromuser,
+				 struct gcmmucontext **gcmmucontext)
 {
 	enum gcerror gcerror = GCERR_NONE;
 	struct list_head *ctxhead;
@@ -444,10 +446,29 @@ void gcpwr_reset(struct gccorecontext *gccorecontext)
 
 
 /*******************************************************************************
- * Command buffer submission.
+ * Public API.
  */
 
-void gc_commit(struct gccommit *gccommit, bool fromuser)
+void gc_caps(struct gcicaps *gcicaps)
+{
+	struct gccorecontext *gccorecontext = &g_context;
+
+	/* Copy capabilities. */
+	gcicaps->gcmodel = gccorecontext->gcmodel;
+	gcicaps->gcrevision = gccorecontext->gcrevision;
+	gcicaps->gcdate = gccorecontext->gcdate;
+	gcicaps->gctime = gccorecontext->gctime;
+	gcicaps->gcfeatures = gccorecontext->gcfeatures;
+	gcicaps->gcfeatures0 = gccorecontext->gcfeatures0;
+	gcicaps->gcfeatures1 = gccorecontext->gcfeatures1;
+	gcicaps->gcfeatures2 = gccorecontext->gcfeatures2;
+	gcicaps->gcfeatures3 = gccorecontext->gcfeatures3;
+
+	/* Success. */
+	gcicaps->gcerror = GCERR_NONE;
+}
+
+void gc_commit(struct gcicommit *gcicommit, bool fromuser)
 {
 	struct gccorecontext *gccorecontext = &g_context;
 	struct gcmmucontext *gcmmucontext;
@@ -464,31 +485,31 @@ void gc_commit(struct gccommit *gccommit, bool fromuser)
 	GCLOCK(&gccorecontext->mmucontextlock);
 
 	/* Validate pipe values. */
-	if ((gccommit->entrypipe != GCPIPE_2D) &&
-		(gccommit->entrypipe != GCPIPE_3D)) {
-		gccommit->gcerror = GCERR_CMD_ENTRY_PIPE;
+	if ((gcicommit->entrypipe != GCPIPE_2D) &&
+		(gcicommit->entrypipe != GCPIPE_3D)) {
+		gcicommit->gcerror = GCERR_CMD_ENTRY_PIPE;
 		goto exit;
 	}
 
-	if ((gccommit->exitpipe != GCPIPE_2D) &&
-		(gccommit->exitpipe != GCPIPE_3D)) {
-		gccommit->gcerror = GCERR_CMD_EXIT_PIPE;
+	if ((gcicommit->exitpipe != GCPIPE_2D) &&
+		(gcicommit->exitpipe != GCPIPE_3D)) {
+		gcicommit->gcerror = GCERR_CMD_EXIT_PIPE;
 		goto exit;
 	}
 
 	/* Locate the client entry. */
-	gccommit->gcerror = find_context(gccorecontext, fromuser,
-						&gcmmucontext);
-	if (gccommit->gcerror != GCERR_NONE)
+	gcicommit->gcerror = find_context(gccorecontext, fromuser,
+					  &gcmmucontext);
+	if (gcicommit->gcerror != GCERR_NONE)
 		goto exit;
 
 	/* Set the master table. */
-	gccommit->gcerror = gcmmu_set_master(gccorecontext, gcmmucontext);
-	if (gccommit->gcerror != GCERR_NONE)
+	gcicommit->gcerror = gcmmu_set_master(gccorecontext, gcmmucontext);
+	if (gcicommit->gcerror != GCERR_NONE)
 		goto exit;
 
 	/* Set the correct graphics pipe. */
-	if (gccorecontext->gcpipe != gccommit->entrypipe) {
+	if (gccorecontext->gcpipe != gcicommit->entrypipe) {
 		static struct gcregpipeselect gcregpipeselect[] = {
 			/* GCPIPE_UNKNOWN */
 			{ 0, 0 },
@@ -501,21 +522,22 @@ void gc_commit(struct gccommit *gccommit, bool fromuser)
 		};
 
 		GCDBG(GCZONE_COMMIT, "allocating space for pipe switch.\n");
-		gccommit->gcerror = gcqueue_alloc(gccorecontext, gcmmucontext,
+		gcicommit->gcerror = gcqueue_alloc(gccorecontext, gcmmucontext,
 						  sizeof(struct gcmopipesel),
 						  (void **) &gcmopipesel, NULL);
-		if (gccommit->gcerror != GCERR_NONE)
+		if (gcicommit->gcerror != GCERR_NONE)
 			goto exit;
 
 		gcmopipesel->pipesel_ldst = gcmopipesel_pipesel_ldst;
-		gcmopipesel->pipesel.reg = gcregpipeselect[gccommit->entrypipe];
+		gcmopipesel->pipesel.reg
+			= gcregpipeselect[gcicommit->entrypipe];
 	}
 
 	/* Update the current pipe. */
-	gccorecontext->gcpipe = gccommit->exitpipe;
+	gccorecontext->gcpipe = gcicommit->exitpipe;
 
 	/* Go through all buffers one at a time. */
-	list_for_each(head, &gccommit->buffer) {
+	list_for_each(head, &gcicommit->buffer) {
 		gcbuffer = list_entry(head, struct gcbuffer, link);
 		GCDBG(GCZONE_COMMIT, "gcbuffer = 0x%08X\n",
 			(unsigned int) gcbuffer);
@@ -532,11 +554,11 @@ void gc_commit(struct gccommit *gccommit, bool fromuser)
 
 		/* Reserve command buffer space. */
 		GCDBG(GCZONE_COMMIT, "allocating command buffer space.\n");
-		gccommit->gcerror = gcqueue_alloc(gccorecontext, gcmmucontext,
+		gcicommit->gcerror = gcqueue_alloc(gccorecontext, gcmmucontext,
 						  buffersize,
 						  (void **) &logical,
 						  &address);
-		if (gccommit->gcerror != GCERR_NONE)
+		if (gcicommit->gcerror != GCERR_NONE)
 			goto exit;
 
 		if (fromuser) {
@@ -544,7 +566,7 @@ void gc_commit(struct gccommit *gccommit, bool fromuser)
 			if (copy_from_user(logical, gcbuffer->head,
 						buffersize)) {
 				GCERR("failed to read data.\n");
-				gccommit->gcerror = GCERR_USER_READ;
+				gcicommit->gcerror = GCERR_USER_READ;
 				goto exit;
 			}
 		} else {
@@ -552,45 +574,45 @@ void gc_commit(struct gccommit *gccommit, bool fromuser)
 		}
 
 		/* Process fixups. */
-		gccommit->gcerror = gcmmu_fixup(&gcbuffer->fixup, logical);
-		if (gccommit->gcerror != GCERR_NONE)
+		gcicommit->gcerror = gcmmu_fixup(&gcbuffer->fixup, logical);
+		if (gcicommit->gcerror != GCERR_NONE)
 			goto exit;
 	}
 
 	/* Add the callback. */
-	if (gccommit->callback != NULL) {
-		gccommit->gcerror = gcqueue_callback(gccorecontext,
+	if (gcicommit->callback != NULL) {
+		gcicommit->gcerror = gcqueue_callback(gccorecontext,
 						     gcmmucontext,
-						     gccommit->callback,
-						     gccommit->callbackparam);
-		if (gccommit->gcerror != GCERR_NONE)
+						     gcicommit->callback,
+						     gcicommit->callbackparam);
+		if (gcicommit->gcerror != GCERR_NONE)
 			goto exit;
 	}
 
 	/* Process unmappings. */
-	list_for_each(head, &gccommit->unmap) {
+	list_for_each(head, &gcicommit->unmap) {
 		gcschedunmap = list_entry(head, struct gcschedunmap, link);
-		gccommit->gcerror = gcqueue_schedunmap(gccorecontext,
+		gcicommit->gcerror = gcqueue_schedunmap(gccorecontext,
 						       gcmmucontext,
 						       gcschedunmap->handle);
-		if (gccommit->gcerror != GCERR_NONE)
+		if (gcicommit->gcerror != GCERR_NONE)
 			goto exit;
 	}
 
 	/* Execute the buffer. */
-	gccommit->gcerror = gcqueue_execute(gccorecontext, false,
-					    gccommit->asynchronous);
+	gcicommit->gcerror = gcqueue_execute(gccorecontext, false,
+					    gcicommit->asynchronous);
 
 exit:
 	GCUNLOCK(&gccorecontext->mmucontextlock);
 
 	GCEXITARG(GCZONE_COMMIT, "gc%s = 0x%08X\n",
-		(gccommit->gcerror == GCERR_NONE) ? "result" : "error",
-		gccommit->gcerror);
+		(gcicommit->gcerror == GCERR_NONE) ? "result" : "error",
+		gcicommit->gcerror);
 }
 EXPORT_SYMBOL(gc_commit);
 
-void gc_map(struct gcmap *gcmap, bool fromuser)
+void gc_map(struct gcimap *gcimap, bool fromuser)
 {
 	struct gccorecontext *gccorecontext = &g_context;
 	struct gcmmucontext *gcmmucontext;
@@ -602,40 +624,42 @@ void gc_map(struct gcmap *gcmap, bool fromuser)
 	GCLOCK(&gccorecontext->mmucontextlock);
 
 	/* Locate the client entry. */
-	gcmap->gcerror = find_context(gccorecontext, fromuser, &gcmmucontext);
-	if (gcmap->gcerror != GCERR_NONE)
+	gcimap->gcerror = find_context(gccorecontext,
+				       fromuser,
+				       &gcmmucontext);
+	if (gcimap->gcerror != GCERR_NONE)
 		goto exit;
 
 	GCDBG(GCZONE_MAPPING, "map client buffer\n");
 
 	/* Initialize the mapping parameters. */
-	if (gcmap->pagearray == NULL) {
-		mem.base = ((u32) gcmap->buf.logical) & ~(PAGE_SIZE - 1);
-		mem.offset = ((u32) gcmap->buf.logical) & (PAGE_SIZE - 1);
+	if (gcimap->pagearray == NULL) {
+		mem.base = ((u32) gcimap->buf.logical) & ~(PAGE_SIZE - 1);
+		mem.offset = ((u32) gcimap->buf.logical) & (PAGE_SIZE - 1);
 		mem.pages = NULL;
 
 		GCDBG(GCZONE_MAPPING, "  logical = 0x%08X\n",
-			(unsigned int) gcmap->buf.logical);
+			(unsigned int) gcimap->buf.logical);
 	} else {
 		mem.base = 0;
-		mem.offset = gcmap->buf.offset;
-		mem.pages = gcmap->pagearray;
+		mem.offset = gcimap->buf.offset;
+		mem.pages = gcimap->pagearray;
 
 		GCDBG(GCZONE_MAPPING, "  pagearray = 0x%08X\n",
-			(unsigned int) gcmap->pagearray);
+			(unsigned int) gcimap->pagearray);
 	}
 
-	GCDBG(GCZONE_MAPPING, "  size = %d\n", gcmap->size);
+	GCDBG(GCZONE_MAPPING, "  size = %d\n", gcimap->size);
 
-	mem.count = DIV_ROUND_UP(gcmap->size + mem.offset, PAGE_SIZE);
-	mem.pagesize = gcmap->pagesize ? gcmap->pagesize : PAGE_SIZE;
+	mem.count = DIV_ROUND_UP(gcimap->size + mem.offset, PAGE_SIZE);
+	mem.pagesize = gcimap->pagesize ? gcimap->pagesize : PAGE_SIZE;
 
 	/* Map the buffer. */
-	gcmap->gcerror = gcmmu_map(gccorecontext, gcmmucontext, &mem, &mapped);
-	if (gcmap->gcerror != GCERR_NONE)
+	gcimap->gcerror = gcmmu_map(gccorecontext, gcmmucontext, &mem, &mapped);
+	if (gcimap->gcerror != GCERR_NONE)
 		goto exit;
 
-	gcmap->handle = (unsigned int) mapped;
+	gcimap->handle = (unsigned int) mapped;
 
 	GCDBG(GCZONE_MAPPING, "  mapped address = 0x%08X\n", mapped->address);
 	GCDBG(GCZONE_MAPPING, "  handle = 0x%08X\n", (unsigned int) mapped);
@@ -644,12 +668,12 @@ exit:
 	GCUNLOCK(&gccorecontext->mmucontextlock);
 
 	GCEXITARG(GCZONE_MAPPING, "gc%s = 0x%08X\n",
-		(gcmap->gcerror == GCERR_NONE) ? "result" : "error",
-		gcmap->gcerror);
+		(gcimap->gcerror == GCERR_NONE) ? "result" : "error",
+		gcimap->gcerror);
 }
 EXPORT_SYMBOL(gc_map);
 
-void gc_unmap(struct gcmap *gcmap, bool fromuser)
+void gc_unmap(struct gcimap *gcimap, bool fromuser)
 {
 	struct gccorecontext *gccorecontext = &g_context;
 	struct gcmmucontext *gcmmucontext;
@@ -659,35 +683,70 @@ void gc_unmap(struct gcmap *gcmap, bool fromuser)
 	GCLOCK(&gccorecontext->mmucontextlock);
 
 	/* Locate the client entry. */
-	gcmap->gcerror = find_context(gccorecontext, fromuser, &gcmmucontext);
-	if (gcmap->gcerror != GCERR_NONE)
+	gcimap->gcerror = find_context(gccorecontext,
+				       fromuser,
+				       &gcmmucontext);
+	if (gcimap->gcerror != GCERR_NONE)
 		goto exit;
 
 	GCDBG(GCZONE_MAPPING, "unmap client buffer\n");
-	GCDBG(GCZONE_MAPPING, "  handle = 0x%08X\n", gcmap->handle);
+	GCDBG(GCZONE_MAPPING, "  handle = 0x%08X\n", gcimap->handle);
 
 	/* Schedule unmapping. */
-	gcmap->gcerror = gcqueue_schedunmap(gccorecontext, gcmmucontext,
-					    gcmap->handle);
-	if (gcmap->gcerror != GCERR_NONE)
+	gcimap->gcerror = gcqueue_schedunmap(gccorecontext, gcmmucontext,
+					    gcimap->handle);
+	if (gcimap->gcerror != GCERR_NONE)
 		goto exit;
 
 	/* Execute the buffer. */
-	gcmap->gcerror = gcqueue_execute(gccorecontext, false, false);
-	if (gcmap->gcerror != GCERR_NONE)
+	gcimap->gcerror = gcqueue_execute(gccorecontext, false, false);
+	if (gcimap->gcerror != GCERR_NONE)
 		goto exit;
 
 	/* Invalidate the handle. */
-	gcmap->handle = ~0U;
+	gcimap->handle = ~0U;
 
 exit:
 	GCUNLOCK(&gccorecontext->mmucontextlock);
 
 	GCEXITARG(GCZONE_MAPPING, "gc%s = 0x%08X\n",
-		(gcmap->gcerror == GCERR_NONE) ? "result" : "error",
-		gcmap->gcerror);
+		(gcimap->gcerror == GCERR_NONE) ? "result" : "error",
+		gcimap->gcerror);
 }
 EXPORT_SYMBOL(gc_unmap);
+
+void gc_callback(struct gcicallbackarm *gcicallbackarm, bool fromuser)
+{
+	struct gccorecontext *gccorecontext = &g_context;
+	struct gcmmucontext *gcmmucontext;
+
+	GCENTER(GCZONE_CALLBACK);
+
+	GCLOCK(&gccorecontext->mmucontextlock);
+
+	/* Locate the client entry. */
+	gcicallbackarm->gcerror = find_context(gccorecontext, fromuser,
+					       &gcmmucontext);
+	if (gcicallbackarm->gcerror != GCERR_NONE)
+		goto exit;
+
+	/* Schedule callback. */
+	gcicallbackarm->gcerror
+		= gcqueue_callback(gccorecontext,
+				   gcmmucontext,
+				   gcicallbackarm->callback,
+				   gcicallbackarm->callbackparam);
+	if (gcicallbackarm->gcerror != GCERR_NONE)
+		goto exit;
+
+exit:
+	GCUNLOCK(&gccorecontext->mmucontextlock);
+
+	GCEXITARG(GCZONE_CALLBACK, "gc%s = 0x%08X\n",
+		  (gcicallbackarm->gcerror == GCERR_NONE) ? "result" : "error",
+		   gcicallbackarm->gcerror);
+}
+EXPORT_SYMBOL(gc_callback);
 
 void gc_release(void)
 {
@@ -768,7 +827,7 @@ static int gc_probe(struct platform_device *pdev)
 	GCENTER(GCZONE_PROBE);
 
 	gccorecontext->plat = (struct omap_gcx_platform_data *)
-		pdev->dev.platform_data;
+			       pdev->dev.platform_data;
 	gccorecontext->regbase = gccorecontext->plat->regbase;
 	gccorecontext->irqline = platform_get_irq(pdev, pdev->id);
 	gccorecontext->device = &pdev->dev;
@@ -780,19 +839,26 @@ static int gc_probe(struct platform_device *pdev)
 
 	pm_runtime_get_sync(gccorecontext->device);
 
+	gccorecontext->gcmodel = gc_read_reg(GC_CHIP_ID_Address);
+	gccorecontext->gcrevision = gc_read_reg(GC_CHIP_REV_Address);
+	gccorecontext->gcdate = gc_read_reg(GC_CHIP_DATE_Address);
+	gccorecontext->gctime = gc_read_reg(GC_CHIP_TIME_Address);
+	gccorecontext->gcfeatures.raw = gc_read_reg(GC_FEATURES_Address);
+	gccorecontext->gcfeatures0.raw = gc_read_reg(GC_FEATURES0_Address);
+	gccorecontext->gcfeatures1.raw = gc_read_reg(GC_FEATURES1_Address);
+	gccorecontext->gcfeatures2.raw = gc_read_reg(GC_FEATURES2_Address);
+	gccorecontext->gcfeatures3.raw = gc_read_reg(GC_FEATURES3_Address);
+
 	GCDBG(GCZONE_PROBE, "GPU IDENTITY:\n");
-	GCDBG(GCZONE_PROBE, "  model=%X\n",
-	      gc_read_reg(GC_CHIP_ID_Address));
-	GCDBG(GCZONE_PROBE, "  revision=%X\n",
-	      gc_read_reg(GC_CHIP_REV_Address));
-	GCDBG(GCZONE_PROBE, "  date=%X\n",
-	      gc_read_reg(GC_CHIP_DATE_Address));
-	GCDBG(GCZONE_PROBE, "  time=%X\n",
-	      gc_read_reg(GC_CHIP_TIME_Address));
-	GCDBG(GCZONE_PROBE, "  chipFeatures=0x%08X\n",
-	      gc_read_reg(GC_FEATURES_Address));
-	GCDBG(GCZONE_PROBE, "  minorFeatures=0x%08X\n",
-	      gc_read_reg(GC_MINOR_FEATURES0_Address));
+	GCDBG(GCZONE_PROBE, "  model=%X\n", gccorecontext->gcmodel);
+	GCDBG(GCZONE_PROBE, "  revision=%X\n", gccorecontext->gcrevision);
+	GCDBG(GCZONE_PROBE, "  date=%X\n", gccorecontext->gcdate);
+	GCDBG(GCZONE_PROBE, "  time=%X\n", gccorecontext->gctime);
+	GCDBG(GCZONE_PROBE, "  features=0x%08X\n", gccorecontext->gcfeatures);
+	GCDBG(GCZONE_PROBE, "  features0=0x%08X\n", gccorecontext->gcfeatures0);
+	GCDBG(GCZONE_PROBE, "  features1=0x%08X\n", gccorecontext->gcfeatures1);
+	GCDBG(GCZONE_PROBE, "  features2=0x%08X\n", gccorecontext->gcfeatures2);
+	GCDBG(GCZONE_PROBE, "  features3=0x%08X\n", gccorecontext->gcfeatures3);
 
 	pm_runtime_put_sync(gccorecontext->device);
 
