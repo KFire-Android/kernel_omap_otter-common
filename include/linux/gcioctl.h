@@ -17,6 +17,7 @@
 
 #include "list.h"
 #include "gcerror.h"
+#include "gcreg.h"
 #include "cache-2dmanager.h"
 #include "bverror.h"
 
@@ -26,10 +27,39 @@
 
 
 /*******************************************************************************
+ * Capability query API entry.
+ */
+
+#define GCIOCTL_GETCAPS _IOWR(GCIOCTL_TYPE, GCIOCTL_BASE + 0x00, \
+			      struct gcicaps)
+
+/* GCIOCTL_CALLBACK_ALLOC / GCIOCTL_CALLBACK_FREE:
+ *   To be able to use the callback mechanism each user space client must
+ *   use the ALLOC/FREE APIs to manage a kernel side callback object
+ *   represented by the handle member of struct gcicallback.
+ *   ALLOC API allocates the object and returns the handle to it. */
+struct gcicaps {
+	/* Error code. */
+	enum gcerror gcerror;
+
+	/* Capabilities and characteristics. */
+	unsigned int gcmodel;
+	unsigned int gcrevision;
+	unsigned int gcdate;
+	unsigned int gctime;
+	union gcfeatures gcfeatures;
+	union gcfeatures0 gcfeatures0;
+	union gcfeatures1 gcfeatures1;
+	union gcfeatures2 gcfeatures2;
+	union gcfeatures3 gcfeatures3;
+};
+
+/*******************************************************************************
  * Commit API entry.
  */
 
-#define GCIOCTL_COMMIT _IOWR(GCIOCTL_TYPE, GCIOCTL_BASE + 0x10, struct gccommit)
+#define GCIOCTL_COMMIT _IOWR(GCIOCTL_TYPE, GCIOCTL_BASE + 0x10, \
+			     struct gcicommit)
 
 /* GPU graphics pipe definition. */
 enum gcpipe {
@@ -40,7 +70,7 @@ enum gcpipe {
 
 /* Commit header; contains pointers to the head and the tail of a linked list
    of command buffers to execute. */
-struct gccommit {
+struct gcicommit {
 	/* Return status code. */
 	enum gcerror gcerror;
 
@@ -60,6 +90,8 @@ struct gccommit {
 	 * passed to the callback. */
 	void (*callback) (void *callbackparam);
 	void *callbackparam;
+
+	/* Callback object handle allocated with GCIOCTL_CALLBACK_ALLOC API. */
 	unsigned long handle;
 
 	/* If asynchronous is set to true, the call returns immediately without
@@ -125,10 +157,12 @@ struct gcschedunmap {
  * Map/unmap API entries.
  */
 
-#define GCIOCTL_MAP   _IOWR(GCIOCTL_TYPE, GCIOCTL_BASE + 0x20, struct gcmap)
-#define GCIOCTL_UNMAP _IOWR(GCIOCTL_TYPE, GCIOCTL_BASE + 0x21, struct gcmap)
+#define GCIOCTL_MAP   _IOWR(GCIOCTL_TYPE, GCIOCTL_BASE + 0x20, \
+			    struct gcimap)
+#define GCIOCTL_UNMAP _IOWR(GCIOCTL_TYPE, GCIOCTL_BASE + 0x21, \
+			    struct gcimap)
 
-struct gcmap {
+struct gcimap {
 	/* Return status code. */
 	enum gcerror gcerror;
 
@@ -156,14 +190,14 @@ struct gcmap {
 };
 
 
-/*****************************************************************************
+/*******************************************************************************
  * Cache manipulation API entries.
  */
 
 #define GCIOCTL_CACHE _IOW(GCIOCTL_TYPE, GCIOCTL_BASE + 0x30, \
-			   struct gccachexfer)
+			   struct gcicache)
 
-struct gccachexfer {
+struct gcicache {
 	/* Number of regions. */
 	int count;
 
@@ -179,26 +213,36 @@ struct gccachexfer {
  * Callback API entry.
  */
 
-#define GCIOCTL_CALLBACK_ALLOC _IOW(GCIOCTL_TYPE, GCIOCTL_BASE + 0x40, \
-				    struct gccmdcallback)
-#define GCIOCTL_CALLBACK_FREE _IOW(GCIOCTL_TYPE, GCIOCTL_BASE + 0x41, \
-				   struct gccmdcallback)
-#define GCIOCTL_CALLBACK_WAIT _IOW(GCIOCTL_TYPE, GCIOCTL_BASE + 0x42, \
-				   struct gccmdcallbackwait)
+#define GCIOCTL_CALLBACK_ALLOC _IOWR(GCIOCTL_TYPE, GCIOCTL_BASE + 0x40, \
+				     struct gcicallback)
+#define GCIOCTL_CALLBACK_FREE  _IOWR(GCIOCTL_TYPE, GCIOCTL_BASE + 0x41, \
+				     struct gcicallback)
+#define GCIOCTL_CALLBACK_WAIT  _IOWR(GCIOCTL_TYPE, GCIOCTL_BASE + 0x42, \
+				     struct gcicallbackwait)
+#define GCIOCTL_CALLBACK_ARM   _IOWR(GCIOCTL_TYPE, GCIOCTL_BASE + 0x43, \
+				     struct gcicallbackarm)
 
-struct gccmdcallback {
+/* GCIOCTL_CALLBACK_ALLOC / GCIOCTL_CALLBACK_FREE:
+ *   To be able to use the callback mechanism each user space client must
+ *   use the ALLOC/FREE APIs to manage a kernel side callback object
+ *   represented by the handle member of struct gcicallback.
+ *   ALLOC API allocates the object and returns the handle to it. */
+struct gcicallback {
 	/* Error code. */
 	enum gcerror gcerror;
 
-	/* Callback handle. */
+	/* Callback object handle. */
 	unsigned long handle;
 };
 
-struct gccmdcallbackwait {
+/* GCIOCTL_CALLBACK_WAIT:
+ *   Called by the user level client to block and wait until the hardware
+ *   has executed a callback that was previosuly scheduled for the handle. */
+struct gcicallbackwait {
 	/* Error code. */
 	enum gcerror gcerror;
 
-	/* Callback handle. */
+	/* Callback object handle. */
 	unsigned long handle;
 
 	/* Timeout in milliseconds. */
@@ -210,5 +254,22 @@ struct gccmdcallbackwait {
 	void *callbackparam;
 };
 
+/* GCIOCTL_CALLBACK_ARM:
+ *   Called by the client to arm a callback. This is similar to what
+ *   COMMIT API does, but in a separate API. */
+struct gcicallbackarm {
+	/* Return status code. */
+	enum gcerror gcerror;
+
+	/* Pointer to the callback function to be called when the GPU completes
+	 * execution of all buffers specified in this call. This member can be
+	 * NULL if no callback is desired. callbackparam specifies data to be
+	 * passed to the callback. */
+	void (*callback) (void *callbackparam);
+	void *callbackparam;
+
+	/* Callback object handle allocated with GCIOCTL_CALLBACK_ALLOC API. */
+	unsigned long handle;
+};
 
 #endif

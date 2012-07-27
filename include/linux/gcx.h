@@ -23,8 +23,20 @@
 
 #ifndef countof
 #define countof(a) \
-	(sizeof(a) / sizeof(a[0]))
+( \
+	sizeof(a) / sizeof(a[0]) \
+)
 #endif
+
+#define GC_PTR2INT(p) \
+( \
+	(unsigned int) (p) \
+)
+
+#define GC_ALIGN(n, align) \
+( \
+	((n) + ((align) - 1)) & ~((align) - 1) \
+)
 
 #define GCLOCK_TIMEOUT_SEC 10
 #define GCLOCK_TIMEOUT_JIF (msecs_to_jiffies(GCLOCK_TIMEOUT_SEC * 1000))

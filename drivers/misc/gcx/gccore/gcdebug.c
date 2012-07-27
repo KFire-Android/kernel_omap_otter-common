@@ -73,7 +73,7 @@ void gc_debug_cache_gpu_id(void)
 	g_gcGpuId.chipDate = gc_read_reg(GC_CHIP_DATE_Address);
 	g_gcGpuId.chipTime = gc_read_reg(GC_CHIP_TIME_Address);
 	g_gcGpuId.chipFeatures = gc_read_reg(GC_FEATURES_Address);
-	g_gcGpuId.chipMinorFeatures = gc_read_reg(GC_MINOR_FEATURES0_Address);
+	g_gcGpuId.chipMinorFeatures = gc_read_reg(GC_FEATURES0_Address);
 	g_gcGpuId.valid = 1;
 }
 

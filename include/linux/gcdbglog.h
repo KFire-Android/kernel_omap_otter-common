@@ -261,13 +261,6 @@ do { \
  * Command buffer parser.
  */
 
-struct gcrect {
-	int l;
-	int t;
-	int r;
-	int b;
-};
-
 struct gcsurfaceinfo {
 	unsigned int width;
 	unsigned int height;
@@ -276,6 +269,13 @@ struct gcsurfaceinfo {
 	unsigned int swizzle;
 	unsigned int format;
 	unsigned int bpp;
+};
+
+struct gcrect {
+	int left;
+	int top;
+	int right;
+	int bottom;
 };
 
 struct gcsourceinfo {

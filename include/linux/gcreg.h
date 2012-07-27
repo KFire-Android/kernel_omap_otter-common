@@ -650,6 +650,108 @@ union gcidle {
 #define   GC_FEATURES_FE20_BIT_INDEX_NONE                                    0x0
 #define   GC_FEATURES_FE20_BIT_INDEX_AVAILABLE                               0x1
 
+union gcfeatures {
+	struct {
+		/* GC_FEATURES_Address:FAST_CLEAR */
+		unsigned int fastclear:1;
+
+		/* GC_FEATURES_Address:SPECIAL_ANTI_ALIASING */
+		unsigned int specialantialiasing:1;
+
+		/* GC_FEATURES_Address:PIPE_3D */
+		unsigned int pipe3d:1;
+
+		/* GC_FEATURES_Address:DXT_TEXTURE_COMPRESSION */
+		unsigned int dxt:1;
+
+		/* GC_FEATURES_Address:DEBUG_MODE */
+		unsigned int debugmode:1;
+
+		/* GC_FEATURES_Address:ZCOMPRESSION */
+		unsigned int zcompression:1;
+
+		/* GC_FEATURES_Address:YUV420_FILTER */
+		unsigned int yuv420filter:1;
+
+		/* GC_FEATURES_Address:MSAA */
+		unsigned int msaa:1;
+
+		/* GC_FEATURES_Address:DC */
+		unsigned int dc:1;
+
+		/* GC_FEATURES_Address:PIPE_2D */
+		unsigned int pipe2d:1;
+
+		/* GC_FEATURES_Address:ETC1_TEXTURE_COMPRESSION */
+		unsigned int etc:1;
+
+		/* GC_FEATURES_Address:FAST_SCALER */
+		unsigned int fastscaler:1;
+
+		/* GC_FEATURES_Address:HIGH_DYNAMIC_RANGE */
+		unsigned int hdr:1;
+
+		/* GC_FEATURES_Address:YUV420_TILER */
+		unsigned int yuv420tiler:1;
+
+		/* GC_FEATURES_Address:MODULE_CG */
+		unsigned int clockgating:1;
+
+		/* GC_FEATURES_Address:MIN_AREA */
+		unsigned int minarea:1;
+
+		/* GC_FEATURES_Address:NO_EZ */
+		unsigned int noez:1;
+
+		/* GC_FEATURES_Address:NO422_TEXTURE */
+		unsigned int no422texture:1;
+
+		/* GC_FEATURES_Address:BUFFER_INTERLEAVING */
+		unsigned int bufinterleaving:1;
+
+		/* GC_FEATURES_Address:BYTE_WRITE_2D */
+		unsigned int bytewrite2d:1;
+
+		/* GC_FEATURES_Address:NO_SCALER */
+		unsigned int noscaler:1;
+
+		/* GC_FEATURES_Address:YUY2_AVERAGING */
+		unsigned int yuy2averaging:1;
+
+		/* GC_FEATURES_Address:HALF_PE_CACHE */
+		unsigned int halfpecache:1;
+
+		/* GC_FEATURES_Address:HALF_TX_CACHE */
+		unsigned int halftxcache:1;
+
+		/* GC_FEATURES_Address:YUY2_RENDER_TARGET */
+		unsigned int yuy2target:1;
+
+		/* GC_FEATURES_Address:MEM32_BIT_SUPPORT */
+		unsigned int mem32:1;
+
+		/* GC_FEATURES_Address:PIPE_VG */
+		unsigned int pipevg:1;
+
+		/* GC_FEATURES_Address:VGTS */
+		unsigned int vgts:1;
+
+		/* GC_FEATURES_Address:FE20 */
+		unsigned int fe20:1;
+
+		/* GC_FEATURES_Address:BYTE_WRITE_3D */
+		unsigned int bytewrite3d:1;
+
+		/* GC_FEATURES_Address:RS_YUV_TARGET */
+		unsigned int rsyuvtarget:1;
+
+		/* GC_FEATURES_Address:FE20_BIT_INDEX */
+		unsigned int fe20bit:1;
+	} reg;
+
+	unsigned int raw;
+};
+
 /*******************************************************************************
 ** Register GCChipId
 */
@@ -754,273 +856,375 @@ union gcidle {
 ** set reset value.  It varies with the implementation.
 */
 
-#define GC_MINOR_FEATURES0_Address                                       0x00034
-#define GC_MINOR_FEATURES0_MSB                                                15
-#define GC_MINOR_FEATURES0_LSB                                                 0
-#define GC_MINOR_FEATURES0_BLK                                                 0
-#define GC_MINOR_FEATURES0_Count                                               1
-#define GC_MINOR_FEATURES0_FieldMask                                  0xFFFFFFFF
-#define GC_MINOR_FEATURES0_ReadMask                                   0xFFFFFFFF
-#define GC_MINOR_FEATURES0_WriteMask                                  0x00000000
-#define GC_MINOR_FEATURES0_ResetValue                                 0x00000000
+#define GC_FEATURES0_Address                                             0x00034
+#define GC_FEATURES0_MSB                                                      15
+#define GC_FEATURES0_LSB                                                       0
+#define GC_FEATURES0_BLK                                                       0
+#define GC_FEATURES0_Count                                                     1
+#define GC_FEATURES0_FieldMask                                        0xFFFFFFFF
+#define GC_FEATURES0_ReadMask                                         0xFFFFFFFF
+#define GC_FEATURES0_WriteMask                                        0x00000000
+#define GC_FEATURES0_ResetValue                                       0x00000000
 
 /* Y flipping capability is added to resolve. */
-#define GC_MINOR_FEATURES0_FLIP_Y                                          0 : 0
-#define GC_MINOR_FEATURES0_FLIP_Y_End                                          0
-#define GC_MINOR_FEATURES0_FLIP_Y_Start                                        0
-#define GC_MINOR_FEATURES0_FLIP_Y_Type                                       U01
-#define   GC_MINOR_FEATURES0_FLIP_Y_NONE                                     0x0
-#define   GC_MINOR_FEATURES0_FLIP_Y_AVAILABLE                                0x1
+#define GC_FEATURES0_FLIP_Y                                                0 : 0
+#define GC_FEATURES0_FLIP_Y_End                                                0
+#define GC_FEATURES0_FLIP_Y_Start                                              0
+#define GC_FEATURES0_FLIP_Y_Type                                             U01
+#define   GC_FEATURES0_FLIP_Y_NONE                                           0x0
+#define   GC_FEATURES0_FLIP_Y_AVAILABLE                                      0x1
 
 /* Dual Return Bus from HI to clients. */
-#define GC_MINOR_FEATURES0_DUAL_RETURN_BUS                                 1 : 1
-#define GC_MINOR_FEATURES0_DUAL_RETURN_BUS_End                                 1
-#define GC_MINOR_FEATURES0_DUAL_RETURN_BUS_Start                               1
-#define GC_MINOR_FEATURES0_DUAL_RETURN_BUS_Type                              U01
-#define   GC_MINOR_FEATURES0_DUAL_RETURN_BUS_NONE                            0x0
-#define   GC_MINOR_FEATURES0_DUAL_RETURN_BUS_AVAILABLE                       0x1
+#define GC_FEATURES0_DUAL_RETURN_BUS                                       1 : 1
+#define GC_FEATURES0_DUAL_RETURN_BUS_End                                       1
+#define GC_FEATURES0_DUAL_RETURN_BUS_Start                                     1
+#define GC_FEATURES0_DUAL_RETURN_BUS_Type                                    U01
+#define   GC_FEATURES0_DUAL_RETURN_BUS_NONE                                  0x0
+#define   GC_FEATURES0_DUAL_RETURN_BUS_AVAILABLE                             0x1
 
 /* Configurable endianness support. */
-#define GC_MINOR_FEATURES0_ENDIANNESS_CONFIG                               2 : 2
-#define GC_MINOR_FEATURES0_ENDIANNESS_CONFIG_End                               2
-#define GC_MINOR_FEATURES0_ENDIANNESS_CONFIG_Start                             2
-#define GC_MINOR_FEATURES0_ENDIANNESS_CONFIG_Type                            U01
-#define   GC_MINOR_FEATURES0_ENDIANNESS_CONFIG_NONE                          0x0
-#define   GC_MINOR_FEATURES0_ENDIANNESS_CONFIG_AVAILABLE                     0x1
+#define GC_FEATURES0_ENDIANNESS_CONFIG                                     2 : 2
+#define GC_FEATURES0_ENDIANNESS_CONFIG_End                                     2
+#define GC_FEATURES0_ENDIANNESS_CONFIG_Start                                   2
+#define GC_FEATURES0_ENDIANNESS_CONFIG_Type                                  U01
+#define   GC_FEATURES0_ENDIANNESS_CONFIG_NONE                                0x0
+#define   GC_FEATURES0_ENDIANNESS_CONFIG_AVAILABLE                           0x1
 
 /* Supports 8Kx8K textures. */
-#define GC_MINOR_FEATURES0_TEXTURE8_K                                      3 : 3
-#define GC_MINOR_FEATURES0_TEXTURE8_K_End                                      3
-#define GC_MINOR_FEATURES0_TEXTURE8_K_Start                                    3
-#define GC_MINOR_FEATURES0_TEXTURE8_K_Type                                   U01
-#define   GC_MINOR_FEATURES0_TEXTURE8_K_NONE                                 0x0
-#define   GC_MINOR_FEATURES0_TEXTURE8_K_AVAILABLE                            0x1
+#define GC_FEATURES0_TEXTURE8_K                                            3 : 3
+#define GC_FEATURES0_TEXTURE8_K_End                                            3
+#define GC_FEATURES0_TEXTURE8_K_Start                                          3
+#define GC_FEATURES0_TEXTURE8_K_Type                                         U01
+#define   GC_FEATURES0_TEXTURE8_K_NONE                                       0x0
+#define   GC_FEATURES0_TEXTURE8_K_AVAILABLE                                  0x1
 
 /* Driver hack is not needed. */
-#define GC_MINOR_FEATURES0_CORRECT_TEXTURE_CONVERTER                       4 : 4
-#define GC_MINOR_FEATURES0_CORRECT_TEXTURE_CONVERTER_End                       4
-#define GC_MINOR_FEATURES0_CORRECT_TEXTURE_CONVERTER_Start                     4
-#define GC_MINOR_FEATURES0_CORRECT_TEXTURE_CONVERTER_Type                    U01
-#define   GC_MINOR_FEATURES0_CORRECT_TEXTURE_CONVERTER_NONE                  0x0
-#define   GC_MINOR_FEATURES0_CORRECT_TEXTURE_CONVERTER_AVAILABLE             0x1
+#define GC_FEATURES0_CORRECT_TEXTURE_CONVERTER                             4 : 4
+#define GC_FEATURES0_CORRECT_TEXTURE_CONVERTER_End                             4
+#define GC_FEATURES0_CORRECT_TEXTURE_CONVERTER_Start                           4
+#define GC_FEATURES0_CORRECT_TEXTURE_CONVERTER_Type                          U01
+#define   GC_FEATURES0_CORRECT_TEXTURE_CONVERTER_NONE                        0x0
+#define   GC_FEATURES0_CORRECT_TEXTURE_CONVERTER_AVAILABLE                   0x1
 
 /* Special LOD calculation when MSAA is on. */
-#define GC_MINOR_FEATURES0_SPECIAL_MSAA_LOD                                5 : 5
-#define GC_MINOR_FEATURES0_SPECIAL_MSAA_LOD_End                                5
-#define GC_MINOR_FEATURES0_SPECIAL_MSAA_LOD_Start                              5
-#define GC_MINOR_FEATURES0_SPECIAL_MSAA_LOD_Type                             U01
-#define   GC_MINOR_FEATURES0_SPECIAL_MSAA_LOD_NONE                           0x0
-#define   GC_MINOR_FEATURES0_SPECIAL_MSAA_LOD_AVAILABLE                      0x1
+#define GC_FEATURES0_SPECIAL_MSAA_LOD                                      5 : 5
+#define GC_FEATURES0_SPECIAL_MSAA_LOD_End                                      5
+#define GC_FEATURES0_SPECIAL_MSAA_LOD_Start                                    5
+#define GC_FEATURES0_SPECIAL_MSAA_LOD_Type                                   U01
+#define   GC_FEATURES0_SPECIAL_MSAA_LOD_NONE                                 0x0
+#define   GC_FEATURES0_SPECIAL_MSAA_LOD_AVAILABLE                            0x1
 
 /* Proper flush is done in fast clear cache. */
-#define GC_MINOR_FEATURES0_FAST_CLEAR_FLUSH                                6 : 6
-#define GC_MINOR_FEATURES0_FAST_CLEAR_FLUSH_End                                6
-#define GC_MINOR_FEATURES0_FAST_CLEAR_FLUSH_Start                              6
-#define GC_MINOR_FEATURES0_FAST_CLEAR_FLUSH_Type                             U01
-#define   GC_MINOR_FEATURES0_FAST_CLEAR_FLUSH_NONE                           0x0
-#define   GC_MINOR_FEATURES0_FAST_CLEAR_FLUSH_AVAILABLE                      0x1
+#define GC_FEATURES0_FAST_CLEAR_FLUSH                                      6 : 6
+#define GC_FEATURES0_FAST_CLEAR_FLUSH_End                                      6
+#define GC_FEATURES0_FAST_CLEAR_FLUSH_Start                                    6
+#define GC_FEATURES0_FAST_CLEAR_FLUSH_Type                                   U01
+#define   GC_FEATURES0_FAST_CLEAR_FLUSH_NONE                                 0x0
+#define   GC_FEATURES0_FAST_CLEAR_FLUSH_AVAILABLE                            0x1
 
 /* 2D PE 2.0 is present. */
-#define GC_MINOR_FEATURES0_2DPE20                                          7 : 7
-#define GC_MINOR_FEATURES0_2DPE20_End                                          7
-#define GC_MINOR_FEATURES0_2DPE20_Start                                        7
-#define GC_MINOR_FEATURES0_2DPE20_Type                                       U01
-#define   GC_MINOR_FEATURES0_2DPE20_NONE                                     0x0
-#define   GC_MINOR_FEATURES0_2DPE20_AVAILABLE                                0x1
+#define GC_FEATURES0_2DPE20                                                7 : 7
+#define GC_FEATURES0_2DPE20_End                                                7
+#define GC_FEATURES0_2DPE20_Start                                              7
+#define GC_FEATURES0_2DPE20_Type                                             U01
+#define   GC_FEATURES0_2DPE20_NONE                                           0x0
+#define   GC_FEATURES0_2DPE20_AVAILABLE                                      0x1
 
 /* Reserved. */
-#define GC_MINOR_FEATURES0_CORRECT_AUTO_DISABLE                            8 : 8
-#define GC_MINOR_FEATURES0_CORRECT_AUTO_DISABLE_End                            8
-#define GC_MINOR_FEATURES0_CORRECT_AUTO_DISABLE_Start                          8
-#define GC_MINOR_FEATURES0_CORRECT_AUTO_DISABLE_Type                         U01
-#define   GC_MINOR_FEATURES0_CORRECT_AUTO_DISABLE_NONE                       0x0
-#define   GC_MINOR_FEATURES0_CORRECT_AUTO_DISABLE_AVAILABLE                  0x1
+#define GC_FEATURES0_CORRECT_AUTO_DISABLE                                  8 : 8
+#define GC_FEATURES0_CORRECT_AUTO_DISABLE_End                                  8
+#define GC_FEATURES0_CORRECT_AUTO_DISABLE_Start                                8
+#define GC_FEATURES0_CORRECT_AUTO_DISABLE_Type                               U01
+#define   GC_FEATURES0_CORRECT_AUTO_DISABLE_NONE                             0x0
+#define   GC_FEATURES0_CORRECT_AUTO_DISABLE_AVAILABLE                        0x1
 
 /* Supports 8K render target. */
-#define GC_MINOR_FEATURES0_RENDER_8K                                       9 : 9
-#define GC_MINOR_FEATURES0_RENDER_8K_End                                       9
-#define GC_MINOR_FEATURES0_RENDER_8K_Start                                     9
-#define GC_MINOR_FEATURES0_RENDER_8K_Type                                    U01
-#define   GC_MINOR_FEATURES0_RENDER_8K_NONE                                  0x0
-#define   GC_MINOR_FEATURES0_RENDER_8K_AVAILABLE                             0x1
+#define GC_FEATURES0_RENDER_8K                                             9 : 9
+#define GC_FEATURES0_RENDER_8K_End                                             9
+#define GC_FEATURES0_RENDER_8K_Start                                           9
+#define GC_FEATURES0_RENDER_8K_Type                                          U01
+#define   GC_FEATURES0_RENDER_8K_NONE                                        0x0
+#define   GC_FEATURES0_RENDER_8K_AVAILABLE                                   0x1
 
 /* 2 bits are used instead of 4 bits for tile status. */
-#define GC_MINOR_FEATURES0_TILE_STATUS_2BITS                             10 : 10
-#define GC_MINOR_FEATURES0_TILE_STATUS_2BITS_End                              10
-#define GC_MINOR_FEATURES0_TILE_STATUS_2BITS_Start                            10
-#define GC_MINOR_FEATURES0_TILE_STATUS_2BITS_Type                            U01
-#define   GC_MINOR_FEATURES0_TILE_STATUS_2BITS_NONE                          0x0
-#define   GC_MINOR_FEATURES0_TILE_STATUS_2BITS_AVAILABLE                     0x1
+#define GC_FEATURES0_TILE_STATUS_2BITS                                   10 : 10
+#define GC_FEATURES0_TILE_STATUS_2BITS_End                                    10
+#define GC_FEATURES0_TILE_STATUS_2BITS_Start                                  10
+#define GC_FEATURES0_TILE_STATUS_2BITS_Type                                  U01
+#define   GC_FEATURES0_TILE_STATUS_2BITS_NONE                                0x0
+#define   GC_FEATURES0_TILE_STATUS_2BITS_AVAILABLE                           0x1
 
 /* Use 2 separate tile status buffers in interleaved mode. */
-#define GC_MINOR_FEATURES0_SEPARATE_TILE_STATUS_WHEN_INTERLEAVED         11 : 11
-#define GC_MINOR_FEATURES0_SEPARATE_TILE_STATUS_WHEN_INTERLEAVED_End          11
-#define GC_MINOR_FEATURES0_SEPARATE_TILE_STATUS_WHEN_INTERLEAVED_Start        11
-#define GC_MINOR_FEATURES0_SEPARATE_TILE_STATUS_WHEN_INTERLEAVED_Type        U01
-#define   GC_MINOR_FEATURES0_SEPARATE_TILE_STATUS_WHEN_INTERLEAVED_NONE      0x0
-#define   GC_MINOR_FEATURES0_SEPARATE_TILE_STATUS_WHEN_INTERLEAVED_AVAILABLE 0x1
+#define GC_FEATURES0_SEPARATE_TILE_STATUS_WHEN_INTERLEAVED               11 : 11
+#define GC_FEATURES0_SEPARATE_TILE_STATUS_WHEN_INTERLEAVED_End                11
+#define GC_FEATURES0_SEPARATE_TILE_STATUS_WHEN_INTERLEAVED_Start              11
+#define GC_FEATURES0_SEPARATE_TILE_STATUS_WHEN_INTERLEAVED_Type              U01
+#define   GC_FEATURES0_SEPARATE_TILE_STATUS_WHEN_INTERLEAVED_NONE            0x0
+#define   GC_FEATURES0_SEPARATE_TILE_STATUS_WHEN_INTERLEAVED_AVAILABLE       0x1
 
 /* 32x32 super tile is available. */
-#define GC_MINOR_FEATURES0_SUPER_TILED_32X32                             12 : 12
-#define GC_MINOR_FEATURES0_SUPER_TILED_32X32_End                              12
-#define GC_MINOR_FEATURES0_SUPER_TILED_32X32_Start                            12
-#define GC_MINOR_FEATURES0_SUPER_TILED_32X32_Type                            U01
-#define   GC_MINOR_FEATURES0_SUPER_TILED_32X32_NONE                          0x0
-#define   GC_MINOR_FEATURES0_SUPER_TILED_32X32_AVAILABLE                     0x1
+#define GC_FEATURES0_SUPER_TILED_32X32                                   12 : 12
+#define GC_FEATURES0_SUPER_TILED_32X32_End                                    12
+#define GC_FEATURES0_SUPER_TILED_32X32_Start                                  12
+#define GC_FEATURES0_SUPER_TILED_32X32_Type                                  U01
+#define   GC_FEATURES0_SUPER_TILED_32X32_NONE                                0x0
+#define   GC_FEATURES0_SUPER_TILED_32X32_AVAILABLE                           0x1
 
 /* Major updates to VG pipe (TS buffer tiling. State masking.). */
-#define GC_MINOR_FEATURES0_VG_20                                         13 : 13
-#define GC_MINOR_FEATURES0_VG_20_End                                          13
-#define GC_MINOR_FEATURES0_VG_20_Start                                        13
-#define GC_MINOR_FEATURES0_VG_20_Type                                        U01
-#define   GC_MINOR_FEATURES0_VG_20_NONE                                      0x0
-#define   GC_MINOR_FEATURES0_VG_20_AVAILABLE                                 0x1
+#define GC_FEATURES0_VG_20                                               13 : 13
+#define GC_FEATURES0_VG_20_End                                                13
+#define GC_FEATURES0_VG_20_Start                                              13
+#define GC_FEATURES0_VG_20_Type                                              U01
+#define   GC_FEATURES0_VG_20_NONE                                            0x0
+#define   GC_FEATURES0_VG_20_AVAILABLE                                       0x1
 
 /* New commands added to the tessellator. */
-#define GC_MINOR_FEATURES0_TS_EXTENDED_COMMANDS                          14 : 14
-#define GC_MINOR_FEATURES0_TS_EXTENDED_COMMANDS_End                           14
-#define GC_MINOR_FEATURES0_TS_EXTENDED_COMMANDS_Start                         14
-#define GC_MINOR_FEATURES0_TS_EXTENDED_COMMANDS_Type                         U01
-#define   GC_MINOR_FEATURES0_TS_EXTENDED_COMMANDS_NONE                       0x0
-#define   GC_MINOR_FEATURES0_TS_EXTENDED_COMMANDS_AVAILABLE                  0x1
+#define GC_FEATURES0_TS_EXTENDED_COMMANDS                                14 : 14
+#define GC_FEATURES0_TS_EXTENDED_COMMANDS_End                                 14
+#define GC_FEATURES0_TS_EXTENDED_COMMANDS_Start                               14
+#define GC_FEATURES0_TS_EXTENDED_COMMANDS_Type                               U01
+#define   GC_FEATURES0_TS_EXTENDED_COMMANDS_NONE                             0x0
+#define   GC_FEATURES0_TS_EXTENDED_COMMANDS_AVAILABLE                        0x1
 
 /* If this bit is not set, the FIFO counter should be set to 50.  Else, the   **
 ** default should remain.                                                     */
-#define GC_MINOR_FEATURES0_COMPRESSION_FIFO_FIXED                        15 : 15
-#define GC_MINOR_FEATURES0_COMPRESSION_FIFO_FIXED_End                         15
-#define GC_MINOR_FEATURES0_COMPRESSION_FIFO_FIXED_Start                       15
-#define GC_MINOR_FEATURES0_COMPRESSION_FIFO_FIXED_Type                       U01
-#define   GC_MINOR_FEATURES0_COMPRESSION_FIFO_FIXED_NONE                     0x0
-#define   GC_MINOR_FEATURES0_COMPRESSION_FIFO_FIXED_AVAILABLE                0x1
+#define GC_FEATURES0_COMPRESSION_FIFO_FIXED                              15 : 15
+#define GC_FEATURES0_COMPRESSION_FIFO_FIXED_End                               15
+#define GC_FEATURES0_COMPRESSION_FIFO_FIXED_Start                             15
+#define GC_FEATURES0_COMPRESSION_FIFO_FIXED_Type                             U01
+#define   GC_FEATURES0_COMPRESSION_FIFO_FIXED_NONE                           0x0
+#define   GC_FEATURES0_COMPRESSION_FIFO_FIXED_AVAILABLE                      0x1
 
 /* Floor, ceil, and sign instructions are available.  */
-#define GC_MINOR_FEATURES0_EXTRA_SHADER_INSTRUCTIONS0                    16 : 16
-#define GC_MINOR_FEATURES0_EXTRA_SHADER_INSTRUCTIONS0_End                     16
-#define GC_MINOR_FEATURES0_EXTRA_SHADER_INSTRUCTIONS0_Start                   16
-#define GC_MINOR_FEATURES0_EXTRA_SHADER_INSTRUCTIONS0_Type                   U01
-#define   GC_MINOR_FEATURES0_EXTRA_SHADER_INSTRUCTIONS0_NONE                 0x0
-#define   GC_MINOR_FEATURES0_EXTRA_SHADER_INSTRUCTIONS0_AVAILABLE            0x1
+#define GC_FEATURES0_EXTRA_SHADER_INSTRUCTIONS0                          16 : 16
+#define GC_FEATURES0_EXTRA_SHADER_INSTRUCTIONS0_End                           16
+#define GC_FEATURES0_EXTRA_SHADER_INSTRUCTIONS0_Start                         16
+#define GC_FEATURES0_EXTRA_SHADER_INSTRUCTIONS0_Type                         U01
+#define   GC_FEATURES0_EXTRA_SHADER_INSTRUCTIONS0_NONE                       0x0
+#define   GC_FEATURES0_EXTRA_SHADER_INSTRUCTIONS0_AVAILABLE                  0x1
 
 /* VG filter is available.  */
-#define GC_MINOR_FEATURES0_VG_FILTER                                     17 : 17
-#define GC_MINOR_FEATURES0_VG_FILTER_End                                      17
-#define GC_MINOR_FEATURES0_VG_FILTER_Start                                    17
-#define GC_MINOR_FEATURES0_VG_FILTER_Type                                    U01
-#define   GC_MINOR_FEATURES0_VG_FILTER_NONE                                  0x0
-#define   GC_MINOR_FEATURES0_VG_FILTER_AVAILABLE                             0x1
+#define GC_FEATURES0_VG_FILTER                                           17 : 17
+#define GC_FEATURES0_VG_FILTER_End                                            17
+#define GC_FEATURES0_VG_FILTER_Start                                          17
+#define GC_FEATURES0_VG_FILTER_Type                                          U01
+#define   GC_FEATURES0_VG_FILTER_NONE                                        0x0
+#define   GC_FEATURES0_VG_FILTER_AVAILABLE                                   0x1
 
 /* Minor updates to VG pipe (Event generation from VG, TS, PE). Tiled image   **
 ** support.                                                                   */
-#define GC_MINOR_FEATURES0_VG_21                                         18 : 18
-#define GC_MINOR_FEATURES0_VG_21_End                                          18
-#define GC_MINOR_FEATURES0_VG_21_Start                                        18
-#define GC_MINOR_FEATURES0_VG_21_Type                                        U01
-#define   GC_MINOR_FEATURES0_VG_21_NONE                                      0x0
-#define   GC_MINOR_FEATURES0_VG_21_AVAILABLE                                 0x1
+#define GC_FEATURES0_VG_21                                               18 : 18
+#define GC_FEATURES0_VG_21_End                                                18
+#define GC_FEATURES0_VG_21_Start                                              18
+#define GC_FEATURES0_VG_21_Type                                              U01
+#define   GC_FEATURES0_VG_21_NONE                                            0x0
+#define   GC_FEATURES0_VG_21_AVAILABLE                                       0x1
 
 /* W is sent to SH from RA. */
-#define GC_MINOR_FEATURES0_SHADER_GETS_W                                 19 : 19
-#define GC_MINOR_FEATURES0_SHADER_GETS_W_End                                  19
-#define GC_MINOR_FEATURES0_SHADER_GETS_W_Start                                19
-#define GC_MINOR_FEATURES0_SHADER_GETS_W_Type                                U01
-#define   GC_MINOR_FEATURES0_SHADER_GETS_W_NONE                              0x0
-#define   GC_MINOR_FEATURES0_SHADER_GETS_W_AVAILABLE                         0x1
+#define GC_FEATURES0_SHADER_GETS_W                                       19 : 19
+#define GC_FEATURES0_SHADER_GETS_W_End                                        19
+#define GC_FEATURES0_SHADER_GETS_W_Start                                      19
+#define GC_FEATURES0_SHADER_GETS_W_Type                                      U01
+#define   GC_FEATURES0_SHADER_GETS_W_NONE                                    0x0
+#define   GC_FEATURES0_SHADER_GETS_W_AVAILABLE                               0x1
 
 /* Sqrt, sin, cos instructions are available.  */
-#define GC_MINOR_FEATURES0_EXTRA_SHADER_INSTRUCTIONS1                    20 : 20
-#define GC_MINOR_FEATURES0_EXTRA_SHADER_INSTRUCTIONS1_End                     20
-#define GC_MINOR_FEATURES0_EXTRA_SHADER_INSTRUCTIONS1_Start                   20
-#define GC_MINOR_FEATURES0_EXTRA_SHADER_INSTRUCTIONS1_Type                   U01
-#define   GC_MINOR_FEATURES0_EXTRA_SHADER_INSTRUCTIONS1_NONE                 0x0
-#define   GC_MINOR_FEATURES0_EXTRA_SHADER_INSTRUCTIONS1_AVAILABLE            0x1
+#define GC_FEATURES0_EXTRA_SHADER_INSTRUCTIONS1                          20 : 20
+#define GC_FEATURES0_EXTRA_SHADER_INSTRUCTIONS1_End                           20
+#define GC_FEATURES0_EXTRA_SHADER_INSTRUCTIONS1_Start                         20
+#define GC_FEATURES0_EXTRA_SHADER_INSTRUCTIONS1_Type                         U01
+#define   GC_FEATURES0_EXTRA_SHADER_INSTRUCTIONS1_NONE                       0x0
+#define   GC_FEATURES0_EXTRA_SHADER_INSTRUCTIONS1_AVAILABLE                  0x1
 
 /* Unavailable registers will return 0. */
-#define GC_MINOR_FEATURES0_DEFAULT_REG0                                  21 : 21
-#define GC_MINOR_FEATURES0_DEFAULT_REG0_End                                   21
-#define GC_MINOR_FEATURES0_DEFAULT_REG0_Start                                 21
-#define GC_MINOR_FEATURES0_DEFAULT_REG0_Type                                 U01
-#define   GC_MINOR_FEATURES0_DEFAULT_REG0_NONE                               0x0
-#define   GC_MINOR_FEATURES0_DEFAULT_REG0_AVAILABLE                          0x1
+#define GC_FEATURES0_DEFAULT_REG0                                        21 : 21
+#define GC_FEATURES0_DEFAULT_REG0_End                                         21
+#define GC_FEATURES0_DEFAULT_REG0_Start                                       21
+#define GC_FEATURES0_DEFAULT_REG0_Type                                       U01
+#define   GC_FEATURES0_DEFAULT_REG0_NONE                                     0x0
+#define   GC_FEATURES0_DEFAULT_REG0_AVAILABLE                                0x1
 
 /* New style MC with separate paths for color and depth. */
-#define GC_MINOR_FEATURES0_MC_20                                         22 : 22
-#define GC_MINOR_FEATURES0_MC_20_End                                          22
-#define GC_MINOR_FEATURES0_MC_20_Start                                        22
-#define GC_MINOR_FEATURES0_MC_20_Type                                        U01
-#define   GC_MINOR_FEATURES0_MC_20_NONE                                      0x0
-#define   GC_MINOR_FEATURES0_MC_20_AVAILABLE                                 0x1
+#define GC_FEATURES0_MC_20                                               22 : 22
+#define GC_FEATURES0_MC_20_End                                                22
+#define GC_FEATURES0_MC_20_Start                                              22
+#define GC_FEATURES0_MC_20_Type                                              U01
+#define   GC_FEATURES0_MC_20_NONE                                            0x0
+#define   GC_FEATURES0_MC_20_AVAILABLE                                       0x1
 
 /* Put the MSAA data into sideband fifo. */
-#define GC_MINOR_FEATURES0_SHADER_MSAA_SIDEBAND                          23 : 23
-#define GC_MINOR_FEATURES0_SHADER_MSAA_SIDEBAND_End                           23
-#define GC_MINOR_FEATURES0_SHADER_MSAA_SIDEBAND_Start                         23
-#define GC_MINOR_FEATURES0_SHADER_MSAA_SIDEBAND_Type                         U01
-#define   GC_MINOR_FEATURES0_SHADER_MSAA_SIDEBAND_NONE                       0x0
-#define   GC_MINOR_FEATURES0_SHADER_MSAA_SIDEBAND_AVAILABLE                  0x1
+#define GC_FEATURES0_SHADER_MSAA_SIDEBAND                                23 : 23
+#define GC_FEATURES0_SHADER_MSAA_SIDEBAND_End                                 23
+#define GC_FEATURES0_SHADER_MSAA_SIDEBAND_Start                               23
+#define GC_FEATURES0_SHADER_MSAA_SIDEBAND_Type                               U01
+#define   GC_FEATURES0_SHADER_MSAA_SIDEBAND_NONE                             0x0
+#define   GC_FEATURES0_SHADER_MSAA_SIDEBAND_AVAILABLE                        0x1
 
-#define GC_MINOR_FEATURES0_BUG_FIXES0                                    24 : 24
-#define GC_MINOR_FEATURES0_BUG_FIXES0_End                                     24
-#define GC_MINOR_FEATURES0_BUG_FIXES0_Start                                   24
-#define GC_MINOR_FEATURES0_BUG_FIXES0_Type                                   U01
-#define   GC_MINOR_FEATURES0_BUG_FIXES0_NONE                                 0x0
-#define   GC_MINOR_FEATURES0_BUG_FIXES0_AVAILABLE                            0x1
+#define GC_FEATURES0_BUG_FIXES0                                          24 : 24
+#define GC_FEATURES0_BUG_FIXES0_End                                           24
+#define GC_FEATURES0_BUG_FIXES0_Start                                         24
+#define GC_FEATURES0_BUG_FIXES0_Type                                         U01
+#define   GC_FEATURES0_BUG_FIXES0_NONE                                       0x0
+#define   GC_FEATURES0_BUG_FIXES0_AVAILABLE                                  0x1
 
 /* VAA is available or not. */
-#define GC_MINOR_FEATURES0_VAA                                           25 : 25
-#define GC_MINOR_FEATURES0_VAA_End                                            25
-#define GC_MINOR_FEATURES0_VAA_Start                                          25
-#define GC_MINOR_FEATURES0_VAA_Type                                          U01
-#define   GC_MINOR_FEATURES0_VAA_NONE                                        0x0
-#define   GC_MINOR_FEATURES0_VAA_AVAILABLE                                   0x1
+#define GC_FEATURES0_VAA                                                 25 : 25
+#define GC_FEATURES0_VAA_End                                                  25
+#define GC_FEATURES0_VAA_Start                                                25
+#define GC_FEATURES0_VAA_Type                                                U01
+#define   GC_FEATURES0_VAA_NONE                                              0x0
+#define   GC_FEATURES0_VAA_AVAILABLE                                         0x1
 
 /* Shader supports bypass mode when MSAA is enabled. */
-#define GC_MINOR_FEATURES0_BYPASS_IN_MSAA                                26 : 26
-#define GC_MINOR_FEATURES0_BYPASS_IN_MSAA_End                                 26
-#define GC_MINOR_FEATURES0_BYPASS_IN_MSAA_Start                               26
-#define GC_MINOR_FEATURES0_BYPASS_IN_MSAA_Type                               U01
-#define   GC_MINOR_FEATURES0_BYPASS_IN_MSAA_NONE                             0x0
-#define   GC_MINOR_FEATURES0_BYPASS_IN_MSAA_AVAILABLE                        0x1
+#define GC_FEATURES0_BYPASS_IN_MSAA                                      26 : 26
+#define GC_FEATURES0_BYPASS_IN_MSAA_End                                       26
+#define GC_FEATURES0_BYPASS_IN_MSAA_Start                                     26
+#define GC_FEATURES0_BYPASS_IN_MSAA_Type                                     U01
+#define   GC_FEATURES0_BYPASS_IN_MSAA_NONE                                   0x0
+#define   GC_FEATURES0_BYPASS_IN_MSAA_AVAILABLE                              0x1
 
 /* Hierarchiccal Z is supported. */
-#define GC_MINOR_FEATURES0_HIERARCHICAL_Z                                27 : 27
-#define GC_MINOR_FEATURES0_HIERARCHICAL_Z_End                                 27
-#define GC_MINOR_FEATURES0_HIERARCHICAL_Z_Start                               27
-#define GC_MINOR_FEATURES0_HIERARCHICAL_Z_Type                               U01
-#define   GC_MINOR_FEATURES0_HIERARCHICAL_Z_NONE                             0x0
-#define   GC_MINOR_FEATURES0_HIERARCHICAL_Z_AVAILABLE                        0x1
+#define GC_FEATURES0_HIERARCHICAL_Z                                      27 : 27
+#define GC_FEATURES0_HIERARCHICAL_Z_End                                       27
+#define GC_FEATURES0_HIERARCHICAL_Z_Start                                     27
+#define GC_FEATURES0_HIERARCHICAL_Z_Type                                     U01
+#define   GC_FEATURES0_HIERARCHICAL_Z_NONE                                   0x0
+#define   GC_FEATURES0_HIERARCHICAL_Z_AVAILABLE                              0x1
 
 /* New texture unit is available. */
-#define GC_MINOR_FEATURES0_NEW_TEXTURE                                   28 : 28
-#define GC_MINOR_FEATURES0_NEW_TEXTURE_End                                    28
-#define GC_MINOR_FEATURES0_NEW_TEXTURE_Start                                  28
-#define GC_MINOR_FEATURES0_NEW_TEXTURE_Type                                  U01
-#define   GC_MINOR_FEATURES0_NEW_TEXTURE_NONE                                0x0
-#define   GC_MINOR_FEATURES0_NEW_TEXTURE_AVAILABLE                           0x1
+#define GC_FEATURES0_NEW_TEXTURE                                         28 : 28
+#define GC_FEATURES0_NEW_TEXTURE_End                                          28
+#define GC_FEATURES0_NEW_TEXTURE_Start                                        28
+#define GC_FEATURES0_NEW_TEXTURE_Type                                        U01
+#define   GC_FEATURES0_NEW_TEXTURE_NONE                                      0x0
+#define   GC_FEATURES0_NEW_TEXTURE_AVAILABLE                                 0x1
 
 /* 2D engine supports A8 target.  */
-#define GC_MINOR_FEATURES0_A8_TARGET_SUPPORT                             29 : 29
-#define GC_MINOR_FEATURES0_A8_TARGET_SUPPORT_End                              29
-#define GC_MINOR_FEATURES0_A8_TARGET_SUPPORT_Start                            29
-#define GC_MINOR_FEATURES0_A8_TARGET_SUPPORT_Type                            U01
-#define   GC_MINOR_FEATURES0_A8_TARGET_SUPPORT_NONE                          0x0
-#define   GC_MINOR_FEATURES0_A8_TARGET_SUPPORT_AVAILABLE                     0x1
+#define GC_FEATURES0_A8_TARGET_SUPPORT                                   29 : 29
+#define GC_FEATURES0_A8_TARGET_SUPPORT_End                                    29
+#define GC_FEATURES0_A8_TARGET_SUPPORT_Start                                  29
+#define GC_FEATURES0_A8_TARGET_SUPPORT_Type                                  U01
+#define   GC_FEATURES0_A8_TARGET_SUPPORT_NONE                                0x0
+#define   GC_FEATURES0_A8_TARGET_SUPPORT_AVAILABLE                           0x1
 
 /* Correct stencil behavior in depth only. */
-#define GC_MINOR_FEATURES0_CORRECT_STENCIL                               30 : 30
-#define GC_MINOR_FEATURES0_CORRECT_STENCIL_End                                30
-#define GC_MINOR_FEATURES0_CORRECT_STENCIL_Start                              30
-#define GC_MINOR_FEATURES0_CORRECT_STENCIL_Type                              U01
-#define   GC_MINOR_FEATURES0_CORRECT_STENCIL_NONE                            0x0
-#define   GC_MINOR_FEATURES0_CORRECT_STENCIL_AVAILABLE                       0x1
+#define GC_FEATURES0_CORRECT_STENCIL                                     30 : 30
+#define GC_FEATURES0_CORRECT_STENCIL_End                                      30
+#define GC_FEATURES0_CORRECT_STENCIL_Start                                    30
+#define GC_FEATURES0_CORRECT_STENCIL_Type                                    U01
+#define   GC_FEATURES0_CORRECT_STENCIL_NONE                                  0x0
+#define   GC_FEATURES0_CORRECT_STENCIL_AVAILABLE                             0x1
 
 /* Enhance VR and add a mode to walk 16 pixels in 16-bit mode in Vertical     **
 ** pass to improve $ hit rate when rotating 90/270.                           */
-#define GC_MINOR_FEATURES0_ENHANCE_VR                                    31 : 31
-#define GC_MINOR_FEATURES0_ENHANCE_VR_End                                     31
-#define GC_MINOR_FEATURES0_ENHANCE_VR_Start                                   31
-#define GC_MINOR_FEATURES0_ENHANCE_VR_Type                                   U01
-#define   GC_MINOR_FEATURES0_ENHANCE_VR_NONE                                 0x0
-#define   GC_MINOR_FEATURES0_ENHANCE_VR_AVAILABLE                            0x1
+#define GC_FEATURES0_ENHANCE_VR                                          31 : 31
+#define GC_FEATURES0_ENHANCE_VR_End                                           31
+#define GC_FEATURES0_ENHANCE_VR_Start                                         31
+#define GC_FEATURES0_ENHANCE_VR_Type                                         U01
+#define   GC_FEATURES0_ENHANCE_VR_NONE                                       0x0
+#define   GC_FEATURES0_ENHANCE_VR_AVAILABLE                                  0x1
+
+union gcfeatures0 {
+	struct {
+		/* GC_FEATURES0_Address:FLIP_Y */
+		unsigned int flipy:1;
+
+		/* GC_FEATURES0_Address:DUAL_RETURN_BUS */
+		unsigned int dualreturnbus:1;
+
+		/* GC_FEATURES0_Address:ENDIANNESS_CONFIG */
+		unsigned int endianessconfig:1;
+
+		/* GC_FEATURES0_Address:TEXTURE8_K */
+		unsigned int texture8k:1;
+
+		/* GC_FEATURES0_Address:CORRECT_TEXTURE_CONVERTER */
+		unsigned int correcttextureconverter:1;
+
+		/* GC_FEATURES0_Address:SPECIAL_MSAA_LOD */
+		unsigned int specialmsaalod:1;
+
+		/* GC_FEATURES0_Address:FAST_CLEAR_FLUSH */
+		unsigned int fastclearflush:1;
+
+		/* GC_FEATURES0_Address:2DPE20 */
+		unsigned int pe2d20:1;
+
+		/* GC_FEATURES0_Address:CORRECT_AUTO_DISABLE */
+		unsigned int correctautodisable:1;
+
+		/* GC_FEATURES0_Address:RENDER_8K */
+		unsigned int render8k:1;
+
+		/* GC_FEATURES0_Address:TILE_STATUS_2BITS */
+		unsigned int tilestatus2bits:1;
+
+		/* GC_FEATURES0_Address:SEPARATE_TILE_STATUS_WHEN_INTERLEAVED */
+		unsigned int separatetilestatus:1;
+
+		/* GC_FEATURES0_Address:SUPER_TILED_32X32 */
+		unsigned int supertiled32x32:1;
+
+		/* GC_FEATURES0_Address:VG_20 */
+		unsigned int vg20:1;
+
+		/* GC_FEATURES0_Address:TS_EXTENDED_COMMANDS */
+		unsigned int tsplus:1;
+
+		/* GC_FEATURES0_Address:COMPRESSION_FIFO_FIXED */
+		unsigned int compressionfifo:1;
+
+		/* GC_FEATURES0_Address:EXTRA_SHADER_INSTRUCTIONS0 */
+		unsigned int shaderinst0:1;
+
+		/* GC_FEATURES0_Address:VG_FILTER */
+		unsigned int vgfilter:1;
+
+		/* GC_FEATURES0_Address:VG_21 */
+		unsigned int vg21:1;
+
+		/* GC_FEATURES0_Address:SHADER_GETS_W */
+		unsigned int shadergetsw:1;
+
+		/* GC_FEATURES0_Address:EXTRA_SHADER_INSTRUCTIONS1 */
+		unsigned int shaderinst1:1;
+
+		/* GC_FEATURES0_Address:DEFAULT_REG0 */
+		unsigned int defaultreg0:1;
+
+		/* GC_FEATURES0_Address:MC_20 */
+		unsigned int mc20:1;
+
+		/* GC_FEATURES0_Address:SHADER_MSAA_SIDEBAND */
+		unsigned int shadermsaasideband:1;
+
+		/* GC_FEATURES0_Address:BUG_FIXES0 */
+		unsigned int bugfixes0:1;
+
+		/* GC_FEATURES0_Address:VAA */
+		unsigned int vaa:1;
+
+		/* GC_FEATURES0_Address:BYPASS_IN_MSAA */
+		unsigned int bypassmsaa:1;
+
+		/* GC_FEATURES0_Address:HIERARCHICAL_Z */
+		unsigned int hz:1;
+
+		/* GC_FEATURES0_Address:NEW_TEXTURE */
+		unsigned int newtx:1;
+
+		/* GC_FEATURES0_Address:A8_TARGET_SUPPORT */
+		unsigned int a8target:1;
+
+		/* GC_FEATURES0_Address:CORRECT_STENCIL */
+		unsigned int correctstencil:1;
+
+		/* GC_FEATURES0_Address:ENHANCE_VR */
+		unsigned int vr20:1;
+	} reg;
+
+	unsigned int raw;
+};
 
 /*******************************************************************************
 ** Register GCMinorFeatures1
@@ -1030,245 +1234,937 @@ union gcidle {
 ** reset value. It varies with the implementation.
 */
 
-#define GC_MINOR_FEATURES1_Address                                       0x00074
-#define GC_MINOR_FEATURES1_MSB                                                15
-#define GC_MINOR_FEATURES1_LSB                                                 0
-#define GC_MINOR_FEATURES1_BLK                                                 0
-#define GC_MINOR_FEATURES1_Count                                               1
-#define GC_MINOR_FEATURES1_FieldMask                                  0xFFFFFFFF
-#define GC_MINOR_FEATURES1_ReadMask                                   0xFFFFFFFF
-#define GC_MINOR_FEATURES1_WriteMask                                  0x00000000
-#define GC_MINOR_FEATURES1_ResetValue                                 0x00000000
+#define GC_FEATURES1_Address                                             0x00074
+#define GC_FEATURES1_MSB                                                      15
+#define GC_FEATURES1_LSB                                                       0
+#define GC_FEATURES1_BLK                                                       0
+#define GC_FEATURES1_Count                                                     1
+#define GC_FEATURES1_FieldMask                                        0xFFFFFFFF
+#define GC_FEATURES1_ReadMask                                         0xFFFFFFFF
+#define GC_FEATURES1_WriteMask                                        0x00000000
+#define GC_FEATURES1_ResetValue                                       0x00000000
 
 /* Resolve UV swizzle. */
-#define GC_MINOR_FEATURES1_RSUV_SWIZZLE                                    0 : 0
-#define GC_MINOR_FEATURES1_RSUV_SWIZZLE_End                                    0
-#define GC_MINOR_FEATURES1_RSUV_SWIZZLE_Start                                  0
-#define GC_MINOR_FEATURES1_RSUV_SWIZZLE_Type                                 U01
-#define   GC_MINOR_FEATURES1_RSUV_SWIZZLE_NONE                               0x0
-#define   GC_MINOR_FEATURES1_RSUV_SWIZZLE_AVAILABLE                          0x1
+#define GC_FEATURES1_RSUV_SWIZZLE                                          0 : 0
+#define GC_FEATURES1_RSUV_SWIZZLE_End                                          0
+#define GC_FEATURES1_RSUV_SWIZZLE_Start                                        0
+#define GC_FEATURES1_RSUV_SWIZZLE_Type                                       U01
+#define   GC_FEATURES1_RSUV_SWIZZLE_NONE                                     0x0
+#define   GC_FEATURES1_RSUV_SWIZZLE_AVAILABLE                                0x1
 
 /* V2 compression. */
-#define GC_MINOR_FEATURES1_V2_COMPRESSION                                  1 : 1
-#define GC_MINOR_FEATURES1_V2_COMPRESSION_End                                  1
-#define GC_MINOR_FEATURES1_V2_COMPRESSION_Start                                1
-#define GC_MINOR_FEATURES1_V2_COMPRESSION_Type                               U01
-#define   GC_MINOR_FEATURES1_V2_COMPRESSION_NONE                             0x0
-#define   GC_MINOR_FEATURES1_V2_COMPRESSION_AVAILABLE                        0x1
+#define GC_FEATURES1_V2_COMPRESSION                                        1 : 1
+#define GC_FEATURES1_V2_COMPRESSION_End                                        1
+#define GC_FEATURES1_V2_COMPRESSION_Start                                      1
+#define GC_FEATURES1_V2_COMPRESSION_Type                                     U01
+#define   GC_FEATURES1_V2_COMPRESSION_NONE                                   0x0
+#define   GC_FEATURES1_V2_COMPRESSION_AVAILABLE                              0x1
 
 /* Double buffering support for VG (second TS-->VG semaphore is present). */
-#define GC_MINOR_FEATURES1_VG_DOUBLE_BUFFER                                2 : 2
-#define GC_MINOR_FEATURES1_VG_DOUBLE_BUFFER_End                                2
-#define GC_MINOR_FEATURES1_VG_DOUBLE_BUFFER_Start                              2
-#define GC_MINOR_FEATURES1_VG_DOUBLE_BUFFER_Type                             U01
-#define   GC_MINOR_FEATURES1_VG_DOUBLE_BUFFER_NONE                           0x0
-#define   GC_MINOR_FEATURES1_VG_DOUBLE_BUFFER_AVAILABLE                      0x1
+#define GC_FEATURES1_VG_DOUBLE_BUFFER                                      2 : 2
+#define GC_FEATURES1_VG_DOUBLE_BUFFER_End                                      2
+#define GC_FEATURES1_VG_DOUBLE_BUFFER_Start                                    2
+#define GC_FEATURES1_VG_DOUBLE_BUFFER_Type                                   U01
+#define   GC_FEATURES1_VG_DOUBLE_BUFFER_NONE                                 0x0
+#define   GC_FEATURES1_VG_DOUBLE_BUFFER_AVAILABLE                            0x1
 
-#define GC_MINOR_FEATURES1_BUG_FIXES1                                      3 : 3
-#define GC_MINOR_FEATURES1_BUG_FIXES1_End                                      3
-#define GC_MINOR_FEATURES1_BUG_FIXES1_Start                                    3
-#define GC_MINOR_FEATURES1_BUG_FIXES1_Type                                   U01
-#define   GC_MINOR_FEATURES1_BUG_FIXES1_NONE                                 0x0
-#define   GC_MINOR_FEATURES1_BUG_FIXES1_AVAILABLE                            0x1
+#define GC_FEATURES1_BUG_FIXES1                                            3 : 3
+#define GC_FEATURES1_BUG_FIXES1_End                                            3
+#define GC_FEATURES1_BUG_FIXES1_Start                                          3
+#define GC_FEATURES1_BUG_FIXES1_Type                                         U01
+#define   GC_FEATURES1_BUG_FIXES1_NONE                                       0x0
+#define   GC_FEATURES1_BUG_FIXES1_AVAILABLE                                  0x1
 
-#define GC_MINOR_FEATURES1_BUG_FIXES2                                      4 : 4
-#define GC_MINOR_FEATURES1_BUG_FIXES2_End                                      4
-#define GC_MINOR_FEATURES1_BUG_FIXES2_Start                                    4
-#define GC_MINOR_FEATURES1_BUG_FIXES2_Type                                   U01
-#define   GC_MINOR_FEATURES1_BUG_FIXES2_NONE                                 0x0
-#define   GC_MINOR_FEATURES1_BUG_FIXES2_AVAILABLE                            0x1
+#define GC_FEATURES1_BUG_FIXES2                                            4 : 4
+#define GC_FEATURES1_BUG_FIXES2_End                                            4
+#define GC_FEATURES1_BUG_FIXES2_Start                                          4
+#define GC_FEATURES1_BUG_FIXES2_Type                                         U01
+#define   GC_FEATURES1_BUG_FIXES2_NONE                                       0x0
+#define   GC_FEATURES1_BUG_FIXES2_AVAILABLE                                  0x1
 
 /* Texture has stride and memory addressing. */
-#define GC_MINOR_FEATURES1_TEXTURE_STRIDE                                  5 : 5
-#define GC_MINOR_FEATURES1_TEXTURE_STRIDE_End                                  5
-#define GC_MINOR_FEATURES1_TEXTURE_STRIDE_Start                                5
-#define GC_MINOR_FEATURES1_TEXTURE_STRIDE_Type                               U01
-#define   GC_MINOR_FEATURES1_TEXTURE_STRIDE_NONE                             0x0
-#define   GC_MINOR_FEATURES1_TEXTURE_STRIDE_AVAILABLE                        0x1
+#define GC_FEATURES1_TEXTURE_STRIDE                                        5 : 5
+#define GC_FEATURES1_TEXTURE_STRIDE_End                                        5
+#define GC_FEATURES1_TEXTURE_STRIDE_Start                                      5
+#define GC_FEATURES1_TEXTURE_STRIDE_Type                                     U01
+#define   GC_FEATURES1_TEXTURE_STRIDE_NONE                                   0x0
+#define   GC_FEATURES1_TEXTURE_STRIDE_AVAILABLE                              0x1
 
-#define GC_MINOR_FEATURES1_BUG_FIXES3                                      6 : 6
-#define GC_MINOR_FEATURES1_BUG_FIXES3_End                                      6
-#define GC_MINOR_FEATURES1_BUG_FIXES3_Start                                    6
-#define GC_MINOR_FEATURES1_BUG_FIXES3_Type                                   U01
-#define   GC_MINOR_FEATURES1_BUG_FIXES3_NONE                                 0x0
-#define   GC_MINOR_FEATURES1_BUG_FIXES3_AVAILABLE                            0x1
+#define GC_FEATURES1_BUG_FIXES3                                            6 : 6
+#define GC_FEATURES1_BUG_FIXES3_End                                            6
+#define GC_FEATURES1_BUG_FIXES3_Start                                          6
+#define GC_FEATURES1_BUG_FIXES3_Type                                         U01
+#define   GC_FEATURES1_BUG_FIXES3_NONE                                       0x0
+#define   GC_FEATURES1_BUG_FIXES3_AVAILABLE                                  0x1
 
-#define GC_MINOR_FEATURES1_CORRECT_AUTO_DISABLE                            7 : 7
-#define GC_MINOR_FEATURES1_CORRECT_AUTO_DISABLE_End                            7
-#define GC_MINOR_FEATURES1_CORRECT_AUTO_DISABLE_Start                          7
-#define GC_MINOR_FEATURES1_CORRECT_AUTO_DISABLE_Type                         U01
-#define   GC_MINOR_FEATURES1_CORRECT_AUTO_DISABLE_NONE                       0x0
-#define   GC_MINOR_FEATURES1_CORRECT_AUTO_DISABLE_AVAILABLE                  0x1
+#define GC_FEATURES1_CORRECT_AUTO_DISABLE                                  7 : 7
+#define GC_FEATURES1_CORRECT_AUTO_DISABLE_End                                  7
+#define GC_FEATURES1_CORRECT_AUTO_DISABLE_Start                                7
+#define GC_FEATURES1_CORRECT_AUTO_DISABLE_Type                               U01
+#define   GC_FEATURES1_CORRECT_AUTO_DISABLE_NONE                             0x0
+#define   GC_FEATURES1_CORRECT_AUTO_DISABLE_AVAILABLE                        0x1
 
-#define GC_MINOR_FEATURES1_AUTO_RESTART_TS                                 8 : 8
-#define GC_MINOR_FEATURES1_AUTO_RESTART_TS_End                                 8
-#define GC_MINOR_FEATURES1_AUTO_RESTART_TS_Start                               8
-#define GC_MINOR_FEATURES1_AUTO_RESTART_TS_Type                              U01
-#define   GC_MINOR_FEATURES1_AUTO_RESTART_TS_NONE                            0x0
-#define   GC_MINOR_FEATURES1_AUTO_RESTART_TS_AVAILABLE                       0x1
+#define GC_FEATURES1_AUTO_RESTART_TS                                       8 : 8
+#define GC_FEATURES1_AUTO_RESTART_TS_End                                       8
+#define GC_FEATURES1_AUTO_RESTART_TS_Start                                     8
+#define GC_FEATURES1_AUTO_RESTART_TS_Type                                    U01
+#define   GC_FEATURES1_AUTO_RESTART_TS_NONE                                  0x0
+#define   GC_FEATURES1_AUTO_RESTART_TS_AVAILABLE                             0x1
 
-#define GC_MINOR_FEATURES1_BUG_FIXES4                                      9 : 9
-#define GC_MINOR_FEATURES1_BUG_FIXES4_End                                      9
-#define GC_MINOR_FEATURES1_BUG_FIXES4_Start                                    9
-#define GC_MINOR_FEATURES1_BUG_FIXES4_Type                                   U01
-#define   GC_MINOR_FEATURES1_BUG_FIXES4_NONE                                 0x0
-#define   GC_MINOR_FEATURES1_BUG_FIXES4_AVAILABLE                            0x1
+#define GC_FEATURES1_BUG_FIXES4                                            9 : 9
+#define GC_FEATURES1_BUG_FIXES4_End                                            9
+#define GC_FEATURES1_BUG_FIXES4_Start                                          9
+#define GC_FEATURES1_BUG_FIXES4_Type                                         U01
+#define   GC_FEATURES1_BUG_FIXES4_NONE                                       0x0
+#define   GC_FEATURES1_BUG_FIXES4_AVAILABLE                                  0x1
 
-#define GC_MINOR_FEATURES1_L2_WINDOWING                                  10 : 10
-#define GC_MINOR_FEATURES1_L2_WINDOWING_End                                   10
-#define GC_MINOR_FEATURES1_L2_WINDOWING_Start                                 10
-#define GC_MINOR_FEATURES1_L2_WINDOWING_Type                                 U01
-#define   GC_MINOR_FEATURES1_L2_WINDOWING_NONE                               0x0
-#define   GC_MINOR_FEATURES1_L2_WINDOWING_AVAILABLE                          0x1
+#define GC_FEATURES1_L2_WINDOWING                                        10 : 10
+#define GC_FEATURES1_L2_WINDOWING_End                                         10
+#define GC_FEATURES1_L2_WINDOWING_Start                                       10
+#define GC_FEATURES1_L2_WINDOWING_Type                                       U01
+#define   GC_FEATURES1_L2_WINDOWING_NONE                                     0x0
+#define   GC_FEATURES1_L2_WINDOWING_AVAILABLE                                0x1
 
-#define GC_MINOR_FEATURES1_HALF_FLOAT_PIPE                               11 : 11
-#define GC_MINOR_FEATURES1_HALF_FLOAT_PIPE_End                                11
-#define GC_MINOR_FEATURES1_HALF_FLOAT_PIPE_Start                              11
-#define GC_MINOR_FEATURES1_HALF_FLOAT_PIPE_Type                              U01
-#define   GC_MINOR_FEATURES1_HALF_FLOAT_PIPE_NONE                            0x0
-#define   GC_MINOR_FEATURES1_HALF_FLOAT_PIPE_AVAILABLE                       0x1
+#define GC_FEATURES1_HALF_FLOAT_PIPE                                     11 : 11
+#define GC_FEATURES1_HALF_FLOAT_PIPE_End                                      11
+#define GC_FEATURES1_HALF_FLOAT_PIPE_Start                                    11
+#define GC_FEATURES1_HALF_FLOAT_PIPE_Type                                    U01
+#define   GC_FEATURES1_HALF_FLOAT_PIPE_NONE                                  0x0
+#define   GC_FEATURES1_HALF_FLOAT_PIPE_AVAILABLE                             0x1
 
-#define GC_MINOR_FEATURES1_PIXEL_DITHER                                  12 : 12
-#define GC_MINOR_FEATURES1_PIXEL_DITHER_End                                   12
-#define GC_MINOR_FEATURES1_PIXEL_DITHER_Start                                 12
-#define GC_MINOR_FEATURES1_PIXEL_DITHER_Type                                 U01
-#define   GC_MINOR_FEATURES1_PIXEL_DITHER_NONE                               0x0
-#define   GC_MINOR_FEATURES1_PIXEL_DITHER_AVAILABLE                          0x1
+#define GC_FEATURES1_PIXEL_DITHER                                        12 : 12
+#define GC_FEATURES1_PIXEL_DITHER_End                                         12
+#define GC_FEATURES1_PIXEL_DITHER_Start                                       12
+#define GC_FEATURES1_PIXEL_DITHER_Type                                       U01
+#define   GC_FEATURES1_PIXEL_DITHER_NONE                                     0x0
+#define   GC_FEATURES1_PIXEL_DITHER_AVAILABLE                                0x1
 
-#define GC_MINOR_FEATURES1_TWO_STENCIL_REFERENCE                         13 : 13
-#define GC_MINOR_FEATURES1_TWO_STENCIL_REFERENCE_End                          13
-#define GC_MINOR_FEATURES1_TWO_STENCIL_REFERENCE_Start                        13
-#define GC_MINOR_FEATURES1_TWO_STENCIL_REFERENCE_Type                        U01
-#define   GC_MINOR_FEATURES1_TWO_STENCIL_REFERENCE_NONE                      0x0
-#define   GC_MINOR_FEATURES1_TWO_STENCIL_REFERENCE_AVAILABLE                 0x1
+#define GC_FEATURES1_TWO_STENCIL_REFERENCE                               13 : 13
+#define GC_FEATURES1_TWO_STENCIL_REFERENCE_End                                13
+#define GC_FEATURES1_TWO_STENCIL_REFERENCE_Start                              13
+#define GC_FEATURES1_TWO_STENCIL_REFERENCE_Type                              U01
+#define   GC_FEATURES1_TWO_STENCIL_REFERENCE_NONE                            0x0
+#define   GC_FEATURES1_TWO_STENCIL_REFERENCE_AVAILABLE                       0x1
 
-#define GC_MINOR_FEATURES1_EXTENDED_PIXEL_FORMAT                         14 : 14
-#define GC_MINOR_FEATURES1_EXTENDED_PIXEL_FORMAT_End                          14
-#define GC_MINOR_FEATURES1_EXTENDED_PIXEL_FORMAT_Start                        14
-#define GC_MINOR_FEATURES1_EXTENDED_PIXEL_FORMAT_Type                        U01
-#define   GC_MINOR_FEATURES1_EXTENDED_PIXEL_FORMAT_NONE                      0x0
-#define   GC_MINOR_FEATURES1_EXTENDED_PIXEL_FORMAT_AVAILABLE                 0x1
+#define GC_FEATURES1_EXTENDED_PIXEL_FORMAT                               14 : 14
+#define GC_FEATURES1_EXTENDED_PIXEL_FORMAT_End                                14
+#define GC_FEATURES1_EXTENDED_PIXEL_FORMAT_Start                              14
+#define GC_FEATURES1_EXTENDED_PIXEL_FORMAT_Type                              U01
+#define   GC_FEATURES1_EXTENDED_PIXEL_FORMAT_NONE                            0x0
+#define   GC_FEATURES1_EXTENDED_PIXEL_FORMAT_AVAILABLE                       0x1
 
 /* EEZ and HZ are correct. */
-#define GC_MINOR_FEATURES1_CORRECT_MIN_MAX_DEPTH                         15 : 15
-#define GC_MINOR_FEATURES1_CORRECT_MIN_MAX_DEPTH_End                          15
-#define GC_MINOR_FEATURES1_CORRECT_MIN_MAX_DEPTH_Start                        15
-#define GC_MINOR_FEATURES1_CORRECT_MIN_MAX_DEPTH_Type                        U01
-#define   GC_MINOR_FEATURES1_CORRECT_MIN_MAX_DEPTH_NONE                      0x0
-#define   GC_MINOR_FEATURES1_CORRECT_MIN_MAX_DEPTH_AVAILABLE                 0x1
+#define GC_FEATURES1_CORRECT_MIN_MAX_DEPTH                               15 : 15
+#define GC_FEATURES1_CORRECT_MIN_MAX_DEPTH_End                                15
+#define GC_FEATURES1_CORRECT_MIN_MAX_DEPTH_Start                              15
+#define GC_FEATURES1_CORRECT_MIN_MAX_DEPTH_Type                              U01
+#define   GC_FEATURES1_CORRECT_MIN_MAX_DEPTH_NONE                            0x0
+#define   GC_FEATURES1_CORRECT_MIN_MAX_DEPTH_AVAILABLE                       0x1
 
 /* Dither and filter+alpha available. */
-#define GC_MINOR_FEATURES1_DITHER_AND_FILTER_PLUS_ALPHA_2D               16 : 16
-#define GC_MINOR_FEATURES1_DITHER_AND_FILTER_PLUS_ALPHA_2D_End                16
-#define GC_MINOR_FEATURES1_DITHER_AND_FILTER_PLUS_ALPHA_2D_Start              16
-#define GC_MINOR_FEATURES1_DITHER_AND_FILTER_PLUS_ALPHA_2D_Type              U01
-#define   GC_MINOR_FEATURES1_DITHER_AND_FILTER_PLUS_ALPHA_2D_NONE            0x0
-#define   GC_MINOR_FEATURES1_DITHER_AND_FILTER_PLUS_ALPHA_2D_AVAILABLE       0x1
+#define GC_FEATURES1_DITHER_AND_FILTER_PLUS_ALPHA_2D                     16 : 16
+#define GC_FEATURES1_DITHER_AND_FILTER_PLUS_ALPHA_2D_End                      16
+#define GC_FEATURES1_DITHER_AND_FILTER_PLUS_ALPHA_2D_Start                    16
+#define GC_FEATURES1_DITHER_AND_FILTER_PLUS_ALPHA_2D_Type                    U01
+#define   GC_FEATURES1_DITHER_AND_FILTER_PLUS_ALPHA_2D_NONE                  0x0
+#define   GC_FEATURES1_DITHER_AND_FILTER_PLUS_ALPHA_2D_AVAILABLE             0x1
 
-#define GC_MINOR_FEATURES1_BUG_FIXES5                                    17 : 17
-#define GC_MINOR_FEATURES1_BUG_FIXES5_End                                     17
-#define GC_MINOR_FEATURES1_BUG_FIXES5_Start                                   17
-#define GC_MINOR_FEATURES1_BUG_FIXES5_Type                                   U01
-#define   GC_MINOR_FEATURES1_BUG_FIXES5_NONE                                 0x0
-#define   GC_MINOR_FEATURES1_BUG_FIXES5_AVAILABLE                            0x1
+#define GC_FEATURES1_BUG_FIXES5                                          17 : 17
+#define GC_FEATURES1_BUG_FIXES5_End                                           17
+#define GC_FEATURES1_BUG_FIXES5_Start                                         17
+#define GC_FEATURES1_BUG_FIXES5_Type                                         U01
+#define   GC_FEATURES1_BUG_FIXES5_NONE                                       0x0
+#define   GC_FEATURES1_BUG_FIXES5_AVAILABLE                                  0x1
 
-#define GC_MINOR_FEATURES1_NEW_2D                                        18 : 18
-#define GC_MINOR_FEATURES1_NEW_2D_End                                         18
-#define GC_MINOR_FEATURES1_NEW_2D_Start                                       18
-#define GC_MINOR_FEATURES1_NEW_2D_Type                                       U01
-#define   GC_MINOR_FEATURES1_NEW_2D_NONE                                     0x0
-#define   GC_MINOR_FEATURES1_NEW_2D_AVAILABLE                                0x1
+#define GC_FEATURES1_NEW_2D                                              18 : 18
+#define GC_FEATURES1_NEW_2D_End                                               18
+#define GC_FEATURES1_NEW_2D_Start                                             18
+#define GC_FEATURES1_NEW_2D_Type                                             U01
+#define   GC_FEATURES1_NEW_2D_NONE                                           0x0
+#define   GC_FEATURES1_NEW_2D_AVAILABLE                                      0x1
 
-#define GC_MINOR_FEATURES1_NEW_FLOATING_POINT_ARITHMETIC                 19 : 19
-#define GC_MINOR_FEATURES1_NEW_FLOATING_POINT_ARITHMETIC_End                  19
-#define GC_MINOR_FEATURES1_NEW_FLOATING_POINT_ARITHMETIC_Start                19
-#define GC_MINOR_FEATURES1_NEW_FLOATING_POINT_ARITHMETIC_Type                U01
-#define   GC_MINOR_FEATURES1_NEW_FLOATING_POINT_ARITHMETIC_NONE              0x0
-#define   GC_MINOR_FEATURES1_NEW_FLOATING_POINT_ARITHMETIC_AVAILABLE         0x1
+#define GC_FEATURES1_NEW_FLOATING_POINT_ARITHMETIC                       19 : 19
+#define GC_FEATURES1_NEW_FLOATING_POINT_ARITHMETIC_End                        19
+#define GC_FEATURES1_NEW_FLOATING_POINT_ARITHMETIC_Start                      19
+#define GC_FEATURES1_NEW_FLOATING_POINT_ARITHMETIC_Type                      U01
+#define   GC_FEATURES1_NEW_FLOATING_POINT_ARITHMETIC_NONE                    0x0
+#define   GC_FEATURES1_NEW_FLOATING_POINT_ARITHMETIC_AVAILABLE               0x1
 
-#define GC_MINOR_FEATURES1_TEXTURE_HORIZONTAL_ALIGNMENT_SELECT           20 : 20
-#define GC_MINOR_FEATURES1_TEXTURE_HORIZONTAL_ALIGNMENT_SELECT_End            20
-#define GC_MINOR_FEATURES1_TEXTURE_HORIZONTAL_ALIGNMENT_SELECT_Start          20
-#define GC_MINOR_FEATURES1_TEXTURE_HORIZONTAL_ALIGNMENT_SELECT_Type          U01
-#define   GC_MINOR_FEATURES1_TEXTURE_HORIZONTAL_ALIGNMENT_SELECT_NONE        0x0
-#define   GC_MINOR_FEATURES1_TEXTURE_HORIZONTAL_ALIGNMENT_SELECT_AVAILABLE   0x1
+#define GC_FEATURES1_TEXTURE_HORIZONTAL_ALIGNMENT_SELECT                 20 : 20
+#define GC_FEATURES1_TEXTURE_HORIZONTAL_ALIGNMENT_SELECT_End                  20
+#define GC_FEATURES1_TEXTURE_HORIZONTAL_ALIGNMENT_SELECT_Start                20
+#define GC_FEATURES1_TEXTURE_HORIZONTAL_ALIGNMENT_SELECT_Type                U01
+#define   GC_FEATURES1_TEXTURE_HORIZONTAL_ALIGNMENT_SELECT_NONE              0x0
+#define   GC_FEATURES1_TEXTURE_HORIZONTAL_ALIGNMENT_SELECT_AVAILABLE         0x1
 
-#define GC_MINOR_FEATURES1_NON_POWER_OF_TWO                              21 : 21
-#define GC_MINOR_FEATURES1_NON_POWER_OF_TWO_End                               21
-#define GC_MINOR_FEATURES1_NON_POWER_OF_TWO_Start                             21
-#define GC_MINOR_FEATURES1_NON_POWER_OF_TWO_Type                             U01
-#define   GC_MINOR_FEATURES1_NON_POWER_OF_TWO_NONE                           0x0
-#define   GC_MINOR_FEATURES1_NON_POWER_OF_TWO_AVAILABLE                      0x1
+#define GC_FEATURES1_NON_POWER_OF_TWO                                    21 : 21
+#define GC_FEATURES1_NON_POWER_OF_TWO_End                                     21
+#define GC_FEATURES1_NON_POWER_OF_TWO_Start                                   21
+#define GC_FEATURES1_NON_POWER_OF_TWO_Type                                   U01
+#define   GC_FEATURES1_NON_POWER_OF_TWO_NONE                                 0x0
+#define   GC_FEATURES1_NON_POWER_OF_TWO_AVAILABLE                            0x1
 
-#define GC_MINOR_FEATURES1_LINEAR_TEXTURE_SUPPORT                        22 : 22
-#define GC_MINOR_FEATURES1_LINEAR_TEXTURE_SUPPORT_End                         22
-#define GC_MINOR_FEATURES1_LINEAR_TEXTURE_SUPPORT_Start                       22
-#define GC_MINOR_FEATURES1_LINEAR_TEXTURE_SUPPORT_Type                       U01
-#define   GC_MINOR_FEATURES1_LINEAR_TEXTURE_SUPPORT_NONE                     0x0
-#define   GC_MINOR_FEATURES1_LINEAR_TEXTURE_SUPPORT_AVAILABLE                0x1
+#define GC_FEATURES1_LINEAR_TEXTURE_SUPPORT                              22 : 22
+#define GC_FEATURES1_LINEAR_TEXTURE_SUPPORT_End                               22
+#define GC_FEATURES1_LINEAR_TEXTURE_SUPPORT_Start                             22
+#define GC_FEATURES1_LINEAR_TEXTURE_SUPPORT_Type                             U01
+#define   GC_FEATURES1_LINEAR_TEXTURE_SUPPORT_NONE                           0x0
+#define   GC_FEATURES1_LINEAR_TEXTURE_SUPPORT_AVAILABLE                      0x1
 
-#define GC_MINOR_FEATURES1_HALTI0                                        23 : 23
-#define GC_MINOR_FEATURES1_HALTI0_End                                         23
-#define GC_MINOR_FEATURES1_HALTI0_Start                                       23
-#define GC_MINOR_FEATURES1_HALTI0_Type                                       U01
-#define   GC_MINOR_FEATURES1_HALTI0_NONE                                     0x0
-#define   GC_MINOR_FEATURES1_HALTI0_AVAILABLE                                0x1
+#define GC_FEATURES1_HALTI0                                              23 : 23
+#define GC_FEATURES1_HALTI0_End                                               23
+#define GC_FEATURES1_HALTI0_Start                                             23
+#define GC_FEATURES1_HALTI0_Type                                             U01
+#define   GC_FEATURES1_HALTI0_NONE                                           0x0
+#define   GC_FEATURES1_HALTI0_AVAILABLE                                      0x1
 
-#define GC_MINOR_FEATURES1_CORRECT_OVERFLOW_VG                           24 : 24
-#define GC_MINOR_FEATURES1_CORRECT_OVERFLOW_VG_End                            24
-#define GC_MINOR_FEATURES1_CORRECT_OVERFLOW_VG_Start                          24
-#define GC_MINOR_FEATURES1_CORRECT_OVERFLOW_VG_Type                          U01
-#define   GC_MINOR_FEATURES1_CORRECT_OVERFLOW_VG_NONE                        0x0
-#define   GC_MINOR_FEATURES1_CORRECT_OVERFLOW_VG_AVAILABLE                   0x1
+#define GC_FEATURES1_CORRECT_OVERFLOW_VG                                 24 : 24
+#define GC_FEATURES1_CORRECT_OVERFLOW_VG_End                                  24
+#define GC_FEATURES1_CORRECT_OVERFLOW_VG_Start                                24
+#define GC_FEATURES1_CORRECT_OVERFLOW_VG_Type                                U01
+#define   GC_FEATURES1_CORRECT_OVERFLOW_VG_NONE                              0x0
+#define   GC_FEATURES1_CORRECT_OVERFLOW_VG_AVAILABLE                         0x1
 
-#define GC_MINOR_FEATURES1_NEGATIVE_LOG_FIX                              25 : 25
-#define GC_MINOR_FEATURES1_NEGATIVE_LOG_FIX_End                               25
-#define GC_MINOR_FEATURES1_NEGATIVE_LOG_FIX_Start                             25
-#define GC_MINOR_FEATURES1_NEGATIVE_LOG_FIX_Type                             U01
-#define   GC_MINOR_FEATURES1_NEGATIVE_LOG_FIX_NONE                           0x0
-#define   GC_MINOR_FEATURES1_NEGATIVE_LOG_FIX_AVAILABLE                      0x1
+#define GC_FEATURES1_NEGATIVE_LOG_FIX                                    25 : 25
+#define GC_FEATURES1_NEGATIVE_LOG_FIX_End                                     25
+#define GC_FEATURES1_NEGATIVE_LOG_FIX_Start                                   25
+#define GC_FEATURES1_NEGATIVE_LOG_FIX_Type                                   U01
+#define   GC_FEATURES1_NEGATIVE_LOG_FIX_NONE                                 0x0
+#define   GC_FEATURES1_NEGATIVE_LOG_FIX_AVAILABLE                            0x1
 
-#define GC_MINOR_FEATURES1_RESOLVE_OFFSET                                26 : 26
-#define GC_MINOR_FEATURES1_RESOLVE_OFFSET_End                                 26
-#define GC_MINOR_FEATURES1_RESOLVE_OFFSET_Start                               26
-#define GC_MINOR_FEATURES1_RESOLVE_OFFSET_Type                               U01
-#define   GC_MINOR_FEATURES1_RESOLVE_OFFSET_NONE                             0x0
-#define   GC_MINOR_FEATURES1_RESOLVE_OFFSET_AVAILABLE                        0x1
+#define GC_FEATURES1_RESOLVE_OFFSET                                      26 : 26
+#define GC_FEATURES1_RESOLVE_OFFSET_End                                       26
+#define GC_FEATURES1_RESOLVE_OFFSET_Start                                     26
+#define GC_FEATURES1_RESOLVE_OFFSET_Type                                     U01
+#define   GC_FEATURES1_RESOLVE_OFFSET_NONE                                   0x0
+#define   GC_FEATURES1_RESOLVE_OFFSET_AVAILABLE                              0x1
 
-#define GC_MINOR_FEATURES1_OK_TO_GATE_AXI_CLOCK                          27 : 27
-#define GC_MINOR_FEATURES1_OK_TO_GATE_AXI_CLOCK_End                           27
-#define GC_MINOR_FEATURES1_OK_TO_GATE_AXI_CLOCK_Start                         27
-#define GC_MINOR_FEATURES1_OK_TO_GATE_AXI_CLOCK_Type                         U01
-#define   GC_MINOR_FEATURES1_OK_TO_GATE_AXI_CLOCK_NONE                       0x0
-#define   GC_MINOR_FEATURES1_OK_TO_GATE_AXI_CLOCK_AVAILABLE                  0x1
+#define GC_FEATURES1_OK_TO_GATE_AXI_CLOCK                                27 : 27
+#define GC_FEATURES1_OK_TO_GATE_AXI_CLOCK_End                                 27
+#define GC_FEATURES1_OK_TO_GATE_AXI_CLOCK_Start                               27
+#define GC_FEATURES1_OK_TO_GATE_AXI_CLOCK_Type                               U01
+#define   GC_FEATURES1_OK_TO_GATE_AXI_CLOCK_NONE                             0x0
+#define   GC_FEATURES1_OK_TO_GATE_AXI_CLOCK_AVAILABLE                        0x1
 
-#define GC_MINOR_FEATURES1_MMU                                           28 : 28
-#define GC_MINOR_FEATURES1_MMU_End                                            28
-#define GC_MINOR_FEATURES1_MMU_Start                                          28
-#define GC_MINOR_FEATURES1_MMU_Type                                          U01
-#define   GC_MINOR_FEATURES1_MMU_NONE                                        0x0
-#define   GC_MINOR_FEATURES1_MMU_AVAILABLE                                   0x1
+#define GC_FEATURES1_MMU                                                 28 : 28
+#define GC_FEATURES1_MMU_End                                                  28
+#define GC_FEATURES1_MMU_Start                                                28
+#define GC_FEATURES1_MMU_Type                                                U01
+#define   GC_FEATURES1_MMU_NONE                                              0x0
+#define   GC_FEATURES1_MMU_AVAILABLE                                         0x1
 
-#define GC_MINOR_FEATURES1_WIDE_LINE                                     29 : 29
-#define GC_MINOR_FEATURES1_WIDE_LINE_End                                      29
-#define GC_MINOR_FEATURES1_WIDE_LINE_Start                                    29
-#define GC_MINOR_FEATURES1_WIDE_LINE_Type                                    U01
-#define   GC_MINOR_FEATURES1_WIDE_LINE_NONE                                  0x0
-#define   GC_MINOR_FEATURES1_WIDE_LINE_AVAILABLE                             0x1
+#define GC_FEATURES1_WIDE_LINE                                           29 : 29
+#define GC_FEATURES1_WIDE_LINE_End                                            29
+#define GC_FEATURES1_WIDE_LINE_Start                                          29
+#define GC_FEATURES1_WIDE_LINE_Type                                          U01
+#define   GC_FEATURES1_WIDE_LINE_NONE                                        0x0
+#define   GC_FEATURES1_WIDE_LINE_AVAILABLE                                   0x1
 
-#define GC_MINOR_FEATURES1_BUG_FIXES6                                    30 : 30
-#define GC_MINOR_FEATURES1_BUG_FIXES6_End                                     30
-#define GC_MINOR_FEATURES1_BUG_FIXES6_Start                                   30
-#define GC_MINOR_FEATURES1_BUG_FIXES6_Type                                   U01
-#define   GC_MINOR_FEATURES1_BUG_FIXES6_NONE                                 0x0
-#define   GC_MINOR_FEATURES1_BUG_FIXES6_AVAILABLE                            0x1
+#define GC_FEATURES1_BUG_FIXES6                                          30 : 30
+#define GC_FEATURES1_BUG_FIXES6_End                                           30
+#define GC_FEATURES1_BUG_FIXES6_Start                                         30
+#define GC_FEATURES1_BUG_FIXES6_Type                                         U01
+#define   GC_FEATURES1_BUG_FIXES6_NONE                                       0x0
+#define   GC_FEATURES1_BUG_FIXES6_AVAILABLE                                  0x1
 
-#define GC_MINOR_FEATURES1_FC_FLUSH_STALL                                31 : 31
-#define GC_MINOR_FEATURES1_FC_FLUSH_STALL_End                                 31
-#define GC_MINOR_FEATURES1_FC_FLUSH_STALL_Start                               31
-#define GC_MINOR_FEATURES1_FC_FLUSH_STALL_Type                               U01
-#define   GC_MINOR_FEATURES1_FC_FLUSH_STALL_NONE                             0x0
-#define   GC_MINOR_FEATURES1_FC_FLUSH_STALL_AVAILABLE                        0x1
+#define GC_FEATURES1_FC_FLUSH_STALL                                      31 : 31
+#define GC_FEATURES1_FC_FLUSH_STALL_End                                       31
+#define GC_FEATURES1_FC_FLUSH_STALL_Start                                     31
+#define GC_FEATURES1_FC_FLUSH_STALL_Type                                     U01
+#define   GC_FEATURES1_FC_FLUSH_STALL_NONE                                   0x0
+#define   GC_FEATURES1_FC_FLUSH_STALL_AVAILABLE                              0x1
+
+union gcfeatures1 {
+	struct {
+		/* GC_FEATURES1_Address:RSUV_SWIZZLE */
+		unsigned int rsuvswizzle:1;
+
+		/* GC_FEATURES1_Address:V2_COMPRESSION */
+		unsigned int v2compression:1;
+
+		/* GC_FEATURES1_Address:VG_DOUBLE_BUFFER */
+		unsigned int vgdblbuffer:1;
+
+		/* GC_FEATURES1_Address:BUG_FIXES1 */
+		unsigned int bugfixes1:1;
+
+		/* GC_FEATURES1_Address:BUG_FIXES2 */
+		unsigned int bugfixes2:1;
+
+		/* GC_FEATURES1_Address:TEXTURE_STRIDE */
+		unsigned int txstride:1;
+
+		/* GC_FEATURES1_Address:BUG_FIXES3 */
+		unsigned int bugfixes3:1;
+
+		/* GC_FEATURES1_Address:CORRECT_AUTO_DISABLE */
+		unsigned int correctautodisable:1;
+
+		/* GC_FEATURES1_Address:AUTO_RESTART_TS */
+		unsigned int autorestartts:1;
+
+		/* GC_FEATURES1_Address:BUG_FIXES4 */
+		unsigned int bugfixes4:1;
+
+		/* GC_FEATURES1_Address:L2_WINDOWING */
+		unsigned int l2win:1;
+
+		/* GC_FEATURES1_Address:HALF_FLOAT_PIPE */
+		unsigned int halffloatpipe:1;
+
+		/* GC_FEATURES1_Address:PIXEL_DITHER */
+		unsigned int pixeldither:1;
+
+		/* GC_FEATURES1_Address:TWO_STENCIL_REFERENCE */
+		unsigned int twostencilref:1;
+
+		/* GC_FEATURES1_Address:EXTENDED_PIXEL_FORMAT */
+		unsigned int pixformatex:1;
+
+		/* GC_FEATURES1_Address:CORRECT_MIN_MAX_DEPTH */
+		unsigned int correctminmaxdepth:1;
+
+		/* GC_FEATURES1_Address:DITHER_AND_FILTER_PLUS_ALPHA_2D */
+		unsigned int ditherfilter:1;
+
+		/* GC_FEATURES1_Address:BUG_FIXES5 */
+		unsigned int bugfixes5:1;
+
+		/* GC_FEATURES1_Address:NEW_2D */
+		unsigned int new2d:1;
+
+		/* GC_FEATURES1_Address:NEW_FLOATING_POINT_ARITHMETIC */
+		unsigned int newfp:1;
+
+		/* GC_FEATURES1_Address:TEXTURE_HORIZONTAL_ALIGNMENT_SELECT */
+		unsigned int txalign:1;
+
+		/* GC_FEATURES1_Address:NON_POWER_OF_TWO */
+		unsigned int nonpowof2:1;
+
+		/* GC_FEATURES1_Address:LINEAR_TEXTURE_SUPPORT */
+		unsigned int lineartx:1;
+
+		/* GC_FEATURES1_Address:HALTI0 */
+		unsigned int halti0:1;
+
+		/* GC_FEATURES1_Address:CORRECT_OVERFLOW_VG */
+		unsigned int correctoverflowvg:1;
+
+		/* GC_FEATURES1_Address:NEGATIVE_LOG_FIX */
+		unsigned int neglogfix:1;
+
+		/* GC_FEATURES1_Address:RESOLVE_OFFSET */
+		unsigned int rsoffset:1;
+
+		/* GC_FEATURES1_Address:OK_TO_GATE_AXI_CLOCK */
+		unsigned int axiclockgating:1;
+
+		/* GC_FEATURES1_Address:MMU */
+		unsigned int mmu:1;
+
+		/* GC_FEATURES1_Address:WIDE_LINE */
+		unsigned int wideline:1;
+
+		/* GC_FEATURES1_Address:BUG_FIXES6 */
+		unsigned int bugfixes6:1;
+
+		/* GC_FEATURES1_Address:FC_FLUSH_STALL */
+		unsigned int fcflushstall:1;
+	} reg;
+
+	unsigned int raw;
+};
+
+/*******************************************************************************
+** Register GCMinorFeatures2
+*/
+
+/* Shows which features are enabled in this chip. This register has no set    **
+** reset value. It varies with the implementation.                            */
+
+#define GC_FEATURES2_Address                                             0x00084
+#define GC_FEATURES2_MSB                                                      15
+#define GC_FEATURES2_LSB                                                       0
+#define GC_FEATURES2_BLK                                                       0
+#define GC_FEATURES2_Count                                                     1
+#define GC_FEATURES2_FieldMask                                        0xFFFFFFFF
+#define GC_FEATURES2_ReadMask                                         0xFFFFFFFF
+#define GC_FEATURES2_WriteMask                                        0x00000000
+#define GC_FEATURES2_ResetValue                                       0x00000000
+
+#define GC_FEATURES2_LINE_LOOP                                             0 : 0
+#define GC_FEATURES2_LINE_LOOP_End                                             0
+#define GC_FEATURES2_LINE_LOOP_Start                                           0
+#define GC_FEATURES2_LINE_LOOP_Type                                          U01
+#define   GC_FEATURES2_LINE_LOOP_NONE                                        0x0
+#define   GC_FEATURES2_LINE_LOOP_AVAILABLE                                   0x1
+
+#define GC_FEATURES2_LOGIC_OP                                              1 : 1
+#define GC_FEATURES2_LOGIC_OP_End                                              1
+#define GC_FEATURES2_LOGIC_OP_Start                                            1
+#define GC_FEATURES2_LOGIC_OP_Type                                           U01
+#define   GC_FEATURES2_LOGIC_OP_NONE                                         0x0
+#define   GC_FEATURES2_LOGIC_OP_AVAILABLE                                    0x1
+
+#define GC_FEATURES2_SEAMLESS_CUBE_MAP                                     2 : 2
+#define GC_FEATURES2_SEAMLESS_CUBE_MAP_End                                     2
+#define GC_FEATURES2_SEAMLESS_CUBE_MAP_Start                                   2
+#define GC_FEATURES2_SEAMLESS_CUBE_MAP_Type                                  U01
+#define   GC_FEATURES2_SEAMLESS_CUBE_MAP_NONE                                0x0
+#define   GC_FEATURES2_SEAMLESS_CUBE_MAP_AVAILABLE                           0x1
+
+#define GC_FEATURES2_SUPER_TILED_TEXTURE                                   3 : 3
+#define GC_FEATURES2_SUPER_TILED_TEXTURE_End                                   3
+#define GC_FEATURES2_SUPER_TILED_TEXTURE_Start                                 3
+#define GC_FEATURES2_SUPER_TILED_TEXTURE_Type                                U01
+#define   GC_FEATURES2_SUPER_TILED_TEXTURE_NONE                              0x0
+#define   GC_FEATURES2_SUPER_TILED_TEXTURE_AVAILABLE                         0x1
+
+#define GC_FEATURES2_LINEAR_PE                                             4 : 4
+#define GC_FEATURES2_LINEAR_PE_End                                             4
+#define GC_FEATURES2_LINEAR_PE_Start                                           4
+#define GC_FEATURES2_LINEAR_PE_Type                                          U01
+#define   GC_FEATURES2_LINEAR_PE_NONE                                        0x0
+#define   GC_FEATURES2_LINEAR_PE_AVAILABLE                                   0x1
+
+#define GC_FEATURES2_RECT_PRIMITIVE                                        5 : 5
+#define GC_FEATURES2_RECT_PRIMITIVE_End                                        5
+#define GC_FEATURES2_RECT_PRIMITIVE_Start                                      5
+#define GC_FEATURES2_RECT_PRIMITIVE_Type                                     U01
+#define   GC_FEATURES2_RECT_PRIMITIVE_NONE                                   0x0
+#define   GC_FEATURES2_RECT_PRIMITIVE_AVAILABLE                              0x1
+
+#define GC_FEATURES2_COMPOSITION                                           6 : 6
+#define GC_FEATURES2_COMPOSITION_End                                           6
+#define GC_FEATURES2_COMPOSITION_Start                                         6
+#define GC_FEATURES2_COMPOSITION_Type                                        U01
+#define   GC_FEATURES2_COMPOSITION_NONE                                      0x0
+#define   GC_FEATURES2_COMPOSITION_AVAILABLE                                 0x1
+
+#define GC_FEATURES2_CORRECT_AUTO_DISABLE_COUNT_WIDTH                      7 : 7
+#define GC_FEATURES2_CORRECT_AUTO_DISABLE_COUNT_WIDTH_End                      7
+#define GC_FEATURES2_CORRECT_AUTO_DISABLE_COUNT_WIDTH_Start                    7
+#define GC_FEATURES2_CORRECT_AUTO_DISABLE_COUNT_WIDTH_Type                   U01
+#define   GC_FEATURES2_CORRECT_AUTO_DISABLE_COUNT_WIDTH_NONE                 0x0
+#define   GC_FEATURES2_CORRECT_AUTO_DISABLE_COUNT_WIDTH_AVAILABLE            0x1
+
+#define GC_FEATURES2_PE_SWIZZLE                                            8 : 8
+#define GC_FEATURES2_PE_SWIZZLE_End                                            8
+#define GC_FEATURES2_PE_SWIZZLE_Start                                          8
+#define GC_FEATURES2_PE_SWIZZLE_Type                                         U01
+#define   GC_FEATURES2_PE_SWIZZLE_NONE                                       0x0
+#define   GC_FEATURES2_PE_SWIZZLE_AVAILABLE                                  0x1
+
+#define GC_FEATURES2_END_EVENT                                             9 : 9
+#define GC_FEATURES2_END_EVENT_End                                             9
+#define GC_FEATURES2_END_EVENT_Start                                           9
+#define GC_FEATURES2_END_EVENT_Type                                          U01
+#define   GC_FEATURES2_END_EVENT_NONE                                        0x0
+#define   GC_FEATURES2_END_EVENT_AVAILABLE                                   0x1
+
+#define GC_FEATURES2_S1S8                                                10 : 10
+#define GC_FEATURES2_S1S8_End                                                 10
+#define GC_FEATURES2_S1S8_Start                                               10
+#define GC_FEATURES2_S1S8_Type                                               U01
+#define   GC_FEATURES2_S1S8_NONE                                             0x0
+#define   GC_FEATURES2_S1S8_AVAILABLE                                        0x1
+
+#define GC_FEATURES2_HALTI1                                              11 : 11
+#define GC_FEATURES2_HALTI1_End                                               11
+#define GC_FEATURES2_HALTI1_Start                                             11
+#define GC_FEATURES2_HALTI1_Type                                             U01
+#define   GC_FEATURES2_HALTI1_NONE                                           0x0
+#define   GC_FEATURES2_HALTI1_AVAILABLE                                      0x1
+
+#define GC_FEATURES2_RGB888                                              12 : 12
+#define GC_FEATURES2_RGB888_End                                               12
+#define GC_FEATURES2_RGB888_Start                                             12
+#define GC_FEATURES2_RGB888_Type                                             U01
+#define   GC_FEATURES2_RGB888_NONE                                           0x0
+#define   GC_FEATURES2_RGB888_AVAILABLE                                      0x1
+
+#define GC_FEATURES2_TX__YUV_ASSEMBLER                                   13 : 13
+#define GC_FEATURES2_TX__YUV_ASSEMBLER_End                                    13
+#define GC_FEATURES2_TX__YUV_ASSEMBLER_Start                                  13
+#define GC_FEATURES2_TX__YUV_ASSEMBLER_Type                                  U01
+#define   GC_FEATURES2_TX__YUV_ASSEMBLER_NONE                                0x0
+#define   GC_FEATURES2_TX__YUV_ASSEMBLER_AVAILABLE                           0x1
+
+#define GC_FEATURES2_DYNAMIC_FREQUENCY_SCALING                           14 : 14
+#define GC_FEATURES2_DYNAMIC_FREQUENCY_SCALING_End                            14
+#define GC_FEATURES2_DYNAMIC_FREQUENCY_SCALING_Start                          14
+#define GC_FEATURES2_DYNAMIC_FREQUENCY_SCALING_Type                          U01
+#define   GC_FEATURES2_DYNAMIC_FREQUENCY_SCALING_NONE                        0x0
+#define   GC_FEATURES2_DYNAMIC_FREQUENCY_SCALING_AVAILABLE                   0x1
+
+#define GC_FEATURES2_TX_FILTER                                           15 : 15
+#define GC_FEATURES2_TX_FILTER_End                                            15
+#define GC_FEATURES2_TX_FILTER_Start                                          15
+#define GC_FEATURES2_TX_FILTER_Type                                          U01
+#define   GC_FEATURES2_TX_FILTER_NONE                                        0x0
+#define   GC_FEATURES2_TX_FILTER_AVAILABLE                                   0x1
+
+#define GC_FEATURES2_FULL_DIRECT_FB                                      16 : 16
+#define GC_FEATURES2_FULL_DIRECT_FB_End                                       16
+#define GC_FEATURES2_FULL_DIRECT_FB_Start                                     16
+#define GC_FEATURES2_FULL_DIRECT_FB_Type                                     U01
+#define   GC_FEATURES2_FULL_DIRECT_FB_NONE                                   0x0
+#define   GC_FEATURES2_FULL_DIRECT_FB_AVAILABLE                              0x1
+
+#define GC_FEATURES2_ONE_PASS_2D_FILTER                                  17 : 17
+#define GC_FEATURES2_ONE_PASS_2D_FILTER_End                                   17
+#define GC_FEATURES2_ONE_PASS_2D_FILTER_Start                                 17
+#define GC_FEATURES2_ONE_PASS_2D_FILTER_Type                                 U01
+#define   GC_FEATURES2_ONE_PASS_2D_FILTER_NONE                               0x0
+#define   GC_FEATURES2_ONE_PASS_2D_FILTER_AVAILABLE                          0x1
+
+#define GC_FEATURES2_THREAD_WALKER_IN_PS                                 18 : 18
+#define GC_FEATURES2_THREAD_WALKER_IN_PS_End                                  18
+#define GC_FEATURES2_THREAD_WALKER_IN_PS_Start                                18
+#define GC_FEATURES2_THREAD_WALKER_IN_PS_Type                                U01
+#define   GC_FEATURES2_THREAD_WALKER_IN_PS_NONE                              0x0
+#define   GC_FEATURES2_THREAD_WALKER_IN_PS_AVAILABLE                         0x1
+
+#define GC_FEATURES2_TILE_FILLER                                         19 : 19
+#define GC_FEATURES2_TILE_FILLER_End                                          19
+#define GC_FEATURES2_TILE_FILLER_Start                                        19
+#define GC_FEATURES2_TILE_FILLER_Type                                        U01
+#define   GC_FEATURES2_TILE_FILLER_NONE                                      0x0
+#define   GC_FEATURES2_TILE_FILLER_AVAILABLE                                 0x1
+
+#define GC_FEATURES2_YUV_STANDARD                                        20 : 20
+#define GC_FEATURES2_YUV_STANDARD_End                                         20
+#define GC_FEATURES2_YUV_STANDARD_Start                                       20
+#define GC_FEATURES2_YUV_STANDARD_Type                                       U01
+#define   GC_FEATURES2_YUV_STANDARD_NONE                                     0x0
+#define   GC_FEATURES2_YUV_STANDARD_AVAILABLE                                0x1
+
+#define GC_FEATURES2_MULTI_SOURCE_BLT                                    21 : 21
+#define GC_FEATURES2_MULTI_SOURCE_BLT_End                                     21
+#define GC_FEATURES2_MULTI_SOURCE_BLT_Start                                   21
+#define GC_FEATURES2_MULTI_SOURCE_BLT_Type                                   U01
+#define   GC_FEATURES2_MULTI_SOURCE_BLT_NONE                                 0x0
+#define   GC_FEATURES2_MULTI_SOURCE_BLT_AVAILABLE                            0x1
+
+#define GC_FEATURES2_YUV_CONVERSION                                      22 : 22
+#define GC_FEATURES2_YUV_CONVERSION_End                                       22
+#define GC_FEATURES2_YUV_CONVERSION_Start                                     22
+#define GC_FEATURES2_YUV_CONVERSION_Type                                     U01
+#define   GC_FEATURES2_YUV_CONVERSION_NONE                                   0x0
+#define   GC_FEATURES2_YUV_CONVERSION_AVAILABLE                              0x1
+
+#define GC_FEATURES2_FLUSH_FIXED_2D                                      23 : 23
+#define GC_FEATURES2_FLUSH_FIXED_2D_End                                       23
+#define GC_FEATURES2_FLUSH_FIXED_2D_Start                                     23
+#define GC_FEATURES2_FLUSH_FIXED_2D_Type                                     U01
+#define   GC_FEATURES2_FLUSH_FIXED_2D_NONE                                   0x0
+#define   GC_FEATURES2_FLUSH_FIXED_2D_AVAILABLE                              0x1
+
+#define GC_FEATURES2_INTERLEAVER                                         24 : 24
+#define GC_FEATURES2_INTERLEAVER_End                                          24
+#define GC_FEATURES2_INTERLEAVER_Start                                        24
+#define GC_FEATURES2_INTERLEAVER_Type                                        U01
+#define   GC_FEATURES2_INTERLEAVER_NONE                                      0x0
+#define   GC_FEATURES2_INTERLEAVER_AVAILABLE                                 0x1
+
+#define GC_FEATURES2_MIXED_STREAMS                                       25 : 25
+#define GC_FEATURES2_MIXED_STREAMS_End                                        25
+#define GC_FEATURES2_MIXED_STREAMS_Start                                      25
+#define GC_FEATURES2_MIXED_STREAMS_Type                                      U01
+#define   GC_FEATURES2_MIXED_STREAMS_NONE                                    0x0
+#define   GC_FEATURES2_MIXED_STREAMS_AVAILABLE                               0x1
+
+#define GC_FEATURES2_L2_CACHE_FOR_2D_420                                 26 : 26
+#define GC_FEATURES2_L2_CACHE_FOR_2D_420_End                                  26
+#define GC_FEATURES2_L2_CACHE_FOR_2D_420_Start                                26
+#define GC_FEATURES2_L2_CACHE_FOR_2D_420_Type                                U01
+#define   GC_FEATURES2_L2_CACHE_FOR_2D_420_NONE                              0x0
+#define   GC_FEATURES2_L2_CACHE_FOR_2D_420_AVAILABLE                         0x1
+
+#define GC_FEATURES2_BUG_FIXES7                                          27 : 27
+#define GC_FEATURES2_BUG_FIXES7_End                                           27
+#define GC_FEATURES2_BUG_FIXES7_Start                                         27
+#define GC_FEATURES2_BUG_FIXES7_Type                                         U01
+#define   GC_FEATURES2_BUG_FIXES7_NONE                                       0x0
+#define   GC_FEATURES2_BUG_FIXES7_AVAILABLE                                  0x1
+
+#define GC_FEATURES2_NO_INDEX_PATTERN                                    28 : 28
+#define GC_FEATURES2_NO_INDEX_PATTERN_End                                     28
+#define GC_FEATURES2_NO_INDEX_PATTERN_Start                                   28
+#define GC_FEATURES2_NO_INDEX_PATTERN_Type                                   U01
+#define   GC_FEATURES2_NO_INDEX_PATTERN_NONE                                 0x0
+#define   GC_FEATURES2_NO_INDEX_PATTERN_AVAILABLE                            0x1
+
+#define GC_FEATURES2_TEXTURE_TILE_STATUS                                 29 : 29
+#define GC_FEATURES2_TEXTURE_TILE_STATUS_End                                  29
+#define GC_FEATURES2_TEXTURE_TILE_STATUS_Start                                29
+#define GC_FEATURES2_TEXTURE_TILE_STATUS_Type                                U01
+#define   GC_FEATURES2_TEXTURE_TILE_STATUS_NONE                              0x0
+#define   GC_FEATURES2_TEXTURE_TILE_STATUS_AVAILABLE                         0x1
+
+#define GC_FEATURES2_DECOMPRESS_Z16                                      30 : 30
+#define GC_FEATURES2_DECOMPRESS_Z16_End                                       30
+#define GC_FEATURES2_DECOMPRESS_Z16_Start                                     30
+#define GC_FEATURES2_DECOMPRESS_Z16_Type                                     U01
+#define   GC_FEATURES2_DECOMPRESS_Z16_NONE                                   0x0
+#define   GC_FEATURES2_DECOMPRESS_Z16_AVAILABLE                              0x1
+
+#define GC_FEATURES2_BUG_FIXES8                                          31 : 31
+#define GC_FEATURES2_BUG_FIXES8_End                                           31
+#define GC_FEATURES2_BUG_FIXES8_Start                                         31
+#define GC_FEATURES2_BUG_FIXES8_Type                                         U01
+#define   GC_FEATURES2_BUG_FIXES8_NONE                                       0x0
+#define   GC_FEATURES2_BUG_FIXES8_AVAILABLE                                  0x1
+
+union gcfeatures2 {
+	struct {
+		/* GC_FEATURES2_Address:LINE_LOOP */
+		unsigned int lineloop:1;
+
+		/* GC_FEATURES2_Address:LOGIC_OP */
+		unsigned int logop:1;
+
+		/* GC_FEATURES2_Address:SEAMLESS_CUBE_MAP */
+		unsigned int cubemap:1;
+
+		/* GC_FEATURES2_Address:SUPER_TILED_TEXTURE */
+		unsigned int supertiledtx:1;
+
+		/* GC_FEATURES2_Address:LINEAR_PE */
+		unsigned int linearpe:1;
+
+		/* GC_FEATURES2_Address:RECT_PRIMITIVE */
+		unsigned int rectprim:1;
+
+		/* GC_FEATURES2_Address:COMPOSITION */
+		unsigned int composition:1;
+
+		/* GC_FEATURES2_Address:CORRECT_AUTO_DISABLE_COUNT_WIDTH */
+		unsigned int correctcountwidth:1;
+
+		/* GC_FEATURES2_Address:PE_SWIZZLE */
+		unsigned int peswizzle:1;
+
+		/* GC_FEATURES2_Address:END_EVENT */
+		unsigned int endevent:1;
+
+		/* GC_FEATURES2_Address:S1S8 */
+		unsigned int s1s8:1;
+
+		/* GC_FEATURES2_Address:HALTI1 */
+		unsigned int halti1:1;
+
+		/* GC_FEATURES2_Address:RGB888 */
+		unsigned int rgb888:1;
+
+		/* GC_FEATURES2_Address:TX__YUV_ASSEMBLER */
+		unsigned int txyuvasm:1;
+
+		/* GC_FEATURES2_Address:DYNAMIC_FREQUENCY_SCALING */
+		unsigned int dynscaling:1;
+
+		/* GC_FEATURES2_Address:TX_FILTER */
+		unsigned int txfilter:1;
+
+		/* GC_FEATURES2_Address:FULL_DIRECT_FB */
+		unsigned int dfb:1;
+
+		/* GC_FEATURES2_Address:ONE_PASS_2D_FILTER */
+		unsigned int onepassfilter:1;
+
+		/* GC_FEATURES2_Address:THREAD_WALKER_IN_PS */
+		unsigned int pstw:1;
+
+		/* GC_FEATURES2_Address:TILE_FILLER */
+		unsigned int tilefiller:1;
+
+		/* GC_FEATURES2_Address:YUV_STANDARD */
+		unsigned int yuvstd:1;
+
+		/* GC_FEATURES2_Address:MULTI_SOURCE_BLT */
+		unsigned int multisrc:1;
+
+		/* GC_FEATURES2_Address:YUV_CONVERSION */
+		unsigned int yuvconvert:1;
+
+		/* GC_FEATURES2_Address:FLUSH_FIXED_2D */
+		unsigned int flushfixed2d:1;
+
+		/* GC_FEATURES2_Address:INTERLEAVER */
+		unsigned int interleaver:1;
+
+		/* GC_FEATURES2_Address:MIXED_STREAMS */
+		unsigned int mixedstreams:1;
+
+		/* GC_FEATURES2_Address:L2_CACHE_FOR_2D_420 */
+		unsigned int l2cachefor420:1;
+
+		/* GC_FEATURES2_Address:BUG_FIXES7 */
+		unsigned int bugfixes7:1;
+
+		/* GC_FEATURES2_Address:NO_INDEX_PATTERN */
+		unsigned int noindexpatern:1;
+
+		/* GC_FEATURES2_Address:TEXTURE_TILE_STATUS */
+		unsigned int tilestatustx:1;
+
+		/* GC_FEATURES2_Address:DECOMPRESS_Z16 */
+		unsigned int decompressz16:1;
+
+		/* GC_FEATURES2_Address:BUG_FIXES8 */
+		unsigned int bugfixes8:1;
+	} reg;
+
+	unsigned int raw;
+};
+
+/*******************************************************************************
+** Register GCMinorFeatures3
+*/
+
+/* Shows which features are enabled in this chip. This register has no set    **
+** reset value, it varies with the implementation.                            */
+
+#define GC_FEATURES3_Address                                             0x00088
+#define GC_FEATURES3_MSB                                                      15
+#define GC_FEATURES3_LSB                                                       0
+#define GC_FEATURES3_BLK                                                       0
+#define GC_FEATURES3_Count                                                     1
+#define GC_FEATURES3_FieldMask                                        0x003FFFFF
+#define GC_FEATURES3_ReadMask                                         0x003FFFFF
+#define GC_FEATURES3_WriteMask                                        0x00000000
+#define GC_FEATURES3_ResetValue                                       0x00000000
+
+#define GC_FEATURES3_DE_ROTATION_STALL_FIX                                 0 : 0
+#define GC_FEATURES3_DE_ROTATION_STALL_FIX_End                                 0
+#define GC_FEATURES3_DE_ROTATION_STALL_FIX_Start                               0
+#define GC_FEATURES3_DE_ROTATION_STALL_FIX_Type                              U01
+#define   GC_FEATURES3_DE_ROTATION_STALL_FIX_NONE                            0x0
+#define   GC_FEATURES3_DE_ROTATION_STALL_FIX_AVAILABLE                       0x1
+
+#define GC_FEATURES3_OCL_ONLY                                              1 : 1
+#define GC_FEATURES3_OCL_ONLY_End                                              1
+#define GC_FEATURES3_OCL_ONLY_Start                                            1
+#define GC_FEATURES3_OCL_ONLY_Type                                           U01
+#define   GC_FEATURES3_OCL_ONLY_NONE                                         0x0
+#define   GC_FEATURES3_OCL_ONLY_AVAILABLE                                    0x1
+
+#define GC_FEATURES3_NEW_FEATURES0                                         2 : 2
+#define GC_FEATURES3_NEW_FEATURES0_End                                         2
+#define GC_FEATURES3_NEW_FEATURES0_Start                                       2
+#define GC_FEATURES3_NEW_FEATURES0_Type                                      U01
+#define   GC_FEATURES3_NEW_FEATURES0_NONE                                    0x0
+#define   GC_FEATURES3_NEW_FEATURES0_AVAILABLE                               0x1
+
+#define GC_FEATURES3_INSTRUCTION_CACHE                                     3 : 3
+#define GC_FEATURES3_INSTRUCTION_CACHE_End                                     3
+#define GC_FEATURES3_INSTRUCTION_CACHE_Start                                   3
+#define GC_FEATURES3_INSTRUCTION_CACHE_Type                                  U01
+#define   GC_FEATURES3_INSTRUCTION_CACHE_NONE                                0x0
+#define   GC_FEATURES3_INSTRUCTION_CACHE_AVAILABLE                           0x1
+
+#define GC_FEATURES3_GEOMETRY_SHADER                                       4 : 4
+#define GC_FEATURES3_GEOMETRY_SHADER_End                                       4
+#define GC_FEATURES3_GEOMETRY_SHADER_Start                                     4
+#define GC_FEATURES3_GEOMETRY_SHADER_Type                                    U01
+#define   GC_FEATURES3_GEOMETRY_SHADER_NONE                                  0x0
+#define   GC_FEATURES3_GEOMETRY_SHADER_AVAILABLE                             0x1
+
+#define GC_FEATURES3_TEX_COMPRESSION_SUPERTILED                            5 : 5
+#define GC_FEATURES3_TEX_COMPRESSION_SUPERTILED_End                            5
+#define GC_FEATURES3_TEX_COMPRESSION_SUPERTILED_Start                          5
+#define GC_FEATURES3_TEX_COMPRESSION_SUPERTILED_Type                         U01
+#define   GC_FEATURES3_TEX_COMPRESSION_SUPERTILED_NONE                       0x0
+#define   GC_FEATURES3_TEX_COMPRESSION_SUPERTILED_AVAILABLE                  0x1
+
+#define GC_FEATURES3_GENERICS                                              6 : 6
+#define GC_FEATURES3_GENERICS_End                                              6
+#define GC_FEATURES3_GENERICS_Start                                            6
+#define GC_FEATURES3_GENERICS_Type                                           U01
+#define   GC_FEATURES3_GENERICS_NONE                                         0x0
+#define   GC_FEATURES3_GENERICS_AVAILABLE                                    0x1
+
+#define GC_FEATURES3_BUG_FIXES9                                            7 : 7
+#define GC_FEATURES3_BUG_FIXES9_End                                            7
+#define GC_FEATURES3_BUG_FIXES9_Start                                          7
+#define GC_FEATURES3_BUG_FIXES9_Type                                         U01
+#define   GC_FEATURES3_BUG_FIXES9_NONE                                       0x0
+#define   GC_FEATURES3_BUG_FIXES9_AVAILABLE                                  0x1
+
+#define GC_FEATURES3_FAST_MSAA                                             8 : 8
+#define GC_FEATURES3_FAST_MSAA_End                                             8
+#define GC_FEATURES3_FAST_MSAA_Start                                           8
+#define GC_FEATURES3_FAST_MSAA_Type                                          U01
+#define   GC_FEATURES3_FAST_MSAA_NONE                                        0x0
+#define   GC_FEATURES3_FAST_MSAA_AVAILABLE                                   0x1
+
+#define GC_FEATURES3_WCLIP                                                 9 : 9
+#define GC_FEATURES3_WCLIP_End                                                 9
+#define GC_FEATURES3_WCLIP_Start                                               9
+#define GC_FEATURES3_WCLIP_Type                                              U01
+#define   GC_FEATURES3_WCLIP_NONE                                            0x0
+#define   GC_FEATURES3_WCLIP_AVAILABLE                                       0x1
+
+#define GC_FEATURES3_BUG_FIXES10                                         10 : 10
+#define GC_FEATURES3_BUG_FIXES10_End                                          10
+#define GC_FEATURES3_BUG_FIXES10_Start                                        10
+#define GC_FEATURES3_BUG_FIXES10_Type                                        U01
+#define   GC_FEATURES3_BUG_FIXES10_NONE                                      0x0
+#define   GC_FEATURES3_BUG_FIXES10_AVAILABLE                                 0x1
+
+#define GC_FEATURES3_UNIFIED_SAMPLERS                                    11 : 11
+#define GC_FEATURES3_UNIFIED_SAMPLERS_End                                     11
+#define GC_FEATURES3_UNIFIED_SAMPLERS_Start                                   11
+#define GC_FEATURES3_UNIFIED_SAMPLERS_Type                                   U01
+#define   GC_FEATURES3_UNIFIED_SAMPLERS_NONE                                 0x0
+#define   GC_FEATURES3_UNIFIED_SAMPLERS_AVAILABLE                            0x1
+
+#define GC_FEATURES3_BUG_FIXES11                                         12 : 12
+#define GC_FEATURES3_BUG_FIXES11_End                                          12
+#define GC_FEATURES3_BUG_FIXES11_Start                                        12
+#define GC_FEATURES3_BUG_FIXES11_Type                                        U01
+#define   GC_FEATURES3_BUG_FIXES11_NONE                                      0x0
+#define   GC_FEATURES3_BUG_FIXES11_AVAILABLE                                 0x1
+
+#define GC_FEATURES3_PERFORMANCE_COUNTERS                                13 : 13
+#define GC_FEATURES3_PERFORMANCE_COUNTERS_End                                 13
+#define GC_FEATURES3_PERFORMANCE_COUNTERS_Start                               13
+#define GC_FEATURES3_PERFORMANCE_COUNTERS_Type                               U01
+#define   GC_FEATURES3_PERFORMANCE_COUNTERS_NONE                             0x0
+#define   GC_FEATURES3_PERFORMANCE_COUNTERS_AVAILABLE                        0x1
+
+/* High precision transcendentals are available. */
+#define GC_FEATURES3_EXTRA_SHADER_INSTRUCTIONS2                          14 : 14
+#define GC_FEATURES3_EXTRA_SHADER_INSTRUCTIONS2_End                           14
+#define GC_FEATURES3_EXTRA_SHADER_INSTRUCTIONS2_Start                         14
+#define GC_FEATURES3_EXTRA_SHADER_INSTRUCTIONS2_Type                         U01
+#define   GC_FEATURES3_EXTRA_SHADER_INSTRUCTIONS2_NONE                       0x0
+#define   GC_FEATURES3_EXTRA_SHADER_INSTRUCTIONS2_AVAILABLE                  0x1
+
+#define GC_FEATURES3_BUG_FIXES12                                         15 : 15
+#define GC_FEATURES3_BUG_FIXES12_End                                          15
+#define GC_FEATURES3_BUG_FIXES12_Start                                        15
+#define GC_FEATURES3_BUG_FIXES12_Type                                        U01
+#define   GC_FEATURES3_BUG_FIXES12_NONE                                      0x0
+#define   GC_FEATURES3_BUG_FIXES12_AVAILABLE                                 0x1
+
+#define GC_FEATURES3_BUG_FIXES13                                         16 : 16
+#define GC_FEATURES3_BUG_FIXES13_End                                          16
+#define GC_FEATURES3_BUG_FIXES13_Start                                        16
+#define GC_FEATURES3_BUG_FIXES13_Type                                        U01
+#define   GC_FEATURES3_BUG_FIXES13_NONE                                      0x0
+#define   GC_FEATURES3_BUG_FIXES13_AVAILABLE                                 0x1
+
+#define GC_FEATURES3_DE_ENHANCEMENTS1                                    17 : 17
+#define GC_FEATURES3_DE_ENHANCEMENTS1_End                                     17
+#define GC_FEATURES3_DE_ENHANCEMENTS1_Start                                   17
+#define GC_FEATURES3_DE_ENHANCEMENTS1_Type                                   U01
+#define   GC_FEATURES3_DE_ENHANCEMENTS1_NONE                                 0x0
+#define   GC_FEATURES3_DE_ENHANCEMENTS1_AVAILABLE                            0x1
+
+#define GC_FEATURES3_ACE                                                 18 : 18
+#define GC_FEATURES3_ACE_End                                                  18
+#define GC_FEATURES3_ACE_Start                                                18
+#define GC_FEATURES3_ACE_Type                                                U01
+#define   GC_FEATURES3_ACE_NONE                                              0x0
+#define   GC_FEATURES3_ACE_AVAILABLE                                         0x1
+
+#define GC_FEATURES3_TX_ENHANCEMENTS1                                    19 : 19
+#define GC_FEATURES3_TX_ENHANCEMENTS1_End                                     19
+#define GC_FEATURES3_TX_ENHANCEMENTS1_Start                                   19
+#define GC_FEATURES3_TX_ENHANCEMENTS1_Type                                   U01
+#define   GC_FEATURES3_TX_ENHANCEMENTS1_NONE                                 0x0
+#define   GC_FEATURES3_TX_ENHANCEMENTS1_AVAILABLE                            0x1
+
+#define GC_FEATURES3_SH_ENHANCEMENTS1                                    20 : 20
+#define GC_FEATURES3_SH_ENHANCEMENTS1_End                                     20
+#define GC_FEATURES3_SH_ENHANCEMENTS1_Start                                   20
+#define GC_FEATURES3_SH_ENHANCEMENTS1_Type                                   U01
+#define   GC_FEATURES3_SH_ENHANCEMENTS1_NONE                                 0x0
+#define   GC_FEATURES3_SH_ENHANCEMENTS1_AVAILABLE                            0x1
+
+#define GC_FEATURES3_SH_ENHANCEMENTS2                                    21 : 21
+#define GC_FEATURES3_SH_ENHANCEMENTS2_End                                     21
+#define GC_FEATURES3_SH_ENHANCEMENTS2_Start                                   21
+#define GC_FEATURES3_SH_ENHANCEMENTS2_Type                                   U01
+#define   GC_FEATURES3_SH_ENHANCEMENTS2_NONE                                 0x0
+#define   GC_FEATURES3_SH_ENHANCEMENTS2_AVAILABLE                            0x1
+
+union gcfeatures3 {
+	struct {
+		/* GC_FEATURES3_Address:DE_ROTATION_STALL_FIX */
+		unsigned int rotationfix:1;
+
+		/* GC_FEATURES3_Address:OCL_ONLY */
+		unsigned int ocl:1;
+
+		/* GC_FEATURES3_Address:NEW_FEATURES0 */
+		unsigned int newfeatures0:1;
+
+		/* GC_FEATURES3_Address:INSTRUCTION_CACHE */
+		unsigned int icache:1;
+
+		/* GC_FEATURES3_Address:GEOMETRY_SHADER */
+		unsigned int gs:1;
+
+		/* GC_FEATURES3_Address:TEX_COMPRESSION_SUPERTILED */
+		unsigned int supertiledtxcompression:1;
+
+		/* GC_FEATURES3_Address:GENERICS */
+		unsigned int generics:1;
+
+		/* GC_FEATURES3_Address:BUG_FIXES9 */
+		unsigned int bugfixes9:1;
+
+		/* GC_FEATURES3_Address:FAST_MSAA */
+		unsigned int fastmsaa:1;
+
+		/* GC_FEATURES3_Address:WCLIP */
+		unsigned int wclip:1;
+
+		/* GC_FEATURES3_Address:BUG_FIXES10 */
+		unsigned int bugfixes10:1;
+
+		/* GC_FEATURES3_Address:UNIFIED_SAMPLERS */
+		unsigned int unifiedsamplers:1;
+
+		/* GC_FEATURES3_Address:BUG_FIXES11 */
+		unsigned int bugfixes11:1;
+
+		/* GC_FEATURES3_Address:PERFORMANCE_COUNTERS */
+		unsigned int perfcounters:1;
+
+		/* GC_FEATURES3_Address:EXTRA_SHADER_INSTRUCTIONS2 */
+		unsigned int shaderinst2:1;
+
+		/* GC_FEATURES3_Address:BUG_FIXES12 */
+		unsigned int bugfixes12:1;
+
+		/* GC_FEATURES3_Address:BUG_FIXES13 */
+		unsigned int bugfixes13:1;
+
+		/* GC_FEATURES3_Address:DE_ENHANCEMENTS1 */
+		unsigned int deenhancements1:1;
+
+		/* GC_FEATURES3_Address:ACE */
+		unsigned int ace:1;
+
+		/* GC_FEATURES3_Address:TX_ENHANCEMENTS1 */
+		unsigned int txenhancements1:1;
+
+		/* GC_FEATURES3_Address:SH_ENHANCEMENTS1 */
+		unsigned int shenhancements1:1;
+
+		/* GC_FEATURES3_Address:SH_ENHANCEMENTS2 */
+		unsigned int shenhancements2:1;
+
+		/* GC_FEATURES3_Address:reserved */
+		unsigned int _reserved_22_31:10;
+	} reg;
+
+	unsigned int raw;
+};
 
 /*******************************************************************************
 ** Register GCResetMemCounters
@@ -1527,253 +2423,6 @@ union gcidle {
 #define   GC_AXI_CONTROL_WR_FULL_BURST_MODE_BURST_RESET_VALUE                0x1
 
 /*******************************************************************************
-** Register GCMinorFeatures1
-*/
-
-/* Shows which features are enabled in this chip. This register has no set
-   reset value. It varies with the implementation. */
-
-#define GC_MINOR_FEATURES1_Address                                       0x00074
-#define GC_MINOR_FEATURES1_MSB                                                15
-#define GC_MINOR_FEATURES1_LSB                                                 0
-#define GC_MINOR_FEATURES1_BLK                                                 0
-#define GC_MINOR_FEATURES1_Count                                               1
-#define GC_MINOR_FEATURES1_FieldMask                                  0xFFFFFFFF
-#define GC_MINOR_FEATURES1_ReadMask                                   0xFFFFFFFF
-#define GC_MINOR_FEATURES1_WriteMask                                  0x00000000
-#define GC_MINOR_FEATURES1_ResetValue                                 0x00000000
-
-/* Resolve UV swizzle. */
-#define GC_MINOR_FEATURES1_RSUV_SWIZZLE                                    0 : 0
-#define GC_MINOR_FEATURES1_RSUV_SWIZZLE_End                                    0
-#define GC_MINOR_FEATURES1_RSUV_SWIZZLE_Start                                  0
-#define GC_MINOR_FEATURES1_RSUV_SWIZZLE_Type                                 U01
-#define   GC_MINOR_FEATURES1_RSUV_SWIZZLE_NONE                               0x0
-#define   GC_MINOR_FEATURES1_RSUV_SWIZZLE_AVAILABLE                          0x1
-
-/* V2 compression. */
-#define GC_MINOR_FEATURES1_V2_COMPRESSION                                  1 : 1
-#define GC_MINOR_FEATURES1_V2_COMPRESSION_End                                  1
-#define GC_MINOR_FEATURES1_V2_COMPRESSION_Start                                1
-#define GC_MINOR_FEATURES1_V2_COMPRESSION_Type                               U01
-#define   GC_MINOR_FEATURES1_V2_COMPRESSION_NONE                             0x0
-#define   GC_MINOR_FEATURES1_V2_COMPRESSION_AVAILABLE                        0x1
-
-/* Double buffering support for VG (second TS-->VG semaphore is present). */
-#define GC_MINOR_FEATURES1_VG_DOUBLE_BUFFER                                2 : 2
-#define GC_MINOR_FEATURES1_VG_DOUBLE_BUFFER_End                                2
-#define GC_MINOR_FEATURES1_VG_DOUBLE_BUFFER_Start                              2
-#define GC_MINOR_FEATURES1_VG_DOUBLE_BUFFER_Type                             U01
-#define   GC_MINOR_FEATURES1_VG_DOUBLE_BUFFER_NONE                           0x0
-#define   GC_MINOR_FEATURES1_VG_DOUBLE_BUFFER_AVAILABLE                      0x1
-
-#define GC_MINOR_FEATURES1_BUG_FIXES1                                      3 : 3
-#define GC_MINOR_FEATURES1_BUG_FIXES1_End                                      3
-#define GC_MINOR_FEATURES1_BUG_FIXES1_Start                                    3
-#define GC_MINOR_FEATURES1_BUG_FIXES1_Type                                   U01
-#define   GC_MINOR_FEATURES1_BUG_FIXES1_NONE                                 0x0
-#define   GC_MINOR_FEATURES1_BUG_FIXES1_AVAILABLE                            0x1
-
-#define GC_MINOR_FEATURES1_BUG_FIXES2                                      4 : 4
-#define GC_MINOR_FEATURES1_BUG_FIXES2_End                                      4
-#define GC_MINOR_FEATURES1_BUG_FIXES2_Start                                    4
-#define GC_MINOR_FEATURES1_BUG_FIXES2_Type                                   U01
-#define   GC_MINOR_FEATURES1_BUG_FIXES2_NONE                                 0x0
-#define   GC_MINOR_FEATURES1_BUG_FIXES2_AVAILABLE                            0x1
-
-/* Texture has stride and memory addressing. */
-#define GC_MINOR_FEATURES1_TEXTURE_STRIDE                                  5 : 5
-#define GC_MINOR_FEATURES1_TEXTURE_STRIDE_End                                  5
-#define GC_MINOR_FEATURES1_TEXTURE_STRIDE_Start                                5
-#define GC_MINOR_FEATURES1_TEXTURE_STRIDE_Type                               U01
-#define   GC_MINOR_FEATURES1_TEXTURE_STRIDE_NONE                             0x0
-#define   GC_MINOR_FEATURES1_TEXTURE_STRIDE_AVAILABLE                        0x1
-
-#define GC_MINOR_FEATURES1_BUG_FIXES3                                      6 : 6
-#define GC_MINOR_FEATURES1_BUG_FIXES3_End                                      6
-#define GC_MINOR_FEATURES1_BUG_FIXES3_Start                                    6
-#define GC_MINOR_FEATURES1_BUG_FIXES3_Type                                   U01
-#define   GC_MINOR_FEATURES1_BUG_FIXES3_NONE                                 0x0
-#define   GC_MINOR_FEATURES1_BUG_FIXES3_AVAILABLE                            0x1
-
-#define GC_MINOR_FEATURES1_CORRECT_AUTO_DISABLE                            7 : 7
-#define GC_MINOR_FEATURES1_CORRECT_AUTO_DISABLE_End                            7
-#define GC_MINOR_FEATURES1_CORRECT_AUTO_DISABLE_Start                          7
-#define GC_MINOR_FEATURES1_CORRECT_AUTO_DISABLE_Type                         U01
-#define   GC_MINOR_FEATURES1_CORRECT_AUTO_DISABLE_NONE                       0x0
-#define   GC_MINOR_FEATURES1_CORRECT_AUTO_DISABLE_AVAILABLE                  0x1
-
-#define GC_MINOR_FEATURES1_AUTO_RESTART_TS                                 8 : 8
-#define GC_MINOR_FEATURES1_AUTO_RESTART_TS_End                                 8
-#define GC_MINOR_FEATURES1_AUTO_RESTART_TS_Start                               8
-#define GC_MINOR_FEATURES1_AUTO_RESTART_TS_Type                              U01
-#define   GC_MINOR_FEATURES1_AUTO_RESTART_TS_NONE                            0x0
-#define   GC_MINOR_FEATURES1_AUTO_RESTART_TS_AVAILABLE                       0x1
-
-#define GC_MINOR_FEATURES1_BUG_FIXES4                                      9 : 9
-#define GC_MINOR_FEATURES1_BUG_FIXES4_End                                      9
-#define GC_MINOR_FEATURES1_BUG_FIXES4_Start                                    9
-#define GC_MINOR_FEATURES1_BUG_FIXES4_Type                                   U01
-#define   GC_MINOR_FEATURES1_BUG_FIXES4_NONE                                 0x0
-#define   GC_MINOR_FEATURES1_BUG_FIXES4_AVAILABLE                            0x1
-
-#define GC_MINOR_FEATURES1_L2_WINDOWING                                  10 : 10
-#define GC_MINOR_FEATURES1_L2_WINDOWING_End                                   10
-#define GC_MINOR_FEATURES1_L2_WINDOWING_Start                                 10
-#define GC_MINOR_FEATURES1_L2_WINDOWING_Type                                 U01
-#define   GC_MINOR_FEATURES1_L2_WINDOWING_NONE                               0x0
-#define   GC_MINOR_FEATURES1_L2_WINDOWING_AVAILABLE                          0x1
-
-#define GC_MINOR_FEATURES1_HALF_FLOAT_PIPE                               11 : 11
-#define GC_MINOR_FEATURES1_HALF_FLOAT_PIPE_End                                11
-#define GC_MINOR_FEATURES1_HALF_FLOAT_PIPE_Start                              11
-#define GC_MINOR_FEATURES1_HALF_FLOAT_PIPE_Type                              U01
-#define   GC_MINOR_FEATURES1_HALF_FLOAT_PIPE_NONE                            0x0
-#define   GC_MINOR_FEATURES1_HALF_FLOAT_PIPE_AVAILABLE                       0x1
-
-#define GC_MINOR_FEATURES1_PIXEL_DITHER                                  12 : 12
-#define GC_MINOR_FEATURES1_PIXEL_DITHER_End                                   12
-#define GC_MINOR_FEATURES1_PIXEL_DITHER_Start                                 12
-#define GC_MINOR_FEATURES1_PIXEL_DITHER_Type                                 U01
-#define   GC_MINOR_FEATURES1_PIXEL_DITHER_NONE                               0x0
-#define   GC_MINOR_FEATURES1_PIXEL_DITHER_AVAILABLE                          0x1
-
-#define GC_MINOR_FEATURES1_TWO_STENCIL_REFERENCE                         13 : 13
-#define GC_MINOR_FEATURES1_TWO_STENCIL_REFERENCE_End                          13
-#define GC_MINOR_FEATURES1_TWO_STENCIL_REFERENCE_Start                        13
-#define GC_MINOR_FEATURES1_TWO_STENCIL_REFERENCE_Type                        U01
-#define   GC_MINOR_FEATURES1_TWO_STENCIL_REFERENCE_NONE                      0x0
-#define   GC_MINOR_FEATURES1_TWO_STENCIL_REFERENCE_AVAILABLE                 0x1
-
-#define GC_MINOR_FEATURES1_EXTENDED_PIXEL_FORMAT                         14 : 14
-#define GC_MINOR_FEATURES1_EXTENDED_PIXEL_FORMAT_End                          14
-#define GC_MINOR_FEATURES1_EXTENDED_PIXEL_FORMAT_Start                        14
-#define GC_MINOR_FEATURES1_EXTENDED_PIXEL_FORMAT_Type                        U01
-#define   GC_MINOR_FEATURES1_EXTENDED_PIXEL_FORMAT_NONE                      0x0
-#define   GC_MINOR_FEATURES1_EXTENDED_PIXEL_FORMAT_AVAILABLE                 0x1
-
-/* EEZ and HZ are correct. */
-#define GC_MINOR_FEATURES1_CORRECT_MIN_MAX_DEPTH                         15 : 15
-#define GC_MINOR_FEATURES1_CORRECT_MIN_MAX_DEPTH_End                          15
-#define GC_MINOR_FEATURES1_CORRECT_MIN_MAX_DEPTH_Start                        15
-#define GC_MINOR_FEATURES1_CORRECT_MIN_MAX_DEPTH_Type                        U01
-#define   GC_MINOR_FEATURES1_CORRECT_MIN_MAX_DEPTH_NONE                      0x0
-#define   GC_MINOR_FEATURES1_CORRECT_MIN_MAX_DEPTH_AVAILABLE                 0x1
-
-/* Dither and filter+alpha available. */
-#define GC_MINOR_FEATURES1_DITHER_AND_FILTER_PLUS_ALPHA_2D               16 : 16
-#define GC_MINOR_FEATURES1_DITHER_AND_FILTER_PLUS_ALPHA_2D_End                16
-#define GC_MINOR_FEATURES1_DITHER_AND_FILTER_PLUS_ALPHA_2D_Start              16
-#define GC_MINOR_FEATURES1_DITHER_AND_FILTER_PLUS_ALPHA_2D_Type              U01
-#define   GC_MINOR_FEATURES1_DITHER_AND_FILTER_PLUS_ALPHA_2D_NONE            0x0
-#define   GC_MINOR_FEATURES1_DITHER_AND_FILTER_PLUS_ALPHA_2D_AVAILABLE       0x1
-
-#define GC_MINOR_FEATURES1_BUG_FIXES5                                    17 : 17
-#define GC_MINOR_FEATURES1_BUG_FIXES5_End                                     17
-#define GC_MINOR_FEATURES1_BUG_FIXES5_Start                                   17
-#define GC_MINOR_FEATURES1_BUG_FIXES5_Type                                   U01
-#define   GC_MINOR_FEATURES1_BUG_FIXES5_NONE                                 0x0
-#define   GC_MINOR_FEATURES1_BUG_FIXES5_AVAILABLE                            0x1
-
-#define GC_MINOR_FEATURES1_NEW_2D                                        18 : 18
-#define GC_MINOR_FEATURES1_NEW_2D_End                                         18
-#define GC_MINOR_FEATURES1_NEW_2D_Start                                       18
-#define GC_MINOR_FEATURES1_NEW_2D_Type                                       U01
-#define   GC_MINOR_FEATURES1_NEW_2D_NONE                                     0x0
-#define   GC_MINOR_FEATURES1_NEW_2D_AVAILABLE                                0x1
-
-#define GC_MINOR_FEATURES1_NEW_FLOATING_POINT_ARITHMETIC                 19 : 19
-#define GC_MINOR_FEATURES1_NEW_FLOATING_POINT_ARITHMETIC_End                  19
-#define GC_MINOR_FEATURES1_NEW_FLOATING_POINT_ARITHMETIC_Start                19
-#define GC_MINOR_FEATURES1_NEW_FLOATING_POINT_ARITHMETIC_Type                U01
-#define   GC_MINOR_FEATURES1_NEW_FLOATING_POINT_ARITHMETIC_NONE              0x0
-#define   GC_MINOR_FEATURES1_NEW_FLOATING_POINT_ARITHMETIC_AVAILABLE         0x1
-
-#define GC_MINOR_FEATURES1_TEXTURE_HORIZONTAL_ALIGNMENT_SELECT           20 : 20
-#define GC_MINOR_FEATURES1_TEXTURE_HORIZONTAL_ALIGNMENT_SELECT_End            20
-#define GC_MINOR_FEATURES1_TEXTURE_HORIZONTAL_ALIGNMENT_SELECT_Start          20
-#define GC_MINOR_FEATURES1_TEXTURE_HORIZONTAL_ALIGNMENT_SELECT_Type          U01
-#define   GC_MINOR_FEATURES1_TEXTURE_HORIZONTAL_ALIGNMENT_SELECT_NONE        0x0
-#define   GC_MINOR_FEATURES1_TEXTURE_HORIZONTAL_ALIGNMENT_SELECT_AVAILABLE   0x1
-
-#define GC_MINOR_FEATURES1_NON_POWER_OF_TWO                              21 : 21
-#define GC_MINOR_FEATURES1_NON_POWER_OF_TWO_End                               21
-#define GC_MINOR_FEATURES1_NON_POWER_OF_TWO_Start                             21
-#define GC_MINOR_FEATURES1_NON_POWER_OF_TWO_Type                             U01
-#define   GC_MINOR_FEATURES1_NON_POWER_OF_TWO_NONE                           0x0
-#define   GC_MINOR_FEATURES1_NON_POWER_OF_TWO_AVAILABLE                      0x1
-
-#define GC_MINOR_FEATURES1_LINEAR_TEXTURE_SUPPORT                        22 : 22
-#define GC_MINOR_FEATURES1_LINEAR_TEXTURE_SUPPORT_End                         22
-#define GC_MINOR_FEATURES1_LINEAR_TEXTURE_SUPPORT_Start                       22
-#define GC_MINOR_FEATURES1_LINEAR_TEXTURE_SUPPORT_Type                       U01
-#define   GC_MINOR_FEATURES1_LINEAR_TEXTURE_SUPPORT_NONE                     0x0
-#define   GC_MINOR_FEATURES1_LINEAR_TEXTURE_SUPPORT_AVAILABLE                0x1
-
-#define GC_MINOR_FEATURES1_HALTI0                                        23 : 23
-#define GC_MINOR_FEATURES1_HALTI0_End                                         23
-#define GC_MINOR_FEATURES1_HALTI0_Start                                       23
-#define GC_MINOR_FEATURES1_HALTI0_Type                                       U01
-#define   GC_MINOR_FEATURES1_HALTI0_NONE                                     0x0
-#define   GC_MINOR_FEATURES1_HALTI0_AVAILABLE                                0x1
-
-#define GC_MINOR_FEATURES1_CORRECT_OVERFLOW_VG                           24 : 24
-#define GC_MINOR_FEATURES1_CORRECT_OVERFLOW_VG_End                            24
-#define GC_MINOR_FEATURES1_CORRECT_OVERFLOW_VG_Start                          24
-#define GC_MINOR_FEATURES1_CORRECT_OVERFLOW_VG_Type                          U01
-#define   GC_MINOR_FEATURES1_CORRECT_OVERFLOW_VG_NONE                        0x0
-#define   GC_MINOR_FEATURES1_CORRECT_OVERFLOW_VG_AVAILABLE                   0x1
-
-#define GC_MINOR_FEATURES1_NEGATIVE_LOG_FIX                              25 : 25
-#define GC_MINOR_FEATURES1_NEGATIVE_LOG_FIX_End                               25
-#define GC_MINOR_FEATURES1_NEGATIVE_LOG_FIX_Start                             25
-#define GC_MINOR_FEATURES1_NEGATIVE_LOG_FIX_Type                             U01
-#define   GC_MINOR_FEATURES1_NEGATIVE_LOG_FIX_NONE                           0x0
-#define   GC_MINOR_FEATURES1_NEGATIVE_LOG_FIX_AVAILABLE                      0x1
-
-#define GC_MINOR_FEATURES1_RESOLVE_OFFSET                                26 : 26
-#define GC_MINOR_FEATURES1_RESOLVE_OFFSET_End                                 26
-#define GC_MINOR_FEATURES1_RESOLVE_OFFSET_Start                               26
-#define GC_MINOR_FEATURES1_RESOLVE_OFFSET_Type                               U01
-#define   GC_MINOR_FEATURES1_RESOLVE_OFFSET_NONE                             0x0
-#define   GC_MINOR_FEATURES1_RESOLVE_OFFSET_AVAILABLE                        0x1
-
-#define GC_MINOR_FEATURES1_OK_TO_GATE_AXI_CLOCK                          27 : 27
-#define GC_MINOR_FEATURES1_OK_TO_GATE_AXI_CLOCK_End                           27
-#define GC_MINOR_FEATURES1_OK_TO_GATE_AXI_CLOCK_Start                         27
-#define GC_MINOR_FEATURES1_OK_TO_GATE_AXI_CLOCK_Type                         U01
-#define   GC_MINOR_FEATURES1_OK_TO_GATE_AXI_CLOCK_NONE                       0x0
-#define   GC_MINOR_FEATURES1_OK_TO_GATE_AXI_CLOCK_AVAILABLE                  0x1
-
-#define GC_MINOR_FEATURES1_MMU                                           28 : 28
-#define GC_MINOR_FEATURES1_MMU_End                                            28
-#define GC_MINOR_FEATURES1_MMU_Start                                          28
-#define GC_MINOR_FEATURES1_MMU_Type                                          U01
-#define   GC_MINOR_FEATURES1_MMU_NONE                                        0x0
-#define   GC_MINOR_FEATURES1_MMU_AVAILABLE                                   0x1
-
-#define GC_MINOR_FEATURES1_WIDE_LINE                                     29 : 29
-#define GC_MINOR_FEATURES1_WIDE_LINE_End                                      29
-#define GC_MINOR_FEATURES1_WIDE_LINE_Start                                    29
-#define GC_MINOR_FEATURES1_WIDE_LINE_Type                                    U01
-#define   GC_MINOR_FEATURES1_WIDE_LINE_NONE                                  0x0
-#define   GC_MINOR_FEATURES1_WIDE_LINE_AVAILABLE                             0x1
-
-#define GC_MINOR_FEATURES1_BUG_FIXES6                                    30 : 30
-#define GC_MINOR_FEATURES1_BUG_FIXES6_End                                     30
-#define GC_MINOR_FEATURES1_BUG_FIXES6_Start                                   30
-#define GC_MINOR_FEATURES1_BUG_FIXES6_Type                                   U01
-#define   GC_MINOR_FEATURES1_BUG_FIXES6_NONE                                 0x0
-#define   GC_MINOR_FEATURES1_BUG_FIXES6_AVAILABLE                            0x1
-
-#define GC_MINOR_FEATURES1_FC_FLUSH_STALL                                31 : 31
-#define GC_MINOR_FEATURES1_FC_FLUSH_STALL_End                                 31
-#define GC_MINOR_FEATURES1_FC_FLUSH_STALL_Start                               31
-#define GC_MINOR_FEATURES1_FC_FLUSH_STALL_Type                               U01
-#define   GC_MINOR_FEATURES1_FC_FLUSH_STALL_NONE                             0x0
-#define   GC_MINOR_FEATURES1_FC_FLUSH_STALL_AVAILABLE                        0x1
-
-/*******************************************************************************
 ** Register gcTotalCycles
 */
 
@@ -1979,7 +2628,7 @@ static const struct gccmdend gccmdend_const = {
 #define GCREG_COMMAND_NOP_OPCODE_Type                                        U05
 
 struct gcfldnop {
-	/* gcregCommandNop:reserve */
+	/* gcregCommandNop:reserved */
 	unsigned int _reserved_0_26:27;
 
 	/* gcregCommandNop:GCREG_COMMAND_NOP_OPCODE */
@@ -2002,7 +2651,7 @@ static const struct gccmdnop gccmdnop_const = {
 	{
 		/* fld */
 		{
-			/* gcregCommandNop:reserve */
+			/* gcregCommandNop:reserved */
 			0,
 
 			/* gcregCommandNop:GCREG_COMMAND_NOP_OPCODE */
@@ -2402,7 +3051,7 @@ struct gccmdcall {
 #define GCREG_COMMAND_RETURN_OPCODE_Type                                     U05
 
 struct gcfldret {
-	/* gccmdCommandReturn:reserve */
+	/* gccmdCommandReturn:reserved */
 	unsigned int _reserved_0_26:27;
 
 	/* gccmdCommandReturn:GCREG_COMMAND_RETURN_OPCODE */
@@ -2421,7 +3070,7 @@ struct gccmdret {
 };
 
 static const struct gcfldret gcfldret = {
-	/* gccmdCommandReturn:reserve */
+	/* gccmdCommandReturn:reserved */
 	0,
 
 	/* gccmdCommandReturn:GCREG_COMMAND_RETURN_OPCODE */
@@ -3963,6 +4612,18 @@ struct gcregdstconfig {
 #define GCREG_FILTER_KERNEL_COEFFICIENT1_Start                                16
 #define GCREG_FILTER_KERNEL_COEFFICIENT1_Type                                U16
 
+struct gcregfilterkernelpair {
+	/* gcregFilterKernelRegAddrs:COEFFICIENT0 */
+	unsigned int coeff0:16;
+
+	/* gcregFilterKernelRegAddrs:COEFFICIENT1 */
+	unsigned int coeff1:16;
+};
+
+struct gcregfilterkernel {
+	struct gcregfilterkernelpair filter[77];
+};
+
 /*******************************************************************************
 ** State gcregHoriFilterKernel
 */
@@ -4016,6 +4677,94 @@ struct gcregdstconfig {
 #define GCREG_VERTI_FILTER_KERNEL_COEFFICIENT1_Type                          U16
 
 /*******************************************************************************
+** State gcregVRConfig
+*/
+
+/* Video Rasterizer kick-off register. */
+
+#define gcregVRConfigRegAddrs                                             0x04A5
+#define GCREG_VR_CONFIG_MSB                                                   15
+#define GCREG_VR_CONFIG_LSB                                                    0
+#define GCREG_VR_CONFIG_BLK                                                    0
+#define GCREG_VR_CONFIG_Count                                                  1
+#define GCREG_VR_CONFIG_FieldMask                                     0x0000000B
+#define GCREG_VR_CONFIG_ReadMask                                      0x0000000B
+#define GCREG_VR_CONFIG_WriteMask                                     0x0000000B
+#define GCREG_VR_CONFIG_ResetValue                                    0x00000000
+
+/* Kick-off command. */
+#define GCREG_VR_CONFIG_START                                              1 : 0
+#define GCREG_VR_CONFIG_START_End                                              1
+#define GCREG_VR_CONFIG_START_Start                                            0
+#define GCREG_VR_CONFIG_START_Type                                           U02
+#define   GCREG_VR_CONFIG_START_HORIZONTAL_BLIT                              0x0
+#define   GCREG_VR_CONFIG_START_VERTICAL_BLIT                                0x1
+#define   GCREG_VR_CONFIG_START_ONE_PASS_BLIT                                0x2
+
+#define GCREG_VR_CONFIG_MASK_START                                         3 : 3
+#define GCREG_VR_CONFIG_MASK_START_End                                         3
+#define GCREG_VR_CONFIG_MASK_START_Start                                       3
+#define GCREG_VR_CONFIG_MASK_START_Type                                      U01
+#define   GCREG_VR_CONFIG_MASK_START_ENABLED                                 0x0
+#define   GCREG_VR_CONFIG_MASK_START_MASKED                                  0x1
+
+struct gcregvrconfig {
+	/* gcregVRConfigRegAddrs:START */
+	unsigned int start:2;
+
+	/* gcregVRConfigRegAddrs:reserved */
+	unsigned int _reserved_2:1;
+
+	/* gcregVRConfigRegAddrs:MASK_START */
+	unsigned int start_mask:1;
+
+	/* gcregVRConfigRegAddrs:reserved */
+	unsigned int _reserved_4_31:28;
+};
+
+static const struct gcregvrconfig gcregvrconfig_horizontal = {
+	/* gcregVRConfigRegAddrs:START */
+	GCREG_VR_CONFIG_START_HORIZONTAL_BLIT,
+
+	/* gcregVRConfigRegAddrs:reserved */
+	0,
+
+	/* gcregVRConfigRegAddrs:MASK_START */
+	GCREG_VR_CONFIG_MASK_START_ENABLED,
+
+	/* gcregVRConfigRegAddrs:reserved */
+	0
+};
+
+static const struct gcregvrconfig gcregvrconfig_vertical = {
+	/* gcregVRConfigRegAddrs:START */
+	GCREG_VR_CONFIG_START_VERTICAL_BLIT,
+
+	/* gcregVRConfigRegAddrs:reserved */
+	0,
+
+	/* gcregVRConfigRegAddrs:MASK_START */
+	GCREG_VR_CONFIG_MASK_START_ENABLED,
+
+	/* gcregVRConfigRegAddrs:reserved */
+	0
+};
+
+static const struct gcregvrconfig gcregvrconfig_onepass = {
+	/* gcregVRConfigRegAddrs:START */
+	GCREG_VR_CONFIG_START_ONE_PASS_BLIT,
+
+	/* gcregVRConfigRegAddrs:reserved */
+	0,
+
+	/* gcregVRConfigRegAddrs:MASK_START */
+	GCREG_VR_CONFIG_MASK_START_ENABLED,
+
+	/* gcregVRConfigRegAddrs:reserved */
+	0
+};
+
+/*******************************************************************************
 ** State gcregVRSourceImageLow
 */
 
@@ -4042,6 +4791,14 @@ struct gcregdstconfig {
 #define GCREG_VR_SOURCE_IMAGE_LOW_TOP_Start                                   16
 #define GCREG_VR_SOURCE_IMAGE_LOW_TOP_Type                                   U16
 
+struct gcregvrsourceimagelow {
+	/* gcregVRSourceImageLowRegAddrs:LEFT */
+	unsigned int left:16;
+
+	/* gcregVRSourceImageLowRegAddrs:TOP */
+	unsigned int top:16;
+};
+
 /*******************************************************************************
 ** State gcregVRSourceImageHigh
 */
@@ -4065,6 +4822,14 @@ struct gcregdstconfig {
 #define GCREG_VR_SOURCE_IMAGE_HIGH_BOTTOM_End                                 31
 #define GCREG_VR_SOURCE_IMAGE_HIGH_BOTTOM_Start                               16
 #define GCREG_VR_SOURCE_IMAGE_HIGH_BOTTOM_Type                               U16
+
+struct gcregvrsourceimagehigh {
+	/* gcregVRSourceImageHighRegAddrs:RIGHT */
+	unsigned int right:16;
+
+	/* gcregVRSourceImageHighRegAddrs:BOTTOM */
+	unsigned int bottom:16;
+};
 
 /*******************************************************************************
 ** State gcregVRSourceOriginLow
@@ -4137,6 +4902,14 @@ struct gcregdstconfig {
 #define GCREG_VR_TARGET_WINDOW_LOW_TOP_Start                                  16
 #define GCREG_VR_TARGET_WINDOW_LOW_TOP_Type                                  U16
 
+struct gcregvrtargetwindowlow {
+	/* gcregVRTargetWindowLowRegAddrs:LEFT */
+	unsigned int left:16;
+
+	/* gcregVRTargetWindowLowRegAddrs:TOP */
+	unsigned int top:16;
+};
+
 /*******************************************************************************
 ** State gcregVRTargetWindowHigh
 */
@@ -4161,37 +4934,13 @@ struct gcregdstconfig {
 #define GCREG_VR_TARGET_WINDOW_HIGH_BOTTOM_Start                              16
 #define GCREG_VR_TARGET_WINDOW_HIGH_BOTTOM_Type                              U16
 
-/*******************************************************************************
-** State gcregVRConfig
-*/
+struct gcregvrtargetwindowhigh {
+	/* gcregVRTargetWindowHighRegAddrs:LEFT */
+	unsigned int right:16;
 
-/* Video Rasterizer kick-off register. */
-
-#define gcregVRConfigRegAddrs                                             0x04A5
-#define GCREG_VR_CONFIG_MSB                                                   15
-#define GCREG_VR_CONFIG_LSB                                                    0
-#define GCREG_VR_CONFIG_BLK                                                    0
-#define GCREG_VR_CONFIG_Count                                                  1
-#define GCREG_VR_CONFIG_FieldMask                                     0x0000000B
-#define GCREG_VR_CONFIG_ReadMask                                      0x0000000B
-#define GCREG_VR_CONFIG_WriteMask                                     0x0000000B
-#define GCREG_VR_CONFIG_ResetValue                                    0x00000000
-
-/* Kick-off command. */
-#define GCREG_VR_CONFIG_START                                              1 : 0
-#define GCREG_VR_CONFIG_START_End                                              1
-#define GCREG_VR_CONFIG_START_Start                                            0
-#define GCREG_VR_CONFIG_START_Type                                           U02
-#define   GCREG_VR_CONFIG_START_HORIZONTAL_BLIT                              0x0
-#define   GCREG_VR_CONFIG_START_VERTICAL_BLIT                                0x1
-#define   GCREG_VR_CONFIG_START_ONE_PASS_BLIT                                0x2
-
-#define GCREG_VR_CONFIG_MASK_START                                         3 : 3
-#define GCREG_VR_CONFIG_MASK_START_End                                         3
-#define GCREG_VR_CONFIG_MASK_START_Start                                       3
-#define GCREG_VR_CONFIG_MASK_START_Type                                      U01
-#define   GCREG_VR_CONFIG_MASK_START_ENABLED                                 0x0
-#define   GCREG_VR_CONFIG_MASK_START_MASKED                                  0x1
+	/* gcregVRTargetWindowHighRegAddrs:TOP */
+	unsigned int bottom:16;
+};
 
 /*******************************************************************************
 ** State gcregVRConfigEx
@@ -4238,6 +4987,26 @@ struct gcregdstconfig {
 #define GCREG_VR_CONFIG_EX_MASK_FILTER_TAP_Type                              U01
 #define   GCREG_VR_CONFIG_EX_MASK_FILTER_TAP_ENABLED                         0x0
 #define   GCREG_VR_CONFIG_EX_MASK_FILTER_TAP_MASKED                          0x1
+
+struct gcregvrconfigex {
+	/* gcregVRConfigExRegAddrs:VERTICAL_LINE_WIDTH */
+	unsigned int stripe:2;
+
+	/* gcregVRConfigExRegAddrs:reserved */
+	unsigned int _reserved_2:1;
+
+	/* gcregVRConfigExRegAddrs:MASK_VERTICAL_LINE_WIDTH */
+	unsigned int mask_stripe:1;
+
+	/* gcregVRConfigExRegAddrs:FILTER_TAP */
+	unsigned int kernelsize:4;
+
+	/* gcregVRConfigExRegAddrs:MASK_FILTER_TAP */
+	unsigned int mask_kernelsize:1;
+
+	/* gcregVRConfigExRegAddrs:reserved */
+	unsigned int _reserved_9_31:23;
+};
 
 /*******************************************************************************
 ** State gcregBWConfig
@@ -4513,10 +5282,19 @@ struct gcregdstconfig {
 #define GCREG_ROP_ROP_FG_Type                                                U08
 
 struct gcregrop {
+	/* gcregRopRegAddrs:ROP_FG */
 	unsigned int fg:8;
+
+	/* gcregRopRegAddrs:ROP_BG */
 	unsigned int bg:8;
+
+	/* gcregRopRegAddrs:reserved */
 	unsigned int _reserved_16_19:4;
+
+	/* gcregRopRegAddrs:ROP_TYPE */
 	unsigned int type:2;
+
+	/* gcregRopRegAddrs:reserved */
 	unsigned int _reserved_22_31:10;
 };
 
@@ -4550,9 +5328,16 @@ struct gcregrop {
 #define GCREG_CLIP_TOP_LEFT_X_Type                                           U15
 
 struct gcregcliplt {
+	/* gcregClipTopLeftRegAddrs:X */
 	unsigned int left:15;
+
+	/* gcregClipTopLeftRegAddrs:reserved */
 	unsigned int _reserved_15:1;
+
+	/* gcregClipTopLeftRegAddrs:Y */
 	unsigned int top:15;
+
+	/* gcregClipTopLeftRegAddrs:reserved */
 	unsigned int _reserved_31:1;
 };
 
@@ -4586,9 +5371,16 @@ struct gcregcliplt {
 #define GCREG_CLIP_BOTTOM_RIGHT_X_Type                                       U15
 
 struct gcregcliprb {
+	/* gcregClipBottomRightRegAddrs:X */
 	unsigned int right:15;
+
+	/* gcregClipBottomRightRegAddrs:reserved */
 	unsigned int _reserved_15:1;
+
+	/* gcregClipBottomRightRegAddrs:Y */
 	unsigned int bottom:15;
+
+	/* gcregClipBottomRightRegAddrs:reserved */
 	unsigned int _reserved_31:1;
 };
 
@@ -4692,6 +5484,22 @@ struct gcregalphacontrol {
 	unsigned int _reserved_1_31:31;
 };
 
+static const struct gcregalphacontrol gcregalpha_off = {
+	/* gcregAlphaControlRegAddrs:GCREG_ALPHA_CONTROL_ENABLE */
+	GCREG_ALPHA_CONTROL_ENABLE_OFF,
+
+	/* gcregAlphaControlRegAddrs:reserved */
+	0
+};
+
+static const struct gcregalphacontrol gcregalpha_on = {
+	/* gcregAlphaControlRegAddrs:GCREG_ALPHA_CONTROL_ENABLE */
+	GCREG_ALPHA_CONTROL_ENABLE_ON,
+
+	/* gcregAlphaControlRegAddrs:reserved */
+	0
+};
+
 /*******************************************************************************
 ** State gcregAlphaModes
 */
@@ -4792,13 +5600,13 @@ struct gcregalphamodes {
 	unsigned int _reserved_5_7:3;
 
 	/* gcregAlphaModes:GCREG_ALPHA_MODES_GLOBAL_SRC_ALPHA_MODE */
-	unsigned int src_global_alpha:2;
+	unsigned int src_global_alpha_mode:2;
 
 	/* gcregAlphaModes:reserved */
 	unsigned int _reserved_10_11:2;
 
 	/* gcregAlphaModes:GCREG_ALPHA_MODES_GLOBAL_DST_ALPHA_MODE */
-	unsigned int dst_global_alpha:2;
+	unsigned int dst_global_alpha_mode:2;
 
 	/* gcregAlphaModes:reserved */
 	unsigned int _reserved_14_23:10;
@@ -5785,6 +6593,14 @@ struct gcregcolormultiplymodes {
 #define   GCREG_SRC_EX_CONFIG_MINOR_TILED_DISABLED                           0x0
 #define   GCREG_SRC_EX_CONFIG_MINOR_TILED_ENABLED                            0x1
 
+/* Source CacheMode. */
+#define GCREG_SRC_SRC_EX_CONFIG_CACHE_MODE                               12 : 12
+#define GCREG_SRC_SRC_EX_CONFIG_CACHE_MODE_End                                12
+#define GCREG_SRC_SRC_EX_CONFIG_CACHE_MODE_Start                              12
+#define GCREG_SRC_SRC_EX_CONFIG_CACHE_MODE_Type                              U01
+#define   GCREG_SRC_SRC_EX_CONFIG_CACHE_MODE_DISABLED                        0x0
+#define   GCREG_SRC_SRC_EX_CONFIG_CACHE_MODE_ENABLED                         0x1
+
 /*******************************************************************************
 ** State gcregSrcExAddress
 */
@@ -6594,20 +7410,20 @@ struct gcregmultisource {
 
 /* 32-bit aligned base address of the source U plane. */
 
-#define gcregBlock4AddressURegAddrs                                       0x4A28
-#define GCREG_BLOCK4_ADDRESS_U_MSB                                            15
-#define GCREG_BLOCK4_ADDRESS_U_LSB                                             2
-#define GCREG_BLOCK4_ADDRESS_U_BLK                                             0
-#define GCREG_BLOCK4_ADDRESS_U_Count                                           4
-#define GCREG_BLOCK4_ADDRESS_U_FieldMask                              0xFFFFFFFF
-#define GCREG_BLOCK4_ADDRESS_U_ReadMask                               0xFFFFFFFC
-#define GCREG_BLOCK4_ADDRESS_U_WriteMask                              0xFFFFFFFC
-#define GCREG_BLOCK4_ADDRESS_U_ResetValue                             0x00000000
+#define gcregBlock4UPlaneAddressRegAddrs                                  0x4A28
+#define GCREG_BLOCK4_UPLANE_ADDRESS_MSB                                       15
+#define GCREG_BLOCK4_UPLANE_ADDRESS_LSB                                        2
+#define GCREG_BLOCK4_UPLANE_ADDRESS_BLK                                        0
+#define GCREG_BLOCK4_UPLANE_ADDRESS_Count                                      4
+#define GCREG_BLOCK4_UPLANE_ADDRESS_FieldMask                         0xFFFFFFFF
+#define GCREG_BLOCK4_UPLANE_ADDRESS_ReadMask                          0xFFFFFFFC
+#define GCREG_BLOCK4_UPLANE_ADDRESS_WriteMask                         0xFFFFFFFC
+#define GCREG_BLOCK4_UPLANE_ADDRESS_ResetValue                        0x00000000
 
-#define GCREG_BLOCK4_ADDRESS_U_ADDRESS                                    31 : 0
-#define GCREG_BLOCK4_ADDRESS_U_ADDRESS_End                                    30
-#define GCREG_BLOCK4_ADDRESS_U_ADDRESS_Start                                   0
-#define GCREG_BLOCK4_ADDRESS_U_ADDRESS_Type                                  U31
+#define GCREG_BLOCK4_UPLANE_ADDRESS_ADDRESS                               31 : 0
+#define GCREG_BLOCK4_UPLANE_ADDRESS_ADDRESS_End                               30
+#define GCREG_BLOCK4_UPLANE_ADDRESS_ADDRESS_Start                              0
+#define GCREG_BLOCK4_UPLANE_ADDRESS_ADDRESS_Type                             U31
 
 /*******************************************************************************
 ** State gcregBlock4StrideU
@@ -6615,20 +7431,20 @@ struct gcregmultisource {
 
 /* Stride of the source U plane in bytes. */
 
-#define gcregBlock4StrideURegAddrs                                        0x4A2C
-#define GCREG_BLOCK4_STRIDE_U_MSB                                             15
-#define GCREG_BLOCK4_STRIDE_U_LSB                                              2
-#define GCREG_BLOCK4_STRIDE_U_BLK                                              0
-#define GCREG_BLOCK4_STRIDE_U_Count                                            4
-#define GCREG_BLOCK4_STRIDE_U_FieldMask                               0x0003FFFF
-#define GCREG_BLOCK4_STRIDE_U_ReadMask                                0x0003FFFC
-#define GCREG_BLOCK4_STRIDE_U_WriteMask                               0x0003FFFC
-#define GCREG_BLOCK4_STRIDE_U_ResetValue                              0x00000000
+#define gcregBlock4UPlaneStrideRegAddrs                                   0x4A2C
+#define GCREG_BLOCK4_UPLANE_STRIDE_MSB                                        15
+#define GCREG_BLOCK4_UPLANE_STRIDE_LSB                                         2
+#define GCREG_BLOCK4_UPLANE_STRIDE_BLK                                         0
+#define GCREG_BLOCK4_UPLANE_STRIDE_Count                                       4
+#define GCREG_BLOCK4_UPLANE_STRIDE_FieldMask                          0x0003FFFF
+#define GCREG_BLOCK4_UPLANE_STRIDE_ReadMask                           0x0003FFFC
+#define GCREG_BLOCK4_UPLANE_STRIDE_WriteMask                          0x0003FFFC
+#define GCREG_BLOCK4_UPLANE_STRIDE_ResetValue                         0x00000000
 
-#define GCREG_BLOCK4_STRIDE_U_STRIDE                                      17 : 0
-#define GCREG_BLOCK4_STRIDE_U_STRIDE_End                                      17
-#define GCREG_BLOCK4_STRIDE_U_STRIDE_Start                                     0
-#define GCREG_BLOCK4_STRIDE_U_STRIDE_Type                                    U18
+#define GCREG_BLOCK4_UPLANE_STRIDE_STRIDE                                 17 : 0
+#define GCREG_BLOCK4_UPLANE_STRIDE_STRIDE_End                                 17
+#define GCREG_BLOCK4_UPLANE_STRIDE_STRIDE_Start                                0
+#define GCREG_BLOCK4_UPLANE_STRIDE_STRIDE_Type                               U18
 
 /*******************************************************************************
 ** State gcregBlock4AddressV
@@ -6636,20 +7452,20 @@ struct gcregmultisource {
 
 /* 32-bit aligned base address of the source V plane. */
 
-#define gcregBlock4AddressVRegAddrs                                       0x4A30
-#define GCREG_BLOCK4_ADDRESS_V_MSB                                            15
-#define GCREG_BLOCK4_ADDRESS_V_LSB                                             2
-#define GCREG_BLOCK4_ADDRESS_V_BLK                                             0
-#define GCREG_BLOCK4_ADDRESS_V_Count                                           4
-#define GCREG_BLOCK4_ADDRESS_V_FieldMask                              0xFFFFFFFF
-#define GCREG_BLOCK4_ADDRESS_V_ReadMask                               0xFFFFFFFC
-#define GCREG_BLOCK4_ADDRESS_V_WriteMask                              0xFFFFFFFC
-#define GCREG_BLOCK4_ADDRESS_V_ResetValue                             0x00000000
+#define gcregBlock4VPlaneAddressRegAddrs                                  0x4A30
+#define GCREG_BLOCK4_VPLANE_ADDRESS_MSB                                       15
+#define GCREG_BLOCK4_VPLANE_ADDRESS_LSB                                        2
+#define GCREG_BLOCK4_VPLANE_ADDRESS_BLK                                        0
+#define GCREG_BLOCK4_VPLANE_ADDRESS_Count                                      4
+#define GCREG_BLOCK4_VPLANE_ADDRESS_FieldMask                         0xFFFFFFFF
+#define GCREG_BLOCK4_VPLANE_ADDRESS_ReadMask                          0xFFFFFFFC
+#define GCREG_BLOCK4_VPLANE_ADDRESS_WriteMask                         0xFFFFFFFC
+#define GCREG_BLOCK4_VPLANE_ADDRESS_ResetValue                        0x00000000
 
-#define GCREG_BLOCK4_ADDRESS_V_ADDRESS                                    31 : 0
-#define GCREG_BLOCK4_ADDRESS_V_ADDRESS_End                                    30
-#define GCREG_BLOCK4_ADDRESS_V_ADDRESS_Start                                   0
-#define GCREG_BLOCK4_ADDRESS_V_ADDRESS_Type                                  U31
+#define GCREG_BLOCK4_VPLANE_ADDRESS_ADDRESS                               31 : 0
+#define GCREG_BLOCK4_VPLANE_ADDRESS_ADDRESS_End                               30
+#define GCREG_BLOCK4_VPLANE_ADDRESS_ADDRESS_Start                              0
+#define GCREG_BLOCK4_VPLANE_ADDRESS_ADDRESS_Type                             U31
 
 /*******************************************************************************
 ** State gcregBlock4StrideV
@@ -6657,20 +7473,20 @@ struct gcregmultisource {
 
 /* Stride of the source V plane in bytes. */
 
-#define gcregBlock4StrideVRegAddrs                                        0x4A34
-#define GCREG_BLOCK4_STRIDE_V_MSB                                             15
-#define GCREG_BLOCK4_STRIDE_V_LSB                                              2
-#define GCREG_BLOCK4_STRIDE_V_BLK                                              0
-#define GCREG_BLOCK4_STRIDE_V_Count                                            4
-#define GCREG_BLOCK4_STRIDE_V_FieldMask                               0x0003FFFF
-#define GCREG_BLOCK4_STRIDE_V_ReadMask                                0x0003FFFC
-#define GCREG_BLOCK4_STRIDE_V_WriteMask                               0x0003FFFC
-#define GCREG_BLOCK4_STRIDE_V_ResetValue                              0x00000000
+#define gcregBlock4VPlaneStrideRegAddrs                                   0x4A34
+#define GCREG_BLOCK4_VPLANE_STRIDE_MSB                                        15
+#define GCREG_BLOCK4_VPLANE_STRIDE_LSB                                         2
+#define GCREG_BLOCK4_VPLANE_STRIDE_BLK                                         0
+#define GCREG_BLOCK4_VPLANE_STRIDE_Count                                       4
+#define GCREG_BLOCK4_VPLANE_STRIDE_FieldMask                          0x0003FFFF
+#define GCREG_BLOCK4_VPLANE_STRIDE_ReadMask                           0x0003FFFC
+#define GCREG_BLOCK4_VPLANE_STRIDE_WriteMask                          0x0003FFFC
+#define GCREG_BLOCK4_VPLANE_STRIDE_ResetValue                         0x00000000
 
-#define GCREG_BLOCK4_STRIDE_V_STRIDE                                      17 : 0
-#define GCREG_BLOCK4_STRIDE_V_STRIDE_End                                      17
-#define GCREG_BLOCK4_STRIDE_V_STRIDE_Start                                     0
-#define GCREG_BLOCK4_STRIDE_V_STRIDE_Type                                    U18
+#define GCREG_BLOCK4_VPLANE_STRIDE_STRIDE                                 17 : 0
+#define GCREG_BLOCK4_VPLANE_STRIDE_STRIDE_End                                 17
+#define GCREG_BLOCK4_VPLANE_STRIDE_STRIDE_Start                                0
+#define GCREG_BLOCK4_VPLANE_STRIDE_STRIDE_Type                               U18
 
 /*******************************************************************************
 ** State gcregBlock4SrcRotationHeight
@@ -7005,58 +7821,58 @@ struct gcregmultisource {
 
 /* General purpose control register. */
 
-#define gcregBlock4ControlRegAddrs                                        0x4A50
-#define GCREG_BLOCK4_CONTROL_MSB                                              15
-#define GCREG_BLOCK4_CONTROL_LSB                                               2
-#define GCREG_BLOCK4_CONTROL_BLK                                               0
-#define GCREG_BLOCK4_CONTROL_Count                                             4
-#define GCREG_BLOCK4_CONTROL_FieldMask                                0x00000999
-#define GCREG_BLOCK4_CONTROL_ReadMask                                 0x00000999
-#define GCREG_BLOCK4_CONTROL_WriteMask                                0x00000999
-#define GCREG_BLOCK4_CONTROL_ResetValue                               0x00000000
+#define gcregBlock4PEControlRegAddrs                                      0x4A50
+#define GCREG_BLOCK4_PE_CONTROL_MSB                                           15
+#define GCREG_BLOCK4_PE_CONTROL_LSB                                            2
+#define GCREG_BLOCK4_PE_CONTROL_BLK                                            0
+#define GCREG_BLOCK4_PE_CONTROL_Count                                          4
+#define GCREG_BLOCK4_PE_CONTROL_FieldMask                             0x00000999
+#define GCREG_BLOCK4_PE_CONTROL_ReadMask                              0x00000999
+#define GCREG_BLOCK4_PE_CONTROL_WriteMask                             0x00000999
+#define GCREG_BLOCK4_PE_CONTROL_ResetValue                            0x00000000
 
-#define GCREG_BLOCK4_CONTROL_YUV                                           0 : 0
-#define GCREG_BLOCK4_CONTROL_YUV_End                                           0
-#define GCREG_BLOCK4_CONTROL_YUV_Start                                         0
-#define GCREG_BLOCK4_CONTROL_YUV_Type                                        U01
-#define   GCREG_BLOCK4_CONTROL_YUV_601                                       0x0
-#define   GCREG_BLOCK4_CONTROL_YUV_709                                       0x1
+#define GCREG_BLOCK4_PE_CONTROL_YUV                                        0 : 0
+#define GCREG_BLOCK4_PE_CONTROL_YUV_End                                        0
+#define GCREG_BLOCK4_PE_CONTROL_YUV_Start                                      0
+#define GCREG_BLOCK4_PE_CONTROL_YUV_Type                                     U01
+#define   GCREG_BLOCK4_PE_CONTROL_YUV_601                                    0x0
+#define   GCREG_BLOCK4_PE_CONTROL_YUV_709                                    0x1
 
-#define GCREG_BLOCK4_CONTROL_MASK_YUV                                      3 : 3
-#define GCREG_BLOCK4_CONTROL_MASK_YUV_End                                      3
-#define GCREG_BLOCK4_CONTROL_MASK_YUV_Start                                    3
-#define GCREG_BLOCK4_CONTROL_MASK_YUV_Type                                   U01
-#define   GCREG_BLOCK4_CONTROL_MASK_YUV_ENABLED                              0x0
-#define   GCREG_BLOCK4_CONTROL_MASK_YUV_MASKED                               0x1
+#define GCREG_BLOCK4_PE_CONTROL_MASK_YUV                                   3 : 3
+#define GCREG_BLOCK4_PE_CONTROL_MASK_YUV_End                                   3
+#define GCREG_BLOCK4_PE_CONTROL_MASK_YUV_Start                                 3
+#define GCREG_BLOCK4_PE_CONTROL_MASK_YUV_Type                                U01
+#define   GCREG_BLOCK4_PE_CONTROL_MASK_YUV_ENABLED                           0x0
+#define   GCREG_BLOCK4_PE_CONTROL_MASK_YUV_MASKED                            0x1
 
-#define GCREG_BLOCK4_CONTROL_UV_SWIZZLE                                    4 : 4
-#define GCREG_BLOCK4_CONTROL_UV_SWIZZLE_End                                    4
-#define GCREG_BLOCK4_CONTROL_UV_SWIZZLE_Start                                  4
-#define GCREG_BLOCK4_CONTROL_UV_SWIZZLE_Type                                 U01
-#define   GCREG_BLOCK4_CONTROL_UV_SWIZZLE_UV                                 0x0
-#define   GCREG_BLOCK4_CONTROL_UV_SWIZZLE_VU                                 0x1
+#define GCREG_BLOCK4_PE_CONTROL_UV_SWIZZLE                                 4 : 4
+#define GCREG_BLOCK4_PE_CONTROL_UV_SWIZZLE_End                                 4
+#define GCREG_BLOCK4_PE_CONTROL_UV_SWIZZLE_Start                               4
+#define GCREG_BLOCK4_PE_CONTROL_UV_SWIZZLE_Type                              U01
+#define   GCREG_BLOCK4_PE_CONTROL_UV_SWIZZLE_UV                              0x0
+#define   GCREG_BLOCK4_PE_CONTROL_UV_SWIZZLE_VU                              0x1
 
-#define GCREG_BLOCK4_CONTROL_MASK_UV_SWIZZLE                               7 : 7
-#define GCREG_BLOCK4_CONTROL_MASK_UV_SWIZZLE_End                               7
-#define GCREG_BLOCK4_CONTROL_MASK_UV_SWIZZLE_Start                             7
-#define GCREG_BLOCK4_CONTROL_MASK_UV_SWIZZLE_Type                            U01
-#define   GCREG_BLOCK4_CONTROL_MASK_UV_SWIZZLE_ENABLED                       0x0
-#define   GCREG_BLOCK4_CONTROL_MASK_UV_SWIZZLE_MASKED                        0x1
+#define GCREG_BLOCK4_PE_CONTROL_MASK_UV_SWIZZLE                            7 : 7
+#define GCREG_BLOCK4_PE_CONTROL_MASK_UV_SWIZZLE_End                            7
+#define GCREG_BLOCK4_PE_CONTROL_MASK_UV_SWIZZLE_Start                          7
+#define GCREG_BLOCK4_PE_CONTROL_MASK_UV_SWIZZLE_Type                         U01
+#define   GCREG_BLOCK4_PE_CONTROL_MASK_UV_SWIZZLE_ENABLED                    0x0
+#define   GCREG_BLOCK4_PE_CONTROL_MASK_UV_SWIZZLE_MASKED                     0x1
 
 /* YUV to RGB convert enable */
-#define GCREG_BLOCK4_CONTROL_YUVRGB                                        8 : 8
-#define GCREG_BLOCK4_CONTROL_YUVRGB_End                                        8
-#define GCREG_BLOCK4_CONTROL_YUVRGB_Start                                      8
-#define GCREG_BLOCK4_CONTROL_YUVRGB_Type                                     U01
-#define   GCREG_BLOCK4_CONTROL_YUVRGB_DISABLED                               0x0
-#define   GCREG_BLOCK4_CONTROL_YUVRGB_ENABLED                                0x1
+#define GCREG_BLOCK4_PE_CONTROL_YUVRGB                                     8 : 8
+#define GCREG_BLOCK4_PE_CONTROL_YUVRGB_End                                     8
+#define GCREG_BLOCK4_PE_CONTROL_YUVRGB_Start                                   8
+#define GCREG_BLOCK4_PE_CONTROL_YUVRGB_Type                                  U01
+#define   GCREG_BLOCK4_PE_CONTROL_YUVRGB_DISABLED                            0x0
+#define   GCREG_BLOCK4_PE_CONTROL_YUVRGB_ENABLED                             0x1
 
-#define GCREG_BLOCK4_CONTROL_MASK_YUVRGB                                 11 : 11
-#define GCREG_BLOCK4_CONTROL_MASK_YUVRGB_End                                  11
-#define GCREG_BLOCK4_CONTROL_MASK_YUVRGB_Start                                11
-#define GCREG_BLOCK4_CONTROL_MASK_YUVRGB_Type                                U01
-#define   GCREG_BLOCK4_CONTROL_MASK_YUVRGB_ENABLED                           0x0
-#define   GCREG_BLOCK4_CONTROL_MASK_YUVRGB_MASKED                            0x1
+#define GCREG_BLOCK4_PE_CONTROL_MASK_YUVRGB                              11 : 11
+#define GCREG_BLOCK4_PE_CONTROL_MASK_YUVRGB_End                               11
+#define GCREG_BLOCK4_PE_CONTROL_MASK_YUVRGB_Start                             11
+#define GCREG_BLOCK4_PE_CONTROL_MASK_YUVRGB_Type                             U01
+#define   GCREG_BLOCK4_PE_CONTROL_MASK_YUVRGB_ENABLED                        0x0
+#define   GCREG_BLOCK4_PE_CONTROL_MASK_YUVRGB_MASKED                         0x1
 
 /*******************************************************************************
 ** State gcregBlock4SrcColorKeyHigh
@@ -7131,6 +7947,14 @@ struct gcregmultisource {
 #define GCREG_BLOCK4_SRC_EX_CONFIG_MINOR_TILED_Type                          U01
 #define   GCREG_BLOCK4_SRC_EX_CONFIG_MINOR_TILED_DISABLED                    0x0
 #define   GCREG_BLOCK4_SRC_EX_CONFIG_MINOR_TILED_ENABLED                     0x1
+
+/* Source CacheMode. */
+#define GCREG_BLOCK4_SRC_EX_CONFIG_CACHE_MODE                            12 : 12
+#define GCREG_BLOCK4_SRC_EX_CONFIG_CACHE_MODE_End                             12
+#define GCREG_BLOCK4_SRC_EX_CONFIG_CACHE_MODE_Start                           12
+#define GCREG_BLOCK4_SRC_EX_CONFIG_CACHE_MODE_Type                           U01
+#define   GCREG_BLOCK4_SRC_EX_CONFIG_CACHE_MODE_DISABLED                     0x0
+#define   GCREG_BLOCK4_SRC_EX_CONFIG_CACHE_MODE_ENABLED                      0x1
 
 /*******************************************************************************
 ** State gcregBlock4SrcExAddress
@@ -7591,19 +8415,19 @@ struct gcregmultisource {
 /* 32-bit aligned base address of the source U plane. */
 
 #define gcregBlock8AddressURegAddrs                                       0x4AD0
-#define GCREG_BLOCK8_ADDRESS_U_MSB                                            15
-#define GCREG_BLOCK8_ADDRESS_U_LSB                                             3
-#define GCREG_BLOCK8_ADDRESS_U_BLK                                             0
-#define GCREG_BLOCK8_ADDRESS_U_Count                                           8
-#define GCREG_BLOCK8_ADDRESS_U_FieldMask                              0xFFFFFFFF
-#define GCREG_BLOCK8_ADDRESS_U_ReadMask                               0xFFFFFFFC
-#define GCREG_BLOCK8_ADDRESS_U_WriteMask                              0xFFFFFFFC
-#define GCREG_BLOCK8_ADDRESS_U_ResetValue                             0x00000000
+#define GCREG_BLOCK8_UPLANE_ADDRESS_MSB                                       15
+#define GCREG_BLOCK8_UPLANE_ADDRESS_LSB                                        3
+#define GCREG_BLOCK8_UPLANE_ADDRESS_BLK                                        0
+#define GCREG_BLOCK8_UPLANE_ADDRESS_Count                                      8
+#define GCREG_BLOCK8_UPLANE_ADDRESS_FieldMask                         0xFFFFFFFF
+#define GCREG_BLOCK8_UPLANE_ADDRESS_ReadMask                          0xFFFFFFFC
+#define GCREG_BLOCK8_UPLANE_ADDRESS_WriteMask                         0xFFFFFFFC
+#define GCREG_BLOCK8_UPLANE_ADDRESS_ResetValue                        0x00000000
 
-#define GCREG_BLOCK8_ADDRESS_U_ADDRESS                                    31 : 0
-#define GCREG_BLOCK8_ADDRESS_U_ADDRESS_End                                    30
-#define GCREG_BLOCK8_ADDRESS_U_ADDRESS_Start                                   0
-#define GCREG_BLOCK8_ADDRESS_U_ADDRESS_Type                                  U31
+#define GCREG_BLOCK8_UPLANE_ADDRESS_ADDRESS                               31 : 0
+#define GCREG_BLOCK8_UPLANE_ADDRESS_ADDRESS_End                               30
+#define GCREG_BLOCK8_UPLANE_ADDRESS_ADDRESS_Start                              0
+#define GCREG_BLOCK8_UPLANE_ADDRESS_ADDRESS_Type                             U31
 
 /*******************************************************************************
 ** State gcregBlock8StrideU
@@ -7612,19 +8436,19 @@ struct gcregmultisource {
 /* Stride of the source U plane in bytes. */
 
 #define gcregBlock8StrideURegAddrs                                        0x4AD8
-#define GCREG_BLOCK8_STRIDE_U_MSB                                             15
-#define GCREG_BLOCK8_STRIDE_U_LSB                                              3
-#define GCREG_BLOCK8_STRIDE_U_BLK                                              0
-#define GCREG_BLOCK8_STRIDE_U_Count                                            8
-#define GCREG_BLOCK8_STRIDE_U_FieldMask                               0x0003FFFF
-#define GCREG_BLOCK8_STRIDE_U_ReadMask                                0x0003FFFC
-#define GCREG_BLOCK8_STRIDE_U_WriteMask                               0x0003FFFC
-#define GCREG_BLOCK8_STRIDE_U_ResetValue                              0x00000000
+#define GCREG_BLOCK8_UPLANE_STRIDE_MSB                                        15
+#define GCREG_BLOCK8_UPLANE_STRIDE_LSB                                         3
+#define GCREG_BLOCK8_UPLANE_STRIDE_BLK                                         0
+#define GCREG_BLOCK8_UPLANE_STRIDE_Count                                       8
+#define GCREG_BLOCK8_UPLANE_STRIDE_FieldMask                          0x0003FFFF
+#define GCREG_BLOCK8_UPLANE_STRIDE_ReadMask                           0x0003FFFC
+#define GCREG_BLOCK8_UPLANE_STRIDE_WriteMask                          0x0003FFFC
+#define GCREG_BLOCK8_UPLANE_STRIDE_ResetValue                         0x00000000
 
-#define GCREG_BLOCK8_STRIDE_U_STRIDE                                      17 : 0
-#define GCREG_BLOCK8_STRIDE_U_STRIDE_End                                      17
-#define GCREG_BLOCK8_STRIDE_U_STRIDE_Start                                     0
-#define GCREG_BLOCK8_STRIDE_U_STRIDE_Type                                    U18
+#define GCREG_BLOCK8_UPLANE_STRIDE_STRIDE                                 17 : 0
+#define GCREG_BLOCK8_UPLANE_STRIDE_STRIDE_End                                 17
+#define GCREG_BLOCK8_UPLANE_STRIDE_STRIDE_Start                                0
+#define GCREG_BLOCK8_UPLANE_STRIDE_STRIDE_Type                               U18
 
 /*******************************************************************************
 ** State gcregBlock8AddressV
@@ -7633,19 +8457,19 @@ struct gcregmultisource {
 /* 32-bit aligned base address of the source V plane. */
 
 #define gcregBlock8AddressVRegAddrs                                       0x4AE0
-#define GCREG_BLOCK8_ADDRESS_V_MSB                                            15
-#define GCREG_BLOCK8_ADDRESS_V_LSB                                             3
-#define GCREG_BLOCK8_ADDRESS_V_BLK                                             0
-#define GCREG_BLOCK8_ADDRESS_V_Count                                           8
-#define GCREG_BLOCK8_ADDRESS_V_FieldMask                              0xFFFFFFFF
-#define GCREG_BLOCK8_ADDRESS_V_ReadMask                               0xFFFFFFFC
-#define GCREG_BLOCK8_ADDRESS_V_WriteMask                              0xFFFFFFFC
-#define GCREG_BLOCK8_ADDRESS_V_ResetValue                             0x00000000
+#define GCREG_BLOCK8_VPLANE_ADDRESS_MSB                                       15
+#define GCREG_BLOCK8_VPLANE_ADDRESS_LSB                                        3
+#define GCREG_BLOCK8_VPLANE_ADDRESS_BLK                                        0
+#define GCREG_BLOCK8_VPLANE_ADDRESS_Count                                      8
+#define GCREG_BLOCK8_VPLANE_ADDRESS_FieldMask                         0xFFFFFFFF
+#define GCREG_BLOCK8_VPLANE_ADDRESS_ReadMask                          0xFFFFFFFC
+#define GCREG_BLOCK8_VPLANE_ADDRESS_WriteMask                         0xFFFFFFFC
+#define GCREG_BLOCK8_VPLANE_ADDRESS_ResetValue                        0x00000000
 
-#define GCREG_BLOCK8_ADDRESS_V_ADDRESS                                    31 : 0
-#define GCREG_BLOCK8_ADDRESS_V_ADDRESS_End                                    30
-#define GCREG_BLOCK8_ADDRESS_V_ADDRESS_Start                                   0
-#define GCREG_BLOCK8_ADDRESS_V_ADDRESS_Type                                  U31
+#define GCREG_BLOCK8_VPLANE_ADDRESS_ADDRESS                               31 : 0
+#define GCREG_BLOCK8_VPLANE_ADDRESS_ADDRESS_End                               30
+#define GCREG_BLOCK8_VPLANE_ADDRESS_ADDRESS_Start                              0
+#define GCREG_BLOCK8_VPLANE_ADDRESS_ADDRESS_Type                             U31
 
 /*******************************************************************************
 ** State gcregBlock8StrideV
@@ -7654,19 +8478,19 @@ struct gcregmultisource {
 /* Stride of the source V plane in bytes. */
 
 #define gcregBlock8StrideVRegAddrs                                        0x4AE8
-#define GCREG_BLOCK8_STRIDE_V_MSB                                             15
-#define GCREG_BLOCK8_STRIDE_V_LSB                                              3
-#define GCREG_BLOCK8_STRIDE_V_BLK                                              0
-#define GCREG_BLOCK8_STRIDE_V_Count                                            8
-#define GCREG_BLOCK8_STRIDE_V_FieldMask                               0x0003FFFF
-#define GCREG_BLOCK8_STRIDE_V_ReadMask                                0x0003FFFC
-#define GCREG_BLOCK8_STRIDE_V_WriteMask                               0x0003FFFC
-#define GCREG_BLOCK8_STRIDE_V_ResetValue                              0x00000000
+#define GCREG_BLOCK8_VPLANE_STRIDE_MSB                                        15
+#define GCREG_BLOCK8_VPLANE_STRIDE_LSB                                         3
+#define GCREG_BLOCK8_VPLANE_STRIDE_BLK                                         0
+#define GCREG_BLOCK8_VPLANE_STRIDE_Count                                       8
+#define GCREG_BLOCK8_VPLANE_STRIDE_FieldMask                          0x0003FFFF
+#define GCREG_BLOCK8_VPLANE_STRIDE_ReadMask                           0x0003FFFC
+#define GCREG_BLOCK8_VPLANE_STRIDE_WriteMask                          0x0003FFFC
+#define GCREG_BLOCK8_VPLANE_STRIDE_ResetValue                         0x00000000
 
-#define GCREG_BLOCK8_STRIDE_V_STRIDE                                      17 : 0
-#define GCREG_BLOCK8_STRIDE_V_STRIDE_End                                      17
-#define GCREG_BLOCK8_STRIDE_V_STRIDE_Start                                     0
-#define GCREG_BLOCK8_STRIDE_V_STRIDE_Type                                    U18
+#define GCREG_BLOCK8_VPLANE_STRIDE_STRIDE                                 17 : 0
+#define GCREG_BLOCK8_VPLANE_STRIDE_STRIDE_End                                 17
+#define GCREG_BLOCK8_VPLANE_STRIDE_STRIDE_Start                                0
+#define GCREG_BLOCK8_VPLANE_STRIDE_STRIDE_Type                               U18
 
 /*******************************************************************************
 ** State gcregBlock8SrcRotationHeight
@@ -8001,58 +8825,58 @@ struct gcregmultisource {
 
 /* General purpose control register. */
 
-#define gcregBlock8ControlRegAddrs                                        0x4B20
-#define GCREG_BLOCK8_CONTROL_MSB                                              15
-#define GCREG_BLOCK8_CONTROL_LSB                                               3
-#define GCREG_BLOCK8_CONTROL_BLK                                               0
-#define GCREG_BLOCK8_CONTROL_Count                                             8
-#define GCREG_BLOCK8_CONTROL_FieldMask                                0x00000999
-#define GCREG_BLOCK8_CONTROL_ReadMask                                 0x00000999
-#define GCREG_BLOCK8_CONTROL_WriteMask                                0x00000999
-#define GCREG_BLOCK8_CONTROL_ResetValue                               0x00000000
+#define gcregBlock8PEControlRegAddrs                                      0x4B20
+#define GCREG_BLOCK8_PE_CONTROL_MSB                                           15
+#define GCREG_BLOCK8_PE_CONTROL_LSB                                            3
+#define GCREG_BLOCK8_PE_CONTROL_BLK                                            0
+#define GCREG_BLOCK8_PE_CONTROL_Count                                          8
+#define GCREG_BLOCK8_PE_CONTROL_FieldMask                             0x00000999
+#define GCREG_BLOCK8_PE_CONTROL_ReadMask                              0x00000999
+#define GCREG_BLOCK8_PE_CONTROL_WriteMask                             0x00000999
+#define GCREG_BLOCK8_PE_CONTROL_ResetValue                            0x00000000
 
-#define GCREG_BLOCK8_CONTROL_YUV                                           0 : 0
-#define GCREG_BLOCK8_CONTROL_YUV_End                                           0
-#define GCREG_BLOCK8_CONTROL_YUV_Start                                         0
-#define GCREG_BLOCK8_CONTROL_YUV_Type                                        U01
-#define   GCREG_BLOCK8_CONTROL_YUV_601                                       0x0
-#define   GCREG_BLOCK8_CONTROL_YUV_709                                       0x1
+#define GCREG_BLOCK8_PE_CONTROL_YUV                                        0 : 0
+#define GCREG_BLOCK8_PE_CONTROL_YUV_End                                        0
+#define GCREG_BLOCK8_PE_CONTROL_YUV_Start                                      0
+#define GCREG_BLOCK8_PE_CONTROL_YUV_Type                                     U01
+#define   GCREG_BLOCK8_PE_CONTROL_YUV_601                                    0x0
+#define   GCREG_BLOCK8_PE_CONTROL_YUV_709                                    0x1
 
-#define GCREG_BLOCK8_CONTROL_MASK_YUV                                      3 : 3
-#define GCREG_BLOCK8_CONTROL_MASK_YUV_End                                      3
-#define GCREG_BLOCK8_CONTROL_MASK_YUV_Start                                    3
-#define GCREG_BLOCK8_CONTROL_MASK_YUV_Type                                   U01
-#define   GCREG_BLOCK8_CONTROL_MASK_YUV_ENABLED                              0x0
-#define   GCREG_BLOCK8_CONTROL_MASK_YUV_MASKED                               0x1
+#define GCREG_BLOCK8_PE_CONTROL_MASK_YUV                                   3 : 3
+#define GCREG_BLOCK8_PE_CONTROL_MASK_YUV_End                                   3
+#define GCREG_BLOCK8_PE_CONTROL_MASK_YUV_Start                                 3
+#define GCREG_BLOCK8_PE_CONTROL_MASK_YUV_Type                                U01
+#define   GCREG_BLOCK8_PE_CONTROL_MASK_YUV_ENABLED                           0x0
+#define   GCREG_BLOCK8_PE_CONTROL_MASK_YUV_MASKED                            0x1
 
-#define GCREG_BLOCK8_CONTROL_UV_SWIZZLE                                    4 : 4
-#define GCREG_BLOCK8_CONTROL_UV_SWIZZLE_End                                    4
-#define GCREG_BLOCK8_CONTROL_UV_SWIZZLE_Start                                  4
-#define GCREG_BLOCK8_CONTROL_UV_SWIZZLE_Type                                 U01
-#define   GCREG_BLOCK8_CONTROL_UV_SWIZZLE_UV                                 0x0
-#define   GCREG_BLOCK8_CONTROL_UV_SWIZZLE_VU                                 0x1
+#define GCREG_BLOCK8_PE_CONTROL_UV_SWIZZLE                                 4 : 4
+#define GCREG_BLOCK8_PE_CONTROL_UV_SWIZZLE_End                                 4
+#define GCREG_BLOCK8_PE_CONTROL_UV_SWIZZLE_Start                               4
+#define GCREG_BLOCK8_PE_CONTROL_UV_SWIZZLE_Type                              U01
+#define   GCREG_BLOCK8_PE_CONTROL_UV_SWIZZLE_UV                              0x0
+#define   GCREG_BLOCK8_PE_CONTROL_UV_SWIZZLE_VU                              0x1
 
-#define GCREG_BLOCK8_CONTROL_MASK_UV_SWIZZLE                               7 : 7
-#define GCREG_BLOCK8_CONTROL_MASK_UV_SWIZZLE_End                               7
-#define GCREG_BLOCK8_CONTROL_MASK_UV_SWIZZLE_Start                             7
-#define GCREG_BLOCK8_CONTROL_MASK_UV_SWIZZLE_Type                            U01
-#define   GCREG_BLOCK8_CONTROL_MASK_UV_SWIZZLE_ENABLED                       0x0
-#define   GCREG_BLOCK8_CONTROL_MASK_UV_SWIZZLE_MASKED                        0x1
+#define GCREG_BLOCK8_PE_CONTROL_MASK_UV_SWIZZLE                            7 : 7
+#define GCREG_BLOCK8_PE_CONTROL_MASK_UV_SWIZZLE_End                            7
+#define GCREG_BLOCK8_PE_CONTROL_MASK_UV_SWIZZLE_Start                          7
+#define GCREG_BLOCK8_PE_CONTROL_MASK_UV_SWIZZLE_Type                         U01
+#define   GCREG_BLOCK8_PE_CONTROL_MASK_UV_SWIZZLE_ENABLED                    0x0
+#define   GCREG_BLOCK8_PE_CONTROL_MASK_UV_SWIZZLE_MASKED                     0x1
 
 /* YUV to RGB convert enable */
-#define GCREG_BLOCK8_CONTROL_YUVRGB                                        8 : 8
-#define GCREG_BLOCK8_CONTROL_YUVRGB_End                                        8
-#define GCREG_BLOCK8_CONTROL_YUVRGB_Start                                      8
-#define GCREG_BLOCK8_CONTROL_YUVRGB_Type                                     U01
-#define   GCREG_BLOCK8_CONTROL_YUVRGB_DISABLED                               0x0
-#define   GCREG_BLOCK8_CONTROL_YUVRGB_ENABLED                                0x1
+#define GCREG_BLOCK8_PE_CONTROL_YUVRGB                                     8 : 8
+#define GCREG_BLOCK8_PE_CONTROL_YUVRGB_End                                     8
+#define GCREG_BLOCK8_PE_CONTROL_YUVRGB_Start                                   8
+#define GCREG_BLOCK8_PE_CONTROL_YUVRGB_Type                                  U01
+#define   GCREG_BLOCK8_PE_CONTROL_YUVRGB_DISABLED                            0x0
+#define   GCREG_BLOCK8_PE_CONTROL_YUVRGB_ENABLED                             0x1
 
-#define GCREG_BLOCK8_CONTROL_MASK_YUVRGB                                 11 : 11
-#define GCREG_BLOCK8_CONTROL_MASK_YUVRGB_End                                  11
-#define GCREG_BLOCK8_CONTROL_MASK_YUVRGB_Start                                11
-#define GCREG_BLOCK8_CONTROL_MASK_YUVRGB_Type                                U01
-#define   GCREG_BLOCK8_CONTROL_MASK_YUVRGB_ENABLED                           0x0
-#define   GCREG_BLOCK8_CONTROL_MASK_YUVRGB_MASKED                            0x1
+#define GCREG_BLOCK8_PE_CONTROL_MASK_YUVRGB                              11 : 11
+#define GCREG_BLOCK8_PE_CONTROL_MASK_YUVRGB_End                               11
+#define GCREG_BLOCK8_PE_CONTROL_MASK_YUVRGB_Start                             11
+#define GCREG_BLOCK8_PE_CONTROL_MASK_YUVRGB_Type                             U01
+#define   GCREG_BLOCK8_PE_CONTROL_MASK_YUVRGB_ENABLED                        0x0
+#define   GCREG_BLOCK8_PE_CONTROL_MASK_YUVRGB_MASKED                         0x1
 
 /*******************************************************************************
 ** State gcregBlock8SrcColorKeyHigh
@@ -8127,6 +8951,14 @@ struct gcregmultisource {
 #define GCREG_BLOCK8_SRC_EX_CONFIG_MINOR_TILED_Type                          U01
 #define   GCREG_BLOCK8_SRC_EX_CONFIG_MINOR_TILED_DISABLED                    0x0
 #define   GCREG_BLOCK8_SRC_EX_CONFIG_MINOR_TILED_ENABLED                     0x1
+
+/* Source CacheMode. */
+#define GCREG_BLOCK8_SRC_EX_CONFIG_CACHE_MODE                            12 : 12
+#define GCREG_BLOCK8_SRC_EX_CONFIG_CACHE_MODE_End                             12
+#define GCREG_BLOCK8_SRC_EX_CONFIG_CACHE_MODE_Start                           12
+#define GCREG_BLOCK8_SRC_EX_CONFIG_CACHE_MODE_Type                           U01
+#define   GCREG_BLOCK8_SRC_EX_CONFIG_CACHE_MODE_DISABLED                     0x0
+#define   GCREG_BLOCK8_SRC_EX_CONFIG_CACHE_MODE_ENABLED                      0x1
 
 /*******************************************************************************
 ** State gcregBlock8SrcExAddress
@@ -8379,7 +9211,7 @@ struct gcmommuflush {
 ** Modular operations: dst
 */
 
-static const struct gccmdldstate gcmodst_address_ldst =
+static const struct gccmdldstate gcmodst_config_ldst =
 	GCLDSTATE(gcregDestAddressRegAddrs, 3);
 
 static const struct gccmdldstate gcmodst_rotationheight_ldst =
@@ -8389,8 +9221,8 @@ static const struct gccmdldstate gcmodst_clip_ldst =
 	GCLDSTATE(gcregClipTopLeftRegAddrs, 2);
 
 struct gcmodst {
-	/* gcregDestAddressRegAddrs */
-	struct gccmdldstate address_ldst;
+	/* Configuration block. */
+	struct gccmdldstate config_ldst;
 
 		/* gcregDestAddressRegAddrs */
 		unsigned int address;
@@ -8413,7 +9245,7 @@ struct gcmodst {
 			unsigned int raw;
 		} rotationheight;
 
-	/* gcregClipTopLeftRegAddrs */
+	/* Clipping block. */
 	struct gccmdldstate clip_ldst;
 
 		/* gcregClipTopLeftRegAddrs */
@@ -8433,6 +9265,239 @@ struct gcmodst {
 };
 
 /*******************************************************************************
+** Modular operations: alpha
+*/
+
+static const struct gccmdldstate gcmoalpha_config_ldst =
+	GCLDSTATE(gcregAlphaControlRegAddrs, 2);
+
+struct gcmoalpha {
+	/* Alpha control block. */
+	struct gccmdldstate config_ldst;
+
+		/* gcregAlphaControlRegAddrs */
+		union {
+			struct gcregalphacontrol reg;
+			unsigned int raw;
+		} control;
+
+		/* gcregAlphaModesRegAddrs */
+		union {
+			struct gcregalphamodes reg;
+			unsigned int raw;
+		} mode;
+
+		/* Alignment filler. */
+		unsigned int _filler;
+};
+
+/*******************************************************************************
+** Modular operations: alphaoff
+*/
+
+static const struct gccmdldstate gcmoalphaoff_control_ldst =
+	GCLDSTATE(gcregAlphaControlRegAddrs, 1);
+
+struct gcmoalphaoff {
+	/* gcregAlphaControlRegAddrs */
+	struct gccmdldstate control_ldst;
+
+		/* gcregAlphaControlRegAddrs */
+		union {
+			struct gcregalphacontrol reg;
+			unsigned int raw;
+		} control;
+};
+
+/*******************************************************************************
+** Modular operations: alphaglobal
+*/
+
+static const struct gccmdldstate gcmoglobal_color_ldst =
+	GCLDSTATE(gcregGlobalSrcColorRegAddrs, 2);
+
+struct gcmoglobal {
+	/* Global color block. */
+	struct gccmdldstate color_ldst;
+
+		/* gcregGlobalSrcColorRegAddrs */
+		union {
+			struct gcregglobalsrccolor reg;
+			unsigned int raw;
+		} srcglobal;
+
+		/* gcregGlobalDestColorRegAddrs */
+		union {
+			struct gcregglobaldstcolor reg;
+			unsigned int raw;
+		} dstglobal;
+
+		/* Alignment filler. */
+		unsigned int _filler;
+};
+
+/*******************************************************************************
+** Modular operations: xsrcalpha
+*/
+
+static const struct gccmdldstate gcmoxsrcalpha_alphamodes_ldst[4] = {
+	GCLDSTATE(gcregBlock4AlphaModesRegAddrs + 0, 1),
+	GCLDSTATE(gcregBlock4AlphaModesRegAddrs + 1, 1),
+	GCLDSTATE(gcregBlock4AlphaModesRegAddrs + 2, 1),
+	GCLDSTATE(gcregBlock4AlphaModesRegAddrs + 3, 1),
+};
+
+static const struct gccmdldstate gcmoxsrcalpha_srcglobal_ldst[4] = {
+	GCLDSTATE(gcregBlock4GlobalSrcColorRegAddrs + 0, 1),
+	GCLDSTATE(gcregBlock4GlobalSrcColorRegAddrs + 1, 1),
+	GCLDSTATE(gcregBlock4GlobalSrcColorRegAddrs + 2, 1),
+	GCLDSTATE(gcregBlock4GlobalSrcColorRegAddrs + 3, 1),
+};
+
+static const struct gccmdldstate gcmoxsrcalpha_dstglobal_ldst[4] = {
+	GCLDSTATE(gcregBlock4GlobalDestColorRegAddrs + 0, 1),
+	GCLDSTATE(gcregBlock4GlobalDestColorRegAddrs + 1, 1),
+	GCLDSTATE(gcregBlock4GlobalDestColorRegAddrs + 2, 1),
+	GCLDSTATE(gcregBlock4GlobalDestColorRegAddrs + 3, 1),
+};
+
+struct gcmoxsrcalpha {
+	/* gcregBlock4AlphaModesRegAddrs */
+	struct gccmdldstate alphamodes_ldst;
+
+		/* gcregBlock4AlphaModesRegAddrs */
+		union {
+			struct gcregalphamodes reg;
+			unsigned int raw;
+		} alphamodes;
+
+	/* gcregBlock4GlobalSrcColorRegAddrs */
+	struct gccmdldstate srcglobal_ldst;
+
+		/* gcregBlock4GlobalSrcColorRegAddrs */
+		union {
+			struct gcregglobalsrccolor reg;
+			unsigned int raw;
+		} srcglobal;
+
+	/* gcregBlock4GlobalDestColorRegAddrs */
+	struct gccmdldstate dstglobal_ldst;
+
+		/* gcregBlock4GlobalDestColorRegAddrs */
+		union {
+			struct gcregglobaldstcolor reg;
+			unsigned int raw;
+		} dstglobal;
+};
+
+/*******************************************************************************
+** Modular operations: yuv
+*/
+
+static const struct gccmdldstate gcmoyuv_plane_ldst =
+	GCLDSTATE(gcregUPlaneAddressRegAddrs, 4);
+
+static const struct gccmdldstate gcmoyuv_pectrl_ldst =
+	GCLDSTATE(gcregPEControlRegAddrs, 1);
+
+struct gcmoyuv {
+	/* Plane state block. */
+	struct gccmdldstate plane_ldst;
+
+		/* gcregBlock4UPlaneAddressRegAddrs */
+		unsigned int uplaneaddress;
+
+		/* gcregBlock4UPlaneStrideRegAddrs */
+		unsigned int uplanestride;
+
+		/* gcregBlock4VPlaneAddressRegAddrs */
+		unsigned int vplaneaddress;
+
+		/* gcregBlock4VPlaneStrideRegAddrs */
+		unsigned int vplanestride;
+
+		/* Alignment filler. */
+		unsigned int _filler1;
+
+	/* gcregBlock4PEControlRegAddrs */
+	struct gccmdldstate pectrl_ldst;
+
+		/* gcregBlock4PEControlRegAddrs */
+		unsigned int pectrl;
+};
+
+/*******************************************************************************
+** Modular operations: xsrcyuv
+*/
+
+static const struct gccmdldstate gcmoxsrcyuv_uplaneaddress_ldst[4] = {
+	GCLDSTATE(gcregBlock4UPlaneAddressRegAddrs + 0, 1),
+	GCLDSTATE(gcregBlock4UPlaneAddressRegAddrs + 1, 1),
+	GCLDSTATE(gcregBlock4UPlaneAddressRegAddrs + 2, 1),
+	GCLDSTATE(gcregBlock4UPlaneAddressRegAddrs + 3, 1),
+};
+
+static const struct gccmdldstate gcmoxsrcyuv_uplanestride_ldst[4] = {
+	GCLDSTATE(gcregBlock4UPlaneStrideRegAddrs + 0, 1),
+	GCLDSTATE(gcregBlock4UPlaneStrideRegAddrs + 1, 1),
+	GCLDSTATE(gcregBlock4UPlaneStrideRegAddrs + 2, 1),
+	GCLDSTATE(gcregBlock4UPlaneStrideRegAddrs + 3, 1),
+};
+
+static const struct gccmdldstate gcmoxsrcyuv_vplaneaddress_ldst[4] = {
+	GCLDSTATE(gcregBlock4VPlaneAddressRegAddrs + 0, 1),
+	GCLDSTATE(gcregBlock4VPlaneAddressRegAddrs + 1, 1),
+	GCLDSTATE(gcregBlock4VPlaneAddressRegAddrs + 2, 1),
+	GCLDSTATE(gcregBlock4VPlaneAddressRegAddrs + 3, 1),
+};
+
+static const struct gccmdldstate gcmoxsrcyuv_vplanestride_ldst[4] = {
+	GCLDSTATE(gcregBlock4VPlaneStrideRegAddrs + 0, 1),
+	GCLDSTATE(gcregBlock4VPlaneStrideRegAddrs + 1, 1),
+	GCLDSTATE(gcregBlock4VPlaneStrideRegAddrs + 2, 1),
+	GCLDSTATE(gcregBlock4VPlaneStrideRegAddrs + 3, 1),
+};
+
+static const struct gccmdldstate gcmoxsrcyuv_pectrl_ldst[4] = {
+	GCLDSTATE(gcregBlock4PEControlRegAddrs + 0, 1),
+	GCLDSTATE(gcregBlock4PEControlRegAddrs + 1, 1),
+	GCLDSTATE(gcregBlock4PEControlRegAddrs + 2, 1),
+	GCLDSTATE(gcregBlock4PEControlRegAddrs + 3, 1),
+};
+
+struct gcmoxsrcyuv {
+	/* gcregBlock4UPlaneAddressRegAddrs */
+	struct gccmdldstate uplaneaddress_ldst;
+
+		/* gcregBlock4UPlaneAddressRegAddrs */
+		unsigned int uplaneaddress;
+
+	/* gcregBlock4UPlaneStrideRegAddrs */
+	struct gccmdldstate uplanestride_ldst;
+
+		/* gcregBlock4UPlaneStrideRegAddrs */
+		unsigned int uplanestride;
+
+	/* gcregBlock4VPlaneAddressRegAddrs */
+	struct gccmdldstate vplaneaddress_ldst;
+
+		/* gcregBlock4VPlaneAddressRegAddrs */
+		unsigned int vplaneaddress;
+
+	/* gcregBlock4VPlaneStrideRegAddrs */
+	struct gccmdldstate vplanestride_ldst;
+
+		/* gcregBlock4VPlaneStrideRegAddrs */
+		unsigned int vplanestride;
+
+	/* gcregBlock4PEControlRegAddrs */
+	struct gccmdldstate pectrl_ldst;
+
+		/* gcregBlock4PEControlRegAddrs */
+		unsigned int pectrl;
+};
+
+/*******************************************************************************
 ** Modular operations: src
 */
 
@@ -8448,34 +9513,6 @@ static const struct gccmdldstate gcmosrc_stride_ldst[4] = {
 	GCLDSTATE(gcregBlock4SrcStrideRegAddrs + 1, 1),
 	GCLDSTATE(gcregBlock4SrcStrideRegAddrs + 2, 1),
 	GCLDSTATE(gcregBlock4SrcStrideRegAddrs + 3, 1),
-};
-
-static const struct gccmdldstate gcmosrc_uplaneaddress_ldst[4] = {
-	GCLDSTATE(gcregUPlaneAddressRegAddrs + 0, 1),
-	GCLDSTATE(gcregUPlaneAddressRegAddrs + 1, 1),
-	GCLDSTATE(gcregUPlaneAddressRegAddrs + 2, 1),
-	GCLDSTATE(gcregUPlaneAddressRegAddrs + 3, 1),
-};
-
-static const struct gccmdldstate gcmosrc_uplanestride_ldst[4] = {
-	GCLDSTATE(gcregUPlaneStrideRegAddrs + 0, 1),
-	GCLDSTATE(gcregUPlaneStrideRegAddrs + 1, 1),
-	GCLDSTATE(gcregUPlaneStrideRegAddrs + 2, 1),
-	GCLDSTATE(gcregUPlaneStrideRegAddrs + 3, 1),
-};
-
-static const struct gccmdldstate gcmosrc_vplaneaddress_ldst[4] = {
-	GCLDSTATE(gcregVPlaneAddressRegAddrs + 0, 1),
-	GCLDSTATE(gcregVPlaneAddressRegAddrs + 1, 1),
-	GCLDSTATE(gcregVPlaneAddressRegAddrs + 2, 1),
-	GCLDSTATE(gcregVPlaneAddressRegAddrs + 3, 1),
-};
-
-static const struct gccmdldstate gcmosrc_vplanestride_ldst[4] = {
-	GCLDSTATE(gcregVPlaneStrideRegAddrs + 0, 1),
-	GCLDSTATE(gcregVPlaneStrideRegAddrs + 1, 1),
-	GCLDSTATE(gcregVPlaneStrideRegAddrs + 2, 1),
-	GCLDSTATE(gcregVPlaneStrideRegAddrs + 3, 1),
 };
 
 static const struct gccmdldstate gcmosrc_rotation_ldst[4] = {
@@ -8539,27 +9576,6 @@ static const struct gccmdldstate gcmosrc_alphacontrol_ldst[4] = {
 	GCLDSTATE(gcregBlock4AlphaControlRegAddrs + 1, 1),
 	GCLDSTATE(gcregBlock4AlphaControlRegAddrs + 2, 1),
 	GCLDSTATE(gcregBlock4AlphaControlRegAddrs + 3, 1),
-};
-
-static const struct gccmdldstate gcmosrcalpha_alphamodes_ldst[4] = {
-	GCLDSTATE(gcregBlock4AlphaModesRegAddrs + 0, 1),
-	GCLDSTATE(gcregBlock4AlphaModesRegAddrs + 1, 1),
-	GCLDSTATE(gcregBlock4AlphaModesRegAddrs + 2, 1),
-	GCLDSTATE(gcregBlock4AlphaModesRegAddrs + 3, 1),
-};
-
-static const struct gccmdldstate gcmosrcalpha_srcglobal_ldst[4] = {
-	GCLDSTATE(gcregBlock4GlobalSrcColorRegAddrs + 0, 1),
-	GCLDSTATE(gcregBlock4GlobalSrcColorRegAddrs + 1, 1),
-	GCLDSTATE(gcregBlock4GlobalSrcColorRegAddrs + 2, 1),
-	GCLDSTATE(gcregBlock4GlobalSrcColorRegAddrs + 3, 1),
-};
-
-static const struct gccmdldstate gcmosrcalpha_dstglobal_ldst[4] = {
-	GCLDSTATE(gcregBlock4GlobalDestColorRegAddrs + 0, 1),
-	GCLDSTATE(gcregBlock4GlobalDestColorRegAddrs + 1, 1),
-	GCLDSTATE(gcregBlock4GlobalDestColorRegAddrs + 2, 1),
-	GCLDSTATE(gcregBlock4GlobalDestColorRegAddrs + 3, 1),
 };
 
 struct gcmosrc {
@@ -8657,51 +9673,109 @@ struct gcmosrc {
 		} alphacontrol;
 };
 
-struct gcmosrcplanaryuv {
-	/* gcregUPlaneAddressRegAddrs */
-	struct gccmdldstate uplaneaddress_ldst;
-		unsigned int uplaneaddress;
+/*******************************************************************************
+** Modular operations: vrsrc
+*/
 
-	/* gcregUPlaneStrideRegAddrs */
-	struct gccmdldstate uplanestride_ldst;
-		unsigned int uplanestride;
+static const struct gccmdldstate gcmovrsrc_config_ldst =
+	GCLDSTATE(gcregSrcAddressRegAddrs, 4);
 
-	/* gcregVPlaneAddressRegAddrs */
-	struct gccmdldstate vplaneaddress_ldst;
-		unsigned int vplaneaddress;
+static const struct gccmdldstate gcmovrsrc_pos_ldst =
+	GCLDSTATE(gcregVRSourceImageLowRegAddrs, 4);
 
-	/* gcregVPlaneStrideRegAddrs */
-	struct gccmdldstate vplanestride_ldst;
-		unsigned int vplanestride;
-};
+static const struct gccmdldstate gcmovrsrc_rotation_ldst =
+	GCLDSTATE(gcregSrcRotationHeightRegAddrs, 2);
 
-struct gcmosrcalpha {
-	/* gcregBlock4AlphaModesRegAddrs */
-	struct gccmdldstate alphamodes_ldst;
+static const struct gccmdldstate gcmovrsrc_rop_ldst =
+	GCLDSTATE(gcregRopRegAddrs, 1);
 
-		/* gcregBlock4AlphaModesRegAddrs */
+static const struct gccmdldstate gcmovrsrc_mult_ldst =
+	GCLDSTATE(gcregColorMultiplyModesRegAddrs, 1);
+
+struct gcmovrsrc {
+	/* Configuration block. */
+	struct gccmdldstate config_ldst;
+
+		/* gcregSrcAddressRegAddrs */
+		unsigned int address;
+
+		/* gcregSrcStrideRegAddrs */
+		unsigned int stride;
+
+		/* gcregSrcRotationConfigRegAddrs */
 		union {
-			struct gcregalphamodes reg;
+			struct gcregsrcrotationconfig reg;
 			unsigned int raw;
-		} alphamodes;
+		} rotation;
 
-	/* gcregBlock4GlobalSrcColorRegAddrs */
-	struct gccmdldstate srcglobal_ldst;
-
-		/* gcregBlock4GlobalSrcColorRegAddrs */
+		/* gcregSrcConfigRegAddrs */
 		union {
-			struct gcregglobalsrccolor reg;
+			struct gcregsrcconfig reg;
 			unsigned int raw;
-		} srcglobal;
+		} config;
 
-	/* gcregBlock4GlobalDestColorRegAddrs */
-	struct gccmdldstate dstglobal_ldst;
+		/* Alignment filler. */
+		unsigned int _filler1;
 
-		/* gcregBlock4GlobalDestColorRegAddrs */
+	/* Source position block. */
+	struct gccmdldstate pos_ldst;
+
+		/* gcregVRSourceImageLowRegAddrs */
 		union {
-			struct gcregglobaldstcolor reg;
+			struct gcregvrsourceimagelow reg;
 			unsigned int raw;
-		} dstglobal;
+		} lt;
+
+		/* gcregVRSourceImageHighRegAddrs */
+		union {
+			struct gcregvrsourceimagehigh reg;
+			unsigned int raw;
+		} rb;
+
+		/* gcregVRSourceOriginLowRegAddrs */
+		unsigned int x;
+
+		/* gcregVRSourceOriginHighRegAddrs */
+		unsigned int y;
+
+		/* Alignment filler. */
+		unsigned int _filler2;
+
+	/* Rotation block. */
+	struct gccmdldstate rotation_ldst;
+
+		/* gcregSrcRotationHeightRegAddrs */
+		union {
+			struct gcregsrcrotationheight reg;
+			unsigned int raw;
+		} rotationheight;
+
+		/* gcregRotAngleRegAddrs */
+		union {
+			struct gcregrotangle reg;
+			unsigned int raw;
+		} rotationangle;
+
+		/* Alignment filler. */
+		unsigned int _filler3;
+
+	/* gcregRopRegAddrs */
+	struct gccmdldstate rop_ldst;
+
+		/* gcregRopRegAddrs */
+		union {
+			struct gcregrop reg;
+			unsigned int raw;
+		} rop;
+
+	/* gcregColorMultiplyModesRegAddrs */
+	struct gccmdldstate mult_ldst;
+
+		/* gcregColorMultiplyModesRegAddrs */
+		union {
+			struct gcregcolormultiplymodes reg;
+			unsigned int raw;
+		} mult;
 };
 
 /*******************************************************************************
@@ -8750,7 +9824,7 @@ struct gcmobltconfig {
 ** Modular operations: startde
 */
 
-struct gcmostart {
+struct gcmostartde {
 	/* Start DE command. */
 	struct gccmdstartde startde;
 	struct gccmdstartderect rect;
@@ -8862,6 +9936,135 @@ struct gcmofill {
 	/* Start DE command. */
 	struct gccmdstartde startde;
 	struct gccmdstartderect rect;
+};
+
+/*******************************************************************************
+** Modular operations: filterkernel
+*/
+
+static const struct gccmdldstate gcmofilterkernel_shared_ldst =
+	GCLDSTATE(gcregFilterKernelRegAddrs, 77);
+
+static const struct gccmdldstate gcmofilterkernel_horizontal_ldst =
+	GCLDSTATE(gcregHoriFilterKernelRegAddrs, 77);
+
+static const struct gccmdldstate gcmofilterkernel_vertical_ldst =
+	GCLDSTATE(gcregVertiFilterKernelRegAddrs, 77);
+
+struct gcmofilterkernel {
+	/* Kernel array block. */
+	struct gccmdldstate kernelarray_ldst;
+
+		/* Array of kernel coefficients. */
+		struct gcregfilterkernel kernelarray;
+};
+
+/*******************************************************************************
+** Modular operations: vrdst
+*/
+
+static const struct gccmdldstate gcmovrdst_config_ldst =
+	GCLDSTATE(gcregDestAddressRegAddrs, 4);
+
+static const struct gccmdldstate gcmovrdst_rotationheight_ldst =
+	GCLDSTATE(gcregDstRotationHeightRegAddrs, 1);
+
+struct gcmovrdst {
+	/* Configuration block. */
+	struct gccmdldstate config_ldst;
+
+		/* gcregDestAddressRegAddrs */
+		unsigned int address;
+
+		/* gcregDestStrideRegAddrs */
+		unsigned int stride;
+
+		/* gcregDestRotationConfigRegAddrs */
+		union {
+			struct gcregdstrotationconfig reg;
+			unsigned int raw;
+		} rotation;
+
+		/* gcregDestConfigRegAddrs */
+		union {
+			struct gcregdstconfig reg;
+			unsigned int raw;
+		} config;
+
+		/* Alignment filler. */
+		unsigned int _filler;
+
+	/* gcregDstRotationHeightRegAddrs */
+	struct gccmdldstate rotationheight_ldst;
+
+		/* gcregDstRotationHeightRegAddrs */
+		union {
+			struct gcregdstrotationheight reg;
+			unsigned int raw;
+		} rotationheight;
+};
+
+/*******************************************************************************
+** Modular operations: vrconfigex
+*/
+
+static const struct gccmdldstate gcmovrconfigex_config_ldst =
+	GCLDSTATE(gcregVRConfigExRegAddrs, 1);
+
+struct gcmovrconfigex {
+	/* gcregVRConfigExRegAddrs */
+	struct gccmdldstate config_ldst;
+
+		/* gcregVRConfigExRegAddrs */
+		union {
+			struct gcregvrconfigex reg;
+			unsigned int raw;
+		} config;
+};
+
+/*******************************************************************************
+** Modular operations: startvr
+*/
+
+static const struct gccmdldstate gcmostartvr_scale_ldst =
+	GCLDSTATE(gcregStretchFactorLowRegAddrs, 2);
+
+static const struct gccmdldstate gcmostartvr_rect_ldst =
+	GCLDSTATE(gcregVRTargetWindowLowRegAddrs, 2);
+
+static const struct gccmdldstate gcmostartvr_config_ldst =
+	GCLDSTATE(gcregVRConfigRegAddrs, 1);
+
+struct gcmostartvr {
+	/* Scale factor block. */
+	struct gccmdldstate scale_ldst;
+
+		/* gcregStretchFactorLowRegAddrs */
+		unsigned int scalex;
+
+		/* gcregStretchFactorHighRegAddrs */
+		unsigned int scaley;
+
+		/* Alignment filler. */
+		unsigned int _filler1;
+
+	/* Target rectangle. */
+	struct gccmdldstate rect_ldst;
+
+		/* gcregVRTargetWindowLowRegAddrs */
+		struct gcregvrtargetwindowlow lt;
+
+		/* gcregVRTargetWindowHighRegAddrs */
+		struct gcregvrtargetwindowhigh rb;
+
+		/* Alignment filler. */
+		unsigned int _filler2;
+
+	/* Start video raster commad. */
+	struct gccmdldstate config_ldst;
+
+		/* gcregVRConfigRegAddrs */
+		struct gcregvrconfig config;
 };
 
 #endif

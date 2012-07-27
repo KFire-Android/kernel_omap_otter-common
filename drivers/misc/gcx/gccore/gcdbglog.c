@@ -91,16 +91,6 @@
  * Miscellaneous macros.
  */
 
-#define GC_PTR2INT(p) \
-( \
-	(unsigned int) (p) \
-)
-
-#define GC_ALIGN(n, align) \
-( \
-	((n) + ((align) - 1)) & ~((align) - 1) \
-)
-
 #define GC_PTRALIGNMENT(p, alignment) \
 ( \
 	GC_ALIGN(GC_PTR2INT(p), alignment) - GC_PTR2INT(p) \
@@ -124,7 +114,7 @@
 #endif
 
 #if GC_SHOW_TIME
-#define GC_TIME_FORMAT "[%5ld.%ld] "
+#define GC_TIME_FORMAT "[%5ld.%10ld] "
 #endif
 
 #if GC_SHOW_DUMP_LINE
@@ -512,7 +502,7 @@ static void gc_print_command(struct seq_file *s, struct itembuffer *item,
 
 		switch (command) {
 		case GCREG_COMMAND_OPCODE_LOAD_STATE:
-			count = (data32[i] >> 16) & 0x3F;
+			count = (data32[i] >> 16) & 0x3FF;
 			addr = data32[i] & 0xFFFF;
 			GC_PRINTK(s, "%s  0x%08X: 0x%08X  STATE(0x%04X, %d)\n",
 				  buffer, item->gpuaddr + (i << 2),
@@ -1962,18 +1952,18 @@ int gc_parse_command_buffer(unsigned int *buffer, unsigned int size,
 					break;
 
 				case gcregSrcOriginRegAddrs:
-					info->src[0].rect.l
+					info->src[0].rect.left
 						= buffer[i] & 0xFFFF;
 
-					info->src[0].rect.t
+					info->src[0].rect.top
 						= (buffer[i] >> 16) & 0xFFFF;
 					break;
 
 				case gcregSrcSizeRegAddrs:
-					info->src[0].rect.r
+					info->src[0].rect.right
 						= buffer[i] & 0xFFFF;
 
-					info->src[0].rect.b
+					info->src[0].rect.bottom
 						= (buffer[i] >> 16) & 0xFFFF;
 					break;
 
@@ -2033,10 +2023,10 @@ int gc_parse_command_buffer(unsigned int *buffer, unsigned int size,
 				case gcregBlock4SrcOriginRegAddrs + 2:
 				case gcregBlock4SrcOriginRegAddrs + 3:
 					index = addr & 3;
-					info->src[index].rect.l
+					info->src[index].rect.left
 						= buffer[i] & 0xFFFF;
 
-					info->src[index].rect.t
+					info->src[index].rect.top
 						= (buffer[i] >> 16) & 0xFFFF;
 					break;
 
@@ -2045,10 +2035,10 @@ int gc_parse_command_buffer(unsigned int *buffer, unsigned int size,
 				case gcregBlock4SrcSizeRegAddrs + 2:
 				case gcregBlock4SrcSizeRegAddrs + 3:
 					index = addr & 3;
-					info->src[index].rect.r
+					info->src[index].rect.right
 						= buffer[i] & 0xFFFF;
 
-					info->src[index].rect.b
+					info->src[index].rect.bottom
 						= (buffer[i] >> 16) & 0xFFFF;
 					break;
 
@@ -2077,15 +2067,15 @@ int gc_parse_command_buffer(unsigned int *buffer, unsigned int size,
 			i += 2;
 
 			for (j = 0; j < info->dst.rectcount; j += 1) {
-				info->dst.rect[j].l
+				info->dst.rect[j].left
 						= buffer[i] & 0xFFFF;
-				info->dst.rect[j].t
+				info->dst.rect[j].top
 						= (buffer[i] >> 16) & 0xFFFF;
 				i += 1;
 
-				info->dst.rect[j].r
+				info->dst.rect[j].right
 						= buffer[i] & 0xFFFF;
-				info->dst.rect[j].b
+				info->dst.rect[j].bottom
 						= (buffer[i] >> 16) & 0xFFFF;
 				i += 1;
 			}

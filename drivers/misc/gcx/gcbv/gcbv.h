@@ -61,6 +61,8 @@
  * Miscellaneous defines and macros.
  */
 
+#define GC_MAX_BASE_ALIGN 64
+
 #if !defined(BVBATCH_DESTRECT)
 #define BVBATCH_DESTRECT (BVBATCH_DSTRECT_ORIGIN | BVBATCH_DSTRECT_SIZE)
 #endif
@@ -72,11 +74,6 @@
 #if !defined(BVBATCH_SRC2RECT)
 #define BVBATCH_SRC2RECT (BVBATCH_SRC2RECT_ORIGIN | BVBATCH_SRC2RECT_SIZE)
 #endif
-
-#define EQ_SIZE(rect1, rect2) \
-( \
-	(rect1->width == rect2->width) && (rect1->height == rect2->height) \
-)
 
 #define STRUCTSIZE(structptr, lastmember) \
 ( \
@@ -118,12 +115,58 @@ do { \
 
 
 /*******************************************************************************
+ * Kernel table definitions.
+ */
+
+#define GC_TAP_COUNT		9
+#define GC_PHASE_BITS		5
+#define GC_PHASE_MAX_COUNT	(1 << GC_PHASE_BITS)
+#define GC_PHASE_LOAD_COUNT	(GC_PHASE_MAX_COUNT / 2 + 1)
+#define GC_COEFFICIENT_COUNT	(GC_PHASE_LOAD_COUNT * GC_TAP_COUNT)
+#define GC_FILTER_CACHE_MAX	10
+
+enum gcfiltertype {
+	GC_FILTER_SYNC,
+	GC_FILTER_BLUR,
+
+	/* Number of supported filter types. */
+	GC_FILTER_COUNT
+};
+
+struct gcfilterkernel {
+	enum gcfiltertype type;
+	unsigned int kernelsize;
+	unsigned int srcsize;
+	unsigned int dstsize;
+	unsigned int scalefactor;
+	short kernelarray[GC_COEFFICIENT_COUNT];
+	struct list_head link;
+};
+
+struct gcfiltercache {
+	unsigned int count;
+	struct list_head list;			/* gcfilterkernel */
+};
+
+
+/*******************************************************************************
  * Global data structure.
  */
 
 struct gccontext {
 	/* Last generated error message. */
 	char bverrorstr[128];
+
+	/* Capabilities and characteristics. */
+	unsigned int gcmodel;
+	unsigned int gcrevision;
+	unsigned int gcdate;
+	unsigned int gctime;
+	union gcfeatures gcfeatures;
+	union gcfeatures0 gcfeatures0;
+	union gcfeatures1 gcfeatures1;
+	union gcfeatures2 gcfeatures2;
+	union gcfeatures3 gcfeatures3;
 
 	/* Dynamically allocated structure cache. */
 	struct bvbuffmap *buffmapvac;		/* bvbuffmap */
@@ -142,6 +185,14 @@ struct gccontext {
 	GCLOCK_TYPE fixuplock;
 	GCLOCK_TYPE maplock;
 	GCLOCK_TYPE callbacklock;
+
+	/* Kernel table cache. */
+	struct gcfilterkernel *loadedfilter;	/* gcfilterkernel */
+	struct gcfiltercache filtercache[GC_FILTER_COUNT][GC_TAP_COUNT];
+
+	/* Temporary buffer descriptor. */
+	struct bvbuffdesc *tmpbuffdesc;
+	void *tmpbuff;
 };
 
 
@@ -166,10 +217,13 @@ struct bvbuffmapinfo {
  * Color format.
  */
 
-enum bvformattype {
-	BVFMT_RGB,
-	BVFMT_YUV
-};
+#define BVFMT_PLANAR		0x100
+#define BVFMT_MASK		0xFF
+
+#define BVFMT_RGB		1
+#define BVFMT_YUV		2
+#define BVFMT_PACKED_YUV	(BVFMT_YUV)
+#define BVFMT_PLANAR_YUV	(BVFMT_YUV | BVFMT_PLANAR)
 
 struct bvcomponent {
 	unsigned int shift;
@@ -185,10 +239,10 @@ struct bvcsrgb {
 };
 
 struct bvformatxlate {
-	enum bvformattype type;
-	unsigned bitspp;
-	unsigned format;
-	unsigned swizzle;
+	unsigned int type;
+	unsigned int bitspp;
+	unsigned int format;
+	unsigned int swizzle;
 	struct bvcsrgb rgba;
 };
 
@@ -249,6 +303,48 @@ extern const unsigned int rotencoding[];
 
 
 /*******************************************************************************
+ * Surface descriptor.
+ */
+
+struct surfaceinfo {
+	/* BLTsville source index (-1 for dst, 0 for src1 and 1 for src2). */
+	int index;
+
+	/* Surface buffer descriptor. */
+	union bvinbuff buf;
+
+	/* Surface geometry. */
+	struct bvsurfgeom *geom;
+
+	/* Rectangle to source from/render to. */
+	struct gcrect rect;
+
+	/* Surface format. */
+	struct bvformatxlate *format;
+
+	/* Physical size of the surface (accounted for rotation). */
+	unsigned int physwidth;
+	unsigned int physheight;
+
+	/* Base address alignment. */
+	int pixalign;
+	int bytealign;
+
+	/* Rotation angle. */
+	int angle;
+
+	/* Mirror setting. */
+	unsigned int mirror;
+
+	/* ROP. */
+	unsigned short rop;
+
+	/* Blending info. */
+	struct gcalpha *gca;
+};
+
+
+/*******************************************************************************
  * Batch structures.
  */
 
@@ -259,9 +355,30 @@ typedef enum bverror (*gcbatchend) (struct bvbltparams *bvbltparams,
 
 /* Blit states. */
 struct gcblit {
+	/* Number of sources in the operation. */
 	unsigned int srccount;
+
+	/* Multi source enable flag. */
 	unsigned int multisrc;
+
+	/* ROP code. */
 	unsigned short rop;
+
+	/* Computed destination rectangle coordinates; in multi-source
+	 * setup can be modified to match new destination and source
+	 * geometry. */
+	struct gcrect dstrect;
+};
+
+/* Filter states. */
+struct gcfilter {
+	/* Kernel size. */
+	unsigned int horkernelsize;
+	unsigned int verkernelsize;
+
+	/* Scale factors. */
+	unsigned int horscalefactor;
+	unsigned int verscalefactor;
 };
 
 /* Batch header. */
@@ -276,49 +393,29 @@ struct gcbatch {
 	gcbatchend batchend;
 
 	/* State of the current operation. */
-	struct gcblit gcblit;
+	union {
+		struct gcblit blit;
+		struct gcfilter filter;
+	} op;
 
-	/* Destination format. */
-	struct bvformatxlate *dstformat;
+	/* Destination surface. */
+	struct surfaceinfo dstinfo;
 
 	/* Clipping deltas; used to correct the source coordinates for
 	 * single source blits. */
-	int deltaleft;
-	int deltatop;
-	int deltaright;
-	int deltabottom;
+	struct gcrect clipdelta;
 
 	/* Clipped destination rectangle coordinates. */
-	unsigned short clippedleft;
-	unsigned short clippedtop;
-	unsigned short clippedright;
-	unsigned short clippedbottom;
+	struct gcrect dstclipped;
+	struct gcrect dstclippedaux;
 
-	/* Destination base address alignment in pixels. */
-	int dstalign;
-
-	/* Destination origin offset. */
+	/* Destination origin offset caused by surface base misalignment. */
 	unsigned int dstoffsetX;
 	unsigned int dstoffsetY;
 
-	/* Rotation angle. */
-	int dstangle;
-
-	/* Geometry size of the destination surface. */
+	/* Adjusted geometry size of the destination surface. */
 	unsigned int dstwidth;
 	unsigned int dstheight;
-
-	/* Physical size of the destination surface. */
-	unsigned int dstphyswidth;
-	unsigned int dstphysheight;
-
-	/* Computed destination rectangle coordinates; in multi-source
-	 * setup can be modified to match new destination and source
-	 * geometry. */
-	unsigned short left;
-	unsigned short top;
-	unsigned short right;
-	unsigned short bottom;
 
 	/* Physical size of the matched destination and source surfaces
 	 * for multi-source setup. */
@@ -356,41 +453,6 @@ struct gcbatch {
 
 
 /*******************************************************************************
- * srcinfo is used by blitters to define an array of valid sources.
- */
-
-struct srcinfo {
-	/* BLTsville source index (0 for src1 and 1 for src2). */
-	int index;
-
-	/* Source surface buffer descriptor. */
-	union bvinbuff buf;
-
-	/* Source surface geometry. */
-	struct bvsurfgeom *geom;
-
-	/* Source rectangle. */
-	struct bvrect *rect;
-
-	/* Source surface format. */
-	struct bvformatxlate *format;
-
-	/* Source rotation angle. */
-	int angle;
-	unsigned int rot;
-
-	/* Mirror setting. */
-	unsigned int mirror;
-
-	/* ROP. */
-	unsigned short rop;
-
-	/* Blending info. */
-	struct gcalpha *gca;
-};
-
-
-/*******************************************************************************
  * Internal API entries.
  */
 
@@ -398,9 +460,6 @@ struct srcinfo {
 struct gccontext *get_context(void);
 
 /* Parsers. */
-enum bverror parse_format(struct bvbltparams *bvbltparams,
-			  enum ocdformat ocdformat,
-			  struct bvformatxlate **format);
 enum bverror parse_blend(struct bvbltparams *bvbltparams,
 			 enum bvblend blend,
 			 struct gcalpha *gca);
@@ -408,12 +467,13 @@ enum bverror parse_destination(struct bvbltparams *bvbltparams,
 			       struct gcbatch *gcbatch);
 enum bverror parse_source(struct bvbltparams *bvbltparams,
 			  struct gcbatch *gcbatch,
-			  struct srcinfo *srcinfo);
+			  struct bvrect *srcrect,
+			  struct surfaceinfo *srcinfo);
+enum bverror parse_scalemode(struct bvbltparams *bvbltparams,
+			     struct gcbatch *batch);
 
 /* Return surface alignment offset. */
-int get_pixel_offset(struct bvbuffdesc *bvbuffdesc,
-		     struct bvformatxlate *format,
-		     int offset);
+int get_pixel_offset(struct surfaceinfo *surfaceinfo, int offset);
 
 /* Buffer mapping. */
 enum bverror do_map(struct bvbuffdesc *bvbuffdesc,
@@ -440,6 +500,11 @@ enum bverror claim_buffer(struct bvbltparams *bvbltparams,
 			  unsigned int size,
 			  void **buffer);
 
+/* Temporary buffer management. */
+enum bverror allocate_temp(struct bvbltparams *bvbltparams,
+			   unsigned int size);
+enum bverror free_temp(bool schedule);
+
 /* Program the destination. */
 enum bverror set_dst(struct bvbltparams *bltparams,
 		     struct gcbatch *batch,
@@ -448,12 +513,12 @@ enum bverror set_dst(struct bvbltparams *bltparams,
 /* Rendering entry points. */
 enum bverror do_fill(struct bvbltparams *bltparams,
 		     struct gcbatch *gcbatch,
-		     struct srcinfo *srcinfo);
+		     struct surfaceinfo *srcinfo);
 enum bverror do_blit(struct bvbltparams *bltparams,
 		     struct gcbatch *gcbatch,
-		     struct srcinfo *srcinfo);
+		     struct surfaceinfo *srcinfo);
 enum bverror do_filter(struct bvbltparams *bvbltparams,
 		       struct gcbatch *gcbatch,
-		       struct srcinfo *srcinfo);
+		       struct surfaceinfo *srcinfo);
 
 #endif

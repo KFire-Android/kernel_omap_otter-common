@@ -277,54 +277,75 @@ static enum gcerror virt2phys(unsigned int logical, pte_t *physical)
 #endif
 
 static enum gcerror get_physical_pages(struct gcmmuphysmem *mem,
-					pte_t *parray,
-					struct gcmmuarena *arena)
+				       pte_t *parray,
+				       struct gcmmuarena *arena)
 {
 	enum gcerror gcerror = GCERR_NONE;
 	struct vm_area_struct *vma;
 	struct page **pages = NULL;
-	unsigned int base, write;
+	unsigned long base, start, end;
+	unsigned int write;
 	int i, count = 0;
+
+	GCENTER(GCZONE_MAPPING);
+
+	/* Get the base address. */
+	base = mem->base;
 
 	/* Reset page descriptor array. */
 	arena->pages = NULL;
 
-	/* Get base address shortcut. */
-	base = mem->base;
-
 	/* Store the logical pointer. */
 	arena->logical = (void *) base;
 
-	/*
-	 * Important Note: base is mapped from user application process
-	 * to current process - it must lie completely within the current
-	 * virtual memory address space in order to be of use to us here.
-	 */
+	/* Compute virtual memory area limits. */
+	start = base + mem->offset;
+	end = base + mem->count * mem->pagesize;
+	GCDBG(GCZONE_MAPPING, "base = 0x%08X\n", base);
+	GCDBG(GCZONE_MAPPING, "offset = 0x%08X\n", mem->offset);
+	GCDBG(GCZONE_MAPPING, "count = %d\n", mem->count);
+	GCDBG(GCZONE_MAPPING, "start = 0x%08X\n", start);
+	GCDBG(GCZONE_MAPPING, "end = 0x%08X\n", end);
 
-	vma = find_vma(current->mm, base + (mem->count << PAGE_SHIFT) - 1);
-	if ((vma == NULL) || (base < vma->vm_start)) {
+	vma = find_vma(current->mm, start);
+	if (vma == NULL) {
 		gcerror = GCERR_MMU_BUFFER_BAD;
+		GCERR("failed to find VMA.\n");
+		goto exit;
+	}
+
+	GCDBG(GCZONE_MAPPING, "vm_start = 0x%08X\n", vma->vm_start);
+	GCDBG(GCZONE_MAPPING, "vm_end = 0x%08X\n", vma->vm_end);
+	if ((start < vma->vm_start) || (end > vma->vm_end)) {
+		gcerror = GCERR_MMU_BUFFER_BAD;
+		GCERR("failed to find VMA...\n");
 		goto exit;
 	}
 
 	/* Allocate page descriptor array. */
 	pages = kmalloc(mem->count * sizeof(struct page *), GFP_KERNEL);
 	if (pages == NULL) {
+		GCERR("failed to allocate page descriptor array.\n");
 		gcerror = GCERR_SETGRP(GCERR_OODM, GCERR_MMU_DESC_ALLOC);
 		goto exit;
 	}
 
 	/* Query page descriptors. */
 	write = ((vma->vm_flags & (VM_WRITE | VM_MAYWRITE)) != 0) ? 1 : 0;
+
+	down_read(&current->mm->mmap_sem);
 	count = get_user_pages(current, current->mm, base, mem->count,
-				write, 1, pages, NULL);
+			       write, 1, pages, NULL);
+	up_read(&current->mm->mmap_sem);
 
 	if (count < 0) {
 		/* Kernel allocated buffer. */
 		for (i = 0; i < mem->count; i += 1) {
 			gcerror = virt2phys(base, &parray[i]);
-			if (gcerror != GCERR_NONE)
+			if (gcerror != GCERR_NONE) {
+				GCERR("failed to convert virtual address.\n");
 				goto exit;
+			}
 
 			base += mem->pagesize;
 		}
@@ -333,6 +354,7 @@ static enum gcerror get_physical_pages(struct gcmmuphysmem *mem,
 		for (i = 0; i < mem->count; i += 1) {
 			parray[i] = page_to_phys(pages[i]);
 			if (phys_to_page(parray[i]) != pages[i]) {
+				GCERR("failed to convert page address.\n");
 				gcerror = GCERR_MMU_PAGE_BAD;
 				goto exit;
 			}
@@ -341,6 +363,7 @@ static enum gcerror get_physical_pages(struct gcmmuphysmem *mem,
 		/* Set page descriptor array. */
 		arena->pages = pages;
 	} else {
+		GCERR("invalid number of pages.\n");
 		gcerror = GCERR_MMU_BUFFER_BAD;
 		goto exit;
 	}
@@ -354,6 +377,7 @@ exit:
 			kfree(pages);
 	}
 
+	GCEXIT(GCZONE_MAPPING);
 	return gcerror;
 }
 
@@ -789,6 +813,7 @@ enum gcerror gcmmu_map(struct gccorecontext *gccorecontext,
 		parray_alloc = kmalloc(mem->count * sizeof(pte_t *),
 					GFP_KERNEL);
 		if (parray_alloc == NULL) {
+			GCERR("failed to allocate page address array\n");
 			gcerror = GCERR_SETGRP(GCERR_OODM,
 						GCERR_MMU_PHYS_ALLOC);
 			goto exit;
