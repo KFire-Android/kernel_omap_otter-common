@@ -58,6 +58,7 @@
 #define WL1271_TX_SQN_POST_RECOVERY_PADDING 0xff
 
 #define WL1271_CIPHER_SUITE_GEM 0x00147201
+#define WL1271_ETH_P_WAI 0x88B4
 
 #define WL1271_BUSY_WORD_CNT 1
 #define WL1271_BUSY_WORD_LEN (WL1271_BUSY_WORD_CNT * sizeof(u32))
@@ -554,6 +555,9 @@ struct wl1271 {
 	struct list_head peers_list;
 
 	bool watchdog_recovery;
+
+	/* work to fire when Tx is stuck */
+	struct delayed_work tx_watchdog_work;
 };
 
 struct wl1271_station {

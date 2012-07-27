@@ -220,6 +220,10 @@ static int wl1271_tx_allocate(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 		wl->tx_blocks_available -= total_blocks;
 		wl->tx_allocated_blocks += total_blocks;
 
+		/* If the FW was empty before, arm the Tx watchdog */
+		if (wl->tx_allocated_blocks == total_blocks)
+			wl12xx_rearm_tx_watchdog_locked(wl);
+
 		ac = wl1271_tx_get_queue(skb_get_queue_mapping(skb));
 		wl->tx_allocated_pkts[ac]++;
 
@@ -407,6 +411,8 @@ static int wl1271_prepare_tx_frame(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 
 		is_gem = (cipher == WL1271_CIPHER_SUITE_GEM);
 	}
+
+	is_gem |= (skb->protocol == cpu_to_be16(WL1271_ETH_P_WAI));
 	hlid = wl12xx_tx_get_hlid(wl, wlvif, skb);
 	if (hlid == WL12XX_INVALID_LINK_ID) {
 		wl1271_error("invalid hlid. dropping skb 0x%p", skb);
