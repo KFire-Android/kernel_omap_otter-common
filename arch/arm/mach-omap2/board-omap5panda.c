@@ -615,6 +615,36 @@ static struct platform_device *omap5evm_devices[] __initdata = {
 	&omap5evm_abe_audio,
 };
 
+
+static struct regulator_consumer_supply omap5_evm_vmmc1_supply[] = {
+	REGULATOR_SUPPLY("vmmc", "omap_hsmmc.0"),
+	REGULATOR_SUPPLY("vmmc", "omap_hsmmc.1"),
+};
+
+static struct regulator_init_data omap5_evm_vmmc1 = {
+	.constraints = {
+		.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+		.always_on	= true,
+	},
+	.num_consumer_supplies = ARRAY_SIZE(omap5_evm_vmmc1_supply),
+	.consumer_supplies = omap5_evm_vmmc1_supply,
+};
+
+static struct fixed_voltage_config omap5_evm_sd_dummy = {
+	.supply_name = "vmmc_supply",
+	.microvolts = 3000000, /* 3.0V */
+	.gpio = -EINVAL,
+	.init_data = &omap5_evm_vmmc1,
+};
+
+static struct platform_device dummy_sd_regulator_device = {
+	.name		= "reg-fixed-voltage",
+	.id		= 1,
+	.dev = {
+		.platform_data = &omap5_evm_sd_dummy,
+	}
+};
+
 static struct pca953x_platform_data omap5evm_gpio_expander_info = {
 	.gpio_base	= OMAP_MAX_GPIO_LINES,
 	.irq_base	= OMAP_TCA6424_IRQ_BASE,
@@ -767,6 +797,7 @@ static void __init omap_5_panda_init(void)
 			"twl6040", OMAP44XX_IRQ_SYS_2N, &twl6040_data);
 
 	omap_serial_init();
+	platform_device_register(&dummy_sd_regulator_device);
 	omap_ehci_ohci_init();
 
 	omap_hsmmc_init(mmc);
