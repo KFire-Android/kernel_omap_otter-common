@@ -99,7 +99,7 @@ static int pwrdm_dbg_show_counter(struct powerdomain *pwrdm, void *user)
 		       pwrdm_state_names[cur_state_idx]);
 
 
-	seq_printf(s, "%s (%s)", pwrdm->name, pwrdm_state_names[exp_state_idx]);
+	seq_printf(s, "%s (%s)", pwrdm->name, pwrdm_state_names[cur_state_idx]);
 	for (i = 0; i < PWRDM_MAX_PWRSTS; i++)
 		seq_printf(s, ",%s:%d", pwrdm_state_names[i],
 			pwrdm->state_counter[i]);
