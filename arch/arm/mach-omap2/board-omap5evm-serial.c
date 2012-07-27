@@ -122,6 +122,7 @@ static struct omap_uart_port_info uart5_info __initdata = {
 	.dma_rx_buf_size = 4096,
 	.dma_rx_poll_rate = 1,
 	.dma_rx_timeout = (3 * HZ),
+	.rts_mux_driver_control = 1,
 	.autosuspend_timeout = -1,
 };
 
