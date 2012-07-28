@@ -356,6 +356,13 @@ static int __devexit case_temp_sensor_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static void case_temp_sensor_shutdown(struct platform_device *pdev)
+{
+	struct case_temp_sensor *temp_sensor = platform_get_drvdata(pdev);
+
+	cancel_delayed_work_sync(&temp_sensor->case_sensor_work);
+}
+
 #ifdef CONFIG_PM
 static int case_temp_sensor_suspend(struct platform_device *pdev,
 				    pm_message_t state)
@@ -417,6 +424,7 @@ static struct platform_driver case_temp_sensor_driver = {
 		.name = "case_temp_sensor",
 		.pm = &case_temp_sensor_dev_pm_ops,
 	},
+	.shutdown = case_temp_sensor_shutdown,
 };
 
 static int __init case_temp_sensor_init(void)
