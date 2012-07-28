@@ -61,6 +61,7 @@ struct gpio_bank {
 	struct gpio_regs context;
 	u32 saved_datain;
 	u32 level_mask;
+	u32 edge_mask;
 	u32 toggle_mask;
 	spinlock_t lock;
 	struct gpio_chip chip;
@@ -297,6 +298,10 @@ exit:
 	bank->level_mask =
 		__raw_readl(bank->base + bank->regs->leveldetect0) |
 		__raw_readl(bank->base + bank->regs->leveldetect1);
+
+	bank->edge_mask =
+		__raw_readl(bank->base + bank->regs->risingdetect) |
+		__raw_readl(bank->base + bank->regs->fallingdetect);
 }
 
 #ifdef CONFIG_ARCH_OMAP1
@@ -649,7 +654,7 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
 		goto exit;
 
 	while (1) {
-		u32 isr_saved, level_mask = 0;
+		u32 isr_saved, level_mask = 0, edge_mask = 0;
 		u32 enabled;
 
 		enabled = _get_gpio_irqbank_mask(bank);
@@ -657,6 +662,17 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
 
 		if (bank->level_mask)
 			level_mask = bank->level_mask & enabled;
+
+		if (bank->edge_mask)
+			edge_mask = bank->edge_mask & enabled;
+		/*
+		 * For level+edge GPIOs, if module is IDLE, a sWakeup event
+		 * is triggered in which case if irq status is not cleared
+		 * immediately the line is not de-asserted preventing the
+		 * module to IDLE further and resulting it in getting stuck
+		 * in transition when disabled
+		 */
+		_clear_gpio_irqbank(bank, isr_saved & edge_mask);
 
 		/* clear edge sensitive interrupts before handler(s) are
 		called so that we don't miss any interrupt occurred while
