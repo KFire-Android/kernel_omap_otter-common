@@ -553,15 +553,6 @@ static int serial_omap_startup(struct uart_port *port)
 {
 	struct uart_omap_port *up = (struct uart_omap_port *)port;
 	unsigned long flags = 0;
-	int retval;
-
-	/*
-	 * Allocate the IRQ
-	 */
-	retval = request_irq(up->port.irq, serial_omap_irq, up->port.irqflags,
-				up->name, up);
-	if (retval)
-		return retval;
 
 	dev_dbg(up->port.dev, "serial_omap_startup+%d\n", up->port.line);
 
@@ -673,7 +664,6 @@ static void serial_omap_shutdown(struct uart_port *port)
 	}
 
 	serial_omap_port_disable(up);
-	free_irq(up->port.irq, up);
 }
 
 static inline void
@@ -1265,7 +1255,6 @@ static int serial_omap_suspend(struct device *dev)
 	struct omap_uart_port_info *pdata = dev->platform_data;
 
 	if (up) {
-		disable_irq(up->port.irq);
 		if (pdata->rts_mux_write) {
 			up->rts_pullup_in_suspend = 1;
 			pdata->rts_mux_write(MUX_PULL_UP, up->port.line);
@@ -1288,7 +1277,6 @@ static int serial_omap_resume(struct device *dev)
 	if (up) {
 		uart_resume_port(&serial_omap_reg, &up->port);
 		up->suspended = false;
-		enable_irq(up->port.irq);
 	}
 	return 0;
 }
@@ -1629,6 +1617,11 @@ static int __devinit serial_omap_probe(struct platform_device *pdev)
 	ui[up->port.line] = up;
 	serial_omap_add_console_port(up);
 
+	ret = request_irq(up->port.irq, serial_omap_irq, up->port.irqflags,
+				up->name, up);
+	if (ret)
+		goto err_add_port;
+
 	ret = uart_add_one_port(&serial_omap_reg, &up->port);
 	if (ret != 0)
 		goto err_add_port;
@@ -1656,6 +1649,7 @@ static int __devexit serial_omap_remove(struct platform_device *dev)
 
 	if (up) {
 		pm_runtime_disable(&up->pdev->dev);
+		free_irq(up->port.irq, up);
 		uart_remove_one_port(&serial_omap_reg, &up->port);
 		pm_qos_remove_request(&up->pm_qos_request);
 	}
@@ -1796,7 +1790,9 @@ static int serial_omap_runtime_resume(struct device *dev)
 #endif
 
 static const struct dev_pm_ops serial_omap_dev_pm_ops = {
-	SET_SYSTEM_SLEEP_PM_OPS(serial_omap_suspend, serial_omap_resume)
+	.suspend_noirq = serial_omap_suspend,
+	.resume_noirq = serial_omap_resume,
+
 	SET_RUNTIME_PM_OPS(serial_omap_runtime_suspend,
 				serial_omap_runtime_resume, NULL)
 };
