@@ -348,6 +348,11 @@ static void hdmi_hotplug_detect_worker(struct work_struct *work)
 
 	DSSDBG("in hpd work %d, state=%d\n", state, dssdev->state);
 	mutex_lock(&hdmi.hdmi_lock);
+
+	/* Make sure it is not a debounce */
+	if (!hdmi_get_current_hpd() && state == HPD_STATE_START)
+		state = HPD_STATE_OFF;
+
 	if (state == HPD_STATE_OFF) {
 		switch_set_state(&hdmi.hpd_switch, 0);
 		hdmi_inform_hpd_to_cec(false);
@@ -399,7 +404,7 @@ int hdmi_panel_hpd_handler(int hpd)
 	__cancel_delayed_work(&hpd_work.dwork);
 	atomic_set(&hpd_work.state, hpd ? HPD_STATE_START : HPD_STATE_OFF);
 	queue_delayed_work(my_workq, &hpd_work.dwork,
-					msecs_to_jiffies(hpd ? 40 : 30));
+					msecs_to_jiffies(hpd ? 500 : 30));
 	return 0;
 }
 
