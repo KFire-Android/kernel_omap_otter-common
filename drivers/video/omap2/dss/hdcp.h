@@ -63,13 +63,15 @@ struct hdcp_wait_control {
 #define HDCP_WAIT_EVENT _IOWR(HDCP_IOCTL_MAGIC, 0, \
 				struct hdcp_wait_control)
 #define HDCP_DONE	_IOW(HDCP_IOCTL_MAGIC, 1, uint32_t)
+#define HDCP_QUERY_STATUS _IOWR(HDCP_IOCTL_MAGIC, 2, uint32_t)
 
 /* Status / error codes */
 #define HDCP_OK			0
 #define HDCP_3DES_ERROR		1
 #define HDCP_AUTH_FAILURE	2
 
-
+#define HDMI_HDCP_ENABLED	0x1
+#define HDMI_HDCP_FAILED	0x0
 
 /* HDCP events */
 #define HDCP_EVENT_STEP2	(1 << 0x1)

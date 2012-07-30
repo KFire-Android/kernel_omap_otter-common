@@ -294,6 +294,23 @@ static void hdcp_start_frame_cb(void)
 	mutex_unlock(&hdcp.lock);
 }
 
+static long hdcp_query_status_ctl(uint32_t *status)
+{
+	struct hdmi_ip_data *ip_data;
+
+	HDCP_DBG("hdcp_ioctl() - QUERY %u", jiffies_to_msecs(jiffies));
+
+	ip_data = get_hdmi_ip_data();
+	if (!ip_data) {
+		HDCP_ERR("null pointer hit\n");
+		return -EINVAL;
+	}
+
+	*status = ip_data->ops->hdcp_status(ip_data);
+
+	return 0;
+}
+
 static long hdcp_wait_event_ctl(struct hdcp_wait_control *ctrl)
 {
 	HDCP_DBG("hdcp_ioctl() - WAIT %u %d", jiffies_to_msecs(jiffies),
@@ -361,6 +378,21 @@ static long hdcp_ioctl(struct file *fd, unsigned int cmd, unsigned long arg)
 				    " wait ioctl");
 			return -EFAULT;
 		}
+		break;
+
+	case HDCP_QUERY_STATUS:
+
+		hdcp_query_status_ctl(&status);
+
+		/* Store output data to output pointer */
+		if (copy_to_user(argp, &status,
+			sizeof(uint32_t))) {
+			HDCP_ERR("HDCP: Error copying to user space -"
+				"query status ioctl");
+			return -EFAULT;
+		}
+
+		break;
 
 	case HDCP_DONE:
 		if (copy_from_user(&status, argp,
@@ -375,6 +407,8 @@ static long hdcp_ioctl(struct file *fd, unsigned int cmd, unsigned long arg)
 	default:
 		return -ENOTTY;
 	} /* End switch */
+
+	return 0;
 }
 
 static int hdcp_mmap(struct file *filp, struct vm_area_struct *vma)

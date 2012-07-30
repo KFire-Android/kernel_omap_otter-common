@@ -25,6 +25,8 @@
 #include <video/cec.h>
 #include <linux/wait.h>
 
+#include "hdcp.h"
+
 #define HDMI_CEC_INT		0x100
 
 struct hdmi_ip_data;
@@ -207,6 +209,8 @@ struct ti_hdmi_ip_ops {
 	int (*hdcp_enable) (struct hdmi_ip_data *ip_data);
 
 	int (*hdcp_disable)(struct hdmi_ip_data *ip_data);
+
+	int (*hdcp_status)(struct hdmi_ip_data *ip_data);
 };
 
 /*
@@ -328,6 +332,7 @@ int ti_hdmi_5xxx_read_edid(struct hdmi_ip_data *ip_data,
 				u8 *edid, int len);
 int ti_hdmi_5xxx_irq_handler(struct hdmi_ip_data *ip_data);
 int ti_hdmi_5xxx_irq_process(struct hdmi_ip_data *ip_data);
+int ti_hdmi_5xxx_hdcp_status(struct hdmi_ip_data *ip_data);
 int ti_hdmi_5xxx_configure_range(struct hdmi_ip_data *ip_data);
 int ti_hdmi_5xxx_cec_get_rx_cmd(struct hdmi_ip_data *ip_data,
 	char *rx_cmd);

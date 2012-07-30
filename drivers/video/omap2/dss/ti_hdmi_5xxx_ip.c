@@ -49,6 +49,8 @@
 #define CONTROL_CORE_PAD0_HDMI_DDC_SCL_PAD1_HDMI_DDC_SDA \
 				(OMAP2_L4_IO_OFFSET + 0x4A002940)
 
+#define HDMI_CORE_A_HDCPOBS0_HDCPENABLED (1 << 0)
+
 static const struct csc_table csc_table_deepcolor[4] = {
 	/* HDMI_DEEP_COLOR_24BIT */
 	[0] = { 7036, 0, 0, 32,
@@ -888,6 +890,25 @@ int ti_hdmi_5xxx_irq_handler(struct hdmi_ip_data *ip_data)
 
 	return r;
 
+}
+
+int ti_hdmi_5xxx_hdcp_status(struct hdmi_ip_data *ip_data)
+{
+	int status = HDMI_HDCP_FAILED;
+	int val = 0;
+	void __iomem *core_sys_base = hdmi_core_sys_base(ip_data);
+
+	if (!core_sys_base) {
+		DSSERR("null pointer hit while getting hdmi base address\n");
+		return status;
+	}
+
+	val = hdmi_read_reg(core_sys_base, HDMI_CORE_A_HDCPOBS0);
+
+	if (val & HDMI_CORE_A_HDCPOBS0_HDCPENABLED)
+		status = HDMI_HDCP_ENABLED;
+
+	return status;
 }
 
 int ti_hdmi_5xxx_irq_process(struct hdmi_ip_data *ip_data)
