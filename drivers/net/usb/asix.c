@@ -301,9 +301,9 @@ asix_write_cmd_async(struct usbnet *dev, u8 cmd, u16 value, u16 index,
 static int asix_rx_fixup(struct usbnet *dev, struct sk_buff *skb)
 {
 	int offset = 0;
+	int res_size = 0;
 
 	while (offset + sizeof(u32) < skb->len) {
-		struct sk_buff *ax_skb;
 		u16 size;
 		u32 header = get_unaligned_le32(skb->data + offset);
 
@@ -322,14 +322,8 @@ static int asix_rx_fixup(struct usbnet *dev, struct sk_buff *skb)
 				   size);
 			return 0;
 		}
-		ax_skb = netdev_alloc_skb_ip_align(dev->net, size);
-		if (!ax_skb)
-			return 0;
-
-		skb_put(ax_skb, size);
-		memcpy(ax_skb->data, skb->data + offset, size);
-		usbnet_skb_return(dev, ax_skb);
-
+		memmove(skb->data + res_size, skb->data + offset, size);
+		res_size += size;
 		offset += (size + 1) & 0xfffe;
 	}
 
@@ -338,6 +332,9 @@ static int asix_rx_fixup(struct usbnet *dev, struct sk_buff *skb)
 			   skb->len);
 		return 0;
 	}
+
+	skb_trim(skb, res_size);
+
 	return 1;
 }
 
@@ -1379,7 +1376,7 @@ static const struct driver_info ax88772_info = {
 	.status = asix_status,
 	.link_reset = ax88772_link_reset,
 	.reset = ax88772_link_reset,
-	.flags = FLAG_ETHER | FLAG_FRAMING_AX | FLAG_LINK_INTR | FLAG_MULTI_PACKET,
+	.flags = FLAG_ETHER | FLAG_FRAMING_AX | FLAG_LINK_INTR,
 	.rx_fixup = asix_rx_fixup,
 	.tx_fixup = asix_tx_fixup,
 };
