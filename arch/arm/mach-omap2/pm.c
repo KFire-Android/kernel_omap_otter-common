@@ -46,6 +46,9 @@ int (*omap_pm_suspend)(void);
  * struct omap2_oscillator - Describe the board main oscillator latencies
  * @startup_time: oscillator startup latency
  * @shutdown_time: oscillator shutdown latency
+ *
+ * This information tends to be specific to every board, because boards
+ * can contain different types of main oscillators.
  */
 struct omap2_oscillator {
 	u32 startup_time;
@@ -59,12 +62,29 @@ static struct omap2_oscillator oscillator = {
 
 bool omap_pm_is_ready_status;
 
+/**
+ * omap_pm_setup_oscillator() - setup the system oscillator time
+ * @tstart:	startup time rounded up to uSec
+ * @tshut:	shutdown time rounded up to uSec
+ *
+ * All boards do need an oscillator or crystal for the device to function.
+ * The startup and stop time of these oscillators vary. Populate
+ * from the board file to optimize the timing.
+ * This function is meant to be used at boot-time configuration.
+ *
+ * NOTE: This API is intended to be invoked from board file
+ */
 void omap_pm_setup_oscillator(u32 tstart, u32 tshut)
 {
 	oscillator.startup_time = tstart;
 	oscillator.shutdown_time = tshut;
 }
 
+/**
+ * omap_pm_get_oscillator() - retrieve the oscillator time
+ * @tstart:	pointer to startup time in uSec
+ * @tshut:	pointer to shutdown time in uSec
+ */
 void omap_pm_get_oscillator(u32 *tstart, u32 *tshut)
 {
 	if (!tstart || !tshut)
