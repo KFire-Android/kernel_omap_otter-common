@@ -441,6 +441,8 @@ static int _suspend(struct rproc *rproc, bool auto_suspend)
 	for (i = 0; i < pdata->timers_cnt; i++)
 		omap_dm_timer_stop(timers[i].odt);
 
+	omap_mbox_disable(oproc->mbox);
+
 	oproc->suspended = true;
 
 	return 0;
@@ -476,6 +478,8 @@ static int omap_rproc_resume(struct rproc *rproc)
 	if (oproc->boot_reg)
 		writel(rproc->bootaddr, oproc->boot_reg);
 
+	omap_mbox_enable(oproc->mbox);
+
 	/*
 	 * if need_kick flag is true, we need to kick all the vrings as
 	 * we do not know which vrings were tried to be kicked while the
@@ -491,10 +495,11 @@ static int omap_rproc_resume(struct rproc *rproc)
 		omap_dm_timer_start(timers[i].odt);
 
 	ret = pdata->device_enable(pdev);
-	if (ret)
+	if (ret) {
 		for (i = 0; i < pdata->timers_cnt; i++)
 			omap_dm_timer_stop(timers[i].odt);
-
+		omap_mbox_disable(oproc->mbox);
+	}
 	return ret;
 }
 
