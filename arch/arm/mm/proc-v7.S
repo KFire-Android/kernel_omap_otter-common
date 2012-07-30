@@ -253,7 +253,7 @@ __v7_setup:
 	b	4f
 
 	/* Cortex-A15 initialisations */
-3:	ldr	r10, =0x00000c0A		@ Cortex-A15 primary part number
+3:	ldr	r10, =0x00000c0F		@ Cortex-A15 primary part number
 	teq	r0, r10
 	bne	4f
 
