@@ -1265,6 +1265,20 @@ static int omap_gpio_runtime_resume(struct device *dev)
 		}
 	}
 
+	/*
+	 * WA for GPIO pins 140 (BT) & 142 (WLAN) used as output pins
+	 * due to h/w bug in GPIO module (Bug ID: OMAP5430-1.0BUG01667)
+	 * On OMAP5 ES1.0 the pins do not maintain their level in OFF.
+	 * Change the direct back to o/p in resume.
+	 */
+	if (cpu_is_omap54xx() &&
+			(omap_rev() == OMAP5430_REV_ES1_0 ||
+			 omap_rev() == OMAP5432_REV_ES1_0) &&
+			bank->id == 4) {
+		_set_gpio_direction(bank, GPIO_INDEX(bank, 142), 0);
+		_set_gpio_direction(bank, GPIO_INDEX(bank, 140), 0);
+	}
+
 	if (!bank->workaround_enabled) {
 		spin_unlock_irqrestore(&bank->lock, flags);
 		return 0;
@@ -1325,20 +1339,6 @@ static int omap_gpio_runtime_resume(struct device *dev)
 	}
 
 	bank->workaround_enabled = false;
-
-	/*
-	 * WA for GPIO pins 140 (BT) & 142 (WLAN) used as output pins
-	 * due to h/w bug in GPIO module (Bug ID: OMAP5430-1.0BUG01667)
-	 * On OMAP5 ES1.0 the pins do not maintain their level in OFF.
-	 * Change the direct back to o/p in resume.
-	 */
-	if (cpu_is_omap54xx() &&
-	    (omap_rev() == OMAP5430_REV_ES1_0 ||
-	     omap_rev() == OMAP5432_REV_ES1_0) &&
-	    bank->id == 4) {
-		_set_gpio_direction(bank, GPIO_INDEX(bank, 142), 0);
-		_set_gpio_direction(bank, GPIO_INDEX(bank, 140), 0);
-	}
 
 	spin_unlock_irqrestore(&bank->lock, flags);
 
