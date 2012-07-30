@@ -68,6 +68,10 @@ static int omap_mbox_restore_ctx(struct device *dev, void *data)
 {
 	struct omap_mbox *mbox = dev_get_drvdata(dev);
 
+	/* mailbox is not init'ed.. no need to restore */
+	if (!mbox->use_count)
+		return 0;
+
 	if (!mbox->ops->restore_ctx) {
 		dev_err(mbox->dev, "%s:\tno restore\n", __func__);
 		return -EINVAL;
@@ -80,12 +84,26 @@ static int omap_mbox_restore_ctx(struct device *dev, void *data)
 
 static int mbox_runtime_resume(struct device *dev)
 {
-	return device_for_each_child(dev, NULL, omap_mbox_restore_ctx);
+	int ret;
+
+	pm_qos_update_request(&mbox_qos_request, SET_MPU_CORE_CONSTRAINT);
+	ret = device_for_each_child(dev, NULL, omap_mbox_restore_ctx);
+	if (ret)
+		pm_qos_update_request(&mbox_qos_request,
+						CLEAR_MPU_CORE_CONSTRAINT);
+
+	return ret;
 }
 
 static int mbox_runtime_suspend(struct device *dev)
 {
-	return device_for_each_child(dev, NULL, omap_mbox_save_ctx);
+	int ret = device_for_each_child(dev, NULL, omap_mbox_save_ctx);
+
+	if (!ret)
+		pm_qos_update_request(&mbox_qos_request,
+					 CLEAR_MPU_CORE_CONSTRAINT);
+
+	return ret;
 }
 
 const struct dev_pm_ops mbox_pm_ops = {
@@ -305,9 +323,6 @@ static int omap_mbox_startup(struct omap_mbox *mbox)
 	omap_mbox_enable(mbox);
 
 	if (!mbox_configured++) {
-		if (mbox->pm_constraint)
-			pm_qos_update_request(&mbox_qos_request,
-					SET_MPU_CORE_CONSTRAINT);
 		if (likely(mbox->ops->startup)) {
 			ret = mbox->ops->startup(mbox);
 			if (unlikely(ret))
@@ -352,9 +367,7 @@ fail_alloc_txq:
 		mbox->ops->shutdown(mbox);
 	mbox->use_count--;
 fail_startup:
-	if (!--mbox_configured && mbox->pm_constraint)
-		pm_qos_update_request(&mbox_qos_request,
-					 CLEAR_MPU_CORE_CONSTRAINT);
+	omap_mbox_disable(mbox);
 	mutex_unlock(&mbox_configured_lock);
 	return ret;
 }
@@ -372,12 +385,8 @@ static void omap_mbox_fini(struct omap_mbox *mbox)
 	}
 
 	if (likely(mbox->ops->shutdown)) {
-		if (!--mbox_configured) {
+		if (!--mbox_configured)
 			mbox->ops->shutdown(mbox);
-			if (mbox->pm_constraint)
-				pm_qos_update_request(&mbox_qos_request,
-						CLEAR_MPU_CORE_CONSTRAINT);
-		}
 	}
 
 	omap_mbox_disable(mbox);
