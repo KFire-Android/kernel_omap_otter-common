@@ -387,25 +387,36 @@ static inline int omap5_init_static_deps(void)
 	 * doesn't work as expected. The hardware recommendation is to
 	 * enable static dependencies for these to avoid system
 	 * lock ups or random crashes.
-	 * The L4 wakeup depedency is added to workaround the OCP sync hardware
-	 * BUG with 32K synctimer which lead to incorrect timer value read
-	 * from the 32K counter. The BUG applies for GPTIMER1 and WDT2 which
-	 * are part of L4 wakeup clockdomain.
 	 */
 	mpuss_clkdm = clkdm_lookup("mpu_clkdm");
 	emif_clkdm = clkdm_lookup("emif_clkdm");
 	dss_clkdm = clkdm_lookup("dss_clkdm");
-	wkupaon_clkdm = clkdm_lookup("wkupaon_clkdm");
-	if (!mpuss_clkdm || !emif_clkdm || !dss_clkdm || !wkupaon_clkdm)
+	if (!mpuss_clkdm || !emif_clkdm || !dss_clkdm)
 		return -EINVAL;
 
 	ret = clkdm_add_wkdep(mpuss_clkdm, emif_clkdm);
 	if (ret)
 		pr_err("Failed to add MPUSS -> emif wakeup dependency\n");
+	/*
+	 * The L4 wakeup depedency is added to workaround the OCP sync hardware
+	 * BUG with 32K synctimer which lead to incorrect timer value read
+	 * from the 32K counter. The BUG applies for GPTIMER1 and WDT2 which
+	 * are part of L4 wakeup clockdomain. The 32K synctimer bug will be
+	 * fixed in ES2.0 but not the GPTIMER1 or WDT2 bugs. The WDT2 is never
+	 * read by the driver and so no workaround is needed. The GPTIMER1 bug
+	 * is handled by the GPTIMER driver. Therefore, only enable the static
+	 * dependency on ES1.0 for the 32K synctimer.
+	 */
+	if ((omap_rev() == OMAP5430_REV_ES1_0) ||
+			(omap_rev() == OMAP5432_REV_ES1_0)) {
+		wkupaon_clkdm = clkdm_lookup("wkupaon_clkdm");
+		if (!wkupaon_clkdm)
+			return -EINVAL;
 
-	ret |= clkdm_add_wkdep(mpuss_clkdm, wkupaon_clkdm);
+		ret |= clkdm_add_wkdep(mpuss_clkdm, wkupaon_clkdm);
+	}
 	if (ret)
-		pr_err("Failed to add MPUSS -> L4PER/WKUPAON wakeup dependency\n");
+		pr_err("Failed to add MPUSS wakeup dependencies\n");
 
 	ret |= clkdm_add_wkdep(dss_clkdm, emif_clkdm);
 	if (ret)
