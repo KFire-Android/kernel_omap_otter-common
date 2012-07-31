@@ -1233,11 +1233,21 @@ update_gpio_context_count:
 	 * to input in resume. This is fixed in ES2.0
 	 */
 	if (cpu_is_omap54xx() &&
-	    (omap_rev() == OMAP5430_REV_ES1_0 ||
-	     omap_rev() == OMAP5432_REV_ES1_0) &&
-	    bank->id == 4) {
-		_set_gpio_direction(bank, GPIO_INDEX(bank, 142), 1);
-		_set_gpio_direction(bank, GPIO_INDEX(bank, 140), 1);
+		(omap_rev() == OMAP5430_REV_ES1_0 ||
+		omap_rev() == OMAP5432_REV_ES1_0)) {
+		if (bank->id == 4) {
+			_set_gpio_direction(bank, GPIO_INDEX(bank, 142), 1);
+			_set_gpio_direction(bank, GPIO_INDEX(bank, 140), 1);
+		}
+		if (bank->id == 5) {
+			/*
+			 * The same h/w bug causes a glitch sometimes resulting
+			 * in reset of USB host module. Hence change the
+			 * direction and corresponding mux for USB reset pins
+			 */
+			_set_gpio_direction(bank, GPIO_INDEX(bank, 172), 1);
+			_set_gpio_direction(bank, GPIO_INDEX(bank, 173), 1);
+		}
 	}
 
 	_gpio_dbck_disable(bank);
@@ -1304,11 +1314,21 @@ static int omap_gpio_runtime_resume(struct device *dev)
 	 * Change the direct back to o/p in resume.
 	 */
 	if (cpu_is_omap54xx() &&
-			(omap_rev() == OMAP5430_REV_ES1_0 ||
-			 omap_rev() == OMAP5432_REV_ES1_0) &&
-			bank->id == 4) {
-		_set_gpio_direction(bank, GPIO_INDEX(bank, 142), 0);
-		_set_gpio_direction(bank, GPIO_INDEX(bank, 140), 0);
+		(omap_rev() == OMAP5430_REV_ES1_0 ||
+		omap_rev() == OMAP5432_REV_ES1_0)) {
+		if (bank->id == 4) {
+			_set_gpio_direction(bank, GPIO_INDEX(bank, 142), 0);
+			_set_gpio_direction(bank, GPIO_INDEX(bank, 140), 0);
+		}
+		if (bank->id == 5) {
+			/*
+			 * The same h/w bug causes a glitch sometimes resulting
+			 * in reset of USB host module. Hence change the
+			 * direction and corresponding mux for USB reset pins
+			 */
+			_set_gpio_direction(bank, GPIO_INDEX(bank, 172), 0);
+			_set_gpio_direction(bank, GPIO_INDEX(bank, 173), 0);
+		}
 	}
 
 	if (!bank->workaround_enabled) {
@@ -1371,7 +1391,6 @@ static int omap_gpio_runtime_resume(struct device *dev)
 	}
 
 	bank->workaround_enabled = false;
-
 	spin_unlock_irqrestore(&bank->lock, flags);
 
 	return 0;
