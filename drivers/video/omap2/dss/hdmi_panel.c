@@ -28,6 +28,7 @@
 #include <video/omapdss.h>
 #include <linux/slab.h>
 #include <linux/gpio.h>
+#include <linux/delay.h>
 
 #include "dss.h"
 
@@ -231,7 +232,6 @@ static int hdmi_panel_enable(struct omap_dss_device *dssdev)
 	}
 
 	dssdev->state = OMAP_DSS_DISPLAY_ACTIVE;
-
 	hdmi_inform_power_on_to_cec(true);
 
 err:
@@ -273,10 +273,20 @@ static void hdmi_panel_disable(struct omap_dss_device *dssdev)
 
 	if (dssdev->state == OMAP_DSS_DISPLAY_ACTIVE) {
 		hdmi_inform_power_on_to_cec(false);
+		/* We cannot cut hdmi power without respecting the content
+		rendering via buffer mechanisms. Set the Display state as
+		disabled first which allows notification to stop rendering to
+		panel. Then wait for some time say 6 vsync of 16msec so
+		that enough time is provided to flush out compostions. Then
+		issue a blank on the HDMI manager which will invalidate
+		compositions and then disable the HDMI panel.
+		*/
+		dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
+		dssdev->manager->blank(dssdev->manager, true);
+		msleep(100);
 		omapdss_hdmi_display_disable(dssdev);
-	}
-
-	dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
+	} else
+		dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
 
 	mutex_unlock(&hdmi.hdmi_lock);
 }
@@ -293,7 +303,8 @@ static int hdmi_panel_suspend(struct omap_dss_device *dssdev)
 	}
 
 	dssdev->state = OMAP_DSS_DISPLAY_SUSPENDED;
-
+	dssdev->manager->blank(dssdev->manager, true);
+	msleep(100);
 	omapdss_hdmi_display_disable(dssdev);
 
 err:
@@ -316,7 +327,6 @@ static int hdmi_panel_resume(struct omap_dss_device *dssdev)
 	dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
 err:
 	mutex_unlock(&hdmi.hdmi_lock);
-
 	hdmi_panel_hpd_handler(hdmi_get_current_hpd());
 
 	return r;
