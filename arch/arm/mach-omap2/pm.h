@@ -23,6 +23,8 @@ extern int omap4_idle_init(void);
 extern int omap_pm_clkdms_setup(struct clockdomain *clkdm, void *unused);
 extern int (*omap_pm_suspend)(void);
 extern int omap5_idle_init(void);
+void omap_inc_mpu_core_pwrdm_usecount(void);
+void omap_dec_mpu_core_pwrdm_usecount(void);
 
 #ifdef CONFIG_PM
 extern void omap4_device_set_state_off(u8 enable);
