@@ -87,7 +87,8 @@ static void omap4_tablet_set_primary_brightness(u8 brightness)
 	} else if (brightness <= 1) {
 		twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x08, TWL6030_TOGGLE3);
 		twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x38, TWL6030_TOGGLE3);
-		gpio_set_value(LED_DISP_EN, 0);
+		if (brightness == 0)
+			gpio_set_value(LED_DISP_EN, 0);
 	}
 }
 
