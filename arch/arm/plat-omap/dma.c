@@ -792,9 +792,9 @@ EXPORT_SYMBOL(omap_free_dma);
  * @param arb_rate
  * @param max_fifo_depth
  * @param tparams - Number of threads to reserve : DMA_THREAD_RESERVE_NORM
- * 						   DMA_THREAD_RESERVE_ONET
- * 						   DMA_THREAD_RESERVE_TWOT
- * 						   DMA_THREAD_RESERVE_THREET
+ *						   DMA_THREAD_RESERVE_ONET
+ *						   DMA_THREAD_RESERVE_TWOT
+ *						   DMA_THREAD_RESERVE_THREET
  */
 void
 omap_dma_set_global_params(int arb_rate, int max_fifo_depth, int tparams)
@@ -826,7 +826,7 @@ EXPORT_SYMBOL(omap_dma_set_global_params);
  * @param read_prio - Read priority
  * @param write_prio - Write priority
  * Both of the above can be set with one of the following values :
- * 	DMA_CH_PRIO_HIGH/DMA_CH_PRIO_LOW
+ *	DMA_CH_PRIO_HIGH/DMA_CH_PRIO_LOW
  */
 int
 omap_dma_set_prio_lch(int lch, unsigned char read_prio,
@@ -961,8 +961,8 @@ void omap_stop_dma(int lch)
 			l = p->dma_read(CCR, lch);
 		}
 		if (i >= 100)
-			printk(KERN_ERR "DMA drain did not complete on "
-					"lch %d\n", lch);
+			printk(KERN_ERR "DMA drain did not complete on lch %d\n",
+					lch);
 		/* Restore OCP_SYSCONFIG */
 		p->dma_write(sys_cf, OCP_SYSCONFIG, lch);
 	} else {
@@ -1160,8 +1160,7 @@ void omap_dma_link_lch(int lch_head, int lch_queue)
 
 	if ((dma_chan[lch_head].dev_id == -1) ||
 	    (dma_chan[lch_queue].dev_id == -1)) {
-		printk(KERN_ERR "omap_dma: trying to link "
-		       "non requested channels\n");
+		printk(KERN_ERR "omap_dma: trying to link non requested channels\n");
 		dump_stack();
 	}
 
@@ -1187,15 +1186,13 @@ void omap_dma_unlink_lch(int lch_head, int lch_queue)
 
 	if (dma_chan[lch_head].next_lch != lch_queue ||
 	    dma_chan[lch_head].next_lch == -1) {
-		printk(KERN_ERR "omap_dma: trying to unlink "
-		       "non linked channels\n");
+		printk(KERN_ERR "omap_dma: trying to unlink non linked channels\n");
 		dump_stack();
 	}
 
 	if ((dma_chan[lch_head].flags & OMAP_DMA_ACTIVE) ||
 	    (dma_chan[lch_queue].flags & OMAP_DMA_ACTIVE)) {
-		printk(KERN_ERR "omap_dma: You need to stop the DMA channels "
-		       "before unlinking\n");
+		printk(KERN_ERR "omap_dma: You need to stop the DMA channels before unlinking\n");
 		dump_stack();
 	}
 
@@ -1247,11 +1244,11 @@ static void create_dma_lch_chain(int lch_head, int lch_queue)
  * @chain_id -
  * @no_of_chans - Number of channels requested
  * @chain_mode - Dynamic or static chaining : OMAP_DMA_STATIC_CHAIN
- * 					      OMAP_DMA_DYNAMIC_CHAIN
+ *					      OMAP_DMA_DYNAMIC_CHAIN
  * @params - Channel parameters
  *
  * @return - Success : 0
- * 	     Failure: -EINVAL/-ENOMEM
+ *	     Failure: -EINVAL/-ENOMEM
  */
 int omap_request_dma_chain(int dev_id, const char *dev_name,
 			   void (*callback) (int lch, u16 ch_status,
@@ -1340,7 +1337,7 @@ EXPORT_SYMBOL(omap_request_dma_chain);
  * @param params
  *
  * @return - Success : 0
- * 	     Failure : -EINVAL
+ *	     Failure : -EINVAL
  */
 int omap_modify_dma_chain_params(int chain_id,
 				struct omap_dma_channel_params params)
@@ -1381,7 +1378,7 @@ EXPORT_SYMBOL(omap_modify_dma_chain_params);
  * @param chain_id
  *
  * @return - Success : 0
- * 	     Failure : -EINVAL
+ *	     Failure : -EINVAL
  */
 int omap_free_dma_chain(int chain_id)
 {
@@ -1415,7 +1412,7 @@ int omap_free_dma_chain(int chain_id)
 	dma_linked_lch[chain_id].chain_mode = -1;
 	dma_linked_lch[chain_id].chain_state = -1;
 
-	return (0);
+	return 0;
 }
 EXPORT_SYMBOL(omap_free_dma_chain);
 
@@ -1425,7 +1422,7 @@ EXPORT_SYMBOL(omap_free_dma_chain);
  * @param chain_id
  *
  * @return - Success : OMAP_DMA_CHAIN_ACTIVE/OMAP_DMA_CHAIN_INACTIVE
- * 	     Failure : -EINVAL
+ *	     Failure : -EINVAL
  */
 int omap_dma_chain_status(int chain_id)
 {
@@ -1462,7 +1459,7 @@ EXPORT_SYMBOL(omap_dma_chain_status);
  * @param callbk_data - channel callback parameter data.
  *
  * @return  - Success : 0
- * 	      Failure: -EINVAL/-EBUSY
+ *	      Failure: -EINVAL/-EBUSY
  */
 int omap_dma_chain_a_transfer(int chain_id, int src_start, int dest_start,
 			int elem_count, int frame_count, void *callbk_data)
@@ -1599,7 +1596,7 @@ EXPORT_SYMBOL(omap_dma_chain_a_transfer);
  * @param chain_id
  *
  * @return - Success : 0
- * 	     Failure : -EINVAL/-EBUSY
+ *	     Failure : -EINVAL/-EBUSY
  */
 int omap_start_dma_chain_transfers(int chain_id)
 {
@@ -1651,7 +1648,7 @@ EXPORT_SYMBOL(omap_start_dma_chain_transfers);
  * @param chain_id
  *
  * @return - Success : 0
- * 	     Failure : EINVAL
+ *	     Failure : EINVAL
  */
 int omap_stop_dma_chain_transfers(int chain_id)
 {
@@ -1714,7 +1711,7 @@ EXPORT_SYMBOL(omap_stop_dma_chain_transfers);
  * @param fi - Frame index
  *
  * @return - Success : 0
- * 	     Failure : -EINVAL
+ *	     Failure : -EINVAL
  */
 int omap_get_dma_chain_index(int chain_id, int *ei, int *fi)
 {
@@ -1754,7 +1751,7 @@ EXPORT_SYMBOL(omap_get_dma_chain_index);
  * @param chain_id
  *
  * @return - Success : Destination position
- * 	     Failure : -EINVAL
+ *	     Failure : -EINVAL
  */
 int omap_get_dma_chain_dst_pos(int chain_id)
 {
@@ -1788,7 +1785,7 @@ EXPORT_SYMBOL(omap_get_dma_chain_dst_pos);
  * @param chain_id
  *
  * @return - Success : Destination position
- * 	     Failure : -EINVAL
+ *	     Failure : -EINVAL
  */
 int omap_get_dma_chain_src_pos(int chain_id)
 {
@@ -1837,16 +1834,16 @@ static int omap1_dma_handle_ch(int ch)
 	if ((csr & 0x3f) == 0)
 		return 0;
 	if (unlikely(dma_chan[ch].dev_id == -1)) {
-		printk(KERN_WARNING "Spurious interrupt from DMA channel "
-		       "%d (CSR %04x)\n", ch, csr);
+		printk(KERN_WARNING "Spurious interrupt from DMA channel %d (CSR %04x)\n",
+				    ch, csr);
 		return 0;
 	}
 	if (unlikely(csr & OMAP1_DMA_TOUT_IRQ))
 		printk(KERN_WARNING "DMA timeout with device %d\n",
 		       dma_chan[ch].dev_id);
 	if (unlikely(csr & OMAP_DMA_DROP_IRQ))
-		printk(KERN_WARNING "DMA synchronization event drop occurred "
-		       "with device %d\n", dma_chan[ch].dev_id);
+		printk(KERN_WARNING "DMA synchronization event drop occurred with device %d\n",
+				    dma_chan[ch].dev_id);
 	if (likely(csr & OMAP_DMA_BLOCK_IRQ))
 		dma_chan[ch].flags &= ~OMAP_DMA_ACTIVE;
 	if (likely(dma_chan[ch].callback != NULL))
@@ -1887,14 +1884,14 @@ static int omap2_dma_handle_ch(int ch)
 	if (!status) {
 		if (printk_ratelimit())
 			printk(KERN_WARNING "Spurious DMA IRQ for lch %d\n",
-				ch);
+			ch);
 		p->dma_write(1 << ch, IRQSTATUS_L0, ch);
 		return 0;
 	}
 	if (unlikely(dma_chan[ch].dev_id == -1)) {
 		if (printk_ratelimit())
-			printk(KERN_WARNING "IRQ %04x for non-allocated DMA"
-					"channel %d\n", status, ch);
+			printk(KERN_WARNING "IRQ %04x for non-allocated DMA channel %d\n",
+					    status, ch);
 		return 0;
 	}
 	if (unlikely(status & OMAP_DMA_DROP_IRQ))
@@ -2029,8 +2026,8 @@ static int __devinit omap_system_dma_probe(struct platform_device *pdev)
 
 	p = pdev->dev.platform_data;
 	if (!p) {
-		dev_err(&pdev->dev, "%s: System DMA initialized without"
-			"platform data\n", __func__);
+		dev_err(&pdev->dev, "%s: System DMA initialized without platform data\n",
+				  __func__);
 		return -EINVAL;
 	}
 
@@ -2106,8 +2103,8 @@ static int __devinit omap_system_dma_probe(struct platform_device *pdev)
 		}
 		ret = setup_irq(dma_irq, &omap24xx_dma_irq);
 		if (ret) {
-			dev_err(&pdev->dev, "set_up failed for IRQ %d"
-				"for DMA (error %d)\n", dma_irq, ret);
+			dev_err(&pdev->dev, "set_up failed for IRQ %d for DMA (error %d)\n",
+					    dma_irq, ret);
 			goto exit_dma_lch_fail;
 		}
 	}
@@ -2115,8 +2112,7 @@ static int __devinit omap_system_dma_probe(struct platform_device *pdev)
 	/* reserve dma channels 0 and 1 in high security devices */
 	if (cpu_is_omap34xx() &&
 		(omap_type() != OMAP2_DEVICE_TYPE_GP)) {
-		printk(KERN_INFO "Reserving DMA channels 0 and 1 for "
-				"HS ROM code\n");
+		printk(KERN_INFO "Reserving DMA channels 0 and 1 for HS ROM code\n");
 		dma_chan[0].dev_id = 0;
 		dma_chan[1].dev_id = 1;
 	}
@@ -2124,8 +2120,8 @@ static int __devinit omap_system_dma_probe(struct platform_device *pdev)
 	return 0;
 
 exit_dma_irq_fail:
-	dev_err(&pdev->dev, "unable to request IRQ %d"
-			"for DMA (error %d)\n", dma_irq, ret);
+	dev_err(&pdev->dev, "unable to request IRQ %d for DMA (error %d)\n",
+			    dma_irq, ret);
 	for (irq_rel = 0; irq_rel < ch;	irq_rel++) {
 		dma_irq = platform_get_irq(pdev, irq_rel);
 		free_irq(dma_irq, (void *)(irq_rel + 1));
