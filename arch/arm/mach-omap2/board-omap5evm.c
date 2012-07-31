@@ -964,6 +964,15 @@ static int __init omap_5430evm_i2c_init(void)
 	omap_register_i2c_bus_board_data(4, &omap5_i2c_4_bus_pdata);
 	omap_register_i2c_bus_board_data(5, &omap5_i2c_5_bus_pdata);
 
+	/*
+	 * WA for OMAP5430-1.0BUG01477: I2C1 and I2C_SR weak and strong
+	 * pull-up are both activated by default. It affects I2C1 and
+	 * hence disable weak pull for it. This is for ES1.0 and fixed
+	 * in ES2.0
+	 */
+	if (omap_rev() == OMAP5430_REV_ES1_0)
+		omap5_i2c_weak_pullup(1, false);
+
 	/* Enable internal pull-ups for SCL, SDA lines. OMAP5 sEVM platform
 	 * does not have external pull-ups for any of the I2C buses hence
 	 * internal pull-ups are enabled
