@@ -113,9 +113,15 @@ void __init omap54xx_voltagedomains_init(void)
 	omap5_voltdm_mm.vp_param = &omap5_mm_vp_data;
 	omap5_voltdm_core.vp_param = &omap5_core_vp_data;
 
-	omap5_voltdm_mpu.vc_param = &omap5_mpu_vc_data;
-	omap5_voltdm_mm.vc_param = &omap5_mm_vc_data;
-	omap5_voltdm_core.vc_param = &omap5_core_vc_data;
+	if (omap_rev() == OMAP5430_REV_ES1_0 ||
+	    omap_rev() == OMAP5432_REV_ES1_0) {
+		omap5_voltdm_mpu.vc_param = &omap5_es1_mpu_vc_data;
+		omap5_voltdm_mm.vc_param = &omap5_es1_mm_vc_data;
+		omap5_voltdm_core.vc_param = &omap5_es1_core_vc_data;
+	} else {
+		/* TBD: Update once ES2.0+ data is available */
+		WARN(1, "OMAP revision = 0x%08X - NO VC param!\n", omap_rev());
+	}
 
 	for (i = 0; voltdm = voltagedomains_omap5[i], voltdm; i++)
 		voltdm->sys_clk.name = sys_clk_name;
