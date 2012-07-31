@@ -191,6 +191,7 @@ struct omap_i2c_dev {
 						 * if set, should be trsh+1
 						 */
 	u8			rev;
+	bool			shutdown;
 	unsigned		b_hw:1;		/* bad h/w fixes */
 	unsigned		idle:1;
 	u16			iestate;	/* Saved interrupt register */
@@ -779,6 +780,9 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 	pdata = pdev->dev.platform_data;
 #endif
 
+	if (dev->shutdown)
+		return -EPERM;
+
 	r = omap_i2c_hwspinlock_lock(dev);
 	/* To-Do: if we are unable to acquire the lock, we must
 	try to recover somehow */
@@ -989,7 +993,7 @@ omap_i2c_isr(int this_irq, void *dev_id)
 	u16 stat, w;
 	int err, count = 0;
 
-	if (dev->idle)
+	if (dev->idle || dev->shutdown)
 		return IRQ_NONE;
 
 	while ((stat = (omap_i2c_read_reg(dev, OMAP_I2C_STAT_REG))) & dev->iestate) {
@@ -1350,6 +1354,30 @@ omap_i2c_remove(struct platform_device *pdev)
 	return 0;
 }
 
+#define PMIC_I2C_NAME "omap_i2c.1"
+static void
+omap_i2c_shutdown(struct platform_device *pdev)
+{
+	struct omap_i2c_dev	*dev = platform_get_drvdata(pdev);
+
+	/* Keep pmic i2c alive - for pm_power_off case */
+	if (!strcmp(dev_name(dev->dev), PMIC_I2C_NAME))
+			return;
+
+	/* Shutdown all other i2c controllers */
+	pm_runtime_get_sync(&pdev->dev);
+	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
+	/* Keep interrupts disabled */
+	free_irq(dev->irq, dev);
+	if (cpu_is_omap44xx() && dev->rev >= OMAP_I2C_REV_ON_4430)
+		omap_i2c_write_reg(dev, OMAP_I2C_IRQENABLE_CLR, 0x6FFF);
+	else
+		omap_i2c_write_reg(dev, OMAP_I2C_IE_REG, 0);
+	pm_runtime_put_sync(&pdev->dev);
+
+	dev->shutdown = true;
+}
+
 #ifdef CONFIG_SUSPEND
 static int omap_i2c_suspend(struct device *dev)
 {
@@ -1384,6 +1412,7 @@ static struct platform_driver omap_i2c_driver = {
 		.owner	= THIS_MODULE,
 		.pm	= OMAP_I2C_PM_OPS,
 	},
+	.shutdown	= omap_i2c_shutdown,
 };
 
 /* I2C may be needed to bring up other drivers */
