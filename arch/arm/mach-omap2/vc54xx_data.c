@@ -105,7 +105,8 @@ struct omap_vc_param omap5_es1_mpu_vc_data = {
 	.on			= OMAP5_ON_VOLTAGE_MPU_UV,
 	.onlp			= OMAP5_ONLP_VOLTAGE_MPU_UV,
 	.ret			= OMAP5_ES1_RET_VOLTAGE_UV,
-	.off			= OMAP5_OFF_VOLTAGE_UV,
+	/* OMAP5430-1.0 BUG01699 - efuse lost if MPU OFF voltage = 0V */
+	.off			= OMAP5_ES1_RET_VOLTAGE_UV,
 };
 
 struct omap_vc_param omap5_es1_mm_vc_data = {
