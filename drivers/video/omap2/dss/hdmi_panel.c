@@ -326,6 +326,7 @@ enum {
 	HPD_STATE_OFF,
 	HPD_STATE_START,
 	HPD_STATE_EDID_TRYLAST = HPD_STATE_START + 5,
+	HPD_STATE_EDID_READ_OK = HPD_STATE_EDID_TRYLAST + 1,
 };
 
 static struct hpd_worker_data {
@@ -364,36 +365,50 @@ static void hdmi_hotplug_detect_worker(struct work_struct *work)
 		}
 		goto done;
 	} else {
-		if (state == HPD_STATE_START) {
-			mutex_unlock(&hdmi.hdmi_lock);
-			dssdev->driver->enable(dssdev);
-			mutex_lock(&hdmi.hdmi_lock);
-			hdmi_notify_hpd(dssdev, true);
-		} else if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE ||
-			   hdmi.hpd_switch.state) {
-			/* powered down after enable - skip EDID read */
-			goto done;
-		} else if (hdmi_read_valid_edid()) {
-			/* get monspecs from edid */
-			hdmi_get_monspecs(dssdev);
-			DSSDBG("panel size %d by %d\n",
-					dssdev->panel.monspecs.max_x,
-					dssdev->panel.monspecs.max_y);
-			dssdev->panel.width_in_um =
-					dssdev->panel.monspecs.max_x * 10000;
-			dssdev->panel.height_in_um =
-					dssdev->panel.monspecs.max_y * 10000;
-			switch_set_state(&hdmi.hpd_switch, 1);
-			hdmi_inform_hpd_to_cec(true);
-			goto done;
-		} else if (state == HPD_STATE_EDID_TRYLAST) {
+		if (state == HPD_STATE_EDID_TRYLAST) {
 			DSSDBG("Failed to read EDID after %d times. Giving up.",
 						state - HPD_STATE_START);
 			goto done;
+		} else if (state == HPD_STATE_START ||
+				state != HPD_STATE_EDID_READ_OK) {
+			/* Read EDID before we turn on the HDMI */
+			if (hdmi_read_valid_edid()) {
+				/* get monspecs from edid */
+				hdmi_get_monspecs(dssdev);
+				DSSDBG("panel size %d by %d\n",
+						dssdev->panel.monspecs.max_x,
+						dssdev->panel.monspecs.max_y);
+				dssdev->panel.width_in_um =
+					dssdev->panel.monspecs.max_x * 10000;
+				dssdev->panel.height_in_um =
+					dssdev->panel.monspecs.max_y * 10000;
+				atomic_set(&d->state,
+						HPD_STATE_EDID_READ_OK - 1);
+			}
+		} else if (dssdev->state != OMAP_DSS_DISPLAY_SUSPENDED &&
+					state == HPD_STATE_EDID_READ_OK) {
+			/* If device is in suspended state we should not
+			     wake it up */
+
+			/* If device is in disabled state turn on the HDMI */
+			if (dssdev->state == OMAP_DSS_DISPLAY_DISABLED) {
+				/* Power on the HDMI if edid is read
+				     successfully*/
+				mutex_unlock(&hdmi.hdmi_lock);
+				dssdev->driver->enable(dssdev);
+				mutex_lock(&hdmi.hdmi_lock);
+			}
+
+			/* We have active hdmi so communicate attach*/
+			hdmi_notify_hpd(dssdev, true);
+			hdmi_inform_hpd_to_cec(true);
+			switch_set_state(&hdmi.hpd_switch, 1);
+			goto done;
 		}
-		if (atomic_add_unless(&d->state, 1, HPD_STATE_OFF))
+		if (atomic_add_unless(&d->state, 1, HPD_STATE_OFF)) {
 			queue_delayed_work(my_workq, &d->dwork,
 							msecs_to_jiffies(60));
+		}
 	}
 done:
 	mutex_unlock(&hdmi.hdmi_lock);
@@ -607,6 +622,8 @@ int hdmi_panel_init(void)
 	r = switch_dev_register(&hdmi.hpd_switch);
 	if (r)
 		goto err_event;
+	/* Init switch state to zero */
+	switch_set_state(&hdmi.hpd_switch, 0);
 
 	my_workq = create_singlethread_workqueue("hdmi_hotplug");
 	if (!my_workq) {
