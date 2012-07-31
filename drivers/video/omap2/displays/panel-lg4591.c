@@ -44,26 +44,26 @@
 static struct omap_video_timings lg4591_timings = {
 	.x_res		= 720,
 	.y_res		= 1280,
-	.pixel_clock	= 73147,
-	.hfp		= 498,
-	.hsw		= 9,
-	.hbp		= 1,
-	.vfp		= 8,
-	.vsw		= 4,
+	.pixel_clock	= 73940,
+	.hfp		= 154,
+	.hsw		= 4,
+	.hbp		= 62,
+	.vfp		= 84,
+	.vsw		= 1,
 	.vbp		= 15,
 };
 
 static const struct omap_dss_dsi_videomode_data vm_data = {
-	.hsa			= 0,
-	.hfp			= 36,
-	.hbp			= 35,
-	.vsa			= 4,
-	.vfp			= 8,
+	.hsa			= 1,
+	.hfp			= 115,
+	.hbp			= 47,
+	.vsa			= 1,
+	.vfp			= 84,
 	.vbp			= 15,
 
 	.vp_de_pol		= true,
 	.vp_vsync_pol		= true,
-	.vp_hsync_pol		= true,
+	.vp_hsync_pol		= false,
 	.vp_hsync_end		= false,
 	.vp_vsync_end		= false,
 
