@@ -38,6 +38,7 @@
 
 #include "voltage.h"
 #include "powerdomain.h"
+#include "smartreflex.h"
 
 #include "vc.h"
 #include "vp.h"
@@ -418,6 +419,87 @@ int voltdm_add_pwrdm(struct voltagedomain *voltdm, struct powerdomain *pwrdm)
 }
 
 /**
+ * voltdm_pwrdm_enable - increase usecount for a voltagedomain
+ * @voltdm: struct voltagedomain * to increase count for
+ *
+ * Increases usecount for a given voltagedomain. If the usecount reaches
+ * 1, the domain is awakened from idle and the function will call the
+ * voltagedomain->wakeup callback for this domain.
+ */
+void voltdm_pwrdm_enable(struct voltagedomain *voltdm)
+{
+	int ret;
+	unsigned long flag;
+
+	if (!voltdm) {
+		WARN(1, "%s: voltdm = NULL\n", __func__);
+		return;
+	}
+
+	spin_lock_irqsave(&voltdm->lock, flag);
+
+	voltdm->usecount++;
+
+	if ((voltdm->usecount == 1)  && voltdm->wakeup) {
+		ret = voltdm->wakeup(voltdm);
+		if (ret)
+			WARN(1, "%s: voltdm%s wakeup returned %d\n",
+			     __func__, voltdm->name, ret);
+	}
+	spin_unlock_irqrestore(&voltdm->lock, flag);
+
+}
+
+/**
+ * voltdm_pwrdm_disable - decrease usecount for a voltagedomain
+ * @voltdm: struct voltagedomain * to decrease count for
+ *
+ * Decreases the usecount for a given voltagedomain. If the usecount
+ * reaches zero, the domain can idle and the function will call the
+ * voltagedomain->sleep callback, and calculate the overall target
+ * state for the voltagedomain.
+ */
+void voltdm_pwrdm_disable(struct voltagedomain *voltdm)
+{
+	int ret = 0;
+	u8 target_state = PWRDM_POWER_OFF;
+	int state;
+	struct powerdomain *pwrdm;
+	unsigned long flag;
+
+	if (!voltdm) {
+		WARN(1, "%s: voltdm = NULL\n", __func__);
+		return;
+	}
+
+	spin_lock_irqsave(&voltdm->lock, flag);
+	voltdm->usecount--;
+
+	if (voltdm->usecount < 0) {
+		pr_warn("%s: voltdm_%s usecount is %d, setting to 0\n",
+			__func__, voltdm->name, voltdm->usecount);
+		voltdm->usecount = 0;
+	} else if (voltdm->usecount == 0) {
+		/*
+		 * Determine target state for voltdm by looking at the highest
+		 * powerdomain state in the given voltage domain.
+		 */
+		list_for_each_entry(pwrdm, &voltdm->pwrdm_list, voltdm_node) {
+			state = pwrdm_read_next_pwrst(pwrdm);
+			if (pwrdm_power_state_lt(target_state, state))
+				target_state = state;
+		}
+		if (voltdm->sleep) {
+			ret = voltdm->sleep(voltdm, target_state);
+			if (ret)
+				WARN(1, "%s: voltdm%s sleep returned %d\n",
+				     __func__, voltdm->name, ret);
+		}
+	}
+	spin_unlock_irqrestore(&voltdm->lock, flag);
+}
+
+/**
  * voltdm_for_each_pwrdm - call function for each pwrdm in a voltdm
  * @voltdm: struct voltagedomain * to iterate over
  * @fn: callback function *
@@ -478,6 +560,7 @@ static int _voltdm_register(struct voltagedomain *voltdm)
 		return -EINVAL;
 
 	INIT_LIST_HEAD(&voltdm->pwrdm_list);
+	spin_lock_init(&voltdm->lock);
 	list_add(&voltdm->node, &voltdm_list);
 
 	pr_debug("voltagedomain: registered %s\n", voltdm->name);

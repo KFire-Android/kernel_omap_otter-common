@@ -1421,12 +1421,19 @@ int pwrdm_clkdm_state_switch(struct clockdomain *clkdm)
  */
 int pwrdm_usecount_inc(struct powerdomain *pwrdm)
 {
+	int val;
+
 	if (!pwrdm) {
 		pr_warn("%s: pwrdm = NULL\n", __func__);
 		return -EINVAL;
 	}
 
-	return atomic_inc_return(&pwrdm->usecount);
+	val = atomic_inc_return(&pwrdm->usecount);
+
+	if (val == 1)
+		voltdm_pwrdm_enable(pwrdm->voltdm.ptr);
+
+	return val;
 }
 
 /**
@@ -1459,6 +1466,9 @@ int pwrdm_usecount_dec(struct powerdomain *pwrdm)
 	}
 
 	usecount = atomic_read(&pwrdm->usecount);
+
+	if (usecount == 0)
+		voltdm_pwrdm_disable(pwrdm->voltdm.ptr);
 
 	return usecount;
 }
