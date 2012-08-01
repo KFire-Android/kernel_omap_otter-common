@@ -1381,22 +1381,27 @@ static int omapfb_blank(int blank, struct fb_info *fbi)
 {
 	struct omapfb_info *ofbi = FB2OFB(fbi);
 	struct omapfb2_device *fbdev = ofbi->fbdev;
-	struct omap_dss_device *display = fb2display(fbi);
+	struct omap_dss_device *display = NULL;
+	unsigned num_displays = fbdev->num_displays;
 	int r = 0;
 
-	if (!display)
+	if (num_displays == 0)
 		return -EINVAL;
 
 	omapfb_lock(fbdev);
 
 	switch (blank) {
 	case FB_BLANK_UNBLANK:
-		if (display->state == OMAP_DSS_DISPLAY_SUSPENDED) {
-			if (display->driver->resume)
-				r = display->driver->resume(display);
-		} else if (display->state == OMAP_DSS_DISPLAY_DISABLED) {
-			if (display->driver->enable)
-				r = display->driver->enable(display);
+		while (num_displays) {
+			display = fbdev->displays[--num_displays];
+			if (display->state == OMAP_DSS_DISPLAY_SUSPENDED) {
+				if (display->driver->resume)
+					r = display->driver->resume(display);
+			} else if (display->state ==
+						OMAP_DSS_DISPLAY_DISABLED) {
+				if (display->driver->enable)
+					r = display->driver->enable(display);
+			}
 		}
 
 		if (fbdev->vsync_active &&
@@ -1415,13 +1420,16 @@ static int omapfb_blank(int blank, struct fb_info *fbi)
 		if (fbdev->vsync_active)
 			omapfb_enable_vsync(fbdev, display->channel, false);
 
-		if (display->state != OMAP_DSS_DISPLAY_ACTIVE)
-			goto exit;
+		while (num_displays) {
+			display = fbdev->displays[--num_displays];
+			if (display->state != OMAP_DSS_DISPLAY_ACTIVE)
+				continue;
 
-		if (display->driver->suspend)
-			r = display->driver->suspend(display);
-		else if (display->driver->disable)
-			display->driver->disable(display);
+			if (display->driver->suspend)
+				r = display->driver->suspend(display);
+			else if (display->driver->disable)
+				display->driver->disable(display);
+		}
 
 		break;
 
@@ -1429,7 +1437,6 @@ static int omapfb_blank(int blank, struct fb_info *fbi)
 		r = -EINVAL;
 	}
 
-exit:
 	omapfb_unlock(fbdev);
 
 	return r;
