@@ -39,11 +39,12 @@
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 #include <linux/usb/ulpi.h>
-#include <plat/usb.h>
+#include <linux/bitops.h>
 #include <linux/regulator/consumer.h>
 #include <linux/pm_runtime.h>
 #include <linux/gpio.h>
 #include <plat/omap-pm.h>
+#include <plat/usb.h>
 
 /* EHCI Register Set */
 #define EHCI_INSNREG04					(0xA0)
@@ -121,9 +122,10 @@ static irqreturn_t ehci_omap_irq(struct usb_hcd *hcd)
 {
 	struct device *dev = hcd->self.controller;
 
-	if (unlikely(pm_runtime_suspended(dev)))
-		pm_runtime_get_sync(dev);
-
+	if (unlikely(pm_runtime_suspended(dev))) {
+		pm_runtime_resume(dev);
+		return IRQ_HANDLED;
+	}
 	return ehci_irq(hcd);
 }
 
@@ -360,7 +362,6 @@ static int ehci_omap_bus_resume(struct usb_hcd *hcd)
 	struct ehci_hcd_omap_platform_data *pdata = dev->platform_data;
 
 	dev_dbg(dev, "ehci_omap_bus_resume\n");
-
 	pm_runtime_get_sync(dev);
 
 	pm_qos_update_request(&pdata->pm_qos_request,

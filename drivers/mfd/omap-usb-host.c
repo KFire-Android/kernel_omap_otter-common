@@ -28,6 +28,7 @@
 #include <plat/cpu.h>
 #include <plat/usb.h>
 #include <plat/omap_device.h>
+#include <linux/platform_device.h>
 #include <linux/pm_runtime.h>
 
 #define USBHS_DRIVER_NAME	"usbhs_omap"
@@ -178,7 +179,7 @@ static struct platform_device *omap_usbhs_alloc_child(const char *name,
 		dev_err(dev, "platform_device_add failed\n");
 		goto err_alloc;
 	}
-
+	child->archdata.od = NULL;
 	return child;
 
 err_alloc:
@@ -288,7 +289,6 @@ static int usbhs_runtime_resume(struct device *dev)
 	struct omap_device *od = to_omap_device(pdev);
 	struct usbhs_hcd_omap		*omap = dev_get_drvdata(dev);
 	struct usbhs_omap_platform_data	*pdata = &omap->platdata;
-	unsigned long			flags;
 
 	dev_dbg(dev, "usbhs_runtime_resume\n");
 
@@ -297,7 +297,6 @@ static int usbhs_runtime_resume(struct device *dev)
 		return  -ENODEV;
 	}
 
-	spin_lock_irqsave(&omap->lock, flags);
 	omap_tll_enable();
 
 	if (omap->ehci_logic_fck && !IS_ERR(omap->ehci_logic_fck))
@@ -335,7 +334,6 @@ static int usbhs_runtime_resume(struct device *dev)
 
 	omap_hwmod_disable_wakeup(od->hwmods[0]);
 
-	spin_unlock_irqrestore(&omap->lock, flags);
 	return 0;
 }
 
@@ -345,7 +343,6 @@ static int usbhs_runtime_suspend(struct device *dev)
 	struct omap_device *od = to_omap_device(pdev);
 	struct usbhs_hcd_omap		*omap = dev_get_drvdata(dev);
 	struct usbhs_omap_platform_data	*pdata = &omap->platdata;
-	unsigned long			flags;
 
 	dev_dbg(dev, "usbhs_runtime_suspend\n");
 
@@ -353,8 +350,6 @@ static int usbhs_runtime_suspend(struct device *dev)
 		dev_dbg(dev, "missing platform_data\n");
 		return  -ENODEV;
 	}
-
-	spin_lock_irqsave(&omap->lock, flags);
 
 	omap_hwmod_enable_wakeup(od->hwmods[0]);
 	if (is_ehci_tll_mode(pdata->port_mode[0]) ||
@@ -390,8 +385,6 @@ static int usbhs_runtime_suspend(struct device *dev)
 		clk_disable(omap->ehci_logic_fck);
 
 	omap_tll_disable();
-
-	spin_unlock_irqrestore(&omap->lock, flags);
 
 	return 0;
 }
