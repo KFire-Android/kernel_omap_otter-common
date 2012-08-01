@@ -653,7 +653,7 @@ static struct panel_generic_dpi_data omap5_dvi_panel = {
 	.platform_disable	= omap5_panda_disable_dvi,
 };
 
-struct omap_dss_device omap5_panda_dvi_device = {
+static struct omap_dss_device omap5_panda_dvi_device = {
 	.type			= OMAP_DISPLAY_TYPE_DPI,
 	.name			= "dvi",
 	.driver_name		= "generic_dpi_panel",
@@ -663,7 +663,7 @@ struct omap_dss_device omap5_panda_dvi_device = {
 	.channel		= OMAP_DSS_CHANNEL_LCD2,
 };
 
-int __init omap5_panda_dvi_init(void)
+static int __init omap5_panda_dvi_init(void)
 {
 	int r = 0;
 
