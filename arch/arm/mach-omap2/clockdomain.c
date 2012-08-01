@@ -925,6 +925,9 @@ static int clkdm_usecount_inc(struct clockdomain *clkdm)
 
 	usecount = atomic_inc_return(&clkdm->usecount);
 
+	if (usecount == 1)
+		pwrdm_usecount_inc(clkdm->pwrdm.ptr);
+
 	return usecount;
 }
 
@@ -954,6 +957,9 @@ static int clkdm_usecount_dec(struct clockdomain *clkdm)
 	}
 
 	usecount = atomic_read(&clkdm->usecount);
+	if (usecount == 0)
+		pwrdm_usecount_dec(clkdm->pwrdm.ptr);
+
 	return usecount;
 }
 

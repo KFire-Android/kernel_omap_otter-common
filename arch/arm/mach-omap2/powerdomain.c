@@ -1407,6 +1407,75 @@ int pwrdm_clkdm_state_switch(struct clockdomain *clkdm)
 	return -EINVAL;
 }
 
+/**
+ * pwrdm_clkdm_enable - increment powerdomain usecount
+ * @pwrdm: struct powerdomain *
+ *
+ * Increases the usecount for a powerdomain. Called from clockdomain
+ * code once a clockdomain's usecount reaches zero, i.e. it is ready
+ * to idle. Only usecounts are protected with atomic operation as this
+ * function is not expected to perform any other critical operation
+ * that can be impacted due to race conditions.
+ *
+ * Returns updated usecount
+ */
+int pwrdm_usecount_inc(struct powerdomain *pwrdm)
+{
+	if (!pwrdm) {
+		pr_warn("%s: pwrdm = NULL\n", __func__);
+		return -EINVAL;
+	}
+
+	return atomic_inc_return(&pwrdm->usecount);
+}
+
+/**
+ * pwrdm_clkdm_disable - decrease powerdomain usecount
+ * @pwrdm: struct powerdomain *
+ *
+ * Decreases the usecount for a powerdomain. Called from clockdomain
+ * code once a clockdomain becomes active.
+ * Only usecounts are protected with atomic operation as this
+ * function is not expected to perform any other critical operation
+ * that can be impacted due to race conditions.
+ *
+ * Returns updated usecount
+ */
+int pwrdm_usecount_dec(struct powerdomain *pwrdm)
+{
+	int usecount, ret;
+
+	if (!pwrdm) {
+		pr_warn("%s: pwrdm = NULL\n", __func__);
+		return -EINVAL;
+	}
+
+	ret = atomic_add_unless(&pwrdm->usecount, -1, 0);
+
+	if (!ret) {
+		pr_warn("%s: pwrdm %s usecount already 0\n",
+			__func__, pwrdm->name);
+		return -EPERM;
+	}
+
+	usecount = atomic_read(&pwrdm->usecount);
+
+	return usecount;
+}
+
+
+/**
+ * pwrdm_get_usecount - return powerdomain usecount
+ * @pwrdm: struct powerdomain *
+ *
+ * Returns the current usecount for a powerdomain.
+ *
+ */
+int pwrdm_get_usecount(struct powerdomain *pwrdm)
+{
+	return atomic_read(&pwrdm->usecount);
+}
+
 int pwrdm_pre_transition(struct powerdomain *pwrdm)
 {
 	if (pwrdm)
