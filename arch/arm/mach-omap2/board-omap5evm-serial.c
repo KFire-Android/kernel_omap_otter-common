@@ -17,6 +17,7 @@
  */
 
 #include <plat/omap-serial.h>
+#include "board-omap5evm.h"
 #include "mux.h"
 
 static struct omap_device_pad uart1_pads[] __initdata = {
