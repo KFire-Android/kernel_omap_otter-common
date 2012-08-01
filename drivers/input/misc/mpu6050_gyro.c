@@ -100,9 +100,9 @@ static void mpu6050_gyro_read_xyz(struct mpu6050_gyro_data *data)
 	datay = (datay * range) / MPU6050_ABS_READING;
 	dataz = (dataz * range) / MPU6050_ABS_READING;
 
-	input_report_abs(data->input_dev, ABS_X, datax);
-	input_report_abs(data->input_dev, ABS_Y, datay);
-	input_report_abs(data->input_dev, ABS_Z, dataz);
+	input_report_rel(data->input_dev, REL_RX, datax);
+	input_report_rel(data->input_dev, REL_RY, datay);
+	input_report_rel(data->input_dev, REL_RZ, dataz);
 	input_sync(data->input_dev);
 
 }
@@ -255,17 +255,9 @@ struct mpu6050_gyro_data *mpu6050_gyro_init(const struct mpu6050_data *mpu_data)
 	input_dev->name = "mpu6050-gyroscope";
 	input_dev->id.bustype = mpu_data->bus_ops->bustype;
 
-	 __set_bit(EV_ABS, input_dev->evbit);
-
-	input_set_abs_params(input_dev, ABS_X,
-			-mpu6050_gyro_fsr_table[pdata->fsr],
-			mpu6050_gyro_fsr_table[pdata->fsr], pdata->x_axis, 0);
-	input_set_abs_params(input_dev, ABS_Y,
-			-mpu6050_gyro_fsr_table[pdata->fsr],
-			mpu6050_gyro_fsr_table[pdata->fsr], pdata->y_axis, 0);
-	input_set_abs_params(input_dev, ABS_Z,
-			-mpu6050_gyro_fsr_table[pdata->fsr],
-			mpu6050_gyro_fsr_table[pdata->fsr], pdata->z_axis, 0);
+	input_set_capability(gyro_data->input_dev, EV_REL, REL_RX);
+	input_set_capability(gyro_data->input_dev, EV_REL, REL_RY);
+	input_set_capability(gyro_data->input_dev, EV_REL, REL_RZ);
 
 	input_set_drvdata(input_dev, gyro_data);
 
