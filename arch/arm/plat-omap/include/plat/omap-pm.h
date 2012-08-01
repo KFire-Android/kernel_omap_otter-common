@@ -349,4 +349,7 @@ int omap_pm_get_dev_context_loss_count(struct device *dev);
 void omap_pm_enable_off_mode(void);
 void omap_pm_disable_off_mode(void);
 
+/* For mach PM core files to control usage of OFF mode */
+extern bool off_mode_enabled;
+
 #endif
