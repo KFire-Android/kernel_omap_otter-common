@@ -98,6 +98,7 @@ struct omap_governor {
 	int alert_threshold;
 	int panic_threshold;
 	int prev_zone;
+	bool enable_debug_print;
 	int sensor_temp_table[AVERAGE_NUMBER];
 	struct delayed_work average_gov_sensor_work;
 	struct notifier_block pm_notifier;
@@ -379,7 +380,8 @@ static int omap_thermal_manager(struct omap_governor *omap_gov,
 		struct omap_thermal_zone *therm_zone;
 
 		therm_zone = &omap_gov->omap_thermal_zones[zone - 1];
-		if ((omap_gov->prev_zone != zone) || (zone == PANIC_ZONE)) {
+		if ((omap_gov->enable_debug_print) &&
+		((omap_gov->prev_zone != zone) || (zone == PANIC_ZONE))) {
 			pr_info("%s:sensor %d avg sensor %d pcb ",
 				 __func__, temp,
 				 omap_gov->avg_gov_sensor_temp);
@@ -511,7 +513,17 @@ static int option_get(void *data, u64 *val)
 
 	return 0;
 }
+
+static int option_set(void *data, u64 val)
+{
+	u32 *option = data;
+
+	*option = val;
+
+	return 0;
+}
 DEFINE_SIMPLE_ATTRIBUTE(omap_die_gov_fops, option_get, NULL, "%llu\n");
+DEFINE_SIMPLE_ATTRIBUTE(omap_die_gov_rw_fops, option_get, option_set, "%llu\n");
 
 /* Update temp_sensor with current values */
 static void debug_apply_thresholds(struct omap_governor *omap_gov)
@@ -648,6 +660,11 @@ static int omap_gov_register_debug_entries(struct thermal_dev *gov,
 			S_IRUGO | S_IWUSR, d, omap_gov,
 			&omap_die_gov_panic_fops);
 
+	/* Flag to enable the Debug Zone Prints */
+	(void) debugfs_create_file("enable_debug_print",
+			S_IRUGO | S_IWUSR, d, &(omap_gov->enable_debug_print),
+			&omap_die_gov_rw_fops);
+
 	return 0;
 }
 #endif
@@ -683,6 +700,7 @@ static int __init omap_governor_init(void)
 		omap_gov_instance[i]->hotspot_temp = 0;
 		omap_gov_instance[i]->panic_zone_reached = 0;
 		omap_gov_instance[i]->pcb_sensor_available = false;
+		omap_gov_instance[i]->enable_debug_print = false;
 		omap_gov_instance[i]->alert_threshold = OMAP_ALERT_TEMP;
 		omap_gov_instance[i]->panic_threshold = OMAP_PANIC_TEMP;
 		omap_gov_instance[i]->omap_gradient_slope =
