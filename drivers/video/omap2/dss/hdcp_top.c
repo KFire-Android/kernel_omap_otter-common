@@ -31,8 +31,12 @@
 #include "../dss/dss.h"
 #include "hdcp.h"
 
-static struct hdcp {
-	void __iomem *hdmi_wp_base_addr;
+struct hdcp_delayed_work {
+	struct delayed_work work;
+	int event;
+};
+
+struct hdcp_data {
 	void __iomem *deshdcp_base_addr;
 	struct mutex lock;
 	struct hdcp_enable_control *en_ctrl;
@@ -50,14 +54,10 @@ static struct hdcp {
 	int hdcp_up_event;
 	int hdcp_down_event;
 	int hdcp_wait_re_entrance;
-} hdcp;
-
-struct hdcp_delayed_work {
-	struct delayed_work work;
-	int event;
 };
 
 static struct miscdevice mdev;
+static struct hdcp_data *hdcp;
 
 static void hdcp_work_queue(struct work_struct *work);
 
@@ -69,15 +69,15 @@ static int hdcp_user_space_task(int flags)
 	int ret;
 
 	HDCP_DBG("Wait for user space task %x\n", flags);
-	hdcp.hdcp_up_event = flags & 0xFF;
-	hdcp.hdcp_down_event = flags & 0xFF;
+	hdcp->hdcp_up_event = flags & 0xFF;
+	hdcp->hdcp_down_event = flags & 0xFF;
 	wake_up_interruptible(&hdcp_up_wait_queue);
 	wait_event_interruptible(hdcp_down_wait_queue,
-				 (hdcp.hdcp_down_event & 0xFF) == 0);
-	ret = (hdcp.hdcp_down_event & 0xFF00) >> 8;
+				 (hdcp->hdcp_down_event & 0xFF) == 0);
+	ret = (hdcp->hdcp_down_event & 0xFF00) >> 8;
 
-	HDCP_DBG("User space task done %x\n", hdcp.hdcp_down_event);
-	hdcp.hdcp_down_event = 0;
+	HDCP_DBG("User space task done %x\n", hdcp->hdcp_down_event);
+	hdcp->hdcp_down_event = 0;
 
 	return ret;
 }
@@ -130,7 +130,7 @@ static struct hdcp_delayed_work *hdcp_submit_work(int event, int delay)
 	if (work) {
 		INIT_DELAYED_WORK(&work->work, hdcp_work_queue);
 		work->event = event;
-		queue_delayed_work(hdcp.workqueue,
+		queue_delayed_work(hdcp->workqueue,
 				   &work->work,
 				   msecs_to_jiffies(delay));
 	} else {
@@ -151,7 +151,7 @@ static void hdcp_work_queue(struct work_struct *work)
 		(event & 0xFF00) >> 8,
 		event & 0xFF);
 
-	mutex_lock(&hdcp.lock);
+	mutex_lock(&hdcp->lock);
 
 	/*
 	 * Clear pending_wq_event
@@ -160,12 +160,12 @@ static void hdcp_work_queue(struct work_struct *work)
 	 * able to cancel any pending work in case HDCP is disabled
 	 */
 	if (event & HDCP_WORKQUEUE_SRC)
-		hdcp.pending_wq_event = NULL;
+		hdcp->pending_wq_event = NULL;
 
 	if (event == HDCP_START_FRAME_EVENT) {
-		hdcp.pending_start = NULL;
+		hdcp->pending_start = NULL;
 		if (hdcp_wq_start_authentication() == HDCP_AUTH_FAILURE)
-			hdcp.pending_wq_event =
+			hdcp->pending_wq_event =
 					hdcp_submit_work(HDCP_START_FRAME_EVENT,
 							HDCP_REAUTH_DELAY);
 	}
@@ -173,7 +173,7 @@ static void hdcp_work_queue(struct work_struct *work)
 	kfree(hdcp_w);
 	hdcp_w = NULL;
 
-	mutex_unlock(&hdcp.lock);
+	mutex_unlock(&hdcp->lock);
 
 	HDCP_DBG("hdcp_work_queue() - END - %u evt=%x\n",
 		(event & 0xFF00) >> 8,
@@ -211,7 +211,7 @@ static int hdcp_3des_load_key(uint32_t *deshdcp_encrypted_key)
 	HDCP_DBG("Loading HDCP keys...\n");
 
 	/* Set decryption mode in DES control register */
-	WR_FIELD_32(hdcp.deshdcp_base_addr,
+	WR_FIELD_32(hdcp->deshdcp_base_addr,
 		DESHDCP__DHDCP_CTRL,
 		DESHDCP__DHDCP_CTRL__DIRECTION_POS_F,
 		DESHDCP__DHDCP_CTRL__DIRECTION_POS_L,
@@ -220,13 +220,13 @@ static int hdcp_3des_load_key(uint32_t *deshdcp_encrypted_key)
 	/* Write encrypted data */
 	while (counter < DESHDCP_KEY_SIZE) {
 		/* Fill Data registers */
-		WR_REG_32(hdcp.deshdcp_base_addr, DESHDCP__DHDCP_DATA_L,
+		WR_REG_32(hdcp->deshdcp_base_addr, DESHDCP__DHDCP_DATA_L,
 			deshdcp_encrypted_key[counter]);
-		WR_REG_32(hdcp.deshdcp_base_addr, DESHDCP__DHDCP_DATA_H,
+		WR_REG_32(hdcp->deshdcp_base_addr, DESHDCP__DHDCP_DATA_H,
 			deshdcp_encrypted_key[counter + 1]);
 
 		/* Wait for output bit at '1' */
-		while (RD_FIELD_32(hdcp.deshdcp_base_addr,
+		while (RD_FIELD_32(hdcp->deshdcp_base_addr,
 			DESHDCP__DHDCP_CTRL,
 			DESHDCP__DHDCP_CTRL__OUTPUT_READY_POS_F,
 			DESHDCP__DHDCP_CTRL__OUTPUT_READY_POS_L) != 0x1)
@@ -235,11 +235,12 @@ static int hdcp_3des_load_key(uint32_t *deshdcp_encrypted_key)
 		/* Dummy read (indeed data are transfered directly into
 		 * key memory)
 		 */
-		if (RD_REG_32(hdcp.deshdcp_base_addr, DESHDCP__DHDCP_DATA_L) != 0x0) {
+		if (RD_REG_32(hdcp->deshdcp_base_addr, DESHDCP__DHDCP_DATA_L)
+				!= 0x0) {
 			status = -HDCP_3DES_ERROR;
 			HDCP_ERR("DESHDCP dummy read error\n");
 		}
-		if (RD_REG_32(hdcp.deshdcp_base_addr, DESHDCP__DHDCP_DATA_H) !=
+		if (RD_REG_32(hdcp->deshdcp_base_addr, DESHDCP__DHDCP_DATA_H) !=
 			0x0) {
 			status = -HDCP_3DES_ERROR;
 			HDCP_ERR("DESHDCP dummy read error\n");
@@ -249,7 +250,7 @@ static int hdcp_3des_load_key(uint32_t *deshdcp_encrypted_key)
 	}
 
 	if (status == HDCP_OK)
-		hdcp.hdcp_keys_loaded = true;
+		hdcp->hdcp_keys_loaded = true;
 
 	return status;
 }
@@ -258,14 +259,14 @@ static bool hdcp_3des_cb(void)
 {
 	HDCP_DBG("hdcp_3des_cb() %u\n", jiffies_to_msecs(jiffies));
 
-	if (!hdcp.hdcp_keys_loaded) {
+	if (!hdcp->hdcp_keys_loaded) {
 		HDCP_ERR("%s: hdcp_keys not loaded = %d\n",
-				__func__, hdcp.hdcp_keys_loaded);
+				__func__, hdcp->hdcp_keys_loaded);
 		return false;
 	}
 
 	/* Load 3DES key */
-	if (hdcp_3des_load_key(hdcp.en_ctrl->key) != HDCP_OK) {
+	if (hdcp_3des_load_key(hdcp->en_ctrl->key) != HDCP_OK) {
 		HDCP_ERR("Error Loading  HDCP keys\n");
 		return false;
 	}
@@ -276,22 +277,22 @@ static void hdcp_start_frame_cb(void)
 {
 	HDCP_DBG("hdcp_start_frame_cb() %ums\n", jiffies_to_msecs(jiffies));
 
-	if (!hdcp.hdcp_keys_loaded) {
+	if (!hdcp->hdcp_keys_loaded) {
 		HDCP_DBG("%s: hdcp_keys not loaded = %d\n",
-		    __func__, hdcp.hdcp_keys_loaded);
+		    __func__, hdcp->hdcp_keys_loaded);
 		return;
 	}
 
-	mutex_lock(&hdcp.lock);
+	mutex_lock(&hdcp->lock);
 	/* Cancel any pending work */
-	if (hdcp.pending_start)
-		hdcp_cancel_work(&hdcp.pending_start);
-	if (hdcp.pending_wq_event)
-		hdcp_cancel_work(&hdcp.pending_wq_event);
+	if (hdcp->pending_start)
+		hdcp_cancel_work(&hdcp->pending_start);
+	if (hdcp->pending_wq_event)
+		hdcp_cancel_work(&hdcp->pending_wq_event);
 
-	hdcp.pending_start = hdcp_submit_work(HDCP_START_FRAME_EVENT,
+	hdcp->pending_start = hdcp_submit_work(HDCP_START_FRAME_EVENT,
 							HDCP_ENABLE_DELAY);
-	mutex_unlock(&hdcp.lock);
+	mutex_unlock(&hdcp->lock);
 }
 
 static long hdcp_query_status_ctl(uint32_t *status)
@@ -314,19 +315,19 @@ static long hdcp_query_status_ctl(uint32_t *status)
 static long hdcp_wait_event_ctl(struct hdcp_wait_control *ctrl)
 {
 	HDCP_DBG("hdcp_ioctl() - WAIT %u %d", jiffies_to_msecs(jiffies),
-					 hdcp.hdcp_up_event);
+					 hdcp->hdcp_up_event);
 
-	if (hdcp.hdcp_wait_re_entrance == 0) {
-		hdcp.hdcp_wait_re_entrance = 1;
+	if (hdcp->hdcp_wait_re_entrance == 0) {
+		hdcp->hdcp_wait_re_entrance = 1;
 
 		HDCP_DBG("hdcp_wait_event_ctl: wating\n");
 		wait_event_interruptible(hdcp_up_wait_queue,
-					 (hdcp.hdcp_up_event & 0xFF) != 0);
+					 (hdcp->hdcp_up_event & 0xFF) != 0);
 
-		ctrl->event = hdcp.hdcp_up_event;
+		ctrl->event = hdcp->hdcp_up_event;
 
-		hdcp.hdcp_up_event = 0;
-		hdcp.hdcp_wait_re_entrance = 0;
+		hdcp->hdcp_up_event = 0;
+		hdcp->hdcp_wait_re_entrance = 0;
 	} else {
 		ctrl->event = HDCP_EVENT_EXIT;
 	}
@@ -339,8 +340,8 @@ static long hdcp_done_ctl(uint32_t *status)
 	HDCP_DBG("hdcp_ioctl() - DONE %u %d", jiffies_to_msecs(jiffies),
 		*status);
 
-	hdcp.hdcp_down_event &= ~(*status & 0xFF);
-	hdcp.hdcp_down_event |= *status & 0xFF00;
+	hdcp->hdcp_down_event &= ~(*status & 0xFF);
+	hdcp->hdcp_down_event |= *status & 0xFF00;
 
 	wake_up_interruptible(&hdcp_down_wait_queue);
 
@@ -459,8 +460,8 @@ static void hdcp_load_keys_cb(const struct firmware *fw, void *context)
 	memcpy(en_ctrl->key, fw->data, sizeof(en_ctrl->key));
 	en_ctrl->nb_retry = 20;
 
-	hdcp.en_ctrl = en_ctrl;
-	hdcp.hdcp_keys_loaded = true;
+	hdcp->en_ctrl = en_ctrl;
+	hdcp->hdcp_keys_loaded = true;
 	HDCP_INFO("loaded keys\n");
 }
 
@@ -471,11 +472,11 @@ static int hdcp_load_keys(void)
 	HDCP_DBG("%s\n", __func__);
 
 	ret = request_firmware_nowait(THIS_MODULE, FW_ACTION_HOTPLUG,
-				      "hdcp.keys", mdev.this_device, GFP_KERNEL,
-				      &hdcp, hdcp_load_keys_cb);
+					"hdcp.keys", mdev.this_device,
+					GFP_KERNEL, hdcp, hdcp_load_keys_cb);
 	if (ret < 0) {
 		HDCP_ERR("request_firmware_nowait failed: %d\n", ret);
-		hdcp.hdcp_keys_loaded = false;
+		hdcp->hdcp_keys_loaded = false;
 	}
 
 	return ret;
@@ -492,15 +493,22 @@ static int __init hdcp_init(void)
 {
 	HDCP_DBG("hdcp_init() %ums\n", jiffies_to_msecs(jiffies));
 
-	/* Map DESHDCP in kernel address space */
-	hdcp.deshdcp_base_addr = ioremap(DSS_SS_FROM_L3__DESHDCP, 0x34);
+	/* Allocate HDCP struct */
+	hdcp = kzalloc(sizeof(struct hdcp_data), GFP_KERNEL);
+	if (!hdcp) {
+		HDCP_ERR("Could not allocate HDCP structure\n");
+		return -ENOMEM;
+	}
 
-	if (!hdcp.deshdcp_base_addr) {
+	/* Map DESHDCP in kernel address space */
+	hdcp->deshdcp_base_addr = ioremap(DSS_SS_FROM_L3__DESHDCP, 0x34);
+
+	if (!hdcp->deshdcp_base_addr) {
 		HDCP_ERR("DESHDCP IOremap error\n");
 		goto err_map_deshdcp;
 	}
 
-	mutex_init(&hdcp.lock);
+	mutex_init(&hdcp->lock);
 
 	mdev.minor = MISC_DYNAMIC_MINOR;
 	mdev.name = "hdcp";
@@ -512,16 +520,8 @@ static int __init hdcp_init(void)
 		goto err_register;
 	}
 
-	/* Variable init */
-	hdcp.en_ctrl  = NULL;
-	hdcp.pending_start = NULL;
-	hdcp.pending_wq_event = NULL;
-	hdcp.hdcp_wait_re_entrance = 0;
-	hdcp.hdcp_up_event = 0;
-	hdcp.hdcp_down_event = 0;
-
-	hdcp.workqueue = create_singlethread_workqueue("hdcp");
-	if (hdcp.workqueue == NULL)
+	hdcp->workqueue = create_singlethread_workqueue("hdcp");
+	if (hdcp->workqueue == NULL)
 		goto err_add_driver;
 
 	if (hdmi_runtime_get())
@@ -538,18 +538,19 @@ static int __init hdcp_init(void)
 	return 0;
 
 err_runtime:
-	destroy_workqueue(hdcp.workqueue);
+	destroy_workqueue(hdcp->workqueue);
 
 err_add_driver:
 	misc_deregister(&mdev);
 
 err_register:
-	mutex_destroy(&hdcp.lock);
+	mutex_destroy(&hdcp->lock);
 
-	iounmap(hdcp.deshdcp_base_addr);
+	iounmap(hdcp->deshdcp_base_addr);
 
 err_map_deshdcp:
 
+	kfree(hdcp);
 	return -EFAULT;
 }
 
@@ -557,9 +558,9 @@ static void __exit hdcp_exit(void)
 {
 	HDCP_DBG("hdcp_exit() %ums\n", jiffies_to_msecs(jiffies));
 
-	mutex_lock(&hdcp.lock);
+	mutex_lock(&hdcp->lock);
 
-	kfree(hdcp.en_ctrl);
+	kfree(hdcp->en_ctrl);
 
 	if (hdmi_runtime_get()) {
 		HDCP_ERR("%s Error enabling clocks\n", __func__);
@@ -574,13 +575,15 @@ static void __exit hdcp_exit(void)
 err_handling:
 	misc_deregister(&mdev);
 
-	iounmap(hdcp.deshdcp_base_addr);
+	iounmap(hdcp->deshdcp_base_addr);
 
-	destroy_workqueue(hdcp.workqueue);
+	destroy_workqueue(hdcp->workqueue);
 
-	mutex_unlock(&hdcp.lock);
+	mutex_unlock(&hdcp->lock);
 
-	mutex_destroy(&hdcp.lock);
+	mutex_destroy(&hdcp->lock);
+
+	kfree(hdcp);
 }
 
 module_init(hdcp_init);
