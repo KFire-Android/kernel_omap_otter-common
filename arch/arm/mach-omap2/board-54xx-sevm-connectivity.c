@@ -76,7 +76,7 @@ static struct wl12xx_platform_data omap5_sdp5430_wlan_data __initdata = {
 
 static void __init omap5_sdp5430_wifi_mux_init(void)
 {
-	omap_mux_init_gpio(GPIO_WIFI_IRQ, OMAP_PIN_INPUT);
+	omap_mux_init_gpio(GPIO_WIFI_IRQ, OMAP_PIN_INPUT_PULLUP | OMAP_WAKEUP_EN);
 
 	omap_mux_init_gpio(GPIO_WIFI_PMENA, OMAP_PIN_OUTPUT |
 			OMAP_PIN_INPUT_PULLUP);
