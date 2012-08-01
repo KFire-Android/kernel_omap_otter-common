@@ -19,7 +19,9 @@
  */
 #include <linux/module.h>
 #include <linux/init.h>
+#include <plat/cpu.h>
 
+#include "control.h"
 #include "mux.h"
 
 #ifdef CONFIG_OMAP_MUX
@@ -1317,6 +1319,7 @@ int __init omap4_mux_init(struct omap_board_mux *board_subset,
 	struct omap_mux *core_muxmodes;
 	struct omap_mux *core_subset = NULL;
 	int ret;
+	u8 val;
 
 	switch (flags & OMAP_PACKAGE_MASK) {
 	case OMAP_PACKAGE_CBL:
@@ -1350,6 +1353,20 @@ int __init omap4_mux_init(struct omap_board_mux *board_subset,
 			    OMAP4_CTRL_MODULE_PAD_WKUP_MUX_SIZE,
 			    omap4_wkup_muxmodes, NULL, board_wkup_subset,
 			    package_balls_wkup);
+
+	/*
+	 * if sysboot bits 6,7 both are 0, then the ioreq pin is INPUT
+	 * Else, the pin is output, and depending on board, OMAP may or maynot
+	 * drive this signal. So let board file worry about it.
+	 * NOTE: we force override here to prevent bootloader default
+	 * values from messing up the system by increasing the power
+	 * consumption
+	 */
+	val = omap_get_sysboot_value();
+	val &= OMAP2_SYSBOOT_6_MASK | OMAP2_SYSBOOT_7_MASK;
+	if (!ret && !val)
+		ret = omap_mux_init_signal("fref_clk_ioreq",
+					   OMAP_PIN_INPUT_PULLDOWN);
 
 	return ret;
 }
