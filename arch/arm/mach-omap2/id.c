@@ -68,6 +68,32 @@ out:
 }
 EXPORT_SYMBOL(omap_type);
 
+u8 omap_get_sysboot_value(void)
+{
+	u32 val = 0;
+	u8 mask = OMAP2_SYSBOOT_5_MASK | OMAP2_SYSBOOT_4_MASK |
+		OMAP2_SYSBOOT_3_MASK | OMAP2_SYSBOOT_2_MASK |
+		OMAP2_SYSBOOT_1_MASK | OMAP2_SYSBOOT_0_MASK;
+
+	if (cpu_is_omap24xx()) {
+		val = omap_ctrl_readl(OMAP24XX_CONTROL_STATUS);
+	} else if (cpu_is_am33xx()) {
+		val = omap_ctrl_readl(AM33XX_CONTROL_STATUS);
+	} else if (cpu_is_omap34xx()) {
+		val = omap_ctrl_readl(OMAP343X_CONTROL_STATUS);
+	} else if (cpu_is_omap44xx()) {
+		val = omap_ctrl_readl(OMAP4_CTRL_MODULE_CORE_STATUS);
+		/* OMAP4 has more bits! */
+		mask |= OMAP2_SYSBOOT_6_MASK | OMAP2_SYSBOOT_7_MASK;
+	} else if (cpu_is_omap54xx()) {
+		val = omap_ctrl_readl(OMAP5XXX_CONTROL_STATUS);
+	} else {
+		pr_err("Cannot detect omap type!\n");
+	}
+
+	return val & mask;
+}
+EXPORT_SYMBOL(omap_get_sysboot_value);
 
 /*----------------------------------------------------------------------------*/
 

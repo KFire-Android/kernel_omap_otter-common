@@ -303,6 +303,8 @@
 
 /* CONTROL_STATUS bits */
 #define OMAP2_DEVICETYPE_MASK		(0x7 << 8)
+#define OMAP2_SYSBOOT_7_MASK		(1 << 7)
+#define OMAP2_SYSBOOT_6_MASK		(1 << 6)
 #define OMAP2_SYSBOOT_5_MASK		(1 << 5)
 #define OMAP2_SYSBOOT_4_MASK		(1 << 4)
 #define OMAP2_SYSBOOT_3_MASK		(1 << 3)
