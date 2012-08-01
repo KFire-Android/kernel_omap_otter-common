@@ -31,25 +31,12 @@
 #include "../dss/dss.h"
 #include "hdcp.h"
 
-struct hdcp_delayed_work {
-	struct delayed_work work;
-	int event;
-};
-
 struct hdcp_data {
 	void __iomem *deshdcp_base_addr;
 	struct mutex lock;
 	struct hdcp_enable_control *en_ctrl;
-	struct hdcp_delayed_work *pending_start;
-	/*
-	 * Following variable should store works submitted from workqueue
-	 * context
-	 * WARNING: only ONE work at a time can be stored (no conflict
-	 * should happen). It is used to allow cancelled pending works when
-	 * disabling HDCP
-	 */
-	struct hdcp_delayed_work *pending_wq_event;
 	struct workqueue_struct *workqueue;
+	struct delayed_work *work;
 	struct miscdevice *mdev;
 	bool hdcp_keys_loaded;
 	int hdcp_up_event;
@@ -119,84 +106,17 @@ static int hdcp_wq_start_authentication(void)
 	return status;
 }
 
-static struct hdcp_delayed_work *hdcp_submit_work(int event, int delay)
-{
-	struct hdcp_delayed_work *work;
-
-	HDCP_DBG("%s\n", __func__);
-
-	work = kzalloc(sizeof(struct hdcp_delayed_work), GFP_ATOMIC);
-
-	if (work) {
-		INIT_DELAYED_WORK(&work->work, hdcp_work_queue);
-		work->event = event;
-		queue_delayed_work(hdcp->workqueue,
-				   &work->work,
-				   msecs_to_jiffies(delay));
-	} else {
-		HDCP_WARN("Cannot allocate memory to create work\n");
-		return NULL;
-	}
-
-	return work;
-}
-
 static void hdcp_work_queue(struct work_struct *work)
 {
-	struct hdcp_delayed_work *hdcp_w =
-		container_of(work, struct hdcp_delayed_work, work.work);
-	int event = hdcp_w->event;
+	HDCP_DBG("hdcp_work_queue() start\n");
 
-	HDCP_DBG("hdcp_work_queue() - START - %u evt= %x\n",
-		(event & 0xFF00) >> 8,
-		event & 0xFF);
-
-	mutex_lock(&hdcp->lock);
-
-	/*
-	 * Clear pending_wq_event
-	 * In case a delayed work is scheduled from the state machine
-	 * "pending_wq_event" is used to memorize pointer on the event to be
-	 * able to cancel any pending work in case HDCP is disabled
-	 */
-	if (event & HDCP_WORKQUEUE_SRC)
-		hdcp->pending_wq_event = NULL;
-
-	if (event == HDCP_START_FRAME_EVENT) {
-		hdcp->pending_start = NULL;
-		if (hdcp_wq_start_authentication() == HDCP_AUTH_FAILURE)
-			hdcp->pending_wq_event =
-					hdcp_submit_work(HDCP_START_FRAME_EVENT,
-							HDCP_REAUTH_DELAY);
+	if (hdcp_wq_start_authentication() == HDCP_AUTH_FAILURE) {
+		HDCP_DBG("HDCP_AUTH_FAILURE, submit work again\n");
+		queue_delayed_work(hdcp->workqueue, hdcp->work,
+				   msecs_to_jiffies(HDCP_REAUTH_DELAY));
 	}
 
-	kfree(hdcp_w);
-	hdcp_w = NULL;
-
-	mutex_unlock(&hdcp->lock);
-
-	HDCP_DBG("hdcp_work_queue() - END - %u evt=%x\n",
-		(event & 0xFF00) >> 8,
-		event & 0xFF);
-
-}
-
-static void hdcp_cancel_work(struct hdcp_delayed_work **work)
-{
-	bool ret;
-
-	HDCP_DBG("%s\n", __func__);
-
-	if (*work) {
-		ret = cancel_delayed_work_sync(&((*work)->work));
-		if (ret == false)
-			HDCP_ERR("Canceling work failed\n");
-		return;
-
-	}
-
-	kfree(*work);
-	*work = NULL;
+	HDCP_DBG("hdcp_work_queue() - END\n");
 }
 
 static int hdcp_3des_load_key(uint32_t *deshdcp_encrypted_key)
@@ -283,16 +203,10 @@ static void hdcp_start_frame_cb(void)
 		return;
 	}
 
-	mutex_lock(&hdcp->lock);
-	/* Cancel any pending work */
-	if (hdcp->pending_start)
-		hdcp_cancel_work(&hdcp->pending_start);
-	if (hdcp->pending_wq_event)
-		hdcp_cancel_work(&hdcp->pending_wq_event);
+	__cancel_delayed_work(hdcp->work);
 
-	hdcp->pending_start = hdcp_submit_work(HDCP_START_FRAME_EVENT,
-							HDCP_ENABLE_DELAY);
-	mutex_unlock(&hdcp->lock);
+	queue_delayed_work(hdcp->workqueue, hdcp->work,
+			   msecs_to_jiffies(HDCP_ENABLE_DELAY));
 }
 
 static long hdcp_query_status_ctl(uint32_t *status)
@@ -530,6 +444,14 @@ static int __init hdcp_init(void)
 	if (hdcp->workqueue == NULL)
 		goto err_add_driver;
 
+	hdcp->work = kzalloc(sizeof(struct delayed_work), GFP_ATOMIC);
+	if (hdcp->work) {
+		INIT_DELAYED_WORK(hdcp->work, hdcp_work_queue);
+	} else {
+		HDCP_ERR("Could not allocate memory to create work\n");
+		goto err_alloc_work;
+	}
+
 	if (hdmi_runtime_get())
 		goto err_runtime;
 
@@ -544,6 +466,9 @@ static int __init hdcp_init(void)
 	return 0;
 
 err_runtime:
+	kfree(hdcp->work);
+
+err_alloc_work:
 	destroy_workqueue(hdcp->workqueue);
 
 err_add_driver:
@@ -586,6 +511,7 @@ err_handling:
 
 	iounmap(hdcp->deshdcp_base_addr);
 
+	kfree(hdcp->work);
 	destroy_workqueue(hdcp->workqueue);
 
 	mutex_unlock(&hdcp->lock);
