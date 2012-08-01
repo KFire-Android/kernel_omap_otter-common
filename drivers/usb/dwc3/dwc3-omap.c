@@ -140,7 +140,7 @@ struct dwc3_omap {
 	struct pm_qos_request	pm_qos_request;
 };
 
-struct dwc3_omap		*_omap;
+static struct dwc3_omap		*_omap;
 
 static inline u32 dwc3_omap_readl(void __iomem *base, u32 offset)
 {
