@@ -6187,7 +6187,6 @@ static struct omap_hwmod omap54xx_usb_host_hs_hwmod = {
 	.clkdm_name	= "l3init_clkdm",
 	.mpu_irqs	= omap54xx_usb_host_hs_irqs,
 	.main_clk	= "l3init_60m_fclk",
-	.flags		= HWMOD_SWSUP_SIDLE | HWMOD_SWSUP_MSTANDBY,
 	.prcm = {
 		.omap4 = {
 			.clkctrl_offs = OMAP54XX_CM_L3INIT_USB_HOST_HS_CLKCTRL_OFFSET,
