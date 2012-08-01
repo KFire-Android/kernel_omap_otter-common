@@ -41,7 +41,8 @@
 
 u32 omap4_device_off_counter;
 u32 enable_off_mode;
-u32 wakeup_timer_seconds = 0;
+u32 wakeup_timer_seconds;
+u32 wakeup_timer_milliseconds;
 
 #ifdef CONFIG_DEBUG_FS
 #include <linux/debugfs.h>
@@ -290,6 +291,10 @@ static int __init pm_dbg_init(void)
 
 	(void) debugfs_create_file("wakeup_timer_seconds", S_IRUGO | S_IWUSR, d,
 				   &wakeup_timer_seconds, &pm_dbg_option_fops);
+	(void) debugfs_create_file("wakeup_timer_milliseconds",
+				   S_IRUGO | S_IWUSR, d,
+				   &wakeup_timer_milliseconds,
+				   &pm_dbg_option_fops);
 
 	pm_dbg_init_done = 1;
 

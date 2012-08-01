@@ -265,6 +265,16 @@ static inline void omap_mpuss_timer_init(void)
 {}
 #endif
 
+#if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_ARCH_OMAP5)
+extern bool omap_wakeupgen_check_interrupts(char *report_string);
+#else
+static inline bool omap_wakeupgen_check_interrupts(char *report_string)
+{
+	return false;
+}
+#endif
+
+
 struct omap_sdrc_params;
 extern void omap_sdrc_init(struct omap_sdrc_params *sdrc_cs0,
 				      struct omap_sdrc_params *sdrc_cs1);

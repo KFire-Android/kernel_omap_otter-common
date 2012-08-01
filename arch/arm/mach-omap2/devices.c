@@ -1041,7 +1041,7 @@ static __init void omap_init_dev(char *name,
 		pm_runtime_enable(&pd->dev);
 }
 
-int omap_cam_deactivate(struct omap_device *od)
+static int omap_cam_deactivate(struct omap_device *od)
 {
 	int i;
 

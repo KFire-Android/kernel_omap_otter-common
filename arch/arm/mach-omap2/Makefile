@@ -279,7 +279,7 @@ obj-$(CONFIG_MACH_OMAP5_SEVM)		+= board-omap5evm.o \
 obj-$(CONFIG_MACH_OMAP5_PANDA)		+= board-omap5panda.o
 
 ifeq ($(CONFIG_OMAP_HSI_DEVICE),y)
-obj-$(CONFIG_MACH_OMAP5_SEVM)		+= board-omap5evm-modem.o
+obj-$(CONFIG_MACH_OMAP5_SEVM)		+= board-54xx-sevm-modem.o
 endif
 
 # Platform specific device init code

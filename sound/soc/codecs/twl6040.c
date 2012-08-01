@@ -748,11 +748,11 @@ int twl6040_get_dl1_gain(struct snd_soc_codec *codec)
 {
 	struct snd_soc_dapm_context *dapm = &codec->dapm;
 
-	if (snd_soc_dapm_get_pin_status(dapm, "EP"))
+	if (snd_soc_dapm_get_pin_power(dapm, "EP"))
 		return -1; /* -1dB */
 
-	if (snd_soc_dapm_get_pin_status(dapm, "HSOR") ||
-		snd_soc_dapm_get_pin_status(dapm, "HSOL")) {
+	if (snd_soc_dapm_get_pin_power(dapm, "HSOR") ||
+		snd_soc_dapm_get_pin_power(dapm, "HSOL")) {
 
 		u8 val = snd_soc_read(codec, TWL6040_REG_HSLCTL);
 		if (val & TWL6040_HSDACMODE)

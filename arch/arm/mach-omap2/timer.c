@@ -28,6 +28,7 @@
  */
 #include <linux/init.h>
 #include <linux/time.h>
+#include <linux/jiffies.h>
 #include <linux/interrupt.h>
 #include <linux/err.h>
 #include <linux/clk.h>
@@ -84,6 +85,7 @@
 static u32 sys_timer_reserved;
 #ifdef CONFIG_PM_DEBUG
 extern u32	wakeup_timer_seconds;
+extern u32	wakeup_timer_milliseconds;
 #endif
 
 /* Clockevent code */
@@ -142,11 +144,23 @@ static void omap2_gp_timer_set_mode(enum clock_event_mode mode,
 	case CLOCK_EVT_MODE_UNUSED:
 	case CLOCK_EVT_MODE_SHUTDOWN:
 #ifdef CONFIG_PM_DEBUG
-		if (wakeup_timer_seconds) {
+		if (wakeup_timer_seconds || wakeup_timer_milliseconds) {
+			u32 tick_rate, cycles;
+
+			tick_rate = clkev.rate;
+			cycles = tick_rate * wakeup_timer_seconds;
+			cycles += DIV_ROUND_UP(tick_rate *
+					       wakeup_timer_milliseconds,
+					       1000);
+
 			__omap_dm_timer_write(&clkev, OMAP_TIMER_LOAD_REG,
-			0xffffffff - (clkev.rate * wakeup_timer_seconds), 1);
+					      0xffffffff - cycles, 1);
 			__omap_dm_timer_load_start(&clkev, OMAP_TIMER_CTRL_ST,
-			0xffffffff - (clkev.rate * wakeup_timer_seconds), 1);
+						   0xffffffff - cycles, 1);
+
+			pr_info("Resume timer @%u.%03uSecs(%d ticks @ %d Hz)\n",
+				wakeup_timer_seconds, wakeup_timer_milliseconds,
+				cycles, tick_rate);
 		}
 #endif
 		break;

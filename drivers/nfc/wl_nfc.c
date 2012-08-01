@@ -186,6 +186,7 @@ static int nfc_drv_open(struct inode *inode, struct file *filp)
 	goto exit;
 
 free_exit:
+	st_unregister(&dev->st_proto);
 	kfree(dev);
 
 release_exit:

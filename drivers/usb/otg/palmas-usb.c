@@ -118,7 +118,7 @@ static irqreturn_t palmas_vbus_irq(int irq, void *_palmas_usb)
 static irqreturn_t palmas_vbus_wakeup_irq(int irq, void *_palmas_usb)
 {
 	enum omap_dwc3_vbus_id_status status = OMAP_DWC3_UNKNOWN;
-	int vbus_line_state;
+	unsigned int vbus_line_state;
 	int slave;
 	unsigned int addr;
 	int timeout = PALMAS_INT3_LINE_STATE_TIME;
@@ -175,7 +175,7 @@ static irqreturn_t palmas_id_irq(int irq, void *_palmas_usb)
 static irqreturn_t palmas_id_wakeup_irq(int irq, void *_palmas_usb)
 {
 	enum omap_dwc3_vbus_id_status status = OMAP_DWC3_UNKNOWN;
-	int			set;
+	unsigned int			set;
 	struct palmas_usb	*palmas_usb = _palmas_usb;
 
 	palmas_usb_read(palmas_usb->palmas, PALMAS_USB_ID_INT_LATCH_SET, &set);
