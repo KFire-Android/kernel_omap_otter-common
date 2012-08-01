@@ -93,11 +93,11 @@ static struct omap_dss_device omap5evm_lcd_device = {
 		},
 		.dsi = {
 			.regn		= 19,	/* DSI_PLL_REGN */
-			.regm		= 233,	/* DSI_PLL_REGM */
+			.regm		= 238,	/* DSI_PLL_REGM */
 
 			.regm_dispc	= 3,	/* PLL_CLK1 (M4) */
 			.regm_dsi	= 3,	/* PLL_CLK2 (M5) */
-			.lp_clk_div	= 9,	/* LPDIV */
+			.lp_clk_div	= 8,	/* LPDIV */
 
 			.dsi_fclk_src	= OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DSI,
 		},
