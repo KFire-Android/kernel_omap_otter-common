@@ -6550,7 +6550,8 @@ static struct omap_hwmod omap54xx_wd_timer3_hwmod = {
 	.slaves_cnt	= ARRAY_SIZE(omap54xx_wd_timer3_slaves),
 };
 
-static __initdata struct omap_hwmod *omap54xx_hwmods[] = {
+/* OMAP54XX hwmods common to all ES revisions */
+static __initdata struct omap_hwmod *omap54xx_hwmods_common[] = {
 
 	/* dmm class */
 	&omap54xx_dmm_hwmod,
@@ -6579,9 +6580,6 @@ static __initdata struct omap_hwmod *omap54xx_hwmods[] = {
 	/* aess class */
 	&omap54xx_aess_hwmod,
 #endif
-
-	/* bb2d class */
-	&omap54xx_bb2d_hwmod,
 
 	/* counter class */
 	&omap54xx_counter_32k_hwmod,
@@ -6748,7 +6746,28 @@ static __initdata struct omap_hwmod *omap54xx_hwmods[] = {
 	NULL,
 };
 
+/* OMAP54XX ES2.0+ specific delta h/wmods */
+static __initdata struct omap_hwmod *omap54xx_hwmods_delta_es2plus[] = {
+
+	/* bb2d class */
+	&omap54xx_bb2d_hwmod,
+
+	/* Terminator */
+	NULL,
+};
+
 int __init omap54xx_hwmod_init(void)
 {
-	return omap_hwmod_register(omap54xx_hwmods);
+	int r;
+	/* if we are ES1.0, just program common ones */
+	if (omap_rev() == OMAP5430_REV_ES1_0 ||
+	    omap_rev() == OMAP5432_REV_ES1_0)
+		goto reg_common_hwmods;
+
+	r = omap_hwmod_register(omap54xx_hwmods_delta_es2plus);
+	WARN(r, "Failed to register ES2+ hwmods with %d\n", r);
+	/* Fall through to attempt and register common hwmods */
+
+reg_common_hwmods:
+	return omap_hwmod_register(omap54xx_hwmods_common);
 }
