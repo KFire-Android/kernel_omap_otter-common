@@ -30,6 +30,8 @@
 #include <plat/omap-serial.h>
 #include <linux/wakelock.h>
 
+#include "board-54xx-sevm.h"
+
 #define WILINK_UART_DEV_NAME "/dev/ttyO4"
 #define OMAP5_BT_NSHUTDOWN_GPIO	142
 
@@ -93,7 +95,7 @@ static void __init omap5_sdp5430_wifi_mux_init(void)
 					OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP);
 }
 
-void __init omap5_sdp5430_wifi_init(void)
+static void __init omap5_sdp5430_wifi_init(void)
 {
 	int ret;
 
