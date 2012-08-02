@@ -832,7 +832,10 @@ static void __init omap_4430sdp_reserve(void)
 	omap_init_ram_size();
 
 #ifdef CONFIG_ION_OMAP
+	omap4_kc1_android_display_setup(get_omap_ion_platform_data());
 	omap_ion_init();
+#else
+	omap4_kc1_android_display_setup(NULL);
 #endif
 	omap_ram_console_init(OMAP_RAM_CONSOLE_START_DEFAULT, OMAP_RAM_CONSOLE_SIZE_DEFAULT);
 

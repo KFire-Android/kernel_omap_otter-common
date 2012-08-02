@@ -27,4 +27,7 @@ void board_serial_init(void);
 
 void omap4_kc1_display_init(void);
 
+struct omap_ion_platform_data;
+void omap4_kc1_android_display_setup(struct omap_ion_platform_data *ion);
+
 #endif

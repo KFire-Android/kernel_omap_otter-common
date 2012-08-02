@@ -39,6 +39,7 @@
 #include <plat/omap_apps_brd_id.h>
 #include <plat/dmtimer.h>
 #include <plat/omap_device.h>
+#include <plat/android-display.h>
 
 #include "board-4430kc1-tablet.h"
 #include "control.h"
@@ -129,6 +130,18 @@ static struct omap_dss_board_info sdp4430_dss_data = {
 	.default_device	=	&tablet_lcd_device,
 };
 
+#define OTTER_FB_RAM_SIZE                SZ_16M /* 1920×1080*4 * 2 */
+static struct omapfb_platform_data sdp4430_fb_data = {
+	.mem_desc = {
+		.region_cnt = 1,
+		.region = {
+			[0] = {
+				.size = OTTER_FB_RAM_SIZE,
+			},
+		},
+	},
+};
+
 static struct spi_board_info tablet_spi_board_info[] __initdata = {
 	{
 		.modalias		= "otter1_disp_spi",
@@ -215,17 +228,27 @@ static struct platform_device __initdata *sdp4430_panel_devices[] = {
 	&board_backlight_device,
 };
 
+void omap4_kc1_android_display_setup(struct omap_ion_platform_data *ion)
+{
+	omap_android_display_setup(&sdp4430_dss_data,
+				   NULL,
+				   NULL,
+				   &sdp4430_fb_data,
+				   ion);
+}
+
 void __init omap4_kc1_display_init(void)
 {
 	int ret;
 
-	spi_register_board_info(tablet_spi_board_info,	ARRAY_SIZE(tablet_spi_board_info));
+	omapfb_set_platform_data(&sdp4430_fb_data);
 
-	omap_display_init(&sdp4430_dss_data);
+	spi_register_board_info(tablet_spi_board_info,	ARRAY_SIZE(tablet_spi_board_info));
 
 	omap_mux_enable_wkup("sys_nirq1");
 	omap_mux_enable_wkup("sys_nirq2");
 
 	platform_add_devices(sdp4430_panel_devices, ARRAY_SIZE(sdp4430_panel_devices));
+	omap_display_init(&sdp4430_dss_data);
 }
 
