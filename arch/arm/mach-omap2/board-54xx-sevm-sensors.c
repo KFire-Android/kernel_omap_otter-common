@@ -28,6 +28,8 @@
 
 #include <plat/i2c.h>
 
+#include "board-54xx-sevm.h"
+
 #define OMAP5_TSL2771_INT_GPIO		149
 #define OMAP5_MPU6050_INT_GPIO		150
 #define OMAP5_AK8975_INT_GPIO		165
