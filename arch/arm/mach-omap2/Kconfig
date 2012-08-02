@@ -431,7 +431,7 @@ config OMAP4_DPLL_CASCADING
 config OMAP4_ONLY_OMAP4430_DPLL_CASCADING
        bool  "Enable DPLL Cascading for OMAP4430 only"
        depends on OMAP4_DPLL_CASCADING
-       default y
+       default n
        help
          Enables DPLL Cascading only for OMAP4430.
 	 Current DPLL cascading implementation is going to be used
