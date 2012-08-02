@@ -74,11 +74,13 @@ struct omap_uart_port_info {
 	unsigned int		dma_rx_timeout;
 	unsigned int		autosuspend_timeout;
 	unsigned int		dma_rx_poll_rate;
+	unsigned		rts_mux_driver_control:1;
 
 	int (*get_context_loss_count)(struct device *);
 	void (*set_forceidle)(struct platform_device *);
 	void (*set_noidle)(struct platform_device *);
 	void (*enable_wakeup)(struct platform_device *, bool);
+	void (*rts_mux_write)(u16 val, int num);
 };
 
 struct uart_omap_dma {
@@ -135,6 +137,9 @@ struct uart_omap_port {
 	char			name[20];
 	unsigned long		port_activity;
 	int			context_loss_cnt;
+	/* RTS control via driver */
+	unsigned		rts_pullup_in_suspend:1;
+
 	u32			errata;
 
 	u32			features;

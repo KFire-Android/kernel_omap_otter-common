@@ -657,7 +657,7 @@ static int hsi_char_remove(struct platform_device *pdev)
 	return 0;
 }
 
-struct platform_driver hsi_char_plat_drv = {
+static struct platform_driver hsi_char_plat_drv = {
 	.probe = hsi_char_probe,
 	.remove = hsi_char_remove,
 	.driver = {

@@ -15,10 +15,6 @@
 
 #include "powerdomain.h"
 
-#ifdef CONFIG_OMAP_PM_NOOP
-extern bool off_mode_enabled;
-#endif
-
 extern void *omap3_secure_ram_storage;
 extern void omap3_pm_off_mode_enable(int);
 extern void omap_sram_idle(void);
