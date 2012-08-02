@@ -1477,4 +1477,3 @@ module_exit(twl_exit);
 MODULE_AUTHOR("Texas Instruments, Inc.");
 MODULE_DESCRIPTION("I2C Core interface for TWL");
 MODULE_LICENSE("GPL");
-

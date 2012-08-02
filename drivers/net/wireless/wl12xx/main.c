@@ -906,7 +906,7 @@ static int wl1271_fetch_firmware(struct wl1271 *wl)
 		return -EINVAL;
 	}
 
-	pr_info("booting firmware %s\n", fw_name);
+	wl1271_debug(DEBUG_BOOT, "booting firmware %s", fw_name);
 
 	ret = request_firmware(&fw, fw_name, wl1271_wl_to_dev(wl));
 
