@@ -296,5 +296,12 @@ void __init omap_emif_set_device_details(u32 emif_nr,
 			struct lpddr2_min_tck *min_tck,
 			struct emif_custom_configs *custom_configs);
 #endif
+
+/* Convert microsecond value to number of 32kHz clock cycles */
+static inline u32 omap_usec_to_32k(u32 usec)
+{
+	return DIV_ROUND_UP_ULL(32768ULL * (u64)usec, 1000000ULL);
+}
+
 #endif /* __ASSEMBLER__ */
 #endif /* __ARCH_ARM_MACH_OMAP2PLUS_COMMON_H */

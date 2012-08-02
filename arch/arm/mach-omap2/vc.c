@@ -26,6 +26,7 @@
 #include "pm.h"
 #include "scrm44xx.h"
 #include "scrm54xx.h"
+#include "common.h"
 
 /**
  * struct omap_vc_channel_cfg - describe the cfg_channel bitfield
@@ -240,12 +241,6 @@ int omap_vc_bypass_scale(struct voltagedomain *voltdm,
 	omap_vc_post_scale(voltdm, target_volt, target_v, target_vsel,
 			   current_vsel);
 	return 0;
-}
-
-/* Convert microsecond value to number of 32kHz clock cycles */
-static inline u32 omap_usec_to_32k(u32 usec)
-{
-	return DIV_ROUND_UP_ULL(32768ULL * (u64)usec, 1000000ULL);
 }
 
 /* Set oscillator setup time for omap3 */
