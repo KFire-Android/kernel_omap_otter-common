@@ -1,28 +1,45 @@
-/**********************************************************************
- *
- * Copyright (C) Imagination Technologies Ltd. All rights reserved.
- * 
- * This program is free software; you can redistribute it and/or modify it
- * under the terms and conditions of the GNU General Public License,
- * version 2, as published by the Free Software Foundation.
- * 
- * This program is distributed in the hope it will be useful but, except 
- * as otherwise stated in writing, without any warranty; without even the 
- * implied warranty of merchantability or fitness for a particular purpose. 
- * See the GNU General Public License for more details.
- * 
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin St - Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * The full GNU General Public License is included in this distribution in
- * the file called "COPYING".
- *
- * Contact Information:
- * Imagination Technologies Ltd. <gpl-support@imgtec.com>
- * Home Park Estate, Kings Langley, Herts, WD4 8LZ, UK 
- *
- ******************************************************************************/
+/*************************************************************************/ /*!
+@Title          System Configuration
+@Copyright      Copyright (c) Imagination Technologies Ltd. All Rights Reserved
+@Description    System Configuration functions
+@License        Dual MIT/GPLv2
+
+The contents of this file are subject to the MIT license as set out below.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+Alternatively, the contents of this file may be used under the terms of
+the GNU General Public License Version 2 ("GPL") in which case the provisions
+of GPL are applicable instead of those above.
+
+If you wish to allow use of your version of this file only under the terms of
+GPL, and not to allow others to use your version of this file under the terms
+of the MIT license, indicate your decision by deleting the provisions above
+and replace them with the notice and other provisions required by GPL as set
+out in the file called "GPL-COPYING" included in this distribution. If you do
+not delete the provisions above, a recipient may use your version of this file
+under the terms of either the MIT license or GPL.
+
+This License is also included in this distribution in the file called
+"MIT-COPYING".
+
+EXCEPT AS OTHERWISE STATED IN A NEGOTIATED AGREEMENT: (A) THE SOFTWARE IS
+PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING
+BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
+PURPOSE AND NONINFRINGEMENT; AND (B) IN NO EVENT SHALL THE AUTHORS OR
+COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+  
+*/ /**************************************************************************/
 
 #include "sysconfig.h"
 #include "services_headers.h"
@@ -34,16 +51,29 @@
 
 #include "ocpdefs.h"
 
+#define OMAP5430_CORE_REV	0x10005
+
+/* top level system data anchor point*/
 SYS_DATA* gpsSysData = (SYS_DATA*)IMG_NULL;
 SYS_DATA  gsSysData;
 
 static SYS_SPECIFIC_DATA gsSysSpecificData;
 SYS_SPECIFIC_DATA *gpsSysSpecificData;
 
+/* SGX structures */
 static IMG_UINT32			gui32SGXDeviceID;
 static SGX_DEVICE_MAP		gsSGXDeviceMap;
 static PVRSRV_DEVICE_NODE	*gpsSGXDevNode;
 
+#if defined(SYS_OMAP4_HAS_DVFS_FRAMEWORK)
+extern uint sgx_dvfs_idle_mode;
+extern uint sgx_dvfs_idle_timeout;
+extern uint sgx_dvfs_active_mode;
+extern uint sgx_dvfs_active_dc_length;
+extern uint sgx_dvfs_active_dc_dec_wait;
+extern uint sgx_dvfs_active_dc_dec_reps;
+extern uint sgx_dvfs_active_dc_inc_wait;
+#endif /* SYS_OMAP4_HAS_DVFS_FRAMEWORK */
 
 #if defined(NO_HARDWARE) || defined(SGX_OCP_REGS_ENABLED)
 static IMG_CPU_VIRTADDR gsSGXRegsCPUVAddr;
@@ -78,14 +108,14 @@ static PVRSRV_ERROR EnableSGXClocksWrap(SYS_DATA *psSysData)
 	return eError;
 }
 
-#else 
+#else /* defined(SGX_OCP_REGS_ENABLED) */
 
 static INLINE PVRSRV_ERROR EnableSGXClocksWrap(SYS_DATA *psSysData)
 {
 	return EnableSGXClocks(psSysData);
 }
 
-#endif 
+#endif /* defined(SGX_OCP_REGS_ENABLED) */
 
 static INLINE PVRSRV_ERROR EnableSystemClocksWrap(SYS_DATA *psSysData)
 {
@@ -94,7 +124,10 @@ static INLINE PVRSRV_ERROR EnableSystemClocksWrap(SYS_DATA *psSysData)
 #if !defined(SUPPORT_ACTIVE_POWER_MANAGEMENT)
 	if(eError == PVRSRV_OK)
 	{
-		
+		/*
+		 * The SGX Clocks are enabled separately if active power
+		 * management is enabled.
+		 */
 		eError = EnableSGXClocksWrap(psSysData);
 		if (eError != PVRSRV_OK)
 		{
@@ -106,6 +139,18 @@ static INLINE PVRSRV_ERROR EnableSystemClocksWrap(SYS_DATA *psSysData)
 	return eError;
 }
 
+/*!
+******************************************************************************
+
+ @Function	SysLocateDevices
+
+ @Description	Specifies devices in the systems memory map
+
+ @Input		psSysData - sys data
+
+ @Return	PVRSRV_ERROR
+
+******************************************************************************/
 static PVRSRV_ERROR SysLocateDevices(SYS_DATA *psSysData)
 {
 #if defined(NO_HARDWARE)
@@ -120,12 +165,16 @@ static PVRSRV_ERROR SysLocateDevices(SYS_DATA *psSysData)
 
 	PVR_UNREFERENCED_PARAMETER(psSysData);
 
-	
+	/* SGX Device: */
 	gsSGXDeviceMap.ui32Flags = 0x0;
 	
 #if defined(NO_HARDWARE)
-	
-	
+	/* 
+	 * For no hardware, allocate some contiguous memory for the
+	 * register block.
+	 */
+
+	/* Registers */
 	gsSGXDeviceMap.ui32RegsSize = SYS_OMAP4430_SGX_REGS_SIZE;
 
 	eError = OSBaseAllocContigMemory(gsSGXDeviceMap.ui32RegsSize,
@@ -138,23 +187,27 @@ static PVRSRV_ERROR SysLocateDevices(SYS_DATA *psSysData)
 	gsSGXDeviceMap.sRegsCpuPBase = sCpuPAddr;
 	gsSGXDeviceMap.sRegsSysPBase = SysCpuPAddrToSysPAddr(gsSGXDeviceMap.sRegsCpuPBase);
 #if defined(__linux__)
-	
+	/* Indicate the registers are already mapped */
 	gsSGXDeviceMap.pvRegsCpuVBase = gsSGXRegsCPUVAddr;
 #else
-	
+	/*
+	 * FIXME: Could we just use the virtual address returned by
+	 * OSBaseAllocContigMemory?
+	 */
 	gsSGXDeviceMap.pvRegsCpuVBase = IMG_NULL;
 #endif
 
 	OSMemSet(gsSGXRegsCPUVAddr, 0, gsSGXDeviceMap.ui32RegsSize);
 
-	
-
-
+	/*
+		device interrupt IRQ
+		Note: no interrupts available on no hardware system
+	*/
 	gsSGXDeviceMap.ui32IRQ = 0;
 
-#else 
+#else /* defined(NO_HARDWARE) */
 #if defined(PVR_LINUX_DYNAMIC_SGX_RESOURCE_INFO)
-	
+	/* get the resource and IRQ through platform resource API */
 	dev_res = platform_get_resource(gpsPVRLDMDev, IORESOURCE_MEM, 0);
 	if (dev_res == NULL)
 	{
@@ -174,19 +227,27 @@ static PVRSRV_ERROR SysLocateDevices(SYS_DATA *psSysData)
 		SysSysPAddrToCpuPAddr(gsSGXDeviceMap.sRegsSysPBase);
 	PVR_TRACE(("SGX register base: 0x%lx", (unsigned long)gsSGXDeviceMap.sRegsCpuPBase.uiAddr));
 
+#if defined(SGX544) && defined(SGX_FEATURE_MP)
+	/* Workaround: Due to the change in the HWMOD, the driver is only detecting the
+	   size of the first memory section. For the moment, set the size with a macro
+	   until a better solution found						*/
+	gsSGXDeviceMap.ui32RegsSize = SYS_OMAP4430_SGX_REGS_SIZE;
+#else
 	gsSGXDeviceMap.ui32RegsSize = (unsigned int)(dev_res->end - dev_res->start);
+#endif
+
 	PVR_TRACE(("SGX register size: %d",gsSGXDeviceMap.ui32RegsSize));
 
 	gsSGXDeviceMap.ui32IRQ = dev_irq;
 	PVR_TRACE(("SGX IRQ: %d", gsSGXDeviceMap.ui32IRQ));
-#else	
+#else	/* defined(PVR_LINUX_DYNAMIC_SGX_RESOURCE_INFO) */
 	gsSGXDeviceMap.sRegsSysPBase.uiAddr = SYS_OMAP4430_SGX_REGS_SYS_PHYS_BASE;
 	gsSGXDeviceMap.sRegsCpuPBase = SysSysPAddrToCpuPAddr(gsSGXDeviceMap.sRegsSysPBase);
 	gsSGXDeviceMap.ui32RegsSize = SYS_OMAP4430_SGX_REGS_SIZE;
 
 	gsSGXDeviceMap.ui32IRQ = SYS_OMAP4430_SGX_IRQ;
 
-#endif	
+#endif	/* defined(PVR_LINUX_DYNAMIC_SGX_RESOURCE_INFO) */
 #if defined(SGX_OCP_REGS_ENABLED)
 	gsSGXRegsCPUVAddr = OSMapPhysToLin(gsSGXDeviceMap.sRegsCpuPBase,
 	gsSGXDeviceMap.ui32RegsSize,
@@ -199,27 +260,37 @@ static PVRSRV_ERROR SysLocateDevices(SYS_DATA *psSysData)
 		return PVRSRV_ERROR_BAD_MAPPING;
 	}
 
-	
+	/* Indicate the registers are already mapped */
 	gsSGXDeviceMap.pvRegsCpuVBase = gsSGXRegsCPUVAddr;
 	gpvOCPRegsLinAddr = gsSGXRegsCPUVAddr;
 #endif
-#endif 
+#endif /* defined(NO_HARDWARE) */
 
 #if defined(PDUMP)
 	{
-		
+		/* initialise memory region name for pdumping */
 		static IMG_CHAR pszPDumpDevName[] = "SGXMEM";
 		gsSGXDeviceMap.pszPDumpDevName = pszPDumpDevName;
 	}
 #endif
 
-	
+	/* add other devices here: */
 
 
 	return PVRSRV_OK;
 }
 
 
+/*!
+******************************************************************************
+
+ @Function	SysCreateVersionString
+
+ @Description Read the version string 
+
+ @Return   IMG_CHAR *  : Version string
+
+******************************************************************************/
 static IMG_CHAR *SysCreateVersionString(void)
 {
 	static IMG_CHAR aszVersionString[100];
@@ -238,8 +309,13 @@ static IMG_CHAR *SysCreateVersionString(void)
 		return IMG_NULL;
 	}
 
+#if defined(SGX544) && defined(SGX_FEATURE_MP)
+	ui32SGXRevision = OMAP5430_CORE_REV;
+#else
 	ui32SGXRevision = OSReadHWReg((IMG_PVOID)((IMG_PBYTE)pvRegsLinAddr),
-								  EUR_CR_CORE_REVISION);
+			EUR_CR_CORE_REVISION);
+#endif
+
 #else
 	ui32SGXRevision = 0;
 #endif
@@ -272,6 +348,16 @@ static IMG_CHAR *SysCreateVersionString(void)
 }
 
 
+/*!
+******************************************************************************
+
+ @Function	SysInitialise
+ 
+ @Description Initialises kernel services at 'driver load' time
+ 
+ @Return   PVRSRV_ERROR  : 
+
+******************************************************************************/
 PVRSRV_ERROR SysInitialise(IMG_VOID)
 {
 	IMG_UINT32			i;
@@ -303,7 +389,7 @@ PVRSRV_ERROR SysInitialise(IMG_VOID)
 
 	gpsSysData->ui32NumDevices = SYS_DEVICE_COUNT;
 
-	
+	/* init device ID's */
 	for(i=0; i<SYS_DEVICE_COUNT; i++)
 	{
 		gpsSysData->sDeviceID[i].uiID = i;
@@ -323,7 +409,7 @@ PVRSRV_ERROR SysInitialise(IMG_VOID)
 	}
 
 #if !defined(SGX_DYNAMIC_TIMING_INFO)
-	
+	/* Set up timing information*/
 	psTimingInfo = &gsSGXDeviceMap.sTimingInfo;
 	psTimingInfo->ui32CoreClockSpeed = SYS_SGX_CLOCK_SPEED;
 	psTimingInfo->ui32HWRecoveryFreq = SYS_SGX_HWRECOVERY_TIMEOUT_FREQ; 
@@ -331,19 +417,21 @@ PVRSRV_ERROR SysInitialise(IMG_VOID)
 	psTimingInfo->bEnableActivePM = IMG_TRUE;
 #else	
 	psTimingInfo->bEnableActivePM = IMG_FALSE;
-#endif 
+#endif /* SUPPORT_ACTIVE_POWER_MANAGEMENT */
 	psTimingInfo->ui32ActivePowManLatencyms = SYS_SGX_ACTIVE_POWER_LATENCY_MS; 
 	psTimingInfo->ui32uKernelFreq = SYS_SGX_PDS_TIMER_FREQ; 
 #endif
 
-	
-
+	/*
+		Setup the Source Clock Divider value
+	*/
 	gpsSysSpecificData->ui32SrcClockDiv = 3;
 
-	
-
-
-
+	/*
+		Locate the devices within the system, specifying 
+		the physical addresses of each devices components 
+		(regs, mem, ports etc.)
+	*/
 	eError = SysLocateDevices(gpsSysData);
 	if (eError != PVRSRV_OK)
 	{
@@ -354,7 +442,7 @@ PVRSRV_ERROR SysInitialise(IMG_VOID)
 	}
 	SYS_SPECIFIC_DATA_SET(&gsSysSpecificData, SYS_SPECIFIC_DATA_ENABLE_LOCATEDEV);
 
-	eError = SysPMRuntimeRegister();
+	eError = SysPMRuntimeRegister(gpsSysSpecificData);
 	if (eError != PVRSRV_OK)
 	{
 		PVR_DPF((PVR_DBG_ERROR,"SysInitialise: Failed to register with OSPM!"));
@@ -374,9 +462,10 @@ PVRSRV_ERROR SysInitialise(IMG_VOID)
 	}
 	SYS_SPECIFIC_DATA_SET(&gsSysSpecificData, SYS_SPECIFIC_DATA_DVFS_INIT);
 
-	
-
-
+	/*
+		Register devices with the system
+		This also sets up their memory maps/heaps
+	*/
 	eError = PVRSRVRegisterDevice(gpsSysData, SGXRegisterDevice,
 								  DEVICE_SGX_INTERRUPT, &gui32SGXDeviceID);
 	if (eError != PVRSRV_OK)
@@ -388,14 +477,14 @@ PVRSRV_ERROR SysInitialise(IMG_VOID)
 	}
 	SYS_SPECIFIC_DATA_SET(&gsSysSpecificData, SYS_SPECIFIC_DATA_ENABLE_REGDEV);
 
-	
-
-
-	
+	/*
+		Once all devices are registered, specify the backing store
+		and, if required, customise the memory heap config
+	*/	
 	psDeviceNode = gpsSysData->psDeviceNodeList;
 	while(psDeviceNode)
 	{
-		
+		/* perform any OEM SOC address space customisations here */
 		switch(psDeviceNode->sDevId.eDeviceType)
 		{
 			case PVRSRV_DEVICE_TYPE_SGX:
@@ -403,16 +492,17 @@ PVRSRV_ERROR SysInitialise(IMG_VOID)
 				DEVICE_MEMORY_INFO *psDevMemoryInfo;
 				DEVICE_MEMORY_HEAP_INFO *psDeviceMemoryHeap;
 
-				
-
-
+				/* 
+					specify the backing store to use for the devices MMU PT/PDs
+					- the PT/PDs are always UMA in this system
+				*/
 				psDeviceNode->psLocalDevMemArena = IMG_NULL;
 
-				
+				/* useful pointers */
 				psDevMemoryInfo = &psDeviceNode->sDevMemoryInfo;
 				psDeviceMemoryHeap = psDevMemoryInfo->psDeviceMemoryHeap;
 
-				
+				/* specify the backing store for all SGX heaps */
 				for(i=0; i<psDevMemoryInfo->ui32HeapCount; i++)
 				{
 					psDeviceMemoryHeap[i].ui32Attribs |= PVRSRV_BACKINGSTORE_SYSMEM_NONCONTIG;
@@ -428,7 +518,7 @@ PVRSRV_ERROR SysInitialise(IMG_VOID)
 				return PVRSRV_ERROR_INIT_FAILURE;
 		}
 
-		
+		/* advance to next device */
 		psDeviceNode = psDeviceNode->psNext;
 	}
 
@@ -450,7 +540,7 @@ PVRSRV_ERROR SysInitialise(IMG_VOID)
 		gpsSysData = IMG_NULL;
 		return eError;
 	}
-#endif	
+#endif	/* SUPPORT_ACTIVE_POWER_MANAGEMENT */
 
 	eError = PVRSRVInitialiseDevice(gui32SGXDeviceID);
 	if (eError != PVRSRV_OK)
@@ -463,9 +553,9 @@ PVRSRV_ERROR SysInitialise(IMG_VOID)
 	SYS_SPECIFIC_DATA_SET(&gsSysSpecificData, SYS_SPECIFIC_DATA_ENABLE_INITDEV);
 
 #if defined(SUPPORT_ACTIVE_POWER_MANAGEMENT)
-	
+	/* SGX defaults to D3 power state */
 	DisableSGXClocks(gpsSysData);
-#endif	
+#endif	/* SUPPORT_ACTIVE_POWER_MANAGEMENT */
 
 #if !defined(PVR_NO_OMAP_TIMER)
 #if defined(PVR_OMAP_TIMER_BASE_IN_SYS_SPEC_DATA)
@@ -480,16 +570,30 @@ PVRSRV_ERROR SysInitialise(IMG_VOID)
 		OSReservePhys(TimerRegPhysBase,
 				  4,
 				  PVRSRV_HAP_MULTI_PROCESS|PVRSRV_HAP_UNCACHED,
+				  IMG_NULL,
 				  (IMG_VOID **)&gpsSysData->pvSOCTimerRegisterKM,
 				  &gpsSysData->hSOCTimerRegisterOSMemHandle);
 	}
-#endif 
+#endif /* !defined(PVR_NO_OMAP_TIMER) */
 
 
 	return PVRSRV_OK;
 }
 
+#if defined(CONFIG_OMAPLFB)
+int OMAPLFBRegisterPVRDriver(void * pfnFuncTable);
+#endif
 
+/*!
+******************************************************************************
+
+ @Function	SysFinalise
+ 
+ @Description Final part of initialisation at 'driver load' time
+ 
+ @Return   PVRSRV_ERROR  : 
+
+******************************************************************************/
 PVRSRV_ERROR SysFinalise(IMG_VOID)
 {
 	PVRSRV_ERROR eError = PVRSRV_OK;
@@ -501,7 +605,7 @@ PVRSRV_ERROR SysFinalise(IMG_VOID)
 		PVR_DPF((PVR_DBG_ERROR,"SysFinalise: Failed to Enable SGX clocks (%d)", eError));
 		return eError;
 	}
-#endif	
+#endif	/* SUPPORT_ACTIVE_POWER_MANAGEMENT */
 
 	eError = OSInstallMISR(gpsSysData);
 	if (eError != PVRSRV_OK)
@@ -512,7 +616,7 @@ PVRSRV_ERROR SysFinalise(IMG_VOID)
 	SYS_SPECIFIC_DATA_SET(&gsSysSpecificData, SYS_SPECIFIC_DATA_ENABLE_MISR);
 
 #if defined(SYS_USING_INTERRUPTS)
-	
+	/* install a Device ISR */
 	eError = OSInstallDeviceLISR(gpsSysData, gsSGXDeviceMap.ui32IRQ, "SGX ISR", gpsSGXDevNode);
 	if (eError != PVRSRV_OK)
 	{
@@ -523,9 +627,9 @@ PVRSRV_ERROR SysFinalise(IMG_VOID)
 #if !defined(SUPPORT_ACTIVE_POWER_MANAGEMENT)
 	SysEnableSGXInterrupts(gpsSysData);
 #endif
-#endif 
+#endif /* defined(SYS_USING_INTERRUPTS) */
 #if defined(__linux__)
-	
+	/* Create a human readable version string for this system */
 	gpsSysData->pszVersionString = SysCreateVersionString();
 	if (!gpsSysData->pszVersionString)
 	{
@@ -538,9 +642,17 @@ PVRSRV_ERROR SysFinalise(IMG_VOID)
 #endif
 
 #if defined(SUPPORT_ACTIVE_POWER_MANAGEMENT)
-	
+	/* SGX defaults to D3 power state */
 	DisableSGXClocks(gpsSysData);
-#endif	
+#endif	/* SUPPORT_ACTIVE_POWER_MANAGEMENT */
+
+#if defined(CONFIG_OMAPLFB)
+	if (OMAPLFBRegisterPVRDriver((void *)&PVRGetDisplayClassJTable) != 0)
+	{
+		PVR_DPF((PVR_DBG_ERROR,"SysFinalise: Failed to register PVR driver with omaplfb"));
+		return PVRSRV_ERROR_INIT_FAILURE;
+	}
+#endif
 
 	gpsSysSpecificData->bSGXInitComplete = IMG_TRUE;
 
@@ -548,6 +660,16 @@ PVRSRV_ERROR SysFinalise(IMG_VOID)
 }
 
 
+/*!
+******************************************************************************
+
+ @Function	SysDeinitialise
+
+ @Description	De-initialises kernel services at 'driver unload' time
+
+ @Return	PVRSRV_ERROR
+
+******************************************************************************/
 PVRSRV_ERROR SysDeinitialise (SYS_DATA *psSysData)
 {
 	PVRSRV_ERROR eError;
@@ -589,16 +711,16 @@ PVRSRV_ERROR SysDeinitialise (SYS_DATA *psSysData)
 	{
 #if defined(SUPPORT_ACTIVE_POWER_MANAGEMENT)
 		PVR_ASSERT(SYS_SPECIFIC_DATA_TEST(gpsSysSpecificData, SYS_SPECIFIC_DATA_ENABLE_SYSCLOCKS));
-		
+		/* Reenable SGX clocks whilst SGX is being deinitialised. */
 		eError = EnableSGXClocksWrap(gpsSysData);
 		if (eError != PVRSRV_OK)
 		{
 			PVR_DPF((PVR_DBG_ERROR,"SysDeinitialise: EnableSGXClocks failed"));
 			return eError;
 		}
-#endif	
+#endif	/* SUPPORT_ACTIVE_POWER_MANAGEMENT */
 
-		
+		/* Deinitialise SGX */
 		eError = PVRSRVDeinitialiseDevice (gui32SGXDeviceID);
 		if (eError != PVRSRV_OK)
 		{
@@ -620,7 +742,7 @@ PVRSRV_ERROR SysDeinitialise (SYS_DATA *psSysData)
 
 	if (SYS_SPECIFIC_DATA_TEST(gpsSysSpecificData, SYS_SPECIFIC_DATA_ENABLE_PM_RUNTIME))
 	{
-		eError = SysPMRuntimeUnregister();
+		eError = SysPMRuntimeUnregister(gpsSysSpecificData);
 		if (eError != PVRSRV_OK)
 		{
 			PVR_DPF((PVR_DBG_ERROR,"SysDeinitialise: Failed to unregister with OSPM!"));
@@ -629,8 +751,9 @@ PVRSRV_ERROR SysDeinitialise (SYS_DATA *psSysData)
 		}
 	}
 
-	
-
+	/*
+		Disable system clocks - must happen after last access to hardware.
+	 */
 	if (SYS_SPECIFIC_DATA_TEST(gpsSysSpecificData, SYS_SPECIFIC_DATA_ENABLE_SYSCLOCKS))
 	{
 		DisableSystemClocks(gpsSysData);
@@ -652,7 +775,7 @@ PVRSRV_ERROR SysDeinitialise (SYS_DATA *psSysData)
 	if(gsSGXRegsCPUVAddr != IMG_NULL)
 	{
 #if defined(NO_HARDWARE)
-		
+		/* Free hardware resources. */
 		OSBaseFreeContigMemory(SYS_OMAP4430_SGX_REGS_SIZE, gsSGXRegsCPUVAddr, gsSGXDeviceMap.sRegsCpuPBase);
 #else
 #if defined(SGX_OCP_REGS_ENABLED)
@@ -663,11 +786,11 @@ PVRSRV_ERROR SysDeinitialise (SYS_DATA *psSysData)
 
 		gpvOCPRegsLinAddr = IMG_NULL;
 #endif
-#endif	
+#endif	/* defined(NO_HARDWARE) */
 		gsSGXRegsCPUVAddr = IMG_NULL;
 		gsSGXDeviceMap.pvRegsCpuVBase = gsSGXRegsCPUVAddr;
 	}
-#endif	
+#endif	/* defined(NO_HARDWARE) || defined(SGX_OCP_REGS_ENABLED) */
 
 	
 	gpsSysSpecificData->ui32SysSpecificData = 0;
@@ -679,6 +802,19 @@ PVRSRV_ERROR SysDeinitialise (SYS_DATA *psSysData)
 }
 
 
+/*!
+******************************************************************************
+
+ @Function		SysGetDeviceMemoryMap
+
+ @Description	returns a device address map for the specified device
+
+ @Input			eDeviceType - device type
+ @Input			ppvDeviceMap - void ptr to receive device specific info.
+
+ @Return		PVRSRV_ERROR
+
+******************************************************************************/
 PVRSRV_ERROR SysGetDeviceMemoryMap(PVRSRV_DEVICE_TYPE	eDeviceType,
 								   IMG_VOID				**ppvDeviceMap)
 {
@@ -687,7 +823,7 @@ PVRSRV_ERROR SysGetDeviceMemoryMap(PVRSRV_DEVICE_TYPE	eDeviceType,
 	{
 		case PVRSRV_DEVICE_TYPE_SGX:
 		{
-			
+			/* just return a pointer to the structure */
 			*ppvDeviceMap = (IMG_VOID*)&gsSGXDeviceMap;
 
 			break;
@@ -701,6 +837,20 @@ PVRSRV_ERROR SysGetDeviceMemoryMap(PVRSRV_DEVICE_TYPE	eDeviceType,
 }
 
 
+/*!
+******************************************************************************
+ @Function        SysCpuPAddrToDevPAddr
+
+ @Description     Compute a device physical address from a cpu physical
+                  address. Relevant when
+
+ @Input           cpu_paddr - cpu physical address.
+ @Input           eDeviceType - device type required if DevPAddr
+                                address spaces vary across devices
+                                in the same system
+ @Return         device physical address.
+
+******************************************************************************/
 IMG_DEV_PHYADDR SysCpuPAddrToDevPAddr(PVRSRV_DEVICE_TYPE	eDeviceType,
 									  IMG_CPU_PHYADDR		CpuPAddr)
 {
@@ -708,82 +858,180 @@ IMG_DEV_PHYADDR SysCpuPAddrToDevPAddr(PVRSRV_DEVICE_TYPE	eDeviceType,
 
 	PVR_UNREFERENCED_PARAMETER(eDeviceType);
 
-	
+	/* Note: for UMA system we assume DevP == CpuP */
 	DevPAddr.uiAddr = CpuPAddr.uiAddr;
 	
 	return DevPAddr;
 }
 
+/*!
+******************************************************************************
+ @Function        SysSysPAddrToCpuPAddr
+
+ @Description     Compute a cpu physical address from a system physical
+                  address.
+
+ @Input           sys_paddr - system physical address.
+ @Return          cpu physical address.
+
+******************************************************************************/
 IMG_CPU_PHYADDR SysSysPAddrToCpuPAddr (IMG_SYS_PHYADDR sys_paddr)
 {
 	IMG_CPU_PHYADDR cpu_paddr;
 
-	
+	/* This would only be an inequality if the CPU's MMU did not point to
+	   sys address 0, ie. multi CPU system */
 	cpu_paddr.uiAddr = sys_paddr.uiAddr;
 	return cpu_paddr;
 }
 
+/*!
+******************************************************************************
+ @Function        SysCpuPAddrToSysPAddr
+
+ @Description     Compute a system physical address from a cpu physical
+	            address.
+
+ @Input           cpu_paddr - cpu physical address.
+ @Return          device physical address.
+
+******************************************************************************/
 IMG_SYS_PHYADDR SysCpuPAddrToSysPAddr (IMG_CPU_PHYADDR cpu_paddr)
 {
 	IMG_SYS_PHYADDR sys_paddr;
 
-	
+	/* This would only be an inequality if the CPU's MMU did not point to
+	   sys address 0, ie. multi CPU system */
 	sys_paddr.uiAddr = cpu_paddr.uiAddr;
 	return sys_paddr;
 }
 
 
+/*!
+******************************************************************************
+ @Function        SysSysPAddrToDevPAddr
+
+ @Description     Compute a device physical address from a system physical
+	            address.
+
+ @Input           SysPAddr - system physical address.
+ @Input           eDeviceType - device type required if DevPAddr 
+				address spaces vary across devices 
+				in the same system
+
+ @Return        Device physical address.
+
+******************************************************************************/
 IMG_DEV_PHYADDR SysSysPAddrToDevPAddr(PVRSRV_DEVICE_TYPE eDeviceType, IMG_SYS_PHYADDR SysPAddr)
 {
 	IMG_DEV_PHYADDR DevPAddr;
 
 	PVR_UNREFERENCED_PARAMETER(eDeviceType);
 
-	
+	/* Note: for UMA system we assume DevP == CpuP */
 	DevPAddr.uiAddr = SysPAddr.uiAddr;
 
 	return DevPAddr;
 }
 
 
+/*!
+******************************************************************************
+ @Function        SysDevPAddrToSysPAddr
+
+ @Description     Compute a device physical address from a system physical
+	            address.
+
+ @Input           DevPAddr - device physical address.
+ @Input           eDeviceType - device type required if DevPAddr 
+		  address spaces vary across devices 
+		  in the same system
+
+ @Return        System physical address.
+
+******************************************************************************/
 IMG_SYS_PHYADDR SysDevPAddrToSysPAddr(PVRSRV_DEVICE_TYPE eDeviceType, IMG_DEV_PHYADDR DevPAddr)
 {
 	IMG_SYS_PHYADDR SysPAddr;
 
 	PVR_UNREFERENCED_PARAMETER(eDeviceType);
 
-	
+	/* Note: for UMA system we assume DevP == SysP */
 	SysPAddr.uiAddr = DevPAddr.uiAddr;
 
 	return SysPAddr;
 }
 
 
+/*****************************************************************************
+ @Function        SysRegisterExternalDevice
+
+ @Description     Called when a 3rd party device registers with services
+
+ @Input           psDeviceNode - the new device node.
+
+ @Return        IMG_VOID
+*****************************************************************************/
 IMG_VOID SysRegisterExternalDevice(PVRSRV_DEVICE_NODE *psDeviceNode)
 {
 	PVR_UNREFERENCED_PARAMETER(psDeviceNode);
 }
 
 
+/*****************************************************************************
+ @Function        SysRemoveExternalDevice
+
+ @Description     Called when a 3rd party device unregisters from services
+
+ @Input           psDeviceNode - the device node being removed.
+
+ @Return        IMG_VOID
+*****************************************************************************/
 IMG_VOID SysRemoveExternalDevice(PVRSRV_DEVICE_NODE *psDeviceNode)
 {
 	PVR_UNREFERENCED_PARAMETER(psDeviceNode);
 }
 
+/*!
+******************************************************************************
+ @Function        SysGetInterruptSource
+
+ @Description     Returns System specific information about the device(s) that
+				generated the interrupt in the system
+
+ @Input           psSysData
+ @Input           psDeviceNode
+
+ @Return        System specific information indicating which device(s) 
+				generated the interrupt
+
+******************************************************************************/
 IMG_UINT32 SysGetInterruptSource(SYS_DATA			*psSysData,
 								 PVRSRV_DEVICE_NODE	*psDeviceNode)
 {
 	PVR_UNREFERENCED_PARAMETER(psSysData);
 #if defined(NO_HARDWARE)
-	
+	/* no interrupts in no_hw system just return all bits */
 	return 0xFFFFFFFF;
 #else
-	
+	/* Not a shared irq, so we know this is an interrupt for this device */
 	return psDeviceNode->ui32SOCInterruptBit;
 #endif
 }
 
 
+/*!
+******************************************************************************
+ @Function        SysClearInterrupts
+
+ @Description     Clears specified system interrupts
+
+ @Input           psSysData
+ @Input           ui32ClearBits
+
+ @Return        IMG_VOID
+
+******************************************************************************/
 IMG_VOID SysClearInterrupts(SYS_DATA* psSysData, IMG_UINT32 ui32ClearBits)
 {
 	PVR_UNREFERENCED_PARAMETER(ui32ClearBits);
@@ -792,12 +1040,23 @@ IMG_VOID SysClearInterrupts(SYS_DATA* psSysData, IMG_UINT32 ui32ClearBits)
 #if defined(SGX_OCP_NO_INT_BYPASS)
 	OSWriteHWReg(gpvOCPRegsLinAddr, EUR_CR_OCP_IRQSTATUS_2, 0x1);
 #endif
-	
+	/* Flush posted writes */
 	OSReadHWReg(((PVRSRV_SGXDEV_INFO *)gpsSGXDevNode->pvDevice)->pvRegsBaseKM, EUR_CR_EVENT_HOST_CLEAR);
-#endif	
+#endif	/* defined(NO_HARDWARE) */
 }
 
 #if defined(SGX_OCP_NO_INT_BYPASS)
+/*!
+******************************************************************************
+ @Function        SysEnableSGXInterrupts
+
+ @Description     Enables SGX interrupts
+
+ @Input           psSysData
+
+ @Return        IMG_VOID
+
+******************************************************************************/
 IMG_VOID SysEnableSGXInterrupts(SYS_DATA *psSysData)
 {
 	SYS_SPECIFIC_DATA *psSysSpecData = (SYS_SPECIFIC_DATA *)psSysData->pvSysSpecificData;
@@ -809,6 +1068,17 @@ IMG_VOID SysEnableSGXInterrupts(SYS_DATA *psSysData)
 	}
 }
 
+/*!
+******************************************************************************
+ @Function        SysDisableSGXInterrupts
+
+ @Description     Disables SGX interrupts
+
+ @Input           psSysData
+
+ @Return        IMG_VOID
+
+******************************************************************************/
 IMG_VOID SysDisableSGXInterrupts(SYS_DATA *psSysData)
 {
 	SYS_SPECIFIC_DATA *psSysSpecData = (SYS_SPECIFIC_DATA *)psSysData->pvSysSpecificData;
@@ -819,8 +1089,20 @@ IMG_VOID SysDisableSGXInterrupts(SYS_DATA *psSysData)
 		SYS_SPECIFIC_DATA_CLEAR(psSysSpecData, SYS_SPECIFIC_DATA_IRQ_ENABLED);
 	}
 }
-#endif	
+#endif	/* defined(SGX_OCP_NO_INT_BYPASS) */
 
+/*!
+******************************************************************************
+
+ @Function	SysSystemPrePowerState
+
+ @Description	Perform system-level processing required before a power transition
+
+ @Input		eNewPowerState :
+
+ @Return	PVRSRV_ERROR
+
+******************************************************************************/
 PVRSRV_ERROR SysSystemPrePowerState(PVRSRV_SYS_POWER_STATE eNewPowerState)
 {
 	PVRSRV_ERROR eError = PVRSRV_OK;
@@ -859,12 +1141,39 @@ PVRSRV_ERROR SysSystemPrePowerState(PVRSRV_SYS_POWER_STATE eNewPowerState)
 			SYS_SPECIFIC_DATA_SET(&gsSysSpecificData, SYS_SPECIFIC_DATA_PM_DISABLE_SYSCLOCKS);
 			SYS_SPECIFIC_DATA_CLEAR(&gsSysSpecificData, SYS_SPECIFIC_DATA_ENABLE_SYSCLOCKS);
 		}
+
+#if defined(SYS_OMAP4_HAS_DVFS_FRAMEWORK)
+		/* Set lowest frequency for system suspend */
+		hrtimer_cancel(&gpsSysSpecificData->sgx_dvfs_idle_timer);
+		cancel_work_sync(&gpsSysSpecificData->sgx_dvfs_idle_work);
+		hrtimer_cancel(&gpsSysSpecificData->sgx_dvfs_active_timer);
+		cancel_work_sync(&gpsSysSpecificData->sgx_dvfs_active_work);
+
+		mutex_lock(&gpsSysSpecificData->sgx_dvfs_lock);
+
+		RequestSGXFreq(gpsSysData, 0);
+		gpsSysSpecificData->sgx_is_idle = true;
+
+		mutex_unlock(&gpsSysSpecificData->sgx_dvfs_lock);
+#endif /* SYS_OMAP4_HAS_DVFS_FRAMEWORK */
 	}
 
 	return eError;
 }
 
 
+/*!
+******************************************************************************
+
+ @Function	SysSystemPostPowerState
+
+ @Description	Perform system-level processing required after a power transition
+
+ @Input		eNewPowerState :
+
+ @Return	PVRSRV_ERROR
+
+******************************************************************************/
 PVRSRV_ERROR SysSystemPostPowerState(PVRSRV_SYS_POWER_STATE eNewPowerState)
 {
 	PVRSRV_ERROR eError = PVRSRV_OK;
@@ -913,6 +1222,21 @@ PVRSRV_ERROR SysSystemPostPowerState(PVRSRV_SYS_POWER_STATE eNewPowerState)
 }
 
 
+/*!
+******************************************************************************
+
+ @Function	SysDevicePrePowerState
+
+ @Description	Perform system level processing required before a device power
+ 				transition
+
+ @Input		ui32DeviceIndex :
+ @Input		eNewPowerState :
+ @Input		eCurrentPowerState :
+
+ @Return	PVRSRV_ERROR
+
+******************************************************************************/
 PVRSRV_ERROR SysDevicePrePowerState(IMG_UINT32				ui32DeviceIndex,
 									PVRSRV_DEV_POWER_STATE	eNewPowerState,
 									PVRSRV_DEV_POWER_STATE	eCurrentPowerState)
@@ -930,13 +1254,28 @@ PVRSRV_ERROR SysDevicePrePowerState(IMG_UINT32				ui32DeviceIndex,
 		PVR_DPF((PVR_DBG_MESSAGE, "SysDevicePrePowerState: SGX Entering state D3"));
 		DisableSGXClocks(gpsSysData);
 	}
-#else	
+#else	/* SUPPORT_ACTIVE_POWER_MANAGEMENT */
 	PVR_UNREFERENCED_PARAMETER(eNewPowerState );
-#endif 
+#endif /* SUPPORT_ACTIVE_POWER_MANAGEMENT */
 	return PVRSRV_OK;
 }
 
 
+/*!
+******************************************************************************
+
+ @Function	SysDevicePostPowerState
+
+ @Description	Perform system level processing required after a device power
+ 				transition
+
+ @Input		ui32DeviceIndex :
+ @Input		eNewPowerState :
+ @Input		eCurrentPowerState :
+
+ @Return	PVRSRV_ERROR
+
+******************************************************************************/
 PVRSRV_ERROR SysDevicePostPowerState(IMG_UINT32				ui32DeviceIndex,
 									 PVRSRV_DEV_POWER_STATE	eNewPowerState,
 									 PVRSRV_DEV_POWER_STATE	eCurrentPowerState)
@@ -956,22 +1295,248 @@ PVRSRV_ERROR SysDevicePostPowerState(IMG_UINT32				ui32DeviceIndex,
 		PVR_DPF((PVR_DBG_MESSAGE, "SysDevicePostPowerState: SGX Leaving state D3"));
 		eError = EnableSGXClocksWrap(gpsSysData);
 	}
-#else	
+#else	/* SUPPORT_ACTIVE_POWER_MANAGEMENT */
 	PVR_UNREFERENCED_PARAMETER(eCurrentPowerState);
-#endif	
+#endif	/* SUPPORT_ACTIVE_POWER_MANAGEMENT */
 
 	return eError;
 }
 
-#if defined(SYS_SUPPORTS_SGX_IDLE_CALLBACK)
-
-IMG_VOID SysSGXIdleTransition(IMG_BOOL bSGXIdle)
+#if defined(SYS_OMAP4_HAS_DVFS_FRAMEWORK)
+static void do_dvfs_active_none(void)
 {
-	PVR_DPF((PVR_DBG_MESSAGE, "SysSGXIdleTransition switch to %u", bSGXIdle));
+	/*
+	 * DVFS active mode "none" always uses highest available frequency.
+	*/
+	mutex_lock(&gpsSysSpecificData->sgx_dvfs_lock);
+
+	/* Reset active DVFS counter if min(active, limit) is changing. */
+	if(gpsSysSpecificData->ui32SGXFreqListIndexActive <
+		gpsSysSpecificData->ui32SGXFreqListIndexLimit)
+	{
+		gpsSysSpecificData->counter = 0;
+	}
+
+	gpsSysSpecificData->ui32SGXFreqListIndexActive =
+		gpsSysSpecificData->ui32SGXFreqListSize - 2;
+
+	RequestSGXFreq(gpsSysData,
+		gpsSysSpecificData->ui32SGXFreqListIndexLimit);
+
+	gpsSysSpecificData->sgx_is_idle = false;
+
+	mutex_unlock(&gpsSysSpecificData->sgx_dvfs_lock);
 }
 
-#endif 
+static void do_dvfs_active_display_cycle(void)
+{
+	/*
+	 * DVFS active mode "display cycle" seeks to optimize the active
+	 * frequency when all rendering operations are targetting buffers
+	 * for display. This condition creates repeated cycles of SGX work
+	 * followed by waits for either held buffers returned from display
+	 * or new frames initiated by clients. The relative work and wait
+	 * times in the cycle determine if SGX frequency can be lowered
+	 * without sacrificing throughput.
+	*/
+	ktime_t sgx_work_time, sgx_wait_time;
+	IMG_UINT32 freq_index;
 
+	/*
+	 * Was SGX waiting for display to return a frame? This is the display-
+	 * throttled case. TODO: Detect client-throttled case as well.
+	*/
+	if((gpsSysSpecificData->sgx_active_kickcmd != SGXMKIF_CMD_PROCESS_QUEUES) ||
+		(!gpsSysSpecificData->dss_kick_is_pending))
+	{
+		/*
+		 * No, just a mid-work transition. So continue with the same
+		 * active frequency.
+		*/
+		mutex_lock(&gpsSysSpecificData->sgx_dvfs_lock);
+
+		RequestSGXFreq(gpsSysData,
+			min(gpsSysSpecificData->ui32SGXFreqListIndexActive,
+			gpsSysSpecificData->ui32SGXFreqListIndexLimit));
+
+		gpsSysSpecificData->sgx_is_idle = false;
+
+		mutex_unlock(&gpsSysSpecificData->sgx_dvfs_lock);
+
+		return;
+	}
+
+	/*
+	 * The work-wait cycle has finished. Collect times and mark the start
+	 * of the next cycle.
+	*/
+	sgx_work_time = ktime_sub(gpsSysSpecificData->sgx_idle_stamp,
+		gpsSysSpecificData->sgx_work_stamp);
+	sgx_wait_time = ktime_sub(gpsSysSpecificData->sgx_active_stamp,
+		gpsSysSpecificData->sgx_idle_stamp);
+	gpsSysSpecificData->sgx_work_stamp =
+		gpsSysSpecificData->sgx_active_stamp;
+
+	/* cancel or wait-out the cycle-length watchdog timer. */
+	hrtimer_cancel(&gpsSysSpecificData->sgx_dvfs_active_timer);
+	cancel_work_sync(&gpsSysSpecificData->sgx_dvfs_active_work);
+
+	/* Disqualify a work-wait cycle with length greater than threshold. */
+	if(ktime_to_ns(ktime_add(sgx_work_time, sgx_wait_time)) >
+		sgx_dvfs_active_dc_length * NSEC_PER_MSEC)
+	{
+		mutex_lock(&gpsSysSpecificData->sgx_dvfs_lock);
+
+		gpsSysSpecificData->ui32SGXFreqListIndexActive =
+			gpsSysSpecificData->ui32SGXFreqListSize - 2;
+		gpsSysSpecificData->counter = 0;
+		goto set_freq;
+	}
+
+	/*
+	 * Work-wait analysis assumes that the entire work period was
+	 * performed at the lesser of the current active (desired) frequency
+	 * and current limit frequency. Mid-work changes to these frequencies
+	 * can violate this assumption, but that is why we require multiple
+	 * consecutive cycle analyses before requesting a lower frequency.
+	*/
+	mutex_lock(&gpsSysSpecificData->sgx_dvfs_lock);
+
+	freq_index = min(gpsSysSpecificData->ui32SGXFreqListIndexActive,
+			gpsSysSpecificData->ui32SGXFreqListIndexLimit);
+
+	/*
+	 * Increase the active frequency if the currently reduced value lead
+	 * to a wait time below threshold.
+	*/
+	if((freq_index < (gpsSysSpecificData->ui32SGXFreqListSize - 2)) &&
+		(ktime_to_ns(sgx_wait_time) <
+		sgx_dvfs_active_dc_inc_wait * NSEC_PER_USEC))
+	{
+		gpsSysSpecificData->ui32SGXFreqListIndexActive = freq_index+1;
+		gpsSysSpecificData->counter = 0;
+		goto set_freq;
+	}
+
+	/*
+	 * Consider decreasing the active frequency based on the timing of
+	 * the previous work-wait cycle.
+	*/
+	if(freq_index > 0)
+	{
+		ktime_t sgx_est_work_time, sgx_est_wait_time;
+		IMG_UINT32 freq_current, freq_reduced;
+
+		freq_current = gpsSysSpecificData->
+			pui32SGXFreqList[freq_index];
+		freq_reduced = gpsSysSpecificData->
+			pui32SGXFreqList[freq_index-1];
+
+		sgx_est_work_time = ktime_add_ns(ktime_set(0, 0),
+			div_u64(ktime_to_ns(sgx_work_time) * freq_current,
+					freq_reduced));
+		sgx_est_wait_time = ktime_sub(sgx_wait_time,
+			ktime_sub(sgx_est_work_time, sgx_work_time));
+
+		if(ktime_to_ns(sgx_est_wait_time) >
+			sgx_dvfs_active_dc_dec_wait * NSEC_PER_USEC)
+		{
+			gpsSysSpecificData->counter++;
+			if(gpsSysSpecificData->counter >= sgx_dvfs_active_dc_dec_reps)
+			{
+				gpsSysSpecificData->ui32SGXFreqListIndexActive =
+					freq_index-1;
+				gpsSysSpecificData->counter = 0;
+			}
+		}
+		else
+			gpsSysSpecificData->counter = 0;
+	}
+
+set_freq:
+	RequestSGXFreq(gpsSysData,
+		min(gpsSysSpecificData->ui32SGXFreqListIndexActive,
+		gpsSysSpecificData->ui32SGXFreqListIndexLimit));
+
+	gpsSysSpecificData->sgx_is_idle = false;
+
+	mutex_unlock(&gpsSysSpecificData->sgx_dvfs_lock);
+
+	/* Start the cycle length watchdog timer if needed. */
+	if(gpsSysSpecificData->ui32SGXFreqListIndexActive <
+		(gpsSysSpecificData->ui32SGXFreqListSize - 2))
+	{
+		hrtimer_start(&gpsSysSpecificData->sgx_dvfs_active_timer,
+				ktime_set(0, sgx_dvfs_active_dc_length * NSEC_PER_MSEC),
+				HRTIMER_MODE_REL);
+	}
+}
+
+IMG_VOID SysSGXIdleEntered(IMG_VOID)
+{
+	gpsSysSpecificData->sgx_idle_stamp = ktime_get();
+	gpsSysSpecificData->sgx_is_idle = true;
+
+	if (sgx_dvfs_idle_mode != 0)
+	{
+		hrtimer_start(&gpsSysSpecificData->sgx_dvfs_idle_timer,
+				ktime_set(0, sgx_dvfs_idle_timeout * NSEC_PER_MSEC),
+				HRTIMER_MODE_REL);
+	}
+}
+
+IMG_VOID SysSGXCommandPending(SGXMKIF_CMD_TYPE eCmdType, IMG_BOOL bSGXIdle)
+{
+	if(bSGXIdle)
+	{
+		gpsSysSpecificData->sgx_active_stamp = ktime_get();
+		gpsSysSpecificData->sgx_active_kickcmd = eCmdType;
+
+		hrtimer_cancel(&gpsSysSpecificData->sgx_dvfs_idle_timer);
+		cancel_work_sync(&gpsSysSpecificData->sgx_dvfs_idle_work);
+
+		/* Reassess active frequency according to dvfs active mode */
+		if(sgx_dvfs_active_mode == 0)
+			do_dvfs_active_none();
+		else
+			do_dvfs_active_display_cycle();
+
+		gpsSysSpecificData->dss_kick_is_pending = false;
+	}
+}
+
+IMG_VOID SysDSSReturnFrame(IMG_VOID)
+{
+	gpsSysSpecificData->dss_return_stamp = ktime_get();
+	gpsSysSpecificData->dss_kick_is_pending = gpsSysSpecificData->sgx_is_idle;
+}
+#endif /* SYS_OMAP4_HAS_DVFS_FRAMEWORK */
+
+IMG_VOID SysLockSystemSuspend(IMG_VOID)
+{
+#if defined(CONFIG_HAS_WAKELOCK)
+	wake_lock(&gpsSysSpecificData->wake_lock);
+#endif
+}
+
+IMG_VOID SysUnlockSystemSuspend(IMG_VOID)
+{
+#if defined(CONFIG_HAS_WAKELOCK)
+	wake_unlock(&gpsSysSpecificData->wake_lock);
+#endif
+}
+
+/*****************************************************************************
+ @Function        SysOEMFunction
+
+ @Description     marshalling function for custom OEM functions
+
+ @Input           ui32ID  - function ID
+ @Input           pvIn - in data
+ @Output          pvOut - out data
+
+ @Return        PVRSRV_ERROR
+*****************************************************************************/
 PVRSRV_ERROR SysOEMFunction (	IMG_UINT32	ui32ID,
 								IMG_VOID	*pvIn,
 								IMG_UINT32	ulInSize,
@@ -987,7 +1552,6 @@ PVRSRV_ERROR SysOEMFunction (	IMG_UINT32	ui32ID,
 	if ((ui32ID == OEM_GET_EXT_FUNCS) &&
 		(ulOutSize == sizeof(PVRSRV_DC_OEM_JTABLE)))
 	{
-		
 		PVRSRV_DC_OEM_JTABLE *psOEMJTable = (PVRSRV_DC_OEM_JTABLE*) pvOut;
 		psOEMJTable->pfnOEMBridgeDispatch = &PVRSRV_BridgeDispatchKM;
 		return PVRSRV_OK;
@@ -995,3 +1559,6 @@ PVRSRV_ERROR SysOEMFunction (	IMG_UINT32	ui32ID,
 
 	return PVRSRV_ERROR_INVALID_PARAMS;
 }
+/******************************************************************************
+ End of file (sysconfig.c)
+******************************************************************************/

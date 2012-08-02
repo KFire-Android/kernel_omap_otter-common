@@ -33,13 +33,8 @@ struct pvrsrv_attribute {
 static struct pvrsrv_attribute PVRSRVAttr = {
 	.attr.name = "egl.cfg",
 	.attr.mode = S_IRUGO,
-#if defined(SGX544)
-	.sgx_version = 544,
-	.sgx_revision = 112,
-#else
-	.sgx_version = 540,
-	.sgx_revision = 120,
-#endif
+	.sgx_version = SGXCORE,
+	.sgx_revision = SGX_CORE_REV,
 };
 
 /* sysfs read function */

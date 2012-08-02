@@ -1,6 +1,4 @@
-#!/bin/sh
 ########################################################################### ###
-#@Title         Test the nature of the C compiler.
 #@Copyright     Copyright (c) Imagination Technologies Ltd. All Rights Reserved
 #@License       Dual MIT/GPLv2
 # 
@@ -41,60 +39,22 @@
 #   
 ### ###########################################################################
 
-LANG=C
-export LANG
+SYS_CFLAGS := \
+ -fno-short-enums -D__linux__ \
+ -I$(ANDROID_ROOT)/bionic/libc/arch-$(ANDROID_ARCH)/include \
+ -I$(ANDROID_ROOT)/bionic/libc/include \
+ -I$(ANDROID_ROOT)/bionic/libc/kernel/common \
+ -I$(ANDROID_ROOT)/bionic/libc/kernel/arch-$(ANDROID_ARCH) \
+ -I$(ANDROID_ROOT)/bionic/libm/include \
+ -I$(ANDROID_ROOT)/bionic/libm/include/$(ANDROID_ARCH) \
+ -I$(ANDROID_ROOT)/bionic/libthread_db/include \
+ -I$(ANDROID_ROOT)/frameworks/base/include \
+ -isystem $(ANDROID_ROOT)/system/core/include \
+ -I$(ANDROID_ROOT)/hardware/libhardware/include \
+ -I$(ANDROID_ROOT)/external/openssl/include
 
-usage() {
-	echo "usage: $0 [--64] --cc CC --out OUT [cflag]"
-	exit 1
-}
+SYS_EXE_LDFLAGS := \
+ -Bdynamic -nostdlib -Wl,-dynamic-linker,/system/bin/linker \
+ -lc -ldl -lcutils
 
-# NOTE: The program passed to the compiler is deliberately incorrect
-# (`return;' should be `return 0;') but we do this to emit a warning.
-#
-# Emitting a warning is necessary to get GCC to print out additional
-# warnings about any unsupported -Wno options, so we can handle these
-# as unsupported by the build.
-#
-do_cc() {
-	echo "int main(void){return;}" | $CC -W -Wall $3 -xc -c - -o $1 >$2 2>&1
-}
-
-while [ 1 ]; do
-	if [ "$1" = "--64" ]; then
-		BIT_CHECK=1
-	elif [ "$1" = "--cc" ]; then
-		[ "x$2" = "x" ] && usage
-		CC="$2" && shift
-	elif [ "$1" = "--out" ]; then
-		[ "x$2" = "x" ] && usage
-		OUT="$2" && shift
-	elif [ "${1#--}" != "$1" ]; then
-		usage
-	else
-		break
-	fi
-	shift
-done
-
-[ "x$CC" = "x" ] && usage
-[ "x$OUT" = "x" ] && usage
-ccof=$OUT/cc-sanity-check
-log=${ccof}.log
-
-if [ "x$BIT_CHECK" = "x1" ]; then
-	do_cc $ccof $log ""
-	file $ccof | grep -q 64-bit
-	[ "$?" = "0" ] && echo true || echo false
-else
-	[ "x$1" = "x" ] && usage
-	do_cc $ccof $log $1
-	if [ "$?" = "0" ]; then
-		# compile passed, but was the warning unrecognized?
-		grep -q "^cc1: warning: unrecognized command line option \"$1\"" $log
-		[ "$?" = "1" ] && echo $1
-	fi
-fi
-
-rm -f $ccof $log
-exit 0
+SYS_LIB_LDFLAGS := $(SYS_EXE_LDFLAGS)

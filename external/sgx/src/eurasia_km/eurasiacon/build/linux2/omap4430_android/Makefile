@@ -1,36 +1,44 @@
-#
-# Copyright (C) Imagination Technologies Ltd. All rights reserved.
+########################################################################### ###
+#@Title         Root makefile for omap4430 Android.  Builds everything else.
+#@Copyright     Copyright (c) Imagination Technologies Ltd. All Rights Reserved
+#@License       Dual MIT/GPLv2
 # 
-# This program is free software; you can redistribute it and/or modify it
-# under the terms and conditions of the GNU General Public License,
-# version 2, as published by the Free Software Foundation.
+# The contents of this file are subject to the MIT license as set out below.
 # 
-# This program is distributed in the hope it will be useful but, except 
-# as otherwise stated in writing, without any warranty; without even the 
-# implied warranty of merchantability or fitness for a particular purpose. 
-# See the GNU General Public License for more details.
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 # 
-# You should have received a copy of the GNU General Public License along with
-# this program; if not, write to the Free Software Foundation, Inc.,
-# 51 Franklin St - Fifth Floor, Boston, MA 02110-1301 USA.
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
 # 
-# The full GNU General Public License is included in this distribution in
-# the file called "COPYING".
-#
-# Contact Information:
-# Imagination Technologies Ltd. <gpl-support@imgtec.com>
-# Home Park Estate, Kings Langley, Herts, WD4 8LZ, UK 
+# Alternatively, the contents of this file may be used under the terms of
+# the GNU General Public License Version 2 ("GPL") in which case the provisions
+# of GPL are applicable instead of those above.
 # 
-#
-
-# We don't support building scripts from this build directory.
-#
-ifeq ($(MAKECMDGOALS),)
-MAKECMDGOALS := components kbuild install_script
-endif
-ifneq ($(filter scripts,$(MAKECMDGOALS)),)
-$(error Building $(MAKECMDGOALS) is not supported for this target)
-endif
+# If you wish to allow use of your version of this file only under the terms of
+# GPL, and not to allow others to use your version of this file under the terms
+# of the MIT license, indicate your decision by deleting the provisions above
+# and replace them with the notice and other provisions required by GPL as set
+# out in the file called "GPL-COPYING" included in this distribution. If you do
+# not delete the provisions above, a recipient may use your version of this file
+# under the terms of either the MIT license or GPL.
+# 
+# This License is also included in this distribution in the file called
+# "MIT-COPYING".
+# 
+# EXCEPT AS OTHERWISE STATED IN A NEGOTIATED AGREEMENT: (A) THE SOFTWARE IS
+# PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING
+# BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
+# PURPOSE AND NONINFRINGEMENT; AND (B) IN NO EVENT SHALL THE AUTHORS OR
+# COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+# IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+# CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#   
+### ###########################################################################
 
 TARGET_PRODUCT ?= blaze
 
@@ -40,6 +48,16 @@ ifeq ($(TARGET_SGX),544sc)
 else ifeq ($(TARGET_SGX),540)
  SGXCORE := 540
  SGX_CORE_REV := 120
+else ifeq ($(TARGET_SGX),544)
+ SGXCORE := 544
+ SGX_CORE_REV := 105
+ HAL_VARIANT := omap5
+ SGX_FEATURE_MP := 1
+ SGX_FEATURE_SYSTEM_CACHE := 1
+ SGX_FEATURE_MP_CORE_COUNT := 2
+ # APM is currently causing problems for OMAP5
+ # Remove once this is functional
+ SUPPORT_ACTIVE_POWER_MANAGEMENT := 0
 else
  #default config
  SGXCORE := 540
@@ -49,7 +67,6 @@ export SGXCORE
 export SGX_CORE_REV
 
 SGX_DYNAMIC_TIMING_INFO := 1
-SYS_SGX_ACTIVE_POWER_LATENCY_MS := 2
 
 SUPPORT_LINUX_USING_WORKQUEUES := 1
 
@@ -58,8 +75,6 @@ DISPLAY_CONTROLLER := omaplfb
 PVR_SYSTEM := omap4
 HAL_VARIANT := $(PVR_SYSTEM)
 
-KERNEL_CROSS_COMPILE ?= arm-none-linux-gnueabi-
-
 include ../common/android/paths.mk
 include ../common/android/armv7-a.mk
 include ../common/android/features.mk
@@ -67,7 +82,6 @@ include ../common/android/features.mk
 ifneq ($(strip $(KERNELDIR)),)
  include ../kernel_version.mk
  ifeq ($(call kernel-version-at-least,2,6,35),true)
-  PVR_NO_FULL_CACHE_OPS := 0
   PVR_NO_OMAP_TIMER := 1
  endif
  ifeq ($(call kernel-version-at-least,2,6,39),true)
@@ -100,8 +114,12 @@ SUPPORT_ACTIVE_POWER_MANAGEMENT := 0
 DISPLAY_CONTROLLER := pvrlfb
 DISPLAY_CONTROLLER_COMPONENT := linux_framebuffer
 OMAP_NON_FLIP_DISPLAY := 1
-else
-DISPLAY_CONTROLLER_COMPONENT := omaplfb_linux
+
+# The code for the omaplfb component is now hosted on a
+# different repository. No need to compile this now
+#
+# DISPLAY_CONTROLLER_COMPONENT := dc_omapfb3_linux
+
 endif
 
 ifeq ($(SUPPORT_DRI_DRM),1)
@@ -151,14 +169,6 @@ KERNEL_COMPONENTS += dc_nohw
 endif
 endif
 
-ifeq ($(SUPPORT_RELEASE_PVR_PROC_FS),1)
-CONFIG_PVR_PROC_FS := 1
-endif
-
-ifeq ($(SUPPORT_PVR_PROC_FS_HEAP_ALLOC_DEBUG),1)
-CONFIG_PVR_PROC_FS_HEAP_ALLOC_DEBUG := 1
-endif
-
 include ../config/core.mk
 include ../common/android/extra_config.mk
 include ../common/dridrm.mk
@@ -168,6 +178,15 @@ include ../common/omap4.mk
 # Not all OMAP4 kernels have a compatible DVFS framework
 #
 $(eval $(call TunableKernelConfigC,SYS_OMAP4_HAS_DVFS_FRAMEWORK,))
+ifeq ($(SYS_OMAP4_HAS_DVFS_FRAMEWORK),1)
+$(eval $(call KernelConfigC,SYS_DVFS_IDLE_MODE,1))
+$(eval $(call KernelConfigC,SYS_DVFS_IDLE_TIMEOUT,1))
+$(eval $(call KernelConfigC,SYS_DVFS_ACTIVE_MODE,0))
+$(eval $(call KernelConfigC,SYS_DVFS_ACTIVE_DC_LENGTH,18))
+$(eval $(call KernelConfigC,SYS_DVFS_ACTIVE_DC_DEC_WAIT,3000))
+$(eval $(call KernelConfigC,SYS_DVFS_ACTIVE_DC_DEC_REPS,5))
+$(eval $(call KernelConfigC,SYS_DVFS_ACTIVE_DC_INC_WAIT,2000))
+endif
 
 # If set, services allows two flips to enter the processing queue,
 # and does not add read dependencies to the set of buffers last

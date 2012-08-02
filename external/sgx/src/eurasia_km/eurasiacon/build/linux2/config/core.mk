@@ -1,27 +1,44 @@
-#
-# Copyright (C) Imagination Technologies Ltd. All rights reserved.
+########################################################################### ###
+#@Title         Root build configuration.
+#@Copyright     Copyright (c) Imagination Technologies Ltd. All Rights Reserved
+#@License       Dual MIT/GPLv2
 # 
-# This program is free software; you can redistribute it and/or modify it
-# under the terms and conditions of the GNU General Public License,
-# version 2, as published by the Free Software Foundation.
+# The contents of this file are subject to the MIT license as set out below.
 # 
-# This program is distributed in the hope it will be useful but, except 
-# as otherwise stated in writing, without any warranty; without even the 
-# implied warranty of merchantability or fitness for a particular purpose. 
-# See the GNU General Public License for more details.
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 # 
-# You should have received a copy of the GNU General Public License along with
-# this program; if not, write to the Free Software Foundation, Inc.,
-# 51 Franklin St - Fifth Floor, Boston, MA 02110-1301 USA.
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
 # 
-# The full GNU General Public License is included in this distribution in
-# the file called "COPYING".
-#
-# Contact Information:
-# Imagination Technologies Ltd. <gpl-support@imgtec.com>
-# Home Park Estate, Kings Langley, Herts, WD4 8LZ, UK 
+# Alternatively, the contents of this file may be used under the terms of
+# the GNU General Public License Version 2 ("GPL") in which case the provisions
+# of GPL are applicable instead of those above.
 # 
-#
+# If you wish to allow use of your version of this file only under the terms of
+# GPL, and not to allow others to use your version of this file under the terms
+# of the MIT license, indicate your decision by deleting the provisions above
+# and replace them with the notice and other provisions required by GPL as set
+# out in the file called "GPL-COPYING" included in this distribution. If you do
+# not delete the provisions above, a recipient may use your version of this file
+# under the terms of either the MIT license or GPL.
+# 
+# This License is also included in this distribution in the file called
+# "MIT-COPYING".
+# 
+# EXCEPT AS OTHERWISE STATED IN A NEGOTIATED AGREEMENT: (A) THE SOFTWARE IS
+# PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING
+# BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
+# PURPOSE AND NONINFRINGEMENT; AND (B) IN NO EVENT SHALL THE AUTHORS OR
+# COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+# IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+# CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#   
+### ###########################################################################
 
 # Configuration wrapper for new build system. This file deals with
 # configuration of the build. Add to this file anything that deals
@@ -110,10 +127,6 @@ endef
 
 ############################### END MACROS ##################################
 
-DOS2UNIX := $(shell \
- if [ -z `which fromdos` ]; then echo dos2unix -f -q; else echo fromdos -f -p; fi \
-)
-
 # Check we have a new enough version of GNU make.
 #
 need := 3.81
@@ -166,7 +179,8 @@ $(call directory-must-exist,$(TOP)/eurasiacon/build/linux2/$(PVR_BUILD_DIR))
 BUILD	?= release
 # TI: Added SGX type to binary build location so builds for different GPUs
 #     with the same build directory are put in different places
-OUT ?= $(TOP)/eurasiacon/binary2_$(SGXCORE)_$(SGX_CORE_REV)_$(PVR_BUILD_DIR)_$(BUILD)
+OUT		?= $(TOP)/eurasiacon/binary2_$(SGXCORE)_$(SGX_CORE_REV)_$(PVR_BUILD_DIR)_$(BUILD)
+override OUT := $(if $(filter /%,$(OUT)),$(OUT),$(TOP)/$(OUT))
 
 CONFIG_MK			:= $(OUT)/config.mk
 CONFIG_H			:= $(OUT)/config.h
@@ -337,7 +351,7 @@ $(foreach _o,SYS_CFLAGS SYS_CXXFLAGS SYS_EXE_LDFLAGS SYS_LIB_LDFLAGS SUPPORT_EWS
 # Check for words in EXCLUDED_APIS that aren't understood by the
 # common/apis/*.mk files. This should be kept in sync with all the tests on
 # EXCLUDED_APIS in those files
-_excludable_apis := opencl opengl opengles1 opengles2 openvg ews unittests xorg xorg_unittests
+_excludable_apis := opencl opengl opengles1 opengles2 openvg ews unittests xorg xorg_unittests scripts
 _unrecognised := $(strip $(filter-out $(_excludable_apis),$(EXCLUDED_APIS)))
 ifneq ($(_unrecognised),)
 $(warning *** Unrecognised entries in EXCLUDED_APIS: $(_unrecognised))
@@ -362,6 +376,13 @@ KERNEL_COMPONENTS += dbgdrv
 endif
 endif
 
+ifeq ($(SUPPORT_PVR_REMOTE),1)
+ifneq ($(filter pvr2d,$(COMPONENTS)),)
+COMPONENTS += null_pvr2d_remote
+endif
+COMPONENTS += pvrvncsrv
+endif
+
 # If KERNELDIR is set, write it out to the config.mk, with
 # KERNEL_COMPONENTS and KERNEL_ID
 #
@@ -382,6 +403,17 @@ KERNEL_CROSS_COMPILE ?= $(CROSS_COMPILE)
 $(eval $(call TunableBothConfigMake,KERNEL_CROSS_COMPILE,))
 endif
 
+# Check the KERNELDIR has a kernel built and also check that it is
+# not 64-bit, which we do not support.
+VMLINUX := $(strip $(wildcard $(KERNELDIR)/vmlinux))
+ifneq ($(VMLINUX),)
+VMLINUX_IS_64BIT := $(shell file $(VMLINUX) | grep -q 64-bit || echo false)
+ifneq ($(VMLINUX_IS_64BIT),false)
+$(warning $$(KERNELDIR)/vmlinux is 64-bit, which is not supported. Kbuild may fail.)
+endif
+else
+$(warning $$(KERNELDIR)/vmlinux does not exist. Kbuild may fail.)
+endif
 endif
 
 
@@ -407,7 +439,9 @@ $(eval $(call TunableBothConfigC,USE_SGX_CORE_REV_HEAD,))
 $(eval $(call BothConfigC,TRANSFER_QUEUE,))
 $(eval $(call BothConfigC,PVR_SECURE_HANDLES,))
 
+ifneq ($(DISPLAY_CONTROLLER),)
 $(eval $(call BothConfigC,DISPLAY_CONTROLLER,$(DISPLAY_CONTROLLER)))
+endif
 
 PVR_LINUX_MEM_AREA_POOL_MAX_PAGES ?= 0
 ifneq ($(PVR_LINUX_MEM_AREA_POOL_MAX_PAGES),0)
@@ -437,6 +471,7 @@ $(eval $(call KernelConfigC,DEBUG_LINUX_MMAP_AREAS,))
 $(eval $(call KernelConfigC,DEBUG_BRIDGE_KM,))
 else ifeq ($(BUILD),release)
 $(eval $(call BothConfigC,RELEASE,))
+$(eval $(call TunableBothConfigMake,DEBUGLINK,1))
 else ifeq ($(BUILD),timing)
 $(eval $(call BothConfigC,TIMING,))
 $(eval $(call TunableBothConfigMake,DEBUGLINK,1))
@@ -468,6 +503,7 @@ $(eval $(call TunableBothConfigC,PDUMP,))
 $(eval $(call TunableBothConfigC,NO_HARDWARE,))
 $(eval $(call TunableBothConfigC,PDUMP_DEBUG_OUTFILES,))
 $(eval $(call TunableBothConfigC,PVRSRV_USSE_EDM_STATUS_DEBUG,))
+$(eval $(call TunableBothConfigC,SGX_DISABLE_VISTEST_SUPPORT,))
 $(eval $(call TunableBothConfigC,PVRSRV_RESET_ON_HWTIMEOUT,))
 $(eval $(call TunableBothConfigC,SYS_USING_INTERRUPTS,1))
 $(eval $(call TunableBothConfigC,SUPPORT_EXTERNAL_SYSTEM_CACHE,))
@@ -476,6 +512,8 @@ $(eval $(call TunableBothConfigC,PVRSRV_NEED_PVR_DPF,))
 $(eval $(call TunableBothConfigC,PVRSRV_NEED_PVR_ASSERT,))
 $(eval $(call TunableBothConfigC,PVRSRV_NEED_PVR_TRACE,))
 $(eval $(call TunableBothConfigC,SUPPORT_SECURE_33657_FIX,))
+$(eval $(call TunableBothConfigC,SUPPORT_ION,))
+$(eval $(call TunableBothConfigC,SUPPORT_HWRECOVERY_TRACE_LIMIT,))
 $(eval $(call TunableBothConfigC,SUPPORT_PVRSRV_GET_DC_SYSTEM_BUFFER,1))
 $(eval $(call TunableBothConfigC,SUPPORT_NV12_FROM_2_HWADDRS,))
 
@@ -503,9 +541,15 @@ $(eval $(call TunableKernelConfigC,HYBRID_SHARED_PB_SIZE,))
 $(eval $(call TunableKernelConfigC,SUPPORT_LARGE_GENERAL_HEAP,))
 $(eval $(call TunableKernelConfigC,TTRACE,))
 
+ifeq ($(BUILD),debug)
+$(eval $(call TunableKernelConfigC,CONFIG_PVR_PROC_FS,1))
+else
+$(eval $(call TunableKernelConfigC,CONFIG_PVR_PROC_FS,))
+endif
 
-$(eval $(call TunableBothConfigMake,LDM_PLATFORM,))
-$(eval $(call TunableBothConfigMake,LDM_PCI,))
+$(eval $(call TunableKernelConfigC,CONFIG_PVR_PROC_FS_HEAP_ALLOC_DEBUG,))
+
+$(eval $(call TunableBothConfigMake,SUPPORT_ION,))
 
 
 $(eval $(call TunableBothConfigMake,OPTIM,))
@@ -519,7 +563,7 @@ export INTERNAL_CLOBBER_ONLY
 export TOP
 export OUT
 
-MAKE_ETC := -Rr --no-print-directory -C $(TOP) TOP=$(TOP) \
+MAKE_ETC := -Rr --no-print-directory -C $(TOP) TOP=$(TOP) OUT=$(OUT) \
 	        -f eurasiacon/build/linux2/toplevel.mk
 
 # This must match the default value of MAKECMDGOALS below, and the default
@@ -537,8 +581,8 @@ endif
 autogen:
 ifeq ($(INTERNAL_CLOBBER_ONLY),)
 	@$(MAKE) -s --no-print-directory -C $(EURASIAROOT) \
-		DOS2UNIX="$(DOS2UNIX)" \
-		-f eurasiacon/build/linux2/prepare_tree.mk
+		-f eurasiacon/build/linux2/prepare_tree.mk \
+		LDM_PCI=$(LDM_PCI) LDM_PLATFORM=$(LDM_PLATFORM)
 else
 	@:
 endif

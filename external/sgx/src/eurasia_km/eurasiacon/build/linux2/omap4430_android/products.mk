@@ -1,46 +1,47 @@
-#
-# Copyright (C) Imagination Technologies Ltd. All rights reserved.
+########################################################################### ###
+#@Copyright     Copyright (c) Imagination Technologies Ltd. All Rights Reserved
+#@License       Dual MIT/GPLv2
 # 
-# This program is free software; you can redistribute it and/or modify it
-# under the terms and conditions of the GNU General Public License,
-# version 2, as published by the Free Software Foundation.
+# The contents of this file are subject to the MIT license as set out below.
 # 
-# This program is distributed in the hope it will be useful but, except 
-# as otherwise stated in writing, without any warranty; without even the 
-# implied warranty of merchantability or fitness for a particular purpose. 
-# See the GNU General Public License for more details.
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 # 
-# You should have received a copy of the GNU General Public License along with
-# this program; if not, write to the Free Software Foundation, Inc.,
-# 51 Franklin St - Fifth Floor, Boston, MA 02110-1301 USA.
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
 # 
-# The full GNU General Public License is included in this distribution in
-# the file called "COPYING".
-#
-# Contact Information:
-# Imagination Technologies Ltd. <gpl-support@imgtec.com>
-# Home Park Estate, Kings Langley, Herts, WD4 8LZ, UK 
+# Alternatively, the contents of this file may be used under the terms of
+# the GNU General Public License Version 2 ("GPL") in which case the provisions
+# of GPL are applicable instead of those above.
 # 
-#
+# If you wish to allow use of your version of this file only under the terms of
+# GPL, and not to allow others to use your version of this file under the terms
+# of the MIT license, indicate your decision by deleting the provisions above
+# and replace them with the notice and other provisions required by GPL as set
+# out in the file called "GPL-COPYING" included in this distribution. If you do
+# not delete the provisions above, a recipient may use your version of this file
+# under the terms of either the MIT license or GPL.
+# 
+# This License is also included in this distribution in the file called
+# "MIT-COPYING".
+# 
+# EXCEPT AS OTHERWISE STATED IN A NEGOTIATED AGREEMENT: (A) THE SOFTWARE IS
+# PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING
+# BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
+# PURPOSE AND NONINFRINGEMENT; AND (B) IN NO EVENT SHALL THE AUTHORS OR
+# COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+# IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+# CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#   
+### ###########################################################################
 
-ifeq ($(TARGET_PRODUCT),crespo)
-$(warning *** Building crespo from omap4430_android is deprecated.)
-$(error Use s5pc110_android instead)
-endif
-
-ifneq ($(filter blaze blaze_tablet tuna maguro toro mysid yakju,$(TARGET_PRODUCT)),)
-ifeq ($(SUPPORT_ANDROID_COMPOSITION_BYPASS),1)
-$(error SUPPORT_ANDROID_COMPOSITION_BYPASS=1 is obsolete for this product)
-endif
-#ifeq ($(SUPPORT_ANDROID_OMAP_NV12),1)
-#SUPPORT_NV12_FROM_2_HWADDRS := 1
-#endif
-# These default on in tuna_defconfig
-PVRSRV_USSE_EDM_STATUS_DEBUG := 1
-SGX_DISABLE_VISTEST_SUPPORT := 1
-PVRSRV_DUMP_MK_TRACE := 1
-SUPPORT_SGX_HWPERF := 1
-PVRSRV_NEED_PVR_DPF := 1
-PVRSRV_NEED_PVR_TRACE := 1
-PVRSRV_NEED_PVR_ASSERT := 1
-endif
+PVRSRV_USSE_EDM_STATUS_DEBUG ?= 1
+SGX_DISABLE_VISTEST_SUPPORT ?= 1
+PVRSRV_DUMP_MK_TRACE ?= 1
+PVRSRV_NEED_PVR_DPF ?= 1
+PVRSRV_NEED_PVR_TRACE ?= 1
+PVRSRV_NEED_PVR_ASSERT ?= 1
