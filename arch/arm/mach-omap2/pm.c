@@ -87,8 +87,11 @@ void __init omap_pm_setup_oscillator(u32 tstart, u32 tshut)
  */
 void omap_pm_get_oscillator(u32 *tstart, u32 *tshut)
 {
-	if (!tstart || !tshut)
+	if (!tstart || !tshut) {
+		pr_warn("%s: Invalid argument tstart=%p tshut=%p\n",
+			__func__, tstart, tshut);
 		return;
+	}
 
 	*tstart = oscillator.startup_time;
 	*tshut = oscillator.shutdown_time;
