@@ -74,7 +74,7 @@ bool omap_pm_is_ready_status;
  *
  * NOTE: This API is intended to be invoked from board file
  */
-void omap_pm_setup_oscillator(u32 tstart, u32 tshut)
+void __init omap_pm_setup_oscillator(u32 tstart, u32 tshut)
 {
 	oscillator.startup_time = tstart;
 	oscillator.shutdown_time = tshut;
