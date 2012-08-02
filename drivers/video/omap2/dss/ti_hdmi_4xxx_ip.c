@@ -1842,7 +1842,7 @@ int ti_hdmi_4xxx_audio_config(struct hdmi_ip_data *ip_data,
 		return -EINVAL;
 	}
 
-	err = hdmi_compute_acr(fs_nr, &n, &cts);
+	err = hdmi_compute_acr(fs_nr, (u32 *)&n, (u32 *)&cts);
 
 	/* Audio clock regeneration settings */
 	core.n = n;

@@ -282,6 +282,11 @@ static int hdmi_core_ddc_edid(struct hdmi_ip_data *ip_data,
 
 }
 
+static inline void ctrl_core_hdmi_write_reg(u32 val)
+{
+	__raw_writel(val, (void __iomem *)CONTROL_CORE_PAD0_HDMI_DDC_SCL_PAD1_HDMI_DDC_SDA);
+}
+
 int ti_hdmi_5xxx_read_edid(struct hdmi_ip_data *ip_data,
 				u8 *edid, int len)
 {
@@ -298,12 +303,11 @@ int ti_hdmi_5xxx_read_edid(struct hdmi_ip_data *ip_data,
 		 * - pull-up/down enabled
 		 *   - pull-up selected
 		 */
-		__raw_writel(0x011E011E,
-				CONTROL_CORE_PAD0_HDMI_DDC_SCL_PAD1_HDMI_DDC_SDA);
+		ctrl_core_hdmi_write_reg((u32)0x011E011E);
 		r = panel_hdmi_read_edid(edid, len);
 		/* Use hdmi_ddc_scl and hdmi_ddc_sda for hdcp */
-		__raw_writel(0x01000100,
-				CONTROL_CORE_PAD0_HDMI_DDC_SCL_PAD1_HDMI_DDC_SDA);
+		ctrl_core_hdmi_write_reg((u32)0x01000100);
+
 		return r;
 	} else {
 
