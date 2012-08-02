@@ -194,7 +194,7 @@ static int omap_hdmi_dai_hw_params(struct snd_pcm_substream *substream,
 	return err;
 }
 
-int hdmi_audio_notifier_callback(struct notifier_block *nb,
+static int hdmi_audio_notifier_callback(struct notifier_block *nb,
 			unsigned long arg, void *ptr)
 {
 	enum omap_dss_display_state state = arg;
