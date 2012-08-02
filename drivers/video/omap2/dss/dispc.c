@@ -1985,6 +1985,8 @@ int dispc_ovl_setup(enum omap_plane plane, struct omap_overlay_info *oi,
 
 	outw = oi->out_width == 0 ? oi->width : oi->out_width;
 	outh = oi->out_height == 0 ? oi->height : oi->out_height;
+	if (outw == 0 || outh == 0)
+		return -EINVAL;
 
 	if (ilace && oi->height == outh)
 		fieldmode = 1;
