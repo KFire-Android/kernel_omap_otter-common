@@ -1106,37 +1106,6 @@ static u32 __init _usec_to_val_scrm(unsigned long rate, u32 usec,
 
 }
 
-/*
- * According to the OMAP4470 LPDDR interface configuration
- * update for 466MHz Slew Rate should be set to “FASTEST”
- * and Impedance Control to “Drv12”:
- * - CONTROL_LPDDR2IOx_2[LPDDR2IO1_GR10_SR] = 0
- * - CONTROL_LPDDR2IOx_2[LPDDR2IO1_GR10_I] = 7
- * where x=[1-2]
- */
-static void __init syscontrol_lpddr2io_config_update_466_mhz(void)
-{
-	u32 v;
-
-	pr_info("OMAP4470 LPDDR interface configuration update for 466 MHz\n");
-
-	/* Setup LPDDR2IO1_2 */
-	v = omap4_ctrl_pad_readl(
-		OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_LPDDR2IO1_2);
-	v &= ~OMAP4_LPDDR2IO1_GR10_SR_MASK;
-	v |= OMAP4_LPDDR2IO1_GR10_I_MASK;
-	omap4_ctrl_pad_writel(v,
-		OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_LPDDR2IO1_2);
-
-	/* Setup LPDDR2IO2_2 */
-	v = omap4_ctrl_pad_readl(
-		OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_LPDDR2IO2_2);
-	v &= ~OMAP4_LPDDR2IO2_GR10_SR_MASK;
-	v |= OMAP4_LPDDR2IO2_GR10_I_MASK;
-	omap4_ctrl_pad_writel(v,
-		OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_LPDDR2IO2_2);
-}
-
 static void __init syscontrol_setup_regs(void)
 {
 	u32 v;
@@ -1155,9 +1124,6 @@ static void __init syscontrol_setup_regs(void)
 		OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_LPDDR2IO2_3);
 
 	syscontrol_lpddr_clk_io_errata(true);
-
-	if (cpu_is_omap447x())
-		syscontrol_lpddr2io_config_update_466_mhz();
 }
 
 static void __init prcm_setup_regs(void)

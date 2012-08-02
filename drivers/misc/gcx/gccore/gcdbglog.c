@@ -80,6 +80,9 @@
 /* Maximum length of a dump string. */
 #define GC_MAXSTR_LENGTH	256
 
+/* Print buffers like C arrays. */
+#define GC_C_BUFFER		0
+
 
 /*******************************************************************************
  * Miscellaneous macros.
@@ -484,6 +487,9 @@ static void gc_print_command(struct seq_file *s, struct itembuffer *item,
 	datacount = (item->datasize + 3) / 4;
 	data32 = (unsigned int *) data;
 	for (i = 0; i < datacount;) {
+#if GC_C_BUFFER
+		GC_PRINTK(s, "%s\t0x%08X,\n", buffer, data32[i++]);
+#else
 		command = (data32[i] >> 27) & 0x1F;
 
 		switch (command) {
@@ -596,6 +602,7 @@ static void gc_print_command(struct seq_file *s, struct itembuffer *item,
 				  data32[i]);
 			i += 2;
 		}
+#endif
 	}
 }
 

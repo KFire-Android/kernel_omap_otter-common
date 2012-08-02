@@ -141,12 +141,16 @@ struct gcqueue {
 	struct gcmoterminator *gcmoterminator;
 
 	/* GPU running state. */
-	bool stopped;
+	struct completion stopped;
 
 	/* Command buffer thread and thread control completions. */
 	struct task_struct *cmdthread;
 	struct completion ready;
 	struct completion stop;
+	struct completion sleep;
+
+	/* Suspend request flag. */
+	bool suspend;
 
 	/* Stall completion; used to imitate synchronous behaviour. */
 	struct completion stall;
@@ -158,12 +162,9 @@ struct gcqueue {
 	/* Command buffer currently being worked on. */
 	struct list_head cmdbufhead;
 
-	/* Queue of entries scheduled to be executed (gccmdbuf). */
-	struct list_head schedule;
-	GCLOCK_TYPE schedulelock;
-
 	/* Queue of entries being executed (gccmdbuf). */
 	struct list_head queue;
+	GCLOCK_TYPE queuelock;
 
 	/* Cache of vacant event entries (gcevent). */
 	struct list_head vacevents;
@@ -213,11 +214,18 @@ enum gcerror gcqueue_execute(struct gccorecontext *gccorecontext,
 
 enum gcerror gcqueue_alloc_event(struct gcqueue *gcqueue,
 				 struct gcevent **gcevent);
+enum gcerror gcqueue_free_event(struct gcqueue *gcqueue,
+				struct gcevent *gcevent);
+
 enum gcerror gcqueue_alloc_cmdbuf(struct gcqueue *gcqueue,
 				  struct gccmdbuf **gccmdbuf);
-void gcqueue_free_cmdbuf(struct gcqueue *gcqueue, struct gccmdbuf *gccmdbuf);
+void gcqueue_free_cmdbuf(struct gcqueue *gcqueue,
+			 struct gccmdbuf *gccmdbuf,
+			 unsigned int *flags);
 
 enum gcerror gcqueue_alloc_int(struct gcqueue *gcqueue,
 			       unsigned int *interrupt);
+
+enum gcerror gcqueue_wait_idle(struct gccorecontext *gccorecontext);
 
 #endif

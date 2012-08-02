@@ -66,7 +66,6 @@ struct gccorecontext {
 	/* Power mode flags. */
 	bool clockenabled;
 	bool pulseskipping;
-	bool forceoff;
 
 	/* MMU and command buffer managers. */
 	struct gcmmu gcmmu;
@@ -77,6 +76,7 @@ struct gccorecontext {
 	struct list_head mmuctxvac;
 	GCLOCK_TYPE mmucontextlock;
 
+	/* Device frequency scaling. */
 	int opp_count;
 	unsigned long *opp_freqs;
 	unsigned long  cur_freq;

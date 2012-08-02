@@ -5080,6 +5080,47 @@ struct gcregsrcrotationheight {
 #define   GCREG_ROT_ANGLE_MASK_DST_MIRROR_ENABLED                            0x0
 #define   GCREG_ROT_ANGLE_MASK_DST_MIRROR_MASKED                             0x1
 
+struct gcregrotangle {
+	/* gcregRotAngleRegAddrs:GCREG_ROT_ANGLE_SRC */
+	unsigned int src:3;
+
+	/* gcregRotAngleRegAddrs:GCREG_ROT_ANGLE_DST */
+	unsigned int dst:3;
+
+	/* gcregRotAngleRegAddrs:reserved */
+	unsigned int _reserved_6_7:2;
+
+	/* gcregRotAngleRegAddrs:GCREG_ROT_ANGLE_MASK_SRC */
+	unsigned int src_mask:1;
+
+	/* gcregRotAngleRegAddrs:GCREG_ROT_ANGLE_MASK_DST */
+	unsigned int dst_mask:1;
+
+	/* gcregRotAngleRegAddrs:reserved */
+	unsigned int _reserved_10_11:2;
+
+	/* gcregRotAngleRegAddrs:GCREG_ROT_ANGLE_SRC_MIRROR */
+	unsigned int src_mirror:2;
+
+	/* gcregRotAngleRegAddrs:reserved */
+	unsigned int _reserved_14:1;
+
+	/* gcregRotAngleRegAddrs:GCREG_ROT_ANGLE_MASK_SRC_MIRROR */
+	unsigned int src_mirror_mask:1;
+
+	/* gcregRotAngleRegAddrs:GCREG_ROT_ANGLE_DST_MIRROR */
+	unsigned int dst_mirror:2;
+
+	/* gcregRotAngleRegAddrs:reserved */
+	unsigned int _reserved_18:1;
+
+	/* gcregRotAngleRegAddrs:GCREG_ROT_ANGLE_MASK_DST_MIRROR */
+	unsigned int dst_mirror_mask:1;
+
+	/* gcregRotAngleRegAddrs:reserved */
+	unsigned int _reserved_20_31:12;
+};
+
 /*******************************************************************************
 ** State gcregClearPixelValue32
 */
@@ -8335,33 +8376,6 @@ struct gcmommuflush {
 };
 
 /*******************************************************************************
-** Modular operations: clip
-*/
-
-static const struct gccmdldstate gcmoclip_lt_ldst =
-	GCLDSTATE(gcregClipTopLeftRegAddrs, 2);
-
-struct gcmoclip {
-	/* gcregClipTopLeftRegAddrs */
-	struct gccmdldstate lt_ldst;
-
-		/* gcregClipTopLeftRegAddrs */
-		union {
-			struct gcregcliplt reg;
-			unsigned int raw;
-		} lt;
-
-		/* gcregClipBottomRight */
-		union {
-			struct gcregcliprb reg;
-			unsigned int raw;
-		} rb;
-
-		/* Alignment filler. */
-		unsigned int _filler;
-};
-
-/*******************************************************************************
 ** Modular operations: dst
 */
 
@@ -8370,6 +8384,9 @@ static const struct gccmdldstate gcmodst_address_ldst =
 
 static const struct gccmdldstate gcmodst_rotationheight_ldst =
 	GCLDSTATE(gcregDstRotationHeightRegAddrs, 1);
+
+static const struct gccmdldstate gcmodst_clip_ldst =
+	GCLDSTATE(gcregClipTopLeftRegAddrs, 2);
 
 struct gcmodst {
 	/* gcregDestAddressRegAddrs */
@@ -8395,6 +8412,24 @@ struct gcmodst {
 			struct gcregdstrotationheight reg;
 			unsigned int raw;
 		} rotationheight;
+
+	/* gcregClipTopLeftRegAddrs */
+	struct gccmdldstate clip_ldst;
+
+		/* gcregClipTopLeftRegAddrs */
+		union {
+			struct gcregcliplt reg;
+			unsigned int raw;
+		} cliplt;
+
+		/* gcregClipBottomRight */
+		union {
+			struct gcregcliprb reg;
+			unsigned int raw;
+		} cliprb;
+
+		/* Alignment filler. */
+		unsigned int _filler;
 };
 
 /*******************************************************************************
@@ -8476,6 +8511,13 @@ static const struct gccmdldstate gcmosrc_rotationheight_ldst[4] = {
 	GCLDSTATE(gcregBlock4SrcRotationHeightRegAddrs + 1, 1),
 	GCLDSTATE(gcregBlock4SrcRotationHeightRegAddrs + 2, 1),
 	GCLDSTATE(gcregBlock4SrcRotationHeightRegAddrs + 3, 1),
+};
+
+static const struct gccmdldstate gcmosrc_rotationangle_ldst[4] = {
+	GCLDSTATE(gcregBlock4RotAngleRegAddrs + 0, 1),
+	GCLDSTATE(gcregBlock4RotAngleRegAddrs + 1, 1),
+	GCLDSTATE(gcregBlock4RotAngleRegAddrs + 2, 1),
+	GCLDSTATE(gcregBlock4RotAngleRegAddrs + 3, 1),
 };
 
 static const struct gccmdldstate gcmosrc_rop_ldst[4] = {
@@ -8578,6 +8620,15 @@ struct gcmosrc {
 			unsigned int raw;
 		} rotationheight;
 
+	/* gcregBlock4RotAngleRegAddrs */
+	struct gccmdldstate rotationangle_ldst;
+
+		/* gcregBlock4RotAngleRegAddrs */
+		union {
+			struct gcregrotangle reg;
+			unsigned int raw;
+		} rotationangle;
+
 	/* gcregBlock4RopRegAddrs */
 	struct gccmdldstate rop_ldst;
 
@@ -8654,42 +8705,36 @@ struct gcmosrcalpha {
 };
 
 /*******************************************************************************
-** Modular operations: multisrc
+** Modular operations: bltconfig
 */
 
-static const struct gccmdldstate gcmomultisrc_control_ldst =
+static const struct gccmdldstate gcmobltconfig_multisource_ldst =
 	GCLDSTATE(gcregDEMultiSourceRegAddrs, 1);
 
-struct gcmomultisrc {
+static const struct gccmdldstate gcmobltconfig_dstconfig_ldst =
+	GCLDSTATE(gcregDestConfigRegAddrs, 1);
+
+static const struct gccmdldstate gcmobltconfig_rop_ldst =
+	GCLDSTATE(gcregRopRegAddrs, 1);
+
+struct gcmobltconfig {
 	/* gcregDEMultiSourceRegAddrs */
-	struct gccmdldstate control_ldst;
+	struct gccmdldstate multisource_ldst;
 
 		/* gcregDEMultiSourceRegAddrs */
 		union {
 			struct gcregmultisource reg;
 			unsigned int raw;
-		} control;
-};
+		} multisource;
 
-/*******************************************************************************
-** Modular operations: startde
-*/
-
-static const struct gccmdldstate gcmostart_config_ldst =
-	GCLDSTATE(gcregDestConfigRegAddrs, 1);
-
-static const struct gccmdldstate gcmostart_rop_ldst =
-	GCLDSTATE(gcregRopRegAddrs, 1);
-
-struct gcmostart {
 	/* gcregDestConfigRegAddrs */
-	struct gccmdldstate config_ldst;
+	struct gccmdldstate dstconfig_ldst;
 
 		/* gcregDestConfigRegAddrs */
 		union {
 			struct gcregdstconfig reg;
 			unsigned int raw;
-		} config;
+		} dstconfig;
 
 	/* gcregRopRegAddrs */
 	struct gccmdldstate rop_ldst;
@@ -8699,7 +8744,13 @@ struct gcmostart {
 			struct gcregrop reg;
 			unsigned int raw;
 		} rop;
+};
 
+/*******************************************************************************
+** Modular operations: startde
+*/
+
+struct gcmostart {
 	/* Start DE command. */
 	struct gccmdstartde startde;
 	struct gccmdstartderect rect;
@@ -8713,7 +8764,7 @@ static const struct gccmdldstate gcmofillsrc_rotation_ldst =
 	GCLDSTATE(gcregSrcRotationConfigRegAddrs, 2);
 
 static const struct gccmdldstate gcmofillsrc_rotationheight_ldst =
-	GCLDSTATE(gcregSrcRotationHeightRegAddrs, 1);
+	GCLDSTATE(gcregSrcRotationHeightRegAddrs, 2);
 
 static const struct gccmdldstate gcmofillsrc_alphacontrol_ldst =
 	GCLDSTATE(gcregAlphaControlRegAddrs, 1);
@@ -8735,7 +8786,7 @@ struct gcmofillsrc {
 		} config;
 
 		/* Alignment filler. */
-		unsigned int _filler;
+		unsigned int _filler1;
 
 	/* gcregSrcRotationHeightRegAddrs */
 	struct gccmdldstate rotationheight_ldst;
@@ -8745,6 +8796,15 @@ struct gcmofillsrc {
 			struct gcregsrcrotationheight reg;
 			unsigned int raw;
 		} rotationheight;
+
+		/* gcregRotAngleRegAddrs */
+		union {
+			struct gcregrotangle reg;
+			unsigned int raw;
+		} rotationangle;
+
+		/* Alignment filler. */
+		unsigned int _filler2;
 
 	/* gcregAlphaControlRegAddrs */
 	struct gccmdldstate alphacontrol_ldst;
@@ -8763,6 +8823,12 @@ struct gcmofillsrc {
 static const struct gccmdldstate gcmofill_clearcolor_ldst =
 	GCLDSTATE(gcregClearPixelValue32RegAddrs, 1);
 
+static const struct gccmdldstate gcmofill_dstconfig_ldst =
+	GCLDSTATE(gcregDestConfigRegAddrs, 1);
+
+static const struct gccmdldstate gcmofill_rop_ldst =
+	GCLDSTATE(gcregRopRegAddrs, 1);
+
 struct gcmofill {
 	struct gcmofillsrc src;
 
@@ -8775,7 +8841,27 @@ struct gcmofill {
 			unsigned int raw;
 		} clearcolor;
 
-	struct gcmostart start;
+	/* gcregDestConfigRegAddrs */
+	struct gccmdldstate dstconfig_ldst;
+
+		/* gcregDestConfigRegAddrs */
+		union {
+			struct gcregdstconfig reg;
+			unsigned int raw;
+		} dstconfig;
+
+	/* gcregRopRegAddrs */
+	struct gccmdldstate rop_ldst;
+
+		/* gcregRopRegAddrs */
+		union {
+			struct gcregrop reg;
+			unsigned int raw;
+		} rop;
+
+	/* Start DE command. */
+	struct gccmdstartde startde;
+	struct gccmdstartderect rect;
 };
 
 #endif

@@ -25,4 +25,7 @@ void gc_commit(struct gccommit *gccommit, bool fromuser);
 void gc_map(struct gcmap *gcmap, bool fromuser);
 void gc_unmap(struct gcmap *gcmap, bool fromuser);
 
+/* Process cleanup. */
+void gc_release(void);
+
 #endif

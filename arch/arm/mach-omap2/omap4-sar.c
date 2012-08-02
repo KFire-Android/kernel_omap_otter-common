@@ -1322,7 +1322,8 @@ void omap4_sar_overwrite(void)
 	__raw_writel(val, sar_ram_base + SAR_BANK1_OFFSET + 0x100);
 	/* CM1 CM_SHADOW_FREQ_CONFIG1, Enable FREQ UPDATE */
 	val = __raw_readl(OMAP4430_CM_SHADOW_FREQ_CONFIG1);
-	val |= 1 << OMAP4430_FREQ_UPDATE_SHIFT;
+	val |= (1 << OMAP4430_FREQ_UPDATE_SHIFT) |
+		(1 << OMAP4430_DLL_RESET_SHIFT);
 	val &= ~OMAP4430_DLL_OVERRIDE_MASK;
 	__raw_writel(val, sar_ram_base + SAR_BANK1_OFFSET + 0x104);
 	/* CM2 MEMIF_CLKTRCTRL = HW_AUTO, after FREQ UPDATE */
