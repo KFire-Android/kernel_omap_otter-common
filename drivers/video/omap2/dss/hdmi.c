@@ -404,8 +404,20 @@ static int hdmi_power_on(struct omap_dss_device *dssdev)
 		dssdev->panel.timings.y_res);
 
 	if (!hdmi.custom_set) {
-		struct fb_videomode vesa_vga = vesa_modes[4];
-		hdmi_set_timings(&vesa_vga, false);
+		struct fb_videomode fb_mode = vesa_modes[4];
+		if ((hdmi.ip_data.cfg.cm.code != 4) &&
+			(hdmi.ip_data.cfg.cm.mode != HDMI_DVI)) {
+			if (hdmi.ip_data.cfg.cm.mode == HDMI_DVI)
+				fb_mode = vesa_modes[hdmi.ip_data.cfg.cm.code];
+			else
+				fb_mode = cea_modes[hdmi.ip_data.cfg.cm.code];
+		}
+		if (!hdmi_set_timings(&fb_mode, false)) {
+			/* Fallback in case we cannot set the timings */
+			DSSERR("fallback to vesa default code");
+			fb_mode = vesa_modes[4];
+			hdmi_set_timings(&fb_mode, false);
+		}
 	}
 
 	omapfb_fb2dss_timings(&hdmi.ip_data.cfg.timings,
