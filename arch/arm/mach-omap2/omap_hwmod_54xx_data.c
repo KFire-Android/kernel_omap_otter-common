@@ -2656,6 +2656,13 @@ static struct omap_hwmod omap54xx_gpu_hwmod = {
 	.slaves_cnt	= ARRAY_SIZE(omap54xx_gpu_slaves),
 	.masters	= omap54xx_gpu_masters,
 	.masters_cnt	= ARRAY_SIZE(omap54xx_gpu_masters),
+	/* Workaround for COBRA-1.0BUG00160 where the SGX
+	 * initiator and target module asserts MStandby during wakeup
+	 * phase, with a few de-assertions before finally releasing
+	 * the MStandby signal. This leads to eventual crashes as
+	 * the SGX tried to access L3 to EMIF.
+	*/
+	.flags		= HWMOD_SWSUP_SIDLE | HWMOD_SWSUP_MSTANDBY,
 };
 
 /*
