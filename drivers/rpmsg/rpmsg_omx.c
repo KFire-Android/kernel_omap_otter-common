@@ -683,8 +683,26 @@ static int rpmsg_omx_probe(struct rpmsg_channel *rpdev)
 	int ret, major, minor;
 	struct rpmsg_omx_service *omxserv = NULL, *tmp;
 
+	/* look for an already created omx service */
+	spin_lock(&rpmsg_omx_services_lock);
+	list_for_each_entry(tmp, &rpmsg_omx_services_list, next) {
+		if (!strcmp(dev_name(tmp->dev), rpdev->id.name)) {
+			omxserv = tmp;
+			break;
+		}
+	}
+	spin_unlock(&rpmsg_omx_services_lock);
+	if (omxserv)
+		goto serv_up;
+
 	if (!idr_pre_get(&rpmsg_omx_services, GFP_KERNEL)) {
 		dev_err(&rpdev->dev, "idr_pre_get failes\n");
+		return -ENOMEM;
+	}
+
+	omxserv = kzalloc(sizeof(*omxserv), GFP_KERNEL);
+	if (!omxserv) {
+		dev_err(&rpdev->dev, "kzalloc failed\n");
 		return -ENOMEM;
 	}
 
@@ -694,31 +712,10 @@ static int rpmsg_omx_probe(struct rpmsg_channel *rpdev)
 	if (ret) {
 		spin_unlock(&rpmsg_omx_services_lock);
 		dev_err(&rpdev->dev, "failed to idr_get_new: %d\n", ret);
-		return ret;
-	}
-
-	/* look for an already created omx service */
-	list_for_each_entry(tmp, &rpmsg_omx_services_list, next) {
-		if (tmp->minor == minor) {
-			omxserv = tmp;
-			idr_replace(&rpmsg_omx_services, omxserv, minor);
-			break;
-		}
+		goto free_omx;
 	}
 	spin_unlock(&rpmsg_omx_services_lock);
-	if (omxserv)
-		goto serv_up;
 
-	omxserv = kzalloc(sizeof(*omxserv), GFP_KERNEL);
-	if (!omxserv) {
-		dev_err(&rpdev->dev, "kzalloc failed\n");
-		ret = -ENOMEM;
-		goto rem_idr;
-	}
-
-	spin_lock(&rpmsg_omx_services_lock);
-	idr_replace(&rpmsg_omx_services, omxserv, minor);
-	spin_unlock(&rpmsg_omx_services_lock);
 	INIT_LIST_HEAD(&omxserv->list);
 	mutex_init(&omxserv->lock);
 	init_completion(&omxserv->comp);
@@ -732,7 +729,7 @@ static int rpmsg_omx_probe(struct rpmsg_channel *rpdev)
 	ret = cdev_add(&omxserv->cdev, MKDEV(major, minor), 1);
 	if (ret) {
 		dev_err(&rpdev->dev, "cdev_add failed: %d\n", ret);
-		goto free_omx;
+		goto rem_idr;
 	}
 
 	omxserv->dev = device_create(rpmsg_omx_class, &rpdev->dev,
@@ -743,9 +740,9 @@ static int rpmsg_omx_probe(struct rpmsg_channel *rpdev)
 		dev_err(&rpdev->dev, "device_create failed: %d\n", ret);
 		goto clean_cdev;
 	}
+	omxserv->minor = minor;
 serv_up:
 	omxserv->rpdev = rpdev;
-	omxserv->minor = minor;
 	omxserv->state = OMX_SERVICE_UP;
 	dev_set_drvdata(&rpdev->dev, omxserv);
 	complete_all(&omxserv->comp);
@@ -756,12 +753,12 @@ serv_up:
 
 clean_cdev:
 	cdev_del(&omxserv->cdev);
-free_omx:
-	kfree(omxserv);
 rem_idr:
 	spin_lock(&rpmsg_omx_services_lock);
 	idr_remove(&rpmsg_omx_services, minor);
 	spin_unlock(&rpmsg_omx_services_lock);
+free_omx:
+	kfree(omxserv);
 	return ret;
 }
 
@@ -774,16 +771,15 @@ static void __devexit rpmsg_omx_remove(struct rpmsg_channel *rpdev)
 
 	dev_info(omxserv->dev, "rpmsg omx driver is removed\n");
 
-	spin_lock(&rpmsg_omx_services_lock);
-	idr_remove(&rpmsg_omx_services, omxserv->minor);
-	spin_unlock(&rpmsg_omx_services_lock);
-
 	mutex_lock(&omxserv->lock);
 	if (rproc->state != RPROC_CRASHED) {
 		device_destroy(rpmsg_omx_class, MKDEV(major, omxserv->minor));
 		cdev_del(&omxserv->cdev);
 		list_del(&omxserv->next);
 		mutex_unlock(&omxserv->lock);
+		spin_lock(&rpmsg_omx_services_lock);
+		idr_remove(&rpmsg_omx_services, omxserv->minor);
+		spin_unlock(&rpmsg_omx_services_lock);
 		kfree(omxserv);
 		return;
 	}
