@@ -58,60 +58,57 @@ static int __init omap5evm_modem_switch(int new_state)
 	return modem_pwrrst_ca;
 }
 
-static void __init omap5evm_modem_pad_conf(void)
+static void __init omap5evm_modem_pad_conf_enable(void)
 {
 	/*
-	 * HSI pad conf: hsi2_ca/ac_wake/flag/data/ready
-	 * Also configure gpio_66, input from modem
+	 * Modem pad conf:
+	 * UART pads are already configured by serial driver
+	 * HSI pads are already configured by HSI driver
+	 * I2S pads are already configured by audio soc driver
 	 */
 
-	pr_info("Update PADs for modem connection\n");
+	pr_info("%s: Configure PADs for modem connection\n", __func__);
 
-	omap_mux_init_signal("hsi2_cawake", \
+	/* GPIO_MOD_RESOUT2 */
+	/* This pad should be wakeup capable to detect a modem reboot */
+	/* Note: The WAKEUPENABLE bit might be overwritten by the GPIO driver */
+	omap_mux_init_signal("hsi1_acwake.gpio3_66", \
 		OMAP_PIN_INPUT_PULLDOWN | \
 		OMAP_PIN_OFF_NONE | \
 		OMAP_PIN_OFF_WAKEUPENABLE);
 
-	omap_mux_init_signal("hsi2_caflag", \
-		OMAP_PIN_INPUT | \
-		OMAP_PIN_OFF_NONE);
+	/* GPIO_MOD_PWR_STATUS */
+	omap_mux_init_signal("hsi1_acflag.gpio3_68", \
+			OMAP_PIN_INPUT_PULLDOWN | \
+			OMAP_PIN_OFF_NONE);
 
-	omap_mux_init_signal("hsi2_cadata", \
-		OMAP_PIN_INPUT_PULLDOWN | \
-		OMAP_PIN_OFF_NONE);
+	/* GPIO_MOD_ON (ONSWC) */
+	omap_mux_init_signal("hsi1_caflag.gpio3_70", \
+			OMAP_PIN_OUTPUT | \
+			OMAP_PIN_OFF_NONE);
+}
 
-	omap_mux_init_signal("hsi2_acready", \
-		OMAP_PIN_OUTPUT | \
-		OMAP_PIN_OFF_OUTPUT_LOW);
+static void __init omap5evm_modem_pad_conf_disable(void)
+{
+	/*
+	 * Modem pad conf:
+	 * UART pads are already configured by serial driver
+	 * HSI pads are already configured by HSI driver
+	 * I2S pads are already configured by audio soc driver
+	 */
 
-	omap_mux_init_signal("hsi2_acwake", \
-		OMAP_PIN_OUTPUT | \
-		OMAP_PIN_OFF_NONE);
+	pr_info("%s: Configure PADs for modem in SafeMode\n", __func__);
 
-	omap_mux_init_signal("hsi2_acdata", \
-		OMAP_PIN_OUTPUT | \
-		OMAP_PIN_OFF_NONE);
+	/* GPIO_MOD_RESOUT2 */
+	/* This pad should be wakeup capable to detect a modem reboot */
+	/* Note: The WAKEUPENABLE bit might be overwritten by the GPIO driver */
+	omap_mux_init_signal("hsi1_acwake.safe_mode", OMAP_PULL_ENA);
 
-	omap_mux_init_signal("hsi2_acflag", \
-		OMAP_PIN_OUTPUT | \
-		OMAP_PIN_OFF_NONE);
+	/* GPIO_MOD_PWR_STATUS */
+	omap_mux_init_signal("hsi1_acflag.safe_mode", OMAP_PULL_ENA);
 
-	omap_mux_init_signal("hsi2_caready", \
-		OMAP_PIN_INPUT | \
-		OMAP_PIN_OFF_NONE);
-
-	omap_mux_init_signal("gpio3_66", \
-		OMAP_PIN_INPUT_PULLDOWN | \
-		OMAP_PIN_OFF_NONE | \
-		OMAP_PIN_OFF_WAKEUPENABLE);
-
-	omap_mux_init_signal("uart1_rx", \
-		OMAP_PIN_INPUT | \
-		OMAP_PIN_OFF_NONE);
-
-	omap_mux_init_signal("uart1_tx", \
-		OMAP_PIN_OUTPUT | \
-		OMAP_PIN_OFF_NONE);
+	/* GPIO_MOD_ON (ONSWC) */
+	omap_mux_init_signal("hsi1_caflag.safe_mode", OMAP_PULL_ENA);
 }
 
 /*
@@ -121,11 +118,9 @@ void __init omap5evm_modem_init(bool force_mux)
 {
 	int modem_enabled, status;
 
-	/* Prepare MDM_STATE to get modem status */
-	omap_mux_init_signal("gpio3_68", \
-			OMAP_PIN_INPUT_PULLDOWN | \
-			OMAP_PIN_OFF_NONE);
+	omap5evm_modem_pad_conf_enable();
 
+	/* Prepare MDM_STATE to get modem status */
 	if (unlikely(!gpio_is_valid(OMAP5_GPIO_MDM_PWRSTATE) ||
 		     gpio_request(OMAP5_GPIO_MDM_PWRSTATE, "MODEM POWER STATE")
 		     < 0)) {
@@ -137,11 +132,6 @@ void __init omap5evm_modem_init(bool force_mux)
 
 	if (unlikely(gpio_get_value(OMAP5_GPIO_MDM_PWRSTATE)))
 		pr_warn("%s: Modem MOD_PWR_STATUS is already ON\n", __func__);
-
-	/* Prepare MDM_ONSWC to control modem state */
-	omap_mux_init_signal("gpio3_70", \
-			OMAP_PIN_OUTPUT | \
-			OMAP_PIN_OFF_NONE);
 
 	/* Enable Modem ONSWC */
 	if (unlikely(!gpio_is_valid(OMAP5_GPIO_MDM_ONSWC) ||
@@ -163,11 +153,12 @@ void __init omap5evm_modem_init(bool force_mux)
 err_onswc:
 	gpio_free(OMAP5_GPIO_MDM_PWRSTATE);
 err_pwrstate:
-	/* Configure OMAP5 pad for HSI if modem detected */
-	if (modem_detected || force_mux) {
-		/* Setup HSI pad conf for blaze platform */
-		omap5evm_modem_pad_conf();
+	/* Disable GPIO padconf if there is no modem connected */
+	if (!modem_detected)
+		omap5evm_modem_pad_conf_disable();
 
+	if (modem_detected || force_mux) {
+		/* Load HSI driver for platform */
 		status = omap_hsi_dev_init();
 		if (status < 0)
 			pr_err("%s: hsi device registration failed: %d\n",

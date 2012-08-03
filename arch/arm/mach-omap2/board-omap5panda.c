@@ -700,20 +700,6 @@ static struct omap_dss_device omap5_panda_dvi_device = {
 	.channel		= OMAP_DSS_CHANNEL_LCD2,
 };
 
-static int __init omap5_panda_dvi_init(void)
-{
-	int r = 0;
-
-	/* Requesting TFP410 DVI GPIO and disabling it, at bootup */
-	r = gpio_request_one(omap5_panda_dvi_device.reset_gpio,
-				GPIOF_OUT_INIT_LOW, "DVI PD");
-	if (r)
-		pr_err("Failed to get DVI powerdown GPIO\n");
-
-	return r;
-}
-
-
 static struct omap_dss_hdmi_data omap5panda_hdmi_data = {
         .hpd_gpio = HDMI_GPIO_HPD,
 	.ct_cp_hpd_gpio = HDMI_GPIO_CT_CP_HPD,
