@@ -168,18 +168,21 @@ static void _update_logic_membank_counters(struct powerdomain *pwrdm)
 	int i;
 	u8 prev_logic_pwrst, prev_mem_pwrst;
 
+	/*
+	 * All powerdomains have logic status bit. Read
+	 * logic status bit directly. Checking for
+	 * supported logic states in pwrdm->pwrsts_logic_ret
+	 * is unnecessary.
+	 */
 	prev_logic_pwrst = pwrdm_read_prev_logic_pwrst(pwrdm);
 
-	/* Fake logic off counter */
-	if ((pwrdm->pwrsts_logic_ret == PWRSTS_OFF_RET) &&
-		(prev_logic_pwrst == PWRDM_POWER_OFF))
+	if (prev_logic_pwrst == PWRDM_POWER_OFF)
 		pwrdm->ret_logic_off_counter++;
 
 	for (i = 0; i < pwrdm->banks; i++) {
 		prev_mem_pwrst = pwrdm_read_prev_mem_pwrst(pwrdm, i);
 
-		if ((pwrdm->pwrsts_mem_ret[i] == PWRSTS_OFF_RET) &&
-		    (prev_mem_pwrst == PWRDM_POWER_OFF))
+		if (prev_mem_pwrst == PWRDM_POWER_OFF)
 			pwrdm->ret_mem_off_counter[i]++;
 	}
 }
