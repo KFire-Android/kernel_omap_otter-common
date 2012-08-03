@@ -54,4 +54,6 @@ struct rpres {
 struct rpres *rpres_get(const char *);
 void rpres_put(struct rpres *);
 int rpres_set_constraints(struct rpres *, enum rpres_constraint type, long val);
+unsigned long rpres_get_max_freq(struct rpres *obj);
+
 #endif /* _PLAT_OMAP_RPRES_H */
