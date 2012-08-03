@@ -46,33 +46,99 @@ int (*omap_pm_suspend)(void);
  * struct omap2_oscillator - Describe the board main oscillator latencies
  * @startup_time: oscillator startup latency
  * @shutdown_time: oscillator shutdown latency
+ * @voltage_setup_time: oscillator voltage setup time
+ * @voltage_shutdown_time: oscillator voltage shutdown time
+ *
+ * This information tends to be specific to every board, because boards
+ * can contain different types of main oscillators.
  */
 struct omap2_oscillator {
 	u32 startup_time;
 	u32 shutdown_time;
+	u32 voltage_setup_time;
+	u32 voltage_shutdown_time;
 };
 
 static struct omap2_oscillator oscillator = {
 	.startup_time = ULONG_MAX,
 	.shutdown_time = ULONG_MAX,
+	/* by default, not expected to have a ramp delay unless specific boards
+	 * have variances in implementation */
+	.voltage_setup_time = 0,
+	.voltage_shutdown_time = 0,
 };
 
 bool omap_pm_is_ready_status;
 
-void omap_pm_setup_oscillator(u32 tstart, u32 tshut)
+/**
+ * omap_pm_setup_oscillator() - setup the system oscillator time
+ * @tstart:	startup time rounded up to uSec
+ * @tshut:	shutdown time rounded up to uSec
+ *
+ * All boards do need an oscillator or crystal for the device to function.
+ * The startup and stop time of these oscillators vary. Populate
+ * from the board file to optimize the timing.
+ * This function is meant to be used at boot-time configuration.
+ *
+ * NOTE: This API is intended to be invoked from board file
+ */
+void __init omap_pm_setup_oscillator(u32 tstart, u32 tshut)
 {
 	oscillator.startup_time = tstart;
 	oscillator.shutdown_time = tshut;
 }
 
+/**
+ * omap_pm_get_oscillator() - retrieve the oscillator time
+ * @tstart:	pointer to startup time in uSec
+ * @tshut:	pointer to shutdown time in uSec
+ */
 void omap_pm_get_oscillator(u32 *tstart, u32 *tshut)
 {
-	if (!tstart || !tshut)
+	if (!tstart || !tshut) {
+		pr_warn("%s: Invalid argument tstart=%p tshut=%p\n",
+			__func__, tstart, tshut);
 		return;
+	}
 
 	*tstart = oscillator.startup_time;
 	*tshut = oscillator.shutdown_time;
 }
+
+/**
+ * omap_pm_setup_oscillator_voltage_ramp_time() -
+ *	setup the oscillator setup/shutdown voltage time
+ * @tstart:	startup time rounded up to uSec
+ * @tshut:	shutdown time rounded up to uSec
+ *
+ * Store the time to setup/shutdown oscillator voltage.
+ *
+ * This function is meant to be used at boot-time configuration.
+ */
+void __init omap_pm_setup_oscillator_voltage_ramp_time(u32 tstart, u32 tshut)
+{
+	oscillator.voltage_setup_time = tstart;
+	oscillator.voltage_shutdown_time = tshut;
+}
+
+/**
+ * omap_pm_get_oscillator_voltage_ramp_time() -
+ *	retrieve the oscillator setup/shutdown voltage time
+ * @tstart:	pointer to startup time in uSec
+ * @tshut:	pointer to shutdown time in uSec
+ */
+void omap_pm_get_oscillator_voltage_ramp_time(u32 *tstart, u32 *tshut)
+{
+	if (!tstart || !tshut) {
+		pr_warn("%s: Invalid argument tstart=%p tshut=%p\n",
+			__func__, tstart, tshut);
+		return;
+	}
+
+	*tstart = oscillator.voltage_setup_time;
+	*tshut = oscillator.voltage_shutdown_time;
+}
+
 
 static struct omap_device_pm_latency iva_pm_lats[] = {
 	{

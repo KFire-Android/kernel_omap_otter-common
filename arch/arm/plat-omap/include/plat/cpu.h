@@ -45,6 +45,12 @@
 int omap_type(void);
 
 /*
+ * API to retrieve the OMAP sysboot value.
+ * NOTE: depending on the SoC the meaning of the bits
+ * OR bit-combinations might vary.
+ */
+u8 omap_get_sysboot_value(void);
+/*
  * omap_rev bits:
  * CPU id bits	(0730, 1510, 1710, 2422...)	[31:16]
  * CPU revision	(See _REV_ defined in cpu.h)	[15:08]

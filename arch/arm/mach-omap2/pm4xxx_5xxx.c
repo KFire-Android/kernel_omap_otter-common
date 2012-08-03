@@ -34,6 +34,7 @@
 #include "prcm44xx.h"
 #include "prm-regbits-44xx.h"
 #include "prminst44xx.h"
+#include "scrm44xx.h"
 #include "pm.h"
 #include "voltage.h"
 #include "prcm-debug.h"
@@ -465,6 +466,17 @@ static void __init prcm_setup_regs(void)
 			OMAP4430_PRM_DEVICE_INST,
 			OMAP4_PRM_LDO_SRAM_IVA_SETUP_OFFSET);
 	}
+
+	/*
+	 * Toggle CLKREQ in RET and OFF states
+	 * 0x2: CLKREQ is de-asserted when system clock is not
+	 * required by any function in the device and if all voltage
+	 * domains are in RET or OFF state.
+	 */
+	omap4_prminst_write_inst_reg(0x2, OMAP4430_PRM_PARTITION,
+				     OMAP4430_PRM_DEVICE_INST,
+				     OMAP4_PRM_CLKREQCTRL_OFFSET);
+
 	/*
 	 * De-assert PWRREQ signal in Device OFF state
 	 * 0x3: PWRREQ is de-asserted if all voltage domain are in
@@ -475,6 +487,56 @@ static void __init prcm_setup_regs(void)
 	omap4_prminst_write_inst_reg(0x3, OMAP4430_PRM_PARTITION,
 				     OMAP4430_PRM_DEVICE_INST,
 				     OMAP4_PRM_PWRREQCTRL_OFFSET);
+}
+
+/**
+ * omap4_usec_to_val_scrm - convert microsecond value to SCRM module bitfield
+ * @usec: microseconds
+ * @shift: number of bits to shift left
+ * @mask: bitfield mask
+ *
+ * Converts microsecond value to OMAP4 SCRM bitfield. Bitfield is
+ * shifted to requested position, and checked agains the mask value.
+ * If larger, forced to the max value of the field (i.e. the mask itself.)
+ * Returns the SCRM bitfield value.
+ */
+static u32 omap4_usec_to_val_scrm(u32 usec, int shift, u32 mask)
+{
+	u32 val;
+
+	val = omap_usec_to_32k(usec) << shift;
+
+	/* Check for overflow, if yes, force to max value */
+	if (val > mask)
+		val = mask;
+
+	return val;
+}
+
+static void __init omap4_scrm_setup_timings(void)
+{
+	u32 val;
+	u32 tstart, tshut;
+
+	/* Setup clksetup/clkshoutdown time for oscillator */
+	omap_pm_get_oscillator(&tstart, &tshut);
+
+	val = omap4_usec_to_val_scrm(tstart, OMAP4_SETUPTIME_SHIFT,
+		OMAP4_SETUPTIME_MASK);
+	val |= omap4_usec_to_val_scrm(tshut, OMAP4_DOWNTIME_SHIFT,
+		OMAP4_DOWNTIME_MASK);
+	omap4_prminst_write_inst_reg(val, OMAP4430_SCRM_PARTITION, 0x0,
+				     OMAP4_SCRM_CLKSETUPTIME_OFFSET);
+
+	/* Setup max PMIC startup/shutdown time */
+	omap_pm_get_oscillator_voltage_ramp_time(&tstart, &tshut);
+
+	val = omap4_usec_to_val_scrm(tstart, OMAP4_WAKEUPTIME_SHIFT,
+		OMAP4_WAKEUPTIME_MASK);
+	val |= omap4_usec_to_val_scrm(tshut, OMAP4_SLEEPTIME_SHIFT,
+		OMAP4_SLEEPTIME_MASK);
+	omap4_prminst_write_inst_reg(val, OMAP4430_SCRM_PARTITION, 0x0,
+				     OMAP4_SCRM_PMICSETUPTIME_OFFSET);
 }
 
 /**
@@ -535,6 +597,9 @@ static int __init omap_pm_init(void)
 		iounmap(emif1);
 		iounmap(emif2);
 	}
+
+	/* setup platform related pmic/oscillator timings */
+	omap4_scrm_setup_timings();
 
 	ret = pwrdm_for_each(pwrdms_setup, NULL);
 	if (ret) {

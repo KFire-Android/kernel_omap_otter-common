@@ -167,6 +167,7 @@ static struct omap_globals omap4_globals = {
 	.cm	= OMAP2_L4_IO_ADDRESS(OMAP4430_CM_BASE),
 	.cm2	= OMAP2_L4_IO_ADDRESS(OMAP4430_CM2_BASE),
 	.prcm_mpu	= OMAP2_L4_IO_ADDRESS(OMAP4430_PRCM_MPU_BASE),
+	.scrm = OMAP2_L4_IO_ADDRESS(OMAP44XX_SCRM_BASE)
 };
 
 void __init omap2_set_globals_443x(void)
@@ -192,6 +193,7 @@ static struct omap_globals omap5_globals = {
 	.cm	= OMAP2_L4_IO_ADDRESS(OMAP54XX_CM_CORE_AON_BASE),
 	.cm2	= OMAP2_L4_IO_ADDRESS(OMAP54XX_CM_CORE_BASE),
 	.prcm_mpu = OMAP2_L4_IO_ADDRESS(OMAP54XX_PRCM_MPU_BASE),
+	.scrm = OMAP2_L4_IO_ADDRESS(OMAP54XX_SCRM_BASE)
 };
 
 void __init omap2_set_globals_543x(void)

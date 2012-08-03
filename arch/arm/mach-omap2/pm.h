@@ -170,9 +170,15 @@ static inline int omap_twl_init(void)
 #ifdef CONFIG_PM
 extern void omap_pm_setup_oscillator(u32 tstart, u32 tshut);
 extern void omap_pm_get_oscillator(u32 *tstart, u32 *tshut);
+extern void omap_pm_setup_oscillator_voltage_ramp_time(u32 tstart, u32 tshut);
+extern void omap_pm_get_oscillator_voltage_ramp_time(u32 *tstart, u32 *tshut);
 #else
 static inline void omap_pm_setup_oscillator(u32 tstart, u32 tshut) { }
 static inline void omap_pm_get_oscillator(u32 *tstart, u32 *tshut) { }
+static inline void omap_pm_setup_oscillator_voltage_ramp_time(
+	u32 tstart, u32 tshut) { }
+static inline void omap_pm_get_oscillator_voltage_ramp_time(
+	u32 *tstart, u32 *tshut) { }
 #endif
 
 #ifdef CONFIG_PM

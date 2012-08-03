@@ -124,6 +124,8 @@ struct omap_globals {
 	void __iomem	*cm;             /* Clock Management */
 	void __iomem	*cm2;
 	void __iomem	*prcm_mpu;
+	void __iomem	*scrm;
+
 };
 
 void omap2_set_globals_242x(void);
@@ -139,6 +141,13 @@ void omap2_set_globals_tap(struct omap_globals *);
 void omap2_set_globals_sdrc(struct omap_globals *);
 void omap2_set_globals_control(struct omap_globals *);
 void omap2_set_globals_prcm(struct omap_globals *);
+#if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_ARCH_OMAP5)
+extern void omap4_prm_base_init(struct omap_globals *omap2_globals);
+extern void omap4_cm_base_init(void);
+#else
+static inline void omap4_prm_base_init(struct omap_globals *omap2_globals) {}
+static inline void omap4_cm_base_init(void) {}
+#endif
 
 void omap242x_map_io(void);
 void omap243x_map_io(void);
@@ -287,5 +296,12 @@ void __init omap_emif_set_device_details(u32 emif_nr,
 			struct lpddr2_min_tck *min_tck,
 			struct emif_custom_configs *custom_configs);
 #endif
+
+/* Convert microsecond value to number of 32kHz clock cycles */
+static inline u32 omap_usec_to_32k(u32 usec)
+{
+	return DIV_ROUND_UP_ULL(32768ULL * (u64)usec, 1000000ULL);
+}
+
 #endif /* __ASSEMBLER__ */
 #endif /* __ARCH_ARM_MACH_OMAP2PLUS_COMMON_H */
