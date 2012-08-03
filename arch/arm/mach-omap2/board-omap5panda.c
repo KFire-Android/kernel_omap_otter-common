@@ -59,6 +59,7 @@
 #define GPIO_ETH_NRESET		15	/* USBB3 to SMSC LAN9730 */
 #define GPIO_HUB_NRESET		80	/* USBB2 to SMSC 3530 HUB */
 #define GPIO_EXT_INT_PIN	99
+#define GPIO_SDCARD_DETECT	152
 #define HDMI_GPIO_HPD		193
 #define HDMI_GPIO_CT_CP_HPD	256
 #define HDMI_GPIO_LS_OE		257
@@ -89,8 +90,9 @@ static struct omap2_hsmmc_info mmc[] = {
 	},
 	{
 		.mmc		= 1,
-		.caps		= MMC_CAP_4_BIT_DATA,
-		.gpio_cd	= 67,
+		.caps		= MMC_CAP_4_BIT_DATA | MMC_CAP_UHS_SDR12 |
+					MMC_CAP_UHS_SDR25 | MMC_CAP_UHS_DDR50,
+		.gpio_cd	= GPIO_SDCARD_DETECT,
 		.gpio_wp	= -EINVAL,
 		.ocr_mask	= MMC_VDD_29_30,
 	},
@@ -198,6 +200,7 @@ static struct palmas_reg_init omap5_ldo8_init = {
 static struct palmas_reg_init omap5_ldo9_init = {
 	.warm_reset = 0,
 	.mode_sleep = 0,
+	.no_bypass = 1,
 };
 
 static struct palmas_reg_init omap5_ldoln_init = {
@@ -440,15 +443,21 @@ static struct regulator_init_data omap5_ldo8 = {
 	},
 };
 
+static struct regulator_consumer_supply omap5_mmc1_io_supply[] = {
+	REGULATOR_SUPPLY("vmmc_aux", "omap_hsmmc.0"),
+};
 static struct regulator_init_data omap5_ldo9 = {
 	.constraints = {
 		.min_uV			= 1800000,
-		.max_uV			= 1800000,
+		.max_uV			= 3300000,
 		.valid_modes_mask	= REGULATOR_MODE_NORMAL
 					| REGULATOR_MODE_STANDBY,
-		.valid_ops_mask		= REGULATOR_CHANGE_MODE
+		.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE
+					| REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
 	},
+	.num_consumer_supplies	= ARRAY_SIZE(omap5_mmc1_io_supply),
+	.consumer_supplies	= omap5_mmc1_io_supply,
 };
 
 static struct regulator_init_data omap5_ldoln = {
@@ -618,7 +627,6 @@ static struct platform_device *omap5evm_devices[] __initdata = {
 	&omap5evm_abe_audio,
 };
 
-
 /*
  * Display monitor features are burnt in their EEPROM as EDID data. The EEPROM
  * is connected as I2C slave device, and can be accessed at address 0x50
@@ -641,6 +649,35 @@ static struct platform_device hdmi_edid_device = {
 	.name                   = "i2c-gpio",
 	.id                     = -1,
 	.dev.platform_data      = &i2c_gpio_pdata,
+};
+
+static struct regulator_consumer_supply omap5_evm_vmmc1_supply[] = {
+	REGULATOR_SUPPLY("vmmc", "omap_hsmmc.0"),
+	REGULATOR_SUPPLY("vmmc", "omap_hsmmc.1"),
+};
+
+static struct regulator_init_data omap5_evm_vmmc1 = {
+	.constraints = {
+		.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+		.always_on	= true,
+	},
+	.num_consumer_supplies = ARRAY_SIZE(omap5_evm_vmmc1_supply),
+	.consumer_supplies = omap5_evm_vmmc1_supply,
+};
+
+static struct fixed_voltage_config omap5_evm_sd_dummy = {
+	.supply_name = "vmmc_supply",
+	.microvolts = 3000000, /* 3.0V */
+	.gpio = -EINVAL,
+	.init_data = &omap5_evm_vmmc1,
+};
+
+static struct platform_device dummy_sd_regulator_device = {
+	.name		= "reg-fixed-voltage",
+	.id		= 1,
+	.dev = {
+		.platform_data = &omap5_evm_sd_dummy,
+	}
 };
 
 static struct pca953x_platform_data omap5evm_gpio_expander_info = {
@@ -797,6 +834,7 @@ static void __init omap_5_panda_init(void)
 			"twl6040", OMAP44XX_IRQ_SYS_2N, &twl6040_data);
 
 	omap_serial_init();
+	platform_device_register(&dummy_sd_regulator_device);
 	omap_ehci_ohci_init();
 
 	omap_hsmmc_init(mmc);
