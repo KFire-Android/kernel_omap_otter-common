@@ -1582,7 +1582,8 @@ static int _reset(struct omap_hwmod *oh)
 }
 
 /**
- * _reconfigure_io_chain - clear any I/O chain wakeups and reconfigure chain
+ * omap_hwmod_reconfigure_io_chain - clear any I/O chain wakeups and
+ *		reconfigure chain
  *
  * Call the appropriate PRM function to clear any logged I/O chain
  * wakeups and to reconfigure the chain.  This apparently needs to be
@@ -1593,7 +1594,7 @@ static int _reset(struct omap_hwmod *oh)
  * XXX When the PRM code is moved to drivers, this function can be removed,
  * as the PRM infrastructure should abstract this.
  */
-static void _reconfigure_io_chain(void)
+void omap_hwmod_reconfigure_io_chain(void)
 {
 	unsigned long flags;
 
@@ -1715,7 +1716,7 @@ static int _enable(struct omap_hwmod *oh)
 			((oh->_state == _HWMOD_STATE_IDLE) &&
 			 oh->mux->pads_dynamic))) {
 		omap_hwmod_mux(oh->mux, _HWMOD_STATE_ENABLED);
-		_reconfigure_io_chain();
+		omap_hwmod_reconfigure_io_chain();
 	}
 
 	_add_initiator_dep(oh, mpu_oh);
@@ -1836,7 +1837,7 @@ static int _idle(struct omap_hwmod *oh)
 	/* Mux pins for device idle if populated */
 	if (oh->mux && oh->mux->pads_dynamic) {
 		omap_hwmod_mux(oh->mux, _HWMOD_STATE_IDLE);
-		_reconfigure_io_chain();
+		omap_hwmod_reconfigure_io_chain();
 	}
 
 	oh->_state = _HWMOD_STATE_IDLE;
