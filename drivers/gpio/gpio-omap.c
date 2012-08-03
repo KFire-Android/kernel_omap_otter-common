@@ -77,7 +77,6 @@ struct gpio_bank {
 	u32 width;
 	int context_loss_count;
 	u16 id;
-	int power_mode;
 	bool workaround_enabled;
 
 	void (*set_dataout)(struct gpio_bank *bank, int gpio, int enable);
@@ -1199,10 +1198,6 @@ static int omap_gpio_runtime_suspend(struct device *dev)
 		__raw_writel(wake_hi | bank->context.risingdetect,
 			     bank->base + bank->regs->risingdetect);
 
-	if (bank->power_mode != OFF_MODE) {
-		bank->power_mode = 0;
-		goto update_gpio_context_count;
-	}
 	/*
 	 * If going to OFF, remove triggering for all
 	 * non-wakeup GPIOs.  Otherwise spurious IRQs will be
@@ -1275,9 +1270,6 @@ static int omap_gpio_runtime_resume(struct device *dev)
 		if (context_lost_cnt_after != bank->context_loss_count ||
 						!context_lost_cnt_after) {
 			omap_gpio_restore_context(bank);
-		} else {
-			spin_unlock_irqrestore(&bank->lock, flags);
-			return 0;
 		}
 	}
 
@@ -1369,8 +1361,6 @@ void omap2_gpio_prepare_for_idle(int pwr_mode)
 	list_for_each_entry(bank, &omap_gpio_list, node) {
 		if (!bank->mod_usage || !bank->loses_context)
 			continue;
-
-		bank->power_mode = pwr_mode;
 
 		pm_runtime_put_sync_suspend(bank->dev);
 	}
