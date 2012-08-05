@@ -769,6 +769,8 @@ int clkdm_sleep(struct clockdomain *clkdm)
 	clkdm->_flags &= ~_CLKDM_FLAG_HWSUP_ENABLED;
 	clkdm->_flags &= ~_CLKDM_FLAG_FORCE_NO_SLEEP;
 	ret = arch_clkdm->clkdm_sleep(clkdm);
+	pwrdm_wait_transition(clkdm->pwrdm.ptr);
+	pwrdm_state_high2low_counter_update(clkdm->pwrdm.ptr);
 	spin_unlock_irqrestore(&clkdm->lock, flags);
 	return ret;
 }
@@ -805,7 +807,8 @@ int clkdm_wakeup(struct clockdomain *clkdm)
 	clkdm->_flags &= ~_CLKDM_FLAG_HWSUP_ENABLED;
 	clkdm->_flags |= _CLKDM_FLAG_FORCE_NO_SLEEP;
 	ret = arch_clkdm->clkdm_wakeup(clkdm);
-	ret |= pwrdm_state_switch(clkdm->pwrdm.ptr);
+	pwrdm_wait_transition(clkdm->pwrdm.ptr);
+	pwrdm_state_low2high_counter_update(clkdm->pwrdm.ptr);
 	spin_unlock_irqrestore(&clkdm->lock, flags);
 	return ret;
 }
@@ -844,7 +847,8 @@ void clkdm_allow_idle(struct clockdomain *clkdm)
 	clkdm->_flags &= ~_CLKDM_FLAG_FORCE_NO_SLEEP;
 
 	arch_clkdm->clkdm_allow_idle(clkdm);
-	pwrdm_clkdm_state_switch(clkdm);
+	pwrdm_wait_transition(clkdm->pwrdm.ptr);
+	pwrdm_state_high2low_counter_update(clkdm->pwrdm.ptr);
 	spin_unlock_irqrestore(&clkdm->lock, flags);
 }
 
@@ -880,7 +884,8 @@ void clkdm_deny_idle(struct clockdomain *clkdm)
 	clkdm->_flags &= ~_CLKDM_FLAG_HWSUP_ENABLED;
 	clkdm->_flags |= _CLKDM_FLAG_FORCE_NO_SLEEP;
 	arch_clkdm->clkdm_deny_idle(clkdm);
-	pwrdm_state_switch(clkdm->pwrdm.ptr);
+	pwrdm_wait_transition(clkdm->pwrdm.ptr);
+	pwrdm_state_low2high_counter_update(clkdm->pwrdm.ptr);
 	spin_unlock_irqrestore(&clkdm->lock, flags);
 }
 
@@ -994,7 +999,7 @@ static int _clkdm_clk_hwmod_enable(struct clockdomain *clkdm,
 	spin_lock_irqsave(&clkdm->lock, flags);
 	arch_clkdm->clkdm_clk_enable(clkdm);
 	pwrdm_wait_transition(clkdm->pwrdm.ptr);
-	pwrdm_clkdm_state_switch(clkdm);
+	pwrdm_state_low2high_counter_update(clkdm->pwrdm.ptr);
 	spin_unlock_irqrestore(&clkdm->lock, flags);
 
 	pr_debug("clockdomain: clkdm %s: enabled\n", clkdm->name);
@@ -1027,10 +1032,10 @@ static int _clkdm_clk_hwmod_disable(struct clockdomain *clkdm,
 	spin_lock_irqsave(&clkdm->lock, flags);
 	if (!(clkdm->_flags & _CLKDM_FLAG_FORCE_NO_SLEEP)) {
 		arch_clkdm->clkdm_clk_disable(clkdm);
-		pwrdm_clkdm_state_switch(clkdm);
+		pwrdm_wait_transition(clkdm->pwrdm.ptr);
+		pwrdm_state_high2low_counter_update(clkdm->pwrdm.ptr);
 	}
 	spin_unlock_irqrestore(&clkdm->lock, flags);
-
 	pr_debug("clockdomain: clkdm %s: disabled\n", clkdm->name);
 
 	return 0;
