@@ -290,7 +290,7 @@ static struct powerdomain cam_54xx_pwrdm = {
 	.voltdm		  = { .name = "core" },
 	.prcm_offs	  = OMAP54XX_PRM_CAM_INST,
 	.prcm_partition	  = OMAP54XX_PRM_PARTITION,
-	.pwrsts		  = PWRSTS_OFF_ON,
+	.pwrsts		  = PWRSTS_OFF_INA_ON,
 	.banks		  = 1,
 	.pwrsts_mem_ret	= {
 		[0] = PWRSTS_OFF_RET,	/* cam_mem */
