@@ -47,11 +47,16 @@ static struct cpuidle_params cpuidle_params_table[] = {
 	{.exit_latency = 328 + 440 , .target_residency = 960, .valid = 1},
 
 	/*
-	 * FIXME: Errata analysis pending. Disabled C-state as CPU Forced-OFF is
-	 * not safe on ES1.0. Preventing MPU OSWR C-state for now.
+	 * FIXME: Original C state target:
+	 * C4 - CPU0 OFF + CPU1 OFF + MPU OSWR  + CORE OSWR
+	 *
+	 * Errata analysis is pending. C4 is modified as CPU Forced OFF
+	 * is not safe preventing CPU OFF and MPU OSWR in idle path.
+	 * In the meantime, ensure C4 can be reached with MPU CSWR
+	 * and CORE OSWR.
 	 */
-	/* C4 - CPU0 OFF + CPU1 OFF + MPU OSWR  + CORE OSWR */
-	{.exit_latency = 1200, .target_residency = 1200, .valid = 0},
+	/* C4 - CPU0 CSWR + CPU1 CSWR + MPU CSWR  + CORE OSWR */
+	{.exit_latency = 1200, .target_residency = 1200, .valid = 1},
 };
 
 #define OMAP5_NUM_STATES ARRAY_SIZE(cpuidle_params_table)
@@ -357,13 +362,18 @@ int __init omap5_idle_init(void)
 			drv.state_count++;
 		}
 
-		/* C4 - CPU0 OFF + CPU1 OFF + MPU OSWR + CORE OSWR */
-		_fill_cstate(&drv, 3, "MPUSS OSWR + CORE OSWR",
-			     CPUIDLE_FLAG_COUPLED);
+		/*
+		 * Errata analysis is pending. C4 is modified as CPU Forced OFF
+		 * is not safe preventing CPU OFF and MPU OSWR in idle path.
+		 * In the meantime, ensure C4 can be reached with MPU CSWR
+		 * and CORE OSWR. Define C-state as non-coupled accordingly.
+		 */
+		/* C4 - CPU0 CSWR + CPU1 CSWR + MPU CSWR + CORE OSWR */
+		_fill_cstate(&drv, 3, "MPUSS CSWR + CORE OSWR", 0);
 		cx = _fill_cstate_usage(dev, 3);
 		if (cx != NULL) {
-			cx->cpu_state = PWRDM_POWER_OFF;
-			cx->mpu_state = PWRDM_POWER_OSWR;
+			cx->cpu_state = PWRDM_POWER_CSWR;
+			cx->mpu_state = PWRDM_POWER_CSWR;
 			cx->core_state = PWRDM_POWER_OSWR;
 			atomic_set(&cx->mpu_state_vote, 0);
 			dev->state_count++;
