@@ -633,12 +633,17 @@ static void __init setup_ehci_io_mux(const enum usbhs_omap_port_mode *port_mode)
 
 
 static struct omap_hwmod_mux_info * __init
-omap_hwmod_mux_array_init(const struct omap_device_pad *bpads[], int *nr_pads)
+omap_hwmod_mux_array_init(struct platform_device	*pdev,
+			  const struct omap_device_pad *bpads[],
+			  int *nr_pads,
+			  const enum usbhs_omap_port_mode *port_mode)
 {
 	struct omap_device_pad		*pads;
 	struct omap_hwmod_mux_info	*hmux;
+	struct omap_device		*od;
+	struct omap_hwmod		*uhh_hwm;
 	size_t				npads;
-	u32				i, k;
+	u32				i, k, j;
 
 	for (i = 0, npads = 0; i < OMAP3_HS_USB_PORTS; i++)
 		npads += nr_pads[i];
@@ -657,12 +662,53 @@ omap_hwmod_mux_array_init(const struct omap_device_pad *bpads[], int *nr_pads)
 			k +=  nr_pads[i];
 		}
 	hmux = omap_hwmod_mux_init(pads, npads);
+
+	if (!pdev)
+		goto end;
+
+	od = to_omap_device(pdev);
+	uhh_hwm = od->hwmods[0];
+	if (!uhh_hwm)
+		goto end;
+
+	uhh_hwm->mux = hmux;
+	for (i = 0, k = 0; i < OMAP3_HS_USB_PORTS; i++) {
+		switch (port_mode[i]) {
+		case OMAP_EHCI_PORT_MODE_PHY:
+		case OMAP_EHCI_PORT_MODE_TLL:
+		case OMAP_EHCI_PORT_MODE_HSIC:
+			for (j = 0; j < nr_pads[i]; j++)
+				omap_hwmod_pad_route_irq(uhh_hwm, k + j, 1);
+			break;
+		case OMAP_OHCI_PORT_MODE_PHY_6PIN_DATSE0:
+		case OMAP_OHCI_PORT_MODE_PHY_6PIN_DPDM:
+		case OMAP_OHCI_PORT_MODE_TLL_6PIN_DATSE0:
+		case OMAP_OHCI_PORT_MODE_TLL_6PIN_DPDM:
+		case OMAP_OHCI_PORT_MODE_PHY_4PIN_DPDM:
+		case OMAP_OHCI_PORT_MODE_TLL_4PIN_DPDM:
+		case OMAP_OHCI_PORT_MODE_PHY_3PIN_DATSE0:
+		case OMAP_OHCI_PORT_MODE_TLL_3PIN_DATSE0:
+		case OMAP_OHCI_PORT_MODE_TLL_2PIN_DATSE0:
+		case OMAP_OHCI_PORT_MODE_TLL_2PIN_DPDM:
+			for (j = 0; j < nr_pads[i]; j++)
+				omap_hwmod_pad_route_irq(uhh_hwm, k + j, 0);
+			break;
+
+		case OMAP_USBHS_PORT_MODE_UNUSED:
+		default:
+			break;
+		}
+		k += nr_pads[i];
+	}
+
+end:
 	kfree(pads);
 	return hmux;
 }
 
 static struct omap_hwmod_mux_info * __init
-setup_4430_usbhs_io_mux(const enum usbhs_omap_port_mode *port_mode)
+setup_4430_usbhs_io_mux(struct platform_device	*pdev,
+			const enum usbhs_omap_port_mode *port_mode)
 {
 	const struct omap_device_pad	*pads[OMAP3_HS_USB_PORTS];
 	int				pads_cnt[OMAP3_HS_USB_PORTS];
@@ -758,7 +804,7 @@ setup_4430_usbhs_io_mux(const enum usbhs_omap_port_mode *port_mode)
 			break;
 	}
 
-	return omap_hwmod_mux_array_init(pads, pads_cnt);
+	return omap_hwmod_mux_array_init(pdev, pads, pads_cnt, port_mode);
 }
 
 static void __init setup_ohci_io_mux(const enum usbhs_omap_port_mode *port_mode)
@@ -914,7 +960,7 @@ void __init usbhs_init(const struct usbhs_omap_board_data *pdata)
 		setup_ehci_io_mux(pdata->port_mode);
 		setup_ohci_io_mux(pdata->port_mode);
 	} else if (cpu_is_omap44xx() || cpu_is_omap54xx())
-		uhh_hwm->mux = setup_4430_usbhs_io_mux(pdata->port_mode);
+		uhh_hwm->mux = setup_4430_usbhs_io_mux(pdev, pdata->port_mode);
 }
 
 #else

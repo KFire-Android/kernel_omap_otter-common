@@ -12,6 +12,7 @@
  */
 #include <linux/clk.h>
 #include <linux/kernel.h>
+#include <linux/leds.h>
 #include <linux/init.h>
 #include <linux/platform_device.h>
 #include <linux/io.h>
@@ -63,6 +64,38 @@
 #define HDMI_GPIO_HPD		193
 #define HDMI_GPIO_CT_CP_HPD	256
 #define HDMI_GPIO_LS_OE		257
+
+static struct gpio_led panda5_gpio_leds[] = {
+	{
+		.name	= "blue",
+		.default_trigger = "timer",
+		.gpio	= OMAP_MPUIO(19),
+	},
+	{
+		.name	= "red",
+		.default_trigger = "timer",
+		.gpio	= OMAP_MPUIO(17),
+	},
+	{
+		.name	= "green",
+		.default_trigger = "timer",
+		.gpio	= OMAP_MPUIO(18),
+	},
+
+};
+
+static struct gpio_led_platform_data panda5_led_data = {
+	.leds	= panda5_gpio_leds,
+	.num_leds = ARRAY_SIZE(panda5_gpio_leds),
+};
+
+static struct platform_device panda5_leds_gpio = {
+	.name	= "leds-gpio",
+	.id	= -1,
+	.dev	= {
+		.platform_data = &panda5_led_data,
+	},
+};
 
 #ifdef CONFIG_OMAP_MUX
 static struct omap_board_mux board_mux[] __initdata = {
@@ -625,6 +658,7 @@ static struct platform_device *omap5evm_devices[] __initdata = {
 	&omap5evm_dmic_codec,
 	&omap5evm_hdmi_audio_codec,
 	&omap5evm_abe_audio,
+	&panda5_leds_gpio,
 };
 
 /*
