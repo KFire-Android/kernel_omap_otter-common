@@ -410,8 +410,6 @@ static int omap_thermal_manager(struct omap_governor *omap_gov,
 static void average_on_die_temperature(struct omap_governor *omap_gov)
 {
 	int i;
-	int die_temp_lower = 0;
-	int die_temp_upper = 0;
 
 	if (omap_gov->temp_sensor == NULL)
 		return;
@@ -449,12 +447,9 @@ static void average_on_die_temperature(struct omap_governor *omap_gov)
 	 */
 	convert_omap_sensor_temp_to_hotspot_temp(omap_gov,
 				omap_gov->sensor_temp);
-	die_temp_lower = hotspot_temp_to_sensor_temp(omap_gov,
-				omap_gov->hotspot_temp_lower);
-	die_temp_upper = hotspot_temp_to_sensor_temp(omap_gov,
-				omap_gov->hotspot_temp_upper);
 	thermal_device_call(omap_gov->temp_sensor, set_temp_thresh,
-				die_temp_lower, die_temp_upper);
+				omap_gov->hotspot_temp_lower,
+				omap_gov->hotspot_temp_upper);
 }
 
 static void average_sensor_delayed_work_fn(struct work_struct *work)
@@ -528,20 +523,13 @@ DEFINE_SIMPLE_ATTRIBUTE(omap_die_gov_rw_fops, option_get, option_set, "%llu\n");
 /* Update temp_sensor with current values */
 static void debug_apply_thresholds(struct omap_governor *omap_gov)
 {
-	int die_temp_lower = 0;
-	int die_temp_upper = 0;
-
 	/*
 	 * Reconfigure the current temperature thresholds according
 	 * to the new user space thresholds.
 	 */
-	die_temp_lower = hotspot_temp_to_sensor_temp(omap_gov,
-		omap_gov->hotspot_temp_lower);
-	die_temp_upper = hotspot_temp_to_sensor_temp(omap_gov,
-		omap_gov->hotspot_temp_upper);
-
 	thermal_device_call(omap_gov->temp_sensor, set_temp_thresh,
-			    die_temp_lower, die_temp_upper);
+				omap_gov->hotspot_temp_lower,
+				omap_gov->hotspot_temp_upper);
 	omap_gov->sensor_temp = thermal_device_call(omap_gov->temp_sensor,
 						    report_temp);
 	thermal_sensor_set_temp(omap_gov->temp_sensor);
