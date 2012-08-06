@@ -35,7 +35,6 @@
 #include "../../arch/arm/mach-omap2/clockdomain.h"
 
 #define PM_SUSPEND_MBOX		0xffffff07
-#define PM_SUSPEND_MBOX_FORCE	0xffffff09
 #define PM_SUSPEND_TIMEOUT	300
 
 struct omap_rproc_priv {
@@ -58,14 +57,11 @@ static bool _may_suspend(struct omap_rproc_priv *rpp)
 	return readl(rpp->idle) & rpp->idle_mask;
 }
 
-static int _suspend(struct omap_rproc_priv *rpp, bool force)
+static int _suspend(struct omap_rproc_priv *rpp)
 {
 	unsigned long timeout = msecs_to_jiffies(PM_SUSPEND_TIMEOUT) + jiffies;
 
-	if (force)
-		omap_mbox_msg_send(rpp->mbox, PM_SUSPEND_MBOX_FORCE);
-	else
-		omap_mbox_msg_send(rpp->mbox, PM_SUSPEND_MBOX);
+	omap_mbox_msg_send(rpp->mbox, PM_SUSPEND_MBOX);
 
 	while (time_after(timeout, jiffies)) {
 		if ((readl(rpp->suspend) & rpp->suspend_mask) &&
@@ -82,7 +78,7 @@ static int omap_suspend(struct rproc *rproc, bool force)
 	struct omap_rproc_priv *rpp = rproc->priv;
 
 	if (rpp->idle && (force || _may_suspend(rpp)))
-		return _suspend(rpp, force);
+		return _suspend(rpp);
 
 	return -EBUSY;
 }
