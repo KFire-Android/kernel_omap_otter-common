@@ -1832,6 +1832,22 @@ static void rproc_error_handler_work(struct work_struct *work)
 }
 
 /**
+ * rproc_recover() - trigger recovery for a rproc
+ *
+ * This function is used to trigger a rproc recovery explicitly.
+ * Recovery could be disabled using debugfs while debugging, and
+ * this function provides the mechanism to reload and restore the
+ * rproc functionality after the debug is complete.
+ */
+void rproc_recover(struct rproc *rproc)
+{
+	if (rproc->recovery_disabled && rproc->state == RPROC_CRASHED) {
+		dev_info(&rproc->dev, "rproc recovering....\n");
+		_reset_all_vdev(rproc);
+	}
+}
+
+/**
  * rproc_get_by_name() - find a remote processor by name and boot it
  * @name: name of the remote processor
  *
