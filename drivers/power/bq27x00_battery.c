@@ -570,25 +570,57 @@ static void bq27x00_external_power_changed(struct power_supply *psy)
 static int bq27x00_powersupply_init(struct bq27x00_device_info *di)
 {
 	int ret;
-
-	di->bat.type = POWER_SUPPLY_TYPE_BATTERY;
-	di->bat.properties = bq27x00_battery_props;
-	di->bat.num_properties = ARRAY_SIZE(bq27x00_battery_props);
-	di->bat.get_property = bq27x00_battery_get_property;
-	di->bat.external_power_changed = bq27x00_external_power_changed;
-
-	INIT_DELAYED_WORK(&di->work, bq27x00_battery_poll);
-	mutex_init(&di->lock);
-
-	ret = power_supply_register(di->dev, &di->bat);
+	union power_supply_propval volt_val;
+	union power_supply_propval curr_val;
+	bool battery_present;
+	/*
+	 * Get the current consumption by battery. If it is 0mA
+	 * either battery is not connected or battery is full
+	 */
+	ret = bq27x00_battery_current(di, &curr_val);
 	if (ret) {
-		dev_err(di->dev, "failed to register battery: %d\n", ret);
+		dev_err(di->dev, "failed to get battery current: %d\n", ret);
 		return ret;
 	}
+	if (!curr_val.intval) {
+		/*
+		 * In case current is 0mA then check if voltage is more than
+		 * 3.9V in that case we are supplying from battery
+		 * as LDO is capable of supplying less than or equal to 3.7V
+		 */
+		ret = bq27x00_battery_voltage(di, &volt_val);
+		if (ret) {
+			dev_err(di->dev, "failed to get voltage: %d\n", ret);
+			return ret;
+		}
+		if (volt_val.intval > 3900000)
+			battery_present = true;
+		else
+			battery_present = false; /* Voltage is less than 4V */
+	} else {
+		battery_present = true; /* Current is non-zero value */
+	}
 
-	dev_info(di->dev, "support ver. %s enabled\n", DRIVER_VERSION);
+	if (battery_present) {
+		di->bat.type = POWER_SUPPLY_TYPE_BATTERY;
+		di->bat.properties = bq27x00_battery_props;
+		di->bat.num_properties = ARRAY_SIZE(bq27x00_battery_props);
+		di->bat.get_property = bq27x00_battery_get_property;
+		di->bat.external_power_changed = bq27x00_external_power_changed;
 
-	bq27x00_update(di);
+		INIT_DELAYED_WORK(&di->work, bq27x00_battery_poll);
+		mutex_init(&di->lock);
+
+		ret = power_supply_register(di->dev, &di->bat);
+		if (ret) {
+			dev_err(di->dev, "fail to register battery: %d\n", ret);
+			return ret;
+		}
+
+		dev_info(di->dev, "support ver. %s enabled\n", DRIVER_VERSION);
+
+		bq27x00_update(di);
+	}
 
 	return 0;
 }
