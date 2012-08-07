@@ -251,32 +251,32 @@ static struct powerdomain custefuse_54xx_pwrdm = {
 		[PWRDM_POWER_RET] = UNSUP_STATE,
 		[PWRDM_POWER_INACTIVE] = UNSUP_STATE,
 		[PWRDM_POWER_ON] = 0,
-		},
-	};
+	},
+};
 
-	/* dsp_54xx_pwrdm: Tesla processor power domain */
-	static struct powerdomain dsp_54xx_pwrdm = {
-		.name		  = "dsp_pwrdm",
-		.voltdm		  = { .name = "mm" },
-		.prcm_offs	  = OMAP54XX_PRM_DSP_INST,
-		.prcm_partition	  = OMAP54XX_PRM_PARTITION,
-		.pwrsts		  = PWRSTS_OFF_RET_ON,
-		.pwrsts_logic_ret = PWRSTS_OFF_RET,
-		.banks		  = 3,
-		.pwrsts_mem_ret	= {
-			[0] = PWRSTS_OFF_RET,	/* dsp_edma */
-			[1] = PWRSTS_OFF_RET,	/* dsp_l1 */
-			[2] = PWRSTS_OFF_RET,	/* dsp_l2 */
-		},
-		.pwrsts_mem_on	= {
-			[0] = PWRSTS_OFF_RET,	/* dsp_edma */
-			[1] = PWRSTS_OFF_RET,	/* dsp_l1 */
-			[2] = PWRSTS_OFF_RET,	/* dsp_l2 */
-		},
-		.flags		  = PWRDM_HAS_LOWPOWERSTATECHANGE,
-		.wakeup_lat = {
-			[PWRDM_POWER_OFF] = 1000,
-			[PWRDM_POWER_OSWR] = 600,
+/* dsp_54xx_pwrdm: Tesla processor power domain */
+static struct powerdomain dsp_54xx_pwrdm = {
+	.name		  = "dsp_pwrdm",
+	.voltdm		  = { .name = "mm" },
+	.prcm_offs	  = OMAP54XX_PRM_DSP_INST,
+	.prcm_partition	  = OMAP54XX_PRM_PARTITION,
+	.pwrsts		  = PWRSTS_OFF_RET_ON,
+	.pwrsts_logic_ret = PWRSTS_OFF_RET,
+	.banks		  = 3,
+	.pwrsts_mem_ret	= {
+		[0] = PWRSTS_OFF_RET,	/* dsp_edma */
+		[1] = PWRSTS_OFF_RET,	/* dsp_l1 */
+		[2] = PWRSTS_OFF_RET,	/* dsp_l2 */
+	},
+	.pwrsts_mem_on	= {
+		[0] = PWRSTS_OFF_RET,	/* dsp_edma */
+		[1] = PWRSTS_OFF_RET,	/* dsp_l1 */
+		[2] = PWRSTS_OFF_RET,	/* dsp_l2 */
+	},
+	.flags		  = PWRDM_HAS_LOWPOWERSTATECHANGE,
+	.wakeup_lat = {
+		[PWRDM_POWER_OFF] = 1000,
+		[PWRDM_POWER_OSWR] = 600,
 		[PWRDM_POWER_CSWR] = 300,
 		[PWRDM_POWER_RET] = UNSUP_STATE,
 		[PWRDM_POWER_INACTIVE] = 20,
