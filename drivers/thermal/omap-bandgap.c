@@ -121,6 +121,9 @@
 #define OMAP5430_CORE_MAX_TEMP		125000
 #define OMAP5430_CORE_HYST_VAL		5000
 
+/* Global bandgap pointer used in PM notifier handlers. */
+static struct omap_bandgap *g_bg_ptr;
+
 /* TODO: provide data structures for 4430 */
 
 /*
@@ -1056,7 +1059,7 @@ static int enable_continuous_mode(struct omap_bandgap *bg_ptr)
 {
 	struct device *cdev = bg_ptr->dev->parent;
 	struct temp_sensor_registers *tsr;
-	int i, r;
+	int i, r = 0;
 	u32 val;
 
 	for (i = 0; i < bg_ptr->pdata->sensor_count; i++) {
@@ -1400,6 +1403,9 @@ int __devinit omap_bandgap_probe(struct platform_device *pdev)
 		}
 	}
 
+	g_bg_ptr = bg_ptr;
+	g_bg_ptr->bg_in_suspend = false;
+	g_bg_ptr->bg_clk_idle = false;
 	return 0;
 
 put_clks:
@@ -1560,6 +1566,8 @@ static int omap_bandgap_suspend(struct device *dev)
 	struct omap_bandgap *bg_ptr = dev_get_drvdata(dev);
 	int err;
 
+	g_bg_ptr->bg_in_suspend = true;
+
 	err = omap_bandgap_save_ctxt(bg_ptr);
 	clk_disable(bg_ptr->fclock);
 
@@ -1572,6 +1580,8 @@ static int omap_bandgap_resume(struct device *dev)
 
 	clk_enable(bg_ptr->fclock);
 
+	g_bg_ptr->bg_in_suspend = false;
+
 	return omap_bandgap_restore_ctxt(bg_ptr);
 }
 static const struct dev_pm_ops omap_bandgap_dev_pm_ops = {
@@ -1583,6 +1593,51 @@ static const struct dev_pm_ops omap_bandgap_dev_pm_ops = {
 #else
 #define DEV_PM_OPS	NULL
 #endif
+
+void omap_bandgap_prepare_for_idle(void)
+{
+	/*
+	 * If the System-wide Suspend/Resume is initiated, then clocks
+	 * are taken care by the suspend/resume handlers. Hence nothing
+	 * todo in the notifiers, so just return.
+	 */
+	if (g_bg_ptr->bg_in_suspend)
+		return;
+
+	clk_disable(g_bg_ptr->fclock);
+	g_bg_ptr->bg_clk_idle = true;
+
+}
+
+void omap_bandgap_resume_after_idle(void)
+{
+	u8 i;
+	/*
+	 * If the System-wide Suspend/Resume is initiated, then clocks
+	 * are taken care by the suspend/resume handlers. Hence nothing
+	 * todo in the notifiers, so just return.
+	 */
+	if (g_bg_ptr->bg_in_suspend)
+		return;
+
+	/* Enable clock for sensor, if it was disabled during idle */
+	if (g_bg_ptr->bg_clk_idle) {
+		clk_enable(g_bg_ptr->fclock);
+		/*
+		 * Since the clocks are gated, the temperature reading
+		 * is not correct. Hence force the single read to get the
+		 * current temperature and then configure back to continuous
+		 * montior mode.
+		 */
+		for (i = 0; i < g_bg_ptr->pdata->sensor_count; i++)
+			omap_bandgap_force_single_read(g_bg_ptr, i);
+
+		enable_continuous_mode(g_bg_ptr);
+
+		g_bg_ptr->bg_clk_idle = false;
+	}
+
+}
 
 static struct platform_driver omap_bandgap_sensor_driver = {
 	.probe = omap_bandgap_probe,
