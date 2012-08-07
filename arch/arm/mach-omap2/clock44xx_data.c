@@ -788,6 +788,14 @@ static struct clk virt_dsp_ck = {
 	.set_rate	= &omap4_virt_dsp_set_rate,
 };
 
+static struct clk virt_lcd_pclk = {
+	.name		= "virt_lcd_pclk",
+	.parent		= NULL,
+	.ops		= &clkops_null,
+	.round_rate	= &clk_dummy_round_rate,
+	.set_rate	= &clk_dummy_set_rate,
+};
+
 /* DPLL_MPU */
 static struct dpll_data dpll_mpu_dd = {
 	.mult_div1_reg	= OMAP4430_CM_CLKSEL_DPLL_MPU,
@@ -3554,6 +3562,7 @@ static struct omap_clk omap44xx_clks[] = {
 	CLK(NULL,	"dpll_iva_m5x2_ck",		&dpll_iva_m5x2_ck,	CK_44XX),
 	CLK(NULL,	"virt_iva_ck",			&virt_iva_ck,	CK_44XX),
 	CLK(NULL,	"virt_dsp_ck",			&virt_dsp_ck,	CK_44XX),
+	CLK(NULL,	"virt_lcd_pclk",		&virt_lcd_pclk,	CK_44XX),
 	CLK(NULL,	"dpll_mpu_ck",			&dpll_mpu_ck,	CK_44XX),
 	CLK(NULL,	"virt_dpll_mpu_ck",		&virt_dpll_mpu_ck,	(CK_446X | CK_447X)),
 	CLK(NULL,	"dpll_mpu_m2_ck",		&dpll_mpu_m2_ck,	CK_44XX),
