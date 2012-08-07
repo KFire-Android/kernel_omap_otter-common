@@ -136,7 +136,7 @@ static struct powerdomain cpu0_54xx_pwrdm = {
 	.voltdm		  = { .name = "mpu" },
 	.prcm_offs	  = OMAP54XX_PRCM_MPU_PRM_C0_INST,
 	.prcm_partition	  = OMAP54XX_PRCM_MPU_PARTITION,
-	.pwrsts		  = PWRSTS_OFF_RET_ON,
+	.pwrsts		  = PWRSTS_OFF_RET_INA_ON,
 	.pwrsts_logic_ret = PWRSTS_OFF_RET,
 	.banks		  = 1,
 	.pwrsts_mem_ret	= {
@@ -162,7 +162,7 @@ static struct powerdomain cpu1_54xx_pwrdm = {
 	.voltdm		  = { .name = "mpu" },
 	.prcm_offs	  = OMAP54XX_PRCM_MPU_PRM_C1_INST,
 	.prcm_partition	  = OMAP54XX_PRCM_MPU_PARTITION,
-	.pwrsts		  = PWRSTS_OFF_RET_ON,
+	.pwrsts		  = PWRSTS_OFF_RET_INA_ON,
 	.pwrsts_logic_ret = PWRSTS_OFF_RET,
 	.banks		  = 1,
 	.pwrsts_mem_ret	= {
@@ -214,7 +214,7 @@ static struct powerdomain mpu_54xx_pwrdm = {
 	.prcm_offs	  = OMAP54XX_PRM_MPU_INST,
 	.prcm_partition	  = OMAP54XX_PRM_PARTITION,
 	.context_offs	  = OMAP54XX_RM_MPU_MPU_CONTEXT_OFFSET,
-	.pwrsts		  = PWRSTS_RET_ON,
+	.pwrsts		  = PWRSTS_RET_INA_ON,
 	.pwrsts_logic_ret = PWRSTS_OFF_RET,
 	.banks		  = 2,
 	.pwrsts_mem_ret	= {
