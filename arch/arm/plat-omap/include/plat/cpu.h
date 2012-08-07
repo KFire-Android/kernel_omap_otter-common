@@ -507,6 +507,7 @@ extern u32 omap_features;
 #define OMAP4_HAS_MPU_1_2GHZ		BIT(10)
 #define OMAP4_HAS_MPU_1_5GHZ		BIT(11)
 #define OMAP5_HAS_OPP_HIGH			BIT(12)
+#define OMAP5_HAS_AUTO_RET			BIT(13)
 
 
 #define OMAP3_HAS_FEATURE(feat,flag)			\
@@ -548,5 +549,7 @@ static inline unsigned int omap5_has_ ##feat(void)	\
 }							\
 
 OMAP5_HAS_FEATURE(opp_high, OPP_HIGH)
+OMAP5_HAS_FEATURE(auto_ret, AUTO_RET)
+
 
 #endif

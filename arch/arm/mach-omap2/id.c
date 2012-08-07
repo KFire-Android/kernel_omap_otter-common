@@ -342,6 +342,13 @@ void __init omap5xxx_check_features(void)
 		 (((omap_ctrl_readl(OMAP5_DIE_ID2_OFFSET) >> 8) & 0xff) >=
 				   OMAP5_ALL_OPP_ENABLED4)))
 		omap_features |= OMAP5_HAS_OPP_HIGH;
+
+	/* Enable Auto-ret support based on FT coverage. >=8 revision is good */
+	if ((omap_rev() == OMAP5430_REV_ES1_0) &&
+	    ((omap_ctrl_readl(OMAP5_DIE_ID2_OFFSET) >> 8) & 0xff) >= 0x8) {
+		omap_features |= OMAP5_HAS_OPP_HIGH;
+		omap_features |= OMAP5_HAS_AUTO_RET;
+	}
 }
 
 void __init ti81xx_check_features(void)
