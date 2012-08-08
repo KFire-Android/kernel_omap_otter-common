@@ -221,7 +221,7 @@ static void __init omap5_ti_st_init(struct omap5_connectivity_gpios *conn_gpios)
 }
 
 
-int __init omap5_connectivity_init(void)
+int __init omap5_connectivity_init(int board_type)
 {
 	struct omap5_connectivity_gpios *conn_gpios;
 

@@ -25,7 +25,7 @@
 int __init sevm_dock_init(void);
 int __init sevm_touch_init(void);
 int __init sevm_sensor_init(void);
-int __init omap5_connectivity_init(void);
+int __init omap5_connectivity_init(int board_type);
 int __init sevm_panel_init(void);
 
 #endif
