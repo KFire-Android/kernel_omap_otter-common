@@ -27,6 +27,8 @@
 #include <plat/omap_device.h>
 #include <plat/omap-pm.h>
 
+#include "dvfs.h"
+
 static struct platform_device omap_display_device = {
 	.name          = "omapdss",
 	.id            = -1,
@@ -97,7 +99,7 @@ int __init omap_display_init(struct omap_dss_board_info *board_data)
 	}
 
 	pdata.board_data = board_data;
-
+	pdata.device_scale = omap_device_scale;
 	for (i = 0; i < oh_count; i++) {
 		oh = omap_hwmod_lookup(curr_dss_hwmod[i].oh_name);
 		if (!oh) {
