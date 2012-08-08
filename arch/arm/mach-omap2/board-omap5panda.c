@@ -663,6 +663,11 @@ static struct platform_device omap5evm_dmic_codec = {
 	.id	= -1,
 };
 
+static struct platform_device omap5evm_spdif_dit_codec = {
+	.name           = "spdif-dit",
+	.id             = -1,
+};
+
 static struct platform_device omap5evm_hdmi_audio_codec = {
 	.name	= "hdmi-audio-codec",
 	.id	= -1,
@@ -698,6 +703,7 @@ static struct platform_device omap5evm_abe_audio = {
 
 static struct platform_device *omap5evm_devices[] __initdata = {
 	&omap5evm_dmic_codec,
+	&omap5evm_spdif_dit_codec,
 	&omap5evm_hdmi_audio_codec,
 	&omap5evm_abe_audio,
 	&panda5_leds_gpio,
