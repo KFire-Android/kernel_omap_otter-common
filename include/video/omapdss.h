@@ -303,6 +303,8 @@ static inline int omap_display_init(struct omap_dss_board_info *board_data)
 struct omap_display_platform_data {
 	struct omap_dss_board_info *board_data;
 	/* TODO: Additional members to be added when PM is considered */
+	int (*device_scale) (struct device *req_dev, struct device *target_dev,
+			unsigned long rate);
 };
 
 struct omap_video_timings {
