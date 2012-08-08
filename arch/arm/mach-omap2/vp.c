@@ -136,6 +136,7 @@ void __init omap_vp_init(struct voltagedomain *voltdm)
 
 	timeout = (sys_clk_rate * voltdm->pmic->vp_timeout_us) / 1000;
 	vddmin = max(voltdm->vp_param->vddmin, voltdm->pmic->vddmin);
+	vddmin = max(vddmin, voltdm->vc_param->ret);
 	vddmax = min(voltdm->vp_param->vddmax, voltdm->pmic->vddmax);
 	vddmin = voltdm->pmic->uv_to_vsel(vddmin);
 	vddmax = voltdm->pmic->uv_to_vsel(vddmax);
