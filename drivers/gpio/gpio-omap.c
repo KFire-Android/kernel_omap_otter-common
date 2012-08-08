@@ -77,11 +77,12 @@ struct gpio_bank {
 	u32 width;
 	int context_loss_count;
 	u16 id;
-	int power_mode;
 	bool workaround_enabled;
 
 	void (*set_dataout)(struct gpio_bank *bank, int gpio, int enable);
 	int (*get_context_loss_count)(struct device *dev);
+	int (*do_reset)(struct device *dev, bool context_lost,
+			bool *should_restore_context);
 
 	struct omap_gpio_reg_offs *regs;
 };
@@ -1154,6 +1155,8 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
 	if (bank->loses_context)
 		bank->get_context_loss_count = pdata->get_context_loss_count;
 
+	bank->do_reset = pdata->do_module_reset;
+
 	pm_runtime_put(bank->dev);
 
 	list_add_tail(&bank->node, &omap_gpio_list);
@@ -1199,10 +1202,6 @@ static int omap_gpio_runtime_suspend(struct device *dev)
 		__raw_writel(wake_hi | bank->context.risingdetect,
 			     bank->base + bank->regs->risingdetect);
 
-	if (bank->power_mode != OFF_MODE) {
-		bank->power_mode = 0;
-		goto update_gpio_context_count;
-	}
 	/*
 	 * If going to OFF, remove triggering for all
 	 * non-wakeup GPIOs.  Otherwise spurious IRQs will be
@@ -1254,6 +1253,7 @@ static int omap_gpio_runtime_resume(struct device *dev)
 	int context_lost_cnt_after;
 	u32 l = 0, gen, gen0, gen1;
 	unsigned long flags;
+	bool should_restore_context = false;
 
 	spin_lock_irqsave(&bank->lock, flags);
 	_gpio_dbck_enable(bank);
@@ -1273,13 +1273,29 @@ static int omap_gpio_runtime_resume(struct device *dev)
 		context_lost_cnt_after =
 			bank->get_context_loss_count(bank->dev);
 		if (context_lost_cnt_after != bank->context_loss_count ||
-						!context_lost_cnt_after) {
-			omap_gpio_restore_context(bank);
-		} else {
-			spin_unlock_irqrestore(&bank->lock, flags);
-			return 0;
-		}
+						!context_lost_cnt_after)
+			should_restore_context = true;
 	}
+
+	/*
+	 * If bank requires reset to be done, then it should be done
+	 * prior to restore, and let arch code deal with decision
+	 * if certain module can or should restore or not.
+	 */
+	if (bank->do_reset) {
+		int r;
+		bool can_loose_context;
+
+		can_loose_context = bank->get_context_loss_count ? true : false;
+		r = bank->do_reset(dev, can_loose_context,
+				   &should_restore_context);
+		if (r)
+			dev_err(dev, "Bank reset fail(%d)!\n", r);
+		/* Fall through anyway and hope it recovers.. */
+	}
+
+	if (should_restore_context)
+		omap_gpio_restore_context(bank);
 
 	/*
 	 * WA for GPIO pins 140 (BT) & 142 (WLAN) used as output pins
@@ -1369,8 +1385,6 @@ void omap2_gpio_prepare_for_idle(int pwr_mode)
 	list_for_each_entry(bank, &omap_gpio_list, node) {
 		if (!bank->mod_usage || !bank->loses_context)
 			continue;
-
-		bank->power_mode = pwr_mode;
 
 		pm_runtime_put_sync_suspend(bank->dev);
 	}

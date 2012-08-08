@@ -27,6 +27,81 @@
 
 #include "powerdomain.h"
 
+static struct powerdomain *core_pd;
+
+static int _do_gpio_module_reset(struct device *dev)
+{
+	struct platform_device *pdev;
+	struct omap_device *odev;
+
+	pdev = to_platform_device(dev);
+	if (!pdev) {
+		dev_err(dev, "no platform data\n");
+		return -ENODEV;
+	}
+	odev = to_omap_device(pdev);
+	if (!odev) {
+		dev_err(dev, "no device data\n");
+		return -ENODEV;
+	}
+	if (!odev->hwmods) {
+		dev_err(dev, "no hwmod data??\n");
+		return -EINVAL;
+	}
+
+	return omap_hwmod_reset(odev->hwmods[0]);
+}
+
+/**
+ * omap5_es1_gpio_do_module_reset() - Do a Module level reset for GPIO block
+ * @dev:		GPIO device representing the GPIO module
+ * @can_loose_context:	can the device loose context?
+ * @should_restore_context: should we restore context?
+ *
+ * WA for Bug ID: COBRA-1.0BUG00134: we have two possibilities:
+ * If module can loose context and it has lost context, then reset the module.
+ * If module cannot loose context, but OMAP device level OFF mode was achieved
+ * We still need to reset the module.
+ */
+static int omap5_es1_gpio_do_module_reset(struct device *dev,
+					  bool can_loose_context,
+					  bool *should_restore_context)
+{
+	int state;
+
+	if (!should_restore_context || !dev) {
+		WARN(1, "Invalid pointer passed dev=%p, restore_context=%p\n",
+		     dev, should_restore_context);
+		return -EINVAL;
+	}
+
+	/*
+	 * If we can loose context and gpio driver determined that we did loose
+	 * context, then just reset the module, else, do nothing
+	 */
+	if (can_loose_context) {
+		if (*should_restore_context)
+			goto do_reset;
+		goto no_reset;
+	}
+
+	/*
+	 * If a bank does not lose context, e.g in WKUP domain we
+	 * still need to reset it when coming from OFF
+	 */
+	state = pwrdm_read_prev_pwrst(core_pd);
+	if (state != PWRDM_POWER_OFF)
+		goto no_reset;
+
+	*should_restore_context = true;
+	/* Fall through and reset */
+do_reset:
+	return _do_gpio_module_reset(dev);
+
+no_reset:
+	return 0;
+}
+
 static int __init omap2_gpio_dev_init(struct omap_hwmod *oh, void *unused)
 {
 	struct platform_device *pdev;
@@ -56,6 +131,17 @@ static int __init omap2_gpio_dev_init(struct omap_hwmod *oh, void *unused)
 	pdata->bank_width = dev_attr->bank_width;
 	pdata->dbck_flag = dev_attr->dbck_flag;
 	pdata->get_context_loss_count = omap_pm_get_dev_context_loss_count;
+
+	/*
+	 * WA to reset the module while coming out of OFF.
+	 * It should be reset prior to restore. This is an
+	 * issue in ES1.0 (Bug ID: COBRA-1.0BUG00134) and
+	 * expected to be fixed in ES2.0
+	 */
+	if (omap_rev() == OMAP5430_REV_ES1_0 ||
+	    omap_rev() == OMAP5432_REV_ES1_0)
+		pdata->do_module_reset = omap5_es1_gpio_do_module_reset;
+
 	pdata->regs = kzalloc(sizeof(struct omap_gpio_reg_offs), GFP_KERNEL);
 	if (!pdata) {
 		pr_err("gpio%d: Memory allocation failed\n", id);
@@ -150,6 +236,10 @@ static int __init omap2_gpio_init(void)
 	/* If dtb is there, the devices will be created dynamically */
 	if (of_have_populated_dt())
 		return -ENODEV;
+
+	core_pd = pwrdm_lookup("core_pwrdm");
+	if (!core_pd)
+		pr_err("%s: core power domain lookup failed\n", __func__);
 
 	return omap_hwmod_for_each_by_class("gpio", omap2_gpio_dev_init,
 						NULL);

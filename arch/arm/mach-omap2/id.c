@@ -113,7 +113,9 @@ EXPORT_SYMBOL(omap_get_sysboot_value);
 #define OMAP5_ALL_OPP_ENABLED1			0x1544d4E
 #define OMAP5_ALL_OPP_ENABLED2			0x15451DE
 #define OMAP5_ALL_OPP_ENABLED3			0x154525E
-#define OMAP5_DIE_ID_OFFSET				0x208
+#define OMAP5_ALL_OPP_ENABLED4			0x8
+#define OMAP5_DIE_ID1_OFFSET			0x208
+#define OMAP5_DIE_ID2_OFFSET			0x20C
 
 #define read_tap_reg(reg)	__raw_readl(tap_base  + (reg))
 
@@ -331,9 +333,14 @@ void __init omap4xxx_check_features(void)
 void __init omap5xxx_check_features(void)
 {
 	if ((omap_rev() == OMAP5430_REV_ES1_0) &&
-	    ((omap_ctrl_readl(OMAP5_DIE_ID_OFFSET) == OMAP5_ALL_OPP_ENABLED1) ||
-	     (omap_ctrl_readl(OMAP5_DIE_ID_OFFSET) == OMAP5_ALL_OPP_ENABLED2) ||
-	     (omap_ctrl_readl(OMAP5_DIE_ID_OFFSET) == OMAP5_ALL_OPP_ENABLED3)))
+	    ((omap_ctrl_readl(OMAP5_DIE_ID1_OFFSET) ==
+						OMAP5_ALL_OPP_ENABLED1) ||
+	     (omap_ctrl_readl(OMAP5_DIE_ID1_OFFSET) ==
+						OMAP5_ALL_OPP_ENABLED2) ||
+	     (omap_ctrl_readl(OMAP5_DIE_ID1_OFFSET) ==
+						OMAP5_ALL_OPP_ENABLED3) ||
+		 (omap_ctrl_readl(OMAP5_DIE_ID2_OFFSET) >=
+						OMAP5_ALL_OPP_ENABLED4)))
 		omap_features |= OMAP5_HAS_OPP_HIGH;
 }
 

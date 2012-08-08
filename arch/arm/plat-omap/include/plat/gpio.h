@@ -207,6 +207,9 @@ struct omap_gpio_platform_data {
 
 	/* Return context loss count due to PM states changing */
 	int (*get_context_loss_count)(struct device *dev);
+	/* Return if module was reset and if module should restore context */
+	int (*do_module_reset)(struct device *dev, bool can_loose_context,
+			       bool *should_restore_context);
 };
 
 extern void omap2_gpio_prepare_for_idle(int off_mode);
