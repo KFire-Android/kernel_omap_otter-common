@@ -19,6 +19,9 @@
 
 #include "board-omap5evm.h"
 
+#define OMAP5_SEVM_BOARD_ID	0
+#define OMAP5_PANDA5_BOARD_ID	1
+
 int __init sevm_dock_init(void);
 int __init sevm_touch_init(void);
 int __init sevm_sensor_init(void);
