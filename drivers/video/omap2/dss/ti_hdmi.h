@@ -28,6 +28,7 @@
 #include "hdcp.h"
 
 #define HDMI_CEC_INT		0x100
+#define HDMI_HDCP_INT		0x200
 
 struct hdmi_ip_data;
 struct snd_aes_iec958;
@@ -211,6 +212,9 @@ struct ti_hdmi_ip_ops {
 	int (*hdcp_disable)(struct hdmi_ip_data *ip_data);
 
 	int (*hdcp_status)(struct hdmi_ip_data *ip_data);
+
+	int (*hdcp_int_handler)(struct hdmi_ip_data *ip_data);
+
 };
 
 /*
@@ -273,7 +277,6 @@ struct hdmi_ip_data {
 	bool set_mode;
 	wait_queue_head_t tx_complete;/*ti signal TX complete*/
 	int cec_int;
-	struct completion ksvlist_arrived;
 };
 int ti_hdmi_4xxx_phy_enable(struct hdmi_ip_data *ip_data);
 void ti_hdmi_4xxx_phy_disable(struct hdmi_ip_data *ip_data);
@@ -352,5 +355,6 @@ int ti_hdmi_5xxx_cec_set_reg_device_list(struct hdmi_ip_data *ip_data,
 int ti_hdmi_5xxx_hdcp_init(struct hdmi_ip_data *ip_data);
 int ti_hdmi_5xxx_hdcp_enable(struct hdmi_ip_data *ip_data);
 int ti_hdmi_5xxx_hdcp_disable(struct hdmi_ip_data *ip_data);
+int ti_hdmi_5xxx_hdcp_int_handler(struct hdmi_ip_data *ip_data);
 
 #endif

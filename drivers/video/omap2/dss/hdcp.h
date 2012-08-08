@@ -68,7 +68,6 @@ struct hdcp_wait_control {
 /* Status / error codes */
 #define HDCP_OK			0
 #define HDCP_3DES_ERROR		1
-#define HDCP_AUTH_FAILURE	2
 
 #define HDMI_HDCP_ENABLED	0x1
 #define HDMI_HDCP_FAILED	0x0
@@ -80,6 +79,15 @@ struct hdcp_wait_control {
 /* HDCP user space status */
 #define HDCP_US_NO_ERR		(0 << 8)
 #define HDCP_US_FAILURE		(1 << 8)
+
+/* HDCP interrupts bits */
+#define KSVACCESSINT		(1 << 0x0)
+#define KSVSHA1CALCINT		(1 << 0x1)
+#define KEEPOUTERRORINT		(1 << 0x2)
+#define LOSTARBITRATION		(1 << 0x3)
+#define I2CNACK			(1 << 0x4)
+#define HDCP_FAILED		(1 << 0x6)
+#define HDCP_ENGAGED		(1 << 0x7)
 
 #ifdef __KERNEL__
 
@@ -116,19 +124,6 @@ struct hdcp_wait_control {
 /***************************/
 /* Definitions             */
 /***************************/
-
-/* FIXME: should be 300ms delay between HDMI start frame event and HDCP enable
- * (to respect 7 VSYNC delay in 24 Hz)
- */
-#define HDCP_ENABLE_DELAY	300
-#define HDCP_REAUTH_DELAY	100
-
-/* Event source */
-#define HDCP_SRC_SHIFT		8
-#define HDCP_WORKQUEUE_SRC	(0x1 << HDCP_SRC_SHIFT)
-
-/* Workqueue event */
-#define HDCP_START_FRAME_EVENT	1
 
 /***************************/
 /* Macros for accessing HW */

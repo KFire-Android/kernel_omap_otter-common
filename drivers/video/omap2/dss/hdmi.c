@@ -85,6 +85,7 @@ static struct {
 	void (*hdmi_cec_hpd)(int phy_addr, int status);
 	void (*hdmi_start_frame_cb)(void);
 	bool (*hdmi_power_on_cb)(void);
+	void (*hdmi_hdcp_irq_cb)(void);
 } hdmi;
 
 static const u8 edid_header[8] = {0x0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x0};
@@ -521,11 +522,15 @@ static void hdmi_power_off(struct omap_dss_device *dssdev)
 }
 
 void omapdss_hdmi_register_hdcp_callbacks(void (*hdmi_start_frame_cb)(void),
-				 bool (*hdmi_power_on_cb)(void))
+				bool (*hdmi_power_on_cb)(void),
+				void (*hdmi_hdcp_irq_cb)(void))
 {
 	hdmi.hdmi_start_frame_cb = hdmi_start_frame_cb;
 	hdmi.hdmi_power_on_cb = hdmi_power_on_cb;
+	hdmi.hdmi_hdcp_irq_cb = hdmi_hdcp_irq_cb;
 }
+
+
 
 struct hdmi_ip_data *get_hdmi_ip_data(void)
 {
@@ -1062,6 +1067,9 @@ static irqreturn_t hdmi_irq_handler(int irq, void *arg)
 
 	if (hdmi.hdmi_cec_irq_cb && (r & HDMI_CEC_INT))
 		hdmi.hdmi_cec_irq_cb();
+
+	if (hdmi.hdmi_hdcp_irq_cb && (r & HDMI_HDCP_INT))
+		hdmi.hdmi_hdcp_irq_cb();
 
 	r = hdmi.ip_data.ops->irq_process(&hdmi.ip_data);
 	return IRQ_HANDLED;

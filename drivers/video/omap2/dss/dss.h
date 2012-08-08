@@ -543,7 +543,8 @@ int omapdss_hdmi_unregister_cec_callbacks(void);
 int omapdss_hdmi_display_3d_enable(struct omap_dss_device *dssdev,
 					struct s3d_disp_info *info, int code);
 void omapdss_hdmi_register_hdcp_callbacks(void (*hdmi_start_frame_cb)(void),
-					bool (*hdmi_power_on_cb)(void));
+					bool (*hdmi_power_on_cb)(void),
+					void (*hdmi_hdcp_irq_cb)(void));
 int hdmi_panel_init(void);
 void hdmi_panel_exit(void);
 #ifdef CONFIG_OMAP4_DSS_HDMI_AUDIO

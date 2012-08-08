@@ -36,7 +36,7 @@ struct hdcp_data {
 	struct mutex lock;
 	struct hdcp_enable_control *en_ctrl;
 	struct workqueue_struct *workqueue;
-	struct delayed_work *work;
+	struct work_struct *work;
 	struct miscdevice *mdev;
 	bool hdcp_keys_loaded;
 	int hdcp_up_event;
@@ -73,7 +73,6 @@ static int hdcp_wq_start_authentication(void)
 {
 	int status = 0;
 	struct hdmi_ip_data *ip_data;
-	unsigned long timeout;
 
 	HDCP_DBG("hdcp_wq_start_authentication %ums\n",
 		jiffies_to_msecs(jiffies));
@@ -86,24 +85,6 @@ static int hdcp_wq_start_authentication(void)
 	ip_data = get_hdmi_ip_data();
 	ip_data->ops->hdcp_enable(ip_data);
 
-	init_completion(&ip_data->ksvlist_arrived);
-	timeout = wait_for_completion_interruptible_timeout(
-				&ip_data->ksvlist_arrived,
-				msecs_to_jiffies(700));
-
-	if (!timeout) {
-		HDCP_DBG("Not received KSV access for 700ms. It must be a receiver\n");
-	} else {
-		HDCP_DBG("its a repeater\n");
-		status = hdcp_step2_authenticate_repeater(HDCP_EVENT_STEP2);
-		/* Wait for user space */
-		if (status) {
-			HDCP_ERR("HDCP: hdcp_step2_authenticate_repeater "
-					"CHECK_V error %d\n", status);
-			status = HDCP_AUTH_FAILURE;
-		}
-	}
-
 	hdmi_runtime_put();
 	return status;
 }
@@ -112,11 +93,7 @@ static void hdcp_work_queue(struct work_struct *work)
 {
 	HDCP_DBG("hdcp_work_queue() start\n");
 
-	if (hdcp_wq_start_authentication() == HDCP_AUTH_FAILURE) {
-		HDCP_DBG("HDCP_AUTH_FAILURE, submit work again\n");
-		queue_delayed_work(hdcp->workqueue, hdcp->work,
-				   msecs_to_jiffies(HDCP_REAUTH_DELAY));
-	}
+	hdcp_step2_authenticate_repeater(HDCP_EVENT_STEP2);
 
 	HDCP_DBG("hdcp_work_queue() - END\n");
 }
@@ -206,10 +183,12 @@ static void hdcp_start_frame_cb(void)
 		return;
 	}
 
-	__cancel_delayed_work(hdcp->work);
+	/* Cancel any previous work submitted */
+	cancel_work_sync(hdcp->work);
 
-	queue_delayed_work(hdcp->workqueue, hdcp->work,
-			   msecs_to_jiffies(HDCP_ENABLE_DELAY));
+	/* HDCP enable after 7 Vsync delay */
+	msleep(300);
+	hdcp_wq_start_authentication();
 }
 
 static long hdcp_query_status_ctl(uint32_t *status)
@@ -399,6 +378,25 @@ static int hdcp_load_keys(void)
 	return ret;
 }
 
+static void hdcp_irq_cb(void)
+{
+	struct hdmi_ip_data *ip_data;
+	u32 intr = 0;
+
+	ip_data = get_hdmi_ip_data();
+
+	if (ip_data->ops->hdcp_int_handler)
+		intr = ip_data->ops->hdcp_int_handler(ip_data);
+
+	if (intr == KSVACCESSINT) {
+		cancel_work_sync(hdcp->work);
+
+		queue_work(hdcp->workqueue, hdcp->work);
+	}
+
+	return;
+}
+
 
 static const struct file_operations hdcp_fops = {
 	.owner = THIS_MODULE,
@@ -449,9 +447,9 @@ static int __init hdcp_init(void)
 		goto err_add_driver;
 	}
 
-	hdcp->work = kzalloc(sizeof(struct delayed_work), GFP_ATOMIC);
+	hdcp->work = kzalloc(sizeof(struct work_struct), GFP_ATOMIC);
 	if (hdcp->work) {
-		INIT_DELAYED_WORK(hdcp->work, hdcp_work_queue);
+		INIT_WORK(hdcp->work, hdcp_work_queue);
 	} else {
 		HDCP_ERR("Could not allocate memory to create work\n");
 		goto err_alloc_work;
@@ -464,7 +462,7 @@ static int __init hdcp_init(void)
 
 	/* Register HDCP callbacks to HDMI library */
 	omapdss_hdmi_register_hdcp_callbacks(&hdcp_start_frame_cb,
-						 &hdcp_3des_cb);
+					 &hdcp_3des_cb, &hdcp_irq_cb);
 
 	hdmi_runtime_put();
 
@@ -508,7 +506,7 @@ static void __exit hdcp_exit(void)
 	}
 
 	/* Un-register HDCP callbacks to HDMI library */
-	omapdss_hdmi_register_hdcp_callbacks(NULL, NULL);
+	omapdss_hdmi_register_hdcp_callbacks(NULL, NULL, NULL);
 
 	hdmi_runtime_put();
 
