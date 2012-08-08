@@ -37,6 +37,7 @@
 
 #define GPIO_WIFI_PMENA     140
 #define GPIO_WIFI_SEVM_IRQ       9
+#define GPIO_WIFI_PANDA5_IRQ     14
 
 struct omap5_connectivity_gpios {
 	int wifi_pmena;
@@ -232,7 +233,11 @@ int __init omap5_connectivity_init(int board_type)
 		return -ENOMEM;
 	}
 
-	conn_gpios->wifi_irq = GPIO_WIFI_SEVM_IRQ;
+	if (board_type == OMAP5_PANDA5_BOARD_ID)
+		conn_gpios->wifi_irq = GPIO_WIFI_PANDA5_IRQ;
+	else
+		conn_gpios->wifi_irq = GPIO_WIFI_SEVM_IRQ;
+
 	conn_gpios->wifi_pmena = GPIO_WIFI_PMENA;
 	conn_gpios->bt_shutdown = OMAP5_BT_NSHUTDOWN_GPIO;
 

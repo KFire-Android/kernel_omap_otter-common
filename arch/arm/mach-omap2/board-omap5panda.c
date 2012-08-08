@@ -49,6 +49,7 @@
 #include "common-board-devices.h"
 #include "mux.h"
 #include "omap5_ion.h"
+#include "board-54xx-sevm.h"
 
 #include <video/omapdss.h>
 #include <video/omap-panel-generic-dpi.h>
@@ -870,6 +871,11 @@ static void __init omap_5_panda_init(void)
 	omap_serial_init();
 	platform_device_register(&dummy_sd_regulator_device);
 	omap_ehci_ohci_init();
+
+	/* TODO: Once the board identification is passed in from the
+	 * bootloader pass in the HACK board ID to the conn board file
+	*/
+	omap5_connectivity_init(OMAP5_PANDA5_BOARD_ID);
 
 	omap_hsmmc_init(mmc);
 	usb_dwc3_init();

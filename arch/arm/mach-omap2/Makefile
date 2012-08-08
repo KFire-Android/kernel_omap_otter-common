@@ -276,7 +276,8 @@ obj-$(CONFIG_MACH_OMAP5_SEVM)		+= board-omap5evm.o \
 					   board-54xx-sevm-panel.o \
 					   board-omap5evm-serial.o \
 					      hsmmc.o
-obj-$(CONFIG_MACH_OMAP5_PANDA)		+= board-omap5panda.o
+obj-$(CONFIG_MACH_OMAP5_PANDA)		+= board-omap5panda.o \
+					   board-54xx-connectivity.o
 
 ifeq ($(CONFIG_OMAP_HSI_DEVICE),y)
 obj-$(CONFIG_MACH_OMAP5_SEVM)		+= board-54xx-sevm-modem.o
