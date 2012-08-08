@@ -36,7 +36,13 @@
 #define OMAP5_BT_NSHUTDOWN_GPIO	142
 
 #define GPIO_WIFI_PMENA     140
-#define GPIO_WIFI_IRQ       9
+#define GPIO_WIFI_SEVM_IRQ       9
+
+struct omap5_connectivity_gpios {
+	int wifi_pmena;
+	int wifi_irq;
+	int bt_shutdown;
+};
 
 static struct regulator_consumer_supply omap5_evm_vmmc3_supply = {
 	.supply         = "vmmc",
@@ -74,11 +80,11 @@ static struct wl12xx_platform_data omap5_evm_wlan_data __initdata = {
 	.board_tcxo_clock   = WL12XX_TCXOCLOCK_26,
 };
 
-static void __init omap5_evm_wifi_mux_init(void)
+static void __init omap5_evm_wifi_mux_init(struct omap5_connectivity_gpios *conn_gpios)
 {
-	omap_mux_init_gpio(GPIO_WIFI_IRQ, OMAP_PIN_INPUT_PULLUP | OMAP_WAKEUP_EN);
+	omap_mux_init_gpio(conn_gpios->wifi_irq, OMAP_PIN_INPUT | OMAP_WAKEUP_EN);
 
-	omap_mux_init_gpio(GPIO_WIFI_PMENA, OMAP_PIN_OUTPUT |
+	omap_mux_init_gpio(conn_gpios->wifi_pmena, OMAP_PIN_OUTPUT |
 			OMAP_PIN_INPUT_PULLUP);
 
 	omap_mux_init_signal("wlsdio_cmd.wlsdio_cmd",
@@ -95,19 +101,19 @@ static void __init omap5_evm_wifi_mux_init(void)
 					OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP);
 }
 
-static void __init omap5_evm_wifi_init(void)
+static void __init omap5_evm_wifi_init(struct omap5_connectivity_gpios *conn_gpios)
 {
 	int ret;
 
-	omap5_evm_wifi_mux_init();
+	omap5_evm_wifi_mux_init(conn_gpios);
 
-	ret = gpio_request_one(GPIO_WIFI_IRQ, GPIOF_IN, "wlan");
+	ret = gpio_request_one(conn_gpios->wifi_irq, GPIOF_IN, "wlan");
 	if (ret) {
 		printk(KERN_INFO "wlan: IRQ gpio request failure in board file\n");
 		return;
 	}
 
-	omap5_evm_wlan_data.irq = gpio_to_irq(GPIO_WIFI_IRQ);
+	omap5_evm_wlan_data.irq = gpio_to_irq(conn_gpios->wifi_irq);
 
 	ret = wl12xx_set_platform_data(&omap5_evm_wlan_data);
 	if (ret) {
@@ -203,9 +209,10 @@ static struct platform_device *omap5evm_wilink_devs[] = {
 	&nfcwilink_device,
 };
 
-static void __init omap5_ti_st_init(void)
+static void __init omap5_ti_st_init(struct omap5_connectivity_gpios *conn_gpios)
 {
-	omap_mux_init_gpio(OMAP5_BT_NSHUTDOWN_GPIO,
+
+	omap_mux_init_gpio(conn_gpios->bt_shutdown,
 		OMAP_PIN_OUTPUT | OMAP_PIN_INPUT_PULLUP);
 	wake_lock_init(&st_wk_lock, WAKE_LOCK_SUSPEND, "st_wake_lock");
 
@@ -216,11 +223,25 @@ static void __init omap5_ti_st_init(void)
 
 int __init omap5_connectivity_init(void)
 {
-	omap5_evm_wifi_init();
+	struct omap5_connectivity_gpios *conn_gpios;
+
+	conn_gpios = kzalloc(sizeof(struct omap5_connectivity_gpios), GFP_KERNEL);
+	if (!conn_gpios) {
+		pr_err("%s: Cannot allocate memory for connectivity\n",
+			__func__);
+		return -ENOMEM;
+	}
+
+	conn_gpios->wifi_irq = GPIO_WIFI_SEVM_IRQ;
+	conn_gpios->wifi_pmena = GPIO_WIFI_PMENA;
+	conn_gpios->bt_shutdown = OMAP5_BT_NSHUTDOWN_GPIO;
+
+	omap5_evm_wifi_init(conn_gpios);
 #ifdef CONFIG_TI_ST
 	/* add shared transport relevant platform devices only */
-	omap5_ti_st_init();
+	omap5_ti_st_init(conn_gpios);
 #endif
 
+	kfree(conn_gpios);
 	return 0;
 }
