@@ -52,6 +52,7 @@
 #define GPIO_HUB_NRESET		80	/* USBB2 to SMSC 3530 HUB */
 #define GPIO_POWER_BUTTON	83
 #define GPIO_EXT_INT_PIN	99
+#define GPIO_TWL6040_PWRON	141
 #define GPIO_SDCARD_DETECT	152
 #define HDMI_GPIO_HPD		193
 
@@ -120,6 +121,7 @@ static struct omap_board_mux board_mux[] __initdata = {
 		OMAP_PIN_INPUT_PULLUP | OMAP_PIN_OFF_NONE | OMAP_MUX_MODE6),
 	OMAP5_MUX(HSI2_ACDATA,
 		OMAP_WAKEUP_EN | OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE6),
+	OMAP5_MUX(MCSPI1_SOMI, OMAP_PIN_OUTPUT | OMAP_MUX_MODE6),
 	{ .reg_offset = OMAP_MUX_TERMINATOR },
 };
 #else
@@ -653,7 +655,7 @@ static struct twl6040_vibra_data twl6040_vibra = {
 static struct twl6040_platform_data twl6040_data = {
 	.codec		= &twl6040_codec,
 	.vibra		= &twl6040_vibra,
-	.audpwron_gpio	= 145,
+	.audpwron_gpio	= GPIO_TWL6040_PWRON,
 };
 
 static struct platform_device omap5evm_dmic_codec = {
