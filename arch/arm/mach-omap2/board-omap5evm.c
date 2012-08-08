@@ -959,7 +959,7 @@ static void __init omap_5430evm_init(void)
 
 	omap_ehci_ohci_init();
 
-	omap5sevm_connectivity_init();
+	omap5_connectivity_init();
 	omap_hsmmc_init(mmc);
 	usb_dwc3_init();
 	platform_add_devices(omap5evm_devices, ARRAY_SIZE(omap5evm_devices));

@@ -38,43 +38,43 @@
 #define GPIO_WIFI_PMENA     140
 #define GPIO_WIFI_IRQ       9
 
-static struct regulator_consumer_supply omap5_sdp5430_vmmc3_supply = {
+static struct regulator_consumer_supply omap5_evm_vmmc3_supply = {
 	.supply         = "vmmc",
 	.dev_name       = "omap_hsmmc.2",
 };
 
-static struct regulator_init_data sdp5430_vmmc3 = {
+static struct regulator_init_data evm_vmmc3 = {
 		.constraints            = {
 		.valid_ops_mask = REGULATOR_CHANGE_STATUS,
 	},
 	.num_consumer_supplies  = 1,
-	.consumer_supplies      = &omap5_sdp5430_vmmc3_supply,
+	.consumer_supplies      = &omap5_evm_vmmc3_supply,
 };
 
-static struct fixed_voltage_config sdp5430_vwlan = {
+static struct fixed_voltage_config evm_vwlan = {
 	.supply_name            = "vwl1271",
 	.microvolts             = 1800000, /* 1.8V */
 	.gpio                   = GPIO_WIFI_PMENA,
 	.startup_delay          = 70000, /* 70msec */
 	.enable_high            = 1,
 	.enabled_at_boot        = 0,
-	.init_data              = &sdp5430_vmmc3,
+	.init_data              = &evm_vmmc3,
 };
 
 static struct platform_device omap_vwlan_device = {
 	.name           = "reg-fixed-voltage",
 	.id             = 2,
 	.dev = {
-		.platform_data = &sdp5430_vwlan,
+		.platform_data = &evm_vwlan,
 	},
 };
 
-static struct wl12xx_platform_data omap5_sdp5430_wlan_data __initdata = {
+static struct wl12xx_platform_data omap5_evm_wlan_data __initdata = {
 	.board_ref_clock    = WL12XX_REFCLOCK_26,
 	.board_tcxo_clock   = WL12XX_TCXOCLOCK_26,
 };
 
-static void __init omap5_sdp5430_wifi_mux_init(void)
+static void __init omap5_evm_wifi_mux_init(void)
 {
 	omap_mux_init_gpio(GPIO_WIFI_IRQ, OMAP_PIN_INPUT_PULLUP | OMAP_WAKEUP_EN);
 
@@ -95,11 +95,11 @@ static void __init omap5_sdp5430_wifi_mux_init(void)
 					OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP);
 }
 
-static void __init omap5_sdp5430_wifi_init(void)
+static void __init omap5_evm_wifi_init(void)
 {
 	int ret;
 
-	omap5_sdp5430_wifi_mux_init();
+	omap5_evm_wifi_mux_init();
 
 	ret = gpio_request_one(GPIO_WIFI_IRQ, GPIOF_IN, "wlan");
 	if (ret) {
@@ -107,9 +107,9 @@ static void __init omap5_sdp5430_wifi_init(void)
 		return;
 	}
 
-	omap5_sdp5430_wlan_data.irq = gpio_to_irq(GPIO_WIFI_IRQ);
+	omap5_evm_wlan_data.irq = gpio_to_irq(GPIO_WIFI_IRQ);
 
-	ret = wl12xx_set_platform_data(&omap5_sdp5430_wlan_data);
+	ret = wl12xx_set_platform_data(&omap5_evm_wlan_data);
 	if (ret) {
 		pr_err("Error setting wl12xx data\n");
 		return;
@@ -203,7 +203,7 @@ static struct platform_device *omap5evm_wilink_devs[] = {
 	&nfcwilink_device,
 };
 
-static void __init omap5sevm_ti_st_init(void)
+static void __init omap5_ti_st_init(void)
 {
 	omap_mux_init_gpio(OMAP5_BT_NSHUTDOWN_GPIO,
 		OMAP_PIN_OUTPUT | OMAP_PIN_INPUT_PULLUP);
@@ -214,12 +214,12 @@ static void __init omap5sevm_ti_st_init(void)
 }
 
 
-int __init omap5sevm_connectivity_init(void)
+int __init omap5_connectivity_init(void)
 {
-	omap5_sdp5430_wifi_init();
+	omap5_evm_wifi_init();
 #ifdef CONFIG_TI_ST
 	/* add shared transport relevant platform devices only */
-	omap5sevm_ti_st_init();
+	omap5_ti_st_init();
 #endif
 
 	return 0;
