@@ -16,8 +16,10 @@
 #include <linux/cpu_pm.h>
 #include <linux/export.h>
 #include <linux/clockchips.h>
+#include <linux/suspend.h>
 
 #include <asm/proc-fns.h>
+#include <asm/system_misc.h>
 
 #include "common.h"
 #include "pm.h"
@@ -38,8 +40,11 @@ struct omap5_idle_statedata {
 static struct cpuidle_params cpuidle_params_table[] = {
 	/* C1 - CPU0 ON + CPU1 ON + MPU ON */
 	{.exit_latency = 2 + 2 , .target_residency = 5, .valid = 1},
-	/* C2- CPU0 CSWR + CPU1 CSWR + MPU CSWR */
-	{.exit_latency = 100 + 100 , .target_residency = 200, .valid = 1},
+	/*
+	 * C2- CPU0 CSWR + CPU1 CSWR + MPU CSWR
+	 * FIXME: Disabled due to instability - under debug
+	 */
+	{.exit_latency = 100 + 100 , .target_residency = 200, .valid = 0},
 
 	/*
 	 * FIXME: Errata analysis pending. Disabled C-state as CPU Forced-OFF is
@@ -213,6 +218,59 @@ static inline struct omap5_idle_statedata *_fill_cstate_usage(
 	return cx;
 }
 
+/*
+ * We need to prevent the freezer from racing with CPUIdle during
+ * suspending/hibernation.
+ *
+ * Hence disable CPUIdle early by hooking onto the Suspend/
+ * Hibernate notifications PM_XXX_PREPARE/PM_POST_XXX.
+ *
+ * Previously CPUIdle has been disabled by generic OMAP PM code only
+ * in omap_pm_begin, omap_pm_end which is too late in case of OAMP5.
+ *
+ * It's safe to use disable_hlt/enable_hlt recursively, because it just
+ * a counter increment/decrement operation.
+ */
+static int cpuidle_sleep_pm_callback(struct notifier_block *nfb,
+					unsigned long action,
+					void *ignored)
+{
+	switch (action) {
+	case PM_HIBERNATION_PREPARE:
+	case PM_SUSPEND_PREPARE:
+		/*
+		 * cpuidle_pause_and_lock()/cpuidle_resume_and_unlock()
+		 * need to be used here because at any moment of time
+		 * one of the CPUs can be in LP state.
+		 * The call to cpuidle_resume_and_unlock() allows
+		 * to kick of all CPUs from LP states, so we can be sure
+		 * that CPUIdle is really disabled on all CPUs.
+		 */
+		cpuidle_pause_and_lock();
+		disable_hlt();
+		cpuidle_resume_and_unlock();
+		return NOTIFY_OK;
+	case PM_POST_HIBERNATION:
+	case PM_POST_SUSPEND:
+		cpuidle_pause_and_lock();
+		enable_hlt();
+		cpuidle_resume_and_unlock();
+		return NOTIFY_OK;
+	}
+
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block cpuidle_sleep_pm_notifier = {
+	.notifier_call = cpuidle_sleep_pm_callback,
+	.priority = 0,
+};
+
+static void __init cpuidle_register_sleep_pm_notifier(void)
+{
+	register_pm_notifier(&cpuidle_sleep_pm_notifier);
+}
+
 /**
  * omap5_idle_init - Init routine for OMAP5 idle
  *
@@ -295,6 +353,8 @@ int __init omap5_idle_init(void)
 			return -EIO;
 		}
 	}
+
+	cpuidle_register_sleep_pm_notifier();
 
 	return 0;
 }
