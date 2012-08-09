@@ -12,3 +12,5 @@ omapdss-$(CONFIG_OMAP4_DSS_HDMI) += hdmi.o \
 omapdss-$(CONFIG_OMAP5_DSS_HDMI) += hdmi.o \
 				hdmi_panel.o ti_hdmi_4xxx_ip.o ti_hdmi_5xxx_ip.o \
 				cec.o hdcp_top.o
+
+ccflags-y += -Iarch/arm
