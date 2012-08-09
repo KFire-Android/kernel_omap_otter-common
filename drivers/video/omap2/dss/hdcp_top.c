@@ -41,7 +41,13 @@ struct hdcp_data {
 	bool hdcp_keys_loaded;
 	int hdcp_up_event;
 	int hdcp_down_event;
-	int hdcp_wait_re_entrance;
+	/*
+	 * This lock is to protect hdcp wait ioctl being called by multiple
+	 * process incorrectly. This can happen if the HDCP user space daemon
+	 * is mistakenly called more than once.
+	 */
+	struct mutex re_entrant_lock;
+	bool re_entrance_flag;
 };
 
 static struct hdcp_data *hdcp;
@@ -213,20 +219,12 @@ static long hdcp_auth_wait_event_ctl(struct hdcp_wait_control *ctrl)
 	HDCP_DBG("hdcp_ioctl() - WAIT %u %d", jiffies_to_msecs(jiffies),
 					 hdcp->hdcp_up_event);
 
-	if (hdcp->hdcp_wait_re_entrance == 0) {
-		hdcp->hdcp_wait_re_entrance = 1;
+	wait_event_interruptible(hdcp_up_wait_queue,
+				 (hdcp->hdcp_up_event & 0xFF) != 0);
 
-		HDCP_DBG("hdcp_auth_wait_event_ctl: wating\n");
-		wait_event_interruptible(hdcp_up_wait_queue,
-					 (hdcp->hdcp_up_event & 0xFF) != 0);
+	ctrl->event = hdcp->hdcp_up_event;
 
-		ctrl->event = hdcp->hdcp_up_event;
-
-		hdcp->hdcp_up_event = 0;
-		hdcp->hdcp_wait_re_entrance = 0;
-	} else {
-		ctrl->event = HDCP_EVENT_EXIT;
-	}
+	hdcp->hdcp_up_event = 0;
 
 	return 0;
 }
@@ -259,6 +257,7 @@ static long hdcp_ioctl(struct file *fd, unsigned int cmd, unsigned long arg)
 
 	switch (cmd) {
 	case HDCP_WAIT_EVENT:
+
 		if (copy_from_user(&ctrl, argp,
 				sizeof(struct hdcp_wait_control))) {
 			HDCP_ERR("HDCP: Error copying from user space"
@@ -266,7 +265,21 @@ static long hdcp_ioctl(struct file *fd, unsigned int cmd, unsigned long arg)
 			return -EFAULT;
 		}
 
-		hdcp_auth_wait_event_ctl(&ctrl);
+		/* Do not allow re-entrance for this ioctl */
+		mutex_lock(&hdcp->re_entrant_lock);
+		if (hdcp->re_entrance_flag == false) {
+			hdcp->re_entrance_flag = true;
+			mutex_unlock(&hdcp->re_entrant_lock);
+
+			hdcp_auth_wait_event_ctl(&ctrl);
+
+			mutex_lock(&hdcp->re_entrant_lock);
+			hdcp->re_entrance_flag = false;
+			mutex_unlock(&hdcp->re_entrant_lock);
+		} else {
+			mutex_unlock(&hdcp->re_entrant_lock);
+			ctrl.event = HDCP_EVENT_EXIT;
+		}
 
 		/* Store output data to output pointer */
 		if (copy_to_user(argp, &ctrl,
@@ -455,6 +468,8 @@ static int __init hdcp_init(void)
 		goto err_alloc_work;
 	}
 
+	mutex_init(&hdcp->re_entrant_lock);
+
 	if (hdmi_runtime_get()) {
 		HDCP_ERR("%s Error enabling clocks\n", __func__);
 		goto err_runtime;
@@ -471,6 +486,8 @@ static int __init hdcp_init(void)
 	return 0;
 
 err_runtime:
+	mutex_destroy(&hdcp->re_entrant_lock);
+
 	kfree(hdcp->work);
 
 err_alloc_work:
@@ -522,6 +539,8 @@ err_handling:
 	mutex_unlock(&hdcp->lock);
 
 	mutex_destroy(&hdcp->lock);
+
+	mutex_destroy(&hdcp->re_entrant_lock);
 
 	kfree(hdcp);
 }
