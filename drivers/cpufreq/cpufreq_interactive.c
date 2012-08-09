@@ -58,6 +58,7 @@ struct cpufreq_interactive_cpuinfo {
 	u64 hispeed_validate_time;
 	int governor_enabled;
 	unsigned int *load_history;
+	unsigned int history_load_index;
 	unsigned int total_avg_load;
 	unsigned int total_load_history;
 	unsigned int low_power_rate_history;
@@ -82,7 +83,6 @@ static cpumask_t tune_cpumask;
 static spinlock_t tune_cpumask_lock;
 
 static unsigned int sampling_periods;
-static unsigned int history_load_index;
 static unsigned int low_power_threshold;
 static unsigned int hi_perf_threshold;
 static unsigned int low_power_rate;
@@ -245,13 +245,14 @@ static void cpufreq_interactive_timer(unsigned long data)
 	 */
 	if (load_since_change > cpu_load)
 		cpu_load = load_since_change;
-	pcpu->load_history[history_load_index] = cpu_load;
+	pcpu->load_history[pcpu->history_load_index] = cpu_load;
 
 	pcpu->total_load_history = 0;
 	pcpu->low_power_rate_history = 0;
 
 	/* compute average load across in & out sampling periods */
-	for (i = 0, j = history_load_index; i < sampling_periods; i++, j--) {
+	for (i = 0, j = pcpu->history_load_index;
+					i < sampling_periods; i++, j--) {
 		pcpu->total_load_history += pcpu->load_history[j];
 		if (low_power_rate < sampling_periods)
 			if (i < low_power_rate)
@@ -262,8 +263,17 @@ static void cpufreq_interactive_timer(unsigned long data)
 	}
 
 	/* return to first element if we're at the circular buffer's end */
-	if (++history_load_index == sampling_periods)
-		history_load_index = 0;
+	if (++pcpu->history_load_index == sampling_periods)
+		pcpu->history_load_index = 0;
+	else if (unlikely(pcpu->history_load_index > sampling_periods)) {
+		/*
+		 * This not supposed to happen.
+		 * If we got here - means something is wrong.
+		 */
+		pr_err("%s: have gone beyond allocated buffer of history!\n",
+					__func__);
+		pcpu->history_load_index = 0;
+	}
 
 	pcpu->total_avg_load = pcpu->total_load_history / sampling_periods;
 
@@ -966,9 +976,10 @@ static ssize_t store_sampling_periods(struct kobject *kobj,
 			struct attribute *attr, const char *buf, size_t count)
 {
 	int ret;
-	unsigned int val;
+	unsigned int val, t_mask = 0;
 	unsigned int *temp;
 	unsigned int j, i;
+	struct cpufreq_interactive_cpuinfo *pcpu;
 
 	ret = sscanf(buf, "%u", &val);
 	if (ret != 1)
@@ -977,40 +988,42 @@ static ssize_t store_sampling_periods(struct kobject *kobj,
 	if (val == sampling_periods)
 		return count;
 
-	if (val <= sampling_periods) {
-		sampling_periods = val;
-		history_load_index = 0;
-		return count;
-	}
-
 	mutex_lock(&set_speed_lock);
 
-	for_each_online_cpu(j) {
-		struct cpufreq_interactive_cpuinfo *pcpu;
+	for_each_present_cpu(j) {
+		pcpu = &per_cpu(cpuinfo, j);
+		ret = del_timer_sync(&pcpu->cpu_timer);
+		if (ret)
+			t_mask |= BIT(j);
+		pcpu->history_load_index = 0;
 
 		temp = kmalloc((sizeof(unsigned int) * val), GFP_KERNEL);
 		if (!temp) {
-			mutex_unlock(&set_speed_lock);
 			pr_err("%s:can't allocate memory for history\n",
 					__func__);
-			return -ENOMEM;
+			count = -ENOMEM;
+			goto out;
 		}
-		pcpu = &per_cpu(cpuinfo, j);
-		ret = del_timer_sync(&pcpu->cpu_timer);
 		memcpy(temp, pcpu->load_history,
-				(sampling_periods * sizeof(unsigned int)));
-		for (i = sampling_periods; i < val; i++)
-			temp[i] = 50;
+			(min(sampling_periods, val) * sizeof(unsigned int)));
+		if (val > sampling_periods)
+			for (i = sampling_periods; i < val; i++)
+				temp[i] = 50;
 
 		kfree(pcpu->load_history);
 		pcpu->load_history = temp;
-
-		if (ret)
-			mod_timer(&pcpu->cpu_timer,
-				  jiffies + usecs_to_jiffies(timer_rate));
 	}
-	sampling_periods = val;
-	history_load_index = 0;
+
+out:
+	if (!(count < 0 && val > sampling_periods))
+		sampling_periods = val;
+
+	for_each_online_cpu(j) {
+		pcpu = &per_cpu(cpuinfo, j);
+		if (t_mask & BIT(j))
+			mod_timer(&pcpu->cpu_timer,
+				jiffies + usecs_to_jiffies(timer_rate));
+	}
 
 	mutex_unlock(&set_speed_lock);
 
@@ -1146,12 +1159,12 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 				return -ENOMEM;
 			for (i = 0; i < sampling_periods; i++)
 				pcpu->load_history[i] = 0;
+			pcpu->history_load_index = 0;
 			smp_wmb();
 		}
 
 		if (!hispeed_freq)
 			hispeed_freq = policy->max;
-		history_load_index = 0;
 
 		/*
 		 * Do not register the idle hook and create sysfs

@@ -84,7 +84,7 @@ struct fm_reg_table {
 
 #define FM_POWER_MODE            254
 #define FM_INTERRUPT             255
-#define STATION_VALID		 123
+#define TUNE_VALIDITY_CHECK	 123
 
 /* Transmitter API */
 
@@ -189,6 +189,7 @@ struct fm_event_msg_hdr {
 #define FM_STIC_EVENT		(1 << 9)
 #define FM_MAL_EVENT		(1 << 10)
 #define FM_POW_ENB_EVENT	(1 << 11)
+#define FM_SCAN_DONE_EVENT	(1 << 15)
 
 /*
  * Firmware files of FM. ASIC ID and ASIC version will be appened to this,
@@ -203,16 +204,21 @@ struct fm_event_msg_hdr {
 /* Band types */
 #define FM_BAND_EUROPE_US	0
 #define FM_BAND_JAPAN		1
+#define FM_BAND_RUSSIAN		2
 
 /* Seek directions */
 #define FM_SEARCH_DIRECTION_DOWN	0
 #define FM_SEARCH_DIRECTION_UP		1
 
-/* Tunner modes */
+/* Tuner modes */
 #define FM_TUNER_STOP_SEARCH_MODE	0
 #define FM_TUNER_PRESET_MODE		1
 #define FM_TUNER_AUTONOMOUS_SEARCH_MODE	2
 #define FM_TUNER_AF_JUMP_MODE		3
+#define FM_TUNER_PI_MATCH_MODE          4
+#define FM_TUNER_BULK_SEARCH_MODE       5
+#define FM_TUNER_WRAP_SEARCH_MODE       6
+#define FM_TUNER_WEATHER_MODE           7
 
 /* Min and Max volume */
 #define FM_RX_VOLUME_MIN	0
@@ -399,6 +405,11 @@ u32 fmc_get_mode(struct fmdev *, u8 *);
 #define FM_CHANNEL_SPACING_100KHZ 2
 #define FM_CHANNEL_SPACING_200KHZ 4
 #define FM_FREQ_MUL 50
+
+#define SEEK_START		0
+#define COMP_SCAN_START		1
+#define COMP_SCAN_READ		2
+#define COMP_SCAN_STOP		3
 
 #define FM_US_BAND_LOW		87500
 #define FM_US_BAND_HIGH		180000

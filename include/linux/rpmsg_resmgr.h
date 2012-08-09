@@ -61,12 +61,17 @@ enum {
 	RPRM_DISCONNECT		= 3,
 	RPRM_REQ_CONSTRAINTS	= 4,
 	RPRM_REL_CONSTRAINTS	= 5,
+	RPRM_REQ_DATA		= 6,
 };
 
 enum {
 	RPRM_SCALE		= 0x1,
 	RPRM_LATENCY		= 0x2,
 	RPRM_BANDWIDTH		= 0x4,
+};
+
+enum {
+	RPRM_MAX_FREQ		= 0,
 };
 
 struct rprm_request {
@@ -127,5 +132,10 @@ struct rprm_constraints_data {
 	long bandwidth;
 	long latency;
 };
+
+struct rprm_request_data {
+	u32 type;
+	char data[];
+} __packed;
 
 #endif /* _LINUX_RPMSG_RESMGR_H */

@@ -58,6 +58,14 @@ static struct region_info region_configs[] = {
 	 .top_freq = 90000,	/* 90 MHz */
 	 .fm_band = 1,
 	 },
+	/* Russian (OIRT) band */
+	{
+	 .chanl_space = FM_CHANNEL_SPACING_200KHZ * FM_FREQ_MUL,
+	 .bot_freq = 65800,     /* 65.8 MHz */
+	 .top_freq = 74000,     /* 74 MHz */
+	 .fm_band = 2,
+	 },
+
 };
 
 /* Band selection */
@@ -584,18 +592,16 @@ static void fm_irq_send_flag_getcmd(struct fmdev *fmdev)
 static void fm_irq_handle_flag_getcmd_resp(struct fmdev *fmdev)
 {
 	struct sk_buff *skb;
-	struct fm_event_msg_hdr *fm_evt_hdr;
 
 	if (check_cmdresp_status(fmdev, &skb))
 		return;
 
-	fm_evt_hdr = (void *)skb->data;
-
 	/* Skip header info and copy only response data */
 	skb_pull(skb, sizeof(struct fm_event_msg_hdr));
-	memcpy(&fmdev->irq_info.flag, skb->data, fm_evt_hdr->dlen);
 
-	fmdev->irq_info.flag = be16_to_cpu(fmdev->irq_info.flag);
+	/* Copy 16 bit flag register value from skb->data */
+	fmdev->irq_info.flag = (u16) ((skb->data[0] << 8) | skb->data[1]);
+
 	fmdbg("irq: flag register(0x%x)\n", fmdev->irq_info.flag);
 
 	/* Continue next function in interrupt handler table */
@@ -836,12 +842,17 @@ static void fm_irq_handle_rds_finish(struct fmdev *fmdev)
 
 static void fm_irq_handle_tune_op_ended(struct fmdev *fmdev)
 {
-	if (fmdev->irq_info.flag & (FM_FR_EVENT | FM_BL_EVENT) & fmdev->
-	    irq_info.mask) {
+	if (fmdev->irq_info.flag & (FM_FR_EVENT | FM_BL_EVENT |
+			FM_SCAN_DONE_EVENT) & fmdev->irq_info.mask) {
 		fmdbg("irq: tune ended/bandlimit reached\n");
 		if (test_and_clear_bit(FM_AF_SWITCH_INPROGRESS, &fmdev->flag)) {
 			fmdev->irq_info.stage = FM_AF_JUMP_RD_FREQ_IDX;
 		} else {
+			if (fmdev->rx.comp_scan_status) {
+				fmdbg("irq: complete scan done\n");
+				fmdev->rx.comp_scan_done = 1;
+			}
+
 			complete(&fmdev->maintask_comp);
 			fmdev->irq_info.stage = FM_HW_POWER_ENB_IDX;
 		}
@@ -1575,7 +1586,7 @@ u32 fmc_prepare(struct fmdev *fmdev)
 	fmdev->rx.rds.flag = FM_RDS_DISABLE;
 	fmdev->rx.freq = FM_UNDEFINED_FREQ;
 	fmdev->rx.rds_mode = FM_RDS_SYSTEM_RDS;
-	fmdev->rx.af_mode = FM_RX_RDS_AF_SWITCH_MODE_OFF;
+	fmdev->rx.af_mode = FM_RX_RDS_AF_SWITCH_MODE_ON;
 	fmdev->irq_info.retry = 0;
 
 	fmdev->tx_data.tx_frq = FM_UNDEFINED_FREQ;
