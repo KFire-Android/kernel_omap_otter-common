@@ -691,12 +691,7 @@ static int __init omap_governor_init(void)
 		omap_gov_instance[i]->enable_debug_print = false;
 		omap_gov_instance[i]->alert_threshold = OMAP_ALERT_TEMP;
 		omap_gov_instance[i]->panic_threshold = OMAP_PANIC_TEMP;
-		omap_gov_instance[i]->omap_gradient_slope =
-			thermal_get_slope(&omap_gov_instance[i]->thermal_fw,
-									NULL);
-		omap_gov_instance[i]->omap_gradient_const =
-			thermal_get_offset(&omap_gov_instance[i]->thermal_fw,
-									NULL);
+
 		INIT_DELAYED_WORK(&omap_gov_instance[i]->
 					average_gov_sensor_work,
 					average_sensor_delayed_work_fn);
@@ -721,6 +716,19 @@ static int __init omap_governor_init(void)
 							&omap_gov_ops;
 	thermal_governor_dev_register(
 			&omap_gov_instance[OMAP_GOV_CPU_INSTANCE]->thermal_fw);
+
+	omap_gov_instance[OMAP_GOV_CPU_INSTANCE]->omap_gradient_slope =
+	thermal_get_slope(&omap_gov_instance[OMAP_GOV_CPU_INSTANCE]->thermal_fw,
+									NULL);
+	omap_gov_instance[OMAP_GOV_CPU_INSTANCE]->omap_gradient_const =
+	thermal_get_offset(&omap_gov_instance[OMAP_GOV_CPU_INSTANCE]->
+							thermal_fw, NULL);
+
+	pr_info("%s: domain %s slope %d const %d\n", __func__,
+	omap_gov_instance[OMAP_GOV_CPU_INSTANCE]->thermal_fw.domain_name,
+	omap_gov_instance[OMAP_GOV_CPU_INSTANCE]->omap_gradient_slope,
+	omap_gov_instance[OMAP_GOV_CPU_INSTANCE]->omap_gradient_const);
+
 	/* Initializing GPU governor */
 	memcpy(omap_gov_instance[OMAP_GOV_GPU_INSTANCE]->omap_thermal_zones,
 		omap_thermal_init_zones, sizeof(omap_thermal_init_zones));
@@ -733,6 +741,18 @@ static int __init omap_governor_init(void)
 							&omap_gov_ops;
 	thermal_governor_dev_register(
 			&omap_gov_instance[OMAP_GOV_GPU_INSTANCE]->thermal_fw);
+
+	omap_gov_instance[OMAP_GOV_GPU_INSTANCE]->omap_gradient_slope =
+	thermal_get_slope(&omap_gov_instance[OMAP_GOV_GPU_INSTANCE]->thermal_fw,
+									NULL);
+	omap_gov_instance[OMAP_GOV_GPU_INSTANCE]->omap_gradient_const =
+	thermal_get_offset(&omap_gov_instance[OMAP_GOV_GPU_INSTANCE]->
+							thermal_fw, NULL);
+
+	pr_info("%s: domain %s slope %d const %d\n", __func__,
+	omap_gov_instance[OMAP_GOV_GPU_INSTANCE]->thermal_fw.domain_name,
+	omap_gov_instance[OMAP_GOV_GPU_INSTANCE]->omap_gradient_slope,
+	omap_gov_instance[OMAP_GOV_GPU_INSTANCE]->omap_gradient_const);
 
 	return 0;
 
