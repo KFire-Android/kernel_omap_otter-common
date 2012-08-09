@@ -1263,7 +1263,7 @@ static void cfhsi_wake_up(struct work_struct *work)
 		__func__);
 
 	/* Wait for acknowledge. */
-	ret = CFHSI_WAKE_TOUT;
+	ret = CFHSI_WAKE_UP_TOUT;
 	ret = wait_event_interruptible_timeout(cfhsi->wake_up_wait,
 					test_and_clear_bit(CFHSI_WAKE_UP_ACK,
 							&cfhsi->bits), ret);
@@ -1373,7 +1373,8 @@ static void cfhsi_wake_down(struct work_struct *work)
 	int retry = CFHSI_WAKE_TOUT;
 
 	cfhsi = container_of(work, struct cfhsi, wake_down_work);
-	netdev_dbg(cfhsi->ndev, "%s.\n", __func__);
+	netdev_dbg(cfhsi->ndev, "%s. inactivity_timeout=%d\n",
+		   __func__, cfhsi->cfg.inactivity_timeout);
 
 	if (test_bit(CFHSI_SHUTDOWN, &cfhsi->bits))
 		return;
@@ -1387,27 +1388,39 @@ static void cfhsi_wake_down(struct work_struct *work)
 	cfhsi->ops->cfhsi_wake_down(cfhsi->ops);
 
 	/* Wait for acknowledge. */
-	ret = CFHSI_WAKE_TOUT;
+	ret = CFHSI_WAKE_DOWN_TOUT;
 	ret = wait_event_interruptible_timeout(cfhsi->wake_down_wait,
-					test_and_clear_bit(CFHSI_WAKE_DOWN_ACK,
-							&cfhsi->bits), ret);
+					       test_and_clear_bit(CFHSI_WAKE_DOWN_ACK,
+								  &cfhsi->bits), ret);
 	if (ret < 0) {
 		/* Interrupted by signal. */
 		netdev_err(cfhsi->ndev, "%s: Signalled: %ld.\n",
-			__func__, ret);
+			   __func__, ret);
 		return;
 	} else if (!ret) {
 		bool ca_wake = true;
 
 		/* Timeout */
-		netdev_err(cfhsi->ndev, "%s: Timeout.\n", __func__);
+		netdev_err(cfhsi->ndev,
+			   "%s: Waiting for ACK Timeout\n", __func__);
 
 		/* Check if we misssed the interrupt. */
 		WARN_ON(cfhsi->ops->cfhsi_get_peer_wake(cfhsi->ops,
 							&ca_wake));
 		if (!ca_wake)
 			netdev_err(cfhsi->ndev, "%s: CA Wake missed !.\n",
-				__func__);
+				   __func__);
+		else {
+			netdev_err(cfhsi->ndev,
+				   "%s: CA Wake Down ACK missed, Taking down interface\n",
+				   __func__);
+			schedule_work(&cfhsi->out_of_sync_work);
+			return;
+		}
+
+	} else {
+		netdev_dbg(cfhsi->ndev, "%s: Wake_Down ACK received from modem\n",
+			   __func__);
 	}
 
 	/* Check FIFO occupancy. */

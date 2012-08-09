@@ -97,6 +97,14 @@ struct cfhsi_desc {
 #define CFHSI_WAKE_TOUT			(3 * HZ)
 #endif /* CFHSI_WAKE_TOUT */
 
+#ifndef CFHSI_WAKE_UP_TOUT
+#define CFHSI_WAKE_UP_TOUT		(3 * HZ)
+#endif /* CFHSI_WAKE_UP_TOUT */
+
+#ifndef CFHSI_WAKE_DOWN_TOUT
+#define CFHSI_WAKE_DOWN_TOUT		(30 * HZ)
+#endif /* CFHSI_WAKE_DOWN_TOUT */
+
 #ifndef CFHSI_MAX_RX_RETRIES
 #define CFHSI_MAX_RX_RETRIES		(10 * HZ)
 #endif
