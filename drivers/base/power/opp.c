@@ -354,6 +354,94 @@ struct opp *opp_find_freq_floor(struct device *dev, unsigned long *freq)
 }
 
 /**
+ * opp_find_volt_ceil() - Search for an rounded ceil voltage
+ * @dev:	device for which we do this operation
+ * @volt:	Start voltage
+ *
+ * Search for the matching ceil *available* OPP from a starting voltage
+ * for a device.
+ *
+ * Returns matching *opp and refreshes *volt accordingly, else returns
+ * ERR_PTR in case of error and should be handled using IS_ERR.
+ *
+ * Locking: This function must be called under rcu_read_lock(). opp is a rcu
+ * protected pointer. The reason for the same is that the opp pointer which is
+ * returned will remain valid for use with opp_get_{voltage, freq} only while
+ * under the locked area. The pointer returned must be used prior to unlocking
+ * with rcu_read_unlock() to maintain the integrity of the pointer.
+ */
+struct opp *opp_find_volt_ceil(struct device *dev, unsigned long *volt)
+{
+	struct device_opp *dev_opp;
+	struct opp *temp_opp, *opp = ERR_PTR(-ENODEV);
+
+	if (!dev || !volt) {
+		dev_err(dev, "%s: Invalid argument volt=%p\n", __func__, volt);
+		return ERR_PTR(-EINVAL);
+	}
+
+	dev_opp = find_device_opp(dev);
+	if (IS_ERR(dev_opp))
+		return opp;
+
+	list_for_each_entry_rcu(temp_opp, &dev_opp->opp_list, node) {
+		if (temp_opp->available && temp_opp->u_volt >= *volt) {
+			opp = temp_opp;
+			*volt = opp->u_volt;
+			break;
+		}
+	}
+
+	return opp;
+}
+
+/**
+ * opp_find_volt_floor() - Search for a rounded floor voltage
+ * @dev:	device for which we do this operation
+ * @volt:	Start voltage
+ *
+ * Search for the matching floor *available* OPP from a starting voltage
+ * for a device.
+ *
+ * Returns matching *opp and refreshes *volt accordingly, else returns
+ * ERR_PTR in case of error and should be handled using IS_ERR.
+ *
+ * Locking: This function must be called under rcu_read_lock(). opp is a rcu
+ * protected pointer. The reason for the same is that the opp pointer which is
+ * returned will remain valid for use with opp_get_{voltage, freq} only while
+ * under the locked area. The pointer returned must be used prior to unlocking
+ * with rcu_read_unlock() to maintain the integrity of the pointer.
+ */
+struct opp *opp_find_volt_floor(struct device *dev, unsigned long *volt)
+{
+	struct device_opp *dev_opp;
+	struct opp *temp_opp, *opp = ERR_PTR(-ENODEV);
+
+	if (!dev || !volt) {
+		dev_err(dev, "%s: Invalid argument volt=%p\n", __func__, volt);
+		return ERR_PTR(-EINVAL);
+	}
+
+	dev_opp = find_device_opp(dev);
+	if (IS_ERR(dev_opp))
+		return opp;
+
+	list_for_each_entry_rcu(temp_opp, &dev_opp->opp_list, node) {
+		if (temp_opp->available) {
+			/* go to the next node, before choosing prev */
+			if (temp_opp->u_volt > *volt)
+				break;
+			else
+				opp = temp_opp;
+		}
+	}
+	if (!IS_ERR(opp))
+		*volt = opp->u_volt;
+
+	return opp;
+}
+
+/**
  * opp_add()  - Add an OPP table from a table definitions
  * @dev:	device for which we do this operation
  * @freq:	Frequency in Hz for this OPP
