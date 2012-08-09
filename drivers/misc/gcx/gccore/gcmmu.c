@@ -667,6 +667,9 @@ enum gcerror gcmmu_enable(struct gccorecontext *gccorecontext,
 		gcmommuinit->safe = gcmmu->safezonephys;
 		gcmommuinit->mtlb = headcmdbuf->gcmmucontext->mmuconfig.raw;
 
+		/* Update the cached master */
+		gcmmu->master = gcmommuinit->mtlb;
+
 		/* Configure EVENT command. */
 		gcmosignal = (struct gcmosignal *) (gcmommuinit + 1);
 		gcmosignal->signal_ldst = gcmosignal_signal_ldst;
@@ -725,6 +728,9 @@ enum gcerror gcmmu_set_master(struct gccorecontext *gccorecontext,
 		gcerror = GCERR_NONE;
 		goto exit;
 	}
+
+	/* Flush required when switching mmu contexts */
+	gcmmucontext->dirty = true;
 
 	/* Allocate command buffer space. */
 	gcerror = gcqueue_alloc(gccorecontext, gcmmucontext,
