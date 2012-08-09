@@ -269,43 +269,6 @@ struct omap_vdd_dvfs_info *_voltdm_to_dvfs_info(struct voltagedomain *voltdm)
 	return NULL;
 }
 
-/**
- * _volt_to_opp() - Find OPP corresponding to a given voltage
- * @dev:	device pointer associated with the OPP list
- * @volt:	voltage to search for in uV
- *
- * Searches for exact match in the OPP list and returns handle to the matching
- * OPP if found, else return the max available OPP.
- * If there are multiple opps with same voltage, it will return
- * the first available entry. Return pointer should be checked against IS_ERR.
- *
- * NOTE: since this uses OPP functions, use under rcu_lock. This function also
- * assumes that the cpufreq table and OPP table are in sync - any modifications
- * to either should be synchronized.
- */
-static struct opp *_volt_to_opp(struct device *dev, unsigned long volt)
-{
-	struct opp *opp = ERR_PTR(-ENODEV);
-	unsigned long f = 0;
-
-	do {
-		opp = opp_find_freq_ceil(dev, &f);
-		if (IS_ERR(opp)) {
-			/*
-			 * if there is no OPP for corresponding volt
-			 * then return max available instead
-			 */
-			opp = opp_find_freq_floor(dev, &f);
-			break;
-		}
-		if (opp_get_voltage(opp) >= volt)
-			break;
-		f++;
-	} while (1);
-
-	return opp;
-}
-
 /* rest of the helper functions */
 /**
  * _add_vdd_user() - Add a voltage request
