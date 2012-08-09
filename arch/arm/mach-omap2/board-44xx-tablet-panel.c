@@ -360,6 +360,8 @@ static struct omap_dss_device lcd_tc35876x_samhyd_wuxga = {
 			.vsw		= 6,
 			.vbp		= 6,
 		},
+		.width_in_um = 191520,
+		.height_in_um = 119700,
 	},
 
 	.ctrl = {
