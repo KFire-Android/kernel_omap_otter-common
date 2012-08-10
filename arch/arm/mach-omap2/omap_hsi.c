@@ -179,6 +179,10 @@ static struct omap_device_pad __initdata
 };
 
 /* OMAP54xx MUX settings for HSI port 1 & 2 */
+/* CAUTION: Adding OMAP_DEVICE_PAD_REMUX flags for a pad will add it in the
+ * dynamic pads list and will change the index of following cawake pads, so
+ * increment the second parameter of the omap_hwmod_pad_route_irq() function
+ * accordingly */
 static struct omap_device_pad __initdata
 			omap54xx_hsi_ports_pads[2][HSI_SIGNALS_PER_PORT] = {
 	{
@@ -432,6 +436,7 @@ static int __init omap_hsi_register(struct omap_hwmod *oh, void *user)
 {
 	struct platform_device *od;
 	struct hsi_platform_data *pdata = &omap_hsi_platform_data;
+	int i, port;
 
 	if (!oh) {
 		pr_err("Could not look up %s omap_hwmod\n",
@@ -442,6 +447,11 @@ static int __init omap_hsi_register(struct omap_hwmod *oh, void *user)
 	omap_hsi_platform_data.errata = omap_hsi_configure_errata();
 
 	oh->mux = omap_hsi_fill_default_pads(pdata);
+
+	for (i = 0; i < pdata->num_ports; i++) {
+		port = pdata->ctx->pctx[i].port_number - 1;
+		omap_hwmod_pad_route_irq(oh, i, port);
+	}
 
 	od = omap_device_build(OMAP_HSI_PLATFORM_DEVICE_DRIVER_NAME, 0, oh,
 			       pdata, sizeof(*pdata), omap_hsi_latency,
