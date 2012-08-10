@@ -790,6 +790,7 @@ static int gccmdthread(void *_gccorecontext)
 				GCDBG(GCZONE_THREAD, "thread timedout.\n");
 
 			if (gcqueue->gcmoterminator == NULL) {
+				gcqueue->suspend = false;
 				GCUNLOCK(&gcqueue->queuelock);
 				continue;
 			}
@@ -814,9 +815,6 @@ static int gccmdthread(void *_gccorecontext)
 				continue;
 			}
 
-			GCDBG(GCZONE_THREAD,
-			      "execution finished, shutting down.\n");
-
 			/* Free the queue. */
 			while (!list_empty(&gcqueue->queue)) {
 				head = gcqueue->queue.next;
@@ -824,10 +822,26 @@ static int gccmdthread(void *_gccorecontext)
 							struct gccmdbuf,
 							link);
 
+				if (!list_empty(&headcmdbuf->events)) {
+					/* found events, there must be
+					 * pending interrupts */
+					break;
+				}
+
 				/* Free the entry. */
 				gcqueue_free_cmdbuf(gcqueue, headcmdbuf,
 						    NULL);
 			}
+
+			if (!list_empty(&gcqueue->queue)) {
+				GCDBG(GCZONE_THREAD,
+					"aborting shutdown to process events\n");
+				GCUNLOCK(&gcqueue->queuelock);
+				continue;
+			}
+
+			GCDBG(GCZONE_THREAD,
+			      "execution finished, shutting down.\n");
 
 			/* Convert WAIT to END. */
 			gcqueue->gcmoterminator->u2.end.cmd.raw
@@ -841,6 +855,8 @@ static int gccmdthread(void *_gccorecontext)
 
 			/* Set idle state. */
 			complete(&gcqueue->stopped);
+
+			gcqueue->suspend = false;
 
 			/* Set timeout to infinity. */
 			timeout = MAX_SCHEDULE_TIMEOUT;
@@ -1614,8 +1630,7 @@ enum gcerror gcqueue_wait_idle(struct gccorecontext *gccorecontext)
 
 	/* Wait for GPU to stop. */
 	count = 0;
-	while (!completion_done(&gcqueue->stopped)) {
-		/* Not stopped, sleep. */
+	while (gcqueue->suspend) {
 		wait_for_completion_timeout(&gcqueue->sleep, timeout);
 
 		/* Waiting too long? */
@@ -1625,9 +1640,6 @@ enum gcerror gcqueue_wait_idle(struct gccorecontext *gccorecontext)
 			break;
 		}
 	}
-
-	/* Reset suspend flag. */
-	gcqueue->suspend = false;
 
 	GCEXIT(GCZONE_THREAD);
 	return gcerror;
