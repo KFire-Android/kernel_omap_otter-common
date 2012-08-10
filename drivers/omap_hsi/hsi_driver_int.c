@@ -779,12 +779,20 @@ static u32 hsi_process_int_event(struct hsi_port *pport)
 	pport->cawake_double_int = false;
 
 
-	/* Check if we missed a CAWAKE Interrupt */
 	/* Only in 4-wires mode */
 	if (!pport->wake_rx_3_wires_mode) {
 		bool cawake_status = hsi_get_cawake(pport);
 		bool caw_int, caw_int_u;
 
+		/* Check if the ISR has been called in case of wakeup from IO PAD
+		 * daisy chain */
+		if (!status_reg) {
+			dev_dbg(pport->hsi_controller->dev,
+			"%s: IO daisy chain wakeup\n", __func__);
+			hsi_do_cawake_process(pport);
+		}
+
+		/* Check if we missed a CAWAKE Interrupt */
 		if (pport->cawake_status != cawake_status) {
 			/* Add a security to not process CAWAKE here if
 			 * interrupt is pending because it will be processed
