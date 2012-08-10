@@ -670,15 +670,6 @@ static int __init omap_pm_init(void)
 		tesla_clkdm = clkdm_lookup("tesla_clkdm");
 	}
 
-
-	if (cpu_is_omap44xx()) {
-		/* Overwrite the default arch_idle() */
-		arm_pm_idle = omap_default_idle;
-		omap4_idle_init();
-	} else if (cpu_is_omap54xx()) {
-		omap5_idle_init();
-	}
-
 	/* Setup the scales for every init device appropriately */
 	for (i = 0; i < ARRAY_SIZE(init_devices); i++) {
 		struct omap_hwmod *oh = omap_hwmod_lookup(init_devices[i]);
@@ -708,6 +699,15 @@ static int __init omap_pm_init(void)
 			/* Continue to next device */
 		}
 	}
+
+	if (cpu_is_omap44xx()) {
+		/* Overwrite the default arch_idle() */
+		arm_pm_idle = omap_default_idle;
+		omap4_idle_init();
+	} else if (cpu_is_omap54xx()) {
+		omap5_idle_init();
+	}
+
 
 err2:
 	return ret;
