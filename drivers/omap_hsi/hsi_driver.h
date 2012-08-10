@@ -128,7 +128,6 @@ struct hsi_channel {
  * @cawake_gpio: GPIO number for cawake line (-1 if none)
  * @cawake_gpio_irq: IRQ number for cawake gpio events
  * @cawake_status: Tracks CAWAKE line status
- * @cawake_off_event: True if CAWAKE event was detected from OFF mode
  * @cawake_double_int: True if new CAWAKE detected while tasklet still executing
  * @acwake_status: Bitmap to track ACWAKE line status per channel
  * @in_int_tasklet: True if interrupt tasklet for this port is currently running
@@ -152,7 +151,6 @@ struct hsi_port {
 	int cawake_gpio;
 	int cawake_gpio_irq;
 	int cawake_status;
-	bool cawake_off_event;
 	bool cawake_double_int;
 	unsigned int acwake_status;	/* HSI_TODO : fine tune init values */
 	bool in_int_tasklet;

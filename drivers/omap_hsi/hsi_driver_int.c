@@ -664,10 +664,7 @@ static u32 hsi_driver_int_proc(struct hsi_port *pport,
 	if (pport->cawake_double_int)
 		status_reg |= HSI_CAWAKEDETECTED;
 
-	if (pport->cawake_off_event) {
-		dev_dbg(hsi_ctrl->dev, "CAWAKE detected from IO daisy on port %d\n",
-			port);
-	} else if (!status_reg) {
+	if (!status_reg) {
 		dev_dbg(hsi_ctrl->dev, "Channels [%d,%d] : no event, exit.\n",
 			start, stop);
 			return 0;
@@ -733,12 +730,11 @@ static u32 hsi_driver_int_proc(struct hsi_port *pport,
 	}
 
 	/* CAWAKE falling or rising edge detected */
-	if ((status_reg & HSI_CAWAKEDETECTED) || pport->cawake_off_event) {
+	if (status_reg & HSI_CAWAKEDETECTED) {
 		if (hsi_do_cawake_process(pport) == -EAGAIN)
 			goto proc_done;
 
 		channels_served |= HSI_CAWAKEDETECTED;
-		pport->cawake_off_event = false;
 	}
 proc_done:
 	/* Reset status bits */

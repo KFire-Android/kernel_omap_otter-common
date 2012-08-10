@@ -469,7 +469,6 @@ void hsi_softreset_driver(struct hsi_dev *hsi_ctrl)
 		hsi_p->reg_counters = pdata->ctx->pctx[i].hsr.counters;
 		hsi_p->wake_rx_3_wires_mode = 0; /* 4 wires */
 		hsi_p->cawake_status = -1; /* Unknown */
-		hsi_p->cawake_off_event = false;
 		hsi_p->acwake_status = 0;
 		hsi_port_channels_reset(&hsi_ctrl->hsi_port[i]);
 	}
@@ -589,7 +588,6 @@ static int __devinit hsi_ports_init(struct hsi_dev *hsi_ctrl)
 		hsi_p->irq = 0;
 		hsi_p->wake_rx_3_wires_mode = 0; /* 4 wires */
 		hsi_p->cawake_status = -1; /* Unknown */
-		hsi_p->cawake_off_event = false;
 		hsi_p->cawake_double_int = false;
 		hsi_p->acwake_status = 0;
 		hsi_p->in_int_tasklet = false;
