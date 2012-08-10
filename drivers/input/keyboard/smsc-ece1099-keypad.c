@@ -420,6 +420,13 @@ static int smsc_kp_suspend(struct device *dev)
 	struct platform_device *pdev = to_platform_device(dev);
 	struct smsc_keypad *kp = platform_get_drvdata(pdev);
 
+	disable_irq(kp_client->irq);
+
+	/* Disable Keypad Scan */
+	smsc_write_data(SMSC_KSO_SELECT, SMSC_KSO_EVAL);
+	/* Disable keypad interrupts */
+	smsc_write_data(SMSC_KSI_MASK, SMSC_SET_LOW);
+
 	cancel_delayed_work(&kp->input_work);
 
 	return 0;
@@ -427,6 +434,15 @@ static int smsc_kp_suspend(struct device *dev)
 
 static int smsc_kp_resume(struct device *dev)
 {
+	enable_irq(kp_client->irq);
+
+	/*Enable Keypad Scan (generate interrupt on key press) */
+	smsc_write_data(SMSC_KSO_SELECT, SMSC_KSO_ALL_LOW);
+	/* Clear all KSI Interrupts */
+	smsc_write_data(SMSC_KSI_STATUS, SMSC_SET_HIGH);
+	/* Enable keypad interrupts */
+	smsc_write_data(SMSC_KSI_MASK, SMSC_SET_HIGH);
+
 	return 0;
 }
 
