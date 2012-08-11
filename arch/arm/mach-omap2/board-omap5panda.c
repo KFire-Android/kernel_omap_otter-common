@@ -28,6 +28,7 @@
 #include <linux/i2c/twl.h>
 #include <linux/mfd/twl6040.h>
 #include <linux/platform_data/omap-abe-twl6040.h>
+#include <linux/gpio_keys.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
@@ -49,6 +50,7 @@
 
 #define GPIO_ETH_NRESET		15	/* USBB3 to SMSC LAN9730 */
 #define GPIO_HUB_NRESET		80	/* USBB2 to SMSC 3530 HUB */
+#define GPIO_POWER_BUTTON	83
 #define GPIO_EXT_INT_PIN	99
 #define GPIO_SDCARD_DETECT	152
 #define HDMI_GPIO_HPD		193
@@ -92,11 +94,37 @@ static struct omap_board_mux board_mux[] __initdata = {
 	OMAP5_MUX(USBB2_HSIC_DATA, OMAP_PIN_INPUT | OMAP_MUX_MODE0),
 	OMAP5_MUX(ABEDMIC_DIN3,
 		OMAP_PIN_INPUT_PULLUP | OMAP_PIN_OFF_NONE | OMAP_MUX_MODE6),
+	OMAP5_MUX(HSI2_ACDATA,
+		OMAP_WAKEUP_EN | OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE6),
 	{ .reg_offset = OMAP_MUX_TERMINATOR },
 };
 #else
 #define board_mux NULL
 #endif
+
+static struct gpio_keys_button panda5_gpio_keys[] = {
+	{
+		.desc			= "power_button",
+		.type			= EV_KEY,
+		.code			= KEY_POWER,
+		.gpio			= GPIO_POWER_BUTTON,
+		.active_low		= 1,
+		.wakeup			= 1,
+		.debounce_interval	= 10,
+	},
+};
+
+static struct gpio_keys_platform_data panda5_gpio_keys_data = {
+	.buttons	= panda5_gpio_keys,
+	.nbuttons	= ARRAY_SIZE(panda5_gpio_keys),
+};
+
+static struct platform_device panda5_gpio_keys_device = {
+	.name	= "gpio-keys",
+	.dev	= {
+		.platform_data	= &panda5_gpio_keys_data,
+	},
+};
 
 static struct omap2_hsmmc_info mmc[] = {
 	{
@@ -647,6 +675,7 @@ static struct platform_device *omap5evm_devices[] __initdata = {
 	&omap5evm_hdmi_audio_codec,
 	&omap5evm_abe_audio,
 	&panda5_leds_gpio,
+	&panda5_gpio_keys_device,
 };
 
 
