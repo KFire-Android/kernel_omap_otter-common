@@ -453,6 +453,17 @@ static bool omap_hwmod_mux_scan_wakeups(struct omap_hwmod_mux_info *hmux,
 		if (!(val & OMAP_WAKEUP_EVENT))
 			continue;
 
+		/* Clear the WAKEUPEVENT bit */
+		omap_mux_write(pad->partition, val & ~OMAP_WAKEUP_EN,
+			       pad->mux->reg_offset);
+		omap_hwmod_reconfigure_io_chain();
+
+		/* Enable back the WAKEUPENABLE bit */
+		val = omap_mux_read(pad->partition, pad->mux->reg_offset);
+		val |= OMAP_WAKEUP_EN;
+		omap_mux_write(pad->partition, val, pad->mux->reg_offset);
+		omap_hwmod_reconfigure_io_chain();
+
 		if (!hmux->irqs)
 			return true;
 
