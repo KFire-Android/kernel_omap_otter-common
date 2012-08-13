@@ -340,6 +340,19 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
 	}
 
 	/*
+	 * Program L4PER to CSWR instead of OSWR in order to avoid glitches
+	 * due to the HW bug on GPIOs for OMAP5430 ES1.0
+	 * (Bug ID: OMAP5430-1.0BUG01667).
+	 */
+	if (omap_rev() == OMAP5430_REV_ES1_0 ||
+	    omap_rev() == OMAP5432_REV_ES1_0) {
+		if (!strcmp(pwrdm->name, "l4per_pwrdm")) {
+			program_state = PWRDM_POWER_CSWR;
+			goto do_program_state;
+		}
+	}
+
+	/*
 	 * What state to program every Power domain can enter deepest to when
 	 * not in suspend state?
 	 */
