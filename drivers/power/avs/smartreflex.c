@@ -130,15 +130,18 @@ static irqreturn_t sr_interrupt(int irq, void *data)
 
 static void sr_set_clk_length(struct omap_sr *sr)
 {
-	struct clk *sys_ck;
+	struct clk *sys_ck = NULL;
 	u32 sys_clk_speed;
 
 	if (cpu_is_omap34xx())
 		sys_ck = clk_get(NULL, "sys_ck");
-	else
+	else if (cpu_is_omap44xx())
 		sys_ck = clk_get(NULL, "sys_clkin_ck");
+	else if (cpu_is_omap54xx())
+		sys_ck = clk_get(NULL, "sys_clkin");
+	/* DONOT populate a default sysclk name unless we know about it */
 
-	if (IS_ERR(sys_ck)) {
+	if (IS_ERR_OR_NULL(sys_ck)) {
 		dev_err(&sr->pdev->dev, "%s: unable to get sys clk\n",
 			__func__);
 		return;
