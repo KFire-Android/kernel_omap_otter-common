@@ -779,8 +779,8 @@ static u32 hsi_process_int_event(struct hsi_port *pport)
 	pport->cawake_double_int = false;
 
 
-	/* Only in 4-wires mode */
-	if (!pport->wake_rx_3_wires_mode) {
+	/* Only in 4-wires mode and if cawake_status has been initialized */
+	if ((!pport->wake_rx_3_wires_mode) && (pport->cawake_status >= 0)) {
 		bool cawake_status = hsi_get_cawake(pport);
 		bool caw_int, caw_int_u;
 
