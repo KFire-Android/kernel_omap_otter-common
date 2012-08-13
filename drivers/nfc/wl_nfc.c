@@ -166,7 +166,7 @@ static int nfc_drv_open(struct inode *inode, struct file *filp)
 				ret = -ETIMEDOUT;
 				goto free_exit;
 			} else if (dev->st_register_cb_status != 0) {
-				ret = dev->st_register_cb_status;
+				ret = -EAGAIN;
 				pr_err("st_register_cb failed %d", ret);
 				goto free_exit;
 			}
