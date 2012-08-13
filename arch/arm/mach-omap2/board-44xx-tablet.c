@@ -578,19 +578,17 @@ static void omap4_tablet_wifi_init(void)
 
 #if defined(CONFIG_USB_EHCI_HCD_OMAP) || defined(CONFIG_USB_OHCI_HCD_OMAP3)
 static const struct usbhs_omap_board_data usbhs_bdata __initconst = {
-	.port_mode[0] = OMAP_EHCI_PORT_MODE_PHY,
-	.port_mode[1] = OMAP_USBHS_PORT_MODE_UNUSED,
+	.port_mode[0] = OMAP_USBHS_PORT_MODE_UNUSED,
+	.port_mode[1] = OMAP_EHCI_PORT_MODE_HSIC,
 	.port_mode[2] = OMAP_USBHS_PORT_MODE_UNUSED,
-	.phy_reset  = false,
-	.reset_gpio_port[0]  = GPIO_USB3320_PHY_RESETB,
-	.reset_gpio_port[1]  = -EINVAL,
-	.reset_gpio_port[2]  = -EINVAL
+	.phy_reset  = true,
+	.reset_gpio_port[0] = -EINVAL,
+	.reset_gpio_port[1] = OMAP4_MDM_PWR_EN_GPIO,
+	.reset_gpio_port[2] = -EINVAL
 };
 
 static void __init omap4_ehci_ohci_init(void)
 {
-	int ret = 0;
-
 	omap_mux_init_signal("fref_clk3_req.gpio_wk30", \
 		OMAP_PIN_OUTPUT | \
 		OMAP_PIN_OFF_NONE | OMAP_PULL_ENA);
@@ -602,27 +600,9 @@ static void __init omap4_ehci_ohci_init(void)
 		gpio_set_value(GPIO_WK30, 0);
 	}
 
-	/* configure the EHCI PHY USB3320C RESET GPIO */
-	omap_mux_init_gpio(GPIO_USB3320_PHY_RESETB, OMAP_PIN_OUTPUT |
-		OMAP_PIN_OFF_NONE);
-
-	ret = gpio_request(GPIO_USB3320_PHY_RESETB, "usb3320_phy_resetb");
-	if (ret) {
-		pr_err("omap: ehci: Cannot request GPIO %d",
-					GPIO_USB3320_PHY_RESETB);
-		return;
-	}
-	gpio_direction_output(GPIO_USB3320_PHY_RESETB, 1);
-
 	omap_mux_init_signal("usbb2_ulpitll_clk.gpio_157", \
 		OMAP_PIN_OUTPUT | \
 		OMAP_PIN_OFF_NONE);
-
-	/* Power on the ULPI PHY */
-	if (gpio_is_valid(OMAP4_MDM_PWR_EN_GPIO)) {
-		gpio_request(OMAP4_MDM_PWR_EN_GPIO, "USBB1 PHY VMDM_3V3");
-		gpio_direction_output(OMAP4_MDM_PWR_EN_GPIO, 1);
-	}
 
 	usbhs_init(&usbhs_bdata);
 

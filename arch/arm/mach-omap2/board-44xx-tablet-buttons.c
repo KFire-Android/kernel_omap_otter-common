@@ -38,12 +38,12 @@ static struct gpio_led tablet_gpio_leds[] = {
 	{
 		.name	= "blue",
 		.default_trigger = "timer",
-		.gpio	= 169,
+		.gpio	= 104,
 	},
 	{
 		.name	= "red",
 		.default_trigger = "timer",
-		.gpio	= 170,
+		.gpio	= 36,
 	},
 	{
 		.name	= "green",
