@@ -2474,6 +2474,8 @@ static int omap_hsmmc_suspend(struct device *dev)
 			return ret;
 		}
 	}
+	if (mmc_slot(host).built_in)
+		host->mmc->pm_flags |= MMC_PM_KEEP_POWER;
 	ret = mmc_suspend_host(host->mmc);
 
 	if (ret) {
