@@ -192,6 +192,16 @@ static void sr_set_regfields(struct omap_sr *sr)
 			sr->senn_avgweight = OMAP3430_SR2_SENNAVGWEIGHT;
 			sr->senp_avgweight = OMAP3430_SR2_SENPAVGWEIGHT;
 		}
+	} else if (cpu_is_omap54xx()) {
+		/*
+		 * Keeping this duplicated until GS80 characterization is
+		 * complete
+		 */
+		sr->err_weight = OMAP3430_SR_ERRWEIGHT;
+		sr->err_maxlimit = OMAP3430_SR_ERRMAXLIMIT;
+		sr->accum_data = OMAP54XX_SR_ACCUMDATA;
+		sr->senn_avgweight = OMAP54XX_SR2_SENNAVGWEIGHT;
+		sr->senp_avgweight = OMAP54XX_SR2_SENPAVGWEIGHT;
 	}
 }
 

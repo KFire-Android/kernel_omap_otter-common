@@ -152,6 +152,13 @@
 #define OMAP3430_SR_ERRWEIGHT		0x04
 #define OMAP3430_SR_ERRMAXLIMIT		0x02
 
+/*
+ * 54xx specific values.
+ */
+#define OMAP54XX_SR_ACCUMDATA		0x80
+#define OMAP54XX_SR2_SENPAVGWEIGHT	0x04
+#define OMAP54XX_SR2_SENNAVGWEIGHT	0x04
+
 struct voltagedomain;
 struct omap_volt_data;
 
