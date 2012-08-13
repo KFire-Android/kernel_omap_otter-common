@@ -169,6 +169,7 @@ static struct omap2_hsmmc_info mmc[] = {
 		.gpio_cd        = -EINVAL,
 		.gpio_wp        = -EINVAL,
 		.ocr_mask       = MMC_VDD_165_195,
+		.built_in	= 1,
 		.nonremovable   = true,
 	},
 	{}	/* Terminator */
