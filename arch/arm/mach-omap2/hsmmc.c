@@ -488,6 +488,7 @@ static int __init omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
 	else
 		mmc->slots[0].ocr_mask = c->ocr_mask;
 
+	mmc->slots[0].built_in = c->built_in;
 	if (!cpu_is_omap3517() && !cpu_is_omap3505())
 		mmc->slots[0].features |= HSMMC_HAS_PBIAS;
 

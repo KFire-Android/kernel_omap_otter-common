@@ -165,6 +165,11 @@ struct omap_mmc_platform_data {
 
 		const char *name;
 		u32 ocr_mask;
+		/* built_in: Use this flag to keep power to MMC/SDIO card
+		 * during suspend in case the driver for the card
+		 * (Eg: SDIO/Wifi driver) has not yet been loaded
+		 */
+		int built_in;
 
 		/* Card detection IRQs */
 		int card_detect_irq;
