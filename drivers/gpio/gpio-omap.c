@@ -1282,8 +1282,7 @@ static int omap_gpio_runtime_resume(struct device *dev)
 	if (bank->get_context_loss_count) {
 		context_lost_cnt_after =
 			bank->get_context_loss_count(bank->dev);
-		if (context_lost_cnt_after != bank->context_loss_count ||
-						!context_lost_cnt_after)
+		if (context_lost_cnt_after != bank->context_loss_count)
 			should_restore_context = true;
 	}
 
