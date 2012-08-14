@@ -1397,6 +1397,9 @@ struct d_vdd_info d_vddinfo_omap5[N_VDDS] =  {
 	},
 };
 
+#define OMAP5_CONTROL_PADCONF_WAKEUPEVENT_0		0x4A0029FC
+#define OMAP5_CONTROL_WKUP_PADCONF_WAKEUPEVENT_0	0x4AE0C880
+
 struct d_prcm_regs_info omap5_prcm_regs_data = {
 	.dpll_en_mask = OMAP54XX_DPLL_EN_MASK,
 	.dpll_autoidle_mask = OMAP54XX_AUTO_DPLL_MODE_MASK,
@@ -1417,6 +1420,10 @@ struct d_prcm_regs_info omap5_prcm_regs_data = {
 	.prm_logicstatest_shift = OMAP54XX_LOGICSTATEST_SHIFT,
 	.prm_dev_instance = OMAP54XX_PRM_DEVICE_INST,
 	.prm_volctrl_offset = OMAP54XX_PRM_VOLTCTRL_OFFSET,
+	.prm_io_st_mask = OMAP54XX_IO_ST_MASK,
+	.control_padconf_wakeupevent0 = OMAP5_CONTROL_PADCONF_WAKEUPEVENT_0,
+	.control_wkup_padconf_wakeupevent0 =
+			OMAP5_CONTROL_WKUP_PADCONF_WAKEUPEVENT_0,
 };
 
 struct d_prcm_regs_info *d_prcm_regs_omap5 = &omap5_prcm_regs_data;

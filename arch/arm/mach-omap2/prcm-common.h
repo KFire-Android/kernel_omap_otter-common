@@ -490,6 +490,7 @@ extern void omap_prcm_irq_cleanup(void);
 extern int omap_prcm_register_chain_handler(
 	struct omap_prcm_irq_setup *irq_setup);
 extern int omap_prcm_event_to_irq(const char *event);
+extern int omap_read_pending_irqs(unsigned long *events);
 extern void omap_prcm_irq_prepare(void);
 extern void omap_prcm_irq_complete(void);
 
