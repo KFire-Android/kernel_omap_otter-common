@@ -339,8 +339,8 @@ void __init omap5xxx_check_features(void)
 						OMAP5_ALL_OPP_ENABLED2) ||
 	     (omap_ctrl_readl(OMAP5_DIE_ID1_OFFSET) ==
 						OMAP5_ALL_OPP_ENABLED3) ||
-		 (omap_ctrl_readl(OMAP5_DIE_ID2_OFFSET) >=
-						OMAP5_ALL_OPP_ENABLED4)))
+		 (((omap_ctrl_readl(OMAP5_DIE_ID2_OFFSET) >> 8) & 0xff) >=
+				   OMAP5_ALL_OPP_ENABLED4)))
 		omap_features |= OMAP5_HAS_OPP_HIGH;
 }
 
