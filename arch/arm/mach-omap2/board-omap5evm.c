@@ -898,8 +898,9 @@ static const struct usbhs_omap_board_data usbhs_bdata __initconst = {
 
 static void __init omap_ehci_ohci_init(void)
 {
-	omap_mux_init_signal("gpio6_172", OMAP_PIN_OUTPUT | OMAP_PIN_OFF_NONE);
-	omap_mux_init_signal("gpio6_173", OMAP_PIN_OUTPUT | OMAP_PIN_OFF_NONE);
+	omap_mux_init_gpio(172, OMAP_PIN_OUTPUT | OMAP_PIN_INPUT_PULLUP);
+	omap_mux_init_gpio(173, OMAP_PIN_OUTPUT | OMAP_PIN_INPUT_PULLUP);
+
 	usbhs_init(&usbhs_bdata);
 	return;
 }

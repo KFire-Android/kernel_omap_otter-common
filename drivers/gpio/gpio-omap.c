@@ -176,12 +176,22 @@ static inline void _gpio_dbck_enable(struct gpio_bank *bank)
 	if (bank->dbck_enable_mask && !bank->dbck_enabled) {
 		clk_enable(bank->dbck);
 		bank->dbck_enabled = true;
+
+		__raw_writel(bank->dbck_enable_mask,
+			bank->base + bank->regs->debounce_en);
 	}
 }
 
 static inline void _gpio_dbck_disable(struct gpio_bank *bank)
 {
 	if (bank->dbck_enable_mask && bank->dbck_enabled) {
+		/*
+		 * Disable debounce before cutting it's clock. If debounce is
+		 * enabled but the clock is not, GPIO module seems to be unable
+		 * to detect events and generate interrupts at least on OMAP3.
+		 */
+		__raw_writel(0, bank->base + bank->regs->debounce_en);
+
 		clk_disable(bank->dbck);
 		bank->dbck_enabled = false;
 	}
@@ -1179,9 +1189,6 @@ static int omap_gpio_runtime_suspend(struct device *dev)
 
 	spin_lock_irqsave(&bank->lock, flags);
 
-	if (!bank->enabled_non_wakeup_gpios)
-		goto update_gpio_context_count;
-
 	/*
 	 * Only edges can generate a wakeup event to the PRCM.
 	 *
@@ -1201,6 +1208,9 @@ static int omap_gpio_runtime_suspend(struct device *dev)
 	if (wake_hi)
 		__raw_writel(wake_hi | bank->context.risingdetect,
 			     bank->base + bank->regs->risingdetect);
+
+	if (!bank->enabled_non_wakeup_gpios)
+		goto update_gpio_context_count;
 
 	/*
 	 * If going to OFF, remove triggering for all
@@ -1233,11 +1243,21 @@ update_gpio_context_count:
 	 * to input in resume. This is fixed in ES2.0
 	 */
 	if (cpu_is_omap54xx() &&
-	    (omap_rev() == OMAP5430_REV_ES1_0 ||
-	     omap_rev() == OMAP5432_REV_ES1_0) &&
-	    bank->id == 4) {
-		_set_gpio_direction(bank, GPIO_INDEX(bank, 142), 1);
-		_set_gpio_direction(bank, GPIO_INDEX(bank, 140), 1);
+		(omap_rev() == OMAP5430_REV_ES1_0 ||
+		omap_rev() == OMAP5432_REV_ES1_0)) {
+		if (bank->id == 4) {
+			_set_gpio_direction(bank, GPIO_INDEX(bank, 142), 1);
+			_set_gpio_direction(bank, GPIO_INDEX(bank, 140), 1);
+		}
+		if (bank->id == 5) {
+			/*
+			 * The same h/w bug causes a glitch sometimes resulting
+			 * in reset of USB host module. Hence change the
+			 * direction and corresponding mux for USB reset pins
+			 */
+			_set_gpio_direction(bank, GPIO_INDEX(bank, 172), 1);
+			_set_gpio_direction(bank, GPIO_INDEX(bank, 173), 1);
+		}
 	}
 
 	_gpio_dbck_disable(bank);
@@ -1272,8 +1292,7 @@ static int omap_gpio_runtime_resume(struct device *dev)
 	if (bank->get_context_loss_count) {
 		context_lost_cnt_after =
 			bank->get_context_loss_count(bank->dev);
-		if (context_lost_cnt_after != bank->context_loss_count ||
-						!context_lost_cnt_after)
+		if (context_lost_cnt_after != bank->context_loss_count)
 			should_restore_context = true;
 	}
 
@@ -1304,11 +1323,21 @@ static int omap_gpio_runtime_resume(struct device *dev)
 	 * Change the direct back to o/p in resume.
 	 */
 	if (cpu_is_omap54xx() &&
-			(omap_rev() == OMAP5430_REV_ES1_0 ||
-			 omap_rev() == OMAP5432_REV_ES1_0) &&
-			bank->id == 4) {
-		_set_gpio_direction(bank, GPIO_INDEX(bank, 142), 0);
-		_set_gpio_direction(bank, GPIO_INDEX(bank, 140), 0);
+		(omap_rev() == OMAP5430_REV_ES1_0 ||
+		omap_rev() == OMAP5432_REV_ES1_0)) {
+		if (bank->id == 4) {
+			_set_gpio_direction(bank, GPIO_INDEX(bank, 142), 0);
+			_set_gpio_direction(bank, GPIO_INDEX(bank, 140), 0);
+		}
+		if (bank->id == 5) {
+			/*
+			 * The same h/w bug causes a glitch sometimes resulting
+			 * in reset of USB host module. Hence change the
+			 * direction and corresponding mux for USB reset pins
+			 */
+			_set_gpio_direction(bank, GPIO_INDEX(bank, 172), 0);
+			_set_gpio_direction(bank, GPIO_INDEX(bank, 173), 0);
+		}
 	}
 
 	if (!bank->workaround_enabled) {
@@ -1371,7 +1400,6 @@ static int omap_gpio_runtime_resume(struct device *dev)
 	}
 
 	bank->workaround_enabled = false;
-
 	spin_unlock_irqrestore(&bank->lock, flags);
 
 	return 0;
