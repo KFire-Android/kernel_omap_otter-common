@@ -69,7 +69,7 @@ config OMAP_REMOTEPROC_WATCHDOG
 config OMAP4_IPU_CMA_SIZE
 	hex "Cortex M3 physically contiguous memory pool size (in bytes)"
 	depends on OMAP_REMOTEPROC_IPU
-	default 0x6500000
+	default 0x6800000
 	help
 	  Allocate a specified size of physically contiguous memory (CMA)
 	  for OMAP4's dual Cortex-M3 sub-system. Vast majority of this
@@ -78,7 +78,7 @@ config OMAP4_IPU_CMA_SIZE
 config OMAP5_IPU_CMA_SIZE
 	hex "Cortex M4 physically contiguous memory pool size (in bytes)"
 	depends on OMAP_REMOTEPROC_IPU
-	default 0xA100000
+	default 0xA400000
 	help
 	  Allocate a specified size of physically contiguous memory (CMA)
 	  for OMAP's dual M4 sub-system. Vast majority of this
@@ -87,7 +87,7 @@ config OMAP5_IPU_CMA_SIZE
 config OMAP_DSP_CMA_SIZE
 	hex "Dsp physically contiguous memory pool size (in bytes)"
 	depends on OMAP_REMOTEPROC_DSP
-	default 0x400000
+	default 0x500000
 	help
 	  Allocate a specified size of physically contiguous memory (CMA)
 	  for OMAP's dsp sub-system. Vast majority of this
