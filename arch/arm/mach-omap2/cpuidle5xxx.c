@@ -281,7 +281,8 @@ int __init omap5_idle_init(void)
 {
 	struct omap5_idle_statedata *cx;
 	struct cpuidle_device *dev;
-	struct cpuidle_driver *drv = &omap5_idle_driver;
+	struct cpuidle_driver drv = omap5_idle_driver;
+	bool drv_reg = false;
 	unsigned int cpu_id = 0;
 
 	mpu_pd = pwrdm_lookup("mpu_pwrdm");
@@ -297,40 +298,40 @@ int __init omap5_idle_init(void)
 
 
 	for_each_cpu(cpu_id, cpu_online_mask) {
-		drv->safe_state_index = -1;
+		drv.safe_state_index = -1;
 		dev = &per_cpu(omap5_idle_dev, cpu_id);
 		dev->cpu = cpu_id;
 		dev->state_count = 0;
-		drv->state_count = 0;
+		drv.state_count = 0;
 		dev->coupled_cpus = *cpu_online_mask;
 
 		/* C1 - CPU0 ON + CPU1 ON + MPU ON */
-		_fill_cstate(drv, 0, "MPUSS ON", 0);
-		drv->safe_state_index = 0;
+		_fill_cstate(&drv, 0, "MPUSS ON", 0);
+		drv.safe_state_index = 0;
 		cx = _fill_cstate_usage(dev, 0);
 		cx->valid = 1;	/* C1 is always valid */
 		cx->cpu_state = PWRDM_POWER_ON;
 		cx->mpu_state = PWRDM_POWER_ON;
 		atomic_set(&cx->mpu_state_vote, 0);
 		dev->state_count++;
-		drv->state_count++;
+		drv.state_count++;
 
 		/* C2 - CPU0 CSWR + CPU1 CSWR + MPU CSWR */
 		if (cpuidle_params_table[1].valid) {
-			_fill_cstate(drv, 1, "MPUSS OSWR", 0);
+			_fill_cstate(&drv, 1, "MPUSS OSWR", 0);
 			cx = _fill_cstate_usage(dev, 1);
 			if (cx != NULL) {
 				cx->cpu_state = PWRDM_POWER_CSWR;
 				cx->mpu_state = PWRDM_POWER_CSWR;
 				atomic_set(&cx->mpu_state_vote, 0);
 				dev->state_count++;
-				drv->state_count++;
+				drv.state_count++;
 			}
 		}
 
 		/* C3 - CPU0 OFF + CPU1 OFF + MPU OSWR */
 		if (cpuidle_params_table[2].valid) {
-			_fill_cstate(drv, 2, "MPUSS OSWR",
+			_fill_cstate(&drv, 2, "MPUSS OSWR",
 				     CPUIDLE_FLAG_COUPLED);
 			cx = _fill_cstate_usage(dev, 2);
 			if (cx != NULL) {
@@ -338,13 +339,18 @@ int __init omap5_idle_init(void)
 				cx->mpu_state = PWRDM_POWER_OSWR;
 				atomic_set(&cx->mpu_state_vote, 0);
 				dev->state_count++;
-				drv->state_count++;
+				drv.state_count++;
 			}
 		}
 
 		/* Setup the brodcast device */
 		clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ON, &cpu_id);
-		cpuidle_register_driver(&omap5_idle_driver);
+		if (!drv_reg) {
+			/* Copy over */
+			omap5_idle_driver = drv;
+			if (!cpuidle_register_driver(&omap5_idle_driver))
+				drv_reg = true;
+		}
 
 		pr_debug("Register %d C-states on CPU%d\n",
 						dev->state_count, cpu_id);

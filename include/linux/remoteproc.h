@@ -471,6 +471,7 @@ struct rproc {
 	int auto_suspend_timeout;
 	bool need_resume;
 	bool system_suspended;
+	char *fw_version;
 };
 
 /* we currently support only two vrings per rvdev */

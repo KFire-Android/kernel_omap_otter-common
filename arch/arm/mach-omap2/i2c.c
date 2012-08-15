@@ -105,3 +105,68 @@ int omap_i2c_reset(struct omap_hwmod *oh)
 
 	return 0;
 }
+
+/**
+ * OMAP5 I2C weak pull-up (pad pull-up) enable/disable handling API
+ *
+ * omap5_i2c_weak_pullup - setup weak pull-ups for I2C lines
+ * @bus_id: bus id counting from number 1
+ * @enable: enable weak pull-up - true, disable - false
+ *
+ */
+void omap5_i2c_weak_pullup(int bus_id, bool enable)
+{
+	u16 r_scl = 0, r_sda = 0;
+	struct omap_mux_partition *p_scl = NULL, *p_sda = NULL;
+	struct omap_mux *mux_scl = NULL, *mux_sda = NULL;
+
+	if (!cpu_is_omap54xx())
+		return;
+
+	if (bus_id < 1 || bus_id > 5) {
+		pr_err("%s:Incorrect I2C port (%d)\n",
+				__func__, bus_id);
+		return;
+	}
+
+	switch (bus_id) {
+	case 1:
+		omap_mux_get_by_name("i2c1_pmic_scl", &p_scl, &mux_scl);
+		omap_mux_get_by_name("i2c1_pmic_sda", &p_sda, &mux_sda);
+		break;
+	case 2:
+		omap_mux_get_by_name("i2c2_scl", &p_scl, &mux_scl);
+		omap_mux_get_by_name("i2c2_sda", &p_sda, &mux_sda);
+		break;
+	case 3:
+		omap_mux_get_by_name("i2c3_scl", &p_scl, &mux_scl);
+		omap_mux_get_by_name("i2c3_sda", &p_sda, &mux_sda);
+		break;
+	case 4:
+		omap_mux_get_by_name("i2c4_scl", &p_scl, &mux_scl);
+		omap_mux_get_by_name("i2c4_sda", &p_sda, &mux_sda);
+		break;
+	case 5:
+		omap_mux_get_by_name("i2c5_scl", &p_scl, &mux_scl);
+		omap_mux_get_by_name("i2c5_sda", &p_sda, &mux_sda);
+		break;
+	default:
+		break;
+	}
+	if (p_scl && p_sda && mux_scl && mux_sda) {
+		r_scl = omap_mux_read(p_scl, mux_scl->reg_offset);
+		r_sda = omap_mux_read(p_sda, mux_sda->reg_offset);
+		if (enable) {
+			r_scl |= 0x1 << 3;
+			r_sda |= 0x1 << 3;
+		} else {
+			r_scl &= ~(0x1 << 3);
+			r_sda &= ~(0x1 << 3);
+		}
+		omap_mux_write(p_scl, r_scl, mux_scl->reg_offset);
+		omap_mux_write(p_sda, r_sda, mux_sda->reg_offset);
+	} else {
+		pr_err("%s:Failed to configure mux for weak pull-up for"
+			"I2C port (%d)\n", __func__, bus_id);
+	}
+}

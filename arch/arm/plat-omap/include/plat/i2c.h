@@ -91,5 +91,6 @@ struct omap_hwmod;
 int omap_i2c_reset(struct omap_hwmod *oh);
 void omap2_i2c_pullup(int bus_id, enum omap_i2c_pullup_values pullup);
 void omap5_i2c_pullup(int bus_id, int enable, int glitch_free);
+void omap5_i2c_weak_pullup(int bus_id, bool enable);
 
 #endif /* __ASM__ARCH_OMAP_I2C_H */

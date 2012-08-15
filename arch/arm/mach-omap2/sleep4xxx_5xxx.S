@@ -348,9 +348,6 @@ ENTRY(omap5_finish_suspend)
 	ldr	r9, [r0, #OMAP_TYPE_OFFSET]
 	cmp	r9, #0x1			@ Check for HS device
 	bne	skip_secure_l1_clean_op
-	mrc	p15, 0, r0, c0, c0, 5		@ Read MPIDR
-	ands	r0, r0, #0x0f
-	bne	skip_secure_l1_clean_op		@ CPU1 doesn't use secure cache
 	mov	r0, #0				@ Clean secure L1
 	stmfd   r13!, {r4-r12, r14}
 	ldr	r12, =OMAP5_MON_CACHES_CLEAN_INDEX

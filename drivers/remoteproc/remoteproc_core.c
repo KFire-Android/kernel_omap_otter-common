@@ -1227,6 +1227,20 @@ rproc_handle_virtio_rsc(struct rproc *rproc, struct resource_table *table, int l
 	return ret;
 }
 
+/* handle firmware version entry before loading the firmware sections */
+static int
+rproc_handle_fw_version(struct rproc *rproc, const char *version, int versz)
+{
+	struct device *dev = &rproc->dev;
+
+	rproc->fw_version = kmemdup(version, versz, GFP_KERNEL);
+	if (!rproc->fw_version) {
+		dev_err(dev, "%s: version kzalloc failed\n", __func__);
+		return -ENOMEM;
+	}
+	return 0;
+}
+
 /**
  * rproc_find_rsc_table() - find the resource table
  * @rproc: the rproc handle
@@ -1304,6 +1318,59 @@ rproc_find_rsc_table(struct rproc *rproc, const u8 *elf_data, size_t len,
 	}
 
 	return table;
+}
+
+/**
+ * rproc_find_version_section() - find the .version section
+ * @rproc: the rproc handle
+ * @elf_data: the content of the ELF firmware image
+ * @len: firmware size (in bytes)
+ * @versz: place holder for providing back the version size
+ *
+ * This function finds the .version section inside the remote processor's
+ * firmware. It is used to provide any version information for the
+ * firmware.
+ *
+ * Returns the pointer to the .version section if it is found, and write its
+ * size into @versz. If a valid version isn't found, NULL is returned
+ * (and @versz isn't set).
+ */
+static const char *
+rproc_find_fw_version_section(struct rproc *rproc, const u8 *elf_data,
+						size_t len, int *versz)
+{
+	struct elf32_hdr *ehdr;
+	struct elf32_shdr *shdr;
+	const char *name_table;
+	struct device *dev = &rproc->dev;
+	const char *vdata = NULL;
+	int i;
+
+	ehdr = (struct elf32_hdr *)elf_data;
+	shdr = (struct elf32_shdr *)(elf_data + ehdr->e_shoff);
+	name_table = elf_data + shdr[ehdr->e_shstrndx].sh_offset;
+
+	/* look for the version section */
+	for (i = 0; i < ehdr->e_shnum; i++, shdr++) {
+		int size = shdr->sh_size;
+		int offset = shdr->sh_offset;
+
+		if (strcmp(name_table + shdr->sh_name, ".version"))
+			continue;
+
+		vdata = (char *)(elf_data + offset);
+
+		/* make sure we have the entire section */
+		if (offset + size > len) {
+			dev_err(dev, "version info truncated\n");
+			return NULL;
+		}
+
+		*versz = shdr->sh_size;
+		break;
+	}
+
+	return vdata;
 }
 
 /**
@@ -1449,7 +1516,8 @@ static int rproc_fw_boot(struct rproc *rproc, const struct firmware *fw)
 	const char *name = rproc->firmware;
 	struct elf32_hdr *ehdr;
 	struct resource_table *table;
-	int ret, tablesz;
+	int ret, tablesz, versz;
+	const char *version;
 
 	ret = rproc_fw_sanity_check(rproc, fw);
 	if (ret)
@@ -1490,18 +1558,30 @@ static int rproc_fw_boot(struct rproc *rproc, const struct firmware *fw)
 		goto clean_up;
 	}
 
+	/* look for the firmware version, and store if present */
+	version = rproc_find_fw_version_section(rproc, fw->data,
+							fw->size, &versz);
+	if (version) {
+		ret = rproc_handle_fw_version(rproc, version, versz);
+		if (ret) {
+			dev_err(dev, "Failed to process version info: %d\n",
+									ret);
+			goto clean_up;
+		}
+	}
+
 	/* load the ELF segments to memory */
 	ret = rproc_load_segments(rproc, fw->data, fw->size);
 	if (ret) {
 		dev_err(dev, "Failed to load program segments: %d\n", ret);
-		goto clean_up;
+		goto free_version;
 	}
 
 	/* power up the remote processor */
 	ret = rproc->ops->start(rproc);
 	if (ret) {
 		dev_err(dev, "can't start rproc %s: %d\n", rproc->name, ret);
-		goto clean_up;
+		goto free_version;
 	}
 
 	rproc->state = RPROC_RUNNING;
@@ -1522,6 +1602,8 @@ static int rproc_fw_boot(struct rproc *rproc, const struct firmware *fw)
 
 	return 0;
 
+free_version:
+	kfree(rproc->fw_version);
 clean_up:
 	rproc_resource_cleanup(rproc);
 	rproc_disable_iommu(rproc);
@@ -1694,6 +1776,9 @@ void rproc_shutdown(struct rproc *rproc)
 		dev_err(dev, "can't stop rproc: %d\n", ret);
 		goto out;
 	}
+
+	/* free fw version */
+	kfree(rproc->fw_version);
 
 	/* clean up all acquired resources */
 	rproc_resource_cleanup(rproc);
