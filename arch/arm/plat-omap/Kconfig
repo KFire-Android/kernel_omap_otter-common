@@ -271,7 +271,7 @@ config OMAP_REMOTEPROC_MEMPOOL_SIZE
 config OMAP_REMOTEPROC_MEMPOOL_SIZE_DSP
         hex "Physical carveout memory pool size for DSP (Byte)"
         depends on OMAP_REMOTE_PROC_DSP
-        default 0x400000
+        default 0x600000
         help
           Allocate specified size of memory at boot time so we can ioremap
           it safely. This memory will be used for the DSP remote processor
