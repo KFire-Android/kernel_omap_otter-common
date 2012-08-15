@@ -87,7 +87,7 @@ config OMAP5_IPU_CMA_SIZE
 config OMAP_DSP_CMA_SIZE
 	hex "Dsp physically contiguous memory pool size (in bytes)"
 	depends on OMAP_REMOTEPROC_DSP
-	default 0x500000
+	default 0x700000
 	help
 	  Allocate a specified size of physically contiguous memory (CMA)
 	  for OMAP's dsp sub-system. Vast majority of this
