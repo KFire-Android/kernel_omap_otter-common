@@ -44,7 +44,17 @@ static int hsi_set_rx_divisor(struct hsi_port *sport, struct hsr_ctx *cfg)
 			sport->reg_counters = hsi_inl(base, HSI_HSR_COUNTERS_REG
 							    (port));
 			sport->counters_on = 0;
-			hsi_outl(0, base, HSI_HSR_COUNTERS_REG(port));
+
+			/* silicon errata fix:i646 for omap44xx
+			 * HSI error counters cannot be disabled
+			 */
+			if (is_hsi_errata(hsi_ctrl,
+				HSI_ERRATUM_i646_ERROR_COUNTERS_DISABLED))
+				hsi_outl(0xFFFFF, base,
+					HSI_HSR_COUNTERS_REG(port));
+			else
+				hsi_outl(0, base, HSI_HSR_COUNTERS_REG(port));
+
 			hsi_outl(0, base, HSI_HSR_DIVISOR_REG(port));
 			dev_dbg(hsi_ctrl->dev, "Switched to HSR auto mode\n");
 		} else if (cfg->divisor != HSI_HSR_DIVISOR_AUTO) {

@@ -476,7 +476,11 @@
 */
 #define HSI_ERRATUM_i702_PM_HSI_SWAKEUP			BIT(2)
 
-
+/*
+ * HSI - OMAP44xx : i646
+ * HSI Error counters cannot be disabled.
+ */
+#define HSI_ERRATUM_i646_ERROR_COUNTERS_DISABLED	BIT(3)
 
 #ifdef CONFIG_OMAP_HSI
 extern int __init omap_hsi_dev_init(void);

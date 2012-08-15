@@ -421,6 +421,11 @@ static u32 omap_hsi_configure_errata(void)
 		SET_HSI_ERRATA(errata, HSI_ERRATUM_i702_PM_HSI_SWAKEUP);
 	}
 
+	if (cpu_is_omap44xx() &&
+		(omap_rev() > OMAP4430_REV_ES1_0))
+		SET_HSI_ERRATA(errata,
+				HSI_ERRATUM_i646_ERROR_COUNTERS_DISABLED);
+
 	return errata;
 }
 
