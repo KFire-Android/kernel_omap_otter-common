@@ -68,7 +68,7 @@
 
 /*-------------------------------------------------------------------------*/
 
-static struct hc_driver ehci_omap_hc_driver;
+static const struct hc_driver ehci_omap_hc_driver;
 
 
 static inline void ehci_write(void __iomem *base, u32 reg, u32 val)
@@ -434,10 +434,64 @@ static int omap_ehci_hub_control(
 	struct device *dev = hcd->self.controller;
 	struct ehci_hcd_omap_platform_data *pdata = dev->platform_data;
 
-	if ((wIndex > 0) && (wIndex < OMAP3_HS_USB_PORTS)) {
-		if (pdata->port_mode[wIndex-1] == OMAP_EHCI_PORT_MODE_TLL)
+	if (cpu_is_omap44xx() && (wIndex > 0) && (wIndex < OMAP3_HS_USB_PORTS)) {
+		if ((omap_rev() < OMAP4430_REV_ES2_3) &&
+				(pdata->port_mode[wIndex-1] == OMAP_EHCI_PORT_MODE_TLL)) {
 			return omap4_ehci_tll_hub_control(hcd, typeReq, wValue,
 						wIndex, buf, wLength);
+		} else if (pdata->port_mode[wIndex-1] == OMAP_EHCI_PORT_MODE_PHY) {
+			struct ehci_hcd *ehci = hcd_to_ehci(hcd);
+			u32 __iomem *status_reg = &ehci->regs->port_status[(wIndex & 0xff) - 1];
+			u32             temp;
+			unsigned long   flags;
+			int             retval = 0;
+
+			/* Errata i693 workaround sequence */
+			spin_lock_irqsave(&ehci->lock, flags);
+
+			if (typeReq == SetPortFeature && wValue == USB_PORT_FEAT_SUSPEND) {
+				temp = ehci_readl(ehci, status_reg);
+				if ((temp & PORT_PE) == 0 || (temp & PORT_RESET) != 0) {
+					spin_unlock_irqrestore(&ehci->lock, flags);
+					return -EPIPE;
+				}
+
+				temp &= ~(PORT_WKCONN_E | PORT_RWC_BITS);
+				temp |= PORT_WKDISC_E | PORT_WKOC_E;
+				ehci_writel(ehci, temp | PORT_SUSPEND, status_reg);
+				mdelay(4);
+
+				if ((wIndex & 0xff) == 1) {
+					u32 temp_reg;
+					temp_reg = omap_readl(L3INIT_HSUSBHOST_CLKCTRL);
+					temp_reg |= 1 << 8;
+					temp_reg &= ~(1 << 24);
+					omap_writel(temp_reg, L3INIT_HSUSBHOST_CLKCTRL);
+
+					mdelay(1);
+					temp_reg &= ~(1 << 8);
+					temp_reg |= 1 << 24;
+					omap_writel(temp_reg, L3INIT_HSUSBHOST_CLKCTRL);
+				} else if ((wIndex & 0xff) == 2) {
+					u32 temp_reg;
+					temp_reg = omap_readl(L3INIT_HSUSBHOST_CLKCTRL);
+					temp_reg |= 1 << 9;
+					temp_reg &= ~(1 << 25);
+					omap_writel(temp_reg, L3INIT_HSUSBHOST_CLKCTRL);
+
+					mdelay(1);
+					temp_reg &= ~(1 << 9);
+					temp_reg |= 1 << 25;
+					omap_writel(temp_reg, L3INIT_HSUSBHOST_CLKCTRL);
+				}
+
+				set_bit((wIndex & 0xff) - 1, &ehci->suspended_ports);
+				ehci_readl(ehci, &ehci->regs->command);	/* unblock posted writes */
+				spin_unlock_irqrestore(&ehci->lock, flags);
+				return retval;
+			}
+			spin_unlock_irqrestore(&ehci->lock, flags);
+		}
 	}
 
 	return ehci_hub_control(hcd, typeReq, wValue, wIndex, buf, wLength);
@@ -523,9 +577,6 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
 		dev_err(dev, "UHH EHCI ioremap failed\n");
 		return -ENOMEM;
 	}
-
-	if (cpu_is_omap44xx() && (omap_rev() < OMAP4430_REV_ES2_3))
-		ehci_omap_hc_driver.hub_control = omap_ehci_hub_control;
 
 	hcd = usb_create_hcd(&ehci_omap_hc_driver, dev,
 			dev_name(dev));
@@ -754,7 +805,7 @@ static struct platform_driver ehci_hcd_omap_driver = {
 
 /*-------------------------------------------------------------------------*/
 
-static struct hc_driver ehci_omap_hc_driver = {
+static const struct hc_driver ehci_omap_hc_driver = {
 	.description		= hcd_name,
 	.product_desc		= "OMAP-EHCI Host Controller",
 	.hcd_priv_size		= sizeof(struct ehci_hcd),
@@ -790,7 +841,7 @@ static struct hc_driver ehci_omap_hc_driver = {
 	 * root hub support
 	 */
 	.hub_status_data	= ehci_hub_status_data,
-	.hub_control		= ehci_hub_control,
+	.hub_control		= omap_ehci_hub_control,
 	.bus_suspend		= ehci_omap_bus_suspend,
 	.bus_resume		= ehci_omap_bus_resume,
 
