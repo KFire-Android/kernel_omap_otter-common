@@ -502,6 +502,27 @@ int omap_enter_lowpower(unsigned int cpu, unsigned int power_state)
 		return -ENXIO;
 	}
 
+	/*
+	 * HACK: COBRA-1.0BUG00167: Disable L1 cache before WFI
+	 * When data caching is disabled, no new cache lines are allocated to
+	 * the L1 data cache and L2 cache because of requests from that
+	 * processor. Other L1 caches will not allocate lines from caches
+	 * with C-bit disabled L1 memory is now Write-Back No-Allocate mode.
+	 * When CPU comes out of WFI, L1 data cache is re-enabled
+	 */
+	if (cpu_is_omap54xx()) {
+		void __iomem *base = sar_base;
+
+		base += cpu ? OMAP5_C_BIT_HACK_CPU1 : OMAP5_C_BIT_HACK_CPU0;
+
+		/* Enable HACK logic only for INA/RET */
+		if (power_state == PWRDM_POWER_CSWR ||
+		    power_state == PWRDM_POWER_INACTIVE)
+			__raw_writel(0x1, base);
+		else
+			__raw_writel(0x0, base);
+	}
+
 	pwrdm_pre_transition(NULL);
 
 	/* Decrease mpu / core usecounts to indicate we are entering idle */
