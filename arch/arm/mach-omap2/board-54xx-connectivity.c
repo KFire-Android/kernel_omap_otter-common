@@ -83,7 +83,8 @@ static struct wl12xx_platform_data omap5_evm_wlan_data __initdata = {
 
 static void __init omap5_evm_wifi_mux_init(struct omap5_connectivity_gpios *conn_gpios)
 {
-	omap_mux_init_gpio(conn_gpios->wifi_irq, OMAP_PIN_INPUT | OMAP_WAKEUP_EN);
+	omap_mux_init_gpio(conn_gpios->wifi_irq, OMAP_PIN_INPUT_PULLDOWN |
+			OMAP_WAKEUP_EN);
 
 	omap_mux_init_gpio(conn_gpios->wifi_pmena, OMAP_PIN_OUTPUT |
 			OMAP_PIN_INPUT_PULLUP);
