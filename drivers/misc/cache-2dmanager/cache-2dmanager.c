@@ -121,84 +121,85 @@ void c2dm_l2cache(int count,		/* number of regions */
 			outer_flush_all();
 			break;
 		}
-	} else {
-		int rgn;
-		for (rgn = 0; rgn < count; rgn++) {
+		return;
+	}
 
-			int i, j;
-			unsigned long linestart, start;
-			unsigned long page_begin, end, offset,
-				pageremain, lineremain;
-			unsigned long phys, opsize;
-			int page_num;
+	for (rgn = 0; rgn < count; rgn++) {
+		int i, j;
+		unsigned long linestart, start;
+		unsigned long page_begin, end, offset,
+			pageremain, lineremain;
+		unsigned long phys, opsize;
+		int page_num;
 
-			/* beginning virtual address of each line */
-			start = (unsigned long)rgns[rgn].start;
+		/* beginning virtual address of each line */
+		start = (unsigned long)rgns[rgn].start;
 
-			for (i = 0; i < rgns[rgn].lines; i++) {
+		for (i = 0; i < rgns[rgn].lines; i++) {
 
-				linestart = start + (i * rgns[rgn].stride);
+			linestart = start + (i * rgns[rgn].stride);
 
-				/* beginning of the page for the new line */
-				page_begin = linestart & PAGE_MASK;
+			/* beginning of the page for the new line */
+			page_begin = linestart & PAGE_MASK;
 
-				/* end of the new line */
-				end = (unsigned long)linestart +
-						rgns[rgn].span;
+			/* end of the new line */
+			end = (unsigned long)linestart +
+				rgns[rgn].span;
 
-				page_num = DIV_ROUND_UP(end-page_begin,
-						PAGE_SIZE);
+			page_num = DIV_ROUND_UP(
+				end-page_begin, PAGE_SIZE);
 
-				/* offset of the new line from page begin */
-				offset = linestart - page_begin;
+			/* offset of the new line from page begin */
+			offset = linestart - page_begin;
 
-				/* track how long it is to the end of
-				   the current page */
-				pageremain = PAGE_SIZE - offset;
+			/* track how long it is to the end of
+			   the current page */
+			pageremain = PAGE_SIZE - offset;
 
-				/* keep track of how much of the line remains
-				   to be copied */
-				lineremain = rgns[rgn].span;
+			/* keep track of how much of the line remains
+			   to be copied */
+			lineremain = rgns[rgn].span;
 
-				for (j = 0; j < page_num; j++) {
+			for (j = 0; j < page_num; j++) {
 
-					opsize = (lineremain < pageremain) ?
-						lineremain : pageremain;
+				opsize = (lineremain < pageremain) ?
+					lineremain : pageremain;
 
-					phys = virt2phys(page_begin);
+				phys = virt2phys(page_begin);
+				if (phys) {
 					phys = phys + offset;
 					switch (dir) {
 					case DMA_TO_DEVICE:
-						outer_clean_range(phys,
-							phys + opsize);
+						outer_clean_range(
+							phys, phys + opsize);
 						break;
 					case DMA_FROM_DEVICE:
-						outer_inv_range(phys,
-							phys + opsize);
+						outer_inv_range(
+							phys, phys + opsize);
 						break;
 					case DMA_BIDIRECTIONAL:
-						outer_flush_range(phys,
-							phys + opsize);
+						outer_flush_range(
+							phys, phys + opsize);
 						break;
 					}
-
-					lineremain -= opsize;
-					/* Move to next page */
-					page_begin += PAGE_SIZE;
-
-					/* After first page, start address
-					 * will be page aligned so offset
-					 * is 0 */
-					offset = 0;
-
-					if (!lineremain)
-						break;
-
-					pageremain -= opsize;
-					if (!pageremain)
-						pageremain = PAGE_SIZE;
-
 				}
+
+				lineremain -= opsize;
+				/* Move to next page */
+				page_begin += PAGE_SIZE;
+
+				/* After first page, start address
+				 * will be page aligned so offset
+				 * is 0 */
+				offset = 0;
+
+				if (!lineremain)
+					break;
+
+				pageremain -= opsize;
+				if (!pageremain)
+					pageremain = PAGE_SIZE;
+
 			}
 		}
 	}
