@@ -1598,4 +1598,17 @@ bool omap4_is_in_dpll_cascading(void)
 {
 	return atomic_read(&in_dpll_cascading);
 }
+
+#else
+int omap4_dpll_cascading_blocker_hold(struct device *dev)
+{
+	return 0;
+}
+EXPORT_SYMBOL(omap4_dpll_cascading_blocker_hold);
+
+int omap4_dpll_cascading_blocker_release(struct device *dev)
+{
+	return 0;
+}
+EXPORT_SYMBOL(omap4_dpll_cascading_blocker_release);
 #endif
