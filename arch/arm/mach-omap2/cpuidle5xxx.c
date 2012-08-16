@@ -153,6 +153,8 @@ static int omap5_enter_couple_idle(struct cpuidle_device *dev,
 
 	omap_enter_lowpower(dev->cpu, cx->cpu_state);
 
+	omap_set_pwrdm_state(mpu_pd, PWRDM_POWER_ON);
+
 	cpu_done[dev->cpu] = true;
 
 	/* Wakeup CPU1 only if it is not offlined */
