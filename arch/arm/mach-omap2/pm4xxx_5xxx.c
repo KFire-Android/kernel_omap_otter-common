@@ -19,6 +19,7 @@
 #include <linux/clk.h>
 #include <asm/system_misc.h>
 #include <linux/io.h>
+#include <linux/gpio.h>
 
 #include <plat/omap_device.h>
 #include <plat/dvfs.h>
@@ -273,6 +274,8 @@ void omap_pm_clear_dsp_wake_up(void)
  */
 void omap_idle_core_notifier(int mpu_next_state, int core_next_state)
 {
+	if (core_next_state != PWRDM_POWER_ON)
+		omap2_gpio_prepare_for_idle(1);
 }
 
 /**
@@ -287,6 +290,8 @@ void omap_idle_core_notifier(int mpu_next_state, int core_next_state)
  */
 void omap_enable_core_notifier(int mpu_next_state, int core_next_state)
 {
+	if (core_next_state != PWRDM_POWER_ON)
+		omap2_gpio_resume_after_idle();
 }
 
 static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
