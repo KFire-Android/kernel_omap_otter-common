@@ -47,8 +47,8 @@ static struct cpuidle_params cpuidle_params_table[] = {
 	 * FIXME: Errata analysis pending. Disabled C-state as CPU Forced-OFF is
 	 * not safe on ES1.0. Preventing MPU OSWR C-state for now.
 	 */
-	/* C3 - CPU0 OFF + CPU1 OFF + MPU OSWR  + CORE ON */
-	{.exit_latency = 460 + 518 , .target_residency = 1100, .valid = 0},
+	/* C3 - CPU0 OFF + CPU1 OFF + MPU OSWR  + CORE OSWR */
+	{.exit_latency = 1200, .target_residency = 1200, .valid = 0},
 };
 
 #define OMAP5_NUM_STATES ARRAY_SIZE(cpuidle_params_table)
@@ -342,14 +342,14 @@ int __init omap5_idle_init(void)
 			drv.state_count++;
 		}
 
-		/* C3 - CPU0 OFF + CPU1 OFF + MPU OSWR + CORE ON */
-		_fill_cstate(&drv, 2, "MPUSS OSWR + CORE ON",
+		/* C3 - CPU0 OFF + CPU1 OFF + MPU OSWR + CORE OSWR */
+		_fill_cstate(&drv, 2, "MPUSS OSWR + CORE OSWR",
 			     CPUIDLE_FLAG_COUPLED);
 		cx = _fill_cstate_usage(dev, 2);
 		if (cx != NULL) {
 			cx->cpu_state = PWRDM_POWER_OFF;
 			cx->mpu_state = PWRDM_POWER_OSWR;
-			cx->core_state = PWRDM_POWER_ON;
+			cx->core_state = PWRDM_POWER_OSWR;
 			atomic_set(&cx->mpu_state_vote, 0);
 			dev->state_count++;
 			drv.state_count++;
