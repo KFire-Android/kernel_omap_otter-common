@@ -950,7 +950,7 @@ static int __init omap_sr_probe(struct platform_device *pdev)
 	struct dentry *lvt_nvalue_dir;
 	int i, ret = 0;
 
-	sr_info = kzalloc(sizeof(struct omap_sr), GFP_KERNEL);
+	sr_info = devm_kzalloc(&pdev->dev, sizeof(struct omap_sr), GFP_KERNEL);
 	if (!sr_info) {
 		dev_err(&pdev->dev, "%s: unable to allocate sr_info\n",
 			__func__);
@@ -961,23 +961,20 @@ static int __init omap_sr_probe(struct platform_device *pdev)
 
 	if (!pdata) {
 		dev_err(&pdev->dev, "%s: platform data missing\n", __func__);
-		ret = -EINVAL;
-		goto err_free_devinfo;
+		return -EINVAL;
 	}
 
 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!mem) {
 		dev_err(&pdev->dev, "%s: no mem resource\n", __func__);
-		ret = -ENODEV;
-		goto err_free_devinfo;
+		return -ENODEV;
 	}
 
-	mem = request_mem_region(mem->start, resource_size(mem),
-					dev_name(&pdev->dev));
+	mem = devm_request_mem_region(&pdev->dev, mem->start,
+				      resource_size(mem), dev_name(&pdev->dev));
 	if (!mem) {
 		dev_err(&pdev->dev, "%s: no mem region\n", __func__);
-		ret = -EBUSY;
-		goto err_free_devinfo;
+		return -EBUSY;
 	}
 
 	irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
@@ -985,28 +982,33 @@ static int __init omap_sr_probe(struct platform_device *pdev)
 	pm_runtime_enable(&pdev->dev);
 	pm_runtime_irq_safe(&pdev->dev);
 
+	if (!pdata->ops || !pdata->ops->get || !pdata->ops->put) {
+		dev_err(&pdev->dev, "%s: Missing fops!!\n", __func__);
+		return -EINVAL;
+	}
+
+	sr_info->ops = devm_kzalloc(&pdev->dev,
+				    sizeof(struct omap_sr_ops), GFP_KERNEL);
+	if (!sr_info->ops) {
+		dev_err(&pdev->dev, "%s: Could'nt alloc ops mem!!\n",
+			__func__);
+		return -ENOMEM;
+	}
+	memcpy(sr_info->ops, pdata->ops, sizeof(struct omap_sr_ops));
+
+	sr_info->base = devm_ioremap(&pdev->dev, mem->start,
+				     resource_size(mem));
+	if (!sr_info->base) {
+		dev_err(&pdev->dev, "%s: ioremap fail\n", __func__);
+		return -ENOMEM;
+	}
+
 	sr_info->name = kasprintf(GFP_KERNEL, "%s", pdata->name);
 	if (!sr_info->name) {
 		dev_err(&pdev->dev, "%s: Unable to alloc SR instance name\n",
 			__func__);
-		ret = -ENOMEM;
-		goto err_release_region;
+		return -ENOMEM;
 	}
-
-	if (!pdata->ops || !pdata->ops->get || !pdata->ops->put) {
-		dev_err(&pdev->dev, "%s: Missing fops!!\n", __func__);
-		ret = -EINVAL;
-		goto err_release_region;
-	}
-
-	sr_info->ops = kmalloc(sizeof(struct omap_sr_ops), GFP_KERNEL);
-	if (!sr_info->ops) {
-		dev_err(&pdev->dev, "%s: Could'nt alloc ops mem!!\n",
-			__func__);
-		ret = -ENOMEM;
-		goto err_release_region;
-	}
-	memcpy(sr_info->ops, pdata->ops, sizeof(struct omap_sr_ops));
 
 	sr_info->pdev = pdev;
 	sr_info->srid = pdev->id;
@@ -1020,12 +1022,6 @@ static int __init omap_sr_probe(struct platform_device *pdev)
 	sr_info->senp_mod = pdata->senp_mod;
 	sr_info->autocomp_active = false;
 	sr_info->ip_type = pdata->ip_type;
-	sr_info->base = ioremap(mem->start, resource_size(mem));
-	if (!sr_info->base) {
-		dev_err(&pdev->dev, "%s: ioremap fail\n", __func__);
-		ret = -ENOMEM;
-		goto err_release_region2;
-	}
 
 	if (irq)
 		sr_info->irq = irq->start;
@@ -1043,11 +1039,9 @@ static int __init omap_sr_probe(struct platform_device *pdev)
 		ret = sr_late_init(sr_info);
 		if (ret) {
 			pr_warning("%s: Error in SR late init\n", __func__);
-			goto err_iounmap;
+			goto err_free_name;
 		}
 	}
-
-	dev_info(&pdev->dev, "%s: SmartReflex driver initialized\n", __func__);
 
 	sr_info->dbg_dir = debugfs_create_dir(sr_info->name, sr_dbg_dir);
 	if (IS_ERR_OR_NULL(sr_info->dbg_dir)) {
@@ -1116,23 +1110,14 @@ static int __init omap_sr_probe(struct platform_device *pdev)
 	}
 
 skip_lvt:
-
+	dev_info(&pdev->dev, "%s: SmartReflex driver initialized\n", __func__);
 	return ret;
 
 err_debugfs:
 	debugfs_remove_recursive(sr_info->dbg_dir);
 err_free_name:
 	kfree(sr_info->name);
-err_iounmap:
 	list_del(&sr_info->node);
-	iounmap(sr_info->base);
-err_release_region2:
-	kfree(sr_info->ops);
-err_release_region:
-	release_mem_region(mem->start, resource_size(mem));
-err_free_devinfo:
-	kfree(sr_info);
-
 	return ret;
 }
 
