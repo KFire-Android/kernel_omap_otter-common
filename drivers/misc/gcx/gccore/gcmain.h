@@ -76,7 +76,7 @@ struct gccorecontext {
 
 	/* Power mode flags. */
 	bool clockenabled;
-	bool pulseskipping;
+	int pulseskipping;
 
 	/* MMU and command buffer managers. */
 	struct gcmmu gcmmu;

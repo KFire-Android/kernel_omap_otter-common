@@ -32,6 +32,7 @@
 #define GCZONE_MAPPING		(1 << 4)
 #define GCZONE_PROBE		(1 << 5)
 #define GCZONE_CALLBACK		(1 << 6)
+#define GCZONE_FREQSCALE	(1 << 7)
 
 GCDBG_FILTERDEF(core, GCZONE_NONE,
 		"init",
@@ -40,7 +41,8 @@ GCDBG_FILTERDEF(core, GCZONE_NONE,
 		"commit",
 		"mapping",
 		"probe",
-		"callback")
+		"callback",
+		"freqscale")
 
 
 #if !defined(GC_ENABLE_SUSPEND)
@@ -240,23 +242,62 @@ static void gcpwr_disable_clock(struct gccorecontext *gccorecontext)
 	GCEXIT(GCZONE_POWER);
 }
 
-/*
- * scale gcxx device
- */
-static void gcxxx_device_scale(struct gccorecontext *core, int idx)
+static void gcpwr_scale(struct gccorecontext *gccorecontext, int index)
 {
 	int ret;
 
-	if (!core->opp_count || (idx >= core->opp_count))
-		return;
-	if (!core->plat || !core->plat->scale_dev)
-		return;
-	if (core->cur_freq != core->opp_freqs[idx]) {
-		ret = core->plat->scale_dev(
-			core->bb2ddevice, core->opp_freqs[idx]);
-		if (!ret)
-			core->cur_freq = core->opp_freqs[idx];
+	GCENTERARG(GCZONE_FREQSCALE, "index=%d\n", index);
+
+	if ((index < 0) || (index >= gccorecontext->opp_count)) {
+		GCERR("invalid index %d.\n", index);
+		goto exit;
 	}
+
+	if ((gccorecontext->plat == NULL) ||
+	    (gccorecontext->plat->scale_dev == NULL)) {
+		GCERR("scale interface is not initialized.\n");
+		goto exit;
+	}
+
+	if (gccorecontext->cur_freq == gccorecontext->opp_freqs[index])
+		goto exit;
+
+	ret = gccorecontext->plat->scale_dev(gccorecontext->bb2ddevice,
+					     gccorecontext->opp_freqs[index]);
+	if (ret != 0) {
+		GCERR("failed to scale the device.\n");
+		goto exit;
+	}
+
+	gccorecontext->cur_freq = gccorecontext->opp_freqs[index];
+	GCDBG(GCZONE_FREQSCALE, "frequency set to %dMHz\n",
+	      gccorecontext->cur_freq / 1000 / 1000);
+
+exit:
+	GCEXIT(GCZONE_FREQSCALE);
+}
+
+static void gcpwr_set_pulse_skipping(unsigned int pulsecount)
+{
+	union gcclockcontrol gcclockcontrol;
+
+	GCENTER(GCZONE_POWER);
+
+	/* Set the pulse skip value. */
+	gcclockcontrol.raw = 0;
+	gcclockcontrol.reg.pulsecount = pulsecount;
+
+	/* Initiate loading. */
+	gcclockcontrol.reg.pulseset = 1;
+	GCDBG(GCZONE_POWER, "pulse skip = 0x%08X\n", gcclockcontrol.raw);
+	gc_write_reg(GCREG_HI_CLOCK_CONTROL_Address, gcclockcontrol.raw);
+
+	/* Lock the value. */
+	gcclockcontrol.reg.pulseset = 0;
+	GCDBG(GCZONE_POWER, "pulse skip = 0x%08X\n", gcclockcontrol.raw);
+	gc_write_reg(GCREG_HI_CLOCK_CONTROL_Address, gcclockcontrol.raw);
+
+	GCEXIT(GCZONE_POWER);
 }
 
 static void gcpwr_enable_pulse_skipping(struct gccorecontext *gccorecontext)
@@ -266,30 +307,19 @@ static void gcpwr_enable_pulse_skipping(struct gccorecontext *gccorecontext)
 	if (!gccorecontext->clockenabled)
 		goto exit;
 
-	if (!gccorecontext->pulseskipping) {
-		union gcclockcontrol gcclockcontrol;
+	if (gccorecontext->pulseskipping != 1) {
+		/* Set the lowest frequency. */
+		gcpwr_scale(gccorecontext, 0);
 
-		/* opp scale */
-		gcxxx_device_scale(gccorecontext, 0);
-
-		/* Enable loading and set to minimum value. */
-		gcclockcontrol.raw = 0;
-		gcclockcontrol.reg.pulsecount = 1;
-		gcclockcontrol.reg.pulseset = true;
-		gc_write_reg(GCREG_HI_CLOCK_CONTROL_Address,
-				gcclockcontrol.raw);
-
-		/* Disable loading. */
-		gcclockcontrol.reg.pulseset = false;
-		gc_write_reg(GCREG_HI_CLOCK_CONTROL_Address,
-				gcclockcontrol.raw);
+		/* Set 1 clock pulse for every 64 clocks. */
+		gcpwr_set_pulse_skipping(1);
 
 		/* Pulse skipping enabled. */
-		gccorecontext->pulseskipping = true;
+		gccorecontext->pulseskipping = 1;
 	}
 
 	GCDBG(GCZONE_POWER, "pulse skipping %s.\n",
-		gccorecontext->pulseskipping ? "enabled" : "disabled");
+	      gccorecontext->pulseskipping ? "enabled" : "disabled");
 
 exit:
 	GCEXIT(GCZONE_POWER);
@@ -302,30 +332,19 @@ static void gcpwr_disable_pulse_skipping(struct gccorecontext *gccorecontext)
 	if (!gccorecontext->clockenabled)
 		goto exit;
 
-	if (gccorecontext->pulseskipping) {
-		union gcclockcontrol gcclockcontrol;
+	if (gccorecontext->pulseskipping != 0) {
+		/* Set the maximum frequency. */
+		gcpwr_scale(gccorecontext, gccorecontext->opp_count - 1);
 
-		/* Enable loading and set to maximum value. */
-		gcclockcontrol.reg.pulsecount = 64;
-		gcclockcontrol.reg.pulseset = true;
-		gc_write_reg(GCREG_HI_CLOCK_CONTROL_Address,
-				gcclockcontrol.raw);
-
-		/* Disable loading. */
-		gcclockcontrol.reg.pulseset = false;
-		gc_write_reg(GCREG_HI_CLOCK_CONTROL_Address,
-				gcclockcontrol.raw);
+		/* Set full speed. */
+		gcpwr_set_pulse_skipping(64);
 
 		/* Pulse skipping disabled. */
-		gccorecontext->pulseskipping = false;
+		gccorecontext->pulseskipping = 0;
 	}
 
-	/* opp device scale */
-	gcxxx_device_scale(gccorecontext,
-			   gccorecontext->opp_count - 1);
-
 	GCDBG(GCZONE_POWER, "pulse skipping %s.\n",
-		gccorecontext->pulseskipping ? "enabled" : "disabled");
+	      gccorecontext->pulseskipping ? "enabled" : "disabled");
 
 exit:
 	GCEXIT(GCZONE_POWER);
@@ -345,6 +364,7 @@ void gcpwr_set(struct gccorecontext *gccorecontext, enum gcpower gcpower)
 			break;
 
 		case GCPWR_LOW:
+			gcpwr_enable_clock(gccorecontext);
 			gcpwr_enable_pulse_skipping(gccorecontext);
 			break;
 
@@ -359,7 +379,7 @@ void gcpwr_set(struct gccorecontext *gccorecontext, enum gcpower gcpower)
 		}
 
 		GCDBG(GCZONE_POWER, "power state %d --> %d\n",
-			gccorecontext->gcpower, gcpower);
+		      gccorecontext->gcpower, gcpower);
 
 		/* Set new power state. */
 		gccorecontext->gcpower = gcpower;
@@ -540,7 +560,7 @@ void gc_commit(struct gcicommit *gcicommit, bool fromuser)
 	list_for_each(head, &gcicommit->buffer) {
 		gcbuffer = list_entry(head, struct gcbuffer, link);
 		GCDBG(GCZONE_COMMIT, "gcbuffer = 0x%08X\n",
-			(unsigned int) gcbuffer);
+		      (unsigned int) gcbuffer);
 
 		/* Flush MMU. */
 		gcmmu_flush(gccorecontext, gcmmucontext);
@@ -639,14 +659,14 @@ void gc_map(struct gcimap *gcimap, bool fromuser)
 		mem.pages = NULL;
 
 		GCDBG(GCZONE_MAPPING, "  logical = 0x%08X\n",
-			(unsigned int) gcimap->buf.logical);
+		      (unsigned int) gcimap->buf.logical);
 	} else {
 		mem.base = 0;
 		mem.offset = gcimap->buf.offset;
 		mem.pages = gcimap->pagearray;
 
 		GCDBG(GCZONE_MAPPING, "  pagearray = 0x%08X\n",
-			(unsigned int) gcimap->pagearray);
+		      (unsigned int) gcimap->pagearray);
 	}
 
 	GCDBG(GCZONE_MAPPING, "  size = %d\n", gcimap->size);
@@ -783,40 +803,44 @@ EXPORT_SYMBOL(gc_release);
 static int gc_probe_opp(struct platform_device *pdev)
 {
 	int i;
+	unsigned int size;
 	unsigned long freq = 0;
-	struct gccorecontext *core = &g_context;
+	struct gccorecontext *gccorecontext = &g_context;
 
-	/* Query supported OPPs */
+	/* Query supported OPPs. */
 	rcu_read_lock();
 
-	core->opp_count = opp_get_opp_count(&pdev->dev);
-	if (core->opp_count <= 0) {
-		core->opp_count = 0;
+	gccorecontext->opp_count = opp_get_opp_count(&pdev->dev);
+	if (gccorecontext->opp_count <= 0) {
+		gccorecontext->opp_count = 0;
 		goto done;
 	}
 
-	core->opp_freqs = kzalloc((core->opp_count) * sizeof(unsigned long),
-			GFP_KERNEL);
-	if (!core->opp_freqs) {
-		core->opp_count = 0;
+	size = gccorecontext->opp_count * sizeof(unsigned long);
+	gccorecontext->opp_freqs = kzalloc(size, GFP_KERNEL);
+	if (!gccorecontext->opp_freqs) {
+		gccorecontext->opp_count = 0;
 		goto done;
 	}
 
-	for (i = 0; i < core->opp_count; i++) {
+	GCDBG(GCZONE_FREQSCALE, "frequency scaling table:\n");
+
+	for (i = 0; i < gccorecontext->opp_count; i++) {
 		struct opp *opp = opp_find_freq_ceil(&pdev->dev, &freq);
 		if (IS_ERR_OR_NULL(opp)) {
-			core->opp_count = i;
+			gccorecontext->opp_count = i;
 			goto done;
 		}
-		core->opp_freqs[i] = freq++; /* get freq, prepare to next */
+
+		/* Set freq, prepare to next. */
+		gccorecontext->opp_freqs[i] = freq++;
+		GCDBG(GCZONE_FREQSCALE, "  [%d] 0x%08X\n",
+		      i, gccorecontext->opp_freqs[i]);
 	}
+
 done:
 	rcu_read_unlock();
-
-	/* set lowest opp */
-	if (core->opp_count)
-		gcxxx_device_scale(core, 0);
-
+	gcpwr_set(gccorecontext, GCPWR_LOW);
 	return 0;
 }
 
@@ -950,6 +974,9 @@ static int gc_init(struct gccorecontext *gccorecontext)
 	GCLOCK_INIT(&gccorecontext->mmucontextlock);
 	INIT_LIST_HEAD(&gccorecontext->mmuctxlist);
 	INIT_LIST_HEAD(&gccorecontext->mmuctxvac);
+
+	/* Pulse skipping isn't known. */
+	gccorecontext->pulseskipping = -1;
 
 	/* Initialize MMU. */
 	if (gcmmu_init(gccorecontext) != GCERR_NONE) {
