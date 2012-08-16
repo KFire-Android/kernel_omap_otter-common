@@ -27,8 +27,6 @@
 #include "clockdomain.h"
 static DEFINE_SPINLOCK(mpu_lock);
 
-#ifdef CONFIG_CPU_IDLE
-
 /* Machine specific information to be recorded in the C-state driver_data */
 struct omap5_idle_statedata {
 	u32 cpu_state;
@@ -370,9 +368,3 @@ int __init omap5_idle_init(void)
 
 	return 0;
 }
-#else
-int __init omap5_idle_init(void)
-{
-	return 0;
-}
-#endif /* CONFIG_CPU_IDLE */

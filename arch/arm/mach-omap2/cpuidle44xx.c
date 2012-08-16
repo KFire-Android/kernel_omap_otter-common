@@ -23,8 +23,6 @@
 #include "prm.h"
 #include "clockdomain.h"
 
-#ifdef CONFIG_CPU_IDLE
-
 /* Machine specific information to be recorded in the C-state driver_data */
 struct omap4_idle_statedata {
 	u32 cpu_state;
@@ -270,9 +268,3 @@ int __init omap4_idle_init(void)
 
 	return 0;
 }
-#else
-int __init omap4_idle_init(void)
-{
-	return 0;
-}
-#endif /* CONFIG_CPU_IDLE */
