@@ -321,7 +321,7 @@ int __init omap5_idle_init(void)
 		drv.state_count++;
 
 		/* C2 - CPU0 CSWR + CPU1 CSWR + MPU CSWR */
-		_fill_cstate(&drv, 1, "MPUSS OSWR", 0);
+		_fill_cstate(&drv, 1, "MPUSS CSWR", 0);
 		cx = _fill_cstate_usage(dev, 1);
 		if (cx != NULL) {
 			cx->cpu_state = PWRDM_POWER_CSWR;
