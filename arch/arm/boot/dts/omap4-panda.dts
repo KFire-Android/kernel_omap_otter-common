@@ -124,7 +124,6 @@
 
 	twl6040: twl@4b {
 		compatible = "ti,twl6040";
-		reg = <0x4b>;
 		/* SPI = 0, IRQ# = 119, 4 = active high level-sensitive */
 		interrupts = <0 119 4>; /* IRQ_SYS_2N cascaded to gic */
 		interrupt-parent = <&gic>;
@@ -137,6 +136,7 @@
 };
 
 /include/ "twl6030.dtsi"
+/include/ "twl6040.dtsi"
 
 &i2c2 {
 	clock-frequency = <400000>;
