@@ -40,7 +40,7 @@ struct omap5_idle_statedata {
 static struct cpuidle_params cpuidle_params_table[] = {
 	/* C1 - CPU0 ON + CPU1 ON + MPU ON + CORE ON */
 	{.exit_latency = 2 + 2 , .target_residency = 5, .valid = 1},
-	/* C2- CPU0 CSWR + CPU1 CSWR + MPU CSWR + CORE ON */
+	/* C2- CPU0 CSWR + CPU1 CSWR + MPU CSWR + CORE INA */
 	{.exit_latency = 100 + 100 , .target_residency = 200, .valid = 1},
 
 	/*
@@ -330,13 +330,13 @@ int __init omap5_idle_init(void)
 		dev->state_count++;
 		drv.state_count++;
 
-		/* C2 - CPU0 CSWR + CPU1 CSWR + MPU CSWR + CORE ON */
-		_fill_cstate(&drv, 1, "MPUSS CSWR + CORE ON", 0);
+		/* C2 - CPU0 CSWR + CPU1 CSWR + MPU CSWR + CORE INA */
+		_fill_cstate(&drv, 1, "MPUSS CSWR + CORE INA", 0);
 		cx = _fill_cstate_usage(dev, 1);
 		if (cx != NULL) {
 			cx->cpu_state = PWRDM_POWER_CSWR;
 			cx->mpu_state = PWRDM_POWER_CSWR;
-			cx->core_state = PWRDM_POWER_ON;
+			cx->core_state = PWRDM_POWER_INACTIVE;
 			atomic_set(&cx->mpu_state_vote, 0);
 			dev->state_count++;
 			drv.state_count++;
