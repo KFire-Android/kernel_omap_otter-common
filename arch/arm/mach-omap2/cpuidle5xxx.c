@@ -25,6 +25,7 @@
 #include "pm.h"
 #include "prm.h"
 #include "clockdomain.h"
+static DEFINE_SPINLOCK(mpu_lock);
 
 #ifdef CONFIG_CPU_IDLE
 
@@ -40,11 +41,8 @@ struct omap5_idle_statedata {
 static struct cpuidle_params cpuidle_params_table[] = {
 	/* C1 - CPU0 ON + CPU1 ON + MPU ON */
 	{.exit_latency = 2 + 2 , .target_residency = 5, .valid = 1},
-	/*
-	 * C2- CPU0 CSWR + CPU1 CSWR + MPU CSWR
-	 * FIXME: Disabled due to instability - under debug
-	 */
-	{.exit_latency = 100 + 100 , .target_residency = 200, .valid = 0},
+	/* C2- CPU0 CSWR + CPU1 CSWR + MPU CSWR */
+	{.exit_latency = 100 + 100 , .target_residency = 200, .valid = 1},
 
 	/*
 	 * FIXME: Errata analysis pending. Disabled C-state as CPU Forced-OFF is
@@ -79,12 +77,14 @@ static int omap5_enter_idle(struct cpuidle_device *dev,
 	struct omap5_idle_statedata *cx =
 			cpuidle_get_statedata(&dev->states_usage[index]);
 	int cpu_id = smp_processor_id();
+	unsigned long flag;
 
 	local_fiq_disable();
 
 	if (index > 0)
 		clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &cpu_id);
 
+	spin_lock_irqsave(&mpu_lock, flag);
 	smp_mb__before_atomic_inc();
 	atomic_inc(&cx->mpu_state_vote);
 	smp_mb__after_atomic_inc();
@@ -92,11 +92,17 @@ static int omap5_enter_idle(struct cpuidle_device *dev,
 	if (atomic_read(&cx->mpu_state_vote) == num_online_cpus())
 		omap_set_pwrdm_state(mpu_pd, cx->mpu_state);
 
+	spin_unlock_irqrestore(&mpu_lock, flag);
+
 	omap_enter_lowpower(dev->cpu, cx->cpu_state);
 
+	spin_lock_irqsave(&mpu_lock, flag);
 	smp_mb__before_atomic_dec();
 	atomic_dec(&cx->mpu_state_vote);
 	smp_mb__after_atomic_dec();
+
+	omap_set_pwrdm_state(mpu_pd, PWRDM_POWER_ON);
+	spin_unlock_irqrestore(&mpu_lock, flag);
 
 	if (index > 0)
 		clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu_id);

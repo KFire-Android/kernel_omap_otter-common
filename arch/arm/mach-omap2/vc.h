@@ -36,6 +36,7 @@ struct voltagedomain;
  * @i2c_cfg_reg: I2C configuration register offset
  * @i2c_cfg_hsen_mask: high-speed mode bit field mask in I2C config register
  * @i2c_mcode_mask: MCODE field mask for I2C config register
+ * @voltctrl_reg: PRM_VOLTCTRL register for auto_ret, auto_off configuration
  *
  * XXX One of cmd_on_mask and cmd_on_shift are not needed
  * XXX VALID should probably be a shift, not a mask
@@ -55,6 +56,7 @@ struct omap_vc_common {
 	u8 i2c_cfg_hsen_mask;
 	u8 i2c_mcode_mask;
 	u8 i2c_clk_reg;
+	u8 voltctrl_reg;
 };
 
 /* omap_vc_channel.flags values */
@@ -82,6 +84,7 @@ struct omap_vc_common {
  * @cfg_channel_reg: VC channel configuration register
  * @cfg_channel_sa_shift: bit shift for slave address cfg_channel register
  * @flags: VC channel-specific flags (optional)
+ *@voltctrl_mask: PRM_VOLTCTRL mask for AUTO_RET fields
  */
 struct omap_vc_channel {
 	/* channel state */
@@ -104,6 +107,7 @@ struct omap_vc_channel {
 	u8 cfg_channel_reg;
 	u8 cfg_channel_sa_shift;
 	u8 flags;
+	u8 voltctrl_mask;
 };
 
 extern struct omap_vc_channel omap3_vc_mpu;

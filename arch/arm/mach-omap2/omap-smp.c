@@ -82,6 +82,9 @@ void __cpuinit platform_secondary_init(unsigned int cpu)
 	 */
 	spin_lock(&boot_lock);
 	spin_unlock(&boot_lock);
+
+	/* Notify pwrdm usecounters about active CPU1 */
+	omap_inc_mpu_core_pwrdm_usecount();
 }
 
 int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)

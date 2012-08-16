@@ -71,6 +71,10 @@ static struct omap_vc_channel_cfg vc_mutant_channel_cfg = {
 static struct omap_vc_channel_cfg *vc_cfg_bits;
 #define CFG_CHANNEL_MASK 0x1f
 
+#define VDD_AUTO_RET_DISABLE	0
+#define VDD_AUTO_SLEEP		1
+#define VDD_AUTO_RET		2
+
 /**
  * omap_vc_config_channel - configure VC channel to PMIC mappings
  * @voltdm: pointer to voltagdomain defining the desired VC channel
@@ -477,6 +481,51 @@ static void omap4_set_timings(struct voltagedomain *voltdm)
 	omap4_set_volt_ramp_time(voltdm, false);
 }
 
+static int omap4_vc_sleep(struct voltagedomain *voltdm, u8 target_state)
+{
+	u32 val = VDD_AUTO_RET_DISABLE;
+	u32 voltctrl;
+
+	/* Return if voltdm does not support autoret */
+	if (!voltdm->auto_ret)
+		return 0;
+
+	switch (target_state) {
+	case PWRDM_POWER_OFF:
+	case PWRDM_POWER_OSWR:
+	case PWRDM_POWER_CSWR:
+		val = VDD_AUTO_RET;
+		break;
+	}
+
+	voltctrl = voltdm->read(voltdm->vc->common->voltctrl_reg);
+
+	voltctrl &= ~voltdm->vc->voltctrl_mask;
+
+	voltctrl |= val << __ffs(voltdm->vc->voltctrl_mask);
+
+	voltdm->write(voltctrl, voltdm->vc->common->voltctrl_reg);
+
+	return 0;
+}
+
+static int omap4_vc_wakeup(struct voltagedomain *voltdm)
+{
+	u32 voltctrl;
+
+	/* Return if voltdm does not support autoret */
+	if (!voltdm->auto_ret)
+		return 0;
+
+	voltctrl = voltdm->read(voltdm->vc->common->voltctrl_reg);
+
+	voltctrl &= ~voltdm->vc->voltctrl_mask;
+
+	voltdm->write(voltctrl, voltdm->vc->common->voltctrl_reg);
+
+	return 0;
+}
+
 /* OMAP4 specific voltage init functions */
 static void __init omap4_vc_init_channel(struct voltagedomain *voltdm)
 {
@@ -486,6 +535,9 @@ static void __init omap4_vc_init_channel(struct voltagedomain *voltdm)
 	u32 vc_val = 0;
 
 	omap4_set_timings(voltdm);
+
+	voltdm->sleep = omap4_vc_sleep;
+	voltdm->wakeup = omap4_vc_wakeup;
 
 	if (is_initialized)
 		return;

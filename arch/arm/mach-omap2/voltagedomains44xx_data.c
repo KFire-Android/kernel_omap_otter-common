@@ -61,6 +61,7 @@ static struct voltagedomain omap4_voltdm_mpu = {
 	.vfsm = &omap4_vdd_mpu_vfsm,
 	.vp = &omap4_vp_mpu,
 	.vdd = &omap4_vdd_mpu_info,
+	.auto_ret = true,
 };
 
 static struct voltagedomain omap4_voltdm_iva = {
@@ -73,6 +74,8 @@ static struct voltagedomain omap4_voltdm_iva = {
 	.vfsm = &omap4_vdd_iva_vfsm,
 	.vp = &omap4_vp_iva,
 	.vdd = &omap4_vdd_iva_info,
+	/* disable auto_ret for mm domain due to known issues */
+	.auto_ret = false,
 };
 
 static struct voltagedomain omap4_voltdm_core = {
@@ -85,6 +88,7 @@ static struct voltagedomain omap4_voltdm_core = {
 	.vfsm = &omap4_vdd_core_vfsm,
 	.vp = &omap4_vp_core,
 	.vdd = &omap4_vdd_core_info,
+	.auto_ret = true,
 };
 
 static struct voltagedomain omap4_voltdm_wkup = {

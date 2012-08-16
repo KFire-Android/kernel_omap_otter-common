@@ -358,6 +358,64 @@ static inline void restore_l3instr_regs(void)
 }
 
 /**
+ * pwrdm_inc_mpu_core_usecount - notify pwrdm usecounters about active CPU
+ *
+ * This function must be called just after a CPU has become active.
+ * Some powerdomains have static dependencies with MPU idle cycle,
+ * namely mpu_pwrdm and core_pwrdm. These powerdomains will get
+ * their usecounts increased / decreased each sleep cycle so that
+ * they reach 0 just before all CPUs have reached idle, and wake-up
+ * right after it. This allows the dependent voltage domains to
+ * follow idle cycle properly and trigger their callbacks for
+ * sleep / wakeup, which in turn will control e.g. auto retention
+ * feature.
+ */
+void omap_inc_mpu_core_pwrdm_usecount(void)
+{
+	if (!omap_pm_is_ready())
+		return;
+
+	if (!mpuss_pd) {
+		WARN_ONCE(1, "Failed to lookup MPUSS power domain\n");
+		return;
+	}
+
+	if (!core_pd) {
+		WARN_ONCE(1, "Failed to lookup CORE power domain\n");
+		return;
+	}
+
+	pwrdm_usecount_inc(mpuss_pd);
+	pwrdm_usecount_inc(core_pd);
+}
+
+/**
+ * pwrdm_inc_mpu_core_usecount - notify pwrdm usecounters about idling CPU
+ *
+ * This function must be called just before CPU is about to idle.
+ * Similar to pwrdm_cpu_wakeup, this is used to make sure the idle
+ * cycle dependent powerdomains follow the sleep cycle properly.
+ */
+void omap_dec_mpu_core_pwrdm_usecount(void)
+{
+	if (!omap_pm_is_ready())
+		return;
+
+	if (!mpuss_pd) {
+		WARN_ONCE(1, "%s: unable to find mpu pwrdm\n", __func__);
+		return;
+	}
+
+	if (!core_pd) {
+		WARN_ONCE(1, "%s: unable to find core pwrdm\n", __func__);
+		return;
+	}
+
+	pwrdm_usecount_dec(mpuss_pd);
+	pwrdm_usecount_dec(core_pd);
+}
+
+/**
  * omap_enter_lowpower: OMAP4 MPUSS Low Power Entry Function
  * The purpose of this function is to manage low power programming
  * of OMAP MPUSS subsystem
@@ -456,11 +514,16 @@ int omap_enter_lowpower(unsigned int cpu, unsigned int power_state)
 	omap_pm_ops.scu_prepare(cpu, power_state);
 	l2x0_pwrst_prepare(cpu, save_state);
 
+	/* Decrease mpu / core usecounts to indicate we are entering idle */
+	omap_dec_mpu_core_pwrdm_usecount();
 
 	/*
 	 * Call low level function  with targeted low power state.
 	 */
 	cpu_suspend(save_state, omap_pm_ops.finish_suspend);
+
+	/* Increase mpu / core usecounts to indicate we are leaving idle */
+	omap_inc_mpu_core_pwrdm_usecount();
 
 	/*
 	 * Restore the CPUx power state to ON otherwise CPUx
@@ -527,12 +590,19 @@ int __cpuinit omap_hotplug_cpu(unsigned int cpu, unsigned int power_state)
 	/* Enable FORCE OFF mode if supported */
 	set_cpu_force_off(cpu, 1);
 #endif
+
+	/* Decrease mpu / core usecounts to indicate we are entering idle */
+	omap_dec_mpu_core_pwrdm_usecount();
+
 	/*
 	 * CPU never retuns back if targetted power state is OFF mode.
 	 * CPU ONLINE follows normal CPU ONLINE ptah via
 	 * omap_secondary_startup().
 	 */
 	omap_pm_ops.finish_suspend(cpu_state);
+
+	/* Increase mpu usecounts to indicate we are exiting idle */
+	omap_inc_mpu_core_pwrdm_usecount();
 
 #if 0
 	/* Clear FORCE OFF mode if supported */
@@ -568,6 +638,7 @@ int __init omap_mpuss_init(void)
 	struct omap4_cpu_pm_info *pm_info;
 	u32 cpu_wakeup_addr = 0;
 	u32 omap_type_offset = 0;
+	int i;
 
 	if (omap_rev() == OMAP4430_REV_ES1_0) {
 		WARN(1, "Power Management not supported on OMAP4430 ES1.0\n");
@@ -647,6 +718,10 @@ int __init omap_mpuss_init(void)
 	}
 	pwrdm_clear_all_prev_pwrst(mpuss_pd);
 	mpuss_clear_prev_logic_pwrst();
+
+	/* Notify pwrdm usecounters about all CPUs  */
+	for (i = 0; i < nr_cpu_ids; i++)
+		omap_inc_mpu_core_pwrdm_usecount();
 
 	/* Save device type on scratchpad for low level code to use */
 	if (cpu_is_omap44xx())

@@ -16,6 +16,7 @@
 
 #include <linux/notifier.h>
 #include <linux/err.h>
+#include <linux/spinlock.h>
 
 #include <mach/common.h>
 struct omap_volt_data;
@@ -62,15 +63,19 @@ struct omap_vfsm_instance {
  * @pwrdm_list: list_head linking all powerdomains in this voltagedomain
  * @vc: pointer to VC channel associated with this voltagedomain
  * @vp: pointer to VP associated with this voltagedomain
+ * @usecount: number of users for this voltagedomain
  * @read: read a VC/VP register
  * @write: write a VC/VP register
  * @read: read-modify-write a VC/VP register
  * @sys_clk: system clock name/frequency, used for various timing calculations
+ * @sleep: function to call once the domain enters idle
+ * @wakeup: function to call once the domain wakes up from idle
  * @scale: function used to scale the voltage of the voltagedomain
  * @nominal_volt: current nominal voltage for this voltage domain
  * @volt_data: voltage table having the distinct voltages supported
  *             by the domain and other associated per voltage data.
  * @change_notify_list: notifiers that need to be told on pre and post change
+ * @auto_ret: does voltage domain can use auto_ret feature
  */
 struct voltagedomain {
 	char *name;
@@ -84,6 +89,8 @@ struct voltagedomain {
 	struct omap_vp_param *vp_param;
 	struct omap_vc_param *vc_param;
 
+	int usecount;
+
 	/* VC/VP register access functions: SoC specific */
 	u32 (*read) (u8 offset);
 	void (*write) (u32 val, u8 offset);
@@ -94,6 +101,8 @@ struct voltagedomain {
 		u32 rate;
 	} sys_clk;
 
+	int (*sleep) (struct voltagedomain *voltdm, u8 target_state);
+	int (*wakeup) (struct voltagedomain *voltdm);
 	int (*scale) (struct voltagedomain *voltdm,
 				struct omap_volt_data *target_volt);
 	struct omap_volt_data *curr_volt;
@@ -101,6 +110,9 @@ struct voltagedomain {
 	struct omap_vdd_info *vdd;
 	struct srcu_notifier_head change_notify_list;
 	struct dentry *debug_dir;
+	/* spinlock for voltage usecount */
+	spinlock_t lock;
+	bool auto_ret;
 };
 
 /**
@@ -275,6 +287,8 @@ extern void omap54xx_voltagedomains_init(void);
 
 void voltdm_init(struct voltagedomain **voltdm_list);
 int voltdm_add_pwrdm(struct voltagedomain *voltdm, struct powerdomain *pwrdm);
+void voltdm_pwrdm_enable(struct voltagedomain *voltdm);
+void voltdm_pwrdm_disable(struct voltagedomain *voltdm);
 int voltdm_for_each(int (*fn)(struct voltagedomain *voltdm, void *user),
 		    void *user);
 int voltdm_for_each_pwrdm(struct voltagedomain *voltdm,
