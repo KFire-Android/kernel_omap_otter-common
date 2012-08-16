@@ -1048,15 +1048,6 @@ static int __init omap_sr_probe(struct platform_device *pdev)
 	}
 
 	dev_info(&pdev->dev, "%s: SmartReflex driver initialized\n", __func__);
-	if (!sr_dbg_dir) {
-		sr_dbg_dir = debugfs_create_dir("smartreflex", NULL);
-		if (IS_ERR_OR_NULL(sr_dbg_dir)) {
-			ret = PTR_ERR(sr_dbg_dir);
-			pr_err("%s:sr debugfs dir creation failed(%d)\n",
-			       __func__, ret);
-			goto err_iounmap;
-		}
-	}
 
 	sr_info->dbg_dir = debugfs_create_dir(sr_info->name, sr_dbg_dir);
 	if (IS_ERR_OR_NULL(sr_info->dbg_dir)) {
@@ -1288,6 +1279,13 @@ static int __init sr_init(void)
 		sr_pmic_data->sr_pmic_init();
 	else
 		pr_warning("%s: No PMIC hook to init smartreflex\n", __func__);
+
+	sr_dbg_dir = debugfs_create_dir("smartreflex", NULL);
+	if (IS_ERR_OR_NULL(sr_dbg_dir)) {
+		pr_err("%s:sr debugfs dir creation failed(%d)\n",
+		       __func__, ret);
+		return	PTR_ERR(sr_dbg_dir);
+	}
 
 	ret = platform_driver_probe(&smartreflex_driver, omap_sr_probe);
 	if (ret) {
