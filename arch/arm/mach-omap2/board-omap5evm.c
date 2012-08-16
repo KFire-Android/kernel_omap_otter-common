@@ -1097,5 +1097,6 @@ MACHINE_START(OMAP5_SEVM, "OMAP5430 evm board")
 	.init_irq	= gic_init_irq,
 	.handle_irq	= gic_handle_irq,
 	.init_machine	= omap_5430evm_init,
+	.restart	= omap_prcm_restart,
 	.timer		= &omap5_timer,
 MACHINE_END
