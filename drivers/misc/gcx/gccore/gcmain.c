@@ -421,7 +421,7 @@ void gcpwr_reset(struct gccorecontext *gccorecontext)
 				gcclockcontrol.raw);
 
 		/* Wait for reset. */
-		mdelay(1);
+		msleep(1);
 
 		/* Reset soft reset bit. */
 		gcclockcontrol.reg.reset = 0;
@@ -464,6 +464,29 @@ void gcpwr_reset(struct gccorecontext *gccorecontext)
 	GCEXIT(GCZONE_POWER);
 }
 
+unsigned int gcpwr_get_speed(void)
+{
+	struct gccorecontext *gccorecontext = &g_context;
+	static const int seccount = 2;
+	unsigned int cyclecount;
+	unsigned int speedmhz = 0;
+
+	GCLOCK(&gccorecontext->powerlock);
+
+	if (gccorecontext->gcpower == GCPWR_ON) {
+		/* Reset cycle counter and sleep. */
+		gc_write_reg(GC_TOTAL_CYCLES_Address, 0);
+		msleep(seccount * 1000);
+
+		/* Read the cycle counter and compute the speed. */
+		cyclecount = gc_read_reg(GC_TOTAL_CYCLES_Address);
+		speedmhz = cyclecount / 1000 / 1000 / seccount;
+	}
+
+	GCUNLOCK(&gccorecontext->powerlock);
+
+	return speedmhz;
+}
 
 /*******************************************************************************
  * Public API.
