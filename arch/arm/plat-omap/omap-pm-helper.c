@@ -225,9 +225,12 @@ unlock:
  */
 static unsigned long remove_req_tput(struct device *dev)
 {
+	struct platform_device *pdev;
 	struct users *user;
 	int found = 0;
 	int ret;
+
+	pdev = container_of(dev, struct platform_device, dev);
 
 	mutex_lock(&bus_tput->throughput_mutex);
 	list_for_each_entry(user, &bus_tput->users_list, node) {
@@ -238,7 +241,7 @@ static unsigned long remove_req_tput(struct device *dev)
 	}
 	if (!found) {
 		/* No such user exists */
-		pr_err("Invalid Device Structure\n");
+		pr_err("OMAP-PM: Invalid Device Structure for %s\n", pdev->name);
 		ret = 0;
 		goto unlock;
 	}
