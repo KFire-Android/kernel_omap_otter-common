@@ -39,7 +39,11 @@
 #include <plat/board.h>
 #include <plat/usb.h>
 #include <plat/mmc.h>
+#include <plat/vram.h>
 #include <plat/remoteproc.h>
+
+#include <video/omapdss.h>
+#include <video/omap-panel-tc358765.h>
 
 #include "mux.h"
 #include "hsmmc.h"
@@ -54,6 +58,8 @@
 #define FIXED_REG_VBAT_ID		0
 #define FIXED_REG_VWLAN_ID		1
 #define TPS62361_GPIO			7
+
+#define TABLET_FB_RAM_SIZE		SZ_16M /* 1920×1080*4 * 2 */
 
 static struct gpio_led tablet_gpio_leds[] = {
 	{
@@ -405,6 +411,157 @@ static int __init omap4_i2c_init(void)
 	return 0;
 }
 
+static struct tc358765_board_data tablet_dsi_panel = {
+	.lp_time	= 0x4,
+	.clrsipo	= 0x3,
+	.lv_is		= 0x1,
+	.lv_nd		= 0x6,
+	.vtgen		= 0x1,
+	.vsdelay	= 0xf,
+};
+
+static struct omap_dss_device tablet_lcd_device = {
+	.name                   = "lcd",
+	.driver_name            = "tc358765",
+	.type                   = OMAP_DISPLAY_TYPE_DSI,
+	.data			= &tablet_dsi_panel,
+	.phy.dsi                = {
+		.clk_lane       = 1,
+		.clk_pol        = 0,
+		.data1_lane     = 2,
+		.data1_pol      = 0,
+		.data2_lane     = 3,
+		.data2_pol      = 0,
+		.data3_lane     = 4,
+		.data3_pol      = 0,
+		.data4_lane     = 5,
+		.data4_pol      = 0,
+
+		.module		= 0,
+	},
+
+	.clocks = {
+		.dispc = {
+			 .channel = {
+				.lck_div        = 1,
+				.pck_div        = 2,
+				.lcd_clk_src    =
+					OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DISPC,
+			},
+			.dispc_fclk_src = OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DISPC,
+		},
+
+		.dsi = {
+			.regn           = 38,
+			.regm           = 441,
+			.regm_dispc     = 6,
+			.regm_dsi       = 9,
+			.lp_clk_div     = 5,
+			.dsi_fclk_src   = OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DSI,
+		},
+	},
+
+	.panel = {
+		.timings = {
+			.x_res		= 1280,
+			.y_res		= 800,
+			.pixel_clock	= 65183,
+			.hfp		= 10,
+			.hsw		= 20,
+			.hbp		= 10,
+			.vfp		= 4,
+			.vsw		= 4,
+			.vbp		= 4,
+		},
+		.dsi_mode = OMAP_DSS_DSI_VIDEO_MODE,
+		.dsi_vm_data = {
+				.hsa			= 0,
+				.hfp			= 6,
+				.hbp			= 21,
+				.vsa			= 4,
+				.vfp			= 4,
+				.vbp			= 4,
+
+				.vp_de_pol		= true,
+				.vp_vsync_pol		= true,
+				.vp_hsync_pol		= false,
+				.vp_hsync_end		= false,
+				.vp_vsync_end		= false,
+
+				.blanking_mode		= 0,
+				.hsa_blanking_mode	= 1,
+				.hfp_blanking_mode	= 1,
+				.hbp_blanking_mode	= 1,
+
+				.ddr_clk_always_on	= true,
+
+				.window_sync		= 4,
+		}
+	},
+
+	.ctrl = {
+		.pixel_size = 24,
+	},
+
+	.reset_gpio     = 102,
+	.channel = OMAP_DSS_CHANNEL_LCD,
+	.platform_enable = NULL,
+	.platform_disable = NULL,
+};
+
+
+static struct omap_dss_device *tablet_dss_devices[] = {
+	&tablet_lcd_device,
+};
+
+static struct omap_dss_board_info tablet_dss_data = {
+	.num_devices	= ARRAY_SIZE(tablet_dss_devices),
+	.devices	= tablet_dss_devices,
+	.default_device	= &tablet_lcd_device,
+};
+
+static void tablet_lcd_init(void)
+{
+	u32 reg;
+	int status;
+
+	/* Enable 3 lanes in DSI1 module, disable pull down */
+	reg = omap4_ctrl_pad_readl(OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_DSIPHY);
+	reg &= ~OMAP4_DSI1_LANEENABLE_MASK;
+	reg |= 0x1f << OMAP4_DSI1_LANEENABLE_SHIFT;
+	reg &= ~OMAP4_DSI1_PIPD_MASK;
+	reg |= 0x1f << OMAP4_DSI1_PIPD_SHIFT;
+	omap4_ctrl_pad_writel(reg, OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_DSIPHY);
+
+	status = gpio_request_one(tablet_lcd_device.reset_gpio,
+				GPIOF_OUT_INIT_LOW, "lcd_reset_gpio");
+	gpio_set_value(tablet_lcd_device.reset_gpio, 1);
+	if (status)
+		pr_err("%s: Could not get lcd_reset_gpio\n", __func__);
+}
+
+static struct i2c_board_info __initdata omap4xx_i2c_bus2_d2l_info[] = {
+	{
+		I2C_BOARD_INFO("tc358765_i2c_driver", 0x0f),
+	},
+};
+
+static int __init tablet_display_init(void)
+{
+	omap_mux_init_signal("fref_clk4_out.fref_clk4_out",
+				OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP);
+
+	tablet_lcd_init();
+
+	omap_vram_set_sdram_vram(TABLET_FB_RAM_SIZE, 0);
+	omap_display_init(&tablet_dss_data);
+
+	i2c_register_board_info(2, omap4xx_i2c_bus2_d2l_info,
+		ARRAY_SIZE(omap4xx_i2c_bus2_d2l_info));
+
+	return 0;
+}
+
 #ifdef CONFIG_OMAP_MUX
 static struct omap_board_mux board_mux[] __initdata = {
 	OMAP4_MUX(USBB2_ULPITLL_CLK, OMAP_MUX_MODE4 | OMAP_PIN_OUTPUT),
@@ -440,6 +597,7 @@ static void __init omap_tablet_init(void)
 	omap4_twl6030_hsmmc_init(mmc);
 	usb_musb_init(&musb_board_data);
 
+	tablet_display_init();
 	status = omap_ethernet_init();
 	if (status) {
 		pr_err("Ethernet initialization failed: %d\n", status);
