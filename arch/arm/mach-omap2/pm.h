@@ -25,6 +25,8 @@ extern int (*omap_pm_suspend)(void);
 extern int omap5_idle_init(void);
 void omap_inc_mpu_core_pwrdm_usecount(void);
 void omap_dec_mpu_core_pwrdm_usecount(void);
+void omap_enable_core_notifier(int mpu_next_state, int core_next_state);
+void omap_idle_core_notifier(int mpu_next_state, int core_next_state);
 
 #ifdef CONFIG_PM
 extern void omap4_device_set_state_off(u8 enable);

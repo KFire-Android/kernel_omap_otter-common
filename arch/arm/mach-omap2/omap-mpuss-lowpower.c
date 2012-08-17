@@ -96,6 +96,8 @@ static struct powerdomain *mpuss_pd, *core_pd;
 static void __iomem *sar_base;
 static unsigned int cpu0_context_offset;
 static unsigned int cpu1_context_offset;
+static spinlock_t mpu_lock;
+static int mpu_usecount;
 
 static int default_finish_suspend(unsigned long cpu_state)
 {
@@ -372,6 +374,9 @@ static inline void restore_l3instr_regs(void)
  */
 void omap_inc_mpu_core_pwrdm_usecount(void)
 {
+	unsigned long flag;
+	int mpu_state, core_state;
+
 	if (!omap_pm_is_ready())
 		return;
 
@@ -385,8 +390,19 @@ void omap_inc_mpu_core_pwrdm_usecount(void)
 		return;
 	}
 
-	pwrdm_usecount_inc(mpuss_pd);
+	spin_lock_irqsave(&mpu_lock, flag);
+
 	pwrdm_usecount_inc(core_pd);
+	mpu_usecount = pwrdm_usecount_inc(mpuss_pd);
+
+	/* Call idle notifier only when we attempt C2 and beyond */
+	mpu_state = pwrdm_read_next_pwrst(mpuss_pd);
+	if ((mpu_usecount == 1) && (mpu_state != PWRDM_POWER_ON)) {
+		core_state = pwrdm_read_next_pwrst(core_pd);
+		omap_enable_core_notifier(mpu_state, core_state);
+	}
+
+	spin_unlock_irqrestore(&mpu_lock, flag);
 }
 
 /**
@@ -398,6 +414,9 @@ void omap_inc_mpu_core_pwrdm_usecount(void)
  */
 void omap_dec_mpu_core_pwrdm_usecount(void)
 {
+	unsigned long flag;
+	int mpu_state, core_state;
+
 	if (!omap_pm_is_ready())
 		return;
 
@@ -411,8 +430,22 @@ void omap_dec_mpu_core_pwrdm_usecount(void)
 		return;
 	}
 
+	spin_lock_irqsave(&mpu_lock, flag);
+
+	mpu_usecount = pwrdm_get_usecount(mpuss_pd);
+
+	/* Call idle notifier only when we attempt C2 and beyond */
+	mpu_state = pwrdm_read_next_pwrst(mpuss_pd);
+
+	if ((mpu_usecount == 1) && (mpu_state != PWRDM_POWER_ON)) {
+		core_state = pwrdm_read_next_pwrst(core_pd);
+		omap_idle_core_notifier(mpu_state, core_state);
+	}
+
 	pwrdm_usecount_dec(mpuss_pd);
 	pwrdm_usecount_dec(core_pd);
+
+	spin_unlock_irqrestore(&mpu_lock, flag);
 }
 
 /**
@@ -719,9 +752,13 @@ int __init omap_mpuss_init(void)
 	pwrdm_clear_all_prev_pwrst(mpuss_pd);
 	mpuss_clear_prev_logic_pwrst();
 
+	spin_lock_init(&mpu_lock);
+
 	/* Notify pwrdm usecounters about all CPUs  */
-	for (i = 0; i < nr_cpu_ids; i++)
-		omap_inc_mpu_core_pwrdm_usecount();
+	for (i = 0; i < nr_cpu_ids; i++) {
+		pwrdm_usecount_inc(mpuss_pd);
+		pwrdm_usecount_inc(core_pd);
+	}
 
 	/* Save device type on scratchpad for low level code to use */
 	if (cpu_is_omap44xx())

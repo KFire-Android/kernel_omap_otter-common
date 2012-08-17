@@ -261,6 +261,34 @@ void omap_pm_clear_dsp_wake_up(void)
 					__func__);
 }
 
+/**
+ * omap_idle_core_drivers - function where core driver idle routines
+ * to be called.
+ * @mpu_next_state:	Next MPUSS PD power state that system will attempt
+ * @core_next_state:	Next Core PD power state that system will attempt
+ *
+ * This function is called by cpuidle when system is entering low
+ * power state. Drivers like GPIO, thermal, SR can hook into this function
+ * to trigger idle transition.
+ */
+void omap_idle_core_notifier(int mpu_next_state, int core_next_state)
+{
+}
+
+/**
+ * omap_enable_core_drivers - function where core driver enable routines
+ * to be called.
+ * @mpu_next_state:	Next MPUSS PD power state that system will attempt
+ * @core_next_state:	Next Core PD power state that system will attempt
+ *
+ * This function is called by cpuidle when system is exiting low
+ * power state. Drivers like GPIO, thermal, SR can hook into this function
+ * to enable the modules.
+ */
+void omap_enable_core_notifier(int mpu_next_state, int core_next_state)
+{
+}
+
 static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
 {
 	struct power_state *pwrst;
