@@ -921,6 +921,15 @@ static struct regulator_ops twlsmps_ops = {
 	.get_status		= twl6030reg_get_status,
 };
 
+static struct regulator_ops twl6030_external_control_pin_ops = {
+	.enable			= twl6030reg_enable,
+	.disable		= twl6030reg_disable,
+	.is_enabled		= twl6030reg_is_enabled,
+
+	.set_mode		= twl6030reg_set_mode,
+
+	.get_status		= twl6030reg_get_status,
+};
 /*----------------------------------------------------------------------*/
 
 #define TWL4030_FIXED_LDO(label, offset, mVolts, num, turnon_delay, \
@@ -1051,6 +1060,19 @@ static struct twlreg_info TWLSMPS_INFO_##label = { \
 		}, \
 	}
 
+#define TWL6030_EXTERNAL_CONTROL_PIN(label, offset, turnon_delay) \
+static struct twlreg_info TWLRES_INFO_##label = { \
+	.base = offset, \
+	.delay = turnon_delay, \
+	.desc = { \
+		.name = #label, \
+		.id = TWL6030_REG_##label, \
+		.ops = &twl6030_external_control_pin_ops, \
+		.type = REGULATOR_VOLTAGE, \
+		.owner = THIS_MODULE, \
+		}, \
+	}
+
 /*
  * We list regulators here if systems need some level of
  * software control over them after boot.
@@ -1110,6 +1132,8 @@ TWL6030_FIXED_RESOURCE(CLK32KAUDIO, 0x8F, 0);
 TWL6032_ADJUSTABLE_SMPS(SMPS3, 0x34);
 TWL6032_ADJUSTABLE_SMPS(SMPS4, 0x10);
 TWL6032_ADJUSTABLE_SMPS(VIO, 0x16);
+
+TWL6030_EXTERNAL_CONTROL_PIN(SYSEN, 0x83, 0);
 
 static u8 twl_get_smps_offset(void)
 {
@@ -1189,6 +1213,7 @@ static const struct of_device_id twl_of_match[] __devinitconst = {
 	TWLFIXED_OF_MATCH("ti,twl6030-v2v1", V2V1),
 	TWLRES_OF_MATCH("ti,twl6030-clk32kg", CLK32KG),
 	TWLRES_OF_MATCH("ti,twl6030-clk32kaudio", CLK32KAUDIO),
+	TWLRES_OF_MATCH("ti,twl6030-sysen", SYSEN),
 	TWLSMPS_OF_MATCH("ti,twl6032-smps3", SMPS3),
 	TWLSMPS_OF_MATCH("ti,twl6032-smps4", SMPS4),
 	TWLSMPS_OF_MATCH("ti,twl6032-vio", VIO),
