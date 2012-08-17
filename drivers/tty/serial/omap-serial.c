@@ -1255,6 +1255,7 @@ static int serial_omap_suspend(struct device *dev)
 	struct omap_uart_port_info *pdata = dev->platform_data;
 
 	if (up) {
+		disable_irq(up->port.irq);
 		if (pdata->rts_mux_write) {
 			up->rts_pullup_in_suspend = 1;
 			pdata->rts_mux_write(MUX_PULL_UP, up->port.line);
@@ -1265,6 +1266,7 @@ static int serial_omap_suspend(struct device *dev)
 
 		if (!device_may_wakeup(dev))
 			pdata->enable_wakeup(up->pdev, false);
+		enable_irq(up->port.irq);
 	}
 
 	return 0;
@@ -1790,8 +1792,8 @@ static int serial_omap_runtime_resume(struct device *dev)
 #endif
 
 static const struct dev_pm_ops serial_omap_dev_pm_ops = {
-	.suspend_noirq = serial_omap_suspend,
-	.resume_noirq = serial_omap_resume,
+	.suspend = serial_omap_suspend,
+	.resume = serial_omap_resume,
 
 	SET_RUNTIME_PM_OPS(serial_omap_runtime_suspend,
 				serial_omap_runtime_resume, NULL)

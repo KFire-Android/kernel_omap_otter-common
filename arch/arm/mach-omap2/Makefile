@@ -74,10 +74,16 @@ ifeq ($(CONFIG_PM),y)
 omap-4-5-common-pm			= pm4xxx_5xxx.o omap-mpuss-lowpower.o
 obj-$(CONFIG_ARCH_OMAP2)		+= pm24xx.o
 obj-$(CONFIG_ARCH_OMAP2)		+= sleep24xx.o
-obj-$(CONFIG_ARCH_OMAP3)		+= pm34xx.o sleep34xx.o \
-					   cpuidle34xx.o
-obj-$(CONFIG_ARCH_OMAP4)		+= $(omap-4-5-common-pm) cpuidle44xx.o
-obj-$(CONFIG_ARCH_OMAP5)		+= $(omap-4-5-common-pm) cpuidle5xxx.o
+obj-$(CONFIG_ARCH_OMAP3)		+= pm34xx.o sleep34xx.o
+obj-$(CONFIG_ARCH_OMAP4)		+= $(omap-4-5-common-pm)
+obj-$(CONFIG_ARCH_OMAP5)		+= $(omap-4-5-common-pm)
+
+ifeq ($(CONFIG_CPU_IDLE),y)
+obj-$(CONFIG_ARCH_OMAP3)		+= cpuidle34xx.o
+obj-$(CONFIG_ARCH_OMAP4)		+= cpuidle44xx.o
+obj-$(CONFIG_ARCH_OMAP5)		+= cpuidle5xxx.o
+endif
+
 obj-$(CONFIG_PM_DEBUG)			+= pm-debug.o
 ifeq ($(CONFIG_PM_DEBUG),y)
 obj-$(CONFIG_ARCH_OMAP5)		+= prcm-54xx-debug.o

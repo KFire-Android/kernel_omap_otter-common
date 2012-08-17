@@ -911,10 +911,6 @@ omap_hsmmc_xfer_done(struct omap_hsmmc_host *host, struct mmc_data *data)
 
 	host->data = NULL;
 
-	if (host->dma_type == ADMA_XFER)
-		dma_unmap_sg(mmc_dev(host->mmc), data->sg, host->dma_len,
-					omap_hsmmc_get_dma_dir(host, data));
-
 	if (!data->error)
 		data->bytes_xfered += data->blocks * (data->blksz);
 	else
@@ -1494,9 +1490,11 @@ static int mmc_populate_adma_desc_table(struct omap_hsmmc_host *host,
 	int numblocks = 0;
 	dma_addr_t dmaaddr;
 	struct mmc_data *data = req->data;
+	int ret = 0;
 
-	host->dma_len = dma_map_sg(mmc_dev(host->mmc), data->sg,
-			data->sg_len, omap_hsmmc_get_dma_dir(host, data));
+	ret = omap_hsmmc_pre_dma_transfer(host, data, NULL);
+	if (ret)
+		return ret;
 	for (i = 0, j = 0; i < host->dma_len; i++) {
 		dmaaddr = sg_dma_address(data->sg + i);
 		dmalen = sg_dma_len(data->sg + i);
@@ -2476,6 +2474,8 @@ static int omap_hsmmc_suspend(struct device *dev)
 			return ret;
 		}
 	}
+	if (mmc_slot(host).built_in)
+		host->mmc->pm_flags |= MMC_PM_KEEP_POWER;
 	ret = mmc_suspend_host(host->mmc);
 
 	if (ret) {
