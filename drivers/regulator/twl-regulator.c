@@ -1134,6 +1134,7 @@ TWL6032_ADJUSTABLE_SMPS(SMPS4, 0x10);
 TWL6032_ADJUSTABLE_SMPS(VIO, 0x16);
 
 TWL6030_EXTERNAL_CONTROL_PIN(SYSEN, 0x83, 0);
+TWL6030_EXTERNAL_CONTROL_PIN(REGEN1, 0x7d, 0);
 
 static u8 twl_get_smps_offset(void)
 {
@@ -1214,6 +1215,7 @@ static const struct of_device_id twl_of_match[] __devinitconst = {
 	TWLRES_OF_MATCH("ti,twl6030-clk32kg", CLK32KG),
 	TWLRES_OF_MATCH("ti,twl6030-clk32kaudio", CLK32KAUDIO),
 	TWLRES_OF_MATCH("ti,twl6030-sysen", SYSEN),
+	TWLRES_OF_MATCH("ti,twl6030-regen1", REGEN1),
 	TWLSMPS_OF_MATCH("ti,twl6032-smps3", SMPS3),
 	TWLSMPS_OF_MATCH("ti,twl6032-smps4", SMPS4),
 	TWLSMPS_OF_MATCH("ti,twl6032-vio", VIO),
