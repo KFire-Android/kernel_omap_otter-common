@@ -87,6 +87,9 @@ void __init omap_barriers_init(void)
 #else
 void __init omap_barriers_init(void)
 {}
+/* The following is defined in sleep4...S file */
+extern void omap_bus_sync(void);
+EXPORT_SYMBOL(omap_bus_sync);
 #endif
 
 void __init gic_init_irq(void)
