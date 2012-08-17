@@ -58,6 +58,7 @@ static enum omap_44xx_tablet_panel_type {
 	LCD_DEFAULT,
 	TC35876x_SHARP_LQ101K1LYxx_WXGA,/* TC35876x + Sharp LCD */
 	TC35876x_SAMSUNG_HYDIS_WUXGA,	/* TC35876x + Samsung or HYDIS */
+	LD089WU1_LG_WUXGA,
 } tablet_panel_type = LCD_DEFAULT;
 
 struct omap_tablet_panel_data {
@@ -209,6 +210,38 @@ static struct omap_video_timings dispc_timings_tc35876x_samhyd_wuxga = {
 	.vfp		= 9,
 	.vsw		= 1,
 	.vbp		= 10,
+};
+
+static struct omap_dsi_timings dsi_timings_ld089wu1_lg_wuxga = {
+	.hbp		= 10,
+	.hfp		= 35,
+	.hsa		= 0,
+	.vbp		= 9,
+	.vfp		= 10,
+	.vsa		= 1,
+	.vact		= 1200,
+	.tl		= 1488,
+	.hsa_hs_int	= 0,
+	.hfp_hs_int	= 0,
+	.hbp_hs_int	= 0,
+	.hsa_lp_int	= 0,
+	.hfp_lp_int	= 0,
+	.hbp_lp_int	= 0,
+	.bl_lp_int	= 12,
+	.bl_hs_int	= 1402,
+	.exit_lat	= 25,
+	.enter_lat	= 29,
+};
+
+static struct omap_video_timings dispc_timings_ld089wu1_lg_wuxga = {
+	.x_res		= 1920,
+	.y_res		= 1200,
+	.hfp		= 8,
+	.hsw		= 5,
+	.hbp		= 51,
+	.vfp		= 9,
+	.vsw		= 2,
+	.vbp		= 9,
 };
 
 static struct omap_dss_device lcd_tc35876x_sharp_lq101k1lyxx = {
@@ -380,6 +413,91 @@ static struct omap_dss_device lcd_tc35876x_samhyd_wuxga = {
 	.dsi_timings = &dsi_timings_tc35876x_samhyd_wuxga,
 };
 
+static struct omap_dss_device lcd_ld089wu1_lg_wuxga = {
+	.name                   = "lcd",
+	.driver_name            = "ld089wu1",
+	.type                   = OMAP_DISPLAY_TYPE_DSI,
+	.phy.dsi                = {
+		.clk_lane       = 3,
+		.clk_pol        = 0,
+		.data1_lane     = 1,
+		.data1_pol      = 0,
+		.data2_lane     = 2,
+		.data2_pol      = 0,
+		.data3_lane     = 4,
+		.data3_pol      = 0,
+		.data4_lane     = 5,
+		.data4_pol      = 0,
+
+		.type = OMAP_DSS_DSI_TYPE_VIDEO_MODE,
+		.line_bufs	= 0,
+	},
+
+	.clocks = {
+		.dispc = {
+			 .channel = {
+				.lck_div        = 1,
+				.pck_div        = 1,
+				.lcd_clk_src    =
+					OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DISPC,
+			},
+			.dispc_fclk_src = OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DISPC,
+		},
+
+		.dsi = {
+			.regn           = 16,
+			.regm           = 363,
+			.regm_dispc     = 12,
+			.regm_dsi       = 10,
+			.lp_clk_div     = 18,
+			.offset_ddr_clk = 0,
+			.dsi_fclk_src   = OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DSI,
+			.tlpx	= 24,
+			.tclk = {
+				.zero	 = 116,
+				.prepare = 29,
+				.trail	 = 29,
+			},
+			.ths = {
+				.zero	 = 46,
+				.prepare = 33,
+				.exit	 = 64,
+				.trail	 = 32,
+			},
+		},
+	},
+
+	.panel = {
+		.timings = {
+			.x_res		= 1920,
+			.y_res		= 1200,
+			.pixel_clock	= 162071,
+			.hfp		= 40,
+			.hsw		= 6,
+			.hbp		= 248,
+			.vfp		= 8,
+			.vsw		= 6,
+			.vbp		= 6,
+		},
+		.width_in_um = 191520,
+		.height_in_um = 119700,
+	},
+
+	.ctrl = {
+		.pixel_size = 24,
+	},
+
+	.reset_gpio     = 102,
+	.channel = OMAP_DSS_CHANNEL_LCD,
+	.skip_init = false,
+
+	.platform_enable = NULL,
+	.platform_disable = NULL,
+
+	.dispc_timings = &dispc_timings_ld089wu1_lg_wuxga,
+	.dsi_timings = &dsi_timings_ld089wu1_lg_wuxga,
+};
+
 static struct omap_dss_device tablet_hdmi_device = {
 	.name = "hdmi",
 	.driver_name = "hdmi_panel",
@@ -422,6 +540,11 @@ static struct omap_dss_device *dss_devices_tc35876x_sharp_lq101k1lyxx[] = {
 	&tablet_hdmi_device,
 };
 
+static struct omap_dss_device *dss_devices_ld089wu1_lg_wuxga[] = {
+	&lcd_ld089wu1_lg_wuxga, /* LCD device has to be first */
+	&tablet_hdmi_device,
+};
+
 static struct omap_dss_device *dss_devices_hdmi_default_display[] = {
 	&tablet_hdmi_device,
 };
@@ -438,6 +561,11 @@ static struct omap_dss_board_info tablet_dss_data_tc35876x_sharp_lq101k1lyxx = {
 	.default_device = &lcd_tc35876x_sharp_lq101k1lyxx,
 };
 
+static struct omap_dss_board_info tablet_dss_data_ld089wu1_lg_wuxga = {
+	.num_devices	= ARRAY_SIZE(dss_devices_ld089wu1_lg_wuxga),
+	.devices	= dss_devices_ld089wu1_lg_wuxga,
+	.default_device	= &lcd_ld089wu1_lg_wuxga,
+};
 
 static struct omap_dss_board_info tablet_dss_data_hdmi_default_display = {
 	.num_devices	= ARRAY_SIZE(dss_devices_hdmi_default_display),
@@ -448,6 +576,10 @@ static struct omap_dss_board_info tablet_dss_data_hdmi_default_display = {
  * 54 MB of TILER1D
  */
 static struct dsscomp_platform_data dsscomp_config_tc35876x_samhyd_wuxga = {
+		.tiler1d_slotsz = (SZ_16M + SZ_2M + SZ_8M + SZ_1M),
+};
+
+static struct dsscomp_platform_data dsscomp_config_ld089wu1_lg_wuxga = {
 		.tiler1d_slotsz = (SZ_16M + SZ_2M + SZ_8M + SZ_1M),
 };
 
@@ -468,6 +600,14 @@ static struct sgx_omaplfb_config omaplfb_config_tc35876x_samhyd_wuxga[OMAPLFB_NU
 	}
 };
 
+static struct sgx_omaplfb_config
+			omaplfb_config_ld089wu1_lg_wuxga[OMAPLFB_NUM_DEV] = {
+	{
+	.vram_buffers = 2,
+	.swap_chain_length = 2,
+	}
+};
+
 static struct sgx_omaplfb_config omaplfb_config_hdmi_default_display[OMAPLFB_NUM_DEV] = {
 	{
 	.vram_buffers = 2,
@@ -480,14 +620,26 @@ static struct sgx_omaplfb_platform_data omaplfb_plat_data_tc35876x_samhyd_wuxga 
 	.configs = omaplfb_config_tc35876x_samhyd_wuxga,
 };
 
+static struct sgx_omaplfb_platform_data omaplfb_plat_data_ld089wu1_lg_wuxga = {
+	.num_configs = OMAPLFB_NUM_DEV,
+	.configs = omaplfb_config_ld089wu1_lg_wuxga,
+};
+
 static struct sgx_omaplfb_platform_data omaplfb_plat_data_hdmi_default_display = {
 	.num_configs = OMAPLFB_NUM_DEV,
 	.configs = omaplfb_config_hdmi_default_display,
 };
+
 static struct omap_tablet_panel_data panel_data_tc35876x_samhyd_wuxga = {
 	.board_info = &tablet_dss_data_tc35876x_samhyd_wuxga,
 	.dsscomp_data = &dsscomp_config_tc35876x_samhyd_wuxga,
 	.omaplfb_data = &omaplfb_plat_data_tc35876x_samhyd_wuxga,
+};
+
+static struct omap_tablet_panel_data panel_data_ld089wu1_lg_wuxga = {
+	.board_info = &tablet_dss_data_ld089wu1_lg_wuxga,
+	.dsscomp_data = &dsscomp_config_ld089wu1_lg_wuxga,
+	.omaplfb_data = &omaplfb_plat_data_ld089wu1_lg_wuxga,
 };
 
 static struct omap_tablet_panel_data panel_data_tc35876x_sharp_lq101k1lyxx = {
@@ -512,6 +664,9 @@ static struct omap_tablet_panel_data *get_panel_data(enum omap_44xx_tablet_panel
 	switch (panel_type) {
 	case TC35876x_SAMSUNG_HYDIS_WUXGA: /* HYDIS & Samsung equivalent */
 		return &panel_data_tc35876x_samhyd_wuxga;
+		break;
+	case LD089WU1_LG_WUXGA:
+		return &panel_data_ld089wu1_lg_wuxga;
 		break;
 	case TC35876x_SHARP_LQ101K1LYxx_WXGA:
 	default:
@@ -562,6 +717,8 @@ static int __init set_tablet_panel_type(char *str)
 	if (!strncmp("2202-002", str, 8) ||
 	    !strncmp("2102-002", str, 8))
 		tablet_panel_type = TC35876x_SAMSUNG_HYDIS_WUXGA;
+	else if (!strncmp("2202-003", str, 8))
+		tablet_panel_type = LD089WU1_LG_WUXGA;
 	else if (!strncmp("2156-003", str, 8))
 		tablet_panel_type = TC35876x_SHARP_LQ101K1LYxx_WXGA;
 	else {
