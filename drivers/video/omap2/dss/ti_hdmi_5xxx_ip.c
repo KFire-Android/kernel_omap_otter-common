@@ -1060,7 +1060,6 @@ void ti_hdmi_5xxx_basic_configure(struct hdmi_ip_data *ip_data)
 	avi_cfg->db2_active_fmt_ar = HDMI_INFOFRAME_AVI_DB2R_SAME;
 	avi_cfg->db3_itc = HDMI_INFOFRAME_AVI_DB3ITC_NO;
 	avi_cfg->db3_ec = HDMI_INFOFRAME_AVI_DB3EC_XVYUV601;
-	avi_cfg->db3_q_range = HDMI_INFOFRAME_AVI_DB3Q_DEFAULT;
 	avi_cfg->db3_nup_scaling = HDMI_INFOFRAME_AVI_DB3SC_NO;
 	avi_cfg->db4_videocode = cfg->cm.code;
 	avi_cfg->db5_pixel_repeat = HDMI_INFOFRAME_AVI_DB5PR_NO;
