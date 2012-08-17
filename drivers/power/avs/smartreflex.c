@@ -693,8 +693,6 @@ void sr_disable(struct voltagedomain *voltdm)
  */
 int sr_register_class(struct omap_sr_class_data *class_data)
 {
-	struct omap_sr *sr_info;
-
 	if (!class_data) {
 		pr_warning("%s:, Smartreflex class data passed is NULL\n",
 			   __func__);
@@ -708,13 +706,6 @@ int sr_register_class(struct omap_sr_class_data *class_data)
 	}
 
 	sr_class = class_data;
-
-	/*
-	 * Call into late init to do intializations that require
-	 * both sr driver and sr class driver to be initiallized.
-	 */
-	list_for_each_entry(sr_info, &sr_list, node)
-		sr_late_init(sr_info);
 
 	return 0;
 }
