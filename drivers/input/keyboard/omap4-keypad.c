@@ -58,14 +58,19 @@
 #define OMAP4_DEF_IRQENABLE_TIMEOUTEN	(1 << 2)
 #define OMAP4_DEF_WUP_EVENT_ENA		(1 << 0)
 #define OMAP4_DEF_WUP_LONG_KEY_ENA	(1 << 1)
+#define OMAP4_DEF_WUP_TIMEOUTEN_ENA	(1 << 2)
 #define OMAP4_DEF_CTRL_NOSOFTMODE	(1 << 1)
-#define OMAP4_DEF_CTRLPTVVALUE		(1 << 2)
-#define OMAP4_DEF_CTRLPTV		(1 << 1)
+#define OMAP4_DEF_CTRL_PTV		(1 << 2)
+#define OMAP4_DEF_REPEAT_MODE		(1 << 8)
+#define OMAP4_DEF_TIMEOUT_LONG_KEY	(1 << 7)
+#define OMAP4_DEF_TIMEOUT_EMPTY		(1 << 6)
+#define OMAP4_DEF_LONG_KEY		(1 << 5)
 
 /* OMAP4 values */
 #define OMAP4_VAL_IRQDISABLE		0x00
-#define OMAP4_VAL_DEBOUNCINGTIME	0x07
-#define OMAP4_VAL_FUNCTIONALCFG		0x1E
+/* DEBOUNCE TIME VALUE = 0x2 PVT = 0x6  Tperiod = 12ms*/
+#define OMAP4_VAL_DEBOUNCINGTIME	0x2
+#define OMAP4_VAL_PVT			0x6
 
 #define OMAP4_MASK_IRQSTATUSDISABLE	0xFFFF
 
@@ -148,8 +153,6 @@ static irqreturn_t omap4_keypad_interrupt(int irq, void *dev_id)
 	unsigned int col, row, code, changed;
 	u32 *new_state = (u32 *) key_state;
 
-	/* Disable interrupts */
-	kbd_write_irqenable(keypad_data, OMAP4_VAL_IRQDISABLE);
 
 	*new_state = kbd_readl(keypad_data, OMAP4_KBD_FULLCODE31_0);
 	*(new_state + 1) = kbd_readl(keypad_data, OMAP4_KBD_FULLCODE63_32);
@@ -179,10 +182,6 @@ static irqreturn_t omap4_keypad_interrupt(int irq, void *dev_id)
 	/* clear pending interrupts */
 	kbd_write_irqstatus(keypad_data,
 		kbd_read_irqstatus(keypad_data, keypad_data->irqstatus));
-
-	/* enable interrupts */
-	kbd_write_irqenable(keypad_data, OMAP4_DEF_IRQENABLE_EVENTEN |
-			OMAP4_DEF_IRQENABLE_LONGKEY);
 
 	return IRQ_HANDLED;
 }
@@ -214,14 +213,22 @@ static int omap4_keypad_open(struct input_dev *input)
 	}
 
 	kbd_writel(keypad_data, OMAP4_KBD_CTRL,
-			OMAP4_VAL_FUNCTIONALCFG);
+			OMAP4_DEF_CTRL_NOSOFTMODE
+			| (OMAP4_VAL_PVT << OMAP4_DEF_CTRL_PTV));
+
 	kbd_writel(keypad_data, OMAP4_KBD_DEBOUNCINGTIME,
 			OMAP4_VAL_DEBOUNCINGTIME);
-	kbd_write_irqstatus(keypad_data, OMAP4_VAL_IRQDISABLE);
-	kbd_write_irqenable(keypad_data, OMAP4_DEF_IRQENABLE_EVENTEN |
-				OMAP4_DEF_IRQENABLE_LONGKEY);
+
+	/* Enable event IRQ */
+	kbd_write_irqenable(keypad_data, OMAP4_DEF_IRQENABLE_EVENTEN);
+
+	/* Enable event wkup */
 	kbd_writel(keypad_data, OMAP4_KBD_WAKEUPENABLE,
-			OMAP4_DEF_WUP_EVENT_ENA | OMAP4_DEF_WUP_LONG_KEY_ENA);
+			OMAP4_DEF_WUP_EVENT_ENA);
+
+	/* clear pending interrupts */
+	kbd_write_irqstatus(keypad_data,
+		kbd_read_irqstatus(keypad_data, keypad_data->irqstatus));
 
 	enable_irq(keypad_data->irq);
 
@@ -411,13 +418,19 @@ static int __devinit omap4_keypad_probe(struct platform_device *pdev)
 	matrix_keypad_build_keymap(keypad_data->keymap_data, row_shift,
 			input_dev->keycode, input_dev->keybit);
 
+	/*
+	 * Set irq level detection for mpu. Edge event are missed
+	 * in gic if the mpu is in low power and keypad event
+	 * is a wakeup
+	 */
 	error = request_irq(keypad_data->irq, omap4_keypad_interrupt,
-			     IRQF_TRIGGER_RISING,
+			     IRQF_TRIGGER_HIGH,
 			     "omap4-keypad", keypad_data);
 	if (error) {
 		dev_err(&pdev->dev, "failed to register interrupt\n");
 		goto err_free_input;
 	}
+	enable_irq_wake(OMAP44XX_IRQ_KBD_CTL);
 
 	pm_runtime_enable(&pdev->dev);
 
