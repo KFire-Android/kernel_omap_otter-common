@@ -28,6 +28,7 @@
 #include <linux/regulator/fixed.h>
 #include <linux/leds_pwm.h>
 #include <linux/platform_data/omap-abe-twl6040.h>
+#include <linux/leds-omap4430sdp-display.h>
 
 #include <asm/hardware/gic.h>
 #include <asm/mach-types.h>
@@ -60,6 +61,93 @@
 #define TPS62361_GPIO			7
 
 #define TABLET_FB_RAM_SIZE		SZ_16M /* 1920×1080*4 * 2 */
+
+/* PWM2 and TOGGLE3 register offsets */
+#define LED_PWM2ON		0x03
+#define LED_PWM2OFF		0x04
+#define TWL6030_TOGGLE3		0x92
+#define PWM2EN			BIT(5)
+#define PWM2S			BIT(4)
+#define PWM2R			BIT(3)
+#define PWM2CTL_MASK		(PWM2EN | PWM2S | PWM2R)
+
+static void omap4_tablet_init_display_led(void)
+{
+	/* Set maximum brightness on init */
+	twl_i2c_write_u8(TWL_MODULE_PWM, 0x00, LED_PWM2ON);
+	twl_i2c_write_u8(TWL_MODULE_PWM, 0x00, LED_PWM2OFF);
+	twl_i2c_write_u8(TWL6030_MODULE_ID1, PWM2S | PWM2EN, TWL6030_TOGGLE3);
+}
+
+static void omap4_tablet_set_primary_brightness(u8 brightness)
+{
+	u8 val;
+	static unsigned enabled = 0x01;
+
+	if (brightness) {
+
+		/*
+		 * Converting brightness 8-bit value into 7-bit value
+		 * for PWM cycles.
+		 * We need to check brightness maximum value for set
+		 * PWM2OFF equal to PWM2ON.
+		 * Aditionally checking for 1 for prevent seting maximum
+		 * brightness in this case.
+		 */
+
+		brightness >>= (brightness ^ 0xFF) ?
+				 ((brightness ^ 0x01) ? 1 : 0) : 8;
+
+		if (twl_i2c_write_u8(TWL_MODULE_PWM, brightness, LED_PWM2OFF))
+				goto io_err;
+
+		/* Enable PWM2 just once */
+		if (!enabled) {
+			if (twl_i2c_read_u8(TWL6030_MODULE_ID1, &val,
+							TWL6030_TOGGLE3))
+				goto io_err;
+
+			val &= ~PWM2CTL_MASK;
+			val |= (PWM2S | PWM2EN);
+			if (twl_i2c_write_u8(TWL6030_MODULE_ID1, val,
+					 TWL6030_TOGGLE3))
+				goto io_err;
+			enabled = 0x01; }
+	} else {
+		/* Disable PWM2 just once */
+		if (enabled) {
+			if (twl_i2c_read_u8(TWL6030_MODULE_ID1, &val,
+							TWL6030_TOGGLE3))
+				goto io_err;
+			val &= ~PWM2CTL_MASK;
+			val |= PWM2R;
+			if (twl_i2c_write_u8(TWL6030_MODULE_ID1, val,
+							TWL6030_TOGGLE3))
+				goto io_err;
+			val |= (PWM2EN | PWM2S);
+			if (twl_i2c_write_u8(TWL6030_MODULE_ID1, val,
+							TWL6030_TOGGLE3))
+				goto io_err;
+			enabled = 0x00;
+		}
+	}
+	return;
+io_err:
+	pr_err("%s: Error occured during adjust PWM2\n", __func__);
+}
+
+static struct omap4430_sdp_disp_led_platform_data tablet_disp_led_data = {
+	.display_led_init = omap4_tablet_init_display_led,
+	.primary_display_set = omap4_tablet_set_primary_brightness,
+};
+
+static struct platform_device tablet_disp_led = {
+		.name	=	"display_led",
+		.id	=	-1,
+		.dev	= {
+		.platform_data = &tablet_disp_led_data,
+		},
+};
 
 static struct gpio_led tablet_gpio_leds[] = {
 	{
@@ -551,6 +639,7 @@ static int __init tablet_display_init(void)
 	omap_mux_init_signal("fref_clk4_out.fref_clk4_out",
 				OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP);
 
+	platform_device_register(&tablet_disp_led);
 	tablet_lcd_init();
 
 	omap_vram_set_sdram_vram(TABLET_FB_RAM_SIZE, 0);
