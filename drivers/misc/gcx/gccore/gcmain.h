@@ -109,5 +109,6 @@ void gc_write_reg(unsigned int address, unsigned int data);
 enum gcpower gcpwr_get(void);
 void gcpwr_set(struct gccorecontext *gccorecontext, enum gcpower gcpower);
 void gcpwr_reset(struct gccorecontext *gccorecontext);
+unsigned int gcpwr_get_speed(void);
 
 #endif
