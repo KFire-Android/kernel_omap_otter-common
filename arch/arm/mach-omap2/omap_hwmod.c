@@ -2446,8 +2446,15 @@ int omap_hwmod_disable_clocks(struct omap_hwmod *oh)
 	unsigned long flags;
 
 	spin_lock_irqsave(&oh->_lock, flags);
-	_disable_clocks(oh);
 	_omap4_disable_module(oh);
+
+	/*
+	 * The module must be in idle mode before disabling any parents
+	 * clocks. Otherwise, the parent clock might be disabled before
+	 * the module transition is done, and thus will prevent the
+	 * transition to complete properly.
+	 */
+	_disable_clocks(oh);
 	spin_unlock_irqrestore(&oh->_lock, flags);
 
 	return 0;
