@@ -1911,6 +1911,8 @@ static int omap_dss_mgr_apply(struct omap_overlay_manager *mgr)
 	if (r)
 		return r;
 
+	omap_dss_overlay_ensure_bw();
+
 	spin_lock_irqsave(&dss_cache.lock, flags);
 
 	if (!mgr->device || (mgr->device->state != OMAP_DSS_DISPLAY_ACTIVE &&
