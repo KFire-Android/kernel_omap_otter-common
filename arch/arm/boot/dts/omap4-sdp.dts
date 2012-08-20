@@ -490,3 +490,52 @@
 &twl_usb_comparator {
 	usb-supply = <&vusb>;
 };
+
+&dsi1 {
+	lcd {
+		compatible = "tpo,taal";
+
+		lanes = <
+			0       /* clk + */
+			1       /* clk - */
+			2       /* data1 + */
+			3       /* data1 - */
+			4       /* data2 + */
+			5       /* data2 - */
+		>;
+
+		gpios = <&gpio4 6 0>;	/* 102, reset */
+	};
+};
+
+&dsi2 {
+	lcd2 {
+		compatible = "tpo,taal";
+
+		lanes = <
+			0       /* clk + */
+			1       /* clk - */
+			2       /* data1 + */
+			3       /* data1 - */
+			4       /* data2 + */
+			5       /* data2 - */
+		>;
+
+		gpios = <&gpio4 8 0>;	/* 104, reset */
+	};
+};
+
+&hdmi {
+	tpd12s015 {
+		compatible = "ti,tpd12s015";
+
+		gpios = <&gpio2 28 0>,	/* 60, CT CP HPD */
+			<&gpio2 9 0>,	/* 41, LS OE */
+			<&gpio2 31 0>;	/* 63, HPD */
+
+		hdmi {
+			compatible = "ti,hdmi_panel";
+		};
+
+	};
+};
