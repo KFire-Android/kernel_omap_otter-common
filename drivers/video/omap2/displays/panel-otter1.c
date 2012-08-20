@@ -406,7 +406,7 @@ static int boxer_spi_probe(struct spi_device *spi)
 	spi->chip_select=0;
 	boxer_spi_device = spi;
 	spi_setup(boxer_spi_device);
-	boxer_init_panel();
+	// boxer_init_panel();
 
 	sysfs_create_group(&spi->dev.kobj, &otter1_panel_attribute_group);
 
