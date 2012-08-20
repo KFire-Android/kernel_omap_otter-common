@@ -84,9 +84,18 @@ static void __init omap5evm_modem_pad_conf_enable(void)
 			OMAP_PIN_OFF_NONE);
 
 	/* GPIO_MOD_ON (ONSWC) */
-	omap_mux_init_gpio(OMAP5_GPIO_MDM_ONSWC, \
-			OMAP_PIN_OUTPUT | \
-			OMAP_PIN_OFF_NONE);
+	if (cpu_is_omap54xx() &&
+		(omap_rev() == OMAP5430_REV_ES1_0 ||
+		omap_rev() == OMAP5432_REV_ES1_0)) {
+		omap_mux_init_gpio(OMAP5_GPIO_MDM_ONSWC, \
+				OMAP_PIN_INPUT_PULLUP | \
+				OMAP_PIN_OUTPUT | \
+				OMAP_PIN_OFF_NONE);
+	} else {
+		omap_mux_init_gpio(OMAP5_GPIO_MDM_ONSWC, \
+				OMAP_PIN_OUTPUT | \
+				OMAP_PIN_OFF_NONE);
+	}
 }
 
 static void __init omap5evm_modem_pad_conf_disable(void)
