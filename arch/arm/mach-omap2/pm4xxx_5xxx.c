@@ -20,6 +20,7 @@
 #include <asm/system_misc.h>
 #include <linux/io.h>
 #include <linux/gpio.h>
+#include <linux/mfd/omap_control.h>
 
 #include <plat/omap_device.h>
 #include <plat/dvfs.h>
@@ -57,6 +58,7 @@ u16 pm44xx_errata;
 
 static struct powerdomain *tesla_pwrdm;
 static struct clockdomain *tesla_clkdm;
+static struct powerdomain *gpu_pd;
 
 /*
 * HSI - OMAP4430-2.2BUG00055:
@@ -276,6 +278,16 @@ void omap_idle_core_notifier(int mpu_next_state, int core_next_state)
 {
 	if (core_next_state != PWRDM_POWER_ON)
 		omap2_gpio_prepare_for_idle(1);
+
+	/*
+	 * Need to keep thermal monitoring as long as Core is active.
+	 * Check for the GPU powerdomain and Core state before idling
+	 * the thermal.
+	 */
+	if (gpu_pd && (pwrdm_read_pwrst(gpu_pd) != PWRDM_POWER_ON) &&
+		pwrdm_power_state_le(core_next_state, PWRDM_POWER_INACTIVE))
+		omap_bandgap_prepare_for_idle();
+
 }
 
 /**
@@ -292,6 +304,12 @@ void omap_enable_core_notifier(int mpu_next_state, int core_next_state)
 {
 	if (core_next_state != PWRDM_POWER_ON)
 		omap2_gpio_resume_after_idle();
+
+	/* Coming out of Idle, start monitoring the thermal. */
+	if (gpu_pd && (pwrdm_read_pwrst(gpu_pd) != PWRDM_POWER_ON) &&
+		pwrdm_power_state_le(core_next_state, PWRDM_POWER_INACTIVE))
+		omap_bandgap_resume_after_idle();
+
 }
 
 static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
@@ -715,6 +733,10 @@ static int __init omap_pm_init(void)
 		tesla_pwrdm = pwrdm_lookup("tesla_pwrdm");
 		tesla_clkdm = clkdm_lookup("tesla_clkdm");
 	}
+
+	gpu_pd = pwrdm_lookup("gpu_pwrdm");
+	if (!gpu_pd)
+		pr_err("%s: Unable to get GPU power domain\n", __func__);
 
 	/* Setup the scales for every init device appropriately */
 	for (i = 0; i < ARRAY_SIZE(init_devices); i++) {
