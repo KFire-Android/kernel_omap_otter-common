@@ -714,15 +714,13 @@ int sr_register_class(struct omap_sr_class_data *class_data)
  * omap_sr_enable() -  API to enable SR clocks and to call into the
  *			registered smartreflex class enable API.
  * @voltdm:	VDD pointer to which the SR module to be configured belongs to.
- * @volt_data:	Voltage data to go to
  *
  * This API is to be called from the kernel in order to enable
  * a particular smartreflex module. This API will do the initial
  * configurations to turn on the smartreflex module and in turn call
  * into the registered smartreflex class enable API.
  */
-void omap_sr_enable(struct voltagedomain *voltdm,
-			struct omap_volt_data *volt_data)
+void omap_sr_enable(struct voltagedomain *voltdm)
 {
 	struct omap_sr *sr;
 
