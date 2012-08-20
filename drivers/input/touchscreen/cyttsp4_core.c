@@ -4898,6 +4898,7 @@ void *cyttsp4_core_init(struct cyttsp4_bus_ops *bus_ops,
 
 	/* FIXME! ey: changed the hardcoded gpio */
 	omap_writel(omap_readl(0x4a1001c8) | 0x011b, 0x4a1001c8);
+	gpio_request(24, "touchscreen_cypress_ttsp");
 	gpio_direction_input(24);
 
 	retval = request_threaded_irq(ts->irq, NULL, cyttsp4_irq,

@@ -67,7 +67,7 @@ GCDBG_FILTERDEF(queue, GCZONE_NONE,
 
 /* GPU timeout in milliseconds. The timeout value controls when the power
  * on the GPU is pulled if there is no activity in progress or scheduled. */
-#define GC_THREAD_TIMEOUT	1000
+#define GC_THREAD_TIMEOUT	20
 
 /* Time in milliseconds to wait for GPU to become idle. */
 #define GC_IDLE_TIMEOUT		100
