@@ -210,6 +210,30 @@
 	status = "disabled";
 };
 
+&dpi {
+	dvi {
+		compatible = "ti,tfp410";
+		data-lines = <24>;
+		gpios = <&gpio1 0 0>;	/* 0, power-down */
+		i2c-bus = <&i2c3>;
+	};
+};
+
+&hdmi {
+	tpd12s015 {
+		compatible = "ti,tpd12s015";
+
+		gpios = <&gpio2 28 0>,	/* 60, CT CP HPD */
+			<&gpio2 9 0>,	/* 41, LS OE */
+			<&gpio2 31 0>;	/* 63, HPD */
+
+		hdmi {
+			compatible = "ti,hdmi_panel";
+		};
+
+	};
+};
+
 &twl_usb_comparator {
 	usb-supply = <&vusb>;
 };
