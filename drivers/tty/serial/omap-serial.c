@@ -836,7 +836,7 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
 	serial_out(up, UART_IER, up->ier);
 	serial_out(up, UART_LCR, cval);		/* reset DLAB */
 	up->lcr = cval;
-	up->scr = OMAP_UART_SCR_TX_EMPTY;
+	up->scr = 0;
 
 	/* FIFOs and DMA Settings */
 
@@ -860,14 +860,9 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
 	/* FIFO ENABLE, DMA MODE */
 
 	up->scr |= OMAP_UART_SCR_RX_TRIG_GRANU1_MASK;
-
 	if (up->use_dma) {
 		serial_out(up, UART_TI752_TLR, 0);
 		up->scr |= UART_FCR_TRIGGER_4;
-	} else {
-		/* Set receive FIFO threshold to 1 byte */
-		up->fcr &= ~OMAP_UART_FCR_RX_FIFO_TRIG_MASK;
-		up->fcr |= (0x1 << OMAP_UART_FCR_RX_FIFO_TRIG_SHIFT);
 	}
 
 	serial_out(up, UART_FCR, up->fcr);
