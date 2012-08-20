@@ -250,5 +250,8 @@ void __init omap_enable_smartreflex_on_init(void)
 
 int __init omap_devinit_smartreflex(void)
 {
+	if (omap5_has_avs())
+		omap_enable_smartreflex_on_init();
+
 	return omap_hwmod_for_each_by_class("smartreflex", sr_dev_init, NULL);
 }

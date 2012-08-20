@@ -844,7 +844,6 @@ static int __init omap_pm_init(void)
 		omap5_idle_init();
 	}
 
-
 err2:
 	return ret;
 }
