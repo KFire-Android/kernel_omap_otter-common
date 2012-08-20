@@ -1460,6 +1460,7 @@ enum bverror bv_cache(struct bvcopparams *copparams)
 	enum bverror bverror = BVERR_NONE;
 	unsigned int bytespp = 0; /* bytes per pixel */
 	unsigned long vert_offset, horiz_offset;
+	unsigned int true_width, true_height;
 
 	struct c2dmrgn rgn[3];
 	int container_size = 0;
@@ -1479,6 +1480,14 @@ enum bverror bv_cache(struct bvcopparams *copparams)
 	if (vendor != OCDFMTDEF_VENDOR_ALL) {
 		bverror = BVERR_FORMAT;
 		goto exit;
+	}
+
+	if (copparams->geom->orientation % 180 != 0) {
+		true_width = copparams->rect->height;
+		true_height = copparams->rect->width;
+	} else {
+		true_width = copparams->rect->width;
+		true_height = copparams->rect->height;
 	}
 
 	switch (container) {
@@ -1529,8 +1538,8 @@ enum bverror bv_cache(struct bvcopparams *copparams)
 			goto exit;
 		}
 
-		rgn[0].span = copparams->rect->width * bytespp;
-		rgn[0].lines = copparams->rect->height;
+		rgn[0].span = true_width * bytespp;
+		rgn[0].lines = true_height;
 		rgn[0].stride = copparams->geom->virtstride;
 		horiz_offset = copparams->rect->left * bytespp;
 		vert_offset = copparams->rect->top;
@@ -1545,16 +1554,16 @@ enum bverror bv_cache(struct bvcopparams *copparams)
 
 	case OCDFMTDEF_2_PLANE_YCbCr:
 		/* 1 byte per pixel */
-		rgn[0].span = copparams->rect->width;
-		rgn[0].lines = copparams->rect->height;
+		rgn[0].span = true_width;
+		rgn[0].lines = true_height;
 		rgn[0].stride = copparams->geom->virtstride;
 		rgn[0].start = (void *)
 			((unsigned long) copparams->desc->virtaddr +
 			 copparams->rect->top * rgn[0].stride +
 			 copparams->rect->left);
 
-		rgn[1].span = copparams->rect->width;
-		rgn[1].lines = copparams->rect->height / 2;
+		rgn[1].span = true_width;
+		rgn[1].lines = true_height / 2;
 		rgn[1].stride = copparams->geom->virtstride;
 		rgn[1].start = rgn[0].start +
 			copparams->geom->height * rgn[0].stride;
