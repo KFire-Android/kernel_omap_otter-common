@@ -38,6 +38,8 @@ struct omap_bandgap_data;
  * @irq: MPU Irq number for thermal alert
  * @tshut_gpio: GPIO where Tshut signal is routed
  * @clk_rate: Holds current clock rate
+ * @bg_in_suspend: Flag to indicate, if suspend is in progress
+ * @bg_clk_idle: Flag to assist balanced clock enable/disable during idle
  */
 struct omap_bandgap {
 	struct device			*dev;
@@ -49,6 +51,8 @@ struct omap_bandgap {
 	int				irq;
 	int				tshut_gpio;
 	u32				clk_rate;
+	bool				bg_in_suspend;
+	bool				bg_clk_idle;
 };
 
 /**

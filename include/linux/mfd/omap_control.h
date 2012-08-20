@@ -66,6 +66,13 @@ struct omap_bdg_data {
 	bool			accurate;
 };
 
+#ifdef CONFIG_OMAP_BANDGAP
+void omap_bandgap_prepare_for_idle(void);
+void omap_bandgap_resume_after_idle(void);
+#else
+static inline void omap_bandgap_prepare_for_idle(void){ }
+static inline void omap_bandgap_resume_after_idle(void){ }
+#endif
 
 #ifdef CONFIG_MFD_OMAP_CONTROL
 extern int omap_control_readl(struct device *dev, u32 reg, u32 *val);
