@@ -193,19 +193,29 @@ int omap_vp_update_errorgain(struct voltagedomain *voltdm,
 	return 0;
 }
 
+#define _MAX_RETRIES_BEFORE_RECOVER 50
 #define _MAX_COUNT_ERR		10
 static u8 __vp_debug_error_message_count = _MAX_COUNT_ERR;
+static u8 __vp_recover_count = _MAX_RETRIES_BEFORE_RECOVER;
 /* Dump with stack the first few messages, tone down severity for the rest */
-#define _vp_controlled_err(ARGS...)					\
-{									\
+#define _vp_controlled_err(vp, voltdm, ARGS...)				\
+do {									\
 	if (__vp_debug_error_message_count) {				\
 		pr_err(ARGS);						\
 		dump_stack();						\
 		__vp_debug_error_message_count--;			\
 	} else {							\
-		pr_err_ratelimited(ARGS);				\
+		do {							\
+			pr_err_ratelimited(ARGS);			\
+		} while (0);						\
 	}								\
-}
+	if ((vp)->common->ops->recover && !(--__vp_recover_count)) {	\
+		pr_err("%s:domain %s recovery count triggered\n",	\
+			__func__, (voltdm)->name);			\
+		(vp)->common->ops->recover((vp)->id);			\
+		__vp_recover_count = _MAX_RETRIES_BEFORE_RECOVER;	\
+	}								\
+} while (0)
 
 
 /* VP force update method of voltage scaling */
@@ -220,7 +230,8 @@ int omap_vp_forceupdate_scale(struct voltagedomain *voltdm,
 
 	ret = _vp_wait_for_idle(voltdm, vp);
 	if (ret) {
-		_vp_controlled_err("%s: vdd_%s idle timedout (v=%ld)\n",
+		_vp_controlled_err(vp, voltdm,
+				   "%s: vdd_%s idle timedout (v=%ld)\n",
 				   __func__, voltdm->name, target_volt);
 		return ret;
 	}
@@ -241,7 +252,8 @@ int omap_vp_forceupdate_scale(struct voltagedomain *voltdm,
 		udelay(1);
 	}
 	if (timeout >= VP_TRANXDONE_TIMEOUT) {
-		_vp_controlled_err("%s: vdd_%s TRANXDONE timeout exceeded."
+		_vp_controlled_err(vp, voltdm,
+			"%s: vdd_%s TRANXDONE timeout exceeded."
 			"Voltage change aborted target volt=%ld,"
 			"target vsel=0x%02x, current_vsel=0x%02x\n",
 			__func__, voltdm->name, target_volt,
@@ -263,7 +275,8 @@ int omap_vp_forceupdate_scale(struct voltagedomain *voltdm,
 	omap_test_timeout(vp->common->ops->check_txdone(vp->id),
 			  VP_TRANXDONE_TIMEOUT, timeout);
 	if (timeout >= VP_TRANXDONE_TIMEOUT)
-		_vp_controlled_err("%s: vdd_%s TRANXDONE timeout exceeded. "
+		_vp_controlled_err(vp, voltdm,
+			"%s: vdd_%s TRANXDONE timeout exceeded. "
 			"TRANXDONE never got set after the voltage update. "
 			"target volt=%ld, target vsel=0x%02x, "
 			"current_vsel=0x%02x\n",
@@ -286,9 +299,12 @@ int omap_vp_forceupdate_scale(struct voltagedomain *voltdm,
 	}
 
 	if (timeout >= VP_TRANXDONE_TIMEOUT)
-		_vp_controlled_err("%s: vdd_%s TRANXDONE timeout exceeded "
-				   "while trying to clear the TRANXDONE "
-				   "status\n", __func__, voltdm->name);
+		_vp_controlled_err(vp, voltdm,
+			"%s: vdd_%s TRANXDONE timeout exceeded while"
+			"trying to clear the TRANXDONE status. target volt=%ld,"
+			"target vsel=0x%02x, current_vsel=0x%02x\n",
+			__func__, voltdm->name, target_volt,
+			target_vsel, current_vsel);
 
 	/* Clear force bit */
 	voltdm->write(vpconfig, vp->vpconfig);

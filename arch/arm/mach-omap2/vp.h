@@ -47,10 +47,12 @@ struct omap_volt_data;
  * struct omap_vp_ops - per-VP operations
  * @check_txdone: check for VP transaction done
  * @clear_txdone: clear VP transaction done status
+ * @recover: arch specific VP recovery mechanism
  */
 struct omap_vp_ops {
 	u32 (*check_txdone)(u8 vp_id);
 	void (*clear_txdone)(u8 vp_id);
+	void (*recover)(u8 vp_id);
 };
 
 /**
