@@ -225,6 +225,12 @@ static int hdmi_panel_enable(struct omap_dss_device *dssdev)
 		goto err;
 	}
 
+	/* Turn on HDMI only if HPD is high */
+	if (!hdmi_get_current_hpd()) {
+		r = 0;
+		goto err;
+	}
+
 	r = omapdss_hdmi_display_enable(dssdev);
 	if (r) {
 		DSSERR("failed to power on\n");
