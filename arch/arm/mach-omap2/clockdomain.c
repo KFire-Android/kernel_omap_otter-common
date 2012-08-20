@@ -971,7 +971,8 @@ static int _clkdm_clk_hwmod_enable(struct clockdomain *clkdm,
 	if (!clkdm || !arch_clkdm || !arch_clkdm->clkdm_clk_enable)
 		return -EINVAL;
 
-	if (oh && oh->prcm.omap4.modulemode == MODULEMODE_SWCTRL)
+	if ((oh && oh->prcm.omap4.modulemode == MODULEMODE_SWCTRL) ||
+	    oh == NULL)
 		usecount = clkdm_usecount_inc(clkdm);
 
 	/*
@@ -1004,7 +1005,8 @@ static int _clkdm_clk_hwmod_disable(struct clockdomain *clkdm,
 	if (!clkdm || !arch_clkdm || !arch_clkdm->clkdm_clk_disable)
 		return -EINVAL;
 
-	if (oh && oh->prcm.omap4.modulemode == MODULEMODE_SWCTRL) {
+	if ((oh && oh->prcm.omap4.modulemode == MODULEMODE_SWCTRL) ||
+	    oh == NULL) {
 		if (atomic_read(&clkdm->usecount) == 0) {
 			WARN_ON(1); /* underflow */
 			return -ERANGE;

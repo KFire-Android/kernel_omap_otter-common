@@ -19,6 +19,7 @@
 #include <linux/clk.h>
 #include <asm/system_misc.h>
 #include <linux/io.h>
+#include <linux/gpio.h>
 
 #include <plat/omap_device.h>
 #include <plat/dvfs.h>
@@ -273,6 +274,8 @@ void omap_pm_clear_dsp_wake_up(void)
  */
 void omap_idle_core_notifier(int mpu_next_state, int core_next_state)
 {
+	if (core_next_state != PWRDM_POWER_ON)
+		omap2_gpio_prepare_for_idle(1);
 }
 
 /**
@@ -287,6 +290,8 @@ void omap_idle_core_notifier(int mpu_next_state, int core_next_state)
  */
 void omap_enable_core_notifier(int mpu_next_state, int core_next_state)
 {
+	if (core_next_state != PWRDM_POWER_ON)
+		omap2_gpio_resume_after_idle();
 }
 
 static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
@@ -337,6 +342,19 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
 	    !strcmp(pwrdm->name, "core_pwrdm")) {
 		program_state = PWRDM_POWER_ON;
 		goto do_program_state;
+	}
+
+	/*
+	 * Program L4PER to CSWR instead of OSWR in order to avoid glitches
+	 * due to the HW bug on GPIOs for OMAP5430 ES1.0
+	 * (Bug ID: OMAP5430-1.0BUG01667).
+	 */
+	if (omap_rev() == OMAP5430_REV_ES1_0 ||
+	    omap_rev() == OMAP5432_REV_ES1_0) {
+		if (!strcmp(pwrdm->name, "l4per_pwrdm")) {
+			program_state = PWRDM_POWER_CSWR;
+			goto do_program_state;
+		}
 	}
 
 	/*
