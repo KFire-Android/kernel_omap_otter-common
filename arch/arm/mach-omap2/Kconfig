@@ -382,6 +382,7 @@ config MACH_OMAP_BLAZE
 config MACH_OMAP_4430_KC1
 	bool "OMAP 4430 KC1 board"
 	depends on ARCH_OMAP4
+	select OMAP_PACKAGE_CBL
 	select OMAP_PACKAGE_CBS
 	select INPUT_MISC
 	select INPUT_TOUCHSCREEN
