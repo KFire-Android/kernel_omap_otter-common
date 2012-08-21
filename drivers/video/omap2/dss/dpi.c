@@ -205,11 +205,7 @@ int omapdss_dpi_display_enable(struct omap_dss_device *dssdev)
 		if (r)
 			goto err_get_dsi;
 
-		if (!cpu_is_omap44xx())
-			r = dsi_pll_init(dssdev, 0, 1);
-		else {
-			r = dsi_pll_init(dssdev, 1, 1);
-		}
+		r = dsi_pll_init(dpi.dsidev, 0, 1);
 		if (r)
 			goto err_dsi_pll_init;
 	}
