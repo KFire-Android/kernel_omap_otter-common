@@ -101,15 +101,10 @@ static int omap4_clkdm_clk_enable(struct clockdomain *clkdm)
 
 static int omap4_clkdm_clk_disable(struct clockdomain *clkdm)
 {
-	bool hwsup = false;
-
-	hwsup = omap4_cminst_is_clkdm_in_hwsup(clkdm->prcm_partition,
-					clkdm->cm_inst, clkdm->clkdm_offs);
-
-	if (!hwsup && (clkdm->flags & CLKDM_CAN_FORCE_SLEEP))
-		omap4_clkdm_sleep(clkdm);
-	else if (clkdm->flags & CLKDM_CAN_HWSUP)
+	if (clkdm->flags & CLKDM_CAN_HWSUP)
 		omap4_clkdm_allow_idle(clkdm);
+	else if (clkdm->flags & CLKDM_CAN_FORCE_SLEEP)
+		omap4_clkdm_sleep(clkdm);
 
 	return 0;
 }
