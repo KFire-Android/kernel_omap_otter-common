@@ -165,14 +165,14 @@ static const struct omap_device_pad port1_hsic_pads[] __initconst = {
 	{
 		.name = "usbb1_hsic_data.usbb1_hsic_data",
 		.flags  = OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
-		.enable = OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
-		.idle =  OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
+		.enable = OMAP_PIN_INPUT | OMAP_MUX_MODE0,
+		.idle =  OMAP_PIN_INPUT | OMAP_MUX_MODE0,
 	},
 	{
 		.name = "usbb1_hsic_strobe.usbb1_hsic_strobe",
 		.flags  = OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
-		.enable = OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
-		.idle = OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
+		.enable = OMAP_PIN_INPUT | OMAP_MUX_MODE0,
+		.idle = OMAP_PIN_INPUT | OMAP_MUX_MODE0,
 	},
 };
 
@@ -180,14 +180,14 @@ static const struct omap_device_pad port2_hsic_pads[] __initconst = {
 	{
 		.name = "usbb2_hsic_data.usbb2_hsic_data",
 		.flags  = OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
-		.enable = OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
-		.idle = OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
+		.enable = OMAP_PIN_INPUT | OMAP_MUX_MODE0,
+		.idle = OMAP_PIN_INPUT | OMAP_MUX_MODE0,
 	},
 	{
 		.name = "usbb2_hsic_strobe.usbb2_hsic_strobe",
 		.flags  = OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
-		.enable = OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
-		.idle = OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
+		.enable = OMAP_PIN_INPUT | OMAP_MUX_MODE0,
+		.idle = OMAP_PIN_INPUT | OMAP_MUX_MODE0,
 	},
 };
 
@@ -195,14 +195,14 @@ static const struct omap_device_pad port3_hsic_pads[] __initconst = {
 	{
 		.name = "usbb3_hsic_data.usbb3_hsic_data",
 		.flags  = OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
-		.enable = OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
-		.idle = OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
+		.enable = OMAP_PIN_INPUT | OMAP_MUX_MODE0,
+		.idle = OMAP_PIN_INPUT | OMAP_MUX_MODE0,
 	},
 	{
 		.name = "usbb3_hsic_strobe.usbb3_hsic_strobe",
 		.flags  = OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
-		.enable = OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
-		.idle = OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
+		.enable = OMAP_PIN_INPUT | OMAP_MUX_MODE0,
+		.idle = OMAP_PIN_INPUT | OMAP_MUX_MODE0,
 	},
 };
 

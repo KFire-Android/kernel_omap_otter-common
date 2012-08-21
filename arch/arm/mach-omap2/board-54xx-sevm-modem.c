@@ -25,6 +25,7 @@
 
 #define OMAP5_GPIO_MDM_ONSWC		70 /* GPIO_MOD_ON (ONSWC) */
 #define OMAP5_GPIO_MDM_PWRSTATE		68 /* GPIO_MOD_PWR_STATUS_CA */
+#define OMAP5_GPIO_MOD_RESOUT2		66 /* GPIO_MOD_RESOUT2 */
 #define MODEM_PWRSTATE_POLLING_MS	1
 #define MODEM_PWRSTATE_TIMEOUT		(100 / MODEM_PWRSTATE_POLLING_MS)
 
@@ -71,21 +72,30 @@ static void __init omap5evm_modem_pad_conf_enable(void)
 
 	/* GPIO_MOD_RESOUT2 */
 	/* This pad should be wakeup capable to detect a modem reboot */
-	/* Note: The WAKEUPENABLE bit might be overwritten by the GPIO driver */
-	omap_mux_init_signal("hsi1_acwake.gpio3_66", \
+	/* Note: The WAKEUPENABLE bit is set later to get the WAKEUPEVENT
+	 * cleared only when necessary */
+	omap_mux_init_gpio(OMAP5_GPIO_MOD_RESOUT2, \
 		OMAP_PIN_INPUT_PULLDOWN | \
-		OMAP_PIN_OFF_NONE | \
-		OMAP_PIN_OFF_WAKEUPENABLE);
+		OMAP_PIN_OFF_NONE);
 
 	/* GPIO_MOD_PWR_STATUS */
-	omap_mux_init_signal("hsi1_acflag.gpio3_68", \
+	omap_mux_init_gpio(OMAP5_GPIO_MDM_PWRSTATE, \
 			OMAP_PIN_INPUT_PULLDOWN | \
 			OMAP_PIN_OFF_NONE);
 
 	/* GPIO_MOD_ON (ONSWC) */
-	omap_mux_init_signal("hsi1_caflag.gpio3_70", \
-			OMAP_PIN_OUTPUT | \
-			OMAP_PIN_OFF_NONE);
+	if (cpu_is_omap54xx() &&
+		(omap_rev() == OMAP5430_REV_ES1_0 ||
+		omap_rev() == OMAP5432_REV_ES1_0)) {
+		omap_mux_init_gpio(OMAP5_GPIO_MDM_ONSWC, \
+				OMAP_PIN_INPUT_PULLUP | \
+				OMAP_PIN_OUTPUT | \
+				OMAP_PIN_OFF_NONE);
+	} else {
+		omap_mux_init_gpio(OMAP5_GPIO_MDM_ONSWC, \
+				OMAP_PIN_OUTPUT | \
+				OMAP_PIN_OFF_NONE);
+	}
 }
 
 static void __init omap5evm_modem_pad_conf_disable(void)
@@ -156,6 +166,11 @@ err_pwrstate:
 	/* Disable GPIO padconf if there is no modem connected */
 	if (!modem_detected)
 		omap5evm_modem_pad_conf_disable();
+	else
+		omap_mux_init_gpio(OMAP5_GPIO_MOD_RESOUT2, \
+			OMAP_PIN_INPUT_PULLDOWN | \
+			OMAP_PIN_OFF_NONE | \
+			OMAP_PIN_OFF_WAKEUPENABLE);
 
 	if (modem_detected || force_mux) {
 		/* Load HSI driver for platform */

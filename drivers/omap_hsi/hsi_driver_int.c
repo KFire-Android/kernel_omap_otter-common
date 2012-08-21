@@ -664,10 +664,7 @@ static u32 hsi_driver_int_proc(struct hsi_port *pport,
 	if (pport->cawake_double_int)
 		status_reg |= HSI_CAWAKEDETECTED;
 
-	if (pport->cawake_off_event) {
-		dev_dbg(hsi_ctrl->dev, "CAWAKE detected from IO daisy on port %d\n",
-			port);
-	} else if (!status_reg) {
+	if (!status_reg) {
 		dev_dbg(hsi_ctrl->dev, "Channels [%d,%d] : no event, exit.\n",
 			start, stop);
 			return 0;
@@ -733,12 +730,11 @@ static u32 hsi_driver_int_proc(struct hsi_port *pport,
 	}
 
 	/* CAWAKE falling or rising edge detected */
-	if ((status_reg & HSI_CAWAKEDETECTED) || pport->cawake_off_event) {
+	if (status_reg & HSI_CAWAKEDETECTED) {
 		if (hsi_do_cawake_process(pport) == -EAGAIN)
 			goto proc_done;
 
 		channels_served |= HSI_CAWAKEDETECTED;
-		pport->cawake_off_event = false;
 	}
 proc_done:
 	/* Reset status bits */
@@ -783,12 +779,20 @@ static u32 hsi_process_int_event(struct hsi_port *pport)
 	pport->cawake_double_int = false;
 
 
-	/* Check if we missed a CAWAKE Interrupt */
-	/* Only in 4-wires mode */
-	if (!pport->wake_rx_3_wires_mode) {
+	/* Only in 4-wires mode and if cawake_status has been initialized */
+	if ((!pport->wake_rx_3_wires_mode) && (pport->cawake_status >= 0)) {
 		bool cawake_status = hsi_get_cawake(pport);
 		bool caw_int, caw_int_u;
 
+		/* Check if the ISR has been called in case of wakeup from IO PAD
+		 * daisy chain */
+		if (!status_reg) {
+			dev_dbg(pport->hsi_controller->dev,
+			"%s: IO daisy chain wakeup\n", __func__);
+			hsi_do_cawake_process(pport);
+		}
+
+		/* Check if we missed a CAWAKE Interrupt */
 		if (pport->cawake_status != cawake_status) {
 			/* Add a security to not process CAWAKE here if
 			 * interrupt is pending because it will be processed
