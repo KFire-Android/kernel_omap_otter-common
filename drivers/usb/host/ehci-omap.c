@@ -683,10 +683,17 @@ static int ehci_omap_bus_resume(struct usb_hcd *hcd)
 {
 	struct device *dev = hcd->self.controller;
 	struct ehci_hcd_omap_platform_data  *pdata;
+	struct omap_hwmod	*oh;
 	struct clk *clk;
 	int i;
 
+	int ret;
+
 	dev_dbg(dev, "ehci_omap_bus_resume\n");
+
+	oh = omap_hwmod_lookup(USBHS_EHCI_HWMODNAME);
+
+	ret = omap_hwmod_disable_ioring_wakeup(oh);
 
 	/* Re-enable any external transceiver clocks first */
 	pdata = dev->platform_data;
@@ -700,7 +707,7 @@ static int ehci_omap_bus_resume(struct usb_hcd *hcd)
 			OCP_INITIATOR_AGENT,
 			(200*1000*4));
 
-	if (dev->parent && pm_runtime_suspended(dev->parent))
+	if (dev->parent)
 		pm_runtime_get_sync(dev->parent);
 
 	*pdata->usbhs_update_sar = 1;
