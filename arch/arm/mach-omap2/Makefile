@@ -66,15 +66,13 @@ obj-$(CONFIG_ARCH_OMAP4)		+= opp4xxx_data.o
 obj-$(CONFIG_ARCH_OMAP5)		+= opp5xxx_data.o
 endif
 
-# CPUFREQ driver
-obj-$(CONFIG_CPU_FREQ)                  += dvfs.o
-
 # Power Management
 ifeq ($(CONFIG_PM),y)
-omap-4-5-common-pm			= pm4xxx_5xxx.o omap-mpuss-lowpower.o
+omap-4-5-common-pm			= pm4xxx_5xxx.o omap-mpuss-lowpower.o \
+					  dvfs.o
 obj-$(CONFIG_ARCH_OMAP2)		+= pm24xx.o
 obj-$(CONFIG_ARCH_OMAP2)		+= sleep24xx.o
-obj-$(CONFIG_ARCH_OMAP3)		+= pm34xx.o sleep34xx.o
+obj-$(CONFIG_ARCH_OMAP3)		+= pm34xx.o sleep34xx.o dvfs.o
 obj-$(CONFIG_ARCH_OMAP4)		+= $(omap-4-5-common-pm)
 obj-$(CONFIG_ARCH_OMAP5)		+= $(omap-4-5-common-pm)
 
