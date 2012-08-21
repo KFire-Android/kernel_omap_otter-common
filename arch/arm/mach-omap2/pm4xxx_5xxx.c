@@ -311,6 +311,20 @@ void omap_pm_clear_dsp_wake_up(void)
  */
 void omap_idle_core_notifier(int mpu_next_state, int core_next_state)
 {
+	bool is_suspend;
+
+	/*
+	 * Driver notifier calls should make use of is_suspend flag
+	 * to differentiate idle Vs suspend path.
+	 */
+	is_suspend = !is_idle_task(current);
+
+	if (is_suspend && smp_processor_id()) {
+		WARN(1, "Called from processor %d, which is unexpected\n",
+			smp_processor_id());
+		return;
+	}
+
 	if (core_next_state != PWRDM_POWER_ON)
 		omap2_gpio_prepare_for_idle(1);
 
@@ -343,6 +357,20 @@ void omap_idle_core_notifier(int mpu_next_state, int core_next_state)
  */
 void omap_enable_core_notifier(int mpu_next_state, int core_next_state)
 {
+	bool is_suspend;
+
+	/*
+	 * Driver notifier calls should make use of is_suspend flag
+	 * to differentiate idle Vs suspend path.
+	 */
+	is_suspend = !is_idle_task(current);
+
+	if (is_suspend && smp_processor_id()) {
+		WARN(1, "Called from processor %d, which is unexpected\n",
+			smp_processor_id());
+		return;
+	}
+
 	if (core_next_state != PWRDM_POWER_ON)
 		omap2_gpio_resume_after_idle();
 
