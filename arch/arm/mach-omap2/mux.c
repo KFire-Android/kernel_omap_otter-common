@@ -818,6 +818,27 @@ static void __init omap_mux_free_names(struct omap_mux *m)
 
 }
 
+/*
+ * check if gpio mux mode
+ */
+static int __init omap_mux_mode_gpio(struct omap_mux_partition *partition,
+				     u16 mode)
+{
+	u16 mux = OMAP_MUX_MODE4;	/* default gpio mux mode 4 */
+
+	/* adjust gpio mux mode based on partition flags */
+	if (partition->flags & OMAP_MUX_GPIO_IN_MODE3)
+		mux = OMAP_MUX_MODE3;
+	else if (partition->flags & OMAP_MUX_GPIO_IN_MODE6)
+		mux = OMAP_MUX_MODE6;
+
+	/* check mux mode */
+	if ((mode & OMAP_MUX_MODE7) == mux)
+		return 1;
+	else
+		return 0;
+}
+
 /* Free all data except for GPIO pins unless CONFIG_DEBUG_FS is set */
 static int __init omap_mux_late_init(void)
 {
@@ -830,7 +851,7 @@ static int __init omap_mux_late_init(void)
 			struct omap_mux *m = &e->mux;
 			u16 mode = omap_mux_read(partition, m->reg_offset);
 
-			if (OMAP_MODE_GPIO(mode))
+			if (omap_mux_mode_gpio(partition, mode))
 				continue;
 
 #ifndef CONFIG_DEBUG_FS
@@ -1148,8 +1169,9 @@ static void __init omap_mux_init_list(struct omap_mux_partition *partition,
 		}
 #else
 		/* Skip pins that are not muxed as GPIO by bootloader */
-		if (!OMAP_MODE_GPIO(omap_mux_read(partition,
-				    superset->reg_offset))) {
+		if (!omap_mux_mode_gpio(partition,
+				omap_mux_read(partition,
+						superset->reg_offset))) {
 			superset++;
 			continue;
 		}
