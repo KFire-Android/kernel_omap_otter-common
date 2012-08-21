@@ -26,6 +26,7 @@
 #include <linux/module.h>
 #include <video/omapdss.h>
 #include <linux/slab.h>
+#include <linux/of.h>
 
 #include "dss.h"
 
@@ -374,6 +375,19 @@ err:
 	return r;
 }
 
+#if defined(CONFIG_OF)
+static const struct of_device_id hdmi_panel_of_match[] = {
+	{
+		.compatible = "ti,hdmi_panel",
+	},
+	{},
+};
+
+MODULE_DEVICE_TABLE(of, hdmi_panel_of_match);
+#else
+#define dss_of_match NULL
+#endif
+
 static struct omap_dss_driver hdmi_driver = {
 	.probe		= hdmi_panel_probe,
 	.remove		= hdmi_panel_remove,
@@ -393,6 +407,7 @@ static struct omap_dss_driver hdmi_driver = {
 	.driver			= {
 		.name   = "hdmi_panel",
 		.owner  = THIS_MODULE,
+		.of_match_table = hdmi_panel_of_match,
 	},
 };
 

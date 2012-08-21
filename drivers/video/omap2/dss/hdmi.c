@@ -34,6 +34,8 @@
 #include <linux/clk.h>
 #include <linux/gpio.h>
 #include <linux/regulator/consumer.h>
+#include <linux/slab.h>
+#include <linux/of_gpio.h>
 #include <video/omapdss.h>
 
 #include "ti_hdmi.h"
@@ -1093,6 +1095,92 @@ static void __init hdmi_probe_pdata(struct platform_device *pdev)
 	}
 }
 
+static void __init hdmi_probe_of(struct platform_device *pdev)
+{
+	struct device_node *node = pdev->dev.of_node;
+	struct device_node *child;
+	struct omap_dss_device *dssdev;
+	int r, gpio;
+	enum omap_channel channel;
+	u32 v;
+
+	r = of_property_read_u32(node, "video-source", &v);
+	if (r) {
+		DSSERR("parsing channel failed\n");
+		return;
+	}
+
+	channel = v;
+
+	node = of_find_compatible_node(node, NULL, "ti,tpd12s015");
+	if (!node)
+		return;
+
+	child = of_get_next_available_child(node, NULL);
+	if (!child)
+		return;
+
+	if (of_gpio_count(node) != 3) {
+		DSSERR("wrong number of GPIOs\n");
+		return;
+	}
+
+	gpio = of_get_gpio(node, 0);
+	if (gpio_is_valid(gpio)) {
+		hdmi.ct_cp_hpd_gpio = gpio;
+	} else {
+		DSSERR("failed to parse CT CP HPD gpio\n");
+		return;
+	}
+
+	gpio = of_get_gpio(node, 1);
+	if (gpio_is_valid(gpio)) {
+		hdmi.ls_oe_gpio = gpio;
+	} else {
+		DSSERR("failed to parse LS OE gpio\n");
+		return;
+	}
+
+	gpio = of_get_gpio(node, 2);
+	if (gpio_is_valid(gpio)) {
+		hdmi.hpd_gpio = gpio;
+	} else {
+		DSSERR("failed to parse HPD gpio\n");
+		return;
+	}
+
+	dssdev = dss_alloc_and_init_device(&pdev->dev);
+	if (!dssdev)
+		return;
+
+	dssdev->dev.of_node = child;
+	dssdev->type = OMAP_DISPLAY_TYPE_HDMI;
+	dssdev->name = child->name;
+	dssdev->channel = channel;
+
+	r = hdmi_init_display(dssdev);
+	if (r) {
+		DSSERR("device %s init failed: %d\n", dssdev->name, r);
+		dss_put_device(dssdev);
+		return;
+	}
+
+	r = omapdss_output_set_device(&hdmi.output, dssdev);
+	if (r) {
+		DSSERR("failed to connect output to new device: %s\n",
+				dssdev->name);
+		dss_put_device(dssdev);
+		return;
+	}
+
+	r = dss_add_device(dssdev);
+	if (r) {
+		DSSERR("dss_add_device failed %d\n", r);
+		dss_put_device(dssdev);
+		return;
+	}
+}
+
 static void __init hdmi_init_output(struct platform_device *pdev)
 {
 	struct omap_dss_output *out = &hdmi.output;
@@ -1158,7 +1246,10 @@ static int __init omapdss_hdmihw_probe(struct platform_device *pdev)
 
 	hdmi_init_output(pdev);
 
-	hdmi_probe_pdata(pdev);
+	if (pdev->dev.of_node)
+		hdmi_probe_of(pdev);
+	else if (pdev->dev.platform_data)
+		hdmi_probe_pdata(pdev);
 
 #if defined(CONFIG_OMAP4_DSS_HDMI_AUDIO)
 	r = hdmi_probe_audio(pdev);
@@ -1229,12 +1320,24 @@ static const struct dev_pm_ops hdmi_pm_ops = {
 	.runtime_resume = hdmi_runtime_resume,
 };
 
+#if defined(CONFIG_OF)
+static const struct of_device_id hdmi_of_match[] = {
+	{
+		.compatible = "ti,omap4-hdmi",
+	},
+	{},
+};
+#else
+#define hdmi_of_match NULL
+#endif
+
 static struct platform_driver omapdss_hdmihw_driver = {
 	.remove         = __exit_p(omapdss_hdmihw_remove),
 	.driver         = {
 		.name   = "omapdss_hdmi",
 		.owner  = THIS_MODULE,
 		.pm	= &hdmi_pm_ops,
+		.of_match_table = hdmi_of_match,
 	},
 };
 
