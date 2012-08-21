@@ -104,13 +104,23 @@ void __init omap54xx_voltagedomains_init(void)
 	 * for the currently-running IC
 	 */
 #ifdef CONFIG_PM_OPP
-	omap5_voltdm_mpu.volt_data = omap54xx_vdd_mpu_volt_data;
-	omap5_vdd_mpu_info.dep_vdd_info = omap54xx_vddmpu_dep_info;
+	if (omap_rev() == OMAP5430_REV_ES1_0) {
+		omap5_voltdm_mpu.volt_data = omap5430_vdd_mpu_volt_data;
+		omap5_vdd_mpu_info.dep_vdd_info = omap5430_vddmpu_dep_info;
 
-	omap5_voltdm_mm.volt_data = omap54xx_vdd_mm_volt_data;
-	omap5_vdd_mm_info.dep_vdd_info = omap54xx_vddmm_dep_info;
+		omap5_voltdm_mm.volt_data = omap5430_vdd_mm_volt_data;
+		omap5_vdd_mm_info.dep_vdd_info = omap5430_vddmm_dep_info;
 
-	omap5_voltdm_core.volt_data = omap54xx_vdd_core_volt_data;
+		omap5_voltdm_core.volt_data = omap5430_vdd_core_volt_data;
+	} else if (omap_rev() == OMAP5432_REV_ES1_0) {
+		omap5_voltdm_mpu.volt_data = omap5432_vdd_mpu_volt_data;
+		omap5_vdd_mpu_info.dep_vdd_info = omap5432_vddmpu_dep_info;
+
+		omap5_voltdm_mm.volt_data = omap5432_vdd_mm_volt_data;
+		omap5_vdd_mm_info.dep_vdd_info = omap5432_vddmm_dep_info;
+
+		omap5_voltdm_core.volt_data = omap5432_vdd_core_volt_data;
+	}
 #endif
 
 	omap5_voltdm_mpu.vp_param = &omap5_mpu_vp_data;
