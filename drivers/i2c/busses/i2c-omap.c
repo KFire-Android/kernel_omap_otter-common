@@ -650,8 +650,10 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 		return r;
 
 	r = pm_runtime_get_sync(dev->dev);
-	if (r < 0)
+	if (r < 0) {
+		pm_runtime_put_noidle(dev->dev);
 		goto err_pm;
+	}
 
 	/* We have the bus, enable IRQ */
 	enable_irq(dev->irq);
