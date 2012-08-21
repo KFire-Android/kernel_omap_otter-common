@@ -2406,14 +2406,13 @@ int omapfb_enable_vsync(struct omapfb2_device *fbdev)
 {
 	int r;
 	/* TODO: should determine correct IRQ like dss_mgr_wait_for_vsync does*/
-
-	r = omap_dispc_register_isr(omapfb_vsync_isr, fbdev, DISPC_IRQ_VSYNC2); // FIXME-HASH: Hack for Kindle LCD2
+	r = omap_dispc_register_isr(omapfb_vsync_isr, fbdev, DISPC_IRQ_VSYNC);
 	return r;
 }
 
 void omapfb_disable_vsync(struct omapfb2_device *fbdev)
 {
-	omap_dispc_unregister_isr(omapfb_vsync_isr, fbdev, DISPC_IRQ_VSYNC2); // FIXME-HASH: Hack for Kindle LCD2
+	omap_dispc_unregister_isr(omapfb_vsync_isr, fbdev, DISPC_IRQ_VSYNC);
 }
 
 static int omapfb_probe(struct platform_device *pdev)
