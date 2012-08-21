@@ -535,8 +535,17 @@ long rpmsg_omx_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 				if (!IS_ERR_OR_NULL(ion_bufs[i]))
 					handle = ion_import(omx->ion_client,
 							   ion_bufs[i]);
+
+				/* num_handles returned from
+				 * omap_ion_share_fd_to_buffers isn't reliable
+				 * in conveying the actual number of valid
+				 * handles returned. 'break' here if handle is
+				 * NULL. We are assuming there are no valid
+				 * handles in ion_bufs after the first NULL
+				 * handle we hit.
+				 */
 				if (IS_ERR_OR_NULL(handle))
-					continue;
+					break;
 
 				if (_is_page_list(omx, handle))
 					data.handles[i] = (void *)
