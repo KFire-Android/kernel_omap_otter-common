@@ -1037,12 +1037,24 @@ static const struct dev_pm_ops dss_pm_ops = {
 	.runtime_resume = dss_runtime_resume,
 };
 
+#if defined(CONFIG_OF)
+static const struct of_device_id dss_of_match[] = {
+	{
+		.compatible = "ti,omap4-dss",
+	},
+	{},
+};
+#else
+#define dss_of_match NULL
+#endif
+
 static struct platform_driver omap_dsshw_driver = {
 	.remove         = __exit_p(omap_dsshw_remove),
 	.driver         = {
 		.name   = "omapdss_dss",
 		.owner  = THIS_MODULE,
 		.pm	= &dss_pm_ops,
+		.of_match_table = dss_of_match,
 	},
 };
 

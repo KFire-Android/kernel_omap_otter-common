@@ -34,6 +34,7 @@
 #include <linux/regulator/consumer.h>
 #include <linux/suspend.h>
 #include <linux/slab.h>
+#include <linux/of_device.h>
 
 #include <video/omapdss.h>
 
@@ -282,7 +283,16 @@ static int dss_bus_match(struct device *dev, struct device_driver *driver)
 	DSSDBG("bus_match. dev %s/%s, drv %s\n",
 			dev_name(dev), dssdev->driver_name, driver->name);
 
-	return strcmp(dssdev->driver_name, driver->name) == 0;
+	/* Attempt an OF style match first... */
+	if (of_driver_match_device(dev, driver))
+		return 1;
+
+	/* Then with old style */
+	if (dssdev->driver_name && driver->name &&
+			strcmp(dssdev->driver_name, driver->name) == 0)
+		return 1;
+
+	return 0;
 }
 
 static ssize_t device_name_show(struct device *dev,
