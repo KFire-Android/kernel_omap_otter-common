@@ -38,6 +38,7 @@ static LIST_HEAD(sr_list);
 static struct omap_sr_class_data *sr_class;
 static struct omap_sr_pmic_data *sr_pmic_data;
 static struct dentry		*sr_dbg_dir;
+static atomic_t sr_driver_ready;
 
 static inline void sr_write_reg(struct omap_sr *sr, unsigned offset, u32 value)
 {
@@ -732,8 +733,12 @@ int sr_register_class(struct omap_sr_class_data *class_data)
 void omap_sr_enable(struct voltagedomain *voltdm,
 			struct omap_volt_data *volt_data)
 {
-	struct omap_sr *sr = _sr_lookup(voltdm);
+	struct omap_sr *sr;
 
+	if (!atomic_read(&sr_driver_ready))
+		return;
+
+	sr = _sr_lookup(voltdm);
 	if (IS_ERR(sr)) {
 		pr_warning("%s: omap_sr struct for voltdm not found\n",
 			   __func__);
@@ -765,8 +770,12 @@ void omap_sr_enable(struct voltagedomain *voltdm,
  */
 void omap_sr_disable(struct voltagedomain *voltdm)
 {
-	struct omap_sr *sr = _sr_lookup(voltdm);
+	struct omap_sr *sr;
 
+	if (!atomic_read(&sr_driver_ready))
+		return;
+
+	sr = _sr_lookup(voltdm);
 	if (IS_ERR(sr)) {
 		pr_warning("%s: omap_sr struct for voltdm not found\n",
 			   __func__);
@@ -798,8 +807,12 @@ void omap_sr_disable(struct voltagedomain *voltdm)
  */
 void omap_sr_disable_reset_volt(struct voltagedomain *voltdm)
 {
-	struct omap_sr *sr = _sr_lookup(voltdm);
+	struct omap_sr *sr;
 
+	if (!atomic_read(&sr_driver_ready))
+		return;
+
+	sr = _sr_lookup(voltdm);
 	if (IS_ERR(sr)) {
 		pr_warning("%s: omap_sr struct for voltdm not found\n",
 			   __func__);
@@ -1127,12 +1140,15 @@ static int __init sr_init(void)
 		return ret;
 	}
 
+	atomic_set(&sr_driver_ready, 1);
+
 	return 0;
 }
 late_initcall(sr_init);
 
 static void __exit sr_exit(void)
 {
+	atomic_set(&sr_driver_ready, 0);
 	platform_driver_unregister(&smartreflex_driver);
 }
 module_exit(sr_exit);
