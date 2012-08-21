@@ -118,6 +118,46 @@
 			pinctrl-single,function-mask = <0x7fff>;
 		};
 
+		dss {
+			compatible = "ti,omap4-dss", "simple-bus";
+			ti,hwmods = "dss_core";
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			dispc {
+				compatible = "ti,omap4-dispc";
+				ti,hwmods = "dss_dispc";
+			};
+
+			dpi: dpi {
+				compatible = "ti,omap4-dpi";
+				video-source = <2>;
+			};
+
+			dsi1: dsi@0 {
+				compatible = "ti,omap4-dsi";
+				ti,hwmods = "dss_dsi1";
+				reg = <0>;
+				vdds_dsi-supply = <&vcxio>;
+				video-source = <0>;
+			};
+
+			dsi2: dsi@1 {
+				compatible = "ti,omap4-dsi";
+				ti,hwmods = "dss_dsi2";
+				reg = <1>;
+				vdds_dsi-supply = <&vcxio>;
+				video-source = <2>;
+			};
+
+			hdmi: hdmi {
+				compatible = "ti,omap4-hdmi";
+				ti,hwmods = "dss_hdmi";
+				vdda_hdmi_dac-supply = <&vdac>;
+				video-source = <1>;
+			};
+		};
+
 		gpio1: gpio@4a310000 {
 			compatible = "ti,omap4-gpio";
 			reg = <0x4a310000 0x200>;
