@@ -262,7 +262,18 @@ static int aess_mmap(struct snd_pcm_substream *substream,
 		return -EINVAL;
 
 	vma->vm_flags |= VM_IO | VM_RESERVED;
-	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+
+	/*
+	 * ABE interconnect fails to manage sub-word accesses, following
+	 * memory types are recommended for CPU -> ABE direct access:
+	 * omap4 - Strongly-ordered or device-shared memory
+	 * omap5 - Normal non-cached
+	 */
+	if (cpu_is_omap44xx())
+		vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+	else
+		vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
+
 	size = vma->vm_end - vma->vm_start;
 	offset = vma->vm_pgoff << PAGE_SHIFT;
 
