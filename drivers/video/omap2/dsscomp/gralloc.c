@@ -254,7 +254,7 @@ static void dsscomp_gralloc_do_clone(struct work_struct *work)
 	dsscomp_gralloc_transfer_dmabuf(wk->dma_cfg);
 #ifdef CONFIG_DEBUG_FS
 	ms2 = ktime_to_ms(ktime_get());
-	dev_info(DEV(cdev), "DMA latency(msec) = %lld\n", ms2-ms1);
+	dev_info(DEV(cdev), "DMA latency(msec) = %d\n", ms2-ms1);
 #endif
 
 	wk->comp->state = DSSCOMP_STATE_APPLYING;
@@ -263,7 +263,7 @@ static void dsscomp_gralloc_do_clone(struct work_struct *work)
 	kfree(wk);
 }
 
-static bool dsscomp_is_any_device_active()
+static bool dsscomp_is_any_device_active(void)
 {
 	struct omap_dss_device *dssdev;
 	u32 display_ix;
