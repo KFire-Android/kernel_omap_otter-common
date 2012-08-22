@@ -540,8 +540,12 @@ int omapdss_hdmi_register_cec_callbacks(void (*hdmi_cec_enable_cb)(int status),
 					int status));
 int omapdss_hdmi_unregister_cec_callbacks(void);
 
+int omapdss_hdmi_display_3d_is_enabled(struct omap_dss_device *dssdev);
 int omapdss_hdmi_display_3d_enable(struct omap_dss_device *dssdev,
-					struct s3d_disp_info *info, int code);
+					bool enable);
+char *omapdss_hdmi_display_3d_get_type(struct omap_dss_device *dssdev);
+int omapdss_hdmi_display_3d_type(struct omap_dss_device *dssdev,
+					int type);
 void omapdss_hdmi_register_hdcp_callbacks(void (*hdmi_start_frame_cb)(void),
 					bool (*hdmi_power_on_cb)(void),
 					void (*hdmi_hdcp_irq_cb)(void));

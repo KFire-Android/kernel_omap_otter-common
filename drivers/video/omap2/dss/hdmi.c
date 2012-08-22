@@ -679,8 +679,13 @@ int hdmi_notify_hpd(struct omap_dss_device *dssdev, bool hpd)
 	return hdmi.ip_data.ops->set_phy(&hdmi.ip_data, hpd);
 }
 
+int omapdss_hdmi_display_3d_is_enabled(struct omap_dss_device *dssdev)
+{
+	return hdmi.ip_data.cfg.s3d_enabled;
+}
+
 int omapdss_hdmi_display_3d_enable(struct omap_dss_device *dssdev,
-					struct s3d_disp_info *info, int code)
+					bool enable)
 {
 	int r = 0;
 
@@ -697,78 +702,75 @@ int omapdss_hdmi_display_3d_enable(struct omap_dss_device *dssdev,
 	if (hdmi.enabled)
 		goto err0;
 
-	r = omap_dss_start_device(dssdev);
-	if (r) {
-		DSSERR("failed to start device\n");
-		goto err0;
-	}
-
-	if (dssdev->platform_enable) {
-		r = dssdev->platform_enable(dssdev);
-		if (r) {
-			DSSERR("failed to enable GPIO's\n");
-			goto err1;
-		}
-	}
-
-	/* hdmi.s3d_enabled will be updated when powering display up */
-	/* if there's no S3D support it will be reset to false */
-	switch (info->type) {
-	case S3D_DISP_OVERUNDER:
-		if (info->sub_samp == S3D_DISP_SUB_SAMPLE_NONE) {
-			dssdev->panel.s3d_info = *info;
-			hdmi.ip_data.cfg.s3d_info.frame_struct = HDMI_S3D_FRAME_PACKING;
-			hdmi.ip_data.cfg.s3d_info.subsamp = false;
-			hdmi.ip_data.cfg.s3d_info.subsamp_pos = 0;
-			hdmi.ip_data.cfg.s3d_enabled = true;
-			hdmi.ip_data.cfg.s3d_info.vsi_enabled = true;
-		} else {
-			goto err2;
-		}
-		break;
-	case S3D_DISP_SIDEBYSIDE:
-		dssdev->panel.s3d_info = *info;
-		if (info->sub_samp == S3D_DISP_SUB_SAMPLE_NONE) {
-			hdmi.ip_data.cfg.s3d_info.frame_struct = HDMI_S3D_SIDE_BY_SIDE_FULL;
-			hdmi.ip_data.cfg.s3d_info.subsamp = true;
-			hdmi.ip_data.cfg.s3d_info.subsamp_pos = HDMI_S3D_HOR_EL_ER;
-			hdmi.ip_data.cfg.s3d_enabled = true;
-			hdmi.ip_data.cfg.s3d_info.vsi_enabled = true;
-		} else if (info->sub_samp == S3D_DISP_SUB_SAMPLE_H) {
-			hdmi.ip_data.cfg.s3d_info.frame_struct = HDMI_S3D_SIDE_BY_SIDE_HALF;
-			hdmi.ip_data.cfg.s3d_info.subsamp = true;
-			hdmi.ip_data.cfg.s3d_info.subsamp_pos = HDMI_S3D_HOR_EL_ER;
-			hdmi.ip_data.cfg.s3d_info.vsi_enabled = true;
-		} else {
-			goto err2;
-		}
-		break;
-	default:
-		goto err2;
-	}
-	if (hdmi.ip_data.cfg.s3d_enabled) {
-		hdmi.ip_data.cfg.cm.code = code;
-		hdmi.ip_data.cfg.cm.mode = HDMI_HDMI;
-	}
-
-	r = hdmi_power_on(dssdev);
-	if (r) {
-		DSSERR("failed to power on device\n");
-		goto err2;
-	}
+	hdmi.ip_data.cfg.s3d_info.vsi_enabled = enable;
 
 	mutex_unlock(&hdmi.lock);
 	return 0;
 
-err2:
-	if (dssdev->platform_disable)
-		dssdev->platform_disable(dssdev);
-err1:
-	omap_dss_stop_device(dssdev);
 err0:
 	mutex_unlock(&hdmi.lock);
 	return r;
 }
+
+char *omapdss_hdmi_display_3d_get_type(struct omap_dss_device *dssdev)
+{
+	switch (hdmi.ip_data.cfg.s3d_info.frame_struct) {
+	case HDMI_S3D_FRAME_PACKING:
+		return "top_bottom";
+	case HDMI_S3D_SIDE_BY_SIDE_FULL:
+		return "side_by_syde_full";
+	case HDMI_S3D_SIDE_BY_SIDE_HALF:
+		return "side_by_syde_half";
+	default:
+		return "INVAL";
+	}
+}
+
+int omapdss_hdmi_display_3d_type(struct omap_dss_device *dssdev,
+					int type)
+{
+	int error = 0;
+
+	mutex_lock(&hdmi.lock);
+
+	switch (type) {
+	case S3D_DISP_TOPBOTTOM:
+		hdmi.ip_data.cfg.s3d_info.frame_struct =
+				HDMI_S3D_FRAME_PACKING;
+		hdmi.ip_data.cfg.s3d_info.subsamp = false;
+		hdmi.ip_data.cfg.s3d_info.subsamp_pos = 0;
+		break;
+
+	case S3D_DISP_SIDE_BY_SIDE_FULL:
+		hdmi.ip_data.cfg.s3d_info.frame_struct =
+				HDMI_S3D_SIDE_BY_SIDE_FULL;
+		hdmi.ip_data.cfg.s3d_info.subsamp = true;
+		hdmi.ip_data.cfg.s3d_info.subsamp_pos = HDMI_S3D_HOR_EL_ER;
+		break;
+
+	case S3D_DISP_SIDE_BY_SIDE_HALF:
+		hdmi.ip_data.cfg.s3d_info.frame_struct =
+				HDMI_S3D_SIDE_BY_SIDE_HALF;
+		hdmi.ip_data.cfg.s3d_info.subsamp = true;
+		hdmi.ip_data.cfg.s3d_info.subsamp_pos = HDMI_S3D_HOR_EL_ER;
+		break;
+	default:
+		DSSERR("Invalid Display type");
+		error = -EINVAL;
+		goto err0;
+	}
+
+
+	hdmi.ip_data.cfg.s3d_enabled = true;
+
+	hdmi.ip_data.cfg.cm.code = 4;
+	hdmi.ip_data.cfg.cm.mode = HDMI_HDMI;
+err0:
+	mutex_unlock(&hdmi.lock);
+	return error;
+
+}
+
 
 void omapdss_hdmi_display_set_timing(struct omap_dss_device *dssdev)
 {

@@ -228,14 +228,14 @@ enum omap_hdmi_flags {
  * are with respect to native scan order
 */
 enum s3d_disp_type {
-	S3D_DISP_NONE = 0,
-	S3D_DISP_FRAME_SEQ,
-	S3D_DISP_ROW_IL,
-	S3D_DISP_COL_IL,
-	S3D_DISP_PIX_IL,
-	S3D_DISP_CHECKB,
-	S3D_DISP_OVERUNDER,
-	S3D_DISP_SIDEBYSIDE,
+	S3D_DISP_FRAME_PACKING          = 0,
+	S3D_DISP_FIELD_ALTERNATIVE      = 1,
+	S3D_DISP_LINE_ALTERNATIVE       = 2,
+	S3D_DISP_SIDE_BY_SIDE_FULL      = 3,
+	S3D_DISP_L_DEPTH                = 4,
+	S3D_DISP_L_DEPTH_GFX_GFX_DEPTH  = 5,
+	S3D_DISP_TOPBOTTOM              = 6,
+	S3D_DISP_SIDE_BY_SIDE_HALF      = 8,
 };
 
 /* Subsampling direction is based on native panel scan order.
@@ -669,7 +669,6 @@ struct omap_dss_device {
 		enum omap_dss_dsi_pixel_format dsi_pix_fmt;
 		enum omap_dss_dsi_mode dsi_mode;
 		struct omap_dss_dsi_videomode_data dsi_vm_data;
-		struct s3d_disp_info s3d_info;
 		u32 width_in_um;
 		u32 height_in_um;
 		u16 fb_xres;
@@ -786,8 +785,15 @@ struct omap_dss_driver {
 	int (*audio_config)(struct omap_dss_device *dssdev,
 		struct snd_aes_iec958 *iec, struct snd_cea_861_aud_if *aud_if);
 
-	int (*s3d_enable)(struct omap_dss_device *dssdev,
-				struct s3d_disp_info *info, int code);
+	/*
+	 * S3D Support
+	 */
+	int (*s3d_enable_set)(struct omap_dss_device *dssdev,
+				bool enable);
+	int (*s3d_enable_get)(struct omap_dss_device *dssdev);
+	int (*s3d_type_set)(struct omap_dss_device *dssdev,
+				int type);
+	char* (*s3d_type_get)(struct omap_dss_device *dssdev);
 };
 
 int omap_dss_register_driver(struct omap_dss_driver *);

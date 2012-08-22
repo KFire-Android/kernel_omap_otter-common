@@ -248,24 +248,73 @@ static ssize_t display_wss_store(struct device *dev,
 	return size;
 }
 
+static ssize_t display_s3d_enabled_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct omap_dss_device *dssdev = to_dss_device(dev);
+	int enable;
+
+	if (dssdev->driver->s3d_enable_get)
+		enable = dssdev->driver->s3d_enable_get(dssdev);
+	else
+		return (ssize_t)-EINVAL;
+
+	return snprintf(buf, PAGE_SIZE, "%u\n", enable);
+}
+
+
 static ssize_t display_s3d_enabled_store(struct device *dev,
 		struct device_attribute *attr,
 		const char *buf, size_t size)
 {
 	struct omap_dss_device *dssdev = to_dss_device(dev);
-	struct s3d_disp_info info;
-	int r, code;
+	int enable;
 
-	if (sscanf(buf, "%u/%u/%u/%u,%u",
-				&info.type, &info.sub_samp,
-				&info.order, &info.gap, &code) != 5)
-		return -EINVAL;
+	int err = kstrtoint(buf, 0, &enable);
 
-	r = dssdev->driver->s3d_enable(dssdev, &info, code);
-	if (r)
-		return r;
+	enable = !!enable;
+
+	dssdev->driver->disable(dssdev);
+
+	if (dssdev->driver->s3d_enable_set)
+		err += dssdev->driver->s3d_enable_set(dssdev, enable);
+
+	err += dssdev->driver->enable(dssdev);
+	if (err)
+		return err;
 
 	return size;
+}
+
+static ssize_t display_s3d_type_store(struct device *dev,
+				      struct device_attribute *attr,
+				      const char *buf, size_t size)
+{
+	struct omap_dss_device *dssdev = to_dss_device(dev);
+
+	int type;
+
+	int err = kstrtoint(buf, 0, &type);
+
+	if (dssdev->driver->s3d_type_set)
+		err += dssdev->driver->s3d_type_set(dssdev, type);
+	else
+		err = -EINVAL;
+
+	if (err)
+		return err;
+
+	return size;
+}
+
+static ssize_t display_s3d_type_show(struct device *dev,
+				     struct device_attribute *attr, char *buf)
+{
+	struct omap_dss_device *dssdev = to_dss_device(dev);
+	if (dssdev->driver->s3d_type_get)
+		return sprintf(buf, "%s\n",
+				dssdev->driver->s3d_type_get(dssdev));
+	return -EINVAL;
 }
 
 static DEVICE_ATTR(enabled, S_IRUGO|S_IWUSR,
@@ -280,8 +329,10 @@ static DEVICE_ATTR(mirror, S_IRUGO|S_IWUSR,
 		display_mirror_show, display_mirror_store);
 static DEVICE_ATTR(wss, S_IRUGO|S_IWUSR,
 		display_wss_show, display_wss_store);
-static DEVICE_ATTR(s3d_enabled, S_IRUGO|S_IWUSR,
-		NULL, display_s3d_enabled_store);
+static DEVICE_ATTR(s3d_enable, S_IRUGO|S_IWUSR,
+		display_s3d_enabled_show, display_s3d_enabled_store);
+static DEVICE_ATTR(s3d_type, S_IRUGO|S_IWUSR,
+		display_s3d_type_show, display_s3d_type_store);
 
 static struct device_attribute *display_sysfs_attrs[] = {
 	&dev_attr_enabled,
@@ -290,7 +341,8 @@ static struct device_attribute *display_sysfs_attrs[] = {
 	&dev_attr_rotate,
 	&dev_attr_mirror,
 	&dev_attr_wss,
-	&dev_attr_s3d_enabled,
+	&dev_attr_s3d_enable,
+	&dev_attr_s3d_type,
 	NULL
 };
 
