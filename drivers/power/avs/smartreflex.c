@@ -623,7 +623,7 @@ int sr_enable(struct voltagedomain *voltdm, unsigned long volt)
 	/* errminlimit is opp dependent and hence linked to voltage */
 	sr->err_minlimit = volt_data->sr_errminlimit;
 
-	pm_runtime_get_sync(&sr->pdev->dev);
+	sr->ops->get(sr);
 
 	/* Check if SR is already enabled. If yes do nothing */
 	if (sr_read_reg(sr, SRCONFIG) & SRCONFIG_SRENABLE)
@@ -680,7 +680,7 @@ void sr_disable(struct voltagedomain *voltdm)
 		}
 	}
 
-	pm_runtime_put_sync_suspend(&sr->pdev->dev);
+	sr->ops->put(sr);
 }
 
 /**
@@ -934,6 +934,21 @@ static int __init omap_sr_probe(struct platform_device *pdev)
 		goto err_release_region;
 	}
 
+	if (!pdata->ops || !pdata->ops->get || !pdata->ops->put) {
+		dev_err(&pdev->dev, "%s: Missing fops!!\n", __func__);
+		ret = -EINVAL;
+		goto err_release_region;
+	}
+
+	sr_info->ops = kmalloc(sizeof(struct omap_sr_ops), GFP_KERNEL);
+	if (!sr_info->ops) {
+		dev_err(&pdev->dev, "%s: Could'nt alloc ops mem!!\n",
+			__func__);
+		ret = -ENOMEM;
+		goto err_release_region;
+	}
+	memcpy(sr_info->ops, pdata->ops, sizeof(struct omap_sr_ops));
+
 	sr_info->pdev = pdev;
 	sr_info->srid = pdev->id;
 	sr_info->voltdm = pdata->voltdm;
@@ -947,7 +962,7 @@ static int __init omap_sr_probe(struct platform_device *pdev)
 	if (!sr_info->base) {
 		dev_err(&pdev->dev, "%s: ioremap fail\n", __func__);
 		ret = -ENOMEM;
-		goto err_release_region;
+		goto err_release_region2;
 	}
 
 	if (irq)
@@ -1035,6 +1050,8 @@ err_free_name:
 err_iounmap:
 	list_del(&sr_info->node);
 	iounmap(sr_info->base);
+err_release_region2:
+	kfree(sr_info->ops);
 err_release_region:
 	release_mem_region(mem->start, resource_size(mem));
 err_free_devinfo:
@@ -1069,6 +1086,7 @@ static int __devexit omap_sr_remove(struct platform_device *pdev)
 	list_del(&sr_info->node);
 	iounmap(sr_info->base);
 	kfree(sr_info->name);
+	kfree(sr_info->ops);
 	kfree(sr_info);
 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	release_mem_region(mem->start, resource_size(mem));
@@ -1099,11 +1117,75 @@ static void __devexit omap_sr_shutdown(struct platform_device *pdev)
 	return;
 }
 
+static int sr_suspend(struct device *dev)
+{
+	struct omap_sr_data *pdata;
+	struct omap_sr *sr_info;
+
+	pdata = dev_get_platdata(dev);
+	if (!pdata) {
+		dev_err(dev, "%s: platform data missing\n", __func__);
+		return -EINVAL;
+	}
+
+	sr_info = _sr_lookup(pdata->voltdm);
+	if (IS_ERR_OR_NULL(sr_info)) {
+		dev_warn(dev, "%s: omap_sr struct not found\n", __func__);
+		return -EINVAL;
+	}
+
+	if (!sr_info->autocomp_active)
+		return 0;
+
+	if (sr_info->suspended)
+		return 0;
+
+	sr_info->suspended =  true;
+	/* Flag the same info to the other CPUs */
+	smp_wmb();
+
+	return 0;
+}
+
+static int sr_resume(struct device *dev)
+{
+
+	struct omap_sr_data *pdata;
+	struct omap_sr *sr_info;
+
+	pdata = dev_get_platdata(dev);
+	if (!pdata) {
+		dev_err(dev, "%s: platform data missing\n", __func__);
+		return -EINVAL;
+	}
+
+	sr_info = _sr_lookup(pdata->voltdm);
+	if (IS_ERR_OR_NULL(sr_info)) {
+		dev_warn(dev, "%s: omap_sr struct not found\n", __func__);
+		return -EINVAL;
+	}
+
+	if (!sr_info->autocomp_active)
+		return 0;
+
+	if (!sr_info->suspended)
+		return 0;
+
+	sr_info->suspended =  false;
+	/* Flag the same info to the other CPUs */
+	smp_wmb();
+
+	return 0;
+}
+
+static SIMPLE_DEV_PM_OPS(serial_omap_dev_pm_ops, sr_suspend, sr_resume);
+
 static struct platform_driver smartreflex_driver = {
 	.remove         = __devexit_p(omap_sr_remove),
 	.shutdown	= __devexit_p(omap_sr_shutdown),
 	.driver		= {
 		.name	= "smartreflex",
+		.pm	= &serial_omap_dev_pm_ops,
 	},
 };
 

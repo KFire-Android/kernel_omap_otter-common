@@ -22,6 +22,7 @@
 #include <linux/err.h>
 #include <linux/slab.h>
 #include <linux/io.h>
+#include <linux/pm_runtime.h>
 
 #include <plat/omap_device.h>
 
@@ -30,6 +31,39 @@
 #include "pm.h"
 
 static bool sr_enable_on_init;
+
+static int sr_get(struct omap_sr *sr)
+{
+	int r;
+
+	if (sr->suspended)
+		r = omap_device_enable(sr->pdev);
+	else
+		r = pm_runtime_get_sync(&sr->pdev->dev);
+	if (r)
+		dev_err(&sr->pdev->dev, "%s: failed:%d susp=%d\n",
+			__func__, r, sr->suspended);
+	return r;
+}
+
+static int sr_put(struct omap_sr *sr)
+{
+	int r;
+
+	if (sr->suspended)
+		r = omap_device_idle(sr->pdev);
+	else
+		r = pm_runtime_put_sync_suspend(&sr->pdev->dev);
+	if (r)
+		dev_err(&sr->pdev->dev, "%s: failed:%d susp=%d\n",
+			__func__, r, sr->suspended);
+	return r;
+}
+
+static __initdata struct omap_sr_ops omap_sr_ops = {
+	.get = sr_get,
+	.put = sr_put,
+};
 
 /* Read EFUSE values from control registers for OMAP3430 */
 static void __init sr_set_nvalues(struct omap_volt_data *volt_data,
@@ -140,11 +174,16 @@ static int __init sr_dev_init(struct omap_hwmod *oh, void *user)
 
 	sr_data->enable_on_init = sr_enable_on_init;
 
+	sr_data->ops = &omap_sr_ops;
+
 	pdev = omap_device_build(name, i, oh, sr_data, sizeof(*sr_data),
 				 NULL, 0, 0);
 	if (IS_ERR(pdev))
 		pr_warning("%s: Could not build omap_device for %s: %s.\n\n",
 			__func__, name, oh->name);
+
+	/* DONOT auto-disable me while going to suspend */
+	omap_device_disable_idle_on_suspend(pdev);
 exit:
 	i++;
 	kfree(sr_data);

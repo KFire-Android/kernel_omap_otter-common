@@ -145,6 +145,8 @@
 struct voltagedomain;
 struct omap_volt_data;
 
+struct omap_sr_ops;
+
 struct omap_sr {
 	char				*name;
 	struct list_head		node;
@@ -157,6 +159,7 @@ struct omap_sr {
 	int				ip_type;
 	int				nvalue_count;
 	bool				autocomp_active;
+	bool				suspended;
 	u32				clk_length;
 	u32				err_weight;
 	u32				err_minlimit;
@@ -167,6 +170,17 @@ struct omap_sr {
 	u32				senp_mod;
 	u32				senn_mod;
 	void __iomem			*base;
+	struct omap_sr_ops		*ops;
+};
+
+/**
+ * struct omap_sr_ops - SmartReflex platform specific operations
+ * @get:	Get the required clocks no matter what context we run from
+ * @put:	release the required clocks no matter what context we run from
+ */
+struct omap_sr_ops {
+	int (*get) (struct omap_sr *sr);
+	int (*put) (struct omap_sr *sr);
 };
 
 /**
@@ -271,6 +285,7 @@ struct omap_sr_nvalue_table {
  * @nvalue_table:	table containing the  efuse offsets and nvalues
  *			corresponding to them.
  * @voltdm:		Pointer to the voltage domain associated with the SR
+ * @ops:		Operations for SmartReflex
  */
 struct omap_sr_data {
 	const char			*name;
@@ -281,6 +296,7 @@ struct omap_sr_data {
 	bool				enable_on_init;
 	struct omap_sr_nvalue_table	*nvalue_table;
 	struct voltagedomain		*voltdm;
+	struct omap_sr_ops		*ops;
 };
 
 /* Smartreflex module enable/disable interface */
