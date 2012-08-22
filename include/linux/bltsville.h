@@ -87,7 +87,11 @@ struct bvrect {
 
 #define BVFLAG_SCALE_RETURN	0x00100000 /* return scale type used */
 #define BVFLAG_DITHER_RETURN	0x00200000 /* return dither type used */
-/**** Bits 31-22 reserved ****/
+
+
+#define BVFLAG_SRC2_AUXDSTRECT	0x00400000 /* src2auxdstrect used */
+#define BVFLAG_MASK_AUXDSTRECT	0x00800000 /* maskauxdstrect used */
+/**** Bits 31-24 reserved ****/
 
 /*
  * BVIMPL_* - BLTsville implementations may be combined under managers to
@@ -118,7 +122,7 @@ struct bvrect {
 #define BVSCALEDEF_IMPLICIT	(0 << BVSCALEDEF_CLASS_SHIFT)
 #define BVSCALEDEF_EXPLICIT	(1 << BVSCALEDEF_CLASS_SHIFT)
 /* 2-3 reserved */
-#define BVSCALEDEF_CLASS_MASK	(3 << BVSCALEDEF_CLASS_MASK)
+#define BVSCALEDEF_CLASS_MASK	(3 << BVSCALEDEF_CLASS_SHIFT)
 
 /**** IMPLICIT definitions ****/
 /*** Bits 21-16 indicate the quality (speed) desired ***/
@@ -127,7 +131,7 @@ struct bvrect {
 #define BVSCALEDEF_GOOD		(0x15 << BVSCALEDEF_QUALITY_SHIFT)
 #define BVSCALEDEF_BETTER	(0x2A << BVSCALEDEF_QUALITY_SHIFT)
 #define BVSCALEDEF_BEST		(0x3F << BVSCALEDEF_QUALITY_SHIFT)
-#define BVSCALEDEF_QUALITY_MASK	(0x3F << BVSCALEDEF_QUALITY_MASK)
+#define BVSCALEDEF_QUALITY_MASK	(0x3F << BVSCALEDEF_QUALITY_SHIFT)
 /* Bits 15-12 are reserved */
 /*** Bits 11-8 indicate the desired technique ***/
 #define BVSCALEDEF_TECHNIQUE_SHIFT 8
@@ -143,7 +147,7 @@ struct bvrect {
 #define BVSCALEDEF_PHOTO	(1 << BVSCALEDEF_TYPE_SHIFT)
 #define BVSCALEDEF_DRAWING	(2 << BVSCALEDEF_TYPE_SHIFT)
 /* 3 reserved */
-#define BVSCALEDEF_TYPE_MASK	(3 << BVSCALEDEF_TYPE_MASK)
+#define BVSCALEDEF_TYPE_MASK	(3 << BVSCALEDEF_TYPE_SHIFT)
 
 /**** EXPLICIT definitions ****/
 /* Bits 21-16 reserved */
@@ -587,6 +591,9 @@ struct bvbltparams {
 							 error; handle contains
 							 callbackdata below */
 	unsigned long callbackdata;	/* (i) callback data */
+
+	struct bvrect src2auxdstrect;
+	struct bvrect maskauxdstrect;
 };
 
 #endif /* BLTSVILLE_H */
