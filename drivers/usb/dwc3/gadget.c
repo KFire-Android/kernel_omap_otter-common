@@ -264,8 +264,11 @@ void dwc3_gadget_giveback(struct dwc3_ep *dep, struct dwc3_request *req,
 	if (req->request.status == -EINPROGRESS)
 		req->request.status = status;
 
-	usb_gadget_unmap_request(&dwc->gadget, &req->request,
-			req->direction);
+	if (dwc->ep0_bounced && dep->number == 0)
+		dwc->ep0_bounced = false;
+	else
+		usb_gadget_unmap_request(&dwc->gadget, &req->request,
+				req->direction);
 
 	dev_dbg(dwc->dev, "request %p from %s completed %d/%d ===> %d\n",
 			req, dep->name, req->request.actual,
@@ -564,27 +567,7 @@ static void dwc3_remove_requests(struct dwc3 *dwc, struct dwc3_ep *dep)
 	if (!list_empty(&dep->req_queued)) {
 		dwc3_stop_active_transfer(dwc, dep->number);
 
-		/*
-		 * NOTICE: We are violating what the Databook says about the
-		 * EndTransfer command. Ideally we would _always_ wait for the
-		 * EndTransfer Command Completion IRQ, but that's causing too
-		 * much trouble synchronizing between us and gadget driver.
-		 *
-		 * We have discussed this with the IP Provider and it was
-		 * suggested to giveback all requests here, but give HW some
-		 * extra time to synchronize with the interconnect. We're using
-		 * an arbitraty 100us delay for that.
-		 *
-		 * Note also that a similar handling was tested by Synopsys
-		 * (thanks a lot Paul) and nothing bad has come out of it.
-		 * In short, what we're doing is:
-		 *
-		 * - Issue EndTransfer WITH CMDIOC bit set
-		 * - Wait 100us
-		 * - giveback all requests to gadget driver
-		 */
-		udelay(100);
-
+		/* - giveback all requests to gadget driver */
 		while (!list_empty(&dep->req_queued)) {
 			req = next_request(&dep->req_queued);
 
@@ -663,6 +646,12 @@ static int dwc3_gadget_ep_enable(struct usb_ep *ep,
 	dep = to_dwc3_ep(ep);
 	dwc = dep->dwc;
 
+	if (dep->flags & DWC3_EP_ENABLED) {
+		dev_WARN_ONCE(dwc->dev, true, "%s is already enabled\n",
+				dep->name);
+		return 0;
+	}
+
 	switch (usb_endpoint_type(desc)) {
 	case USB_ENDPOINT_XFER_CONTROL:
 		strlcat(dep->name, "-control", sizeof(dep->name));
@@ -678,12 +667,6 @@ static int dwc3_gadget_ep_enable(struct usb_ep *ep,
 		break;
 	default:
 		dev_err(dwc->dev, "invalid endpoint transfer type\n");
-	}
-
-	if (dep->flags & DWC3_EP_ENABLED) {
-		dev_WARN_ONCE(dwc->dev, true, "%s is already enabled\n",
-				dep->name);
-		return 0;
 	}
 
 	dev_vdbg(dwc->dev, "Enabling %s\n", dep->name);
@@ -1105,7 +1088,8 @@ static int __dwc3_gadget_ep_queue(struct dwc3_ep *dep, struct dwc3_request *req)
 	 *    core may not see the modified TRB(s).
 	 */
 	if (usb_endpoint_xfer_isoc(dep->endpoint.desc) &&
-			(dep->flags & DWC3_EP_BUSY)) {
+			(dep->flags & DWC3_EP_BUSY) &&
+			!(dep->flags & DWC3_EP_MISSED_ISOC)) {
 		WARN_ON_ONCE(!dep->resource_index);
 		ret = __dwc3_gadget_kick_transfer(dep, dep->resource_index,
 				false);
@@ -1941,6 +1925,25 @@ static void dwc3_stop_active_transfer(struct dwc3 *dwc, u32 epnum)
 	if (!dep->resource_index)
 		return;
 
+	/*
+	 * NOTICE: We are violating what the Databook says about the
+	 * EndTransfer command. Ideally we would _always_ wait for the
+	 * EndTransfer Command Completion IRQ, but that's causing too
+	 * much trouble synchronizing between us and gadget driver.
+	 *
+	 * We have discussed this with the IP Provider and it was
+	 * suggested to giveback all requests here, but give HW some
+	 * extra time to synchronize with the interconnect. We're using
+	 * an arbitraty 100us delay for that.
+	 *
+	 * Note also that a similar handling was tested by Synopsys
+	 * (thanks a lot Paul) and nothing bad has come out of it.
+	 * In short, what we're doing is:
+	 *
+	 * - Issue EndTransfer WITH CMDIOC bit set
+	 * - Wait 100us
+	 */
+
 	cmd = DWC3_DEPCMD_ENDTRANSFER;
 	cmd |= DWC3_DEPCMD_HIPRI_FORCERM | DWC3_DEPCMD_CMDIOC;
 	cmd |= DWC3_DEPCMD_PARAM(dep->resource_index);
@@ -1948,6 +1951,8 @@ static void dwc3_stop_active_transfer(struct dwc3 *dwc, u32 epnum)
 	ret = dwc3_send_gadget_ep_cmd(dwc, dep->number, cmd, &params);
 	WARN_ON_ONCE(ret);
 	dep->resource_index = 0;
+
+	udelay(100);
 }
 
 static void dwc3_stop_active_transfers(struct dwc3 *dwc)

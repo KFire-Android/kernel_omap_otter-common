@@ -533,7 +533,10 @@ static int __devinit dwc3_probe(struct platform_device *pdev)
 		ret = -ENODEV;
 		goto err1;
 	}
-	dwc->xhci_resources[1] = *res;
+	dwc->xhci_resources[1].start = res->start;
+	dwc->xhci_resources[1].end = res->end;
+	dwc->xhci_resources[1].flags = res->flags;
+	dwc->xhci_resources[1].name = res->name;
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!res) {
@@ -541,9 +544,11 @@ static int __devinit dwc3_probe(struct platform_device *pdev)
 		ret = -ENODEV;
 		goto err1;
 	}
-	dwc->xhci_resources[0] = *res;
+	dwc->xhci_resources[0].start = res->start;
 	dwc->xhci_resources[0].end = dwc->xhci_resources[0].start +
 					DWC3_XHCI_REGS_END;
+	dwc->xhci_resources[0].flags = res->flags;
+	dwc->xhci_resources[0].name = res->name;
 
 	 /*
 	  * Request memory region but exclude xHCI regs,
@@ -558,7 +563,7 @@ static int __devinit dwc3_probe(struct platform_device *pdev)
 		goto err1;
 	}
 
-	regs = devm_ioremap(dev, res->start, resource_size(res));
+	regs = devm_ioremap_nocache(dev, res->start, resource_size(res));
 	if (!regs) {
 		dev_err(dev, "ioremap failed\n");
 		ret = -ENOMEM;
