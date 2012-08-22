@@ -984,7 +984,7 @@ void ti_hdmi_5xxx_basic_configure(struct hdmi_ip_data *ip_data)
 	hdmi_wp_video_config_timing(ip_data, &video_timing);
 
 	/* video config */
-	video_format.packing_mode = HDMI_PACK_24b_RGB_YUV444_YUV422;
+	video_format.packing_mode = HDMI_PACK_ALREADYPACKED;
 
 	hdmi_wp_video_config_format(ip_data, &video_format);
 
