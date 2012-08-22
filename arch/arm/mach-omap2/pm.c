@@ -18,6 +18,7 @@
 #include <linux/suspend.h>
 #include <linux/pm_qos.h>
 #include <linux/ratelimit.h>
+#include <linux/regulator/machine.h>
 
 #include <asm/system_misc.h>
 
@@ -392,6 +393,8 @@ static int omap_pm_enter(suspend_state_t suspend_state)
 
 static int omap_pm_begin(suspend_state_t state)
 {
+	int ret = 0;
+
 	disable_hlt();
 
 	/*
@@ -408,6 +411,13 @@ static int omap_pm_begin(suspend_state_t state)
 	if (cpu_is_omap34xx())
 		omap_prcm_irq_prepare();
 
+	ret = regulator_suspend_prepare(state);
+	if (ret) {
+		pr_err("%s: Regulator suspend prepare failed (%d)!\n",
+		       __func__, ret);
+		return ret;
+	}
+
 	/* Enable DEV OFF */
 	if (off_mode_enabled && (cpu_is_omap44xx() || cpu_is_omap54xx()))
 		pwrdm_enable_off_mode(true);
@@ -417,9 +427,17 @@ static int omap_pm_begin(suspend_state_t state)
 
 static void omap_pm_end(void)
 {
+	int ret = 0;
+
 	/* Disable DEV OFF */
 	if (off_mode_enabled && (cpu_is_omap44xx() || cpu_is_omap54xx()))
 		pwrdm_enable_off_mode(false);
+
+	ret = regulator_suspend_finish();
+	if (ret) {
+		pr_err("%s: resume regulators from suspend failed (%d)!\n",
+		       __func__, ret);
+	}
 
 	enable_hlt();
 	return;
