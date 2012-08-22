@@ -1236,15 +1236,18 @@ update_gpio_context_count:
 				bank->get_context_loss_count(bank->dev);
 
 	/*
-	 * WA for GPIO pins 140 (BT) & 142 (WLAN) used as output pins
+	 * WA for GPIO pins 70 (Modem), 140 (BT) & 142 (WLAN) used as outputs
 	 * due to h/w bug in GPIO module (Bug ID: OMAP5430-1.0BUG01667)
 	 * On OMAP5 ES1.0 the pins do not maintain their level in OFF.
 	 * This WA changes the direction to input while in OFF and back
-	 * to input in resume. This is fixed in ES2.0
+	 * to output in resume. This is fixed in ES2.0
 	 */
 	if (cpu_is_omap54xx() &&
 		(omap_rev() == OMAP5430_REV_ES1_0 ||
 		omap_rev() == OMAP5432_REV_ES1_0)) {
+		if (bank->id == 2) {
+			_set_gpio_direction(bank, GPIO_INDEX(bank, 70), 1);
+		}
 		if (bank->id == 4) {
 			_set_gpio_direction(bank, GPIO_INDEX(bank, 142), 1);
 			_set_gpio_direction(bank, GPIO_INDEX(bank, 140), 1);
@@ -1317,14 +1320,17 @@ static int omap_gpio_runtime_resume(struct device *dev)
 		omap_gpio_restore_context(bank);
 
 	/*
-	 * WA for GPIO pins 140 (BT) & 142 (WLAN) used as output pins
+	 * WA for GPIO pins 70 (Modem), 140 (BT) & 142 (WLAN) used as outputs
 	 * due to h/w bug in GPIO module (Bug ID: OMAP5430-1.0BUG01667)
 	 * On OMAP5 ES1.0 the pins do not maintain their level in OFF.
-	 * Change the direct back to o/p in resume.
+	 * Change the direct back to output in resume.
 	 */
 	if (cpu_is_omap54xx() &&
 		(omap_rev() == OMAP5430_REV_ES1_0 ||
 		omap_rev() == OMAP5432_REV_ES1_0)) {
+		if (bank->id == 2) {
+			_set_gpio_direction(bank, GPIO_INDEX(bank, 70), 0);
+		}
 		if (bank->id == 4) {
 			_set_gpio_direction(bank, GPIO_INDEX(bank, 142), 0);
 			_set_gpio_direction(bank, GPIO_INDEX(bank, 140), 0);
