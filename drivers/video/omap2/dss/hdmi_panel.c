@@ -123,6 +123,14 @@ static ssize_t hdmi_range_store(struct device *dev,
 
 static DEVICE_ATTR(range, S_IRUGO | S_IWUSR, hdmi_range_show, hdmi_range_store);
 
+static ssize_t hdmi_edid_show(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	return omapdss_get_edid(buf);
+}
+
+static DEVICE_ATTR(edid, S_IRUGO | S_IWUSR, hdmi_edid_show, NULL);
+
 static int hdmi_panel_probe(struct omap_dss_device *dssdev)
 {
 	struct omap_dss_hdmi_data *priv;
@@ -144,7 +152,8 @@ static int hdmi_panel_probe(struct omap_dss_device *dssdev)
 
 	/* sysfs entry to to set deepcolor mode and hdmi_timings */
 	if (device_create_file(&dssdev->dev, &dev_attr_deepcolor) ||
-	    device_create_file(&dssdev->dev, &dev_attr_hdmi_timings))
+	    device_create_file(&dssdev->dev, &dev_attr_hdmi_timings) ||
+	    device_create_file(&dssdev->dev, &dev_attr_edid))
 		DSSERR("failed to create sysfs file\n");
 
 	DSSDBG("hdmi_panel_probe x_res= %d y_res = %d\n",
@@ -197,6 +206,7 @@ done_err:
 	device_remove_file(&dssdev->dev, &dev_attr_deepcolor);
 	device_remove_file(&dssdev->dev, &dev_attr_hdmi_timings);
 	device_remove_file(&dssdev->dev, &dev_attr_range);
+	device_remove_file(&dssdev->dev, &dev_attr_edid);
 	return r;
 }
 
@@ -207,6 +217,7 @@ static void hdmi_panel_remove(struct omap_dss_device *dssdev)
 	device_remove_file(&dssdev->dev, &dev_attr_deepcolor);
 	device_remove_file(&dssdev->dev, &dev_attr_range);
 	device_remove_file(&dssdev->dev, &dev_attr_hdmi_timings);
+	device_remove_file(&dssdev->dev, &dev_attr_edid);
 	free_irq(gpio_to_irq(hdmi.hpd_gpio), NULL);
 	gpio_free(priv->hpd_gpio);
 	gpio_free(priv->ls_oe_gpio);

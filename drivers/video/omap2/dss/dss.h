@@ -509,6 +509,7 @@ extern struct device_attribute dev_attr_hdmi_timings;
 int omapdss_hdmi_display_enable(struct omap_dss_device *dssdev);
 void omapdss_hdmi_display_disable(struct omap_dss_device *dssdev);
 void omapdss_hdmi_clear_edid(void);
+ssize_t omapdss_get_edid(char *buf);
 void omapdss_hdmi_display_set_timing(struct omap_dss_device *dssdev);
 int omapdss_hdmi_display_check_timing(struct omap_dss_device *dssdev,
 					struct omap_video_timings *timings);

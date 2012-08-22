@@ -1061,6 +1061,13 @@ void omapdss_hdmi_clear_edid(void)
 	hdmi.custom_set = false;
 }
 
+ssize_t omapdss_get_edid(char *buf)
+{
+	ssize_t size = hdmi.edid_set ? HDMI_EDID_MAX_LENGTH : 0;
+	memcpy(buf, hdmi.edid, size);
+	return size;
+}
+
 static irqreturn_t hdmi_irq_handler(int irq, void *arg)
 {
 	int r = 0;
