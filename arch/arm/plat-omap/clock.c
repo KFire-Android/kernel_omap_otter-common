@@ -591,6 +591,20 @@ const struct clkops clkops_null = {
 };
 
 /*
+ * Dummy functions used for virtual dummy clocks
+ */
+long clk_dummy_round_rate(struct clk *clk, unsigned long rate)
+{
+	return rate;
+};
+
+int clk_dummy_set_rate(struct clk *clk, unsigned long rate)
+{
+	clk->rate = rate;
+	return 0;
+};
+
+/*
  * Dummy clock
  *
  * Used for clock aliases that are needed on some OMAPs, but not others

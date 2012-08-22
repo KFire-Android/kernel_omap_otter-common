@@ -379,7 +379,8 @@ extern int omap_clk_enable_autoidle_all(void);
 extern int omap_clk_disable_autoidle_all(void);
 
 extern const struct clkops clkops_null;
-
+extern long clk_dummy_round_rate(struct clk *clk, unsigned long rate);
+extern int clk_dummy_set_rate(struct clk *clk, unsigned long rate);
 extern struct clk dummy_ck;
 
 #endif
