@@ -595,6 +595,10 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
 		goto err_add_hcd;
 	}
 
+	omap_pm_set_min_bus_tput(dev,
+			OCP_INITIATOR_AGENT,
+			(200*1000*4));
+
 	/* root ports should always stay powered */
 	ehci_port_power(omap_ehci, 1);
 
