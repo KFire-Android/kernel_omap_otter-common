@@ -90,6 +90,15 @@ struct omap_opp_def {
 	.vp_errgain	= _errgain				       \
 }
 
+#define OMAP5_VOLT_DATA_DEFINE(_v_nom, _efuse_offs, _lvt_efuse_offs, _errminlimit, _errgain)  \
+{								       \
+	.volt_nominal	= _v_nom,				       \
+	.sr_efuse_offs	= _efuse_offs,				       \
+	.lvt_sr_efuse_offs	= _lvt_efuse_offs,				       \
+	.sr_errminlimit = _errminlimit,				       \
+	.vp_errgain	= _errgain				       \
+}
+
 /* Use this to initialize the default table */
 extern int __init omap_init_opp_table(struct omap_opp_def *opp_def,
 		u32 opp_def_size);
