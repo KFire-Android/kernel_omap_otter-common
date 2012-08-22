@@ -634,9 +634,6 @@ int __cpuinit omap_hotplug_cpu(unsigned int cpu, unsigned int power_state)
 	 */
 	omap_pm_ops.finish_suspend(cpu_state);
 
-	/* Increase mpu usecounts to indicate we are exiting idle */
-	omap_inc_mpu_core_pwrdm_usecount();
-
 #if 0
 	/* Clear FORCE OFF mode if supported */
 	set_cpu_force_off(cpu, 0);
