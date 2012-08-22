@@ -8,16 +8,10 @@
  * warranty of any kind, whether express or implied.
  */
 #include <linux/kernel.h>
-#include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/bug.h>
-#include <linux/io.h>
 
-#include <asm/div64.h>
 
-#include <plat/cpu.h>
-
-#include "iomap.h"
 #include "voltage.h"
 #include "vc.h"
 #include "prm-regbits-34xx.h"
