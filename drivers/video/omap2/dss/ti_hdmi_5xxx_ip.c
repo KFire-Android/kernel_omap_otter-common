@@ -462,6 +462,22 @@ static void hdmi_core_infoframe_vsi_config(struct hdmi_ip_data *ip_data,
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_DATAUTO2, 0, 3, 0);
 }
 
+static void hdmi_core_infoframe_vsi_disable(struct hdmi_ip_data *ip_data)
+{
+	void __iomem *core_sys_base = hdmi_core_sys_base(ip_data);
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_DATAUTO0, 0, 3, 3);
+	hdmi_write_reg(core_sys_base, HDMI_CORE_FC_VSDPAYLOAD(0), 0x0);
+	hdmi_write_reg(core_sys_base, HDMI_CORE_FC_VSDPAYLOAD(1), 0x0);
+	hdmi_write_reg(core_sys_base, HDMI_CORE_FC_VSDPAYLOAD(2), 0x0);
+	hdmi_write_reg(core_sys_base, HDMI_CORE_FC_VSDSIZE, 0);
+	hdmi_write_reg(core_sys_base, HDMI_CORE_FC_VSDIEEEID0, 0x0);
+	hdmi_write_reg(core_sys_base, HDMI_CORE_FC_VSDIEEEID1, 0x0);
+	hdmi_write_reg(core_sys_base, HDMI_CORE_FC_VSDIEEEID2, 0x0);
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_DATAUTO0, 1, 3, 3);
+
+	ip_data->cfg.s3d_enabled = false;
+}
+
 /* DSS_HDMI_CORE_VIDEO_CONFIG */
 static void hdmi_core_video_config(struct hdmi_ip_data *ip_data,
 				struct hdmi_core_vid_config *cfg)
@@ -1068,10 +1084,12 @@ void ti_hdmi_5xxx_basic_configure(struct hdmi_ip_data *ip_data)
 	avi_cfg->db10_11_pixel_eofleft = 0;
 	avi_cfg->db12_13_pixel_sofright = 0;
 
-	hdmi_core_aux_infoframe_avi_config(ip_data);
-
-	if (ip_data->cfg.s3d_info.vsi_enabled)
+	if (ip_data->cfg.s3d_info.vsi_enabled && ip_data->cfg.s3d_enabled)
 		hdmi_core_infoframe_vsi_config(ip_data, ip_data->cfg.s3d_info);
+	else if (!ip_data->cfg.s3d_info.vsi_enabled && ip_data->cfg.s3d_enabled)
+		hdmi_core_infoframe_vsi_disable(ip_data);
+
+	hdmi_core_aux_infoframe_avi_config(ip_data);
 
 	hdmi_enable_video_path(ip_data);
 
