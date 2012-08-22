@@ -24,10 +24,10 @@
 #include <plat/omap-pm.h>
 #include <plat/omap_device.h>
 #include <plat/dvfs.h>
+#include <plat/voltage.h>
 #include "common.h"
 
 #include "prcm-common.h"
-#include "voltage.h"
 #include "powerdomain.h"
 #include "clockdomain.h"
 #include "pm.h"

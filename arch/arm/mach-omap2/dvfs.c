@@ -22,13 +22,13 @@
 #include <linux/seq_file.h>
 #include <linux/uaccess.h>
 #include <linux/pm_qos.h>
+#include <linux/power/smartreflex.h>
 #include <plat/common.h>
 #include <plat/omap_device.h>
 #include <plat/omap_hwmod.h>
 #include <plat/clock.h>
 #include <plat/dvfs.h>
-#include "voltage.h"
-#include "smartreflex.h"
+#include <plat/voltage.h>
 #include "powerdomain.h"
 #include "pm.h"
 
@@ -108,7 +108,6 @@
  *
  * For voltage dependency description, see: struct dependency:
  * voltagedomain -> (description of the voltagedomain)
- *	omap_vdd_info -> (vdd information)
  *		omap_vdd_dep_info[]-> (stores array of depedency info)
  *			omap_vdd_dep_volt[] -> (stores array of maps)
  *				(main_volt -> dep_volt) (a singular map)
@@ -473,7 +472,7 @@ static int _dep_scan_table(struct device *dev,
 /**
  * _dep_scan_domains() - Scan dependency domains for a device
  * @dev:	device requesting the scan
- * @vdd:	vdd_info corresponding to the device
+ * @dep_info:	dep_info corresponding to the device
  * @main_volt:	voltage to scan for
  *
  * Since each domain *may* have multiple dependent domains, we scan
@@ -484,9 +483,8 @@ static int _dep_scan_table(struct device *dev,
  * Returns 0 if all went well.
  */
 static int _dep_scan_domains(struct device *dev,
-		struct omap_vdd_info *vdd, unsigned long main_volt)
+		struct omap_vdd_dep_info *dep_info, unsigned long main_volt)
 {
-	struct omap_vdd_dep_info *dep_info = vdd->dep_vdd_info;
 	int ret = 0, r;
 
 	if (!dep_info) {
@@ -508,7 +506,7 @@ static int _dep_scan_domains(struct device *dev,
 /**
  * _dep_scale_domains() - Cause a scale of all dependent domains
  * @req_dev:	device requesting the scale
- * @req_vdd:	vdd_info corresponding to the requesting device.
+ * @dep_info:	voltage dep_info corresponding to the requesting device.
  *
  * This walks through every dependent domain and triggers a scale
  * It is assumed that the corresponding scale handling for the
@@ -523,9 +521,8 @@ static int _dep_scan_domains(struct device *dev,
  * Returns 0 if all went fine.
  */
 static int _dep_scale_domains(struct device *req_dev,
-				struct omap_vdd_info *req_vdd)
+				struct omap_vdd_dep_info *dep_info)
 {
-	struct omap_vdd_dep_info *dep_info = req_vdd->dep_vdd_info;
 	int ret = 0, r;
 
 	if (!dep_info) {
@@ -590,7 +587,6 @@ static int _dvfs_scale(struct device *req_dev, struct device *target_dev,
 	struct plist_node *node;
 	int ret = 0;
 	struct voltagedomain *voltdm;
-	struct omap_vdd_info *vdd;
 	struct omap_volt_data *new_vdata;
 	struct omap_volt_data *curr_vdata;
 	struct list_head *dev_list;
@@ -600,7 +596,6 @@ static int _dvfs_scale(struct device *req_dev, struct device *target_dev,
 		dev_err(target_dev, "%s: bad voltdm\n", __func__);
 		return -EINVAL;
 	}
-	vdd = voltdm->vdd;
 
 	/* Find the highest voltage being requested */
 	node = plist_last(&tdvfs_info->vdd_user_list);
@@ -631,7 +626,7 @@ static int _dvfs_scale(struct device *req_dev, struct device *target_dev,
 	/* Make a decision to scale dependent domain based on nominal voltage */
 	if (omap_get_nominal_voltage(new_vdata) >
 					omap_get_nominal_voltage(curr_vdata)) {
-		ret = _dep_scale_domains(target_dev, vdd);
+		ret = _dep_scale_domains(target_dev, voltdm->dep_vdd_info);
 		if (ret) {
 			dev_err(target_dev,
 				"%s: Error(%d)scale dependent with %ld volt\n",
@@ -706,7 +701,7 @@ next:
 	/* Make a decision to scale dependent domain based on nominal voltage */
 	if (omap_get_nominal_voltage(new_vdata) <
 			omap_get_nominal_voltage(curr_vdata)) {
-		_dep_scale_domains(target_dev, vdd);
+		_dep_scale_domains(target_dev, voltdm->dep_vdd_info);
 	}
 
 	/* All clear.. go out gracefully */
@@ -809,7 +804,8 @@ int omap_device_scale(struct device *target_dev, unsigned long rate)
 	}
 
 	/* Check for any dep domains and add the user request */
-	ret = _dep_scan_domains(target_dev, tdvfs_info->voltdm->vdd, volt);
+	ret = _dep_scan_domains(target_dev,
+			tdvfs_info->voltdm->dep_vdd_info, volt);
 	if (ret) {
 		dev_err(target_dev,
 			"%s: Error in scan domains for vdd_%s\n",
@@ -840,7 +836,6 @@ static int dvfs_dump_vdd(struct seq_file *sf, void *unused)
 	int k;
 	struct omap_vdd_dvfs_info *dvfs_info;
 	struct omap_vdd_user_list *vuser;
-	struct omap_vdd_info *vdd;
 	struct omap_vdd_dep_info *dep_info;
 	struct voltagedomain *voltdm;
 	struct omap_volt_data *volt_data;
@@ -857,12 +852,6 @@ static int dvfs_dump_vdd(struct seq_file *sf, void *unused)
 	voltdm = dvfs_info->voltdm;
 	if (IS_ERR_OR_NULL(voltdm)) {
 		pr_err("%s: NO voltdm?\n", __func__);
-		return -EINVAL;
-	}
-
-	vdd = voltdm->vdd;
-	if (IS_ERR_OR_NULL(vdd)) {
-		pr_err("%s: NO vdd data?\n", __func__);
 		return -EINVAL;
 	}
 
@@ -892,7 +881,7 @@ static int dvfs_dump_vdd(struct seq_file *sf, void *unused)
 		seq_printf(sf, "|  X\n");
 	seq_printf(sf, "|\n");
 
-	volt_data = vdd->volt_data;
+	volt_data = voltdm->volt_data;
 	seq_printf(sf, "|- Supported voltages\n|  |\n");
 	anyreq = 0;
 	while (volt_data && volt_data->volt_nominal) {
@@ -905,7 +894,7 @@ static int dvfs_dump_vdd(struct seq_file *sf, void *unused)
 	else
 		seq_printf(sf, "|  X\n");
 
-	dep_info = vdd->dep_vdd_info;
+	dep_info = voltdm->dep_vdd_info;
 	seq_printf(sf, "`- voltage dependencies\n   |\n");
 	anyreq = 0;
 	while (dep_info && dep_info->nr_dep_entries) {

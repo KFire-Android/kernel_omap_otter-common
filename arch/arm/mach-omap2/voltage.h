@@ -19,7 +19,7 @@
 #include <linux/spinlock.h>
 
 #include <mach/common.h>
-struct omap_volt_data;
+#include <plat/voltage.h>
 
 #include "vc.h"
 #include "vp.h"
@@ -37,8 +37,6 @@ struct powerdomain;
 #define OMAP3_CLKSETUP		0xff
 #define OMAP3_VOLTOFFSET	0xff
 #define OMAP3_VOLTSETUP2	0xff
-
-struct omap_vdd_info;
 
 /**
  * struct omap_vfsm_instance - per-voltage manager FSM register/bitfield
@@ -107,31 +105,12 @@ struct voltagedomain {
 				struct omap_volt_data *target_volt);
 	struct omap_volt_data *curr_volt;
 	struct omap_volt_data *volt_data;
-	struct omap_vdd_info *vdd;
+	struct omap_vdd_dep_info *dep_vdd_info;
 	struct srcu_notifier_head change_notify_list;
 	struct dentry *debug_dir;
 	/* spinlock for voltage usecount */
 	spinlock_t lock;
 	bool auto_ret;
-};
-
-/**
- * struct omap_volt_data - Omap voltage specific data.
- * @voltage_nominal:	The possible voltage value in uV
- * @sr_efuse_offs:	The offset of the efuse register(from system
- *			control module base address) from where to read
- *			the n-target value for the smartreflex module.
- * @sr_errminlimit:	Error min limit value for smartreflex. This value
- *			differs at differnet opp and thus is linked
- *			with voltage.
- * @vp_errorgain:	Error gain value for the voltage processor. This
- *			field also differs according to the voltage/opp.
- */
-struct omap_volt_data {
-	u32	volt_nominal;
-	u32	sr_efuse_offs;
-	u8	sr_errminlimit;
-	u8	vp_errgain;
 };
 
 /* Min and max voltages from OMAP perspective */
@@ -255,19 +234,6 @@ struct omap_vdd_dep_info {
 	int nr_dep_entries;
 };
 
-/**
- * omap_vdd_info - Per Voltage Domain info
- *
- * @volt_data		: voltage table having the distinct voltages supported
- *			  by the domain and other associated per voltage data.
- * @dep_vdd_info	: Array ending with a 0 terminator for dependency
- *			  voltage information.
- */
-struct omap_vdd_info {
-	struct omap_volt_data *volt_data;
-	struct omap_vdd_dep_info *dep_vdd_info;
-};
-
 void omap_voltage_get_volttable(struct voltagedomain *voltdm,
 		struct omap_volt_data **volt_data);
 struct omap_volt_data *omap_voltage_get_curr_vdata(struct voltagedomain *voltdm);
@@ -294,8 +260,6 @@ int voltdm_for_each(int (*fn)(struct voltagedomain *voltdm, void *user),
 int voltdm_for_each_pwrdm(struct voltagedomain *voltdm,
 			  int (*fn)(struct voltagedomain *voltdm,
 				    struct powerdomain *pwrdm));
-int voltdm_scale(struct voltagedomain *voltdm,
-		 struct omap_volt_data *target_volt);
 void voltdm_reset(struct voltagedomain *voltdm);
 
 int __init __init_volt_domain_notifier_list(struct voltagedomain **voltdms);

@@ -26,6 +26,8 @@
 #include <linux/debugfs.h>
 #include <linux/slab.h>
 #include <linux/clk.h>
+#include <linux/power/smartreflex.h>
+#include <plat/voltage.h>
 
 #include "common.h"
 
@@ -36,9 +38,7 @@
 #include "prminst44xx.h"
 #include "control.h"
 
-#include "voltage.h"
 #include "powerdomain.h"
-#include "smartreflex.h"
 
 #include "vc.h"
 #include "vp.h"

@@ -88,8 +88,8 @@ obj-$(CONFIG_PM_DEBUG)			+= pm-debug.o
 ifeq ($(CONFIG_PM_DEBUG),y)
 obj-$(CONFIG_ARCH_OMAP5)		+= prcm-54xx-debug.o
 endif
-obj-$(CONFIG_OMAP_SMARTREFLEX)          += sr_device.o smartreflex.o
-obj-$(CONFIG_OMAP_SMARTREFLEX_CLASS3)	+= smartreflex-class3.o
+obj-$(CONFIG_POWER_AVS_OMAP)		+= sr_device.o
+obj-$(CONFIG_POWER_AVS_OMAP_CLASS3)    += smartreflex-class3.o
 
 AFLAGS_sleep24xx.o			:=-Wa,-march=armv6
 AFLAGS_sleep34xx.o			:=-Wa,-march=armv7-a$(plus_sec)

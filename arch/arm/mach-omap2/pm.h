@@ -171,7 +171,7 @@ extern u16 pm44xx_errata;
 #define IS_PM44XX_ERRATUM(id)		0
 #endif
 
-#ifdef CONFIG_OMAP_SMARTREFLEX
+#ifdef CONFIG_POWER_AVS_OMAP
 extern int omap_devinit_smartreflex(void);
 extern void omap_enable_smartreflex_on_init(void);
 #else
