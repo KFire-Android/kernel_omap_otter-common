@@ -121,8 +121,8 @@ static struct platform_device sdp4430_aic3110 = {
 static struct regulator_consumer_supply lcd_supply[] = {
 //	REGULATOR_SUPPLY("vlcd", "otter1_panel_drv"),
 	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dss"),
-	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dsi1"),
-	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dsi2"),
+	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dsi.0"),
+	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dsi.1"),
 //	{ .supply = "vdds_dsi", },
 };
 
