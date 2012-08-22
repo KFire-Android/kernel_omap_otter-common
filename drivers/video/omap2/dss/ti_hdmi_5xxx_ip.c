@@ -1024,15 +1024,6 @@ void ti_hdmi_5xxx_basic_configure(struct hdmi_ip_data *ip_data)
 		ti_hdmi_5xxx_configure_range(ip_data);
 	}
 
-	if (ip_data->cfg.cm.mode == HDMI_DVI ||
-	(ip_data->cfg.cm.code == 1 && ip_data->cfg.cm.mode == HDMI_HDMI)) {
-		ip_data->cfg.range = HDMI_FULL_RANGE;
-		ti_hdmi_5xxx_configure_range(ip_data);
-	} else {
-		ip_data->cfg.range = HDMI_LIMITED_RANGE;
-		ti_hdmi_5xxx_configure_range(ip_data);
-	}
-
 	/* Enable pll and core interrupts */
 	irq_enable.pll_recal = 1;
 	irq_enable.pll_unlock = 1;
