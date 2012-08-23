@@ -315,6 +315,14 @@ int __init omap_mux_init_signal(const char *muxname, int val)
 	u16 old_mode;
 	int mux_mode;
 
+	/* If WAKEUPENABLE bit is set, the WAKEUPEVENT has to be handled by the
+	 * framework. Use omap_mux_init_gpio() or omap_hwmod_mux_init() */
+	if (val & OMAP_WAKEUP_EN) {
+		pr_err("%s must not set the WAKEUPENABLE bit, muxing aborted\n",
+		       __func__);
+		return -EINVAL;
+	}
+
 	mux_mode = omap_mux_get_by_name(muxname, &partition, &mux);
 	if (mux_mode < 0)
 		return mux_mode;
