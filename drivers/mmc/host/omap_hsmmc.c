@@ -651,7 +651,7 @@ static int omap_hsmmc_context_restore(struct omap_hsmmc_host *host)
 
 	if (host->pdata->controller_flags & OMAP_HSMMC_SUPPORTS_DUAL_VOLT) {
 		if (host->power_mode != MMC_POWER_OFF &&
-		    (1 << ios->vdd) <= MMC_VDD_23_24)
+		    (ios->signal_voltage == MMC_SIGNAL_VOLTAGE_180))
 			hctl = SDVS18;
 		else
 			hctl = SDVS30;
