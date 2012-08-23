@@ -244,7 +244,9 @@ static int hdmi_panel_suspend(struct omap_dss_device *dssdev)
 	mutex_lock(&hdmi.hdmi_lock);
 
 	if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE) {
-		r = -EINVAL;
+		/* We should enable "resume" event handler for case, when HDMI
+		 * display is plugged in while device was in suspend mode */
+		dssdev->activate_after_resume = true;
 		goto err;
 	}
 
