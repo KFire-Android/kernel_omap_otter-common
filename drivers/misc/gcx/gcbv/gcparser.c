@@ -76,21 +76,12 @@ GCDBG_FILTERDEF(gcparser, GCZONE_NONE,
  * Internal macros.
  */
 
-#define GCCONVERT_RECT(zone, error, name, bvrect, gcrect) \
+#define GCCONVERT_RECT(zone, name, bvrect, gcrect) \
 { \
 	(gcrect)->left = (bvrect)->left; \
 	(gcrect)->top = (bvrect)->top; \
 	(gcrect)->right = (bvrect)->left + (bvrect)->width; \
 	(gcrect)->bottom = (bvrect)->top + (bvrect)->height; \
-	\
-	if (((gcrect)->left   < GC_CLIP_RESET_LEFT)  || \
-	    ((gcrect)->top    < GC_CLIP_RESET_TOP)   || \
-	    ((gcrect)->right  > GC_CLIP_RESET_RIGHT) || \
-	    ((gcrect)->bottom > GC_CLIP_RESET_BOTTOM)) { \
-		BVSETBLTERROR((error), \
-			      "invalid " name " rectangle"); \
-		goto exit; \
-	} \
 	\
 	GCDBG(zone, \
 	      name " = (%d,%d)-(%d,%d), %dx%d\n", \
@@ -1476,7 +1467,15 @@ enum bverror parse_destination(struct bvbltparams *bvbltparams,
 
 		/* Determine destination rectangle. */
 		dstrect = &dstinfo->rect;
-		GCCONVERT_RECT(GCZONE_DEST, BVERR_DSTRECT,
+
+		GCDBG(GCZONE_DEST,
+		      "destination = (%d,%d) %dx%d\n",
+		      bvbltparams->dstrect.left,
+		      bvbltparams->dstrect.top,
+		      bvbltparams->dstrect.width,
+		      bvbltparams->dstrect.height);
+
+		GCCONVERT_RECT(GCZONE_DEST,
 			       "destination",
 			       &bvbltparams->dstrect,
 			       dstrect);
@@ -1487,10 +1486,26 @@ enum bverror parse_destination(struct bvbltparams *bvbltparams,
 		/* Is clipping rectangle specified? */
 		if ((bvbltparams->flags & BVFLAG_CLIP) == BVFLAG_CLIP) {
 			/* Convert and validate clipping rectangle. */
-			GCCONVERT_RECT(GCZONE_DEST, BVERR_CLIP_RECT,
+			GCDBG(GCZONE_DEST,
+			      "clip = (%d,%d) %dx%d\n",
+			      bvbltparams->cliprect.left,
+			      bvbltparams->cliprect.top,
+			      bvbltparams->cliprect.width,
+			      bvbltparams->cliprect.height);
+
+			GCCONVERT_RECT(GCZONE_DEST,
 				       "clipping",
 				       &bvbltparams->cliprect,
 				       &cliprect);
+
+			if (cliprect.left < GC_CLIP_RESET_LEFT ||
+			    cliprect.top < GC_CLIP_RESET_TOP ||
+			    cliprect.right > GC_CLIP_RESET_RIGHT ||
+			    cliprect.bottom > GC_CLIP_RESET_BOTTOM) {
+				BVSETERROR(BVERR_CLIP_RECT,
+					   "clip rect is invalid");
+				goto exit;
+			}
 
 			/* Compute clipping deltas and the adjusted
 			 * destination rect. */
@@ -1533,7 +1548,7 @@ enum bverror parse_destination(struct bvbltparams *bvbltparams,
 			/* Clip the aux destination. */
 			if (haveaux) {
 				/* Convert and validate aux rectangle. */
-				GCCONVERT_RECT(GCZONE_DEST, BVERR_DSTRECT,
+				GCCONVERT_RECT(GCZONE_DEST,
 					       "aux destination",
 					       &bvbltparams->src2auxdstrect,
 					       &dstrectaux);
@@ -1567,7 +1582,7 @@ enum bverror parse_destination(struct bvbltparams *bvbltparams,
 			batch->dstclipped = *dstrect;
 			if (haveaux)
 				/* Convert and validate aux rectangle. */
-				GCCONVERT_RECT(GCZONE_DEST, BVERR_DSTRECT,
+				GCCONVERT_RECT(GCZONE_DEST,
 					       "aux destination",
 					       &bvbltparams->src2auxdstrect,
 					       &batch->dstclippedaux);
@@ -1583,6 +1598,16 @@ enum bverror parse_destination(struct bvbltparams *bvbltparams,
 		      batch->dstclipped.left,
 		      batch->dstclipped.bottom -
 		      batch->dstclipped.top);
+
+		/* Check for valid dest rect after clipping. */
+		if (batch->dstclipped.left < 0 ||
+		    batch->dstclipped.top < 0 ||
+		    batch->dstclipped.right > dstinfo->geom->width ||
+		    batch->dstclipped.bottom > dstinfo->geom->height) {
+			BVSETBLTERROR(BVERR_DSTRECT,
+				      "destination rect invalid");
+			goto exit;
+		}
 
 		if (haveaux)
 			GCDBG(GCZONE_DEST,
@@ -1620,9 +1645,6 @@ enum bverror parse_source(struct bvbltparams *bvbltparams,
 
 	/* Convert the rectangle. */
 	GCCONVERT_RECT(GCZONE_SRC,
-		       (srcinfo->index == 0)
-				? BVERR_SRC1GEOM_FORMAT
-				: BVERR_SRC2GEOM_FORMAT,
 		       "source", srcrect, &srcinfo->rect);
 
 	/* Parse the source format. */
