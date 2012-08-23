@@ -72,21 +72,45 @@
 
 static struct gpio_led panda5_gpio_leds[] = {
 	{
-		.name	= "blue",
-		.default_trigger = "timer",
-		.gpio	= OMAP_MPUIO(19),
+		.name			= "blue",
+		.default_trigger	= "timer",
+		.gpio			= OMAP_MPUIO(19),
 	},
 	{
-		.name	= "red",
-		.default_trigger = "timer",
-		.gpio	= OMAP_MPUIO(17),
+		.name			= "red",
+		.default_trigger	= "timer",
+		.gpio			= OMAP_MPUIO(17),
 	},
 	{
-		.name	= "green",
-		.default_trigger = "timer",
-		.gpio	= OMAP_MPUIO(18),
+		.name			= "green",
+		.default_trigger	= "timer",
+		.gpio			= OMAP_MPUIO(18),
 	},
-
+	{
+		.name			= "panda5::status1",
+		.default_trigger	= "heartbeat",
+		.gpio			= OMAP_MPUIO(2),
+	},
+	{
+		.name			= "panda5::status2",
+		.default_trigger	= "mmc0",
+		.gpio			= OMAP_MPUIO(3),
+	},
+	{
+		.name			= "panda5::status3",
+		.default_trigger	= "none",
+		.gpio			= OMAP_MPUIO(4),
+	},
+	{
+		.name			= "panda5::status4",
+		.default_trigger	= "none",
+		.gpio			= OMAP_MPUIO(5),
+	},
+	{
+		.name			= "panda5::status5",
+		.default_trigger	= "none",
+		.gpio			= OMAP_MPUIO(6),
+	},
 };
 
 static struct gpio_led_platform_data panda5_led_data = {

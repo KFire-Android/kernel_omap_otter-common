@@ -305,7 +305,8 @@ long omap2_dpll_round_rate(struct clk *clk, unsigned long target_rate)
 	pr_debug("clock: %s: starting DPLL round_rate, target rate %ld\n",
 		 clk->name, target_rate);
 
-	scaled_rt_rp = target_rate / (dd->clk_ref->rate / DPLL_SCALE_FACTOR);
+	scaled_rt_rp = DIV_ROUND_CLOSEST(target_rate,
+			dd->clk_ref->rate / DPLL_SCALE_FACTOR);
 	scaled_max_m = dd->max_multiplier * DPLL_SCALE_FACTOR;
 
 	dd->last_rounded_rate = 0;
