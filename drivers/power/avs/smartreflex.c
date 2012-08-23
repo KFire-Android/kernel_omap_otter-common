@@ -1226,6 +1226,7 @@ static int sr_suspend(struct device *dev)
 {
 	struct omap_sr_data *pdata;
 	struct omap_sr *sr_info;
+	int ret = 0;
 
 	pdata = dev_get_platdata(dev);
 	if (!pdata) {
@@ -1245,18 +1246,23 @@ static int sr_suspend(struct device *dev)
 	if (sr_info->suspended)
 		return 0;
 
-	sr_info->suspended =  true;
-	/* Flag the same info to the other CPUs */
-	smp_wmb();
+	if (sr_class->suspend)
+		ret = sr_class->suspend(sr_info);
 
-	return 0;
+	if (!ret) {
+		sr_info->suspended =  true;
+		/* Flag the same info to the other CPUs */
+		smp_wmb();
+	}
+
+	return ret;
 }
 
 static int sr_resume(struct device *dev)
 {
-
 	struct omap_sr_data *pdata;
 	struct omap_sr *sr_info;
+	int ret = 0;
 
 	pdata = dev_get_platdata(dev);
 	if (!pdata) {
@@ -1276,11 +1282,16 @@ static int sr_resume(struct device *dev)
 	if (!sr_info->suspended)
 		return 0;
 
-	sr_info->suspended =  false;
-	/* Flag the same info to the other CPUs */
-	smp_wmb();
+	if (sr_class->resume)
+		ret = sr_class->resume(sr_info);
 
-	return 0;
+	if (!ret) {
+		sr_info->suspended =  false;
+		/* Flag the same info to the other CPUs */
+		smp_wmb();
+	}
+
+	return ret;
 }
 
 static SIMPLE_DEV_PM_OPS(serial_omap_dev_pm_ops, sr_suspend, sr_resume);

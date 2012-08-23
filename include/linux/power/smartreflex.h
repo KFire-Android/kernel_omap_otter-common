@@ -274,6 +274,8 @@ struct omap_sr_class_data {
 	int (*disable)(struct omap_sr *sr, int is_volt_reset);
 	int (*init)(struct omap_sr *sr, void *class_priv_data);
 	int (*deinit)(struct omap_sr *sr, void *class_priv_data);
+	int (*suspend)(struct omap_sr *sr);
+	int (*resume)(struct omap_sr *sr);
 	int (*configure)(struct omap_sr *sr);
 	int (*notify)(struct omap_sr *sr, u32 status);
 	u8 notify_flags;
