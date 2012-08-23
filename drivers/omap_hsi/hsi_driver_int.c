@@ -821,16 +821,23 @@ static void do_hsi_tasklet(unsigned long hsi_port)
 	struct hsi_port *pport = (struct hsi_port *)hsi_port;
 	struct hsi_dev *hsi_ctrl = pport->hsi_controller;
 	u32 status_reg;
+	int err;
 
 	dev_dbg(hsi_ctrl->dev, "Int Tasklet : clock_enabled=%d\n",
 		hsi_ctrl->clock_enabled);
 	spin_lock(&hsi_ctrl->lock);
-	hsi_clocks_enable(hsi_ctrl->dev, __func__);
+	err = hsi_clocks_enable(hsi_ctrl->dev, __func__);
+	if ((err < 0) && (err != -EEXIST)) {
+		dev_err(hsi_ctrl->dev, "%s: hsi_clocks_enable error = %d\n",
+			__func__, err);
+		goto rback;
+	}
 	pport->in_int_tasklet = true;
 
 	status_reg = hsi_process_int_event(pport);
 
 	pport->in_int_tasklet = false;
+rback:
 	clear_bit(HSI_FLAGS_TASKLET_LOCK, &pport->flags);
 	hsi_clocks_disable(hsi_ctrl->dev, __func__);
 	spin_unlock(&hsi_ctrl->lock);
