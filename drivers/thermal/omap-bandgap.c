@@ -1612,13 +1612,6 @@ void omap_bandgap_prepare_for_idle(void)
 void omap_bandgap_resume_after_idle(void)
 {
 	u8 i;
-	/*
-	 * If the System-wide Suspend/Resume is initiated, then clocks
-	 * are taken care by the suspend/resume handlers. Hence nothing
-	 * todo in the notifiers, so just return.
-	 */
-	if (g_bg_ptr->bg_in_suspend)
-		return;
 
 	/* Enable clock for sensor, if it was disabled during idle */
 	if (g_bg_ptr->bg_clk_idle) {
