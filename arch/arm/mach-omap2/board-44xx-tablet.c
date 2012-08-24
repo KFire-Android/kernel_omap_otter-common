@@ -55,6 +55,45 @@
 #define FIXED_REG_VWLAN_ID		1
 #define TPS62361_GPIO			7
 
+static struct gpio_led tablet_gpio_leds[] = {
+	{
+		.name	= "green",
+		.default_trigger = "timer",
+		.gpio	= 174,
+	},
+	{
+		.name	= "blue",
+		.default_trigger = "timer",
+		.gpio	= 169,
+	},
+	{
+		.name	= "red",
+		.default_trigger = "timer",
+		.gpio	= 170,
+	},
+	{
+		.name	= "user:gp_4:green",
+		.gpio	= 50,
+	},
+	{
+		.name	= "user:gp_1:green",
+		.gpio	= 173,
+	},
+};
+
+static struct gpio_led_platform_data tablet_led_data = {
+	.leds	= tablet_gpio_leds,
+	.num_leds = ARRAY_SIZE(tablet_gpio_leds),
+};
+
+static struct platform_device tablet_leds_gpio = {
+	.name	= "leds-gpio",
+	.id	= -1,
+	.dev	= {
+		.platform_data = &tablet_led_data,
+	},
+};
+
 static struct led_pwm tablet_pwm_leds[] = {
 	{
 		.name		= "omap4:green:chrg",
@@ -181,12 +220,13 @@ static struct platform_device tablet_abe_audio = {
 };
 
 static struct platform_device *tablet_devices[] __initdata = {
-	&tablet_leds_pwm,
 	&tablet_vbat,
 	&tablet_dmic_codec,
 	&tablet_spdif_dit_codec,
 	&tablet_abe_audio,
 	&tablet_hdmi_audio_codec,
+	&tablet_leds_gpio,
+	&tablet_leds_pwm
 };
 
 static struct omap_musb_board_data musb_board_data = {
@@ -398,7 +438,6 @@ static void __init omap_tablet_init(void)
 	omap_serial_init();
 	omap_sdrc_init(NULL, NULL);
 	omap4_twl6030_hsmmc_init(mmc);
-
 	usb_musb_init(&musb_board_data);
 
 	status = omap_ethernet_init();
