@@ -325,7 +325,7 @@ void omap_idle_core_notifier(int mpu_next_state, int core_next_state)
 		return;
 	}
 
-	if (core_next_state != PWRDM_POWER_ON)
+	if (!is_suspend && core_next_state != PWRDM_POWER_ON)
 		omap2_gpio_prepare_for_idle(1);
 
 	/*
@@ -372,7 +372,7 @@ void omap_enable_core_notifier(int mpu_next_state, int core_next_state)
 		return;
 	}
 
-	if (core_next_state != PWRDM_POWER_ON)
+	if (!is_suspend && core_next_state != PWRDM_POWER_ON)
 		omap2_gpio_resume_after_idle();
 
 	/* Coming out of Idle, start monitoring the thermal. */
