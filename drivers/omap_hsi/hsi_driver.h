@@ -236,6 +236,8 @@ struct hsi_platform_data {
 	bool (*wakeup_is_from_hsi) (int *hsi_port);
 	int (*board_suspend)(int hsi_port, bool dev_may_wakeup);
 	int (*board_resume)(int hsi_port, bool dev_may_wakeup);
+	int (*runtime_suspend_helper)(struct device *dev);
+	int (*runtime_resume_helper)(struct device *dev);
 	u8 num_ports;
 	struct hsi_ctrl_ctx *ctx;
 	u8 hsi_gdd_chan_count;
@@ -322,7 +324,7 @@ void hsi_set_pm_default(struct hsi_dev *hsi_ctrl);
 int hsi_softreset(struct hsi_dev *hsi_ctrl);
 void hsi_softreset_driver(struct hsi_dev *hsi_ctrl);
 
-void hsi_clocks_disable_channel(struct device *dev, u8 channel_number,
+int hsi_clocks_disable_channel(struct device *dev, u8 channel_number,
 				const char *s);
 int hsi_clocks_enable_channel(struct device *dev, u8 channel_number,
 				const char *s);
@@ -424,9 +426,9 @@ static inline int hsi_get_cawake(struct hsi_port *port)
 		return -ENXIO;
 }
 
-static inline void hsi_clocks_disable(struct device *dev, const char *s)
+static inline int hsi_clocks_disable(struct device *dev, const char *s)
 {
-	hsi_clocks_disable_channel(dev, HSI_CH_NUMBER_NONE, s);
+	return hsi_clocks_disable_channel(dev, HSI_CH_NUMBER_NONE, s);
 }
 
 static inline int hsi_clocks_enable(struct device *dev, const char *s)
