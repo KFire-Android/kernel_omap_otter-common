@@ -52,7 +52,7 @@ struct omap_abe_data {
 	int twl6040_power_mode;
 	int mcbsp_cfg;
 	struct snd_soc_platform *abe_platform;
-	struct twl6040 *twl6040;
+	struct snd_soc_codec *twl6040_codec;
 	struct i2c_client *tps6130x;
 	struct i2c_adapter *adapter;
 };
@@ -266,7 +266,8 @@ static int omap_abe_dmic_startup(struct snd_pcm_substream *substream)
 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
 	struct snd_soc_card *card = rtd->card;
 	struct omap_abe_data *card_data = snd_soc_card_get_drvdata(card);
-	struct twl6040 *twl6040 = card_data->twl6040;
+	struct snd_soc_codec *codec = card_data->twl6040_codec;
+	struct twl6040 *twl6040 = codec->control_data;
 	int ret = 0;
 
 	/* twl6040 supplies DMic PAD_CLKS */
@@ -301,7 +302,8 @@ static void omap_abe_dmic_shutdown(struct snd_pcm_substream *substream)
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_card *card = rtd->card;
 	struct omap_abe_data *card_data = snd_soc_card_get_drvdata(card);
-	struct twl6040 *twl6040 = card_data->twl6040;
+	struct snd_soc_codec *codec = card_data->twl6040_codec;
+	struct twl6040 *twl6040 = codec->control_data;
 
 	twl6040_power(twl6040, 0);
 }
@@ -508,7 +510,7 @@ static int omap_abe_twl6040_init(struct snd_soc_pcm_runtime *rtd)
 	u32 hsotrim, left_offset, right_offset, step_mV;
 	int ret = 0;
 
-	card_data->twl6040 = codec->control_data;
+	card_data->twl6040_codec = codec;
 
 	/* Disable not connected paths if not used */
 	twl6040_disconnect_pin(dapm, pdata->has_hs, "Headset Stereophone");
