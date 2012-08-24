@@ -391,6 +391,8 @@ static void hdmi_hotplug_detect_worker(struct work_struct *work)
 			hdmi_notify_hpd(dssdev, false);
 			mutex_unlock(&hdmi.hdmi_lock);
 			dssdev->driver->disable(dssdev);
+			/* clear EDID and mode */
+			omapdss_hdmi_clear_edid();
 			mutex_lock(&hdmi.hdmi_lock);
 		}
 		goto done;
@@ -633,7 +635,7 @@ static struct omap_dss_driver hdmi_driver = {
 	.audio_detect	= hdmi_panel_audio_detect,
 	.audio_config	= hdmi_panel_audio_config,
 #endif
-	.s3d_enable_set	= NULL,
+	.s3d_enable_set	= hdmi_panel_3d_enable,
 	.s3d_enable_get	= hdmi_panel_3d_is_enabled,
 	.s3d_type_set	= hdmi_panel_3d_set_type,
 	.s3d_type_get	= hdmi_panel_3d_get_type,

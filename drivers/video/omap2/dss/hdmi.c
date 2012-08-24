@@ -1045,14 +1045,6 @@ void omapdss_hdmi_display_disable(struct omap_dss_device *dssdev)
 	hdmi.enabled = false;
 	hdmi.hdcp = false;
 
-	if (!dssdev->sync_lost_error
-		&& (dssdev->state != OMAP_DSS_DISPLAY_SUSPENDED)) {
-		/* clear EDID and mode on disable only */
-		hdmi.edid_set = false;
-		hdmi.custom_set = false;
-		pr_info("hdmi: clearing EDID info\n");
-	}
-
 	hdmi_power_off(dssdev);
 
 	if (dssdev->platform_disable)
@@ -1061,6 +1053,12 @@ void omapdss_hdmi_display_disable(struct omap_dss_device *dssdev)
 	omap_dss_stop_device(dssdev);
 done:
 	mutex_unlock(&hdmi.lock);
+}
+
+void omapdss_hdmi_clear_edid(void)
+{
+	hdmi.edid_set = false;
+	hdmi.custom_set = false;
 }
 
 static irqreturn_t hdmi_irq_handler(int irq, void *arg)
@@ -1322,6 +1320,8 @@ static int omapdss_hdmihw_probe(struct platform_device *pdev)
 	hdmi.ip_data.phy_offset = HDMI_PHY;
 
 	hdmi_panel_init();
+
+	hdmi.edid_set = false;
 
 	if (hdmi_get_current_hpd())
 		hdmi_panel_hpd_handler(1);
