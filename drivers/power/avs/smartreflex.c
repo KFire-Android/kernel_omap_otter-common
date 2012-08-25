@@ -27,6 +27,7 @@
 #include <linux/pm_runtime.h>
 #include <linux/power/smartreflex.h>
 #include <plat/voltage.h>
+#include <plat/dvfs.h>
 
 #define SMARTREFLEX_NAME_LEN	16
 #define NVALUE_NAME_LEN		40
@@ -214,8 +215,11 @@ static void sr_start_vddautocomp(struct omap_sr *sr)
 		return;
 	}
 
+	/* Pause DVFS from interfering with our operations */
+	mutex_lock(&omap_dvfs_lock);
 	if (!sr_class->enable(sr))
 		sr->autocomp_active = true;
+	mutex_unlock(&omap_dvfs_lock);
 }
 
 static void sr_stop_vddautocomp(struct omap_sr *sr)
@@ -228,8 +232,11 @@ static void sr_stop_vddautocomp(struct omap_sr *sr)
 	}
 
 	if (sr->autocomp_active) {
+		/* Pause DVFS from interfering with our operations */
+		mutex_lock(&omap_dvfs_lock);
 		sr_class->disable(sr, 1);
 		sr->autocomp_active = false;
+		mutex_unlock(&omap_dvfs_lock);
 	}
 }
 
