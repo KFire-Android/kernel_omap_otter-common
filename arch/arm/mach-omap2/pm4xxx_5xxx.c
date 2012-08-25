@@ -21,6 +21,7 @@
 #include <linux/io.h>
 #include <linux/gpio.h>
 #include <linux/mfd/omap_control.h>
+#include <linux/power/smartreflex.h>
 
 #include <plat/omap_device.h>
 #include <plat/dvfs.h>
@@ -59,6 +60,7 @@ u16 pm44xx_errata;
 static struct powerdomain *tesla_pwrdm;
 static struct clockdomain *tesla_clkdm;
 static struct powerdomain *gpu_pd;
+static struct voltagedomain *mpu_vdd, *core_vdd, *mm_vdd;
 
 /*
 * HSI - OMAP4430-2.2BUG00055:
@@ -321,6 +323,12 @@ void omap_idle_core_notifier(int mpu_next_state, int core_next_state)
 		pwrdm_power_state_le(core_next_state, PWRDM_POWER_INACTIVE))
 		omap_bandgap_prepare_for_idle();
 
+	if (pwrdm_power_state_lt(mpu_next_state, PWRDM_POWER_INACTIVE))
+		omap_sr_disable(mpu_vdd);
+	if (pwrdm_power_state_lt(core_next_state, PWRDM_POWER_INACTIVE)) {
+		omap_sr_disable(core_vdd);
+		omap_sr_disable(mm_vdd);
+	}
 }
 
 /**
@@ -343,6 +351,12 @@ void omap_enable_core_notifier(int mpu_next_state, int core_next_state)
 		pwrdm_power_state_le(core_next_state, PWRDM_POWER_INACTIVE))
 		omap_bandgap_resume_after_idle();
 
+	if (pwrdm_power_state_lt(mpu_next_state, PWRDM_POWER_INACTIVE))
+		omap_sr_enable(mpu_vdd);
+	if (pwrdm_power_state_lt(core_next_state, PWRDM_POWER_INACTIVE)) {
+		omap_sr_enable(core_vdd);
+		omap_sr_enable(mm_vdd);
+	}
 }
 
 static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
@@ -738,6 +752,27 @@ static int __init omap_pm_init(void)
 		goto err2;
 	}
 
+	mpu_vdd = voltdm_lookup("mpu");
+	if (!mpu_vdd) {
+		pr_err("Failed to lookup MPU voltage domain\n");
+		goto err2;
+	}
+
+	core_vdd = voltdm_lookup("core");
+	if (!core_vdd) {
+		pr_err("Failed to lookup CORE voltage domain\n");
+		goto err2;
+	}
+
+	if (cpu_is_omap54xx())
+		mm_vdd = voltdm_lookup("mm");
+	else
+		mm_vdd = voltdm_lookup("iva");
+	if (!mm_vdd) {
+		pr_err("Failed to lookup Multimedia(iva) voltage domain\n");
+		goto err2;
+	}
+
 	(void) clkdm_for_each(omap_pm_clkdms_setup, NULL);
 
 	/*
@@ -808,7 +843,6 @@ static int __init omap_pm_init(void)
 	} else if (cpu_is_omap54xx()) {
 		omap5_idle_init();
 	}
-
 
 err2:
 	return ret;

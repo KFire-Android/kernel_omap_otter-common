@@ -17,12 +17,12 @@
  * published by the Free Software Foundation.
  */
 
-#ifndef __ASM_ARM_OMAP_SMARTREFLEX_H
-#define __ASM_ARM_OMAP_SMARTREFLEX_H
+#ifndef __POWER_SMARTREFLEX_H
+#define __POWER_SMARTREFLEX_H
 
+#include <linux/types.h>
+#include <linux/delay.h>
 #include <linux/platform_device.h>
-
-#include "voltage.h"
 
 /*
  * Different Smartreflex IPs version. The v1 is the 65nm version used in
@@ -50,6 +50,11 @@
 #define IRQENABLE_CLR		0x30
 #define SENERROR_V2		0x34
 #define ERRCONFIG_V2		0x38
+#define LVTSENVAL		0x3C
+#define LVTSENMIN		0x40
+#define LVTSENMAX		0x44
+#define LVTSENAVG		0x48
+#define LVTNVALUERECIPROCAL	0x4C
 
 /* Bit/Shift Positions */
 
@@ -63,11 +68,16 @@
 #define SRCONFIG_CLKCTRL_SHIFT		0
 
 #define SRCONFIG_ACCUMDATA_MASK		(0x3ff << 22)
+#define SRCONFIG_LVTSENNENABLE_MASK	(1 << 3)
+#define SRCONFIG_LVTSENPENABLE_MASK	(1 << 2)
 
 #define SRCONFIG_SRENABLE		BIT(11)
 #define SRCONFIG_SENENABLE		BIT(10)
 #define SRCONFIG_ERRGEN_EN		BIT(9)
 #define SRCONFIG_MINMAXAVG_EN		BIT(8)
+#define SRCONFIG_LVTSENENABLE		BIT(4)
+#define SRCONFIG_LVTSENNENABLE		BIT(3)
+#define SRCONFIG_LVTSENPENABLE		BIT(2)
 #define SRCONFIG_DELAYCTRL		BIT(2)
 
 /* AVGWEIGHT */
@@ -142,6 +152,79 @@
 #define OMAP3430_SR_ERRWEIGHT		0x04
 #define OMAP3430_SR_ERRMAXLIMIT		0x02
 
+/*
+ * 54xx specific values.
+ */
+#define OMAP54XX_SR_ACCUMDATA		0x80
+#define OMAP54XX_SR2_SENPAVGWEIGHT	0x04
+#define OMAP54XX_SR2_SENNAVGWEIGHT	0x04
+
+struct voltagedomain;
+struct omap_volt_data;
+
+struct omap_sr_ops;
+
+struct omap_sr {
+	char				*name;
+	struct list_head		node;
+	struct platform_device		*pdev;
+	struct omap_sr_nvalue_table	*nvalue_table;
+	struct omap_sr_nvalue_table	*lvt_nvalue_table;
+	struct voltagedomain		*voltdm;
+	struct dentry			*dbg_dir;
+	unsigned int			irq;
+	int				srid;
+	int				ip_type;
+	int				nvalue_count;
+	int				lvt_nvalue_count;
+	bool				autocomp_active;
+	bool				suspended;
+	bool				lvt_sensor;
+	u32				clk_length;
+	u32				err_weight;
+	u32				err_minlimit;
+	u32				err_maxlimit;
+	u32				accum_data;
+	u32				senn_avgweight;
+	u32				senp_avgweight;
+	u32				senp_mod;
+	u32				senn_mod;
+	void __iomem			*base;
+	struct omap_sr_ops		*ops;
+};
+
+/**
+ * struct omap_sr_ops - SmartReflex platform specific operations
+ * @get:	Get the required clocks no matter what context we run from
+ * @put:	release the required clocks no matter what context we run from
+ */
+struct omap_sr_ops {
+	int (*get) (struct omap_sr *sr);
+	int (*put) (struct omap_sr *sr);
+};
+
+/**
+ * test_cond_timeout - busy-loop, testing a condition
+ * @cond: condition to test until it evaluates to true
+ * @timeout: maximum number of microseconds in the timeout
+ * @index: loop index (integer)
+ *
+ * Loop waiting for @cond to become true or until at least @timeout
+ * microseconds have passed.  To use, define some integer @index in the
+ * calling code.  After running, if @index == @timeout, then the loop has
+ * timed out.
+ *
+ * Copied from omap_test_timeout
+ */
+#define sr_test_cond_timeout(cond, timeout, index)		\
+({								\
+	for (index = 0; index < timeout; index++) {		\
+		if (cond)					\
+			break;					\
+		udelay(1);					\
+	}							\
+})
+
 /**
  * struct omap_sr_pmic_data - Strucutre to be populated by pmic code to pass
  *				pmic specific info to smartreflex driver
@@ -161,7 +244,7 @@ struct omap_smartreflex_dev_attr {
 	const char      *sensor_voltdm_name;
 };
 
-#ifdef CONFIG_OMAP_SMARTREFLEX
+#ifdef CONFIG_POWER_AVS_OMAP
 /*
  * The smart reflex driver supports CLASS1 CLASS2 and CLASS3 SR.
  * The smartreflex class driver should pass the class type.
@@ -186,11 +269,10 @@ struct omap_smartreflex_dev_attr {
  *			based decisions.
  */
 struct omap_sr_class_data {
-	int (*enable)(struct voltagedomain *voltdm,
-			struct omap_volt_data *volt_data);
-	int (*disable)(struct voltagedomain *voltdm, int is_volt_reset);
-	int (*configure)(struct voltagedomain *voltdm);
-	int (*notify)(struct voltagedomain *voltdm, u32 status);
+	int (*enable)(struct omap_sr *sr);
+	int (*disable)(struct omap_sr *sr, int is_volt_reset);
+	int (*configure)(struct omap_sr *sr);
+	int (*notify)(struct omap_sr *sr, u32 status);
 	u8 notify_flags;
 	u8 class_type;
 };
@@ -198,40 +280,54 @@ struct omap_sr_class_data {
 /**
  * struct omap_sr_nvalue_table	- Smartreflex n-target value info
  *
- * @efuse_offs:	The offset of the efuse where n-target values are stored.
- * @nvalue:	The n-target value.
+ * @efuse_offs:	  The offset of the efuse where n-target values are stored.
+ * @nvalue:	  The n-target value.
+ * @errminlimit:  The value of the ERRMINLIMIT bitfield for this n-target
+ * @volt_nominal: microvolts DC that the VDD is initially programmed to
  */
 struct omap_sr_nvalue_table {
 	u32 efuse_offs;
 	u32 nvalue;
+	u32 errminlimit;
+	unsigned long volt_nominal;
 };
 
 /**
  * struct omap_sr_data - Smartreflex platform data.
  *
+ * @name:		instance name
  * @ip_type:		Smartreflex IP type.
  * @senp_mod:		SENPENABLE value for the sr
  * @senn_mod:		SENNENABLE value for sr
  * @nvalue_count:	Number of distinct nvalues in the nvalue table
  * @enable_on_init:	whether this sr module needs to enabled at
  *			boot up or not.
+ * @lvt_sensor:		Flag to check whether LVT Sensor is enabled.
  * @nvalue_table:	table containing the  efuse offsets and nvalues
  *			corresponding to them.
+ * @lvt_nvalue_count:	Number of distinct LVT nvlaues
+ * @lvt_nvalue_table:	table containing the LVT efuse offsets and LVT nvalues
+ *			corresponding to them.
  * @voltdm:		Pointer to the voltage domain associated with the SR
+ * @ops:		Operations for SmartReflex
  */
 struct omap_sr_data {
+	const char			*name;
 	int				ip_type;
 	u32				senp_mod;
 	u32				senn_mod;
 	int				nvalue_count;
+	int                             lvt_nvalue_count;
 	bool				enable_on_init;
+	bool				lvt_sensor;
 	struct omap_sr_nvalue_table	*nvalue_table;
+	struct omap_sr_nvalue_table     *lvt_nvalue_table;
 	struct voltagedomain		*voltdm;
+	struct omap_sr_ops		*ops;
 };
 
 /* Smartreflex module enable/disable interface */
-void omap_sr_enable(struct voltagedomain *voltdm,
-			struct omap_volt_data *volt_data);
+void omap_sr_enable(struct voltagedomain *voltdm);
 void omap_sr_disable(struct voltagedomain *voltdm);
 void omap_sr_disable_reset_volt(struct voltagedomain *voltdm);
 
@@ -239,7 +335,7 @@ void omap_sr_disable_reset_volt(struct voltagedomain *voltdm);
 void omap_sr_register_pmic(struct omap_sr_pmic_data *pmic_data);
 
 /* Smartreflex driver hooks to be called from Smartreflex class driver */
-int sr_enable(struct voltagedomain *voltdm, struct omap_volt_data *volt_data);
+int sr_enable(struct voltagedomain *voltdm, unsigned long volt);
 void sr_disable(struct voltagedomain *voltdm);
 int sr_configure_errgen(struct voltagedomain *voltdm);
 int sr_disable_errgen(struct voltagedomain *voltdm);
@@ -248,8 +344,7 @@ int sr_configure_minmax(struct voltagedomain *voltdm);
 /* API to register the smartreflex class driver with the smartreflex driver */
 int sr_register_class(struct omap_sr_class_data *class_data);
 #else
-static inline  void omap_sr_enable(struct voltagedomain *voltdm,
-			struct omap_volt_data *volt_data) {}
+static inline void omap_sr_enable(struct voltagedomain *voltdm) {}
 static inline void omap_sr_disable(struct voltagedomain *voltdm) {}
 static inline void omap_sr_disable_reset_volt(
 		struct voltagedomain *voltdm) {}

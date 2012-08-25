@@ -26,19 +26,15 @@ static const struct omap_vfsm_instance omap5_vdd_mpu_vfsm = {
 	.voltsetup_off_reg = OMAP54XX_PRM_VOLTSETUP_MPU_OFF_OFFSET,
 };
 
-static struct omap_vdd_info omap5_vdd_mpu_info;
-
 static const struct omap_vfsm_instance omap5_vdd_mm_vfsm = {
 	.voltsetup_reg = OMAP54XX_PRM_VOLTSETUP_MM_RET_SLEEP_OFFSET,
 	.voltsetup_off_reg = OMAP54XX_PRM_VOLTSETUP_MM_OFF_OFFSET,
 };
-static struct omap_vdd_info omap5_vdd_mm_info;
 
 static const struct omap_vfsm_instance omap5_vdd_core_vfsm = {
 	.voltsetup_reg = OMAP54XX_PRM_VOLTSETUP_CORE_RET_SLEEP_OFFSET,
 	.voltsetup_off_reg = OMAP54XX_PRM_VOLTSETUP_CORE_OFF_OFFSET,
 };
-static struct omap_vdd_info omap5_vdd_core_info;
 
 static struct voltagedomain omap5_voltdm_mpu = {
 	.name = "mpu",
@@ -49,7 +45,6 @@ static struct voltagedomain omap5_voltdm_mpu = {
 	.vc = &omap5_vc_mpu,
 	.vfsm = &omap5_vdd_mpu_vfsm,
 	.vp = &omap5_vp_mpu,
-	.vdd = &omap5_vdd_mpu_info,
 	.auto_ret = true,
 };
 
@@ -62,7 +57,6 @@ static struct voltagedomain omap5_voltdm_mm = {
 	.vc = &omap5_vc_mm,
 	.vfsm = &omap5_vdd_mm_vfsm,
 	.vp = &omap5_vp_mm,
-	.vdd = &omap5_vdd_mm_info,
 	/* disable auto_ret for mm domain due to known issues */
 	.auto_ret = false,
 };
@@ -76,7 +70,6 @@ static struct voltagedomain omap5_voltdm_core = {
 	.vc = &omap5_vc_core,
 	.vfsm = &omap5_vdd_core_vfsm,
 	.vp = &omap5_vp_core,
-	.vdd = &omap5_vdd_core_info,
 	.auto_ret = true,
 };
 
@@ -106,18 +99,18 @@ void __init omap54xx_voltagedomains_init(void)
 #ifdef CONFIG_PM_OPP
 	if (omap_rev() == OMAP5430_REV_ES1_0) {
 		omap5_voltdm_mpu.volt_data = omap5430_vdd_mpu_volt_data;
-		omap5_vdd_mpu_info.dep_vdd_info = omap5430_vddmpu_dep_info;
+		omap5_voltdm_mpu.dep_vdd_info = omap5430_vddmpu_dep_info;
 
 		omap5_voltdm_mm.volt_data = omap5430_vdd_mm_volt_data;
-		omap5_vdd_mm_info.dep_vdd_info = omap5430_vddmm_dep_info;
+		omap5_voltdm_mm.dep_vdd_info = omap5430_vddmm_dep_info;
 
 		omap5_voltdm_core.volt_data = omap5430_vdd_core_volt_data;
 	} else if (omap_rev() == OMAP5432_REV_ES1_0) {
 		omap5_voltdm_mpu.volt_data = omap5432_vdd_mpu_volt_data;
-		omap5_vdd_mpu_info.dep_vdd_info = omap5432_vddmpu_dep_info;
+		omap5_voltdm_mpu.dep_vdd_info = omap5432_vddmpu_dep_info;
 
 		omap5_voltdm_mm.volt_data = omap5432_vdd_mm_volt_data;
-		omap5_vdd_mm_info.dep_vdd_info = omap5432_vddmm_dep_info;
+		omap5_voltdm_mm.dep_vdd_info = omap5432_vddmm_dep_info;
 
 		omap5_voltdm_core.volt_data = omap5432_vdd_core_volt_data;
 	}
