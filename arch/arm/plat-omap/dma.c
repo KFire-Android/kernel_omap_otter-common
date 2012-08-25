@@ -65,6 +65,7 @@ static u32 errata;
 static struct global_context_registers {
 	u32 irqenable_l0;
 	u32 gcr;
+	u32 sysc;
 } global_ctx_regs;
 
 struct dma_link_info {
@@ -1987,6 +1988,7 @@ void omap2_dma_context_save(void)
 
 	global_ctx_regs.irqenable_l0	= p->dma_read(IRQENABLE_L0, 0);
 	global_ctx_regs.gcr		= p->dma_read(GCR, 0);
+	global_ctx_regs.sysc		= p->dma_read(OCP_SYSCONFIG, 0);
 
 	for (ch = 0; ch < dma_chan_count; ch++) {
 		if (dma_chan[ch].dev_id == -1)
@@ -2003,6 +2005,7 @@ void omap2_dma_context_restore(void)
 
 	p->dma_write(global_ctx_regs.gcr, GCR, 0);
 	p->dma_write(global_ctx_regs.irqenable_l0, IRQENABLE_L0, 0);
+	p->dma_write(global_ctx_regs.sysc, OCP_SYSCONFIG, 0);
 
 	for (ch = 0; ch < dma_chan_count; ch++) {
 		if (dma_chan[ch].dev_id == -1)
@@ -2014,7 +2017,6 @@ void omap2_dma_context_restore(void)
 
 	if (IS_DMA_ERRATA(DMA_ROMCODE_BUG))
 		p->dma_write(0x3 , IRQSTATUS_L0, 0);
-
 }
 
 static int __devinit omap_system_dma_probe(struct platform_device *pdev)
@@ -2162,7 +2164,6 @@ static int omap_dma_suspend(struct device *dev)
 		p->dma_context_save();
 
 	return 0;
-
 }
 
 static int omap_dma_resume(struct device *dev)
