@@ -14,7 +14,7 @@
 #ifndef __ARCH_ARM_MACH_OMAP2_DVFS_H
 #define __ARCH_ARM_MACH_OMAP2_DVFS_H
 
-#ifdef CONFIG_CPU_FREQ
+#ifdef CONFIG_PM
 #include <linux/mutex.h>
 extern struct mutex omap_dvfs_lock;
 

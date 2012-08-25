@@ -348,6 +348,7 @@ void __init omap5xxx_check_features(void)
 	    ((omap_ctrl_readl(OMAP5_DIE_ID2_OFFSET) >> 8) & 0xff) >= 0x8) {
 		omap_features |= OMAP5_HAS_OPP_HIGH;
 		omap_features |= OMAP5_HAS_AUTO_RET;
+		omap_features |= OMAP5_HAS_AVS;
 	}
 }
 

@@ -575,18 +575,21 @@ static int bq27x00_powersupply_init(struct bq27x00_device_info *di)
 	bool battery_present;
 	/*
 	 * Get the current consumption by battery. If it is 0mA
-	 * either battery is not connected or battery is full
+	 * or a small leaking current of 100mA either battery is
+	 * not connected or battery is full
 	 */
 	ret = bq27x00_battery_current(di, &curr_val);
 	if (ret) {
 		dev_err(di->dev, "failed to get battery current: %d\n", ret);
 		return ret;
 	}
-	if (!curr_val.intval) {
+
+	if (curr_val.intval < 100000) {
 		/*
-		 * In case current is 0mA then check if voltage is more than
-		 * 3.9V in that case we are supplying from battery
-		 * as LDO is capable of supplying less than or equal to 3.7V
+		 * In case current is less than 100mA then check if
+		 * voltage is more than 3.9V in that case we are
+		 * supplying from battery as LDO is capable of
+		 * supplying less than or equal to 3.7V
 		 */
 		ret = bq27x00_battery_voltage(di, &volt_val);
 		if (ret) {
@@ -598,7 +601,7 @@ static int bq27x00_powersupply_init(struct bq27x00_device_info *di)
 		else
 			battery_present = false; /* Voltage is less than 4V */
 	} else {
-		battery_present = true; /* Current is non-zero value */
+		battery_present = true; /* Current is non-zero or no leak */
 	}
 
 	if (battery_present) {

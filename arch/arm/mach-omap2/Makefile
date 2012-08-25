@@ -66,15 +66,13 @@ obj-$(CONFIG_ARCH_OMAP4)		+= opp4xxx_data.o
 obj-$(CONFIG_ARCH_OMAP5)		+= opp5xxx_data.o
 endif
 
-# CPUFREQ driver
-obj-$(CONFIG_CPU_FREQ)                  += dvfs.o
-
 # Power Management
 ifeq ($(CONFIG_PM),y)
-omap-4-5-common-pm			= pm4xxx_5xxx.o omap-mpuss-lowpower.o
+omap-4-5-common-pm			= pm4xxx_5xxx.o omap-mpuss-lowpower.o \
+					  dvfs.o
 obj-$(CONFIG_ARCH_OMAP2)		+= pm24xx.o
 obj-$(CONFIG_ARCH_OMAP2)		+= sleep24xx.o
-obj-$(CONFIG_ARCH_OMAP3)		+= pm34xx.o sleep34xx.o
+obj-$(CONFIG_ARCH_OMAP3)		+= pm34xx.o sleep34xx.o dvfs.o
 obj-$(CONFIG_ARCH_OMAP4)		+= $(omap-4-5-common-pm)
 obj-$(CONFIG_ARCH_OMAP5)		+= $(omap-4-5-common-pm)
 
@@ -88,8 +86,8 @@ obj-$(CONFIG_PM_DEBUG)			+= pm-debug.o
 ifeq ($(CONFIG_PM_DEBUG),y)
 obj-$(CONFIG_ARCH_OMAP5)		+= prcm-54xx-debug.o
 endif
-obj-$(CONFIG_OMAP_SMARTREFLEX)          += sr_device.o smartreflex.o
-obj-$(CONFIG_OMAP_SMARTREFLEX_CLASS3)	+= smartreflex-class3.o
+obj-$(CONFIG_POWER_AVS_OMAP)		+= sr_device.o
+obj-$(CONFIG_POWER_AVS_OMAP_CLASS3)    += smartreflex-class3.o
 
 AFLAGS_sleep24xx.o			:=-Wa,-march=armv6
 AFLAGS_sleep34xx.o			:=-Wa,-march=armv7-a$(plus_sec)
