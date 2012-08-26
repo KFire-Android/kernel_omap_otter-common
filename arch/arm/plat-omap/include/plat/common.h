@@ -37,4 +37,8 @@ extern int omap_dss_reset(struct omap_hwmod *);
 
 void omap_sram_init(void);
 
+extern struct meminfo meminfo;
+void omap_init_ram_size(void);
+phys_addr_t omap_total_ram_size(void);
+
 #endif /* __ARCH_ARM_MACH_OMAP_COMMON_H */

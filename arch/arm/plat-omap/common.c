@@ -31,6 +31,7 @@
 
 struct omap_board_config_kernel *omap_board_config __initdata;
 int omap_board_config_size;
+phys_addr_t omap4_total_ram_size;
 
 static const void *__init get_config(u16 tag, size_t len,
 		int skip, size_t *len_out)
@@ -80,4 +81,17 @@ void __init omap_init_consistent_dma_size(void)
 #ifdef CONFIG_FB_OMAP_CONSISTENT_DMA_SIZE
 	init_consistent_dma_size(CONFIG_FB_OMAP_CONSISTENT_DMA_SIZE << 20);
 #endif
+}
+
+void omap_init_ram_size(void)
+{
+	int i;
+
+	for (i = 0; i < meminfo.nr_banks; i++)
+		omap4_total_ram_size += meminfo.bank[i].size;
+}
+
+phys_addr_t omap_total_ram_size(void)
+{
+	return omap4_total_ram_size;
 }
