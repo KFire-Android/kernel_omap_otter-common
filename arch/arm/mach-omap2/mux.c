@@ -242,6 +242,25 @@ int __init omap_mux_get_by_name(const char *muxname,
 	return -ENODEV;
 }
 
+int omap_mux_enable_wkup(const char *muxname)
+{
+	struct omap_mux_partition *partition = NULL;
+	struct omap_mux *mux = NULL;
+	u16 old_mode;
+	int mux_mode;
+
+	mux_mode = omap_mux_get_by_name(muxname, &partition, &mux);
+	if (mux_mode < 0)
+		return mux_mode;
+	
+	old_mode = omap_mux_read(partition, mux->reg_offset);
+	old_mode |= OMAP_WAKEUP_EN;
+	pr_debug("%s: Setting signal %s 0x%04x -> 0x%04x\n",
+			__func__, muxname, old_mode, mux_mode);
+	omap_mux_write(partition, old_mode, mux->reg_offset);
+	return 0;
+}
+
 int __init omap_mux_init_signal(const char *muxname, int val)
 {
 	struct omap_mux_partition *partition = NULL;

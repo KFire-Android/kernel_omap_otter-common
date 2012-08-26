@@ -212,6 +212,13 @@ int omap_mux_init_gpio(int gpio, int val);
 int omap_mux_init_signal(const char *muxname, int val);
 
 /**
+ * omap_mux_enable_wkup - set/clear the pad wakup bit.
+ * @muxname:		Mux name in mode0_name.signal_name format
+ */
+int omap_mux_enable_wkup(const char *muxname);
+int omap_mux_disable_wkup(const char *muxname);
+
+/**
  * omap_hwmod_mux_init - initialize hwmod specific mux data
  * @bpads:		Board specific device signal names
  * @nr_pads:		Number of signal names for the device
@@ -245,6 +252,16 @@ static inline int omap_mux_init_gpio(int gpio, int val)
 	return 0;
 }
 static inline int omap_mux_init_signal(char *muxname, int val)
+{
+	return 0;
+}
+
+static inline int omap_mux_enable_wkup(const char *muxname)
+{
+	return 0;
+}
+
+static inline int omap_mux_disable_wkup(const char *muxname)
 {
 	return 0;
 }
