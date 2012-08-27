@@ -325,7 +325,7 @@ void omap_idle_core_notifier(int mpu_next_state, int core_next_state)
 		return;
 	}
 
-	if (core_next_state != PWRDM_POWER_ON)
+	if (!is_suspend && core_next_state != PWRDM_POWER_ON)
 		omap2_gpio_prepare_for_idle(1);
 
 	/*
@@ -333,8 +333,9 @@ void omap_idle_core_notifier(int mpu_next_state, int core_next_state)
 	 * Check for the GPU powerdomain and Core state before idling
 	 * the thermal.
 	 */
-	if (gpu_pd && (pwrdm_read_pwrst(gpu_pd) != PWRDM_POWER_ON) &&
-		pwrdm_power_state_le(core_next_state, PWRDM_POWER_INACTIVE))
+	if (!is_suspend && gpu_pd
+	     && (pwrdm_read_pwrst(gpu_pd) != PWRDM_POWER_ON)
+	     && pwrdm_power_state_le(core_next_state, PWRDM_POWER_INACTIVE))
 		omap_bandgap_prepare_for_idle();
 
 	if (pwrdm_power_state_lt(mpu_next_state, PWRDM_POWER_INACTIVE))
@@ -371,12 +372,13 @@ void omap_enable_core_notifier(int mpu_next_state, int core_next_state)
 		return;
 	}
 
-	if (core_next_state != PWRDM_POWER_ON)
+	if (!is_suspend && core_next_state != PWRDM_POWER_ON)
 		omap2_gpio_resume_after_idle();
 
 	/* Coming out of Idle, start monitoring the thermal. */
-	if (gpu_pd && (pwrdm_read_pwrst(gpu_pd) != PWRDM_POWER_ON) &&
-		pwrdm_power_state_le(core_next_state, PWRDM_POWER_INACTIVE))
+	if (!is_suspend && gpu_pd
+	    && (pwrdm_read_pwrst(gpu_pd) != PWRDM_POWER_ON)
+	    && pwrdm_power_state_le(core_next_state, PWRDM_POWER_INACTIVE))
 		omap_bandgap_resume_after_idle();
 
 	if (pwrdm_power_state_lt(mpu_next_state, PWRDM_POWER_INACTIVE))

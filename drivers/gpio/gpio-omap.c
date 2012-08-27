@@ -777,14 +777,16 @@ static void gpio_unmask_irq(struct irq_data *d)
 	if (trigger)
 		_set_gpio_triggering(bank, GPIO_INDEX(bank, gpio), trigger);
 
-	/* For level-triggered GPIOs, the clearing must be done after
-	 * the HW source is cleared, thus after the handler has run */
-	if (bank->level_mask & irq_mask) {
-		_set_gpio_irqenable(bank, gpio, 0);
-		_clear_gpio_irqstatus(bank, gpio);
-	}
-
 	_set_gpio_irqenable(bank, gpio, 1);
+	/*
+	 * For level-triggered GPIOs, the clearing must be done after
+	 * the HW source is cleared, thus after the handler has run.
+	 * Also, make sure to clear the status _after_ enabling the irq
+	 * so that pending event will be cleared.
+	 */
+	if (bank->level_mask & irq_mask)
+		_clear_gpio_irqstatus(bank, gpio);
+
 	spin_unlock_irqrestore(&bank->lock, flags);
 }
 
@@ -1415,24 +1417,54 @@ static int omap_gpio_runtime_resume(struct device *dev)
 void omap2_gpio_prepare_for_idle(int pwr_mode)
 {
 	struct gpio_bank *bank;
+	unsigned long flags;
+	u32 wake_low, wake_hi;
 
 	list_for_each_entry(bank, &omap_gpio_list, node) {
 		if (!bank->mod_usage || !bank->loses_context)
 			continue;
 
-		pm_runtime_put_sync_suspend(bank->dev);
+		spin_lock_irqsave(&bank->lock, flags);
+		/*
+		 * In idle path we leave GPIO in auto and not disable it hence
+		 * runtime suspend handler is not called which ensures that
+		 * level triggered GPIOs are changed to edge since GPIO block
+		 * can detect only edges when in idle. Put that logic here to
+		 * ensure that level events are not missed. This is restored
+		 * back on resume from idle
+		 */
+		wake_low = bank->context.leveldetect0 & bank->context.wake_en;
+		if (wake_low)
+			__raw_writel(wake_low | bank->context.fallingdetect,
+				bank->base + bank->regs->fallingdetect);
+		wake_hi = bank->context.leveldetect1 & bank->context.wake_en;
+		if (wake_hi)
+			__raw_writel(wake_hi | bank->context.risingdetect,
+				bank->base + bank->regs->risingdetect);
+
+		_gpio_dbck_disable(bank);
+		spin_unlock_irqrestore(&bank->lock, flags);
 	}
 }
 
 void omap2_gpio_resume_after_idle(void)
 {
 	struct gpio_bank *bank;
+	unsigned long flags;
 
 	list_for_each_entry(bank, &omap_gpio_list, node) {
 		if (!bank->mod_usage || !bank->loses_context)
 			continue;
 
-		pm_runtime_get_sync(bank->dev);
+		spin_lock_irqsave(&bank->lock, flags);
+		_gpio_dbck_enable(bank);
+
+		__raw_writel(bank->context.fallingdetect,
+			bank->base + bank->regs->fallingdetect);
+		__raw_writel(bank->context.risingdetect,
+			bank->base + bank->regs->risingdetect);
+
+		spin_unlock_irqrestore(&bank->lock, flags);
 	}
 }
 

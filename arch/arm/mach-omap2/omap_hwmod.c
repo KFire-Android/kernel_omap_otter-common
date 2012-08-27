@@ -1804,9 +1804,12 @@ static int _idle(struct omap_hwmod *oh)
 	if (oh->class->sysc)
 		_idle_sysc(oh);
 	_del_initiator_dep(oh, mpu_oh);
-	if (oh->clkdm && (oh->prcm.omap4.modulemode == MODULEMODE_HWCTRL)) {
+	if (oh->clkdm && oh->clkdm->flags &&
+	    (oh->clkdm->flags & CLKDM_CAN_ENABLE_AUTO) &&
+	    (oh->prcm.omap4.modulemode == MODULEMODE_HWCTRL)) {
 		/*
-		 * For modules with modulemode configured as "auto"
+		 * For modules with modulemode configured as "auto" and
+		 * if this clockdomain supports HW_AUTO mode
 		 * the clockdomain must be in SW_WKUP before disabling
 		 * a module completely.
 		 */
@@ -1925,10 +1928,12 @@ static int _shutdown(struct omap_hwmod *oh)
 	/* clocks and deps are already disabled in idle */
 	if (oh->_state == _HWMOD_STATE_ENABLED) {
 		_del_initiator_dep(oh, mpu_oh);
-		if (oh->clkdm &&
-		    oh->prcm.omap4.modulemode == MODULEMODE_HWCTRL) {
+		if (oh->clkdm && oh->clkdm->flags &&
+		    (oh->clkdm->flags & CLKDM_CAN_ENABLE_AUTO) &&
+		    (oh->prcm.omap4.modulemode == MODULEMODE_HWCTRL)) {
 			/*
-			 * For modules with modulemode configured as "auto"
+			 * For modules with modulemode configured as "auto" and
+			 * if this clockdomain supports HW_AUTO mode
 			 * the clockdomain must be in SW_WKUP before disabling
 			 * a module completely.
 			 */
