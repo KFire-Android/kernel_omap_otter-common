@@ -64,6 +64,11 @@ static unsigned int current_target_freq;
 static unsigned int current_cooling_level;
 static bool omap_cpufreq_ready;
 
+static unsigned int en_therm_freq_print;
+module_param(en_therm_freq_print, uint, 0644);
+MODULE_PARM_DESC(en_therm_freq_print,
+		"Enable Debug prints of CPU Freq change due to thermal");
+
 static unsigned int omap_getspeed(unsigned int cpu)
 {
 	unsigned long rate;
@@ -233,8 +238,9 @@ static void omap_thermal_step_freq_down(struct cpufreq_policy *policy)
 
 	max_thermal = omap_thermal_lower_speed();
 
-	pr_debug("%s: temperature too high, starting cpu throtling at max %u\n",
-		__func__, max_thermal);
+	if (en_therm_freq_print)
+		pr_info("%s: temperature too high, starting cpu throtling at max %u\n",
+			__func__, max_thermal);
 
 	cur = omap_getspeed(0);
 	if (cur > max_thermal)
@@ -249,8 +255,9 @@ static void omap_thermal_step_freq_up(struct cpufreq_policy *policy)
 
 	max_thermal = max_freq;
 
-	pr_debug("%s: temperature reduced, stepping up to %i\n",
-		__func__, current_target_freq);
+	if (en_therm_freq_print)
+		pr_info("%s: temperature reduced, stepping up to %i\n",
+			__func__, current_target_freq);
 
 	cur = omap_getspeed(0);
 	omap_cpufreq_scale(policy, current_target_freq, cur,
@@ -433,6 +440,7 @@ static int __init omap_cpufreq_init(void)
 
 	max_thermal = max_freq;
 	current_cooling_level = 0;
+	en_therm_freq_print = 0;
 
 	if (!ret)
 		ret = omap_cpufreq_cooling_init();
