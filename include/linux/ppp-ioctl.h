@@ -14,6 +14,11 @@
 #include <linux/compiler.h>
 
 /*
+ * Packet sizes
+ */
+#define	PPP_MTU		1500	/* Default MTU (size of Info field) */
+
+/*
  * Bit definitions for flags argument to PPPIOCGFLAGS/PPPIOCSFLAGS.
  */
 #define SC_COMP_PROT	0x00000001	/* protocol compression (output) */
