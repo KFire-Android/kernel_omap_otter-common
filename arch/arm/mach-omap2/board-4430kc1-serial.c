@@ -97,28 +97,48 @@ static struct omap_device_pad tablet_uart4_pads[] __initdata = {
 	},
 };
 
+static struct omap_board_data uart1_board_data __initdata = {
+	.id = 0,
+	.pads = tablet_uart1_pads,
+	.pads_cnt = ARRAY_SIZE(tablet_uart1_pads),
+};
+
+static struct omap_board_data uart2_board_data __initdata = {
+	.id = 1,
+	.pads = tablet_uart2_pads,
+	.pads_cnt = ARRAY_SIZE(tablet_uart2_pads),
+};
+
+static struct omap_board_data uart3_board_data __initdata = {
+	.id = 2,
+	.pads = tablet_uart3_pads,
+	.pads_cnt = ARRAY_SIZE(tablet_uart3_pads),
+};
+
+static struct omap_board_data uart4_board_data __initdata = {
+	.id = 3,
+	.pads = tablet_uart4_pads,
+	.pads_cnt = ARRAY_SIZE(tablet_uart4_pads),
+};
+
 static struct omap_uart_port_info tablet_uart_info_uncon __initdata = {
-	.use_dma	= 0,
-	.auto_sus_timeout = DEFAULT_AUTOSUSPEND_DELAY,
-	.wer = 0,
+	.dma_enabled = 0,
+	.autosuspend_timeout = -1,
+//	.wer = 0,
 };
 #endif
 
 static struct omap_uart_port_info tablet_uart_info __initdata = {
-	.use_dma	= 0,
-	.auto_sus_timeout = DEFAULT_AUTOSUSPEND_DELAY,
-	.wer = (OMAP_UART_WER_TX | OMAP_UART_WER_RX | OMAP_UART_WER_CTS),
+	.dma_enabled = 0,
+	.autosuspend_timeout = -1,
+//	.wer = (OMAP_UART_WER_TX | OMAP_UART_WER_RX | OMAP_UART_WER_CTS),
 };
 
 void __init board_serial_init(void)
 {
-//	omap_serial_init_port_pads(0, tablet_uart1_pads,
-//		ARRAY_SIZE(tablet_uart1_pads), &tablet_uart_info_uncon);
-//	omap_serial_init_port_pads(1, tablet_uart2_pads,
-//		ARRAY_SIZE(tablet_uart2_pads), &tablet_uart_info);
-	omap_serial_init_port_pads(2, tablet_uart3_pads,
-		ARRAY_SIZE(tablet_uart3_pads), &tablet_uart_info);
-//	omap_serial_init_port_pads(3, tablet_uart4_pads,
-//		ARRAY_SIZE(tablet_uart4_pads), &tablet_uart_info_uncon);
+//	omap_serial_init_port(&uart1_board_data, &tablet_uart_info_uncon);
+//	omap_serial_init_port(&uart2_board_data, &tablet_uart_info);
+//	omap_serial_init_port(&uart3_board_data, &tablet_uart_info);
+//	omap_serial_init_port(&uart4_board_data, &tablet_uart_info_uncon);
 }
 

@@ -30,23 +30,25 @@
 #include <linux/leds.h>
 #include <linux/delay.h>
 // #include <linux/pwm_backlight.h>
-
 #include <linux/i2c/twl.h>
 #include <linux/regulator/machine.h>
 #include <linux/regulator/consumer.h>
+#include <linux/module.h>
 
 #include <plat/vram.h>
 #include <plat/omap_apps_brd_id.h>
 #include <plat/dmtimer.h>
 #include <plat/omap_device.h>
-#include <plat/android-display.h>
+//#include <plat/android-display.h>
+#include <plat/sgx_omaplfb.h>
 
 #include "board-4430kc1-tablet.h"
 #include "control.h"
 #include "mux.h"
 #include "mux44xx.h"
-#include "dmtimer.h"
+//#include "dmtimer.h"
 
+#define OTTER_FB_RAM_SIZE                SZ_16M + SZ_4M /* 1920×1080*4 * 2 */
 
 #define LED_PWM2ON			0x03
 #define LED_PWM2OFF			0x04
@@ -104,18 +106,6 @@ static struct omap_dss_board_info sdp4430_dss_data = {
 	.default_device	=	&tablet_lcd_device,
 };
 
-#define OTTER_FB_RAM_SIZE                SZ_16M /* 1920×1080*4 * 2 */
-static struct omapfb_platform_data sdp4430_fb_data = {
-	.mem_desc = {
-		.region_cnt = 1,
-		.region = {
-			[0] = {
-				.size = OTTER_FB_RAM_SIZE,
-			},
-		},
-	},
-};
-
 static struct spi_board_info tablet_spi_board_info[] __initdata = {
 	{
 		.modalias		= "otter1_disp_spi",
@@ -130,8 +120,8 @@ static void __init sdp4430_init_display_led(void)
 	twl_i2c_write_u8(TWL_MODULE_PWM, 0xFF, LED_PWM2ON);
 	twl_i2c_write_u8(TWL_MODULE_PWM, 0x7F, LED_PWM2OFF);
 	//twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x30, TWL6030_TOGGLE3);
-    twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x08, TWL6030_TOGGLE3);
-    twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x38, TWL6030_TOGGLE3);
+	twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x08, TWL6030_TOGGLE3);
+	twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x38, TWL6030_TOGGLE3);
 }
 
 static void sdp4430_set_primary_brightness(u8 brightness)
@@ -195,18 +185,41 @@ static struct platform_device __initdata *sdp4430_panel_devices[] = {
 
 void omap4_kc1_android_display_setup(struct omap_ion_platform_data *ion)
 {
+#if 0
 	omap_android_display_setup(&sdp4430_dss_data,
 				   NULL,
 				   NULL,
 				   &sdp4430_fb_data,
 				   ion);
+#endif
 }
+
+static struct omapfb_platform_data sdp4430_fb_data = {
+	.mem_desc = {
+		.region_cnt = 1,
+		.region = {
+			[0] = {
+				.size = OTTER_FB_RAM_SIZE,
+			},
+		},
+	},
+};
 
 void __init omap4_kc1_display_init(void)
 {
 	int ret;
 
+	struct sgx_omaplfb_config data = {
+		.tiler2d_buffers = 0,
+		.swap_chain_length = 2,
+		.vram_buffers = 2,
+	};
+
 	omapfb_set_platform_data(&sdp4430_fb_data);
+	omap_vram_set_sdram_vram(OTTER_FB_RAM_SIZE, 0);
+#ifdef CONFIG_OMAPLFB
+	sgx_omaplfb_set(0, &data);
+#endif
 
 	spi_register_board_info(tablet_spi_board_info,	ARRAY_SIZE(tablet_spi_board_info));
 
