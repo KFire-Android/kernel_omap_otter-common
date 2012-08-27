@@ -43,6 +43,7 @@
 #include "hsmmc.h"
 #include "common-board-devices.h"
 #include "mux.h"
+#include "board-omap5evm.h"
 
 #include <video/omapdss.h>
 #include <video/omap-panel-generic-dpi.h>
@@ -909,7 +910,8 @@ static void __init omap_5_panda_init(void)
 	omap5_pmic_init(1, PALMAS_NAME, OMAP44XX_IRQ_SYS_1N, PALMAS_DATA,
 			"twl6040", OMAP44XX_IRQ_SYS_2N, &twl6040_data);
 
-	omap_serial_init();
+	omap5_board_serial_init();
+
 	platform_device_register(&dummy_sd_regulator_device);
 	omap_ehci_ohci_init();
 
