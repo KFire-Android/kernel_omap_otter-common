@@ -77,11 +77,12 @@ void omap3_pmic_get_config(struct twl4030_platform_data *pmic_data,
 
 void omap4_pmic_get_config(struct twl4030_platform_data *pmic_data,
 			   u32 pdata_flags, u32 regulators_flags);
+#ifdef CONFIG_OMAP5_SEVM_PALMAS
 void omap5_pmic_init(int bus_id, const char *pmic_type, int pmic_irq,
 		     struct palmas_platform_data *pmic_data,
 		     const char *audio_type, int audio_irq,
 		     struct twl6040_platform_data *audio_data);
-
+#endif
 /**
  * struct omap_pmic_map - Describe the OMAP PMIC data for OMAP
  * @name:		name of the voltage domain
