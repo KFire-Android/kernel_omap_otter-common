@@ -15,6 +15,7 @@
 #include <linux/init.h>
 #include <linux/io.h>
 #include <linux/dma-mapping.h>
+#include <asm/setup.h>
 
 #include <plat/common.h>
 #include <plat/board.h>
