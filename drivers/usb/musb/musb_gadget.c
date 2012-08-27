@@ -1736,7 +1736,8 @@ static int musb_gadget_pullup(struct usb_gadget *gadget, int is_on)
 	}
 	spin_unlock_irqrestore(&musb->lock, flags);
 
-	pm_runtime_put(musb->controller);
+	pm_runtime_mark_last_busy(musb->controller);
+	pm_runtime_put_autosuspend(musb->controller);
 
 	return 0;
 }
