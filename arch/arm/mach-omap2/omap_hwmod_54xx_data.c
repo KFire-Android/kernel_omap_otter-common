@@ -2735,6 +2735,7 @@ static struct omap_hwmod omap54xx_hsi_hwmod = {
 	.slaves_cnt	= ARRAY_SIZE(omap54xx_hsi_slaves),
 	.masters	= omap54xx_hsi_masters,
 	.masters_cnt	= ARRAY_SIZE(omap54xx_hsi_masters),
+	.flags		= HWMOD_SWSUP_SIDLE | HWMOD_SWSUP_MSTANDBY,
 };
 
 /*
