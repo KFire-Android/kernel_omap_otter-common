@@ -686,8 +686,11 @@ static int rpmsg_omx_probe(struct rpmsg_channel *rpdev)
 	omxserv = (struct rpmsg_omx_service *)idr_for_each(&rpmsg_omx_services,
 					_match_omx_service, rpdev->id.name);
 	spin_unlock(&rpmsg_omx_services_lock);
-	if (omxserv)
+	if (omxserv) {
+		omxserv->rpdev = rpdev;
+		dev_set_drvdata(&rpdev->dev, omxserv);
 		goto serv_up;
+	}
 
 	if (!idr_pre_get(&rpmsg_omx_services, GFP_KERNEL)) {
 		dev_err(&rpdev->dev, "idr_pre_get failes\n");
@@ -714,6 +717,10 @@ static int rpmsg_omx_probe(struct rpmsg_channel *rpdev)
 	mutex_init(&omxserv->lock);
 	init_completion(&omxserv->comp);
 
+	omxserv->minor = minor;
+	omxserv->rpdev = rpdev;
+	dev_set_drvdata(&rpdev->dev, omxserv);
+
 	major = MAJOR(rpmsg_omx_dev);
 
 	cdev_init(&omxserv->cdev, &rpmsg_omx_fops);
@@ -732,10 +739,7 @@ static int rpmsg_omx_probe(struct rpmsg_channel *rpdev)
 		dev_err(&rpdev->dev, "device_create failed: %d\n", ret);
 		goto clean_cdev;
 	}
-	omxserv->minor = minor;
 serv_up:
-	omxserv->rpdev = rpdev;
-	dev_set_drvdata(&rpdev->dev, omxserv);
 	complete_all(&omxserv->comp);
 
 	dev_info(omxserv->dev, "new OMX connection srv channel: %u -> %u!\n",
