@@ -633,19 +633,12 @@ static ssize_t rpmsg_omx_write(struct file *filp, const char __user *ubuf,
 }
 
 static
-unsigned int rpmsg_poll(struct file *filp, struct poll_table_struct *wait)
+unsigned int rpmsg_omx_poll(struct file *filp, struct poll_table_struct *wait)
 {
 	struct rpmsg_omx_instance *omx = filp->private_data;
 	unsigned int mask = 0;
 
-	if (mutex_lock_interruptible(&omx->lock))
-		return -ERESTARTSYS;
-
 	poll_wait(filp, &omx->readq, wait);
-	if (omx->state == OMX_FAIL) {
-		mutex_unlock(&omx->lock);
-		return -ENXIO;
-	}
 
 	if (!skb_queue_empty(&omx->queue))
 		mask |= POLLIN | POLLRDNORM;
@@ -654,7 +647,8 @@ unsigned int rpmsg_poll(struct file *filp, struct poll_table_struct *wait)
 	if (true)
 		mask |= POLLOUT | POLLWRNORM;
 
-	mutex_unlock(&omx->lock);
+	if (omx->state == OMX_FAIL)
+		mask = POLLERR;
 
 	return mask;
 }
@@ -665,7 +659,7 @@ static const struct file_operations rpmsg_omx_fops = {
 	.unlocked_ioctl	= rpmsg_omx_ioctl,
 	.read		= rpmsg_omx_read,
 	.write		= rpmsg_omx_write,
-	.poll		= rpmsg_poll,
+	.poll		= rpmsg_omx_poll,
 	.owner		= THIS_MODULE,
 };
 
