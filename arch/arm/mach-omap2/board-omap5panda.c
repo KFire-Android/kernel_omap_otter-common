@@ -442,7 +442,7 @@ static struct regulator_init_data omap5_ldo1 = {
 	},
 };
 
-static struct regulator_consumer_supply omap5evm_lcd_panel_supply[] = {
+static struct regulator_consumer_supply panda5_lcd_panel_supply[] = {
 	REGULATOR_SUPPLY("panel_supply", "omapdss_dsi.0"),
 };
 
@@ -456,8 +456,8 @@ static struct regulator_init_data omap5_ldo2 = {
 					| REGULATOR_CHANGE_STATUS,
 		.apply_uV		= 1,
 	},
-	.num_consumer_supplies	= ARRAY_SIZE(omap5evm_lcd_panel_supply),
-	.consumer_supplies	= omap5evm_lcd_panel_supply,
+	.num_consumer_supplies	= ARRAY_SIZE(panda5_lcd_panel_supply),
+	.consumer_supplies	= panda5_lcd_panel_supply,
 };
 
 static struct regulator_init_data omap5_ldo3 = {
@@ -676,22 +676,22 @@ static struct twl6040_platform_data twl6040_data = {
 	.audpwron_gpio	= GPIO_TWL6040_PWRON,
 };
 
-static struct platform_device omap5evm_dmic_codec = {
+static struct platform_device panda5_dmic_codec = {
 	.name	= "dmic-codec",
 	.id	= -1,
 };
 
-static struct platform_device omap5evm_spdif_dit_codec = {
+static struct platform_device panda5_spdif_dit_codec = {
 	.name           = "spdif-dit",
 	.id             = -1,
 };
 
-static struct platform_device omap5evm_hdmi_audio_codec = {
+static struct platform_device panda5_hdmi_audio_codec = {
 	.name	= "hdmi-audio-codec",
 	.id	= -1,
 };
 
-static struct omap_abe_twl6040_data omap5evm_abe_audio_data = {
+static struct omap_abe_twl6040_data panda5_abe_audio_data = {
 	/* Audio out */
 	.has_hs		= ABE_TWL6040_LEFT | ABE_TWL6040_RIGHT,
 	/* HandsFree through expasion connector */
@@ -711,19 +711,19 @@ static struct omap_abe_twl6040_data omap5evm_abe_audio_data = {
 
 };
 
-static struct platform_device omap5evm_abe_audio = {
+static struct platform_device panda5_abe_audio = {
 	.name		= "omap-abe-twl6040",
 	.id		= -1,
 	.dev = {
-		.platform_data = &omap5evm_abe_audio_data,
+		.platform_data = &panda5_abe_audio_data,
 	},
 };
 
-static struct platform_device *omap5evm_devices[] __initdata = {
-	&omap5evm_dmic_codec,
-	&omap5evm_spdif_dit_codec,
-	&omap5evm_hdmi_audio_codec,
-	&omap5evm_abe_audio,
+static struct platform_device *panda5_devices[] __initdata = {
+	&panda5_dmic_codec,
+	&panda5_spdif_dit_codec,
+	&panda5_hdmi_audio_codec,
+	&panda5_abe_audio,
 	&panda5_leds_gpio,
 	&panda5_gpio_keys_device,
 };
@@ -758,15 +758,15 @@ static struct platform_device dummy_sd_regulator_device = {
 	}
 };
 
-static struct pca953x_platform_data omap5evm_gpio_expander_info = {
+static struct pca953x_platform_data panda5_gpio_expander_info = {
 	.gpio_base	= OMAP_MAX_GPIO_LINES,
 	.irq_base	= OMAP_TCA6424_IRQ_BASE,
 };
 
-static struct i2c_board_info __initdata omap5evm_i2c_5_boardinfo[] = {
+static struct i2c_board_info __initdata panda5_i2c_5_boardinfo[] = {
 	{
 		I2C_BOARD_INFO("tca6424", 0x22),
-		.platform_data = &omap5evm_gpio_expander_info,
+		.platform_data = &panda5_gpio_expander_info,
 		.irq = GPIO_EXT_INT_PIN,
 	},
 };
@@ -778,8 +778,8 @@ static int __init omap5pandai2c_init(void)
 	omap_register_i2c_bus(2, 400, NULL, 0);
 	omap_register_i2c_bus(3, 400, NULL, 0);
 	omap_register_i2c_bus(4, 400, NULL, 0);
-	omap_register_i2c_bus(5, 400, omap5evm_i2c_5_boardinfo,
-					ARRAY_SIZE(omap5evm_i2c_5_boardinfo));
+	omap_register_i2c_bus(5, 400, panda5_i2c_5_boardinfo,
+					ARRAY_SIZE(panda5_i2c_5_boardinfo));
 
 	return 0;
 }
@@ -844,7 +844,7 @@ static struct omap_dss_device *omap5panda_dss_devices[] = {
 	&omap5panda_hdmi_device,
 };
 
-static struct omap_dss_board_info omap5evm_dss_data = {
+static struct omap_dss_board_info panda5_dss_data = {
 	.num_devices	= ARRAY_SIZE(omap5panda_dss_devices),
 	.devices	= omap5panda_dss_devices,
 	.default_device	= &omap5_panda_dvi_device,
@@ -866,7 +866,7 @@ static void omap5panda_hdmi_init(void)
 static void __init omap5panda_display_init(void)
 {
 	omap5panda_hdmi_init();
-	omap_display_init(&omap5evm_dss_data);
+	omap_display_init(&panda5_dss_data);
 }
 
 static const struct usbhs_omap_board_data usbhs_bdata __initconst = {
@@ -915,7 +915,7 @@ static void __init omap_5_panda_init(void)
 
 	omap_hsmmc_init(mmc);
 	usb_dwc3_init();
-	platform_add_devices(omap5evm_devices, ARRAY_SIZE(omap5evm_devices));
+	platform_add_devices(panda5_devices, ARRAY_SIZE(panda5_devices));
 
 	omap5panda_display_init();
 }
