@@ -490,6 +490,9 @@ ohci_hub_status_data (struct usb_hcd *hcd, char *buf)
 	int		rhsc_status;
 	unsigned long	flags;
 
+	if (!HC_IS_RUNNING(hcd->state))
+		return 0;
+
 	spin_lock_irqsave (&ohci->lock, flags);
 	if (!HCD_HW_ACCESSIBLE(hcd))
 		goto done;
