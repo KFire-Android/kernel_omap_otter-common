@@ -532,6 +532,7 @@ void rproc_shutdown(struct rproc *rproc);
 void rproc_error_reporter(struct rproc *rproc, enum rproc_err type);
 int rproc_set_constraints(struct device *dev, struct rproc *rproc,
 			  enum rproc_constraint type, long v);
+void *rproc_da_to_va(struct rproc *rproc, u64 da, int len);
 int rproc_pa_to_da(struct rproc *rproc, phys_addr_t pa, u64 *da);
 
 static inline struct rproc_vdev *vdev_to_rvdev(struct virtio_device *vdev)

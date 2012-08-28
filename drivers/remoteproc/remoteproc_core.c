@@ -395,15 +395,19 @@ static void rproc_disable_iommu(struct rproc *rproc)
  * code/data sections) or expose us certain symbols in other device address
  * (e.g. their trace buffer).
  *
- * This function is an internal helper with which we can go over the allocated
+ * This function is a helper function with which we can go over the allocated
  * carveouts and translate specific device address to kernel virtual addresses
  * so we can access the referenced memory.
+ *
+ * This function is exported so that it can also be used by individual remote
+ * processor driver implementations to convert a device address into the
+ * corresponding kernel virtual address that it can operate on.
  *
  * Note: phys_to_virt(iommu_iova_to_phys(rproc->domain, da)) will work too,
  * but only on kernel direct mapped RAM memory. Instead, we're just using
  * here the output of the DMA API, which should be more correct.
  */
-static void *rproc_da_to_va(struct rproc *rproc, u64 da, int len)
+void *rproc_da_to_va(struct rproc *rproc, u64 da, int len)
 {
 	struct rproc_mem_entry *carveout;
 	void *ptr = NULL;
@@ -426,7 +430,7 @@ static void *rproc_da_to_va(struct rproc *rproc, u64 da, int len)
 
 	return ptr;
 }
-
+EXPORT_SYMBOL(rproc_da_to_va);
 
 int rproc_pa_to_da(struct rproc *rproc, phys_addr_t pa, u64 *da)
 {
