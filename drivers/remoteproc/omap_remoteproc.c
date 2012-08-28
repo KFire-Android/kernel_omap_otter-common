@@ -374,6 +374,30 @@ put_mbox:
 	return ret;
 }
 
+/**
+ * Helper function to reset spinlocks
+ *
+ * There is a possibility that the remote processor was
+ * holding spinlocks when an exception occured. One way
+ * of dealing with it would be for the driver to unlock
+ * all hwspinlocks that were held by the remote processor.
+ */
+static inline void reset_hwspinlock(struct rproc *rproc)
+{
+	struct omap_rproc *oproc = rproc->priv;
+	struct device *dev = rproc->dev.parent;
+	int id;
+
+	/* reset only the spinlocks that were marked held */
+	if (!oproc->hwlock_info.num_locks_va || !oproc->hwlock_info.state_va) {
+		dev_err(dev, "invalid va\n");
+		return;
+	}
+	for_each_set_bit(id, oproc->hwlock_info.state_va,
+					*(oproc->hwlock_info.num_locks_va))
+		__hwspin_lock_reset(id);
+}
+
 /* power off the remote processor */
 static int omap_rproc_stop(struct rproc *rproc)
 {
@@ -383,6 +407,9 @@ static int omap_rproc_stop(struct rproc *rproc)
 	struct omap_rproc *oproc = rproc->priv;
 	struct omap_rproc_timers_info *timers = pdata->timers;
 	int ret, i;
+
+	/* reset the hwspinlocks held by remote processor */
+	reset_hwspinlock(rproc);
 
 	ret = pdata->device_shutdown(pdev);
 	if (ret)
