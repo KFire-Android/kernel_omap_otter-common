@@ -273,6 +273,10 @@ static void __devexit unregister_hsi_devices(struct hsi_dev *hsi_ctrl)
 
 void hsi_set_pm_default(struct hsi_dev *hsi_ctrl)
 {
+	/* On OMAP5+, stop interfering with HWMOD mngmnt of SYSCONFIG */
+	if (cpu_is_omap54xx())
+		return;
+
 	/* Set default SYSCONFIG PM settings */
 	hsi_outl((HSI_AUTOIDLE | HSI_SIDLEMODE_SMART_WAKEUP |
 				 HSI_MIDLEMODE_SMART_WAKEUP),
@@ -284,6 +288,10 @@ void hsi_set_pm_default(struct hsi_dev *hsi_ctrl)
 
 void hsi_set_pm_force_hsi_on(struct hsi_dev *hsi_ctrl)
 {
+	/* On OMAP5+, stop interfering with HWMOD mngmnt of SYSCONFIG */
+	if (cpu_is_omap54xx())
+		return;
+
 	/* Force HSI to ON by never acknowledging a PRCM idle request */
 	/* SIdleAck and MStandby are never asserted */
 	hsi_outl((HSI_AUTOIDLE | HSI_SIDLEMODE_NO |

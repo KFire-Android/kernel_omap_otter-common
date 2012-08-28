@@ -480,7 +480,14 @@ int omap_enter_lowpower(unsigned int cpu, unsigned int power_state)
 
 	switch (power_state) {
 	case PWRDM_POWER_ON:
+		save_state = 0;
+		break;
 	case PWRDM_POWER_INACTIVE:
+		if (cpu_is_omap54xx()) {
+			/* HACK: COBRA-1.0BUG00167 Do equivalent to CPUx OFF */
+			save_state = 1;
+			break;
+		}
 		save_state = 0;
 		break;
 	case PWRDM_POWER_OFF:
@@ -488,7 +495,8 @@ int omap_enter_lowpower(unsigned int cpu, unsigned int power_state)
 		break;
 	case PWRDM_POWER_CSWR:
 		if (cpu_is_omap54xx()) {
-			save_state = 0;
+			/* HACK: COBRA-1.0BUG00167 Do equivalent to CPUx OFF */
+			save_state = 1;
 			break;
 		}
 	default:

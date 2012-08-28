@@ -410,10 +410,12 @@ static u32 omap_hsi_configure_errata(void)
 {
 	u32 errata = 0;
 
+	if (cpu_is_omap44xx())
+		SET_HSI_ERRATA(errata, HSI_ERRATUM_ixxx_3WIRES_NO_SWAKEUP);
+
 	if (cpu_is_omap44xx() ||
 	    (cpu_is_omap54xx() && (omap_rev() <= OMAP5430_REV_ES1_0))) {
 		SET_HSI_ERRATA(errata, HSI_ERRATUM_i696_SW_RESET_FSM_STUCK);
-		SET_HSI_ERRATA(errata, HSI_ERRATUM_ixxx_3WIRES_NO_SWAKEUP);
 		SET_HSI_ERRATA(errata, HSI_ERRATUM_i702_PM_HSI_SWAKEUP);
 	}
 
@@ -436,7 +438,7 @@ static int __init omap_hsi_register(struct omap_hwmod *oh, void *user)
 {
 	struct platform_device *od;
 	struct hsi_platform_data *pdata = &omap_hsi_platform_data;
-	int i, port;
+	int i, port, err;
 
 	if (!oh) {
 		pr_err("Could not look up %s omap_hwmod\n",
@@ -450,7 +452,12 @@ static int __init omap_hsi_register(struct omap_hwmod *oh, void *user)
 
 	for (i = 0; i < pdata->num_ports; i++) {
 		port = pdata->ctx->pctx[i].port_number - 1;
-		omap_hwmod_pad_route_irq(oh, i, port);
+		err = omap_hwmod_pad_route_irq(oh, i, port);
+		if (err < 0) {
+			pr_err("%s: Could not route the IO PAD wakeup event on IRQ %d for the port %d, error = %d\n",
+				__func__, oh->mpu_irqs[i].irq, port + 1, err);
+			return err;
+		}
 	}
 
 	od = omap_device_build(OMAP_HSI_PLATFORM_DEVICE_DRIVER_NAME, 0, oh,
