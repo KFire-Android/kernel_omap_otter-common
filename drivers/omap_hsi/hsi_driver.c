@@ -954,7 +954,7 @@ static int __devinit hsi_platform_device_probe(struct platform_device *pd)
 	} else if (err) {
 		dev_err(&pd->dev, "%s: Error %d setting HSI FClk to %ld.\n",
 				__func__, err, pdata->default_hsi_fclk);
-		goto rollback3;
+		goto rollback4;
 	} else {
 		hsi_ctrl->hsi_fclk_current = pdata->default_hsi_fclk;
 	}
@@ -963,6 +963,8 @@ static int __devinit hsi_platform_device_probe(struct platform_device *pd)
 
 	return 0;
 
+rollback4:
+	unregister_hsi_devices(hsi_ctrl);
 rollback3:
 	hsi_debug_remove_ctrl(hsi_ctrl);
 rollback2:
