@@ -660,11 +660,24 @@ enum bverror do_blit(struct bvbltparams *bvbltparams,
 
 	if (srcinfo->format->format == GCREG_DE_FORMAT_NV12) {
 		struct gcmoxsrcyuv *gcmoxsrcyuv;
-		int uvshift;
+		int uvshift = srcbyteshift;
 
-		uvshift = srcbyteshift
-			+ srcinfo->geom->virtstride
-			* srcinfo->geom->height;
+		/* add fixed offset from Y plane */
+		switch (srcinfo->angle) {
+		case ROT_ANGLE_0:
+		case ROT_ANGLE_180:
+			uvshift += srcinfo->geom->virtstride *
+				srcinfo->geom->height;
+			break;
+		case ROT_ANGLE_90:
+		case ROT_ANGLE_270:
+			/* NV12 has stride requirement of actual stride + 32
+			 * Changing the UV plane address for rotation */
+			uvshift += (srcinfo->geom->virtstride) *
+				srcinfo->geom->width;
+			break;
+		}
+
 		GCDBG(GCZONE_SURF, "  uvshift = 0x%08X (%d)\n",
 			uvshift, uvshift);
 
