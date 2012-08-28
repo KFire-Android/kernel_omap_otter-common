@@ -26,10 +26,13 @@
 #include <linux/of_device.h>
 #include <linux/irqdomain.h>
 #include <linux/gpio.h>
+#include <linux/bitops.h>
 #include <mach/hardware.h>
 #include <asm/irq.h>
 #include <mach/irqs.h>
 #include <asm/mach/irq.h>
+
+#include "../mux.h"
 
 #define OFF_MODE	1
 
@@ -78,6 +81,9 @@ struct gpio_bank {
 	int context_loss_count;
 	u16 id;
 	bool workaround_enabled;
+	u16 mux_val[32];
+	struct omap_mux *mux[32];
+	u32 is_oe_wa;
 
 	void (*set_dataout)(struct gpio_bank *bank, int gpio, int enable);
 	int (*get_context_loss_count)(struct device *dev);
@@ -904,6 +910,24 @@ static int gpio_output(struct gpio_chip *chip, unsigned offset, int value)
 	spin_lock_irqsave(&bank->lock, flags);
 	bank->set_dataout(bank, offset, value);
 	_set_gpio_direction(bank, offset, 0);
+
+	/* Required for GPIO h/w bug WA */
+	if (cpu_is_omap54xx() &&
+		(omap_rev() == OMAP5430_REV_ES1_0 ||
+		omap_rev() == OMAP5432_REV_ES1_0)) {
+
+		/* Store gpio mux value for o/p pins */
+		bank->mux[offset] =
+			omap_mux_get_gpio(offset + (bank->id)*(bank->width));
+		if (bank->mux[offset])
+			bank->mux_val[offset] =
+			omap_mux_read((bank->mux[offset])->partition,
+				(bank->mux[offset])->reg_offset);
+		else
+			dev_err(bank->dev, "Failed to get mux for gpio %d\n",
+				offset + (bank->id)*(bank->width));
+	}
+
 	spin_unlock_irqrestore(&bank->lock, flags);
 	return 0;
 }
@@ -1113,6 +1137,7 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
 	bank->chip.of_node = of_node_get(node);
 #endif
 	bank->id = pdev->id;
+	bank->is_oe_wa = 0;
 
 	bank->irq_base = irq_alloc_descs(-1, 0, bank->width, 0);
 	if (bank->irq_base < 0) {
@@ -1170,6 +1195,64 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
 	list_add_tail(&bank->node, &omap_gpio_list);
 
 	return ret;
+}
+
+static void _omap5_gpio_apply_wa(struct gpio_bank *bank)
+{
+	u32 i;
+	u16 mux_val;
+	unsigned long op;
+
+	/* Get o/p pins */
+	op = ~bank->context.oe;
+	for_each_set_bit(i, &op, bank->width) {
+		/* Check if o/p is pulled high */
+		if (_get_gpio_dataout(bank, i)) {
+			/* Enable pull up for o/p pulled high */
+			mux_val = bank->mux_val[i];
+			mux_val |= OMAP_PIN_INPUT_PULLUP;
+			if (bank->mux[i]) {
+				omap_mux_write((bank->mux[i])->partition,
+						mux_val,
+						(bank->mux[i])->reg_offset);
+				/* Change direction to input */
+				_set_gpio_direction(bank, i, 1);
+				bank->is_oe_wa |= (0x1 << i);
+			} else {
+				dev_err(bank->dev,
+					"Failed to apply WA for gpio %d\n",
+					i + (bank->id)*(bank->width));
+			}
+		}
+	}
+}
+
+static void _omap5_gpio_remove_wa(struct gpio_bank *bank)
+{
+	u32 i;
+	unsigned long op = bank->is_oe_wa;
+
+	for_each_set_bit(i, &op, bank->width) {
+		/* Change the direction back to o/p */
+		_set_gpio_direction(bank, i, 0);
+		/* Replace the mux to original value */
+		omap_mux_write((bank->mux[i])->partition,
+				bank->mux_val[i],
+				(bank->mux[i])->reg_offset);
+	}
+	bank->is_oe_wa = 0;
+}
+
+static void omap5_gpio_es1_hw_wa(struct gpio_bank *bank, bool is_suspend)
+{
+	if (cpu_is_omap54xx() &&
+			(omap_rev() == OMAP5430_REV_ES1_0 ||
+			 omap_rev() == OMAP5432_REV_ES1_0)) {
+		if (is_suspend)
+			_omap5_gpio_apply_wa(bank);
+		else
+			_omap5_gpio_remove_wa(bank);
+	}
 }
 
 #ifdef CONFIG_ARCH_OMAP2PLUS
@@ -1234,32 +1317,14 @@ update_gpio_context_count:
 				bank->get_context_loss_count(bank->dev);
 
 	/*
-	 * WA for GPIO pins 70 (Modem), 140 (BT) & 142 (WLAN) used as outputs
-	 * due to h/w bug in GPIO module (Bug ID: OMAP5430-1.0BUG01667)
+	 * WA for GPIO pins used as outputs due to h/w bug in GPIO
+	 * module (Bug ID: OMAP5430-1.0BUG01667)
 	 * On OMAP5 ES1.0 the pins do not maintain their level in OFF.
-	 * This WA changes the direction to input while in OFF and back
-	 * to output in resume. This is fixed in ES2.0
+	 * This WA enables pull up and changes the direction to input
+	 * while in RETENTION/OFF and back to output in resume. This
+	 * is fixed in ES2.0
 	 */
-	if (cpu_is_omap54xx() &&
-		(omap_rev() == OMAP5430_REV_ES1_0 ||
-		omap_rev() == OMAP5432_REV_ES1_0)) {
-		if (bank->id == 2) {
-			_set_gpio_direction(bank, GPIO_INDEX(bank, 70), 1);
-		}
-		if (bank->id == 4) {
-			_set_gpio_direction(bank, GPIO_INDEX(bank, 142), 1);
-			_set_gpio_direction(bank, GPIO_INDEX(bank, 140), 1);
-		}
-		if (bank->id == 5) {
-			/*
-			 * The same h/w bug causes a glitch sometimes resulting
-			 * in reset of USB host module. Hence change the
-			 * direction and corresponding mux for USB reset pins
-			 */
-			_set_gpio_direction(bank, GPIO_INDEX(bank, 172), 1);
-			_set_gpio_direction(bank, GPIO_INDEX(bank, 173), 1);
-		}
-	}
+	omap5_gpio_es1_hw_wa(bank, true);
 
 	_gpio_dbck_disable(bank);
 	spin_unlock_irqrestore(&bank->lock, flags);
@@ -1297,31 +1362,12 @@ static int omap_gpio_runtime_resume(struct device *dev)
 	}
 
 	/*
-	 * WA for GPIO pins 70 (Modem), 140 (BT) & 142 (WLAN) used as outputs
-	 * due to h/w bug in GPIO module (Bug ID: OMAP5430-1.0BUG01667)
+	 * Restore the GPIO pins changed in suspend path while applying
+	 * WA for h/w bug Bug ID: OMAP5430-1.0BUG01667.
 	 * On OMAP5 ES1.0 the pins do not maintain their level in OFF.
-	 * Change the direct back to output in resume.
+	 * Change the direction back to output in resume
 	 */
-	if (cpu_is_omap54xx() &&
-		(omap_rev() == OMAP5430_REV_ES1_0 ||
-		omap_rev() == OMAP5432_REV_ES1_0)) {
-		if (bank->id == 2) {
-			_set_gpio_direction(bank, GPIO_INDEX(bank, 70), 0);
-		}
-		if (bank->id == 4) {
-			_set_gpio_direction(bank, GPIO_INDEX(bank, 142), 0);
-			_set_gpio_direction(bank, GPIO_INDEX(bank, 140), 0);
-		}
-		if (bank->id == 5) {
-			/*
-			 * The same h/w bug causes a glitch sometimes resulting
-			 * in reset of USB host module. Hence change the
-			 * direction and corresponding mux for USB reset pins
-			 */
-			_set_gpio_direction(bank, GPIO_INDEX(bank, 172), 0);
-			_set_gpio_direction(bank, GPIO_INDEX(bank, 173), 0);
-		}
-	}
+	omap5_gpio_es1_hw_wa(bank, false);
 
 	if (!bank->workaround_enabled) {
 		spin_unlock_irqrestore(&bank->lock, flags);
