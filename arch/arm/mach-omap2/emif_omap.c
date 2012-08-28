@@ -111,7 +111,7 @@ static int __init init_emif_timings(void)
 
 	rate = clk_get_rate(dpll_core_m2_clk);
 
-	pr_info("Reprogramming LPDDR2 timings to %d Hz\n", rate);
+	pr_info("Reprogramming LPDDR2 timings to %d Hz\n", rate >> 1);
 	if (clk_set_rate(dpll_core_m2_clk, rate))
 		goto error;
 
