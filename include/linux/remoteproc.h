@@ -103,6 +103,8 @@ struct fw_rsc_hdr {
  * @RSC_VDEV:       declare support for a virtio device, and serve as its
  *		    virtio header.
  * @RSC_SUSPD_TIME: suspend timeout used for autosuspend feature
+ * @RSC_CUSTOM:     a custom resource type that needs to be handled outside
+ *		    remoteproc core.
  * @RSC_LAST:       just keep this one at the end
  *
  * For more details regarding a specific resource type, please see its
@@ -119,7 +121,8 @@ enum fw_resource_type {
 	RSC_TRACE	= 2,
 	RSC_VDEV	= 3,
 	RSC_SUSPD_TIME	= 4,
-	RSC_LAST	= 5,
+	RSC_CUSTOM	= 5,
+	RSC_LAST	= 6,
 };
 
 #define FW_RSC_ADDR_ANY (0xFFFFFFFFFFFFFFFF)
@@ -318,6 +321,18 @@ struct fw_rsc_suspd_time {
 } __packed;
 
 /**
+ * struct fw_rsc_custom - custom resource definition
+ * @sub_type: implementation specific type
+ * @size: size of the custom resource
+ * @data: label for the start of the resource
+ */
+struct fw_rsc_custom {
+	u32  sub_type;
+	u32  size;
+	u8   data[0];
+} __packed;
+
+/**
  * struct rproc_mem_entry - memory entry descriptor
  * @va:	virtual address
  * @dma: dma address
@@ -347,6 +362,7 @@ struct rproc;
  * @set_latency		set latency on remote processor
  * @set_bandwidth	set bandwidth on remote processor
  * @set_frequency	set frequency of remote processor
+ * @handle_custom_rsc	hook to handle device specific resource table entries
  */
 struct rproc_ops {
 	int (*start)(struct rproc *rproc);
@@ -357,6 +373,8 @@ struct rproc_ops {
 	int (*set_latency)(struct device *dev, struct rproc *rproc, long v);
 	int (*set_bandwidth)(struct device *dev, struct rproc *rproc, long v);
 	int (*set_frequency)(struct device *dev, struct rproc *rproc, long v);
+	int (*handle_custom_rsc)(struct rproc *rproc,
+						struct fw_rsc_custom *rsc);
 };
 
 /**
