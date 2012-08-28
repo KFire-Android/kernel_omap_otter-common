@@ -85,4 +85,34 @@ enum omap_rp_mbox_messages {
 	RP_MBOX_END_MSG		= 0xFFFFFF14,
 };
 
+/**
+ * enum - OMAP specific resources
+ *	  resources specific to omap can be appended here
+ *
+ * @OMAP_RSC_HWSPIN: Resource holding information on hwspinlock state
+ *
+ * Introduce new custom resource definitions here
+ *
+ * @OMAP_RSC_MAX: Indicates end of known/defined omap resources
+ * This should be the last definition.
+ *
+ */
+enum omap_resources {
+	OMAP_RSC_HWSPIN	= 1,
+	OMAP_RSC_MAX	= 2,
+};
+
+/**
+ * struct fw_rsc_custom_spinlock - custom resource to define spinlock
+ * @num_locks_da: device address of hwspinlocks number
+ * @da: device address of hwspinlock state array
+ * @name: name of the resource
+ *
+ */
+struct fw_rsc_custom_spinlock {
+	u32 num_locks_da;
+	u32 da;
+	char name[32];
+};
+
 #endif /* _OMAP_RPMSG_H */
