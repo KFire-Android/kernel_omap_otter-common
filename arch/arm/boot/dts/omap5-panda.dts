@@ -26,6 +26,9 @@
 		ti,mclk-freq = <19200000>;
 
 		ti,mcpdm = <&mcpdm>;
+		ti,mcbsp1 = <&mcbsp1>;
+		ti,mcbsp2 = <&mcbsp2>;
+		ti,aess = <&aess>;
 
 		ti,twl6040 = <&twl6040>;
 
@@ -38,7 +41,13 @@
 			"HSMIC", "Headset Mic",
 			"Headset Mic", "Headset Mic Bias",
 			"AFML", "Line In",
-			"AFMR", "Line In";
+			"AFMR", "Line In",
+			"Headset Playback", "PDM_DL1",
+			"PDM_UL1", "Capture",
+			"omap-mcbsp.1 Playback", "BT_VX_DL",
+			"BT_VX_UL", "omap-mcbsp.1 Capture",
+			"omap-mcbsp.2 Playback", "MM_EXT_DL",
+			"MM_EXT_UL", "omap-mcbsp.2 Capture";
 	};
 };
 
