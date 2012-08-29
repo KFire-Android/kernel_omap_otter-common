@@ -22,4 +22,3 @@ config OMAP4_TMP102_SENSOR
 	help
 	  Enabling this config will give support for the tmp102
 	  temp sensor for the OMAP platform.
-
