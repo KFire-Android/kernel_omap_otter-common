@@ -1084,6 +1084,11 @@ int omap_mux_clear_wakeupenable(struct omap_mux *m)
 	return 0;
 }
 
+void omap_mux_reconfigure_iochain(void)
+{
+	omap_hwmod_reconfigure_io_chain();
+}
+
 static struct omap_mux * __init omap_mux_list_add(
 					struct omap_mux_partition *partition,
 					struct omap_mux *src)

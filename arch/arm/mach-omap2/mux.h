@@ -286,6 +286,10 @@ int omap_mux_clear_wakeupenable(struct omap_mux *m);
  */
 bool omap_mux_get_wakeupenable(struct omap_mux *m);
 
+/** omap_mux_reconfigure_iochain() - reconfigure IO chain after mux change
+ */
+void omap_mux_reconfigure_iochain(void);
+
 /**
  * omap_mux_set_gpio() - set mux register value based on GPIO number
  * @val:		New mux register value
