@@ -160,8 +160,6 @@
 #define OMAP54XX_SR2_SENNAVGWEIGHT	0x04
 
 struct voltagedomain;
-struct omap_volt_data;
-
 struct omap_sr_ops;
 
 struct omap_sr {
