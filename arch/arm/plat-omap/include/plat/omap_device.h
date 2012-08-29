@@ -84,6 +84,9 @@ struct omap_device {
 
 int omap_device_enable(struct platform_device *pdev);
 int omap_device_idle(struct platform_device *pdev);
+int omap_device_runtime_resume_helper(struct device *dev);
+int omap_device_runtime_suspend_helper(struct device *dev);
+
 int omap_device_shutdown(struct platform_device *pdev);
 
 /* Core code interface */
