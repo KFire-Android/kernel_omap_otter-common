@@ -44,10 +44,10 @@
 			"AFMR", "Line In",
 			"Headset Playback", "PDM_DL1",
 			"PDM_UL1", "Capture",
-			"omap-mcbsp.1 Playback", "BT_VX_DL",
-			"BT_VX_UL", "omap-mcbsp.1 Capture",
-			"omap-mcbsp.2 Playback", "MM_EXT_DL",
-			"MM_EXT_UL", "omap-mcbsp.2 Capture";
+			"40122000.mcbsp Playback", "BT_VX_DL",
+			"BT_VX_UL", "40122000.mcbsp Capture",
+			"40124000.mcbsp Playback", "MM_EXT_DL",
+			"MM_EXT_UL", "40124000.mcbsp Capture";
 	};
 };
 
