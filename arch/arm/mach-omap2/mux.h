@@ -290,6 +290,11 @@ bool omap_mux_get_wakeupenable(struct omap_mux *m);
  */
 void omap_mux_reconfigure_iochain(void);
 
+/** omap_mux_get_wakeupstatus() - get wakeup status for a pad
+ * @m:			mux struct
+ */
+bool omap_mux_get_wakeupstatus(struct omap_mux *m);
+
 /**
  * omap_mux_set_gpio() - set mux register value based on GPIO number
  * @val:		New mux register value

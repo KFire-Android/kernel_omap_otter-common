@@ -1056,6 +1056,16 @@ bool omap_mux_get_wakeupenable(struct omap_mux *m)
 	return val & OMAP_PIN_OFF_WAKEUPENABLE;
 }
 
+bool omap_mux_get_wakeupstatus(struct omap_mux *m)
+{
+	u16 val;
+	if (IS_ERR_OR_NULL(m))
+		return false;
+
+	val = omap_mux_read(m->partition, m->reg_offset);
+	return val & OMAP_WAKEUP_EVENT;
+}
+
 /* Has no locking, don't use on a pad that is remuxed (by hwmod or otherwise) */
 int omap_mux_set_wakeupenable(struct omap_mux *m)
 {
