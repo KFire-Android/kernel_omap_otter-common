@@ -412,7 +412,7 @@ static u32 sr_retrieve_lvt_nvalue(struct omap_sr *sr, u32 efuse_offs)
 /**
  * sr_configure_errgen() - Configures the smrtreflex to perform AVS using the
  *			 error generator module.
- * @voltdm:	VDD pointer to which the SR module to be configured belongs to.
+ * @sr:			SR module to be configured.
  *
  * This API is to be called from the smartreflex class driver to
  * configure the error generator module inside the smartreflex module.
@@ -421,18 +421,17 @@ static u32 sr_retrieve_lvt_nvalue(struct omap_sr *sr, u32 efuse_offs)
  * SR CLASS 2 can choose between ERROR module and MINMAXAVG
  * module. Returns 0 on success and error value in case of failure.
  */
-int sr_configure_errgen(struct voltagedomain *voltdm)
+int sr_configure_errgen(struct omap_sr *sr)
 {
 	u32 sr_config, sr_errconfig, errconfig_offs;
 	u32 vpboundint_en, vpboundint_st;
 	u32 senp_en = 0, senn_en = 0;
 	u8 senp_shift, senn_shift;
-	struct omap_sr *sr = _sr_lookup(voltdm);
 
-	if (IS_ERR(sr)) {
-		pr_warning("%s: omap_sr struct for voltdm not found\n",
-			   __func__);
-		return PTR_ERR(sr);
+	if (IS_ERR_OR_NULL(sr)) {
+		pr_warning("%s: bad omap_sr %p from %pF\n", __func__,
+			   sr, (void *)_RET_IP_);
+		return sr ? PTR_ERR(sr) : -EINVAL;
 	}
 
 	if (!sr->clk_length)
@@ -488,23 +487,22 @@ int sr_configure_errgen(struct voltagedomain *voltdm)
 
 /**
  * sr_disable_errgen() - Disables SmartReflex AVS module's errgen component
- * @voltdm:	VDD pointer to which the SR module to be configured belongs to.
+ * @sr:			SR module to be configured.
  *
  * This API is to be called from the smartreflex class driver to
  * disable the error generator module inside the smartreflex module.
  *
  * Returns 0 on success and error value in case of failure.
  */
-int sr_disable_errgen(struct voltagedomain *voltdm)
+int sr_disable_errgen(struct omap_sr *sr)
 {
 	u32 errconfig_offs;
 	u32 vpboundint_en, vpboundint_st;
-	struct omap_sr *sr = _sr_lookup(voltdm);
 
-	if (IS_ERR(sr)) {
-		pr_warning("%s: omap_sr struct for voltdm not found\n",
-			   __func__);
-		return PTR_ERR(sr);
+	if (IS_ERR_OR_NULL(sr)) {
+		pr_warning("%s: bad omap_sr %p from %pF\n", __func__,
+			   sr, (void *)_RET_IP_);
+		return sr ? PTR_ERR(sr) : -EINVAL;
 	}
 
 	switch (sr->ip_type) {
