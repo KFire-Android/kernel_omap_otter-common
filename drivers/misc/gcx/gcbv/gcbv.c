@@ -4360,12 +4360,13 @@ enum bverror bv_blt(struct bvbltparams *bltparams)
 					}
 				}
 
-				if (EQ_SIZE(srcinfo[i].rect, dstrect))
-					bverror = do_blit(bltparams, batch,
-							  &srcinfo[i]);
-				else if ((srcinfo[i].rect->width == 1) &&
-					 (srcinfo[i].rect->height == 1))
+				if ((srcinfo[i].rect->width == 1) &&
+				    (srcinfo[i].rect->height == 1) &&
+				    (bltparams->src1.desc->virtaddr))
 					bverror = do_fill(bltparams, batch,
+							&srcinfo[i]);
+				else if (EQ_SIZE(srcinfo[i].rect, dstrect))
+					bverror = do_blit(bltparams, batch,
 							  &srcinfo[i]);
 				else
 					bverror = do_filter(bltparams, batch,
