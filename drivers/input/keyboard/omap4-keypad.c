@@ -471,12 +471,41 @@ static const struct of_device_id omap_keypad_dt_match[] = {
 };
 MODULE_DEVICE_TABLE(of, omap_keypad_dt_match);
 
+#ifdef CONFIG_PM
+static int omap4_keypad_suspend(struct device *dev)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct omap4_keypad *keypad_data = platform_get_drvdata(pdev);
+
+	omap4_keypad_close(keypad_data->input);
+	return 0;
+}
+
+static int omap4_keypad_resume(struct device *dev)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct omap4_keypad *keypad_data = platform_get_drvdata(pdev);
+
+	omap4_keypad_open(keypad_data->input);
+	return 0;
+}
+
+static const struct dev_pm_ops omap4_keypad_pm_ops = {
+	.suspend = omap4_keypad_suspend,
+	.resume = omap4_keypad_resume,
+};
+#define OMAP4_KEYPAD_PM_OPS (&omap4_keypad_pm_ops)
+#else
+#define OMAP4_KEYPAD_PM_OPS NULL
+#endif
+
 static struct platform_driver omap4_keypad_driver = {
 	.probe		= omap4_keypad_probe,
 	.remove		= __devexit_p(omap4_keypad_remove),
 	.driver		= {
 		.name	= "omap4-keypad",
 		.owner	= THIS_MODULE,
+		.pm	= OMAP4_KEYPAD_PM_OPS,
 		.of_match_table = of_match_ptr(omap_keypad_dt_match),
 	},
 };
