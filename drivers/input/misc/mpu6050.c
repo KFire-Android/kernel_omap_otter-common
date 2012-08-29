@@ -27,8 +27,149 @@
 #include <linux/err.h>
 #include <linux/i2c.h>
 #include <linux/input/mpu6050.h>
+#include <linux/platform_device.h>
 
 #include "mpu6050x.h"
+
+#define MPU6050_DEBUG
+
+#ifdef MPU6050_DEBUG
+struct mpu6050_reg {
+	u8 *name;
+	uint8_t reg;
+} mpu6050_regs[] = {
+	{ "SMPLRT_DIV", MPU6050_REG_SMPLRT_DIV },
+	{ "CONFIG", MPU6050_REG_CONFIG },
+	{ "GYRO_CONFIG", MPU6050_REG_GYRO_CONFIG },
+	{ "ACCEL_CONFIG", MPU6050_REG_ACCEL_CONFIG },
+	{ "ACCEL_FF_TH", MPU6050_REG_ACCEL_FF_THR },
+	{ "ACCEL_FF_DUR", MPU6050_REG_ACCEL_FF_DUR },
+	{ "ACCEL_MOT_TH", MPU6050_REG_ACCEL_MOT_THR },
+	{ "ACCEL_MOT_DUR", MPU6050_REG_ACCEL_MOT_DUR },
+	{ "ACCEL_ZRMOT_THR", MPU6050_REG_ACCEL_ZRMOT_THR },
+	{ "ACCEL_ZRMOT_DUR", MPU6050_REG_ACCEL_ZRMOT_DUR },
+	{ "ACCEL_FIFO_EX", MPU6050_REG_FIFO_EN },
+	{ "I2C_MST_CTRL", MPU6050_REG_I2C_MST_CTRL },
+	{ "I2C_SLV0_ADDR", MPU6050_REG_I2C_SLV0_ADDR },
+	{ "I2C_SLV0_REG", MPU6050_REG_I2C_SLV0_REG },
+	{ "I2C_SLV0_CTRL", MPU6050_REG_I2C_SLV0_CTRL },
+	{ "I2C_SLV1_ADDR", MPU6050_REG_I2C_SLV1_ADDR },
+	{ "I2C_SLV1_REG" , MPU6050_REG_I2C_SLV1_REG },
+	{ "I2C_SLV1_CTRL" , MPU6050_REG_I2C_SLV1_CTRL },
+	{ "I2C_SLV2_ADDR", MPU6050_REG_I2C_SLV2_ADDR },
+	{ "I2C_SLV2_REG", MPU6050_REG_I2C_SLV2_REG },
+	{ "I2C_SLV2_CTRL", MPU6050_REG_I2C_SLV2_CTRL },
+	{ "I2C_SLV3_ADDR", MPU6050_REG_I2C_SLV3_ADDR },
+	{ "I2C_SLV3_REG", MPU6050_REG_I2C_SLV3_REG },
+	{ "I2C_SLV3_CTRL", MPU6050_REG_I2C_SLV3_CTRL },
+	{ "I2C_SLV4_ADDR", MPU6050_REG_I2C_SLV4_ADDR },
+	{ "I2C_SLV4_REG", MPU6050_REG_I2C_SLV4_REG },
+	{ "I2C_SLV4_DO", MPU6050_REG_I2C_SLV4_DO },
+	{ "I2C_SLV4_CTRL", MPU6050_REG_I2C_SLV4_CTRL },
+	{ "I2C_SLV4_DI", MPU6050_REG_I2C_SLV4_DI },
+	{ "I2C_MST_STATUS", MPU6050_REG_I2C_MST_STATUS },
+	{ "INT_PIN_CFG", MPU6050_REG_INT_PIN_CFG },
+	{ "INT_PIN_EN", MPU6050_REG_INT_ENABLE },
+	{ "INT_PIN_STATUS", MPU6050_REG_INT_STATUS },
+	{ "ACC_X_H", MPU6050_REG_ACCEL_XOUT_H },
+	{ "ACC_X_L", MPU6050_REG_ACCEL_XOUT_L },
+	{ "ACC_Y_H", MPU6050_REG_ACCEL_YOUT_H },
+	{ "ACC_Y_L", MPU6050_REG_ACCEL_YOUT_L },
+	{ "ACC_Z_H", MPU6050_REG_ACCEL_ZOUT_H },
+	{ "ACC_Z_L", MPU6050_REG_ACCEL_ZOUT_L },
+	{ "TEMP_H", MPU6050_REG_TEMP_OUT_H },
+	{ "TEMP_L", MPU6050_REG_TEMP_OUT_L },
+	{ "GYRO_X_H", MPU6050_REG_GYRO_XOUT_H },
+	{ "GYRO_X_L", MPU6050_REG_GYRO_XOUT_L },
+	{ "GYRO_Y_H", MPU6050_REG_GYRO_YOUT_H },
+	{ "GYRO_Y_L", MPU6050_REG_GYRO_YOUT_L },
+	{ "GYRO_Z_H", MPU6050_REG_GYRO_ZOUT_H },
+	{ "GYRO_Z_L", MPU6050_REG_GYRO_ZOUT_L },
+	{ "ACC_INTEL_STATUS", MPU6050_REG_ACCEL_INTEL_STATUS },
+	{ "I2C_SLV0_DO", MPU6050_REG_I2C_SLV0_DO },
+	{ "I2C_SLV1_DO", MPU6050_REG_I2C_SLV1_DO },
+	{ "I2C_SLV2_DO", MPU6050_REG_I2C_SLV2_DO },
+	{ "I2C_SLV3_DO", MPU6050_REG_I2C_SLV3_DO },
+	{ "MST_DELAY_CTRL", MPU6050_REG_I2C_MST_DELAY_CTRL },
+	{ "SIG_PATH_RESET", MPU6050_REG_SIGNAL_PATH_RESET },
+	{ "ACC_INTEL_CTRL", MPU6050_REG_ACCEL_INTEL_CTRL },
+	{ "USER_CTRL", MPU6050_REG_USER_CTRL },
+	{ "PWR_MGT_1", MPU6050_REG_PWR_MGMT_1 },
+	{ "PWR_MGT_2", MPU6050_REG_PWR_MGMT_2 },
+	{ "FIFO_COUNT_H", MPU6050_REG_FIFO_COUNTH },
+	{ "FIFO_COUNT_L", MPU6050_REG_FIFO_COUNTL },
+	{ "FIFO_COUNT_R_W", MPU6050_REG_FIFO_R_W },
+	{ "WHO_AM_I", MPU6050_REG_WHOAMI },
+};
+
+static ssize_t mpu6050_registers_show(struct device *dev,
+			      struct device_attribute *attr, char *buf)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct mpu6050_data *data = platform_get_drvdata(pdev);
+	unsigned i, n, reg_count;
+	uint8_t value;
+
+	reg_count = sizeof(mpu6050_regs) / sizeof(mpu6050_regs[0]);
+	for (i = 0, n = 0; i < reg_count; i++) {
+		MPU6050_READ(data, MPU6050_CHIP_I2C_ADDR,
+			mpu6050_regs[i].reg, 1, &value, mpu6050_regs[i].name);
+		n += scnprintf(buf + n, PAGE_SIZE - n,
+			       "%-20s = 0x%02X\n",
+			       mpu6050_regs[i].name, value);
+	}
+
+	return n;
+}
+
+static ssize_t mpu6050_registers_store(struct device *dev,
+			       struct device_attribute *attr,
+			       const char *buf, size_t count)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct mpu6050_data *data = platform_get_drvdata(pdev);
+	unsigned i, reg_count, value;
+	char name[30];
+
+	if (count >= 30) {
+		pr_err("%s:input too long\n", __func__);
+		return -1;
+	}
+
+	if (sscanf(buf, "%s %x", name, &value) != 2) {
+		pr_err("%s:unable to parse input\n", __func__);
+		return -1;
+	}
+
+	reg_count = sizeof(mpu6050_regs) / sizeof(mpu6050_regs[0]);
+	for (i = 0; i < reg_count; i++) {
+		if (!strcmp(name, mpu6050_regs[i].name)) {
+			MPU6050_WRITE(data, MPU6050_CHIP_I2C_ADDR,
+				mpu6050_regs[i].reg, value,
+				mpu6050_regs[i].name);
+			return count;
+		}
+	}
+
+	pr_err("%s:no such register %s\n", __func__, name);
+	return -1;
+}
+
+static DEVICE_ATTR(registers, S_IWUSR | S_IRUGO,
+		mpu6050_registers_show, mpu6050_registers_store);
+
+static struct attribute *mpu6050_attrs[] = {
+	&dev_attr_registers.attr,
+	NULL
+};
+
+static const struct attribute_group mpu6050_attr_group = {
+	.attrs = mpu6050_attrs,
+};
+
+#endif
+
+
 
 static int mpu6050_enable_sleep(struct mpu6050_data *data, int action)
 {
@@ -271,6 +412,9 @@ int mpu6050_init(struct mpu6050_data *data, const struct mpu6050_bus_ops *bops)
 				return -ENODEV;
 		}
 	}
+#ifdef MPU6050_DEBUG
+	error = sysfs_create_group(&data->client->dev.kobj, &mpu6050_attr_group);
+#endif
 
 	return error;
 }
@@ -278,6 +422,9 @@ EXPORT_SYMBOL(mpu6050_init);
 
 void mpu6050_exit(struct mpu6050_data *data)
 {
+#ifdef MPU6050_DEBUG
+	sysfs_remove_group(&data->client->dev.kobj, &mpu6050_attr_group);
+#endif
 	if (data->pdata->flags & MPU6050_USE_ACCEL)
 		mpu6050_accel_exit(data->accel_data);
 
