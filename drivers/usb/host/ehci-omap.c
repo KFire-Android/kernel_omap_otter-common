@@ -328,9 +328,17 @@ static int ehci_hcd_omap_remove(struct platform_device *pdev)
 static void ehci_hcd_omap_shutdown(struct platform_device *pdev)
 {
 	struct usb_hcd *hcd = dev_get_drvdata(&pdev->dev);
+	struct device *dev = &pdev->dev;
+
+	if (pm_runtime_suspended(dev))
+		pm_runtime_get_sync(dev);
 
 	if (hcd->driver->shutdown)
 		hcd->driver->shutdown(hcd);
+
+	if (!(pm_runtime_suspended(dev)))
+		pm_runtime_put_sync(dev);
+
 }
 
 static int ehci_omap_bus_suspend(struct usb_hcd *hcd)
