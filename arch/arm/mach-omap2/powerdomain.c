@@ -739,7 +739,7 @@ int pwrdm_get_achievable_pwrst(struct powerdomain *pwrdm, u8 req_pwrst)
  */
 int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 pwrst)
 {
-	u8 curr_pwrst, next_pwrst;
+	u8 curr_pwrst, next_pwrst, prev_pwrst;
 	int sleep_switch = -1, ret = 0, hwsup = 0;
 
 	if (!pwrdm || IS_ERR(pwrdm)) {
@@ -754,6 +754,7 @@ int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 pwrst)
 
 	next_pwrst = pwrdm_read_next_pwrst(pwrdm);
 	curr_pwrst = pwrdm_read_pwrst(pwrdm);
+	prev_pwrst = pwrdm_read_prev_pwrst(pwrdm);
 	/*
 	 * we do not need to do anything IFF it is SURE that
 	 * current power domain state is the same and the programmed
@@ -786,6 +787,10 @@ int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 pwrst)
 
 	switch (sleep_switch) {
 	case FORCEWAKEUP_SWITCH:
+		/*
+		 * power state counters are updated from clkdm functions
+		 * as needed
+		 */
 		if (hwsup)
 			clkdm_allow_idle(pwrdm->pwrdm_clkdms[0]);
 		else
@@ -794,10 +799,23 @@ int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 pwrst)
 	case LOWPOWERSTATE_SWITCH:
 		pwrdm_set_lowpwrstchange(pwrdm);
 		pwrdm_wait_transition(pwrdm);
-		pwrdm_state_switch(pwrdm);
+		pwrdm_state_high2low_counter_update(pwrdm);
 		break;
+	default:
+		/*
+		 * we are here because the powerdomain is ON, likely
+		 * due to a wakeup interrupt. Just update the counters
+		 * The two possible cases, why we could be here are
+		 * a powerdomain wakeup due to a pending interrupt, or
+		 * via suspend
+		 */
+		if (_pwrdm_state_compare_int(curr_pwrst, prev_pwrst,
+					     PWRDM_COMPARE_PWRST_GT))
+				pwrdm_state_low2high_counter_update(pwrdm);
+		else if (_pwrdm_state_compare_int(curr_pwrst, pwrst,
+						  PWRDM_COMPARE_PWRST_GT))
+				pwrdm_state_high2low_counter_update(pwrdm);
 	}
-
 out:
 	spin_unlock(&pwrdm->lock);
 	return ret;
