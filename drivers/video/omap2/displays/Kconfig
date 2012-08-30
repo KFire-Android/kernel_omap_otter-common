@@ -79,4 +79,19 @@ config PANEL_N8X0
 	depends on BACKLIGHT_CLASS_DEVICE
 	help
 	  This is the LCD panel used on Nokia N8x0
+
+config PANEL_TC358765
+	tristate "Toshiba TC358765 DSI-2-LVDS bridge"
+	depends on OMAP2_DSS_DSI && I2C
+	select BACKLIGHT_CLASS_DEVICE
+	help
+		Toshiba TC358765 DSI-2-LVDS chip with 1024x768 panel,
+		which can be found in OMAP4-based Blaze Tablet boards
+		and some other boards.
+
+config TC358765_DEBUG
+	bool "Toshiba TC358765 DSI-2-LVDS chip debug"
+	depends on PANEL_TC358765 && DEBUG_FS
+	help
+	  Support of TC358765 DSI-2-LVDS chip register access via debugfs
 endmenu

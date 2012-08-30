@@ -355,6 +355,15 @@ config MACH_OMAP_4430SDP
 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
 	select OMAP_TPS6236X
 
+config MACH_OMAP_44XX_TABLET
+	bool "OMAP 44XX Tablet board"
+	default y
+	depends on ARCH_OMAP4
+	select OMAP_PACKAGE_CBS
+	select REGULATOR_FIXED_VOLTAGE
+	select OMAP_TPS6236X
+	select LEDS_OMAP4430_SDP_DISPLAY
+
 config MACH_OMAP4_PANDA
 	bool "OMAP4 Panda Board"
 	default y

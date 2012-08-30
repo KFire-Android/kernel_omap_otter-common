@@ -1426,7 +1426,7 @@ static struct omap_hwmod omap44xx_dss_hwmod = {
 	.prcm = {
 		.omap4 = {
 			.clkctrl_offs = OMAP4_CM_DSS_DSS_CLKCTRL_OFFSET,
-			.context_offs = OMAP4_RM_DSS_DSS_CONTEXT_OFFSET,
+			.context_offs = USHRT_MAX,
 			.modulemode   = MODULEMODE_SWCTRL,
 		},
 	},
@@ -1627,7 +1627,7 @@ static struct omap_hwmod omap44xx_dss_dsi1_hwmod = {
 	.prcm = {
 		.omap4 = {
 			.clkctrl_offs = OMAP4_CM_DSS_DSS_CLKCTRL_OFFSET,
-			.context_offs = OMAP4_RM_DSS_DSS_CONTEXT_OFFSET,
+			.context_offs = USHRT_MAX,
 		},
 	},
 	.opt_clks	= dss_dsi1_opt_clks,
@@ -1704,7 +1704,7 @@ static struct omap_hwmod omap44xx_dss_dsi2_hwmod = {
 	.prcm = {
 		.omap4 = {
 			.clkctrl_offs = OMAP4_CM_DSS_DSS_CLKCTRL_OFFSET,
-			.context_offs = OMAP4_RM_DSS_DSS_CONTEXT_OFFSET,
+			.context_offs = USHRT_MAX,
 		},
 	},
 	.opt_clks	= dss_dsi2_opt_clks,
@@ -1801,7 +1801,7 @@ static struct omap_hwmod omap44xx_dss_hdmi_hwmod = {
 	.prcm = {
 		.omap4 = {
 			.clkctrl_offs = OMAP4_CM_DSS_DSS_CLKCTRL_OFFSET,
-			.context_offs = OMAP4_RM_DSS_DSS_CONTEXT_OFFSET,
+			.context_offs = USHRT_MAX,
 		},
 	},
 	.opt_clks	= dss_hdmi_opt_clks,
@@ -1892,7 +1892,7 @@ static struct omap_hwmod omap44xx_dss_rfbi_hwmod = {
 	.prcm = {
 		.omap4 = {
 			.clkctrl_offs = OMAP4_CM_DSS_DSS_CLKCTRL_OFFSET,
-			.context_offs = OMAP4_RM_DSS_DSS_CONTEXT_OFFSET,
+			.context_offs = USHRT_MAX,
 		},
 	},
 	.opt_clks	= dss_rfbi_opt_clks,
@@ -1962,7 +1962,7 @@ static struct omap_hwmod omap44xx_dss_venc_hwmod = {
 	.prcm = {
 		.omap4 = {
 			.clkctrl_offs = OMAP4_CM_DSS_DSS_CLKCTRL_OFFSET,
-			.context_offs = OMAP4_RM_DSS_DSS_CONTEXT_OFFSET,
+			.context_offs = USHRT_MAX,
 		},
 	},
 	.slaves		= omap44xx_dss_venc_slaves,
