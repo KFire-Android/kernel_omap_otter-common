@@ -469,7 +469,7 @@ static void tc358765_set_timings(struct omap_dss_device *dssdev,
 static int tc358765_check_timings(struct omap_dss_device *dssdev,
 		struct omap_video_timings *timings)
 {
-	if ( unlikely(!timings) ) {
+	if (unlikely(!timings)) {
 		WARN(true, "%s: timings NULL pointer was passed\n", __func__);
 		return -EINVAL;
 	}
