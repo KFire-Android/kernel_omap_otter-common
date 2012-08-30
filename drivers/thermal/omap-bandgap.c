@@ -1404,7 +1404,6 @@ int __devinit omap_bandgap_probe(struct platform_device *pdev)
 	}
 
 	g_bg_ptr = bg_ptr;
-	g_bg_ptr->bg_in_suspend = false;
 	g_bg_ptr->bg_clk_idle = false;
 	return 0;
 
@@ -1566,8 +1565,6 @@ static int omap_bandgap_suspend(struct device *dev)
 	struct omap_bandgap *bg_ptr = dev_get_drvdata(dev);
 	int err;
 
-	g_bg_ptr->bg_in_suspend = true;
-
 	err = omap_bandgap_save_ctxt(bg_ptr);
 	clk_disable(bg_ptr->fclock);
 
@@ -1579,8 +1576,6 @@ static int omap_bandgap_resume(struct device *dev)
 	struct omap_bandgap *bg_ptr = dev_get_drvdata(dev);
 
 	clk_enable(bg_ptr->fclock);
-
-	g_bg_ptr->bg_in_suspend = false;
 
 	return omap_bandgap_restore_ctxt(bg_ptr);
 }
@@ -1596,13 +1591,6 @@ static const struct dev_pm_ops omap_bandgap_dev_pm_ops = {
 
 void omap_bandgap_prepare_for_idle(void)
 {
-	/*
-	 * If the System-wide Suspend/Resume is initiated, then clocks
-	 * are taken care by the suspend/resume handlers. Hence nothing
-	 * todo in the notifiers, so just return.
-	 */
-	if (g_bg_ptr->bg_in_suspend)
-		return;
 
 	clk_disable(g_bg_ptr->fclock);
 	g_bg_ptr->bg_clk_idle = true;

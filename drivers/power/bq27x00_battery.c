@@ -584,7 +584,7 @@ static int bq27x00_powersupply_init(struct bq27x00_device_info *di)
 		return ret;
 	}
 
-	if (curr_val.intval < 100000) {
+	if (abs(curr_val.intval) < 100000) {
 		/*
 		 * In case current is less than 100mA then check if
 		 * voltage is more than 3.9V in that case we are

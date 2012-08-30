@@ -65,6 +65,7 @@
 #define GPIO_HUB_NRESET		80	/* USBB2 to SMSC 3530 HUB */
 #define GPIO_POWER_BUTTON	83
 #define GPIO_EXT_INT_PIN	99
+#define GPIO_TWL6040_PWRON	141
 #define GPIO_SDCARD_DETECT	152
 #define HDMI_GPIO_HPD		193
 #define HDMI_GPIO_CT_CP_HPD	256
@@ -135,6 +136,25 @@ static struct omap_board_mux board_mux[] __initdata = {
 		OMAP_PIN_INPUT_PULLUP | OMAP_PIN_OFF_NONE | OMAP_MUX_MODE6),
 	OMAP5_MUX(HSI2_ACDATA,
 		OMAP_WAKEUP_EN | OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE6),
+	OMAP5_MUX(MCSPI1_SOMI, OMAP_PIN_OUTPUT | OMAP_MUX_MODE6),
+
+	/* Audio pads */
+	OMAP5_MUX(ABE_CLKS, OMAP_PIN_INPUT | OMAP_MUX_MODE0),
+	OMAP5_MUX(ABEDMIC_DIN1, OMAP_PIN_INPUT | OMAP_MUX_MODE4),
+	OMAP5_MUX(ABEDMIC_DIN2, OMAP_PIN_INPUT | OMAP_MUX_MODE4),
+	OMAP5_MUX(ABEDMIC_CLK1, OMAP_MUX_MODE4),
+	OMAP5_MUX(ABEDMIC_CLK2, OMAP_PIN_INPUT | OMAP_MUX_MODE1),
+	OMAP5_MUX(ABEDMIC_CLK3, OMAP_MUX_MODE1),
+	OMAP5_MUX(ABESLIMBUS1_CLOCK, OMAP_PIN_INPUT | OMAP_MUX_MODE1),
+	OMAP5_MUX(ABESLIMBUS1_DATA, OMAP_PIN_INPUT | OMAP_MUX_MODE1),
+	OMAP5_MUX(ABEMCBSP2_DR, OMAP_PIN_INPUT | OMAP_MUX_MODE0),
+	OMAP5_MUX(ABEMCBSP2_DX, OMAP_MUX_MODE0),
+	OMAP5_MUX(ABEMCBSP2_FSX, OMAP_PIN_INPUT | OMAP_MUX_MODE0),
+	OMAP5_MUX(ABEMCBSP2_CLKX, OMAP_PIN_INPUT | OMAP_MUX_MODE0),
+	OMAP5_MUX(ABEMCPDM_UL_DATA, OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE0),
+	OMAP5_MUX(ABEMCPDM_DL_DATA, OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE0),
+	OMAP5_MUX(ABEMCPDM_FRAME, OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0),
+	OMAP5_MUX(ABEMCPDM_LB_CLK, OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0),
 	{ .reg_offset = OMAP_MUX_TERMINATOR },
 };
 #else
@@ -677,12 +697,17 @@ static struct twl6040_vibra_data twl6040_vibra = {
 static struct twl6040_platform_data twl6040_data = {
 	.codec		= &twl6040_codec,
 	.vibra		= &twl6040_vibra,
-	.audpwron_gpio	= 145,
+	.audpwron_gpio	= GPIO_TWL6040_PWRON,
 };
 
 static struct platform_device omap5evm_dmic_codec = {
 	.name	= "dmic-codec",
 	.id	= -1,
+};
+
+static struct platform_device omap5evm_spdif_dit_codec = {
+	.name           = "spdif-dit",
+	.id             = -1,
 };
 
 static struct platform_device omap5evm_hdmi_audio_codec = {
@@ -720,6 +745,7 @@ static struct platform_device omap5evm_abe_audio = {
 
 static struct platform_device *omap5evm_devices[] __initdata = {
 	&omap5evm_dmic_codec,
+	&omap5evm_spdif_dit_codec,
 	&omap5evm_hdmi_audio_codec,
 	&omap5evm_abe_audio,
 	&panda5_leds_gpio,
