@@ -32,6 +32,7 @@
 #include <asm/irq.h>
 #include <mach/irqs.h>
 #include <asm/mach/irq.h>
+#include <plat/omap_device.h>
 
 #include "../mux.h"
 
@@ -1193,6 +1194,9 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
 	if (bank->loses_context)
 		bank->get_context_loss_count = pdata->get_context_loss_count;
 
+	/* Don't idle omap device during suspend */
+	omap_device_disable_idle_on_suspend(pdev);
+
 	pm_runtime_put(bank->dev);
 
 	list_add_tail(&bank->node, &omap_gpio_list);
@@ -1460,6 +1464,8 @@ void omap2_gpio_prepare_for_idle(int pwr_mode)
 
 		if (is_idle_task(current))
 			omap_gpio_pm_idle(bank->dev);
+		else
+			omap_device_runtime_suspend(bank->dev);
 	}
 }
 
@@ -1473,6 +1479,8 @@ void omap2_gpio_resume_after_idle(void)
 
 		if (is_idle_task(current))
 			omap_gpio_pm_noidle(bank->dev);
+		else
+			omap_device_runtime_resume(bank->dev);
 	}
 }
 
