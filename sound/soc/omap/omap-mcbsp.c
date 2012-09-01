@@ -35,6 +35,8 @@
 #include <plat/mcbsp.h>
 #include "omap-mcbsp.h"
 #include "omap-pcm.h"
+#include "omap-abe.h"
+#include "abe/abe_typ.h"
 
 #define OMAP_MCBSP_RATES	(SNDRV_PCM_RATE_8000_96000)
 
@@ -246,6 +248,8 @@ static int omap_mcbsp_dai_hw_params(struct snd_pcm_substream *substream,
 	dma = omap_mcbsp_dma_ch_params(bus_id, substream->stream);
 	port = omap_mcbsp_dma_reg_params(bus_id, substream->stream);
 
+	if (cpu_dai->id != OMAP_ABE_DAI_MM_FM) {
+
 	switch (params_format(params)) {
 	case SNDRV_PCM_FORMAT_S16_LE:
 		dma_data->data_type = OMAP_DMA_DATA_TYPE_S16;
@@ -258,6 +262,14 @@ static int omap_mcbsp_dai_hw_params(struct snd_pcm_substream *substream,
 	default:
 		return -EINVAL;
 	}
+
+	} else {
+		printk(KERN_ERR "%s: found OMAP_ABE_DAI_MM_FM\n");
+		regs->xcr2 |= XCOMPAND(0);
+		dma_data->data_type = OMAP_DMA_DATA_TYPE_S16;
+		wlen = 16;
+	}
+
 	if (cpu_is_omap34xx() || cpu_is_omap44xx()) {
 		dma_data->set_threshold = omap_mcbsp_set_threshold;
 		/* TODO: Currently, MODE_ELEMENT == MODE_FRAME */
@@ -333,6 +345,8 @@ static int omap_mcbsp_dai_hw_params(struct snd_pcm_substream *substream,
 	regs->rcr1	|= RFRLEN1(wpf - 1);
 	regs->xcr1	|= XFRLEN1(wpf - 1);
 
+	if (cpu_dai->id != OMAP_ABE_DAI_MM_FM) {
+
 	switch (params_format(params)) {
 	case SNDRV_PCM_FORMAT_S16_LE:
 		/* Set word lengths */
@@ -351,6 +365,13 @@ static int omap_mcbsp_dai_hw_params(struct snd_pcm_substream *substream,
 	default:
 		/* Unsupported PCM format */
 		return -EINVAL;
+	}
+
+	} else {
+		regs->rcr2	|= RWDLEN2(OMAP_MCBSP_WORD_16);
+		regs->rcr1	|= RWDLEN1(OMAP_MCBSP_WORD_16);
+		regs->xcr2	|= XWDLEN2(OMAP_MCBSP_WORD_16);
+		regs->xcr1	|= XWDLEN1(OMAP_MCBSP_WORD_16);
 	}
 
 	/* In McBSP master modes, FRAME (i.e. sample rate) is generated
@@ -461,6 +482,7 @@ static int omap_mcbsp_dai_set_dai_fmt(struct snd_soc_dai *cpu_dai,
 		break;
 	case SND_SOC_DAIFMT_CBM_CFM:
 		/* McBSP slave */
+		regs->wken = XFSXEN | RFSREN;
 		break;
 	default:
 		/* Unsupported master/slave configuration */
