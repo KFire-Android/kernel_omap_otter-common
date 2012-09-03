@@ -391,7 +391,10 @@ static void OMAPLFBSetNV12Params(struct bvsurfgeom *geom, struct bvbuffdesc *des
 		return;
 
 	/* Fixup stride for NV12 format */
-	geom->virtstride = (desc->length * 2) / (geom->height * 3);
+	if (geom->orientation % 180 == 0)
+		geom->virtstride = (desc->length * 2) / (geom->height * 3);
+	else
+		geom->virtstride = (desc->length * 2) / (geom->width * 3);
 }
 
 void OMAPLFBDoBlits(OMAPLFB_DEVINFO *psDevInfo, PDC_MEM_INFO *ppsMemInfos, struct omap_hwc_blit_data *blit_data, IMG_UINT32 ui32NumMemInfos)
