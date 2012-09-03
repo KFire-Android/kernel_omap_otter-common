@@ -1165,7 +1165,7 @@ static struct omap_aess_task task_aess_enable_bt_vx_ul_16k_port[] = {
 
 struct omap_aess_io_task aess_port_bt_vx_ul_16k = {
 	.nb_task = sizeof(task_aess_enable_bt_vx_ul_16k_port)/sizeof(struct omap_aess_task),
-	.smem = BT_DL_16k_labelID,
+	.smem = BT_UL_16k_labelID,
 	.task = task_aess_enable_bt_vx_ul_16k_port,
 };
 
