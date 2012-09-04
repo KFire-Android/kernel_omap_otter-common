@@ -2576,6 +2576,12 @@ static void __init _setup_postsetup(struct omap_hwmod *oh)
 		postsetup_state = _HWMOD_STATE_ENABLED;
 	}
 
+	/*
+	 * Process HWMOD_NO_ACCESS: module should be disabled and not accessible
+	 */
+	if (oh->flags & HWMOD_ACCESS_DISABLED)
+		postsetup_state = _HWMOD_STATE_DISABLED;
+
 	if (postsetup_state == _HWMOD_STATE_IDLE)
 		_idle(oh);
 	else if (postsetup_state == _HWMOD_STATE_DISABLED)
@@ -3185,6 +3191,11 @@ struct omap_hwmod *omap_hwmod_lookup(const char *name)
 		return NULL;
 
 	oh = _lookup(name);
+	/* check access flag */
+	if (oh && oh->flags & HWMOD_ACCESS_DISABLED) {
+		pr_warning("omap_hwmod: %s: access denied\n", oh->name);
+		oh = NULL;
+	}
 
 	return oh;
 }
@@ -3479,6 +3490,40 @@ int omap_hwmod_reset(struct omap_hwmod *oh)
 	spin_unlock_irqrestore(&oh->_lock, flags);
 
 	return r;
+}
+
+
+/**
+ * omap_hwmod_register_flags - set/clear hwmod flags
+ * @ohs: pointer to an array of omap_hwmods to register new flags
+ * @set_flags: flags which have to be set
+ * @clear_flags: flags which have to be cleared
+ *
+ * Intended to be called early in boot before the clock framework is
+ * initialized.  If @ohs is not null, will set/clear flags.
+ * Allowed to be called only in REGISTERED state.
+ * Returns 0.
+ */
+int __init omap_hwmod_register_flags(struct omap_hwmod **ohs,
+					u32 set_flags, u32 clear_flags)
+{
+	int i = 0;
+
+	if (!ohs)
+		return 0;
+
+	/* scan through list of modules */
+	do {
+		/* allow to be called only in registered state */
+		if (ohs[i]->_state != _HWMOD_STATE_REGISTERED) {
+			i++;
+			continue;
+		}
+
+		ohs[i]->flags = (ohs[i]->flags & ~clear_flags) | set_flags;
+	} while (ohs[++i]);
+
+	return 0;
 }
 
 /*
