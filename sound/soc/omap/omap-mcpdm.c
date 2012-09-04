@@ -34,6 +34,7 @@
 #include <linux/irq.h>
 #include <linux/slab.h>
 #include <linux/pm_runtime.h>
+#include <linux/platform_data/omap-mcpdm.h>
 
 #include <sound/core.h>
 #include <sound/pcm.h>
@@ -582,6 +583,7 @@ EXPORT_SYMBOL_GPL(omap_mcpdm_configure_dn_offsets);
 
 static __devinit int asoc_mcpdm_probe(struct platform_device *pdev)
 {
+	struct omap_mcpdm_pdata *pdata = dev_get_platdata(&pdev->dev);
 	struct omap_mcpdm *mcpdm;
 	struct resource *res;
 	int ret = 0;
@@ -639,6 +641,13 @@ static __devinit int asoc_mcpdm_probe(struct platform_device *pdev)
 		goto err_irq;
 	}
 #endif
+
+	/*
+	 * McPDM can be used to interface with analog audio chip
+	 * during voice calls, so can remain active during suspend
+	 */
+	if (pdata && pdata->disable_idle_on_suspend)
+		pdata->disable_idle_on_suspend(pdev);
 
 	ret = snd_soc_register_dais(&pdev->dev, omap_mcpdm_dai,
 			ARRAY_SIZE(omap_mcpdm_dai));

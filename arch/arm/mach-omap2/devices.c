@@ -21,8 +21,9 @@
 #include <linux/mm.h>
 #include <linux/platform_data/omap4-keypad.h>
 #include <linux/pm_runtime.h>
-#include <media/omap3isp.h>
+#include <linux/platform_data/omap-mcpdm.h>
 #include <sound/omap-abe.h>
+#include <media/omap3isp.h>
 
 #include <linux/omap_ocp2scp.h>
 
@@ -418,6 +419,7 @@ static void __init omap_init_mcpdm(void)
 {
 	struct omap_hwmod *oh;
 	struct platform_device *pdev;
+	struct omap_mcpdm_pdata *pdata;
 
 	oh = omap_hwmod_lookup("mcpdm");
 	if (!oh) {
@@ -425,8 +427,19 @@ static void __init omap_init_mcpdm(void)
 		return;
 	}
 
-	pdev = omap_device_build("omap-mcpdm", -1, oh, NULL, 0, NULL, 0, 0);
+	pdata = kzalloc(sizeof(*pdata), GFP_KERNEL);
+	if (!pdata) {
+		pr_err("Could not allocate mcpdm pdata\n");
+		return;
+	}
+
+	pdata->disable_idle_on_suspend = omap_device_disable_idle_on_suspend;
+
+	pdev = omap_device_build("omap-mcpdm", -1, oh, pdata, sizeof(*pdata),
+				 NULL, 0, 0);
 	WARN(IS_ERR(pdev), "Can't build omap_device for omap-mcpdm.\n");
+
+	kfree(pdata);
 }
 #else
 static inline void omap_init_mcpdm(void) {}
