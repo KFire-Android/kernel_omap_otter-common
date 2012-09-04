@@ -6757,18 +6757,37 @@ static __initdata struct omap_hwmod *omap54xx_hwmods_delta_es2plus[] = {
 	NULL,
 };
 
+/* OMAP5432 ES1 missing hwmods */
+static __initdata struct omap_hwmod *omap5432es1_hwmods_disable[] = {
+
+	/* mmc class */
+	&omap54xx_mmc5_hwmod,
+
+	/* uart class */
+	&omap54xx_uart1_hwmod,
+	&omap54xx_uart6_hwmod,
+
+	/* Terminator */
+	NULL,
+};
+
 int __init omap54xx_hwmod_init(void)
 {
 	int r;
-	/* if we are ES1.0, just program common ones */
-	if (omap_rev() == OMAP5430_REV_ES1_0 ||
-	    omap_rev() == OMAP5432_REV_ES1_0)
-		goto reg_common_hwmods;
+	unsigned int rev = omap_rev();
 
-	r = omap_hwmod_register(omap54xx_hwmods_delta_es2plus);
-	WARN(r, "Failed to register ES2+ hwmods with %d\n", r);
-	/* Fall through to attempt and register common hwmods */
+	/* register common */
+	r = omap_hwmod_register(omap54xx_hwmods_common);
+	WARN(r, "Failed to register 54xx common hwmods with %d\n", r);
 
-reg_common_hwmods:
-	return omap_hwmod_register(omap54xx_hwmods_common);
+	/* if not 5430ES1.0/5432ES1.0: program delta  */
+	if (rev != OMAP5430_REV_ES1_0 && rev != OMAP5432_REV_ES1_0)
+		r |= omap_hwmod_register(omap54xx_hwmods_delta_es2plus);
+
+	/* if we are 5432ES1.0: disable some hwmods */
+	if (rev == OMAP5432_REV_ES1_0)
+		r |= omap_hwmod_register_flags(omap5432es1_hwmods_disable,
+				HWMOD_ACCESS_DISABLED, 0);
+
+	return r;
 }
