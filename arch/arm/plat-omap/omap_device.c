@@ -831,12 +831,12 @@ static int _od_suspend_noirq(struct device *dev)
 	ret = pm_generic_suspend_noirq(dev);
 
 	if (!ret && !pm_runtime_status_suspended(dev)) {
-		if (pm_generic_runtime_suspend(dev) == 0) {
-			if (!(od->flags & OMAP_DEVICE_NO_IDLE_ON_SUSPEND))
+		if (!(od->flags & OMAP_DEVICE_NO_IDLE_ON_SUSPEND))
+			if (pm_generic_runtime_suspend(dev) == 0) {
 				omap_device_idle(pdev);
-			od->flags |= OMAP_DEVICE_SUSPENDED;
+				od->flags |= OMAP_DEVICE_SUSPENDED;
+			}
 		}
-	}
 
 	return ret;
 }
