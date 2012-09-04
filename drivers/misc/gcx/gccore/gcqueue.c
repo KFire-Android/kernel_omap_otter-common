@@ -567,9 +567,12 @@ static int gccmdthread(void *_gccorecontext)
 		/* Wait for ready signal. If 'ready' is signaled before the
 		 * call times out, signaled is set to a value greater then
 		 * zero. If the call times out, signaled is set to zero. */
-		signaled = wait_for_completion_timeout(&gcqueue->ready,
-						       timeout);
+		signaled = wait_for_completion_interruptible_timeout(
+			&gcqueue->ready, timeout);
 		GCDBG(GCZONE_THREAD, "wait(ready) = %d.\n", signaled);
+
+		if (signaled < 0)
+			continue;
 
 		/* Get triggered interrupts. */
 		ints2process = triggered = atomic_read(&gcqueue->triggered);
