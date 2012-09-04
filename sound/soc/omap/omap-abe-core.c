@@ -368,6 +368,9 @@ static int __devinit abe_engine_probe(struct platform_device *pdev)
 	if (pdata) {
 		abe->get_context_loss_count = pdata->get_context_loss_count;
 		abe->device_scale = pdata->device_scale;
+		/* AESS must remain active on suspend for voice call */
+		if (pdata->disable_idle_on_suspend)
+			pdata->disable_idle_on_suspend(pdev);
 	}
 #endif
 	abe->context_loss = 0;

@@ -628,6 +628,7 @@ static void __init omap_init_aess(void)
 
 	pdata->get_context_loss_count = omap_pm_get_dev_context_loss_count;
 	pdata->device_scale = omap_device_scale;
+	pdata->disable_idle_on_suspend = omap_device_disable_idle_on_suspend;
 
 	pdev = omap_device_build("aess", -1, oh,
 				pdata, sizeof(*pdata),

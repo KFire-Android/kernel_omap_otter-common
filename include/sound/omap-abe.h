@@ -30,6 +30,7 @@ struct omap_abe_pdata {
 	int (*get_context_loss_count)(struct device *dev);
 	int (*device_scale)(struct device *target_dev,
 			    unsigned long rate);
+	void (*disable_idle_on_suspend)(struct platform_device *pdev);
 };
 
 #endif
