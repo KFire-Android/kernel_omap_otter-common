@@ -40,6 +40,7 @@
 #include <plat/usb.h>
 #include <plat/mmc.h>
 #include <plat/remoteproc.h>
+#include <plat/omap_apps_brd_id.h>
 
 
 #include "mux.h"
@@ -434,7 +435,7 @@ static void __init omap_tablet_init(void)
 #endif
 
 	omap4_mux_init(board_mux, NULL, package);
-
+	omap_create_board_props();
 	omap4_i2c_init();
 	platform_add_devices(tablet_devices, ARRAY_SIZE(tablet_devices));
 	omap_serial_init();
