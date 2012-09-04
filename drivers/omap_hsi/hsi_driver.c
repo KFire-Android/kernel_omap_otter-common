@@ -678,16 +678,21 @@ static int __devinit hsi_init_gdd_chan_count(struct hsi_dev *hsi_ctrl)
 * @channel_number - channel number which requests clock to be disabled
 *		    0xFF means no particular channel
 *
+* Returns: pm_runtime_put_sync_suspend() or device_idle() errors
+*	   0 if clocks were previously inactive
+*
 * Note : there is no real HW clock management per HSI channel, this is only
 * virtual to keep track of active channels and ease debug
 *
 * Function to be called with lock
 */
-void hsi_clocks_disable_channel(struct device *dev, u8 channel_number,
+int hsi_clocks_disable_channel(struct device *dev, u8 channel_number,
 				const char *s)
 {
 	struct platform_device *pd = to_platform_device(dev);
 	struct hsi_dev *hsi_ctrl = platform_get_drvdata(pd);
+	struct hsi_platform_data *pdata = dev_get_platdata(dev);
+	int err = 0;
 
 	if (channel_number != HSI_CH_NUMBER_NONE)
 		dev_dbg(dev, "CLK: hsi_clocks_disable for channel %d: %s\n",
@@ -697,16 +702,16 @@ void hsi_clocks_disable_channel(struct device *dev, u8 channel_number,
 
 	if (hsi_ctrl->clock_forced_on) {
 		dev_dbg(dev, "Clocks in forced on mode, skipping...\n");
-		return;
+		return 0;
 	}
 
 	if (!hsi_ctrl->clock_enabled) {
 		dev_dbg(dev, "Clocks already disabled, skipping...\n");
-		return;
+		return 0;
 	}
 	if (hsi_is_hsi_controller_busy(hsi_ctrl)) {
 		dev_dbg(dev, "Cannot disable clocks, HSI port busy\n");
-		return;
+		return 0;
 	}
 
 	if (hsi_is_hst_controller_busy(hsi_ctrl))
@@ -718,7 +723,16 @@ void hsi_clocks_disable_channel(struct device *dev, u8 channel_number,
 		dev_warn(dev, "Error releasing DPLL cascading constraint\n");
 #endif
 
-	pm_runtime_put_sync_suspend(dev);
+	if (pm_runtime_enabled(dev))
+		err = pm_runtime_put_sync_suspend(dev);
+	else
+		err = pdata->runtime_suspend_helper(dev);
+
+	if (err)
+		dev_err(dev, "%s: error = %d\n",
+			__func__, err);
+
+	return err;
 }
 
 /**
@@ -729,6 +743,7 @@ void hsi_clocks_disable_channel(struct device *dev, u8 channel_number,
 *		    0xFF means no particular channel
 *
 * Returns: -EEXIST if clocks were already active
+*	   pm_runtime_get_sync() or device_enable() errors
 *	   0 if clocks were previously inactive
 *
 * Note : there is no real HW clock management per HSI channel, this is only
@@ -741,6 +756,8 @@ int hsi_clocks_enable_channel(struct device *dev, u8 channel_number,
 {
 	struct platform_device *pd = to_platform_device(dev);
 	struct hsi_dev *hsi_ctrl = platform_get_drvdata(pd);
+	struct hsi_platform_data *pdata = dev_get_platdata(dev);
+	int err = 0;
 
 	if (channel_number != HSI_CH_NUMBER_NONE)
 		dev_dbg(dev, "CLK: hsi_clocks_enable for channel %d: %s\n",
@@ -759,7 +776,17 @@ int hsi_clocks_enable_channel(struct device *dev, u8 channel_number,
 		dev_warn(dev, "Error holding DPLL cascading constraint\n");
 #endif
 
-	return pm_runtime_get_sync(dev);
+	if (pm_runtime_enabled(dev))
+		err = pm_runtime_get_sync(dev);
+	else
+		err = pdata->runtime_resume_helper(dev);
+
+	if (err < 0)
+		dev_err(dev, "%s: error = %d\n", __func__, err);
+	else if (err)
+		dev_dbg(dev, "%s: get clocks even if clocks active. error = %d\n",
+			__func__, err);
+	return err;
 }
 
 static int __devinit hsi_controller_init(struct hsi_dev *hsi_ctrl,
@@ -856,8 +883,9 @@ static int __devinit hsi_platform_device_probe(struct platform_device *pd)
 	}
 
 	/* Check if mandatory board functions are populated */
-	if (!pdata->device_scale) {
-		dev_err(&pd->dev, "Missing platform device_scale function\n");
+	if (!pdata->device_scale || !pdata->device_enable
+		    || !pdata->device_idle) {
+		dev_err(&pd->dev, "Missing platform functions\n");
 		return -ENOSYS;
 	}
 

@@ -971,6 +971,86 @@ int omap_device_idle(struct platform_device *pdev)
 }
 
 /**
+ * omap_device_runtime_resume_helper - unidle omap_device
+ * @dev: struct device * to resume
+ *
+ * There are few runtime PM limitations were runtime helper functions
+ * are disabled. However, driver still needs to meet the actual device
+ * physical state. In below cases runtime helper API's are disabled:
+ *
+ * Case 1: AFter system suspend is executed for the device during which runtime
+ * auto-disables the runtime helper API's.
+ * Case 2: Wake-up IRQ handler: If an IRQ or wakeup IRQ is triggered before
+ * system resume is called for that device.
+ *
+ * In such cases, if driver needs to unidle the device then use
+ * omap_device_runtime_resume_helper() to enable the device and this will also
+ * takes care of updating the runtime status for that device.
+ */
+int omap_device_runtime_resume_helper(struct device *dev)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	int ret;
+
+	if (!pdev)
+		return -EINVAL;
+
+	omap_device_enable(pdev);
+
+	ret = pm_generic_runtime_resume(dev);
+	if (!ret) {
+		/* Update runtime status for the device */
+		pm_runtime_disable(dev);
+		pm_runtime_set_active(dev);
+		pm_runtime_enable(dev);
+		/* Update counter */
+		pm_runtime_get_sync(dev);
+	}
+
+	return ret;
+}
+
+/**
+ * omap_device_runtime_suspend_helper - idle omap_device
+ * @dev: struct device * to resume
+ *
+ * There are few runtime PM limitations were runtime helper functions
+ * are disabled. However, driver still needs to meet the actual device
+ * physical state. In below cases runtime helper API's are disabled:
+ *
+ * Case 1: AFter system suspend is executed for the device during which runtime
+ * auto-disables the runtime helper API's.
+ * Case 2: Wake-up IRQ handler: If an IRQ or wakeup IRQ is triggered before
+ * system resume is called for that device.
+ *
+ * In such cases, if driver needs to idle the device then use
+ * omap_device_runtime_resume_helper() to enable the device and this will also
+ * takes care of updating the runtime status for that device.
+ */
+int omap_device_runtime_suspend_helper(struct device *dev)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	int ret;
+
+	if (!pdev)
+		return -EINVAL;
+
+	ret = pm_generic_runtime_suspend(dev);
+	if (!ret) {
+		omap_device_idle(pdev);
+
+		/* Update counter */
+		pm_runtime_put_sync(dev);
+		/* Update runtime status for the device */
+		pm_runtime_disable(dev);
+		pm_runtime_set_suspended(dev);
+		pm_runtime_enable(dev);
+	}
+
+	return ret;
+}
+
+/**
  * omap_device_shutdown - shut down an omap_device
  * @od: struct omap_device * to shut down
  *

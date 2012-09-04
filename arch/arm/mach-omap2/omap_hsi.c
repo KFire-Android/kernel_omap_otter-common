@@ -403,6 +403,8 @@ static struct hsi_platform_data omap_hsi_platform_data = {
 	.device_shutdown = omap_device_shutdown,
 	.device_scale = omap_device_scale,
 	.get_context_loss_count = omap_pm_get_dev_context_loss_count,
+	.runtime_suspend_helper = omap_device_runtime_suspend_helper,
+	.runtime_resume_helper = omap_device_runtime_resume_helper,
 
 };
 
@@ -465,6 +467,9 @@ static int __init omap_hsi_register(struct omap_hwmod *oh, void *user)
 			       ARRAY_SIZE(omap_hsi_latency), false);
 	WARN(IS_ERR(od), "Can't build omap_device for %s:%s.\n",
 	     OMAP_HSI_PLATFORM_DEVICE_DRIVER_NAME, oh->name);
+
+	/* DONOT auto-disable me while going to suspend */
+	omap_device_disable_idle_on_suspend(od);
 
 	pr_info("HSI: device registered as omap_hwmod: %s\n", oh->name);
 	return 0;
