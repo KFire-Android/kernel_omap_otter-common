@@ -468,7 +468,7 @@ static void __init omap_tablet_reserve(void)
 	omap_reserve();
 }
 
-MACHINE_START(OMAP_BLAZE, "OMAP44XX Tablet board")
+MACHINE_START(OMAP_BLAZE, "OMAP4 Blaze board")
 	.atag_offset	= 0x100,
 	.reserve	= omap_tablet_reserve,
 	.map_io		= omap4_map_io,
