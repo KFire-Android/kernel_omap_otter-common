@@ -594,7 +594,7 @@ static int hdmi_power_on_full(struct omap_dss_device *dssdev)
 		if (p->pixel_clock >= 148500) {
 			DSSERR("36 bit deep color not supported for the pixel clock %d\n",
 				p->pixel_clock);
-			goto err;
+			goto err_deep_color;
 		}
 		phy = (p->pixel_clock * 150) / 100;
 		break;
@@ -646,7 +646,9 @@ err_vid_enable:
 err_phy_enable:
 	hdmi.ip_data.ops->pll_disable(&hdmi.ip_data);
 err_pll_enable:
+err_deep_color:
 	hdmi_power_off_core(dssdev);
+
 	return -EIO;
 }
 
