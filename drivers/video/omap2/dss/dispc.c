@@ -2267,6 +2267,16 @@ int dispc_scaling_decision(u16 width, u16 height,
 		in_width = DIV_ROUND_UP(width, x);
 		in_height = DIV_ROUND_UP(height, y);
 
+		/* Use 5-tap filter unless must use 3-tap,
+		 * even in no-scaling case, for not to lose sharpening filters
+		 */
+		if (!cpu_is_omap44xx())
+			*five_taps = in_width <= 1024;
+		else if (omap_rev() == OMAP4430_REV_ES1_0)
+			*five_taps = in_width <= 1280;
+		else
+			*five_taps = true;
+
 		if (in_width == out_width && in_height == out_height)
 			break;
 
@@ -2277,13 +2287,6 @@ int dispc_scaling_decision(u16 width, u16 height,
 			out_height < in_height / maxdownscale)
 			goto loop;
 
-		/* Use 5-tap filter unless must use 3-tap */
-		if (!cpu_is_omap44xx())
-			*five_taps = in_width <= 1024;
-		else if (omap_rev() == OMAP4430_REV_ES1_0)
-			*five_taps = in_width <= 1280;
-		else
-			*five_taps = true;
 
 		/*
 		 * Predecimation on OMAP4 still fetches the whole lines
