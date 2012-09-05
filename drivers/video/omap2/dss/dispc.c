@@ -1974,6 +1974,16 @@ int dispc_scaling_decision(enum omap_plane plane, struct omap_overlay_info *oi,
 		in_width = DIV_ROUND_UP(oi->width, x);
 		in_height = DIV_ROUND_UP(oi->height, y);
 
+		/* Use 5-tap filter unless must use 3-tap,
+		 * even in no-scaling case, for not to lose sharpening filters
+		 */
+		if (!(cpu_is_omap44xx() || cpu_is_omap54xx()))
+			*five_taps = in_width <= 1024;
+		else if (omap_rev() == OMAP4430_REV_ES1_0)
+			*five_taps = in_width <= 1280;
+		else
+			*five_taps = true;
+
 		if (in_width == oi->out_width && in_height == oi->out_height)
 			break;
 
@@ -1983,14 +1993,6 @@ int dispc_scaling_decision(enum omap_plane plane, struct omap_overlay_info *oi,
 		if (oi->out_width * maxdownscale < in_width ||
 				oi->out_height * maxdownscale < in_height)
 			goto loop;
-
-		/* Use 5-tap filter unless must use 3-tap */
-		if (!(cpu_is_omap44xx() || cpu_is_omap54xx()))
-			*five_taps = in_width <= 1024;
-		else if (omap_rev() == OMAP4430_REV_ES1_0)
-			*five_taps = in_width <= 1280;
-		else
-			*five_taps = true;
 
 		/*
 		 * Predecimation on OMAP4 still fetches the whole lines
