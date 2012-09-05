@@ -375,7 +375,7 @@ static void hdmi_load_hdcp_keys(struct omap_dss_device *dssdev)
 	DSSDBG("hdmi_load_hdcp_keys\n");
 	/* load the keys and reset the wrapper to populate the AKSV registers*/
 	if (hdmi.hdmi_power_on_cb()) {
-		hdmi_ti_4xxx_set_wait_soft_reset(&hdmi.ip_data);
+		hdmi.ip_data.ops->reset_wrapper(&hdmi.ip_data);
 		DSSINFO("HDMI_WRAPPER RESET DONE\n");
 	}
 }

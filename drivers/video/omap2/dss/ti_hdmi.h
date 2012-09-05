@@ -215,6 +215,8 @@ struct ti_hdmi_ip_ops {
 
 	int (*hdcp_int_handler)(struct hdmi_ip_data *ip_data);
 
+	int (*reset_wrapper)(struct hdmi_ip_data *ip_data);
+
 };
 
 /*

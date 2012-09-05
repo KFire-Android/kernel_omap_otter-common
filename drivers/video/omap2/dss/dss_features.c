@@ -703,6 +703,7 @@ static const struct ti_hdmi_ip_ops omap4_hdmi_functions = {
 	.hdcp_disable			=	NULL,
 	.hdcp_status			=	NULL,
 	.hdcp_int_handler		=	NULL,
+	.reset_wrapper			=	hdmi_ti_4xxx_set_wait_soft_reset,
 };
 
 /* HDMI OMAP5 Functions*/
@@ -739,6 +740,7 @@ static const struct ti_hdmi_ip_ops omap5_hdmi_functions = {
 	.hdcp_disable			=	ti_hdmi_5xxx_hdcp_disable,
 	.hdcp_status			=	ti_hdmi_5xxx_hdcp_status,
 	.hdcp_int_handler		=	ti_hdmi_5xxx_hdcp_int_handler,
+	.reset_wrapper			=	hdmi_ti_4xxx_set_wait_soft_reset,
 };
 
 void dss_init_hdmi_ip_ops(struct hdmi_ip_data *ip_data)
