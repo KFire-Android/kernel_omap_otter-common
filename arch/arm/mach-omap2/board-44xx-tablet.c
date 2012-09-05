@@ -42,13 +42,13 @@
 #include <plat/remoteproc.h>
 #include <plat/omap_apps_brd_id.h>
 
-
 #include "mux.h"
 #include "hsmmc.h"
 #include "common.h"
 #include "control.h"
 #include "common-board-devices.h"
 #include "board-44xx-tablet.h"
+#include "omap4_ion.h"
 
 #define ETH_KS8851_IRQ			34
 #define ETH_KS8851_POWER_ON		48
@@ -443,6 +443,7 @@ static void __init omap_tablet_init(void)
 	omap4_twl6030_hsmmc_init(mmc);
 	usb_musb_init(&musb_board_data);
 
+	omap4_register_ion();
 	tablet_display_init();
 	status = omap_ethernet_init();
 	if (status) {
@@ -465,6 +466,7 @@ static void __init omap_tablet_init(void)
 static void __init omap_tablet_reserve(void)
 {
 	omap_rproc_reserve_cma(RPROC_CMA_OMAP4);
+	omap4_ion_init();
 	omap_reserve();
 }
 
