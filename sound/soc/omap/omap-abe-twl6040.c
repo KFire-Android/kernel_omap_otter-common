@@ -857,6 +857,7 @@ static struct snd_soc_dai_link omap_abe_dai_link[] = {
 
 		.init = omap_abe_dmic_init,
 		.ops = &omap_abe_dmic_ops,
+		.ignore_suspend = 1,
 	},
 
 /*
