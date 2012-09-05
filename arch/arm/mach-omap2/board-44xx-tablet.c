@@ -36,6 +36,7 @@
 
 #include <mach/hardware.h>
 
+#include <plat/drm.h>
 #include <plat/board.h>
 #include <plat/usb.h>
 #include <plat/mmc.h>
@@ -443,6 +444,7 @@ static void __init omap_tablet_init(void)
 	omap4_twl6030_hsmmc_init(mmc);
 	usb_musb_init(&musb_board_data);
 
+	omap_init_dmm_tiler();
 	omap4_register_ion();
 	tablet_display_init();
 	status = omap_ethernet_init();
