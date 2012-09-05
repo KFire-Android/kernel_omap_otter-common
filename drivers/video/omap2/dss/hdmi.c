@@ -373,10 +373,13 @@ static void hdmi_compute_pll(struct omap_dss_device *dssdev, int phy,
 static void hdmi_load_hdcp_keys(struct omap_dss_device *dssdev)
 {
 	DSSDBG("hdmi_load_hdcp_keys\n");
-	/* load the keys and reset the wrapper to populate the AKSV registers*/
 	if (hdmi.hdmi_power_on_cb()) {
-		hdmi.ip_data.ops->reset_wrapper(&hdmi.ip_data);
-		DSSINFO("HDMI_WRAPPER RESET DONE\n");
+		if (cpu_is_omap44xx()) {
+			/* load the keys and reset the wrapper to populate
+			 * the AKSV registers*/
+			hdmi.ip_data.ops->reset_wrapper(&hdmi.ip_data);
+			DSSINFO("HDMI_WRAPPER RESET DONE\n");
+		}
 	}
 }
 
