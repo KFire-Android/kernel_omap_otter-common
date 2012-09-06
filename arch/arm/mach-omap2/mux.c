@@ -449,6 +449,7 @@ static bool omap_hwmod_mux_scan_wakeups(struct omap_hwmod_mux_info *hmux,
 	int i, irq;
 	unsigned int val;
 	u32 handled_irqs = 0;
+	bool retval = false;
 
 	for (i = 0; i < hmux->nr_pads_dynamic; i++) {
 		struct omap_device_pad *pad = hmux->pads_dynamic[i];
@@ -472,8 +473,15 @@ static bool omap_hwmod_mux_scan_wakeups(struct omap_hwmod_mux_info *hmux,
 		omap_mux_write(pad->partition, val, pad->mux->reg_offset);
 		omap_hwmod_reconfigure_io_chain();
 
-		if (!hmux->irqs)
-			return true;
+		if (hmux->wakeup_handler && hmux->wakeup_handler[i]) {
+			hmux->wakeup_handler[i](hmux);
+			continue;
+		}
+
+		if (!hmux->irqs) {
+			retval = true;
+			continue;
+		}
 
 		irq = hmux->irqs[i];
 		/* make sure we only handle each irq once */
@@ -485,7 +493,7 @@ static bool omap_hwmod_mux_scan_wakeups(struct omap_hwmod_mux_info *hmux,
 		generic_handle_irq(mpu_irqs[irq].irq);
 	}
 
-	return false;
+	return retval;
 }
 
 /**

@@ -3146,6 +3146,35 @@ int omap_hwmod_pad_route_irq(struct omap_hwmod *oh, int pad_idx, int irq_idx)
 }
 
 /**
+ * omap_hwmod_pad_wakeup_handler - add wakeup handler for an I/O pad wakeup
+ * @oh: struct omap_hwmod * containing hwmod mux entries
+ * @pad_idx: array index in oh->mux of the hwmod mux entry to handle wakeup
+ * @wakeup_handler: the wakeup_handler function to trigger on wakeup
+ */
+int omap_hwmod_pad_wakeup_handler(struct omap_hwmod *oh, int pad_idx,
+		int (*wakeup_handler)(struct omap_hwmod_mux_info *hmux))
+{
+	might_sleep();
+
+	if (!oh || !oh->mux || pad_idx < 0 ||
+			pad_idx >= oh->mux->nr_pads_dynamic)
+		return -EINVAL;
+
+	if (!oh->mux->wakeup_handler) {
+		/* XXX What frees this? */
+		oh->mux->wakeup_handler =
+				kzalloc(sizeof(*(oh->mux->wakeup_handler)) *
+				oh->mux->nr_pads_dynamic, GFP_KERNEL);
+
+		if (!oh->mux->wakeup_handler)
+			return -ENOMEM;
+	}
+	oh->mux->wakeup_handler[pad_idx] = wakeup_handler;
+
+	return 0;
+}
+
+/**
  * omap_hwmod_get_main_clk - get pointer to main clock name
  * @oh: struct omap_hwmod *
  *

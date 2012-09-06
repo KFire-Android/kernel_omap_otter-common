@@ -108,6 +108,7 @@ struct omap_hwmod_mux_info {
 	int				nr_pads_dynamic;
 	struct omap_device_pad		**pads_dynamic;
 	int				*irqs;
+	int				(**wakeup_handler)(struct omap_hwmod_mux_info *hmux);
 	bool				enabled;
 };
 
@@ -635,6 +636,9 @@ int omap_hwmod_get_context_loss_count(struct omap_hwmod *oh);
 int omap_hwmod_no_setup_reset(struct omap_hwmod *oh);
 
 int omap_hwmod_pad_route_irq(struct omap_hwmod *oh, int pad_idx, int irq_idx);
+
+int omap_hwmod_pad_wakeup_handler(struct omap_hwmod *oh, int pad_idx,
+		int (*wakeup_handler)(struct omap_hwmod_mux_info *hmux));
 
 const char *omap_hwmod_get_main_clk(struct omap_hwmod *oh);
 
