@@ -2864,7 +2864,17 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 							di->voltage_mV);
 
 	di->capacity = capacity_lookup(di->voltage_mV);
-	di->max_battery_capacity = pdata->max_battery_capacity;
+	/*
+	 * If platform data did not report the battery capacity,
+	 * then assume a default value of 1000 mAh
+	 */
+	if (!pdata->max_battery_capacity) {
+		di->max_battery_capacity = 1000;
+		dev_dbg(di->dev,
+				"battery capacity unknown. Assume 1000 mAh\n");
+	} else {
+		di->max_battery_capacity = pdata->max_battery_capacity;
+	}
 	di->boot_capacity_mAh = di->max_battery_capacity * di->capacity / 100;
 	ret = twl_i2c_read_u8(TWL6030_MODULE_ID0, &hw_state, STS_HW_CONDITIONS);
 	if (ret)
