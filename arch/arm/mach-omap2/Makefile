@@ -264,6 +264,7 @@ obj-$(CONFIG_MACH_OMAP_4430SDP)		+= board-4430sdp.o
 obj-$(CONFIG_MACH_OMAP_44XX_TABLET)	+= board-44xx-tablet.o \
 					   board-44xx-tablet-panel.o \
 					   board-44xx-tablet-touch.o \
+					   board-44xx-tablet-buttons.o \
 					   board-44xx-tablet-sensors.o
 
 obj-$(CONFIG_MACH_OMAP4_PANDA)		+= board-omap4panda.o

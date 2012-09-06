@@ -26,7 +26,6 @@
 #include <linux/mfd/twl6040.h>
 #include <linux/regulator/machine.h>
 #include <linux/regulator/fixed.h>
-#include <linux/leds_pwm.h>
 #include <linux/platform_data/omap-abe-twl6040.h>
 
 #include <asm/hardware/gic.h>
@@ -58,67 +57,6 @@
 #define FIXED_REG_VBAT_ID		0
 #define FIXED_REG_VWLAN_ID		1
 #define TPS62361_GPIO			7
-
-static struct gpio_led tablet_gpio_leds[] = {
-	{
-		.name	= "green",
-		.default_trigger = "timer",
-		.gpio	= 174,
-	},
-	{
-		.name	= "blue",
-		.default_trigger = "timer",
-		.gpio	= 169,
-	},
-	{
-		.name	= "red",
-		.default_trigger = "timer",
-		.gpio	= 170,
-	},
-	{
-		.name	= "user:gp_4:green",
-		.gpio	= 50,
-	},
-	{
-		.name	= "user:gp_1:green",
-		.gpio	= 173,
-	},
-};
-
-static struct gpio_led_platform_data tablet_led_data = {
-	.leds	= tablet_gpio_leds,
-	.num_leds = ARRAY_SIZE(tablet_gpio_leds),
-};
-
-static struct platform_device tablet_leds_gpio = {
-	.name	= "leds-gpio",
-	.id	= -1,
-	.dev	= {
-		.platform_data = &tablet_led_data,
-	},
-};
-
-static struct led_pwm tablet_pwm_leds[] = {
-	{
-		.name		= "omap4:green:chrg",
-		.pwm_id		= 1,
-		.max_brightness	= 255,
-		.pwm_period_ns	= 7812500,
-	},
-};
-
-static struct led_pwm_platform_data tablet_pwm_data = {
-	.num_leds	= ARRAY_SIZE(tablet_pwm_leds),
-	.leds		= tablet_pwm_leds,
-};
-
-static struct platform_device tablet_leds_pwm = {
-	.name	= "leds_pwm",
-	.id	= -1,
-	.dev	= {
-		.platform_data = &tablet_pwm_data,
-	},
-};
 
 static struct spi_board_info tablet_spi_board_info[] __initdata = {
 	{
@@ -229,8 +167,6 @@ static struct platform_device *tablet_devices[] __initdata = {
 	&tablet_spdif_dit_codec,
 	&tablet_abe_audio,
 	&tablet_hdmi_audio_codec,
-	&tablet_leds_gpio,
-	&tablet_leds_pwm
 };
 
 static struct omap_musb_board_data musb_board_data = {
@@ -449,6 +385,7 @@ static void __init omap_tablet_init(void)
 	tablet_display_init();
 	tablet_touch_init();
 	tablet_sensor_init();
+	tablet_button_init();
 
 	status = omap_ethernet_init();
 	if (status) {
