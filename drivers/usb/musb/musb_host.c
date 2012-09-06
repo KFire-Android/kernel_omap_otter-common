@@ -1113,6 +1113,11 @@ void musb_host_tx(struct musb *musb, u8 epnum)
 		return;
 	}
 
+	if (!qh->is_ready) {
+		dev_dbg(musb->controller, "received TX%d completion when qh is not ready\n", epnum);
+		return;
+	}
+
 	pipe = urb->pipe;
 	dma = is_dma_capable() ? hw_ep->tx_channel : NULL;
 	dev_dbg(musb->controller, "OUT/TX%d end, csr %04x%s\n", epnum, tx_csr,
@@ -1447,6 +1452,12 @@ void musb_host_rx(struct musb *musb, u8 epnum)
 		 */
 		dev_dbg(musb->controller, "BOGUS RX%d ready, csr %04x, count %d\n", epnum, val,
 			musb_readw(epio, MUSB_RXCOUNT));
+		musb_h_flush_rxfifo(hw_ep, MUSB_RXCSR_CLRDATATOG);
+		return;
+	}
+
+	if (!qh->is_ready) {
+		dev_dbg(musb->controller, "received RX%d completion when qh is not ready\n", epnum);
 		musb_h_flush_rxfifo(hw_ep, MUSB_RXCSR_CLRDATATOG);
 		return;
 	}

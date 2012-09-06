@@ -59,9 +59,7 @@ static struct usbhs_wakeup {
 	struct device *dev;
 	struct omap_hwmod *oh_ehci;
 	struct omap_hwmod *oh_ohci;
-	struct work_struct wakeup_work;
-	int wakeup_ehci:1;
-	int wakeup_ohci:1;
+	struct delayed_work wakeup_work;
 } *usbhs_wake;
 
 /* MUX settings for EHCI pins */
@@ -812,36 +810,29 @@ void usbhs_wakeup()
 
 	if (test_bit(USB_OHCI_LOADED, &usb_hcds_loaded) &&
 	    omap_hwmod_pad_get_wakeup_status(usbhs_wake->oh_ohci) == true) {
-		usbhs_wake->wakeup_ohci = 1;
+		omap_hwmod_disable_ioring_wakeup(usbhs_wake->oh_ohci);
 		workq = 1;
 	}
 
 	if (test_bit(USB_EHCI_LOADED, &usb_hcds_loaded) &&
 	    omap_hwmod_pad_get_wakeup_status(usbhs_wake->oh_ehci) == true) {
-		usbhs_wake->wakeup_ehci = 1;
+		omap_hwmod_disable_ioring_wakeup(usbhs_wake->oh_ehci);
 		workq = 1;
 	}
 
-	if (workq)
-		queue_work(pm_wq, &usbhs_wake->wakeup_work);
+	if (workq) {
+		int queued;
+		queued = queue_delayed_work(pm_wq, &usbhs_wake->wakeup_work,
+				msecs_to_jiffies(20));
+		if (queued)
+			pm_runtime_get(usbhs_wake->dev);
+	}
 }
 
 static void usbhs_resume_work(struct work_struct *work)
 {
 	dev_dbg(usbhs_wake->dev, "USB IO PAD Wakeup event triggered\n");
-
-	if (usbhs_wake->wakeup_ehci) {
-		usbhs_wake->wakeup_ehci = 0;
-		omap_hwmod_disable_ioring_wakeup(usbhs_wake->oh_ehci);
-	}
-
-	if (usbhs_wake->wakeup_ohci) {
-		usbhs_wake->wakeup_ohci = 0;
-		omap_hwmod_disable_ioring_wakeup(usbhs_wake->oh_ohci);
-	}
-
-	if (pm_runtime_suspended(usbhs_wake->dev))
-		pm_runtime_get_sync(usbhs_wake->dev);
+	pm_runtime_put(usbhs_wake->dev);
 }
 
 void __init usbhs_init(const struct usbhs_omap_board_data *pdata)
@@ -911,13 +902,13 @@ void __init usbhs_init(const struct usbhs_omap_board_data *pdata)
 		return;
 	}
 
-	usbhs_wake = kmalloc(sizeof(*usbhs_wake), GFP_KERNEL);
+	usbhs_wake = kzalloc(sizeof(*usbhs_wake), GFP_KERNEL);
 	if (!usbhs_wake) {
 		pr_err("Could not allocate usbhs_wake\n");
 		return;
 	}
 
-	INIT_WORK(&usbhs_wake->wakeup_work, usbhs_resume_work);
+	INIT_DELAYED_WORK(&usbhs_wake->wakeup_work, usbhs_resume_work);
 	usbhs_wake->oh_ehci = oh[2];
 	usbhs_wake->oh_ohci = oh[1];
 	usbhs_wake->dev = &od->pdev.dev;

@@ -37,6 +37,17 @@
 #include "dss.h"
 #include "dss_features.h"
 
+/*
+ * Estimated available DSS bandwidth on L3@OPP50 is ~800MB/s.
+ * It is approximately 3 WXGA layers or almost 1.5 FullHD layers at 60fps rate.
+ */
+#define OVERLAY_AREA_BW_THRESHOLD (1280*800*3)
+
+static DEFINE_MUTEX(overlay_bw_mutex);
+static bool overlay_bw_requested;
+static struct device dummy_overlay_dev = {
+	.init_name = "omap_dss_overlay_dev",
+};
 static int num_overlays;
 static struct list_head overlay_list;
 
@@ -709,6 +720,32 @@ struct omap_overlay *omap_dss_get_overlay(int num)
 	return NULL;
 }
 EXPORT_SYMBOL(omap_dss_get_overlay);
+
+void omap_dss_overlay_ensure_bw(void)
+{
+	long unsigned total_area;
+	struct omap_overlay *ovl;
+
+	mutex_lock(&overlay_bw_mutex);
+
+	total_area = 0;
+	list_for_each_entry(ovl, &overlay_list, list) {
+		if (ovl->info.enabled)
+			total_area += ovl->info.width * ovl->info.height;
+	}
+
+	if (!overlay_bw_requested &&
+			(total_area > OVERLAY_AREA_BW_THRESHOLD)) {
+		omap_dss_request_high_bandwidth(&dummy_overlay_dev);
+		overlay_bw_requested = true;
+	} else if (overlay_bw_requested &&
+			(total_area <= OVERLAY_AREA_BW_THRESHOLD)) {
+		omap_dss_reset_high_bandwidth(&dummy_overlay_dev);
+		overlay_bw_requested = false;
+	}
+
+	mutex_unlock(&overlay_bw_mutex);
+}
 
 static void omap_dss_add_overlay(struct omap_overlay *overlay)
 {

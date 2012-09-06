@@ -217,6 +217,9 @@ struct platform_device;
 struct bus_type *dss_get_bus(void);
 struct regulator *dss_get_vdds_dsi(void);
 struct regulator *dss_get_vdds_sdi(void);
+void omap_dss_request_high_bandwidth(struct device *dss_dev);
+void omap_dss_reset_high_bandwidth(struct device *dss_dev);
+void omap_dss_overlay_ensure_bw(void);
 
 /* display */
 int dss_suspend_all_devices(void);
