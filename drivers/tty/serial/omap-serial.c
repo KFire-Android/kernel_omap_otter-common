@@ -1612,6 +1612,7 @@ static int __devinit serial_omap_probe(struct platform_device *pdev)
 	serial_omap_uart_wq = create_singlethread_workqueue(up->name);
 	INIT_WORK(&up->qos_work, serial_omap_uart_qos_work);
 
+	platform_set_drvdata(pdev, up);
 	pm_runtime_enable(&pdev->dev);
 	pm_runtime_use_autosuspend(&pdev->dev);
 	pm_runtime_set_autosuspend_delay(&pdev->dev,
@@ -1638,7 +1639,6 @@ static int __devinit serial_omap_probe(struct platform_device *pdev)
 		omap_up_info->enable_wakeup(pdev, false);
 
 	serial_omap_port_disable(up);
-	platform_set_drvdata(pdev, up);
 	return 0;
 
 err_add_port:
