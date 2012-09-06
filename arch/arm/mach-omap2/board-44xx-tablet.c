@@ -448,6 +448,7 @@ static void __init omap_tablet_init(void)
 	omap4_register_ion();
 	tablet_display_init();
 	tablet_touch_init();
+	tablet_sensor_init();
 
 	status = omap_ethernet_init();
 	if (status) {

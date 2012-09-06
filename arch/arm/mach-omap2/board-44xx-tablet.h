@@ -19,5 +19,6 @@
 
 int __init tablet_display_init(void);
 int __init tablet_touch_init(void);
+int __init tablet_sensor_init(void);
 
 #endif
