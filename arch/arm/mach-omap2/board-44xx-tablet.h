@@ -18,5 +18,6 @@
 #define _MACH_OMAP_BOARD_44XX_TABLET_H
 
 int __init tablet_display_init(void);
+int __init tablet_touch_init(void);
 
 #endif
