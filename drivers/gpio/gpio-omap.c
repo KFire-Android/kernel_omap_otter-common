@@ -1217,7 +1217,7 @@ static void _omap5_gpio_apply_wa(struct gpio_bank *bank)
 						(bank->mux[i])->reg_offset);
 				/* Change direction to input */
 				_set_gpio_direction(bank, i, 1);
-				bank->is_oe_wa &= (0x1 << i);
+				bank->is_oe_wa |= (0x1 << i);
 			} else {
 				dev_err(bank->dev,
 					"Failed to apply WA for gpio %d\n",

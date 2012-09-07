@@ -140,7 +140,6 @@ static int aess_open(struct snd_pcm_substream *substream)
 	if (!abe->active++) {
 		abe->opp.level = 0;
 		abe_pm_restore_context(abe);
-		abe_opp_set_level(abe, 100);
 		omap_aess_wakeup(abe->aess);
 	}
 
