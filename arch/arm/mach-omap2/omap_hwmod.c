@@ -138,6 +138,9 @@
 #include <linux/spinlock.h>
 #include <linux/slab.h>
 #include <linux/bootmem.h>
+#include <linux/debugfs.h>
+#include <linux/seq_file.h>
+#include <linux/uaccess.h>
 
 #include "clock.h"
 #include "omap_hwmod.h"
@@ -2315,6 +2318,65 @@ static int _shutdown(struct omap_hwmod *oh)
 	return 0;
 }
 
+#if defined(CONFIG_DEBUG_FS)
+
+static struct dentry *omap_hwmod_dbg_dir;
+
+/* internal hwmod states */
+static const char *hwmod_states[_HWMOD_STATE_COUNT] = {
+	[_HWMOD_STATE_UNKNOWN]          = "unknown",
+	[_HWMOD_STATE_REGISTERED]       = "registered",
+	[_HWMOD_STATE_CLKS_INITED]      = "clks_inited",
+	[_HWMOD_STATE_INITIALIZED]      = "initialized",
+	[_HWMOD_STATE_ENABLED]          = "enabled",
+	[_HWMOD_STATE_IDLE]             = "idle",
+	[_HWMOD_STATE_DISABLED]         = "disabled",
+};
+
+const char *_state_str(u8 state)
+{
+	if (state >= _HWMOD_STATE_COUNT)
+		return "invalid_state";
+	return hwmod_states[state];
+}
+
+static int omap_hwmod_dbg_show(struct seq_file *s, void *unused)
+{
+	struct omap_hwmod *oh;
+
+	list_for_each_entry(oh, &omap_hwmod_list, node) {
+		seq_printf(s, "name: %16s, state %d/%s\n", oh->name,
+			oh->_state, _state_str(oh->_state));
+	}
+
+	return 0;
+}
+
+static int omap_hwmod_dbg_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, omap_hwmod_dbg_show, inode->i_private);
+}
+
+static const struct file_operations omap_hwmod_dbg_fops = {
+	.open		= omap_hwmod_dbg_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
+static void __init omap_hwmod_dbg_init(void)
+{
+	omap_hwmod_dbg_dir = debugfs_create_dir("omap_hwmod", NULL);
+	if (!omap_hwmod_dbg_dir)
+		return;
+
+	(void)debugfs_create_file("state", S_IRUGO, omap_hwmod_dbg_dir,
+					NULL, &omap_hwmod_dbg_fops);
+}
+
+#endif	/* CONFIG_DEBUG_FS */
+
+
 /**
  * _init_mpu_rt_base - populate the virtual address for a hwmod
  * @oh: struct omap_hwmod * to locate the virtual address
@@ -3260,6 +3322,10 @@ static int __init omap_hwmod_setup_all(void)
 
 	omap_hwmod_for_each(_init, NULL);
 	omap_hwmod_for_each(_setup, NULL);
+
+#ifdef CONFIG_DEBUG_FS
+	omap_hwmod_dbg_init();
+#endif
 
 	return 0;
 }
