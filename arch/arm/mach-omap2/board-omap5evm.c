@@ -68,6 +68,11 @@
 /* MSECURE GPIO */
 #define GPIO_MSECURE 234
 
+/* CHARGER INTERRUPT */
+#define GPIO_CHRGR_INT 163
+
+#define GPIO1_WKOUT5 5
+
 static const uint32_t evm5430_keymap[] = {
 	KEY(2, 2, KEY_VOLUMEUP),
 	KEY(2, 3, KEY_VOLUMEDOWN),
@@ -1034,6 +1039,15 @@ static void __init omap_msecure_init(void)
 			GPIO_MSECURE, err);
 }
 
+static void __init sevm_battery_init(void)
+{
+	/* To turn on U44 (emu/gpio mux) as gpio pins have gpio5 pulled low */
+	omap_mux_init_gpio(GPIO1_WKOUT5, OMAP_PIN_OUTPUT);
+	gpio_set_value(GPIO1_WKOUT5, 0);
+	/* Pull up gpio163 and as input pin */
+	omap_mux_init_gpio(GPIO_CHRGR_INT, OMAP_PIN_INPUT_PULLUP);
+}
+
 static void __init omap_5430evm_init(void)
 {
 	int status;
@@ -1060,6 +1074,7 @@ static void __init omap_5430evm_init(void)
 	omap5_pmic_init(1, PALMAS_NAME, OMAP44XX_IRQ_SYS_1N, PALMAS_DATA,
 			"twl6040", OMAP44XX_IRQ_SYS_2N, &twl6040_data);
 
+	sevm_battery_init();
 	omap5_board_serial_init();
 	platform_device_register(&dummy_sd_regulator_device);
 	/* omap5evm_modem_init shall be called before omap_ehci_ohci_init */
