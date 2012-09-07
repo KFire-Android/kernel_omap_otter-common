@@ -910,6 +910,7 @@ static struct i2c_board_info __initdata omap5evm_i2c_5_boardinfo[] = {
 static struct i2c_board_info __initdata omap5evm_i2c_1_boardinfo[] = {
 	{
 		I2C_BOARD_INFO("bq27530", 0x55),
+		.irq = GPIO_CHRGR_INT,
 	},
 };
 
