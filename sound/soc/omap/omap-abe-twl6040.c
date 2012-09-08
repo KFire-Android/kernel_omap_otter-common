@@ -547,7 +547,8 @@ static int omap_abe_twl6040_init(struct snd_soc_pcm_runtime *rtd)
 	snd_soc_dapm_ignore_suspend(&card->dapm, "Digital Mic 1");
 	snd_soc_dapm_ignore_suspend(&card->dapm, "Digital Mic 2");
 
-	card_dapm->stream_event = omap_abe_stream_event;
+	/* REVISIT: cards stream event is breaking suspend/resume */
+	/* card_dapm->stream_event = omap_abe_stream_event; */
 
 	/* DC offset cancellation computation only if ABE is enabled */
 	if (pdata->has_abe) {

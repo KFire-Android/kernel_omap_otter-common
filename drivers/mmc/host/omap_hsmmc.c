@@ -32,6 +32,7 @@
 #include <linux/mmc/host.h>
 #include <linux/mmc/core.h>
 #include <linux/mmc/mmc.h>
+#include <linux/mmc/card.h>
 #include <linux/io.h>
 #include <linux/semaphore.h>
 #include <linux/gpio.h>
@@ -48,6 +49,7 @@
 /* OMAP HSMMC Host Controller Registers */
 #define OMAP_HSMMC_SYSCONFIG	0x0010
 #define OMAP_HSMMC_SYSSTATUS	0x0014
+#define OMAP_HSMMC_CSRE		0x0024
 #define OMAP_HSMMC_CON		0x002C
 #define OMAP_HSMMC_BLK		0x0104
 #define OMAP_HSMMC_ARG		0x0108
@@ -159,6 +161,10 @@
 #define VDD_165_195		(ffs(MMC_VDD_165_195) - 1)
 
 #define AUTO_CMD12		(1 << 0)	/* Auto CMD12 support */
+
+/* Errata definitions */
+#define OMAP_HSMMC_ERRATA_I761	BIT(0)
+
 /*
  * One controller can have multiple slots, like on some omap boards using
  * omap.c controller driver. Luckily this is not currently done on any known
@@ -228,6 +234,7 @@ struct omap_hsmmc_host {
 	int			use_reg;
 	int			req_in_progress;
 	unsigned int		flags;
+	unsigned int		errata;
 	int			regulator_enabled;
 	struct omap_hsmmc_next	next_data;
 
@@ -928,6 +935,23 @@ omap_hsmmc_xfer_done(struct omap_hsmmc_host *host, struct mmc_data *data)
 	return;
 }
 
+static int
+omap_hsmmc_errata_i761(struct omap_hsmmc_host *host, struct mmc_command *cmd)
+{
+	u32 rsp10, csre;
+
+	if ((cmd->flags & MMC_RSP_R1) == MMC_RSP_R1
+			|| (host->mmc->card && (mmc_card_sd(host->mmc->card)
+			|| mmc_card_sdio(host->mmc->card))
+			&& (cmd->flags & MMC_RSP_R5))) {
+		rsp10 = OMAP_HSMMC_READ(host->base, RSP10);
+		csre = OMAP_HSMMC_READ(host->base, CSRE);
+		return rsp10 & csre;
+	}
+
+	return 0;
+}
+
 /*
  * Notify the core about command completion
  */
@@ -1133,6 +1157,17 @@ static void omap_hsmmc_do_irq(struct omap_hsmmc_host *host, int status)
 			OMAP_HSMMC_READ(host->base, BLK),
 			OMAP_HSMMC_READ(host->base, ADMA_SAL),
 			OMAP_HSMMC_READ(host->base, PSTATE));
+	}
+
+	/* Errata i761 */
+	if ((host->errata & OMAP_HSMMC_ERRATA_I761) && host->cmd
+			&& omap_hsmmc_errata_i761(host, host->cmd)) {
+		/* Do the same as for CARD_ERR case */
+		dev_dbg(mmc_dev(host->mmc),
+			"Ignoring card err CMD%d\n", host->cmd->opcode);
+		end_cmd = 1;
+		if (host->data)
+			end_trans = 1;
 	}
 
 	OMAP_HSMMC_WRITE(host->base, STAT, status);
@@ -2182,6 +2217,10 @@ static int __devinit omap_hsmmc_probe(struct platform_device *pdev)
 	}
 	host->power_mode = MMC_POWER_OFF;
 	host->flags	= AUTO_CMD12;
+	host->errata = 0;
+	if (cpu_is_omap44xx())
+		host->errata |= OMAP_HSMMC_ERRATA_I761;
+
 	host->next_data.cookie = 1;
 	host->regulator_enabled = 0;
 
