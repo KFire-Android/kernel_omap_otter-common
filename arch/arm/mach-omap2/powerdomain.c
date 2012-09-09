@@ -44,6 +44,8 @@
 enum {
 	PWRDM_STATE_NOW = 0,
 	PWRDM_STATE_PREV,
+	PWRDM_STATE_HIGH2LOW,
+	PWRDM_STATE_LOW2HIGH,
 };
 
 static unsigned char _pwrdm_state_idx_lookup[] = {
@@ -1398,6 +1400,29 @@ int pwrdm_state_switch(struct powerdomain *pwrdm)
 		ret = _pwrdm_state_switch(pwrdm, PWRDM_STATE_NOW);
 
 	return ret;
+}
+
+/*
+ * pwrdm_state_high2low_counter_update() - handle a high to low change
+ * @pwrdm:	powerdomain to change
+ *
+ * Update counters when a powerdomain transitioned from high to low
+ */
+void pwrdm_state_high2low_counter_update(struct powerdomain *pwrdm)
+{
+	_pwrdm_state_switch(pwrdm, PWRDM_STATE_HIGH2LOW);
+}
+
+/*
+ * pwrdm_state_low2high_counter_update() - handle a low to high change
+ * @pwrdm:	powerdomain to change
+ *
+ * Update counters when a powerdomain has transitioned from low power state
+ * to high.
+ */
+void pwrdm_state_low2high_counter_update(struct powerdomain *pwrdm)
+{
+	_pwrdm_state_switch(pwrdm, PWRDM_STATE_LOW2HIGH);
 }
 
 int pwrdm_clkdm_state_switch(struct clockdomain *clkdm)
