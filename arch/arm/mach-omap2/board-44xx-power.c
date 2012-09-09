@@ -343,6 +343,7 @@ static struct twl4030_bci_platform_data bci_data = {
 	.max_charger_voltagemV		= 4560,
 	.max_bat_voltagemV		= 4200,
 	.low_bat_voltagemV		= 3300,
+	.max_battery_capacity		= 4000,
 	.battery_tmp_tbl		= batt_table,
 	.tblsize			= ARRAY_SIZE(batt_table),
 	.sense_resistor_mohm		= 10,

@@ -300,6 +300,7 @@ struct twl6030_bci_device_info {
 
 	unsigned int		capacity;
 	unsigned int		capacity_debounce_count;
+	unsigned int		max_battery_capacity;
 	unsigned int		boot_capacity_mAh;
 	unsigned int		prev_capacity;
 	unsigned int		wakelock_enabled;
@@ -327,9 +328,6 @@ struct twl6030_bci_device_info {
 
 	unsigned int		min_vbus_val;
 };
-
-/* FIXME: Make this a platform data passed down from the board file */
-#define BATT_CAPACITY_MAH	4000
 
 /* Battery capacity estimation table */
 struct batt_capacity_chart {
@@ -1700,8 +1698,8 @@ static int capacity_changed(struct twl6030_bci_device_info *di)
 
 	accumulated_charge = ((acc_value - (di->cc_offset * samples))
 								* 5 / 6) >> 14;
-	curr_capacity = (di->boot_capacity_mAh + accumulated_charge)
-					/ (BATT_CAPACITY_MAH / 100);
+	curr_capacity = (di->boot_capacity_mAh + accumulated_charge) /
+					(di->max_battery_capacity / 100);
 	dev_dbg(di->dev, "voltage %d\n", di->voltage_mV);
 	dev_dbg(di->dev,
 		"initial capacity %d mAh, accumulated %d mAh, total %d mAh\n",
@@ -2866,7 +2864,8 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 							di->voltage_mV);
 
 	di->capacity = capacity_lookup(di->voltage_mV);
-	di->boot_capacity_mAh = di->capacity * (BATT_CAPACITY_MAH / 100);
+	di->max_battery_capacity = pdata->max_battery_capacity;
+	di->boot_capacity_mAh = di->max_battery_capacity * di->capacity / 100;
 	ret = twl_i2c_read_u8(TWL6030_MODULE_ID0, &hw_state, STS_HW_CONDITIONS);
 	if (ret)
 		goto  bk_batt_failed;

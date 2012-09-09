@@ -636,6 +636,7 @@ struct twl4030_bci_platform_data {
 	unsigned int max_charger_currentmA;
 	unsigned int max_charger_voltagemV;
 	unsigned int termination_currentmA;
+	unsigned int max_battery_capacity;
 
 	unsigned int max_bat_voltagemV;
 	unsigned int low_bat_voltagemV;
