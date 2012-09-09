@@ -145,6 +145,7 @@ struct powerdomain {
 	/* Lock to secure accesses around pwrdm data structure updates */
 	spinlock_t lock;
 	int state;
+	bool high2low_transition_enable;
 	unsigned state_counter[PWRDM_MAX_PWRSTS];
 	unsigned ret_logic_off_counter;
 	unsigned ret_mem_off_counter[PWRDM_MAX_MEM_BANKS];

@@ -189,10 +189,20 @@ static void _update_logic_membank_counters(struct powerdomain *pwrdm)
 	}
 }
 
+static inline void _pwrdm_state_counter_update(struct powerdomain *pwrdm,
+					       int state)
+{
+
+	pwrdm->state_counter[_PWRDM_STATE_COUNT_IDX(state)]++;
+	if ((state == PWRDM_POWER_OSWR) ||
+	    (state == PWRDM_POWER_OFF))
+		_update_logic_membank_counters(pwrdm);
+}
+
 static int _pwrdm_state_switch(struct powerdomain *pwrdm, int flag)
 {
 
-	int prev, state, trace_state = 0;
+	int prev_state, current_state, next_state, saved_state;
 
 	if (pwrdm == NULL) {
 		WARN_ONCE(1, "null pwrdm\n");
@@ -201,28 +211,53 @@ static int _pwrdm_state_switch(struct powerdomain *pwrdm, int flag)
 		return -EINVAL;
 	}
 
-	state = pwrdm_read_pwrst(pwrdm);
+	current_state = pwrdm_read_pwrst(pwrdm);
+	prev_state = pwrdm_read_prev_pwrst(pwrdm);
+	next_state = pwrdm_read_next_pwrst(pwrdm);
+	saved_state = pwrdm->state;
 
 	switch (flag) {
-	case PWRDM_STATE_NOW:
-		prev = pwrdm->state;
+	case PWRDM_STATE_HIGH2LOW:
+		if (_pwrdm_state_compare_int(current_state, next_state,
+					     PWRDM_COMPARE_PWRST_GT))
+			/* Transition to lower power state hasn't occurred */
+			pwrdm->high2low_transition_enable = true;
+		else if (current_state != saved_state) {
+			/*
+			 * Transition to the low power state has occurred.
+			 * Multiple calls to this function could be made
+			 * from clock framework and powerdomain framework
+			 * to update counters for a single transition
+			 * Therefore, update the counters only once on the
+			 * very first call.
+			 */
+			pwrdm->high2low_transition_enable = false;
+			_pwrdm_state_counter_update(pwrdm, current_state);
+			pm_dbg_update_time(pwrdm, saved_state);
+		}
 		break;
-	case PWRDM_STATE_PREV:
-		prev = pwrdm_read_prev_pwrst(pwrdm);
-		if (pwrdm->state != prev)
-			pwrdm->state_counter[_PWRDM_STATE_COUNT_IDX(prev)]++;
-		if (prev == PWRDM_POWER_OSWR)
-			_update_logic_membank_counters(pwrdm);
-		/*
-		 * If the power domain did not hit the desired state,
-		 * generate a trace event with both the desired and hit states
-		 */
-		if (state != prev) {
-			trace_state = (PWRDM_TRACE_STATES_FLAG |
-				       ((state & OMAP_POWERSTATE_MASK) << 8) |
-				       ((prev & OMAP_POWERSTATE_MASK) << 0));
-			trace_power_domain_target(pwrdm->name, trace_state,
-						  smp_processor_id());
+	case PWRDM_STATE_LOW2HIGH:
+		if (_pwrdm_state_compare_int(current_state, prev_state,
+					     PWRDM_COMPARE_PWRST_GT)) {
+			/* transition to a higher power state occurred*/
+			_pwrdm_state_counter_update(pwrdm, current_state);
+
+			if (pwrdm->high2low_transition_enable) {
+				/*
+				 * This flag will be set only if the
+				 * the powerdomain did not transition to
+				 * the programmed low power state by the
+				 * time this function was called.
+				 * The powerdomain would have transitioned
+				 * to the low power state later.
+				 * Therefore, update the counter of the
+				 * prev state here
+				 */
+				_pwrdm_state_counter_update(pwrdm, prev_state);
+				pwrdm->high2low_transition_enable = false;
+			}
+
+			pm_dbg_update_time(pwrdm, prev_state);
 		}
 		break;
 	default:
@@ -231,12 +266,8 @@ static int _pwrdm_state_switch(struct powerdomain *pwrdm, int flag)
 		return -EINVAL;
 	}
 
-	if (state != prev)
-		pwrdm->state_counter[_PWRDM_STATE_COUNT_IDX(state)]++;
 
-	pm_dbg_update_time(pwrdm, prev);
-
-	pwrdm->state = state;
+	pwrdm->state = current_state;
 
 	return 0;
 }
