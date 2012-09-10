@@ -22,6 +22,7 @@
 #include <linux/platform_data/omap4-keypad.h>
 #include <linux/pm_runtime.h>
 #include <linux/platform_data/omap-mcpdm.h>
+#include <linux/platform_data/omap-dmic.h>
 #include <sound/omap-abe.h>
 #include <media/omap3isp.h>
 
@@ -452,6 +453,7 @@ static void __init omap_init_dmic(void)
 {
 	struct omap_hwmod *oh;
 	struct platform_device *pdev;
+	struct omap_dmic_pdata *pdata;
 
 	oh = omap_hwmod_lookup("dmic");
 	if (!oh) {
@@ -459,8 +461,19 @@ static void __init omap_init_dmic(void)
 		return;
 	}
 
-	pdev = omap_device_build("omap-dmic", -1, oh, NULL, 0, NULL, 0, 0);
+	pdata = kzalloc(sizeof(*pdata), GFP_KERNEL);
+	if (!pdata) {
+		pr_err("Could not allocate dmic pdata\n");
+		return;
+	}
+
+	pdata->disable_idle_on_suspend = omap_device_disable_idle_on_suspend;
+
+	pdev = omap_device_build("omap-dmic", -1, oh, pdata, sizeof(*pdata),
+				 NULL, 0, 0);
 	WARN(IS_ERR(pdev), "Can't build omap_device for omap-dmic.\n");
+
+	kfree(pdata);
 }
 #else
 static inline void omap_init_dmic(void) {}
