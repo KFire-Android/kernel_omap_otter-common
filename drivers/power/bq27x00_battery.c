@@ -106,8 +106,10 @@ struct bq27x00_device_info {
 
 	struct power_supply	bat;
 	struct power_supply	ac;
+	struct power_supply	bat_sim;
 
 	struct bq27x00_access_methods bus;
+	bool battery_present;
 
 	struct mutex lock;
 };
@@ -571,6 +573,24 @@ static int bq27x00_battery_get_property(struct power_supply *psy,
 	return ret;
 }
 
+static int bq27x00_bat_sim_get_property(struct power_supply *psy,
+					enum power_supply_property psp,
+					union power_supply_propval *val)
+{
+	switch (psp) {
+	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
+		val->intval = 3800000;
+		break;
+	case POWER_SUPPLY_PROP_ONLINE:
+		val->intval = POWER_SUPPLY_TYPE_MAINS;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
 static int bq27x00_ac_get_property(struct power_supply *psy,
 					enum power_supply_property psp,
 					union power_supply_propval *val)
@@ -597,6 +617,7 @@ static int bq27x00_ac_get_property(struct power_supply *psy,
 
 	return ret;
 }
+
 static void bq27x00_external_power_changed(struct power_supply *psy)
 {
 	struct bq27x00_device_info *di = to_bq27x00_device_info(psy);
@@ -618,7 +639,6 @@ static int bq27x00_powersupply_init(struct bq27x00_device_info *di)
 	int ret;
 	union power_supply_propval volt_val;
 	union power_supply_propval curr_val;
-	bool battery_present;
 	int status;
 	/*
 	 * Get the current consumption by battery. If it is 0mA
@@ -643,15 +663,16 @@ static int bq27x00_powersupply_init(struct bq27x00_device_info *di)
 			dev_err(di->dev, "failed to get voltage: %d\n", ret);
 			return ret;
 		}
+		/* Check if voltage is greater than 3.9v */
 		if (volt_val.intval > 3900000)
-			battery_present = true;
+			di->battery_present = true;
 		else
-			battery_present = false; /* Voltage is less than 4V */
+			di->battery_present = false;
 	} else {
-		battery_present = true; /* Current is non-zero or no leak */
+		di->battery_present = true; /* Current is non-zero or no leak */
 	}
 
-	if (battery_present) {
+	if (di->battery_present) {
 		di->bat.type = POWER_SUPPLY_TYPE_BATTERY;
 		di->bat.properties = bq27x00_battery_props;
 		di->bat.num_properties = ARRAY_SIZE(bq27x00_battery_props);
@@ -694,8 +715,21 @@ static int bq27x00_powersupply_init(struct bq27x00_device_info *di)
 		}
 
 		bq27x00_update(di);
-	}
+	} else {
 
+		di->bat_sim.name = "bat-sim";
+		di->bat_sim.type = POWER_SUPPLY_TYPE_MAINS;
+		di->bat_sim.properties = bq27x00_ac_props;
+		di->bat_sim.num_properties = ARRAY_SIZE(bq27x00_ac_props);
+		di->bat_sim.get_property = bq27x00_bat_sim_get_property;
+
+		ret = power_supply_register(di->dev, &di->bat_sim);
+		if (ret) {
+			dev_err(di->dev, "fail to register bat sim: %d\n", ret);
+			return ret;
+		}
+		dev_info(di->dev, "support ver. %s enabled\n", DRIVER_VERSION);
+	}
 	return 0;
 }
 
