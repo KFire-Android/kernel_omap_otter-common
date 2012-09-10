@@ -159,6 +159,9 @@ static int _pwrdm_register(struct powerdomain *pwrdm)
 	pwrdm_wait_transition(pwrdm);
 	pwrdm->state = pwrdm_read_pwrst(pwrdm);
 	pwrdm->state_counter[_PWRDM_STATE_COUNT_IDX(pwrdm->state)] = 1;
+	if (_pwrdm_state_compare_int(pwrdm->state, PWRDM_POWER_ON,
+				     PWRDM_COMPARE_PWRST_EQ))
+		pwrdm_clear_all_prev_pwrst(pwrdm);
 
 	pr_debug("powerdomain: registered %s\n", pwrdm->name);
 
