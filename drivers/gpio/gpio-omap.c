@@ -88,6 +88,7 @@ struct gpio_bank {
 	u32 is_oe_wa;
 	bool is_idle;
 	u32 pending_wakeups;
+	u32 wakeup_enabled;
 
 	void (*set_dataout)(struct gpio_bank *bank, int gpio, int enable);
 	int (*get_context_loss_count)(struct device *dev);
@@ -537,11 +538,10 @@ static int _set_gpio_wakeup(struct gpio_bank *bank, int gpio, int enable)
 
 	spin_lock_irqsave(&bank->lock, flags);
 	if (enable)
-		bank->context.wake_en |= gpio_bit;
+		bank->wakeup_enabled |= gpio_bit;
 	else
-		bank->context.wake_en &= ~gpio_bit;
+		bank->wakeup_enabled &= ~gpio_bit;
 
-	__raw_writel(bank->context.wake_en, bank->base + bank->regs->wkup_en);
 	spin_unlock_irqrestore(&bank->lock, flags);
 
 	return 0;
@@ -1477,12 +1477,15 @@ static int omap_gpio_pm_noidle(struct device *dev)
 	return 0;
 }
 
-static u32 omap2_gpio_set_wakeupenables(struct gpio_bank *bank)
+static u32 omap2_gpio_set_wakeupenables(struct gpio_bank *bank, bool idle)
 {
 	unsigned long pad_wakeup;
 	int i;
 
-	pad_wakeup = bank->context.irqenable1;
+	if (idle)
+		pad_wakeup = bank->context.irqenable1;
+	else
+		pad_wakeup = bank->wakeup_enabled;
 
 	for_each_set_bit(i, &pad_wakeup, bank->width) {
 		if (!bank->mux[i])
@@ -1493,12 +1496,15 @@ static u32 omap2_gpio_set_wakeupenables(struct gpio_bank *bank)
 	return pad_wakeup;
 }
 
-static u32 omap2_gpio_clear_wakeupenables(struct gpio_bank *bank)
+static u32 omap2_gpio_clear_wakeupenables(struct gpio_bank *bank, bool idle)
 {
 	unsigned long pad_wakeup;
 	int i;
 
-	pad_wakeup = bank->context.irqenable1;
+	if (idle)
+		pad_wakeup = bank->context.irqenable1;
+	else
+		pad_wakeup = bank->wakeup_enabled;
 
 	for_each_set_bit(i, &pad_wakeup, bank->width)
 		omap_mux_clear_wakeupenable(bank->mux[i]);
@@ -1551,17 +1557,20 @@ void omap2_gpio_prepare_for_idle(int pwr_mode)
 {
 	struct gpio_bank *bank;
 	u32 reconfig_needed = 0;
+	bool idle_task;
 
 	list_for_each_entry(bank, &omap_gpio_list, node) {
 		if (!bank->mod_usage || !bank->loses_context)
 			continue;
 
-		if (is_idle_task(current))
+		idle_task = is_idle_task(current);
+		if (idle_task)
 			omap_gpio_pm_idle(bank->dev);
 		else
 			omap_device_runtime_suspend(bank->dev);
 
-		reconfig_needed |= omap2_gpio_set_wakeupenables(bank);
+		reconfig_needed |= omap2_gpio_set_wakeupenables(bank,
+								idle_task);
 	}
 
 	if (reconfig_needed)
@@ -1575,6 +1584,7 @@ void omap2_gpio_resume_after_idle(void)
 {
 	struct gpio_bank *bank;
 	u32 reconfig_needed = 0;
+	bool idle_task;
 
 	if (gpio8_dbck)
 		clk_enable(gpio8_dbck);
@@ -1583,13 +1593,15 @@ void omap2_gpio_resume_after_idle(void)
 		if (!bank->mod_usage || !bank->loses_context)
 			continue;
 
-		if (is_idle_task(current))
+		idle_task = is_idle_task(current);
+		if (idle_task)
 			omap_gpio_pm_noidle(bank->dev);
 		else
 			omap_device_runtime_resume(bank->dev);
 
 		omap2_gpio_scan_iochain(bank);
-		reconfig_needed |= omap2_gpio_clear_wakeupenables(bank);
+		reconfig_needed |= omap2_gpio_clear_wakeupenables(bank,
+								idle_task);
 	}
 
 	if (reconfig_needed)
