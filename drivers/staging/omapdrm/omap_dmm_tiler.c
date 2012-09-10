@@ -838,6 +838,9 @@ static int omap_dmm_probe(struct platform_device *dev)
 	omap_dmm->container_width = 256;
 	omap_dmm->container_height = 128;
 
+	/* reserve CPCAM engine - engine 4 */
+	omap_dmm->num_engines--;
+
 	/* read out actual LUT width and height */
 	pat_geom = readl(omap_dmm->base + DMM_PAT_GEOMETRY);
 	omap_dmm->lut_width = ((pat_geom >> 16) & 0xF) << 5;
