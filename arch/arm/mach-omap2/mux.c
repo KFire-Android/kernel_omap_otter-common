@@ -37,6 +37,7 @@
 
 
 #include <plat/omap_hwmod.h>
+#include <plat/gpio.h>
 
 #include "control.h"
 #include "mux.h"
@@ -453,6 +454,7 @@ static int _omap_hwmod_mux_handle_irq(struct omap_hwmod *oh, void *data)
 static irqreturn_t omap_hwmod_mux_handle_irq(int irq, void *unused)
 {
 	omap_hwmod_for_each(_omap_hwmod_mux_handle_irq, NULL);
+	omap2_gpio_trigger_wakeup_irqs();
 	return IRQ_HANDLED;
 }
 
