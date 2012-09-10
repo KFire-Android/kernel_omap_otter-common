@@ -629,6 +629,56 @@ out:
 }
 EXPORT_SYMBOL_GPL(hwspin_lock_free);
 
+/**
+ * __hwspin_lock_reset() - reset/unlock a specific hwspinlock
+ * @id: index of the specific hwspinlock that needs to be reset
+ *
+ * This function resets a specific hwspinlock. This _should_
+ * only be called in very special circumstances to unlock and
+ * to avoid a deadlock by an user who would want to acquire the
+ * lock but cannot.
+ *
+ * An example would be a case where a remote processor has crashed
+ * holding a lock.
+ */
+void __hwspin_lock_reset(int id)
+{
+	struct hwspinlock *hwlock;
+
+	mutex_lock(&hwspinlock_tree_lock);
+
+	/* make sure this hwspinlock exists */
+	hwlock = radix_tree_lookup(&hwspinlock_tree, id);
+	if (!hwlock) {
+		pr_warn("hwspinlock %u does not exist\n", id);
+		goto out;
+	}
+
+	/* sanity check (this shouldn't happen) */
+	if (hwlock_to_id(hwlock) != id) {
+		pr_warn("id %u does not match hwspinlock id %u\n", id,
+							hwlock_to_id(hwlock));
+		goto out;
+	}
+
+	/*
+	 * We must make sure that memory operations (both reads and writes),
+	 * done before unlocking the hwspinlock, will not be reordered
+	 * after the lock is released.
+	 *
+	 * That's the purpose of this explicit memory barrier.
+	 */
+	mb();
+	pr_warn("hwspinlock %u forced to unlock\n", id);
+
+	hwlock->bank->ops->unlock(hwlock);
+
+out:
+	mutex_unlock(&hwspinlock_tree_lock);
+
+}
+EXPORT_SYMBOL_GPL(__hwspin_lock_reset);
+
 MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("Hardware spinlock interface");
 MODULE_AUTHOR("Ohad Ben-Cohen <ohad@wizery.com>");

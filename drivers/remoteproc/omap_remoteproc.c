@@ -28,6 +28,7 @@
 #include <linux/platform_device.h>
 #include <linux/dma-mapping.h>
 #include <linux/remoteproc.h>
+#include <linux/hwspinlock.h>
 #include <linux/kthread.h>
 #include <linux/slab.h>
 #include <linux/pm_qos.h>
@@ -42,7 +43,6 @@
 /* 1 sec is fair enough time for suspending an OMAP device */
 #define DEF_SUSPEND_TIMEOUT 1000
 
-
 /**
  * union oproc_pm_qos - holds the pm qos structure
  *			ipu being in core domain uses pm_qos API
@@ -54,6 +54,16 @@
 union oproc_pm_qos {
 	struct pm_qos_request pm_qos;
 	struct dev_pm_qos_request dev_pm_qos;
+};
+
+/**
+ * struct hwspinlock_info - stores the remoteproc's hwspinlock state variables
+ * @num_locks_va: kernel virtual address pointing to no. of spinlocks
+ * @state_va: kernel virtual address of the 1st element of state array
+ */
+struct hwspinlock_info {
+	unsigned *num_locks_va;
+	unsigned long *state_va;
 };
 
 /**
@@ -71,6 +81,8 @@ union oproc_pm_qos {
  * @suspend_acked: flag that says if the suspend request was acked
  * @suspended: flag that says if rproc suspended
  * @need_kick: flag that says if vrings need to be kicked on resume
+ * @hwlock_info: virtual addresses of hwspinlock states shared by rproc
+ *
  */
 struct omap_rproc {
 	struct omap_mbox *mbox;
@@ -87,6 +99,7 @@ struct omap_rproc {
 	bool suspend_acked;
 	bool suspended;
 	bool need_kick;
+	struct hwspinlock_info hwlock_info;
 };
 
 struct _thread_data {
@@ -361,6 +374,30 @@ put_mbox:
 	return ret;
 }
 
+/**
+ * Helper function to reset spinlocks
+ *
+ * There is a possibility that the remote processor was
+ * holding spinlocks when an exception occured. One way
+ * of dealing with it would be for the driver to unlock
+ * all hwspinlocks that were held by the remote processor.
+ */
+static inline void reset_hwspinlock(struct rproc *rproc)
+{
+	struct omap_rproc *oproc = rproc->priv;
+	struct device *dev = rproc->dev.parent;
+	int id;
+
+	/* reset only the spinlocks that were marked held */
+	if (!oproc->hwlock_info.num_locks_va || !oproc->hwlock_info.state_va) {
+		dev_err(dev, "invalid va\n");
+		return;
+	}
+	for_each_set_bit(id, oproc->hwlock_info.state_va,
+					*(oproc->hwlock_info.num_locks_va))
+		__hwspin_lock_reset(id);
+}
+
 /* power off the remote processor */
 static int omap_rproc_stop(struct rproc *rproc)
 {
@@ -370,6 +407,9 @@ static int omap_rproc_stop(struct rproc *rproc)
 	struct omap_rproc *oproc = rproc->priv;
 	struct omap_rproc_timers_info *timers = pdata->timers;
 	int ret, i;
+
+	/* reset the hwspinlocks held by remote processor */
+	reset_hwspinlock(rproc);
 
 	ret = pdata->device_shutdown(pdev);
 	if (ret)
@@ -503,15 +543,53 @@ static int omap_rproc_resume(struct rproc *rproc)
 	return ret;
 }
 
+static inline int omap_rproc_handle_hwspin_rsc(struct rproc *rproc,
+				struct fw_rsc_custom_spinlock *hw_rsc)
+{
+	struct omap_rproc *oproc = rproc->priv;
+	struct device *dev = rproc->dev.parent;
+
+	oproc->hwlock_info.num_locks_va = (unsigned *)rproc_da_to_va(rproc,
+				hw_rsc->num_locks_da, sizeof(unsigned *));
+	oproc->hwlock_info.state_va = (unsigned long *)rproc_da_to_va(rproc,
+					hw_rsc->da, sizeof(unsigned long *));
+
+	if (!oproc->hwlock_info.num_locks_va || !oproc->hwlock_info.state_va) {
+		dev_err(dev, "Invalid hwspinlock resource info\n");
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+static inline int omap_rproc_handle_custom_rsc(struct rproc *rproc,
+					struct fw_rsc_custom *rsc)
+{
+	struct device *dev = rproc->dev.parent;
+	int ret = -EINVAL;
+
+	switch (rsc->sub_type) {
+	case OMAP_RSC_HWSPIN:
+		ret = omap_rproc_handle_hwspin_rsc(rproc,
+			(struct fw_rsc_custom_spinlock *)rsc->data);
+		break;
+	default:
+		dev_err(dev, "%s: handling unknown type %d\n", __func__,
+								rsc->sub_type);
+	}
+	return ret;
+}
+
 static struct rproc_ops omap_rproc_ops = {
-	.start		= omap_rproc_start,
-	.stop		= omap_rproc_stop,
-	.kick		= omap_rproc_kick,
-	.suspend	= omap_rproc_suspend,
-	.resume		= omap_rproc_resume,
-	.set_latency	= omap_rproc_set_latency,
-	.set_bandwidth	= omap_rproc_set_bandwidth,
-	.set_frequency	= omap_rproc_set_frequency,
+	.start			= omap_rproc_start,
+	.stop			= omap_rproc_stop,
+	.kick			= omap_rproc_kick,
+	.suspend		= omap_rproc_suspend,
+	.resume			= omap_rproc_resume,
+	.set_latency		= omap_rproc_set_latency,
+	.set_bandwidth		= omap_rproc_set_bandwidth,
+	.set_frequency		= omap_rproc_set_frequency,
+	.handle_custom_rsc	= omap_rproc_handle_custom_rsc,
 };
 
 static inline int omap_rproc_add_lat_request(struct omap_rproc *oproc)
