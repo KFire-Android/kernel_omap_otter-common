@@ -768,6 +768,12 @@ static int tc358765_power_on(struct omap_dss_device *dssdev)
 	/* reset tc358765 bridge */
 	tc358765_hw_reset(dssdev);
 
+	/* We need to wait at least 100ms after power-on and before
+	 * turning on DDR clock. Otherwise display can be not initialithed
+	 * after resume, time to time. Delay in tc358765_hw_reset() function
+	 * also plays role. */
+	msleep(100);
+
 	/* do extra job to match kozio registers (???) */
 	dsi_videomode_panel_preinit(dssdev);
 
