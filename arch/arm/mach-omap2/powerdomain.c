@@ -256,7 +256,12 @@ static int _pwrdm_state_switch(struct powerdomain *pwrdm, int flag)
 				_pwrdm_state_counter_update(pwrdm, prev_state);
 				pwrdm->high2low_transition_enable = false;
 			}
-
+			/*
+			 * Prev state of the powerdomain has now been processed
+			 * clear it to ensure, counters are not incremented
+			 * multiple times for a single power state transition
+			 */
+			pwrdm_clear_all_prev_pwrst(pwrdm);
 			pm_dbg_update_time(pwrdm, prev_state);
 		}
 		break;
