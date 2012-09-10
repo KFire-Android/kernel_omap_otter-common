@@ -89,6 +89,8 @@ struct clkdm_dep {
 
 /* Possible flags for struct clockdomain._flags */
 #define _CLKDM_FLAG_HWSUP_ENABLED		BIT(0)
+#define _CLKDM_FLAG_FORCE_NO_SLEEP		BIT(1)
+
 
 /**
  * struct clockdomain - OMAP clockdomain
