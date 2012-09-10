@@ -101,6 +101,22 @@ int twl6040_clear_bits(struct twl6040 *twl6040, unsigned int reg, u8 mask)
 }
 EXPORT_SYMBOL(twl6040_clear_bits);
 
+static int twl6040_set_pll_input(struct twl6040 *twl6040, int pll_id, int on)
+{
+	int ret;
+
+	if (!twl6040->set_pll_input)
+		return 0;
+
+	ret = twl6040->set_pll_input(pll_id, on);
+	if (ret)
+		dev_err(twl6040->dev, "failed to %s %s PLL input\n",
+			on ? "enable" : "disable",
+			pll_id ? "High-Performance" : "Low-Power");
+
+	return ret;
+}
+
 /* twl6040 codec manual power-up sequence */
 static int twl6040_power_up(struct twl6040 *twl6040)
 {
@@ -311,12 +327,20 @@ int twl6040_power(struct twl6040 *twl6040, int on)
 		if (twl6040->power_count++)
 			goto out;
 
+		/* enable LPPLL input: clk32k */
+		ret = twl6040_set_pll_input(twl6040,
+					TWL6040_SYSCLK_SEL_LPPLL, 1);
+		if (ret)
+			goto out;
+
 		if (gpio_is_valid(audpwron)) {
 			/* wait for power-up completion */
 			ret = twl6040_power_up_completion(twl6040, naudint);
 			if (ret) {
 				dev_err(twl6040->dev,
 					"automatic power-down failed\n");
+				twl6040_set_pll_input(twl6040,
+						TWL6040_SYSCLK_SEL_LPPLL, 0);
 				twl6040->power_count = 0;
 				goto out;
 			}
@@ -326,6 +350,8 @@ int twl6040_power(struct twl6040 *twl6040, int on)
 			if (ret) {
 				dev_err(twl6040->dev,
 					"manual power-up failed\n");
+				twl6040_set_pll_input(twl6040,
+						TWL6040_SYSCLK_SEL_LPPLL, 0);
 				twl6040->power_count = 0;
 				goto out;
 			}
@@ -370,6 +396,10 @@ int twl6040_power(struct twl6040 *twl6040, int on)
 			/* use manual power-down sequence */
 			twl6040_power_down(twl6040);
 		}
+
+		/* disable current PLL's reference clock */
+		twl6040_set_pll_input(twl6040, twl6040->pll, 0);
+
 		twl6040->sysclk = 0;
 		twl6040->mclk = 0;
 	}
@@ -426,6 +456,12 @@ int twl6040_set_pll(struct twl6040 *twl6040, int pll_id,
 
 		switch (freq_in) {
 		case 32768:
+			/* enable LPPLL reference clock */
+			ret = twl6040_set_pll_input(twl6040,
+						TWL6040_SYSCLK_SEL_LPPLL, 1);
+			if (ret)
+				goto pll_out;
+
 			lppllctl |= TWL6040_LPLLENA;
 			twl6040_reg_write(twl6040, TWL6040_REG_LPPLLCTL,
 					  lppllctl);
@@ -436,6 +472,10 @@ int twl6040_set_pll(struct twl6040 *twl6040, int pll_id,
 			hppllctl &= ~TWL6040_HPLLENA;
 			twl6040_reg_write(twl6040, TWL6040_REG_HPPLLCTL,
 					  hppllctl);
+
+			/* disable MCLK, LPPLL is now running */
+			twl6040_set_pll_input(twl6040,
+					TWL6040_SYSCLK_SEL_HPPLL, 0);
 			break;
 		default:
 			dev_err(twl6040->dev,
@@ -487,6 +527,12 @@ int twl6040_set_pll(struct twl6040 *twl6040, int pll_id,
 				goto pll_out;
 			}
 
+			/* enable MCLK, supplied externally */
+			ret = twl6040_set_pll_input(twl6040,
+						TWL6040_SYSCLK_SEL_HPPLL, 1);
+			if (ret)
+				goto pll_out;
+
 			/*
 			 * enable clock slicer to ensure input waveform is
 			 * square
@@ -502,6 +548,10 @@ int twl6040_set_pll(struct twl6040 *twl6040, int pll_id,
 			lppllctl &= ~TWL6040_LPLLENA;
 			twl6040_reg_write(twl6040, TWL6040_REG_LPPLLCTL,
 					  lppllctl);
+
+			/* disable clk32k, HPPLL is now running */
+			twl6040_set_pll_input(twl6040,
+					TWL6040_SYSCLK_SEL_LPPLL, 0);
 		}
 		break;
 	default:
@@ -652,6 +702,7 @@ static int __devinit twl6040_probe(struct i2c_client *client,
 
 	twl6040->dev = &client->dev;
 	twl6040->irq = client->irq;
+	twl6040->set_pll_input = pdata->set_pll_input;
 
 	mutex_init(&twl6040->mutex);
 	mutex_init(&twl6040->io_mutex);
