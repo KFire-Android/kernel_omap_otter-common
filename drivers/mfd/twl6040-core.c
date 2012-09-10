@@ -508,7 +508,8 @@ int twl6040_set_pll(struct twl6040 *twl6040, int pll_id,
 				* (enable PLL if MCLK jitter quality
 				*  doesn't meet specification)
 				*/
-				hppllctl |= TWL6040_MCLK_19200KHZ;
+				hppllctl |= TWL6040_MCLK_19200KHZ |
+					    TWL6040_HPLLENA;
 				break;
 			case 26000000:
 				/* PLL enabled, active mode */
