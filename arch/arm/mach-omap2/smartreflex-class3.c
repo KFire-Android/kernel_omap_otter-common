@@ -35,7 +35,7 @@ static int sr_class3_enable(struct omap_sr *sr)
 	}
 
 	omap_vp_enable(sr->voltdm);
-	return sr_enable(sr, volt);
+	return sr_enable(sr);
 }
 
 static int sr_class3_disable(struct omap_sr *sr, int is_volt_reset)

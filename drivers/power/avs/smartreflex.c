@@ -632,15 +632,12 @@ int sr_configure_minmax(struct omap_sr *sr)
 /**
  * sr_enable() - Enables the smartreflex module.
  * @sr:		pointer to which the SR module to be configured belongs to.
- * @volt:	The voltage at which the Voltage domain associated with
- *		the smartreflex module is operating at.
- *		This is required only to program the correct Ntarget value.
  *
  * This API is to be called from the smartreflex class driver to
  * enable a smartreflex module. Returns 0 on success. Returns error
  * value if the voltage passed is wrong or if ntarget value is wrong.
  */
-int sr_enable(struct omap_sr *sr, unsigned long volt)
+int sr_enable(struct omap_sr *sr)
 {
 	struct omap_volt_data *volt_data = NULL;
 	struct voltagedomain *voltdm;
@@ -664,8 +661,8 @@ int sr_enable(struct omap_sr *sr, unsigned long volt)
 
 	nvalue_reciprocal = sr_retrieve_nvalue(sr, volt_data->sr_efuse_offs);
 	if (!nvalue_reciprocal) {
-		dev_warn(&sr->pdev->dev, "%s: NVALUE = 0 at voltage %ld\n",
-			 __func__, volt);
+		dev_warn(&sr->pdev->dev, "%s: NVALUE = 0 at voltage %d\n",
+			 __func__, volt_data->volt_nominal);
 		return -ENODATA;
 	}
 
@@ -674,8 +671,8 @@ int sr_enable(struct omap_sr *sr, unsigned long volt)
 						volt_data->lvt_sr_efuse_offs);
 		if (!lvt_nvalue_reciprocal) {
 			dev_err(&sr->pdev->dev,
-				"%s: LVT SENSOR NVALUE = 0 at voltage %ld\n",
-				__func__, volt);
+				"%s: LVT SENSOR NVALUE = 0 at voltage %d\n",
+				__func__, volt_data->volt_nominal);
 			return -ENODATA;
 		}
 	}
