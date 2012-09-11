@@ -128,6 +128,7 @@ struct mgr_priv_data {
 static struct {
 	struct ovl_priv_data ovl_priv_data_array[MAX_DSS_OVERLAYS];
 	struct mgr_priv_data mgr_priv_data_array[MAX_DSS_MANAGERS];
+	struct writeback_cache_data writeback_cache;
 
 	bool fifo_merge_dirty;
 	bool fifo_merge;
@@ -766,6 +767,73 @@ static void dss_set_go_bits(void)
 
 }
 
+static void dss_wb_write_regs(void)
+{
+	struct writeback_cache_data *wbc;
+	int r = 0;
+	if (dss_has_feature(FEAT_WB))
+		wbc = &dss_data.writeback_cache;
+	else
+		wbc = NULL;
+	/* setup WB for capture mode */
+	if (wbc && wbc->enabled && wbc->dirty) {
+		/* writeback is enabled for this plane - set accordingly */
+		r = dispc_setup_wb(wbc);
+		if (r)
+			DSSERR("dispc_setup_wb failed with error %d\n", r);
+		wbc->dirty = false;
+		wbc->shadow_dirty = true;
+	}
+}
+static void dss_wb_ovl_enable(void)
+{
+	struct writeback_cache_data *wbc;
+	if (dss_has_feature(FEAT_WB))
+		wbc = &dss_data.writeback_cache;
+	else
+		wbc = NULL;
+	if (dss_has_feature(FEAT_WB)) {
+		/* Enable WB plane and source plane */
+		DSSDBG("configure manager wbc->shadow_dirty = %d",
+		wbc->shadow_dirty);
+		if (wbc->shadow_dirty && wbc->enabled) {
+			switch (wbc->source) {
+			case OMAP_WB_GFX:
+			case OMAP_WB_VID1:
+			case OMAP_WB_VID2:
+			case OMAP_WB_VID3:
+				dispc_ovl_enable(wbc->source - 3, true);
+				wbc->shadow_dirty = false;
+				dispc_ovl_enable(OMAP_DSS_WB, true);
+				break;
+			case OMAP_WB_LCD1:
+			case OMAP_WB_LCD2:
+			case OMAP_WB_TV:
+				dispc_ovl_enable(OMAP_DSS_WB, true);
+				wbc->shadow_dirty = false;
+				break;
+			}
+		} else if (wbc->dirty && !wbc->enabled) {
+			dispc_ovl_enable(OMAP_DSS_WB, false);
+			wbc->dirty = false;
+		}
+	}
+}
+
+static void dss_wb_set_go_bits(void)
+{
+	struct writeback_cache_data *wbc;
+	if (dss_has_feature(FEAT_WB))
+		wbc = &dss_data.writeback_cache;
+	else
+		wbc = NULL;
+	/* WB GO bit has to be used only in case of
+	 * capture mode and not in memory mode
+	 */
+	if (wbc && wbc->mode != OMAP_WB_MEM2MEM_MODE)
+		dispc_go_wb();
+}
+
 static void mgr_clear_shadow_dirty(struct omap_overlay_manager *mgr)
 {
 	struct omap_overlay *ovl;
@@ -1208,6 +1276,72 @@ int omap_dss_mgr_apply(struct omap_overlay_manager *mgr)
 
 	spin_unlock_irqrestore(&data_lock, flags);
 
+	return 0;
+}
+
+int omap_dss_wb_mgr_apply(struct omap_overlay_manager *mgr,
+		struct omap_writeback *wb)
+{
+	struct writeback_cache_data *wbc;
+	unsigned long flags;
+
+	DSSDBG("omap_dss_wb_mgr_apply(%s)\n", mgr->name);
+	if (!wb) {
+		printk(KERN_ERR "[%s][%d] No WB!\n", __FILE__, __LINE__);
+		return -EINVAL;
+	}
+
+	spin_lock_irqsave(&data_lock, flags);
+	wbc = &dss_data.writeback_cache;
+
+	if (wb && wb->info.enabled) {
+		/* mem2mem mode not supported as of now */
+		if (wb->info.source >= OMAP_WB_GFX)
+			return -EINVAL;
+		/* if source is an overlay, mode cannot be capture */
+		if ((wb->info.source >= OMAP_WB_GFX) &&
+			(wb->info.mode != OMAP_WB_MEM2MEM_MODE))
+			return -EINVAL;
+		wbc->enabled = true;
+		wbc->mode = wb->info.mode;
+		wbc->color_mode = wb->info.dss_mode;
+		wbc->out_width = wb->info.out_width;
+		wbc->out_height = wb->info.out_height;
+		wbc->width = wb->info.width;
+		wbc->height = wb->info.height;
+
+		wbc->paddr = wb->info.paddr;
+		wbc->p_uv_addr = wb->info.p_uv_addr;
+
+		wbc->capturemode = wb->info.capturemode;
+		wbc->burst_size = BURST_SIZE_X8;
+
+		/*
+		 * only these FIFO values work in WB capture mode for all
+		 * downscale scenarios. Other FIFO values cause a SYNC_LOST
+		 * on LCD due to b/w issues.
+		 */
+		wbc->fifo_high = 0x10;
+		wbc->fifo_low = 0x8;
+		wbc->source = wb->info.source;
+
+		wbc->rotation = wb->info.rotation;
+		wbc->rotation_type = wb->info.rotation_type;
+
+		wbc->dirty = true;
+		wbc->shadow_dirty = false;
+	} else if (wb && (wbc->enabled != wb->info.enabled)) {
+		/* disable WB if not disabled already*/
+		wbc->enabled = wb->info.enabled;
+		wbc->dirty = true;
+		wbc->shadow_dirty = false;
+	}
+
+	dss_wb_write_regs();
+	dss_wb_ovl_enable();
+	dss_wb_set_go_bits();
+
+	spin_unlock_irqrestore(&data_lock, flags);
 	return 0;
 }
 

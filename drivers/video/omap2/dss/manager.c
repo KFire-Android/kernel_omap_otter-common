@@ -552,6 +552,7 @@ int dss_init_overlay_managers(struct platform_device *pdev)
 		mgr->set_device = &dss_mgr_set_device;
 		mgr->unset_device = &dss_mgr_unset_device;
 		mgr->apply = &omap_dss_mgr_apply;
+		mgr->wb_apply = &omap_dss_wb_mgr_apply;
 		mgr->set_manager_info = &dss_mgr_set_info;
 		mgr->get_manager_info = &dss_mgr_get_info;
 		mgr->wait_for_go = &dss_mgr_wait_for_go;

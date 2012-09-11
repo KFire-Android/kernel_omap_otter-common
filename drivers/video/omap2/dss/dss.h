@@ -121,6 +121,12 @@ struct dss_clock_info {
 	u16 fck_div;
 };
 
+enum omap_burst_size {
+	BURST_SIZE_X2 = 0,
+	BURST_SIZE_X4 = 1,
+	BURST_SIZE_X8 = 2,
+};
+
 struct dispc_clock_info {
 	/* rates that we get with dividers below */
 	unsigned long lck;
@@ -155,6 +161,36 @@ struct dsi_clock_info {
 	bool use_sys_clk;
 };
 
+/*TODO: Move this structure to apply.c*/
+struct writeback_cache_data {
+	/* If true, cache changed, but not written to shadow registers. Set
+	 * in apply(), cleared when registers written.
+	 */
+	bool dirty;
+	/* If true, shadow registers contain changed values not yet in real
+	 * registers. Set when writing to shadow registers, cleared at
+	 * VSYNC/EVSYNC
+	 */
+	bool shadow_dirty;
+	bool enabled;
+	u32 paddr;
+	u32 p_uv_addr; /* relevant for NV12 format only */
+	u16 out_width;
+	u16 out_height;
+	u16 width;
+	u16 height;
+	u32	fifo_low;
+	u32	fifo_high;
+	enum omap_color_mode			color_mode;
+	enum omap_color_mode			input_color_mode;
+	enum omap_writeback_capturemode	capturemode;
+	enum omap_writeback_source		source;
+	enum omap_burst_size			burst_size;
+	enum omap_writeback_mode		mode;
+	u8					rotation;
+	enum omap_dss_rotation_type		rotation_type;
+};
+
 struct seq_file;
 struct platform_device;
 
@@ -172,6 +208,9 @@ int dss_mgr_wait_for_go(struct omap_overlay_manager *mgr);
 int dss_mgr_wait_for_go_ovl(struct omap_overlay *ovl);
 void dss_mgr_start_update(struct omap_overlay_manager *mgr);
 int omap_dss_mgr_apply(struct omap_overlay_manager *mgr);
+/* writeback apply */
+int omap_dss_wb_mgr_apply(struct omap_overlay_manager *mgr,
+		struct omap_writeback *wb);
 
 int dss_mgr_enable(struct omap_overlay_manager *mgr);
 void dss_mgr_disable(struct omap_overlay_manager *mgr);
@@ -230,6 +269,11 @@ int dss_ovl_simple_check(struct omap_overlay *ovl,
 		const struct omap_overlay_info *info);
 int dss_ovl_check(struct omap_overlay *ovl,
 		struct omap_overlay_info *info, struct omap_dss_device *dssdev);
+/* Write back */
+void dss_init_writeback(struct platform_device *pdev);
+void dss_uninit_writeback(struct platform_device *pdev);
+bool omap_dss_check_wb(struct writeback_cache_data *wb, int overlayId,
+						int managerId);
 
 /* DSS */
 int dss_init_platform_driver(void);
@@ -456,6 +500,9 @@ int dispc_mgr_get_clock_div(enum omap_channel channel,
 		struct dispc_clock_info *cinfo);
 void dispc_mgr_setup(enum omap_channel channel,
 		struct omap_overlay_manager_info *info);
+/* DISPC WRITEBACK */
+int dispc_setup_wb(struct writeback_cache_data *wb);
+void dispc_go_wb(void);
 
 /* VENC */
 #ifdef CONFIG_OMAP2_DSS_VENC

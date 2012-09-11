@@ -218,6 +218,9 @@ static int omap_dss_probe(struct platform_device *pdev)
 	dss_init_overlay_managers(pdev);
 	dss_init_overlays(pdev);
 
+	if (dss_has_feature(FEAT_WB))
+		dss_init_writeback(pdev);
+
 	r = dss_initialize_debugfs();
 	if (r)
 		goto err_debugfs;
@@ -256,6 +259,8 @@ static int omap_dss_remove(struct platform_device *pdev)
 
 	dss_uninitialize_debugfs();
 
+	if (dss_has_feature(FEAT_WB))
+		dss_uninit_writeback(pdev);
 	dss_uninit_overlays(pdev);
 	dss_uninit_overlay_managers(pdev);
 

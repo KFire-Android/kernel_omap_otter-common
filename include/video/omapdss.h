@@ -50,6 +50,7 @@
 #define DISPC_IRQ_FRAMEDONEWB		(1 << 23)
 #define DISPC_IRQ_FRAMEDONETV		(1 << 24)
 #define DISPC_IRQ_WBBUFFEROVERFLOW	(1 << 25)
+#define DISPC_IRQ_WBINCOMPLETE		(1 << 26)
 
 struct omap_dss_device;
 struct omap_overlay_manager;
@@ -69,6 +70,7 @@ enum omap_plane {
 	OMAP_DSS_VIDEO1	= 1,
 	OMAP_DSS_VIDEO2	= 2,
 	OMAP_DSS_VIDEO3	= 3,
+	OMAP_DSS_WB		= 4,
 };
 
 enum omap_channel {
@@ -109,22 +111,6 @@ enum omap_dss_load_mode {
 	OMAP_DSS_LOAD_CLUT_ONLY		= 1,
 	OMAP_DSS_LOAD_FRAME_ONLY	= 2,
 	OMAP_DSS_LOAD_CLUT_ONCE_FRAME	= 3,
-};
-
-/* Writeback data structures */
-enum omap_writeback_source {
-	OMAP_WB_LCD1		= 0,
-	OMAP_WB_TV		= 1,
-	OMAP_WB_LCD2		= 2,
-	OMAP_WB_GFX		= 3,
-	OMAP_WB_VID1		= 4,
-	OMAP_WB_VID2		= 5,
-	OMAP_WB_VID3		= 6,
-};
-
-enum omap_writeback_mode {
-	OMAP_WB_CAPTURE_MODE	= 0,
-	OMAP_WB_MEM2MEM_MODE	= 1,
 };
 
 enum omap_dss_trans_key_type {
@@ -447,6 +433,69 @@ struct omap_dss_cconv_coefs {
 	u16 full_range;
 } __aligned(4);
 
+/* Writeback data structures */
+enum omap_writeback_source {
+	OMAP_WB_LCD1		= 0,
+	OMAP_WB_TV		= 1,
+	OMAP_WB_LCD2		= 2,
+	OMAP_WB_GFX		= 3,
+	OMAP_WB_VID1		= 4,
+	OMAP_WB_VID2		= 5,
+	OMAP_WB_VID3		= 6
+};
+
+enum omap_writeback_capturemode {
+	OMAP_WB_CAPTURE_ALL		= 0x0,
+	OMAP_WB_CAPTURE_1		= 0x1,
+	OMAP_WB_CAPTURE_1_OF_2	= 0x2,
+	OMAP_WB_CAPTURE_1_OF_3	= 0x3,
+	OMAP_WB_CAPTURE_1_OF_4	= 0x4,
+	OMAP_WB_CAPTURE_1_OF_5	= 0x5,
+	OMAP_WB_CAPTURE_1_OF_6	= 0x6,
+	OMAP_WB_CAPTURE_1_OF_7	= 0x7
+};
+
+enum omap_writeback_mode {
+	OMAP_WB_CAPTURE_MODE	= 0x0,
+	OMAP_WB_MEM2MEM_MODE	= 0x1,
+};
+
+struct omap_writeback_info {
+	bool					enabled;
+	bool					info_dirty;
+	enum omap_writeback_source		source;
+	u16					width;
+	u16					height;
+	u16					out_width;
+	u16					out_height;
+	enum omap_color_mode			dss_mode;
+	enum omap_writeback_capturemode		capturemode;
+	/* capture or mem2mem mode */
+	enum omap_writeback_mode		mode;
+	u32					paddr;
+	/* NV12 support*/
+	u32					p_uv_addr;
+	u8					rotation;
+	enum omap_dss_rotation_type		rotation_type;
+};
+
+struct omap_writeback {
+	struct kobject			kobj;
+	struct list_head		list;
+	bool				info_dirty;
+	int				width;
+	int				height;
+	/* mutex to control access to wb data */
+	struct mutex			lock;
+	struct omap_writeback_info	info;
+
+	bool (*check_wb)(struct omap_writeback *wb);
+	int (*set_wb_info)(struct omap_writeback *wb,
+			struct omap_writeback_info *info);
+	void (*get_wb_info)(struct omap_writeback *wb,
+			struct omap_writeback_info *info);
+};
+
 
 struct omap_overlay_info {
 	u32 paddr;
@@ -573,6 +622,8 @@ struct omap_overlay_manager {
 	int (*blank)(struct omap_overlay_manager *mgr, bool wait_for_vsync);
 	void (*dump_cb)(struct omap_overlay_manager *mgr, struct seq_file *s);
 	int (*set_ovl)(struct omap_overlay_manager *mgr);
+	int (*wb_apply)(struct omap_overlay_manager *mgr,
+		struct omap_writeback *wb);
 };
 
 struct omap_dss_device {
@@ -814,6 +865,7 @@ struct omap_overlay_manager *omap_dss_get_overlay_manager(int num);
 
 int omap_dss_get_num_overlays(void);
 struct omap_overlay *omap_dss_get_overlay(int num);
+struct omap_writeback *omap_dss_get_wb(int num);
 
 void omapdss_default_get_resolution(struct omap_dss_device *dssdev,
 		u16 *xres, u16 *yres);

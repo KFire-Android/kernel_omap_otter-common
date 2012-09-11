@@ -64,6 +64,7 @@ enum dss_feat_id {
 	FEAT_OMAP3_DSI_FIFO_BUG,
 	FEAT_DSI_PLL_SELFREQDCO,
 	FEAT_DSI_PLL_REFSEL,
+	FEAT_WB,
 };
 
 /* DSS register field id */
