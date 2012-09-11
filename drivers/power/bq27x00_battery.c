@@ -33,6 +33,9 @@
 #include <linux/power_supply.h>
 #include <linux/idr.h>
 #include <linux/i2c.h>
+#include <plat/mux.h>
+#include <linux/interrupt.h>
+#include <linux/gpio.h>
 #include <linux/slab.h>
 #include <asm/unaligned.h>
 
@@ -91,6 +94,8 @@ struct bq27x00_reg_cache {
 struct bq27x00_device_info {
 	struct device 		*dev;
 	int			id;
+	int			gpio;
+	int			gpio_irq;
 	enum bq27x00_chip	chip;
 
 	struct bq27x00_reg_cache cache;
@@ -600,12 +605,21 @@ static void bq27x00_external_power_changed(struct power_supply *psy)
 	schedule_delayed_work(&di->work, 0);
 }
 
+static irqreturn_t bq27x00_irq_handler(int irq, void *_priv)
+{
+	struct bq27x00_device_info *di = _priv;
+
+	power_supply_changed(&di->ac);
+	return IRQ_HANDLED;
+}
+
 static int bq27x00_powersupply_init(struct bq27x00_device_info *di)
 {
 	int ret;
 	union power_supply_propval volt_val;
 	union power_supply_propval curr_val;
 	bool battery_present;
+	int status;
 	/*
 	 * Get the current consumption by battery. If it is 0mA
 	 * or a small leaking current of 100mA either battery is
@@ -668,6 +682,17 @@ static int bq27x00_powersupply_init(struct bq27x00_device_info *di)
 			return ret;
 		}
 
+		status = request_threaded_irq(di->gpio_irq, NULL,
+				bq27x00_irq_handler,
+				IRQF_TRIGGER_LOW, "bq27x00_soc_int",
+				di);
+		if (status) {
+			dev_err(di->dev, "request irq failed for bq27x00_soc_int");
+			power_supply_unregister(&di->bat);
+			power_supply_unregister(&di->ac);
+			return status;
+		}
+
 		bq27x00_update(di);
 	}
 
@@ -688,6 +713,8 @@ static void bq27x00_powersupply_unregister(struct bq27x00_device_info *di)
 
 	power_supply_unregister(&di->bat);
 
+	free_irq(di->gpio_irq, NULL);
+	gpio_free(di->gpio);
 	mutex_destroy(&di->lock);
 }
 
@@ -772,14 +799,26 @@ static int bq27x00_battery_probe(struct i2c_client *client,
 	di->chip = id->driver_data;
 	di->bat.name = name;
 	di->bus.read = &bq27x00_read_i2c;
+	di->gpio = client->irq;
+	retval = gpio_request_one(di->gpio, GPIOF_IN, "bq_gpio");
+	if (retval < 0) {
+		dev_err(di->dev, "Could not request for GPIO:%i\n",
+				di->gpio);
+		goto batt_failed_3;
+	}
+
+	di->gpio_irq = gpio_to_irq(di->gpio);
 
 	if (bq27x00_powersupply_init(di))
-		goto batt_failed_3;
+		goto batt_failed_4;
 
 	i2c_set_clientdata(client, di);
 
 	return 0;
 
+batt_failed_4:
+	gpio_free(di->gpio);
+	free_irq(di->gpio_irq, NULL);
 batt_failed_3:
 	kfree(di);
 batt_failed_2:
