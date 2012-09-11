@@ -68,6 +68,22 @@ static struct omap2_oscillator oscillator = {
 	.voltage_shutdown_time = 0,
 };
 
+/**
+ * struct omap_pm - Describe the board PM parameters
+ * @rsttime_latency: board global reset latency
+ *
+ * This information tends to be specific to every board, because boards
+ * can contain different types of HW (like PMIC) with different timing
+ * characteristics and etc.
+ */
+struct omap_pm {
+	u32 rsttime_latency;
+};
+
+static struct omap_pm omap_pm = {
+	.rsttime_latency = 0,	/* Explicit declaration to be readable */
+};
+
 bool omap_pm_is_ready_status;
 
 /**
@@ -139,6 +155,30 @@ void omap_pm_get_oscillator_voltage_ramp_time(u32 *tstart, u32 *tshut)
 	*tshut = oscillator.voltage_shutdown_time;
 }
 
+/**
+ * omap_pm_setup_rsttime_latency() -
+ *	setup the board global reset latency
+ * @rsttime_latency:	reset latency time rounded up to uSec
+ *
+ * Store the board global reset latency.
+ *
+ * This function is meant to be used at boot-time configuration.
+ */
+void __init omap_pm_setup_rsttime_latency(u32 rsttime_latency)
+{
+	omap_pm.rsttime_latency = rsttime_latency;
+}
+
+/**
+ * omap_pm_get_rsttime_latency() -
+ *	retrieve the board global reset latency
+ *
+ * Returns latency for reset if registered, else returns 0
+ */
+u32 omap_pm_get_rsttime_latency(void)
+{
+	return omap_pm.rsttime_latency;
+}
 
 static struct omap_device_pm_latency iva_pm_lats[] = {
 	{
