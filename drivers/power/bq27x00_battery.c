@@ -100,6 +100,7 @@ struct bq27x00_device_info {
 	struct delayed_work work;
 
 	struct power_supply	bat;
+	struct power_supply	ac;
 
 	struct bq27x00_access_methods bus;
 
@@ -126,6 +127,12 @@ static enum power_supply_property bq27x00_battery_props[] = {
 };
 
 static unsigned int poll_interval = 1;
+
+static enum power_supply_property bq27x00_ac_props[] = {
+	POWER_SUPPLY_PROP_ONLINE,
+	POWER_SUPPLY_PROP_VOLTAGE_NOW,
+};
+
 module_param(poll_interval, uint, 0644);
 MODULE_PARM_DESC(poll_interval, "battery poll interval in seconds - " \
 				"0 disables polling");
@@ -559,6 +566,32 @@ static int bq27x00_battery_get_property(struct power_supply *psy,
 	return ret;
 }
 
+static int bq27x00_ac_get_property(struct power_supply *psy,
+					enum power_supply_property psp,
+					union power_supply_propval *val)
+{
+	int ret = 0;
+	struct bq27x00_device_info *di =
+		container_of(psy, struct bq27x00_device_info, ac);
+
+	switch (psp) {
+	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
+		ret = bq27x00_battery_voltage(di, val);
+		break;
+	case POWER_SUPPLY_PROP_ONLINE:
+		ret = bq27x00_battery_status(di, val);
+		if (val->intval == POWER_SUPPLY_STATUS_CHARGING)
+			val->intval = POWER_SUPPLY_TYPE_MAINS;
+		else
+			val->intval = POWER_SUPPLY_TYPE_UNKNOWN;
+
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	return ret;
+}
 static void bq27x00_external_power_changed(struct power_supply *psy)
 {
 	struct bq27x00_device_info *di = to_bq27x00_device_info(psy);
@@ -621,6 +654,19 @@ static int bq27x00_powersupply_init(struct bq27x00_device_info *di)
 		}
 
 		dev_info(di->dev, "support ver. %s enabled\n", DRIVER_VERSION);
+
+		di->ac.name = "ac-supply";
+		di->ac.type = POWER_SUPPLY_TYPE_MAINS;
+		di->ac.properties = bq27x00_ac_props;
+		di->ac.num_properties = ARRAY_SIZE(bq27x00_ac_props);
+		di->ac.get_property = bq27x00_ac_get_property;
+
+		ret = power_supply_register(di->dev, &di->ac);
+		if (ret) {
+			dev_err(di->dev, "fail to register AC: %d\n", ret);
+			power_supply_unregister(&di->bat);
+			return ret;
+		}
 
 		bq27x00_update(di);
 	}
