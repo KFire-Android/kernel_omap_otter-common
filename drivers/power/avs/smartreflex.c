@@ -631,7 +631,7 @@ int sr_configure_minmax(struct omap_sr *sr)
 
 /**
  * sr_enable() - Enables the smartreflex module.
- * @voltdm:	VDD pointer to which the SR module to be configured belongs to.
+ * @sr:		pointer to which the SR module to be configured belongs to.
  * @volt:	The voltage at which the Voltage domain associated with
  *		the smartreflex module is operating at.
  *		This is required only to program the correct Ntarget value.
@@ -640,20 +640,21 @@ int sr_configure_minmax(struct omap_sr *sr)
  * enable a smartreflex module. Returns 0 on success. Returns error
  * value if the voltage passed is wrong or if ntarget value is wrong.
  */
-int sr_enable(struct voltagedomain *voltdm, unsigned long volt)
+int sr_enable(struct omap_sr *sr, unsigned long volt)
 {
 	struct omap_volt_data *volt_data = NULL;
-	struct omap_sr *sr = _sr_lookup(voltdm);
+	struct voltagedomain *voltdm;
 	u32 nvalue_reciprocal;
 	int ret;
 	u32 lvt_nvalue_reciprocal = 0;
 
-	if (IS_ERR(sr)) {
-		pr_warning("%s: omap_sr struct for voltdm not found\n",
-			   __func__);
-		return PTR_ERR(sr);
+	if (IS_ERR_OR_NULL(sr)) {
+		pr_warning("%s: bad omap_sr %p from %pF\n", __func__,
+			   sr, (void *)_RET_IP_);
+		return sr ? PTR_ERR(sr) : -EINVAL;
 	}
 
+	voltdm = sr->voltdm;
 	volt_data = omap_voltage_get_curr_vdata(voltdm);
 
 	if (IS_ERR_OR_NULL(volt_data)) {
@@ -705,18 +706,16 @@ int sr_enable(struct voltagedomain *voltdm, unsigned long volt)
 
 /**
  * sr_disable() - Disables the smartreflex module.
- * @voltdm:	VDD pointer to which the SR module to be configured belongs to.
+ * @sr:		pointer to which the SR module to be configured belongs to.
  *
  * This API is to be called from the smartreflex class driver to
  * disable a smartreflex module.
  */
-void sr_disable(struct voltagedomain *voltdm)
+void sr_disable(struct omap_sr *sr)
 {
-	struct omap_sr *sr = _sr_lookup(voltdm);
-
-	if (IS_ERR(sr)) {
-		pr_warning("%s: omap_sr struct for voltdm not found\n",
-			   __func__);
+	if (IS_ERR_OR_NULL(sr)) {
+		pr_warning("%s: bad omap_sr %p from %pF\n", __func__,
+			   sr, (void *)_RET_IP_);
 		return;
 	}
 
