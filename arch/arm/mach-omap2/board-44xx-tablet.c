@@ -63,6 +63,7 @@
 #define OMAP4_MDM_PWR_EN_GPIO       157
 #define GPIO_USB3320_PHY_RESETB	    171
 #define GPIO_WK30		    30
+#define OMAP4_HSIC_AUX_GPIO	42
 
 static struct spi_board_info tablet_spi_board_info[] __initdata = {
 	{
@@ -584,7 +585,10 @@ static const struct usbhs_omap_board_data usbhs_bdata __initconst = {
 	.phy_reset  = true,
 	.reset_gpio_port[0] = -EINVAL,
 	.reset_gpio_port[1] = OMAP4_MDM_PWR_EN_GPIO,
-	.reset_gpio_port[2] = -EINVAL
+	.reset_gpio_port[2] = -EINVAL,
+	.hsic_aux_port[0] = -EINVAL,
+	.hsic_aux_port[1] = OMAP4_HSIC_AUX_GPIO,
+	.hsic_aux_port[2] = -EINVAL
 };
 
 static void __init omap4_ehci_ohci_init(void)
@@ -603,6 +607,9 @@ static void __init omap4_ehci_ohci_init(void)
 	omap_mux_init_signal("usbb2_ulpitll_clk.gpio_157", \
 		OMAP_PIN_OUTPUT | \
 		OMAP_PIN_OFF_NONE);
+
+	omap_mux_init_signal("gpmc_a18.gpio_42",
+			OMAP_PIN_INPUT_PULLUP | OMAP_PIN_OFF_INPUT_PULLUP);
 
 	usbhs_init(&usbhs_bdata);
 
