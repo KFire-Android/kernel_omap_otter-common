@@ -26,6 +26,12 @@ extern int usb_authorize_device(struct usb_device *);
 extern void usb_detect_quirks(struct usb_device *udev);
 extern int usb_remove_device(struct usb_device *udev);
 
+extern bool usb_can_disconnect_device(struct usb_device *udev);
+extern bool usb_can_reconnect_device(struct usb_device *udev);
+
+extern int usb_disconnect_device(struct usb_device *udev, int port);
+extern int usb_reconnect_device(struct usb_device *udev, int port);
+
 extern int usb_get_device_descriptor(struct usb_device *dev,
 		unsigned int size);
 extern char *usb_cache_string(struct usb_device *udev, int index);

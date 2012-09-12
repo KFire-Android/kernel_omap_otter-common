@@ -541,6 +541,43 @@ static ssize_t usb_remove_store(struct device *dev,
 }
 static DEVICE_ATTR(remove, 0200, NULL, usb_remove_store);
 
+/* "Disconnect a device" */
+static ssize_t usb_disconnect_store(struct device *dev,
+		struct device_attribute *attr,
+		const char *buf, size_t count)
+{
+	struct usb_device *udev = to_usb_device(dev);
+	int portnum, rc = 0;
+
+	if (sscanf(buf, "%d", &portnum) != 1 || portnum < 0)
+		return -EINVAL;
+
+	rc = usb_disconnect_device(udev, portnum);
+
+	if (rc == 0)
+		rc = count;
+	return rc;
+}
+static DEVICE_ATTR(disconnect, 0200, NULL, usb_disconnect_store);
+
+/* "Reconnect a device" */
+static ssize_t usb_reconnect_store(struct device *dev,
+		struct device_attribute *attr,
+		const char *buf, size_t count)
+{
+	struct usb_device *udev = to_usb_device(dev);
+	int portnum, rc = 0;
+
+	if (sscanf(buf, "%d", &portnum) != 1 || portnum < 0)
+		return -EINVAL;
+
+	rc = usb_reconnect_device(udev, portnum);
+
+	if (rc == 0)
+		rc = count;
+	return rc;
+}
+static DEVICE_ATTR(reconnect, 0200, NULL, usb_reconnect_store);
 
 static struct attribute *dev_attrs[] = {
 	/* current configuration's attributes */
@@ -569,10 +606,33 @@ static struct attribute *dev_attrs[] = {
 	&dev_attr_avoid_reset_quirk.attr,
 	&dev_attr_authorized.attr,
 	&dev_attr_remove.attr,
+	&dev_attr_disconnect.attr,
+	&dev_attr_reconnect.attr,
 	NULL,
 };
+
+
+static mode_t dev_attrs_are_visible(struct kobject *kobj,
+		struct attribute *a, int n)
+{
+	struct device *dev = container_of(kobj, struct device, kobj);
+	struct usb_device *udev = to_usb_device(dev);
+
+	if (a == &dev_attr_disconnect.attr) {
+		if (usb_can_disconnect_device(udev))
+			return a->mode;
+		return 0;
+	} else if (a == &dev_attr_reconnect.attr) {
+		if (usb_can_reconnect_device(udev))
+			return a->mode;
+		return 0;
+	}
+	return a->mode;
+}
+
 static struct attribute_group dev_attr_grp = {
 	.attrs = dev_attrs,
+	.is_visible =	dev_attrs_are_visible,
 };
 
 /* When modifying this list, be sure to modify dev_string_attrs_are_visible()

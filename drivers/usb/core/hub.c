@@ -687,6 +687,68 @@ int usb_remove_device(struct usb_device *udev)
 	return 0;
 }
 
+bool usb_can_disconnect_device(struct usb_device *udev)
+{
+	struct usb_hcd *hcd = bus_to_hcd(udev->bus);
+
+	/* Currently only root hubs supported */
+	if (udev->parent == NULL && hcd->driver->disconnect)
+		return true;
+
+	return false;
+}
+
+bool usb_can_reconnect_device(struct usb_device *udev)
+{
+	struct usb_hcd *hcd = bus_to_hcd(udev->bus);
+
+	/* Currently only root hubs supported */
+	if (udev->parent == NULL && hcd->driver->reconnect)
+		return true;
+
+	return false;
+}
+
+
+/**
+ * usb_disconnect_device - disconnect a device
+ * @port: port with device to be disconnected
+ */
+int usb_disconnect_device(struct usb_device *udev, int port)
+{
+	struct usb_hcd *hcd;
+
+	if (udev->parent)
+		return -EINVAL;
+
+	hcd = bus_to_hcd(udev->bus);
+
+	if (!hcd->driver->disconnect)
+		return -EINVAL;
+
+	return hcd->driver->disconnect(hcd, port);
+}
+
+/**
+ * usb_reconnect_device - re-connect a device
+ * @port: port with device to be reconnected
+ * Must be disconnected before
+ */
+int usb_reconnect_device(struct usb_device *udev, int port)
+{
+	struct usb_hcd *hcd;
+
+	if (udev->parent)
+		return -EINVAL;
+
+	hcd = bus_to_hcd(udev->bus);
+
+	if (!hcd->driver->reconnect)
+		return -EINVAL;
+
+	return hcd->driver->reconnect(hcd, port);
+}
+
 enum hub_activation_type {
 	HUB_INIT, HUB_INIT2, HUB_INIT3,		/* INITs must come first */
 	HUB_POST_RESET, HUB_RESUME, HUB_RESET_RESUME,
