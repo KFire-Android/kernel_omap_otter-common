@@ -340,29 +340,6 @@ ENTRY(omap5_finish_suspend)
 	cmp	r0, #0x0
 	beq	do_wfi				@ No lowpower state, jump to WFI
 
-	mov	r7, r0
-	/*
-	 * Clear the SCTLR.C bit to prevent further data cache
-	 * allocation.
-	 */
-	mrc	p15, 0, r0, c1, c0, 0
-	bic	r0, r0, #(1 << 2)		@ Disable the C bit
-	mcr	p15, 0, r0, c1, c0, 0
-	isb
-	/*
-	 * HACK: COBRA-1.0BUG00167:  Disable L1 cache and execute WFI
-	 *
-	 * When data caching is disabled, no new cache lines are allocated
-	 * to the L1 data cache and L2 cache because of requests from that
-	 * processor. Other L1 caches will not allocate lines from caches
-	 * with C-bit disabled. L1 memory is now in Write-Back No-Allocate mode.
-	 *
-	 * When CPU comes out of WFI, L1 data cache is re-enabled
-	 */
-
-	cmp	r7, #0x1
-	beq	do_wfi				@ INA/CSWR, jump to WFI
-
 	/*
 	 * Flush all data from the L1 data cache before disabling
 	 * SCTLR.C bit.
@@ -379,6 +356,16 @@ ENTRY(omap5_finish_suspend)
 skip_secure_l1_clean_op:
 	mov	r0, #1
 	bl	v7_flush_dcache_by_level
+
+	/*
+	 * Clear the SCTLR.C bit to prevent further data cache
+	 * allocation. Clearing SCTLR.C would make all the data accesses
+	 * strongly ordered and would not hit the cache.
+	 */
+	mrc	p15, 0, r0, c1, c0, 0
+	bic	r0, r0, #(1 << 2)		@ Disable the C bit
+	mcr	p15, 0, r0, c1, c0, 0
+	isb
 
 	/*
 	 * Invalidate L1 data cache. Even though only invalidate is
