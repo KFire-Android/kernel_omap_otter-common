@@ -506,6 +506,8 @@ struct omap_overlay_manager {
 	/* if true, info has been changed but not applied() yet */
 	bool info_dirty;
 
+	bool m2m_only;
+
 	int (*set_device)(struct omap_overlay_manager *mgr,
 		struct omap_dss_device *dssdev);
 	int (*unset_device)(struct omap_overlay_manager *mgr);
@@ -818,6 +820,8 @@ struct omap_dss_device *omap_dss_find_device(void *data,
 
 int omap_dss_start_device(struct omap_dss_device *dssdev);
 void omap_dss_stop_device(struct omap_dss_device *dssdev);
+
+void dss_m2m_clock_handling(struct omap_overlay_manager *mgr);
 
 int omap_dss_get_num_overlay_managers(void);
 struct omap_overlay_manager *omap_dss_get_overlay_manager(int num);
