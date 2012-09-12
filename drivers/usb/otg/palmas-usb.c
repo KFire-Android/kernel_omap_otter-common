@@ -189,6 +189,9 @@ static irqreturn_t palmas_id_wakeup_irq(int irq, void *_palmas_usb)
 			palmas_usb_write(palmas_usb->palmas,
 						PALMAS_USB_ID_INT_EN_HI_CLR,
 						USB_ID_INT_EN_HI_CLR_ID_GND);
+			palmas_usb_write(palmas_usb->palmas,
+						PALMAS_USB_ID_INT_LATCH_CLR,
+						USB_ID_INT_SRC_ID_GND);
 			status = OMAP_DWC3_ID_GROUND;
 			palmas_usb->linkstat = status;
 		} else {
@@ -202,6 +205,9 @@ static irqreturn_t palmas_id_wakeup_irq(int irq, void *_palmas_usb)
 			palmas_usb_write(palmas_usb->palmas,
 						PALMAS_USB_ID_INT_EN_HI_CLR,
 						USB_ID_INT_EN_HI_CLR_ID_FLOAT);
+			palmas_usb_write(palmas_usb->palmas,
+						PALMAS_USB_ID_INT_LATCH_CLR,
+						USB_ID_INT_SRC_ID_FLOAT);
 			regulator_disable(palmas_usb->vbus_reg);
 			status = OMAP_DWC3_ID_FLOAT;
 			palmas_usb->linkstat = status;
