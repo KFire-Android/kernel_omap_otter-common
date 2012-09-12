@@ -113,7 +113,7 @@ struct dsscomp_data {
 	void (*extra_cb)(void *data, int status);
 	void *extra_cb_data;
 	bool must_apply;	/* whether composition must be applied */
-
+	bool m2m_only;
 #ifdef CONFIG_DEBUG_FS
 	struct list_head dbg_q;
 	u32 dbg_used;
