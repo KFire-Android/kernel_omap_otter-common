@@ -1521,19 +1521,22 @@ static void ti_hdmi_5xxx_core_audio_infoframe_cfg
 	(struct hdmi_ip_data *ip_data,
 	 struct snd_cea_861_aud_if *info_aud)
 {
+	unsigned char temp;
 	void __iomem *core_sys_base = hdmi_core_sys_base(ip_data);
 
-	hdmi_write_reg(core_sys_base, HDMI_CORE_FC_AUDICONF0,
-		info_aud->db1_ct_cc);
+	/* rearrange the bits to match the proper locations in the registers */
+	temp = (info_aud->db1_ct_cc >> 4) | (info_aud->db1_ct_cc << 4);
+	hdmi_write_reg(core_sys_base, HDMI_CORE_FC_AUDICONF0, temp);
 
-	hdmi_write_reg(core_sys_base, HDMI_CORE_FC_AUDICONF1,
-		info_aud->db2_sf_ss);
+	temp = ((info_aud->db2_sf_ss >> 2) & AUDICONF1_SF_MASK) |
+		((info_aud->db2_sf_ss << 4) & AUDICONF1_SS_MASK);
+	hdmi_write_reg(core_sys_base, HDMI_CORE_FC_AUDICONF1, temp);
 
 	hdmi_write_reg(core_sys_base, HDMI_CORE_FC_AUDICONF2,
 		info_aud->db4_ca);
 
-	hdmi_write_reg(core_sys_base, HDMI_CORE_FC_AUDICONF3,
-		info_aud->db5_dminh_lsv);
+	temp = (info_aud->db5_dminh_lsv >> 3) & AUDICONF3_DMINH_LSV_MASK;
+	hdmi_write_reg(core_sys_base, HDMI_CORE_FC_AUDICONF3, temp);
 }
 
 int ti_hdmi_5xxx_audio_config(struct hdmi_ip_data *ip_data,

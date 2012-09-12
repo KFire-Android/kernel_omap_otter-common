@@ -586,8 +586,8 @@ int __init omap_wakeupgen_init(void)
 	if (cpu_is_omap446x() && omap_type() == OMAP2_DEVICE_TYPE_GP)
 		pm44xx_errata |= PM_OMAP4_ROM_CPU1_BACKUP_ERRATUM_xxx;
 
-	if (omap_type() == OMAP2_DEVICE_TYPE_GP) {
-		sar_base = ioremap(OMAP44XX_SAR_RAM_BASE, SZ_16K);
+	if (cpu_is_omap44xx() && (omap_type() == OMAP2_DEVICE_TYPE_GP)) {
+		sar_base = omap4_get_sar_ram_base();
 
 		if (IS_PM44XX_ERRATUM(PM_OMAP4_ROM_CPU1_BACKUP_ERRATUM_xxx))
 			for (i = SAR_BACKUP_STATUS_OFFSET;
@@ -604,8 +604,6 @@ int __init omap_wakeupgen_init(void)
 			__raw_writel(SAR_BACKUP_STATUS_GIC_CPU0,
 				     sar_base + SAR_BACKUP_STATUS_OFFSET);
 
-		iounmap(sar_base);
-		sar_base = NULL;
 	} else {
 		l3_main_3_oh = omap_hwmod_lookup("l3_main_3");
 		if (!l3_main_3_oh)

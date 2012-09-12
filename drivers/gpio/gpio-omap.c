@@ -27,6 +27,7 @@
 #include <linux/irqdomain.h>
 #include <linux/gpio.h>
 #include <linux/bitops.h>
+#include <linux/sched.h>
 #include <mach/hardware.h>
 #include <asm/irq.h>
 #include <mach/irqs.h>
@@ -84,6 +85,7 @@ struct gpio_bank {
 	u16 mux_val[32];
 	struct omap_mux *mux[32];
 	u32 is_oe_wa;
+	bool is_idle;
 
 	void (*set_dataout)(struct gpio_bank *bank, int gpio, int enable);
 	int (*get_context_loss_count)(struct device *dev);
@@ -1138,6 +1140,7 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
 #endif
 	bank->id = pdev->id;
 	bank->is_oe_wa = 0;
+	bank->is_idle = false;
 
 	bank->irq_base = irq_alloc_descs(-1, 0, bank->width, 0);
 	if (bank->irq_base < 0) {
@@ -1257,10 +1260,9 @@ static void omap5_gpio_es1_hw_wa(struct gpio_bank *bank, bool is_suspend)
 
 #ifdef CONFIG_ARCH_OMAP2PLUS
 
-#if defined(CONFIG_PM_RUNTIME)
 static void omap_gpio_restore_context(struct gpio_bank *bank);
 
-static int omap_gpio_runtime_suspend(struct device *dev)
+static int omap_gpio_pm_idle(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
 	struct gpio_bank *bank = platform_get_drvdata(pdev);
@@ -1269,6 +1271,11 @@ static int omap_gpio_runtime_suspend(struct device *dev)
 	u32 wake_low, wake_hi;
 
 	spin_lock_irqsave(&bank->lock, flags);
+
+	if (bank->is_idle) {
+		spin_unlock_irqrestore(&bank->lock, flags);
+		return 0;
+	}
 
 	/*
 	 * Only edges can generate a wakeup event to the PRCM.
@@ -1327,12 +1334,13 @@ update_gpio_context_count:
 	omap5_gpio_es1_hw_wa(bank, true);
 
 	_gpio_dbck_disable(bank);
+	bank->is_idle = true;
 	spin_unlock_irqrestore(&bank->lock, flags);
 
 	return 0;
 }
 
-static int omap_gpio_runtime_resume(struct device *dev)
+static int omap_gpio_pm_noidle(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
 	struct gpio_bank *bank = platform_get_drvdata(pdev);
@@ -1341,6 +1349,12 @@ static int omap_gpio_runtime_resume(struct device *dev)
 	unsigned long flags;
 
 	spin_lock_irqsave(&bank->lock, flags);
+
+	if (!bank->is_idle) {
+		spin_unlock_irqrestore(&bank->lock, flags);
+		return 0;
+	}
+
 	_gpio_dbck_enable(bank);
 
 	/*
@@ -1370,6 +1384,7 @@ static int omap_gpio_runtime_resume(struct device *dev)
 	omap5_gpio_es1_hw_wa(bank, false);
 
 	if (!bank->workaround_enabled) {
+		bank->is_idle = false;
 		spin_unlock_irqrestore(&bank->lock, flags);
 		return 0;
 	}
@@ -1429,67 +1444,38 @@ static int omap_gpio_runtime_resume(struct device *dev)
 	}
 
 	bank->workaround_enabled = false;
+	bank->is_idle = false;
 	spin_unlock_irqrestore(&bank->lock, flags);
 
 	return 0;
 }
-#endif /* CONFIG_PM_RUNTIME */
 
 void omap2_gpio_prepare_for_idle(int pwr_mode)
 {
 	struct gpio_bank *bank;
-	unsigned long flags;
-	u32 wake_low, wake_hi;
 
 	list_for_each_entry(bank, &omap_gpio_list, node) {
 		if (!bank->mod_usage || !bank->loses_context)
 			continue;
 
-		spin_lock_irqsave(&bank->lock, flags);
-		/*
-		 * In idle path we leave GPIO in auto and not disable it hence
-		 * runtime suspend handler is not called which ensures that
-		 * level triggered GPIOs are changed to edge since GPIO block
-		 * can detect only edges when in idle. Put that logic here to
-		 * ensure that level events are not missed. This is restored
-		 * back on resume from idle
-		 */
-		wake_low = bank->context.leveldetect0 & bank->context.wake_en;
-		if (wake_low)
-			__raw_writel(wake_low | bank->context.fallingdetect,
-				bank->base + bank->regs->fallingdetect);
-		wake_hi = bank->context.leveldetect1 & bank->context.wake_en;
-		if (wake_hi)
-			__raw_writel(wake_hi | bank->context.risingdetect,
-				bank->base + bank->regs->risingdetect);
-
-		_gpio_dbck_disable(bank);
-		spin_unlock_irqrestore(&bank->lock, flags);
+		if (is_idle_task(current))
+			omap_gpio_pm_idle(bank->dev);
 	}
 }
 
 void omap2_gpio_resume_after_idle(void)
 {
 	struct gpio_bank *bank;
-	unsigned long flags;
 
 	list_for_each_entry(bank, &omap_gpio_list, node) {
 		if (!bank->mod_usage || !bank->loses_context)
 			continue;
 
-		spin_lock_irqsave(&bank->lock, flags);
-		_gpio_dbck_enable(bank);
-
-		__raw_writel(bank->context.fallingdetect,
-			bank->base + bank->regs->fallingdetect);
-		__raw_writel(bank->context.risingdetect,
-			bank->base + bank->regs->risingdetect);
-
-		spin_unlock_irqrestore(&bank->lock, flags);
+		if (is_idle_task(current))
+			omap_gpio_pm_noidle(bank->dev);
 	}
 }
 
-#if defined(CONFIG_PM_RUNTIME)
 static void omap_gpio_restore_context(struct gpio_bank *bank)
 {
 	__raw_writel(bank->context.wake_en,
@@ -1523,16 +1509,29 @@ static void omap_gpio_restore_context(struct gpio_bank *bank)
 	__raw_writel(bank->context.irqenable2,
 				bank->base + bank->regs->irqenable2);
 }
-#endif /* CONFIG_PM_RUNTIME */
-#else
-#define omap_gpio_runtime_suspend NULL
-#define omap_gpio_runtime_resume NULL
-#endif
+
+#ifdef CONFIG_PM_RUNTIME
+static int omap_gpio_runtime_suspend(struct device *dev)
+{
+	omap_gpio_pm_idle(dev);
+	return 0;
+}
+
+static int omap_gpio_runtime_resume(struct device *dev)
+{
+	omap_gpio_pm_noidle(dev);
+	return 0;
+}
 
 static const struct dev_pm_ops gpio_pm_ops = {
 	SET_RUNTIME_PM_OPS(omap_gpio_runtime_suspend, omap_gpio_runtime_resume,
 									NULL)
 };
+#define OMAP_GPIO_PM_OPS (&gpio_pm_ops)
+#else
+#define OMAP_GPIO_PM_OPS NULL
+#endif
+#endif
 
 #if defined(CONFIG_OF)
 static struct omap_gpio_reg_offs omap2_gpio_regs = {
@@ -1621,7 +1620,7 @@ static struct platform_driver omap_gpio_driver = {
 	.probe		= omap_gpio_probe,
 	.driver		= {
 		.name	= "omap_gpio",
-		.pm	= &gpio_pm_ops,
+		.pm	= OMAP_GPIO_PM_OPS,
 		.of_match_table = of_match_ptr(omap_gpio_match),
 	},
 };

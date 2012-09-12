@@ -744,7 +744,7 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 	int err = 0;
 	int fifo = 0;
 	u8 ret;
-	struct hsi_platform_data *pdata;
+	bool hi_speed;
 
 	if (unlikely((!dev) ||
 		     (!dev->ch) ||
@@ -913,6 +913,9 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 		}
 		*(size_t *)arg = hsi_get_rx_fifo_occupancy(hsi_ctrl, fifo);
 		break;
+	case HSI_IOCTL_GET_TX_STATE_PORT:
+		*(bool *)arg = hsi_is_hst_port_busy(pport);
+		break;
 	case HSI_IOCTL_SET_WAKE_RX_3WIRES_MODE:
 		dev_info(hsi_ctrl->dev,
 			 "Entering RX wakeup in 3 wires mode (no CAWAKE)\n");
@@ -961,14 +964,7 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 			err = -EINVAL;
 			goto out;
 		}
-		hsi_ctrl->hsi_fclk_req = *(unsigned int *)arg ?
-					HSI_FCLK_HI_SPEED : HSI_FCLK_LOW_SPEED;
-
-		if (hsi_ctrl->hsi_fclk_req == hsi_ctrl->hsi_fclk_current) {
-			dev_dbg(hsi_ctrl->dev, "HSI FClk already @%ldHz\n",
-				 hsi_ctrl->hsi_fclk_current);
-			goto out;
-		}
+		hi_speed = *(unsigned int *)arg;
 
 		if (hsi_is_controller_transfer_ongoing(hsi_ctrl)) {
 			err = -EBUSY;
@@ -977,24 +973,10 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 		hsi_ctrl->clock_change_ongoing = true;
 		spin_unlock_bh(&hsi_ctrl->lock);
 
-		pdata = dev_get_platdata(hsi_ctrl->dev);
-
-		/* Set the HSI FCLK to requested value. */
-		err = pdata->device_scale(hsi_ctrl->dev,
-					  hsi_ctrl->hsi_fclk_req);
-		if (err < 0) {
-			dev_err(hsi_ctrl->dev, "%s: Cannot set HSI FClk to %ldHz, err %d\n",
-				__func__, hsi_ctrl->hsi_fclk_req, err);
-		} else {
-			dev_info(hsi_ctrl->dev, "HSI FClk changed from %ldHz to %ldHz\n",
-				hsi_ctrl->hsi_fclk_current,
-				hsi_ctrl->hsi_fclk_req);
-			hsi_ctrl->hsi_fclk_current = hsi_ctrl->hsi_fclk_req;
-		}
+		hsi_pm_change_hsi_speed(hsi_ctrl, hi_speed);
 
 		spin_lock_bh(&hsi_ctrl->lock);
 		hsi_ctrl->clock_change_ongoing = false;
-
 		break;
 	case HSI_IOCTL_GET_SPEED:
 		if (!arg) {
@@ -1011,6 +993,66 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 	case HSI_IOCTL_SET_CLK_DYNAMIC:
 		dev_info(hsi_ctrl->dev, "Entering clocks dynamic mode\n");
 		hsi_ctrl->clock_forced_on = false;
+		break;
+	case HSI_IOCTL_SET_HSI_LATENCY:
+		if (!arg) {
+			err = -EINVAL;
+			goto out;
+		}
+
+		spin_unlock_bh(&hsi_ctrl->lock);
+
+		hsi_pm_change_hsi_wakeup_latency(hsi_ctrl, *(int *)arg);
+
+		spin_lock_bh(&hsi_ctrl->lock);
+		break;
+	case HSI_IOCTL_GET_HSI_LATENCY:
+		if (!arg) {
+			err = -EINVAL;
+			goto out;
+		}
+
+		*(int *)arg = hsi_ctrl->hsi_latency_us;
+		break;
+	case HSI_IOCTL_SET_MPU_LATENCY:
+		if (!arg) {
+			err = -EINVAL;
+			goto out;
+		}
+
+		spin_unlock_bh(&hsi_ctrl->lock);
+
+		hsi_pm_change_mpu_wakeup_latency(hsi_ctrl, *(int *)arg);
+
+		spin_lock_bh(&hsi_ctrl->lock);
+		break;
+	case HSI_IOCTL_GET_MPU_LATENCY:
+		if (!arg) {
+			err = -EINVAL;
+			goto out;
+		}
+
+		*(int *)arg = hsi_ctrl->mpu_latency_us;
+		break;
+	case HSI_IOCTL_SET_MPU_OPP:
+		if (!arg) {
+			err = -EINVAL;
+			goto out;
+		}
+
+		spin_unlock_bh(&hsi_ctrl->lock);
+
+		hsi_pm_change_mpu_opp(hsi_ctrl, *(unsigned long *)arg);
+
+		spin_lock_bh(&hsi_ctrl->lock);
+		break;
+	case HSI_IOCTL_GET_MPU_OPP:
+		if (!arg) {
+			err = -EINVAL;
+			goto out;
+		}
+
+		*(unsigned long *)arg = hsi_ctrl->mpu_fclk_current;
 		break;
 	default:
 		err = -ENOIOCTLCMD;

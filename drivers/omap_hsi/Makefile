@@ -4,7 +4,7 @@
 
 omap_hsi-objs	:=	hsi_driver.o hsi_driver_dma.o hsi_driver_int.o \
 			hsi_driver_if.o hsi_driver_bus.o hsi_driver_gpio.o \
-			hsi_driver_fifo.o
+			hsi_driver_fifo.o hsi_driver_pm.o
 
 ifeq ($(CONFIG_DEBUG_FS), y)
 	omap_hsi-objs += hsi_driver_debugfs.o

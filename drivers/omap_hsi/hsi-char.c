@@ -363,6 +363,7 @@ static long  hsi_char_ioctl(struct file *file,
 {
 	int ch = (int)file->private_data;
 	unsigned int state;
+	bool txstate;
 	size_t size;
 	unsigned long fclock;
 	struct hsi_rx_config rx_cfg;
@@ -437,6 +438,11 @@ static long  hsi_char_ioctl(struct file *file,
 		if (copy_to_user((void __user *)arg, &size, sizeof(size)))
 			ret = -EFAULT;
 		break;
+	case CS_GET_TX_STATE_PORT:
+		if_hsi_get_tx_state_port(ch, &txstate);
+		if (copy_to_user((void __user *)arg, &txstate, sizeof(txstate)))
+			ret = -EFAULT;
+		break;
 	case CS_SET_HI_SPEED:
 		if (copy_from_user(&state, (void __user *)arg, sizeof(state)))
 			ret = -EFAULT;
@@ -453,6 +459,38 @@ static long  hsi_char_ioctl(struct file *file,
 		break;
 	case CS_SET_CLK_DYNAMIC:
 		if_hsi_set_clk_dynamic(ch);
+	case CS_SET_HSI_LATENCY:
+		if (copy_from_user(&state, (void __user *)arg, sizeof(state)))
+			ret = -EFAULT;
+		else
+			if_hsi_set_hsi_latency(ch, state);
+		break;
+	case CS_GET_HSI_LATENCY:
+		if_hsi_get_hsi_latency(ch, &state);
+		if (copy_to_user((void __user *)arg, &fclock, sizeof(state)))
+			ret = -EFAULT;
+		break;
+	case CS_SET_MPU_LATENCY:
+		if (copy_from_user(&state, (void __user *)arg, sizeof(state)))
+			ret = -EFAULT;
+		else
+			if_hsi_set_mpu_latency(ch, state);
+		break;
+	case CS_GET_MPU_LATENCY:
+		if_hsi_get_mpu_latency(ch, &state);
+		if (copy_to_user((void __user *)arg, &fclock, sizeof(state)))
+			ret = -EFAULT;
+		break;
+	case CS_SET_MPU_OPP:
+		if (copy_from_user(&fclock, (void __user *)arg, sizeof(fclock)))
+			ret = -EFAULT;
+		else
+			if_hsi_set_hi_speed(ch, fclock);
+		break;
+	case CS_GET_MPU_OPP:
+		if_hsi_get_speed(ch, &fclock);
+		if (copy_to_user((void __user *)arg, &fclock, sizeof(fclock)))
+			ret = -EFAULT;
 		break;
 	default:
 		ret = -ENOIOCTLCMD;

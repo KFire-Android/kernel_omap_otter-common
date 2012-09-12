@@ -943,26 +943,30 @@ static int __devinit hsi_platform_device_probe(struct platform_device *pd)
 	/* Allow HSI to wake up the platform */
 	device_init_wakeup(hsi_ctrl->dev, true);
 
+	err = 0;
 	/* Set the HSI FCLK to default. */
-	hsi_ctrl->hsi_fclk_req = pdata->default_hsi_fclk;
-	err = pdata->device_scale(hsi_ctrl->dev, pdata->default_hsi_fclk);
-	if (err == -EBUSY) {
-		/* PM framework init is late_initcall, so it may not yet be */
-		/* initialized, so be prepared to retry later on open. */
-		dev_warn(&pd->dev, "Cannot set HSI FClk to default value: %ld. Will retry on next open\n",
-			  pdata->default_hsi_fclk);
-	} else if (err) {
-		dev_err(&pd->dev, "%s: Error %d setting HSI FClk to %ld.\n",
-				__func__, err, pdata->default_hsi_fclk);
-		goto rollback3;
-	} else {
-		hsi_ctrl->hsi_fclk_current = pdata->default_hsi_fclk;
-	}
+	if (pdata->default_hsi_fclk == HSI_FCLK_LOW_SPEED)
+		err = hsi_pm_change_hsi_speed(hsi_ctrl, HSI_SPEED_LOW_SPEED);
+	else if (pdata->default_hsi_fclk == HSI_FCLK_HI_SPEED)
+		err = hsi_pm_change_hsi_speed(hsi_ctrl, HSI_SPEED_HI_SPEED);
+	else
+		dev_err(&pd->dev, "%s: Error invalid default HSI FClk %ld.\n",
+				__func__, pdata->default_hsi_fclk);
+	if ((err < 0) && (err != -EBUSY))
+		goto rollback4;
+
+	dev_pm_qos_add_request(hsi_ctrl->dev, &hsi_ctrl->dev_pm_qos,
+			       PM_QOS_DEFAULT_VALUE);
+	pm_qos_add_request(&hsi_ctrl->pm_qos, PM_QOS_CPU_DMA_LATENCY,
+			   PM_QOS_DEFAULT_VALUE);
+
 	/* From here no need for HSI HW access */
 	hsi_clocks_disable(hsi_ctrl->dev, __func__);
 
 	return 0;
 
+rollback4:
+	unregister_hsi_devices(hsi_ctrl);
 rollback3:
 	hsi_debug_remove_ctrl(hsi_ctrl);
 rollback2:
@@ -984,6 +988,9 @@ static int __devexit hsi_platform_device_remove(struct platform_device *pd)
 
 	if (!hsi_ctrl)
 		return 0;
+
+	dev_pm_qos_remove_request(&hsi_ctrl->dev_pm_qos);
+	pm_qos_remove_request(&hsi_ctrl->pm_qos);
 
 	unregister_hsi_devices(hsi_ctrl);
 
