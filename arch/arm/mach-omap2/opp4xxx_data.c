@@ -136,6 +136,12 @@ static struct device_info hsi_dev_info = {
 	.voltdm_name	= "core",
 };
 
+static struct device_info gpu_dev_info = {
+	.hwmod_name	= "gpu",
+	.clk_name	= "dpll_per_m7x2_ck",
+	.voltdm_name	= "core",
+};
+
 static struct omap_opp_def __initdata omap443x_opp_def_list[] = {
 	/* MPU OPP1 - OPP50 */
 	OPP_INITIALIZER(&mpu_dev_info, true, 300000000, OMAP4430_VDD_MPU_OPP50_UV),
@@ -163,7 +169,11 @@ static struct omap_opp_def __initdata omap443x_opp_def_list[] = {
 	OPP_INITIALIZER(&hsi_dev_info, true, 96000000, OMAP4430_VDD_CORE_OPP50_UV),
 	/* HSI OPP2 - OPP100 */
 	OPP_INITIALIZER(&hsi_dev_info, true, 192000000, OMAP4430_VDD_CORE_OPP100_UV),
-	/* TODO: add DSP, fdif, gpu */
+	/* SGX OPP1 - OPP50 */
+	OPP_INITIALIZER(&gpu_dev_info, true, 153600000, OMAP4430_VDD_CORE_OPP50_UV),
+	/* SGX OPP2 - OPP100 */
+	OPP_INITIALIZER(&gpu_dev_info, true, 307200000, OMAP4430_VDD_CORE_OPP100_UV),
+	/* TODO: add DSP, fdif */
 };
 
 #define OMAP4460_VDD_MPU_OPP50_UV		1025000
@@ -279,6 +289,12 @@ static struct omap_opp_def __initdata omap446x_opp_def_list[] = {
 	OPP_INITIALIZER(&abe_dev_info, true, 98304000, OMAP4460_VDD_IVA_OPP50_UV),
 	/* ABE OPP2 - OPP100 */
 	OPP_INITIALIZER(&abe_dev_info, true, 196608000, OMAP4460_VDD_IVA_OPP100_UV),
+	/* SGX OPP1 - OPP50 */
+	OPP_INITIALIZER(&gpu_dev_info, true, 153600000, OMAP4460_VDD_CORE_OPP50_UV),
+	/* SGX OPP2 - OPP100 */
+	OPP_INITIALIZER(&gpu_dev_info, true, 307200000, OMAP4460_VDD_CORE_OPP100_UV),
+	/* SGX OPP3 - OPP100_OV */
+	OPP_INITIALIZER(&gpu_dev_info, true, 384000000, OMAP4460_VDD_CORE_OPP100_OV_UV),
 };
 
 /**

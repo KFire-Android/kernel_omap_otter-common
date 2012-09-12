@@ -832,7 +832,8 @@ static int __init omap_pm_init(void)
 		tesla_clkdm = clkdm_lookup("tesla_clkdm");
 	}
 
-	gpu_pd = pwrdm_lookup("gpu_pwrdm");
+	gpu_pd = pwrdm_lookup(cpu_is_omap54xx() ? "gpu_pwrdm" : "gfx_pwrdm");
+
 	if (!gpu_pd)
 		pr_err("%s: Unable to get GPU power domain\n", __func__);
 
