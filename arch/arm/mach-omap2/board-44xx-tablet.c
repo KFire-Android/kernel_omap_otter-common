@@ -309,18 +309,6 @@ static struct twl4030_platform_data tablet_twldata = {
 	.vaux1		= &tablet_vaux1,
 };
 
-static struct i2c_board_info __initdata tablet_i2c_3_boardinfo[] = {
-	{
-		I2C_BOARD_INFO("tmp105", 0x48),
-	},
-};
-
-static struct i2c_board_info __initdata tablet_i2c_4_boardinfo[] = {
-	{
-		I2C_BOARD_INFO("hmc5843", 0x1e),
-	},
-};
-
 static int __init omap4_i2c_init(void)
 {
 	omap4_pmic_get_config(&tablet_twldata, TWL_COMMON_PDATA_USB,
@@ -338,10 +326,8 @@ static int __init omap4_i2c_init(void)
 	omap4_pmic_init("twl6030", &tablet_twldata,
 			&twl6040_data, OMAP44XX_IRQ_SYS_2N);
 	omap_register_i2c_bus(2, 400, NULL, 0);
-	omap_register_i2c_bus(3, 400, tablet_i2c_3_boardinfo,
-				ARRAY_SIZE(tablet_i2c_3_boardinfo));
-	omap_register_i2c_bus(4, 400, tablet_i2c_4_boardinfo,
-				ARRAY_SIZE(tablet_i2c_4_boardinfo));
+	omap_register_i2c_bus(3, 400, NULL, 0);
+	omap_register_i2c_bus(4, 400, NULL, 0);
 	return 0;
 }
 
