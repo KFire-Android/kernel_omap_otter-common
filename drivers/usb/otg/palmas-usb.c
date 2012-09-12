@@ -128,6 +128,9 @@ static irqreturn_t palmas_vbus_wakeup_irq(int irq, void *_palmas_usb)
 	addr = PALMAS_BASE_TO_REG(PALMAS_INTERRUPT_BASE,
 						PALMAS_INT3_LINE_STATE);
 
+	if (palmas_usb->linkstat == OMAP_DWC3_ID_GROUND)
+		return IRQ_HANDLED;
+
 	do {
 		regmap_read(palmas_usb->palmas->regmap[slave], addr, &vbus_line_state);
 
