@@ -306,6 +306,24 @@ static int __init omap4xxx_prcm_init(void)
 		}
 		omap44xx_prm_enable_io_wakeup();
 	}
+
+	/*
+	 * Errata i612 - Wkup Clk Recycling Needed After Warm Reset
+	 * CRITICALITY: Low
+	 * REVISIONS IMPACTED: OMAP4430 all, OMAP543x ES1.0
+	 * Hardware does not recycle the I/O wake-up clock upon a global warm
+	 * reset. When a warm reset is done, wakeups of daisy I/Os are disabled,
+	 * but without the wake-up clock running, this change is not latched.
+	 * Hence there is a possibility of seeing unexpected I/O wake-up events
+	 * after warm reset.
+	 *
+	 * As W/A the call to omap44xx_prm_reconfigure_io_chain() has been added
+	 * at PM initialization time for I/O pads daisy chain resetting.
+	 */
+	if (cpu_is_omap443x() || omap_rev() == OMAP5430_REV_ES1_0 ||
+	    omap_rev() == OMAP5432_REV_ES1_0)
+		omap44xx_prm_reconfigure_io_chain();
+
 	return ret;
 }
 subsys_initcall(omap4xxx_prcm_init);

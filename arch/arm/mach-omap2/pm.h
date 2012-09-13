@@ -198,6 +198,9 @@ extern void omap_pm_setup_oscillator(u32 tstart, u32 tshut);
 extern void omap_pm_get_oscillator(u32 *tstart, u32 *tshut);
 extern void omap_pm_setup_oscillator_voltage_ramp_time(u32 tstart, u32 tshut);
 extern void omap_pm_get_oscillator_voltage_ramp_time(u32 *tstart, u32 *tshut);
+extern void omap_pm_setup_rsttime_latency(u32 rsttime_latency);
+extern u32 omap_pm_get_rsttime_latency(void);
+
 #else
 static inline void omap_pm_setup_oscillator(u32 tstart, u32 tshut) { }
 static inline void omap_pm_get_oscillator(u32 *tstart, u32 *tshut) { }
@@ -205,6 +208,8 @@ static inline void omap_pm_setup_oscillator_voltage_ramp_time(
 	u32 tstart, u32 tshut) { }
 static inline void omap_pm_get_oscillator_voltage_ramp_time(
 	u32 *tstart, u32 *tshut) { }
+static inline void omap_pm_setup_rsttime_latency(u32 rsttime_latency) {};
+static inline u32 omap_pm_get_rsttime_latency(void) { return 0; }
 #endif
 
 #ifdef CONFIG_PM

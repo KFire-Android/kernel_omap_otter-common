@@ -459,6 +459,8 @@ struct omap_hwmod_omap4_prcm {
 #define _HWMOD_STATE_ENABLED			4
 #define _HWMOD_STATE_IDLE			5
 #define _HWMOD_STATE_DISABLED			6
+/* count of possible states */
+#define _HWMOD_STATE_COUNT			(_HWMOD_STATE_DISABLED + 1)
 
 /**
  * struct omap_hwmod_class - the type of an IP block
