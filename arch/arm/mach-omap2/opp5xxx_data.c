@@ -262,7 +262,7 @@ static int __init opp_def_list_modify_opp(struct omap_opp_def *list,
 /**
  * omap5_opp_init() - initialize omap4 opp table
  */
-static int __init omap5_opp_init(void)
+int __init omap5_opp_init(void)
 {
 	int r = -ENODEV;
 
@@ -307,4 +307,3 @@ static int __init omap5_opp_init(void)
 
 	return r;
 }
-device_initcall(omap5_opp_init);

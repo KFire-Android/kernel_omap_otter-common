@@ -823,4 +823,3 @@ int __init omap4_opp_init(void)
 
 	return r;
 }
-device_initcall(omap4_opp_init);
