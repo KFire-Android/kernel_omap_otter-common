@@ -71,7 +71,6 @@ static enum bverror do_blit_end(struct bvbltparams *bvbltparams,
 {
 	enum bverror bverror;
 	struct gcblit *gcblit;
-	struct surfaceinfo *dstinfo;
 	struct gcmobltconfig *gcmobltconfig;
 	struct gcmostartde *gcmostartde;
 
@@ -82,9 +81,6 @@ static enum bverror do_blit_end(struct bvbltparams *bvbltparams,
 
 	GCDBG(GCZONE_BLIT, "finalizing the blit, scrcount = %d\n",
 	      gcblit->srccount);
-
-	/* Get a shortcut to the destination surface. */
-	dstinfo = &batch->dstinfo;
 
 	/***********************************************************************
 	 * Configure the operation.
@@ -116,15 +112,13 @@ static enum bverror do_blit_end(struct bvbltparams *bvbltparams,
 	}
 
 	/* Set destination configuration. */
-	GCDBG(GCZONE_BLIT, "  swizzle code = %d\n",
-	      dstinfo->format.swizzle);
-	GCDBG(GCZONE_BLIT, "  format code = %d\n",
-	      dstinfo->format.format);
+	GCDBG(GCZONE_BLIT, "  swizzle code = %d\n", gcblit->swizzle);
+	GCDBG(GCZONE_BLIT, "  format code = %d\n", gcblit->format);
 
 	gcmobltconfig->dstconfig_ldst = gcmobltconfig_dstconfig_ldst;
 	gcmobltconfig->dstconfig.raw = 0;
-	gcmobltconfig->dstconfig.reg.swizzle = dstinfo->format.swizzle;
-	gcmobltconfig->dstconfig.reg.format = dstinfo->format.format;
+	gcmobltconfig->dstconfig.reg.swizzle = gcblit->swizzle;
+	gcmobltconfig->dstconfig.reg.format = gcblit->format;
 	gcmobltconfig->dstconfig.reg.command = gcblit->multisrc
 		? GCREG_DEST_CONFIG_COMMAND_MULTI_SOURCE_BLT
 		: GCREG_DEST_CONFIG_COMMAND_BIT_BLT;
@@ -518,6 +512,10 @@ enum bverror do_blit(struct bvbltparams *bvbltparams,
 		gcblit->srccount = 0;
 		gcblit->multisrc = multisrc;
 		gcblit->rop = srcinfo->rop;
+
+		/* Set the destination format. */
+		gcblit->format  = dstinfo->format.format;
+		gcblit->swizzle = dstinfo->format.swizzle;
 
 		/* Set the destination coordinates. */
 		gcblit->dstrect.left   = batch->dstadjusted.left   - dstoffsetX;
