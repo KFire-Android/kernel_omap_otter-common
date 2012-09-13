@@ -31,6 +31,7 @@
 #define OMAP4_TABLET_2_0	2158001
 #define OMAP4_TABLET_2_1	2158002
 #define OMAP4_TABLET_2_1_1	2158003
+#define OMAP4_TABLET_2_1_2	2158004
 
 #define OMAP4_PANDA_ID		0
 #define OMAP4_BLAZE_ID		1
@@ -40,7 +41,8 @@
 #define OMAP4_TABLET_2_0_ID	5
 #define OMAP4_TABLET_2_1_ID	6
 #define OMAP4_TABLET_2_1_1_ID	7
-#define OMAP4_MAX_ID	(OMAP4_TABLET_2_1_1_ID + 1)
+#define OMAP4_TABLET_2_1_2_ID	8
+#define OMAP4_MAX_ID	(OMAP4_TABLET_2_1_2_ID + 1)
 
 int omap_get_board_version(void);
 int omap_get_board_id(void);
