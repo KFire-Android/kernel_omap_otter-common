@@ -171,4 +171,7 @@ void omap_device_disable_idle_on_suspend(struct platform_device *pdev)
 	od->flags |= OMAP_DEVICE_NO_IDLE_ON_SUSPEND;
 }
 
+int omap_device_runtime_suspend(struct device *dev);
+int omap_device_runtime_resume(struct device *dev);
+
 #endif
