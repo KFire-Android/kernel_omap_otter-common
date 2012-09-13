@@ -654,10 +654,31 @@ static u32 omap4_usec_to_val_scrm(u32 usec, int shift, u32 mask)
 	return val;
 }
 
+static int __init _voltdm_sum_time(struct voltagedomain *voltdm, void *user)
+{
+	struct omap_voltdm_pmic *pmic;
+	u32 *max_time = (u32 *)user;
+
+	if (!voltdm || !max_time) {
+		WARN_ON(1);
+		return -EINVAL;
+	}
+
+	pmic = voltdm->pmic;
+	if (pmic) {
+		*max_time += DIV_ROUND_UP(voltdm->vc_param->on,
+					  pmic->slew_rate);
+		*max_time += pmic->switch_on_time;
+	}
+
+	return 0;
+}
+
 static void __init omap4_scrm_setup_timings(void)
 {
 	u32 val;
 	u32 tstart, tshut;
+	u32 reset_delay_time;
 
 	/* Setup clksetup/clkshoutdown time for oscillator */
 	omap_pm_get_oscillator(&tstart, &tshut);
@@ -668,6 +689,29 @@ static void __init omap4_scrm_setup_timings(void)
 		OMAP4_DOWNTIME_MASK);
 	omap4_prminst_write_inst_reg(val, OMAP4430_SCRM_PARTITION, 0x0,
 				     OMAP4_SCRM_CLKSETUPTIME_OFFSET);
+
+	/*
+	 * Setup OMAP WARMRESET time:
+	 * we use the sum of each voltage domain setup times to handle
+	 * the worst case condition where the device resets from OFF mode.
+	 * hence we leave PRM_VOLTSETUP_WARMRESET alone as this is
+	 * already part of RSTTIME1 we program in.
+	 * in addition, to handle oscillator switch off and switch back on
+	 * (in case WDT triggered while CLKREQ goes low), we also
+	 * add in the additional latencies.
+	 */
+	reset_delay_time = omap_pm_get_rsttime_latency();
+	if (!voltdm_for_each(_voltdm_sum_time, (void *)&reset_delay_time)) {
+		reset_delay_time += tstart + tshut;
+		val = omap4_usec_to_val_scrm(reset_delay_time,
+					     OMAP4430_RSTTIME1_SHIFT,
+					     OMAP4430_RSTTIME1_MASK);
+		omap4_prminst_rmw_inst_reg_bits(OMAP4430_RSTTIME1_MASK,
+						val,
+						OMAP4430_PRM_PARTITION,
+						OMAP4430_PRM_DEVICE_INST,
+						OMAP4_PRM_RSTTIME_OFFSET);
+	}
 
 	/* Setup max PMIC startup/shutdown time */
 	omap_pm_get_oscillator_voltage_ramp_time(&tstart, &tshut);
