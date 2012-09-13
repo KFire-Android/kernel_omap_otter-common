@@ -141,7 +141,7 @@ static int __devinit palmas_pwron_probe(struct platform_device *pdev)
 
 	slave = PALMAS_BASE_TO_SLAVE(PALMAS_PMU_CONTROL_BASE);
 	addr = PALMAS_BASE_TO_REG(PALMAS_PMU_CONTROL_BASE,
-			PALMAS_PMU_CONTROL_BASE);
+				  PALMAS_LONG_PRESS_KEY);
 
 	/* 6 Seconds as the LPK_TIME Long Press Key Time */
 	regmap_update_bits(palmas->regmap[slave], addr,
