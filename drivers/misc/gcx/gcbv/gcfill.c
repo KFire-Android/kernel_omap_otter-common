@@ -65,7 +65,7 @@ GCDBG_FILTERDEF(gcfill, GCZONE_NONE,
 
 
 static inline unsigned int extract_component(unsigned int pixel,
-					     struct bvcomponent *desc)
+					     const struct bvcomponent *desc)
 {
 	unsigned int component;
 	unsigned int component8;
@@ -129,10 +129,10 @@ static unsigned int getinternalcolor(void *ptr, struct bvformatxlate *format)
 		GCDBG(GCZONE_COLOR, "srcpixel=0x%08X\n", srcpixel);
 	}
 
-	r = extract_component(srcpixel, &format->rgba.r);
-	g = extract_component(srcpixel, &format->rgba.g);
-	b = extract_component(srcpixel, &format->rgba.b);
-	a = extract_component(srcpixel, &format->rgba.a);
+	r = extract_component(srcpixel, &format->cs.rgb.comp->r);
+	g = extract_component(srcpixel, &format->cs.rgb.comp->g);
+	b = extract_component(srcpixel, &format->cs.rgb.comp->b);
+	a = extract_component(srcpixel, &format->cs.rgb.comp->a);
 
 	GCDBG(GCZONE_COLOR, "(r,g,b,a)=0x%02X,0x%02X,0x%02X,0x%02X\n",
 	      r, g, b, a);
@@ -233,11 +233,11 @@ enum bverror do_fill(struct bvbltparams *bvbltparams,
 	fillcolorptr
 		= (unsigned char *) srcinfo->buf.desc->virtaddr
 		+ srcinfo->rect.top * srcinfo->geom->virtstride
-		+ srcinfo->rect.left * srcinfo->format->bitspp / 8;
+		+ srcinfo->rect.left * srcinfo->format.bitspp / 8;
 
 	gcmofill->clearcolor_ldst = gcmofill_clearcolor_ldst;
 	gcmofill->clearcolor.raw = getinternalcolor(fillcolorptr,
-						    srcinfo->format);
+						    &srcinfo->format);
 
 	/***********************************************************************
 	** Configure and start fill.
@@ -246,8 +246,8 @@ enum bverror do_fill(struct bvbltparams *bvbltparams,
 	/* Set destination configuration. */
 	gcmofill->dstconfig_ldst = gcmofill_dstconfig_ldst;
 	gcmofill->dstconfig.raw = 0;
-	gcmofill->dstconfig.reg.swizzle = dstinfo->format->swizzle;
-	gcmofill->dstconfig.reg.format = dstinfo->format->format;
+	gcmofill->dstconfig.reg.swizzle = dstinfo->format.swizzle;
+	gcmofill->dstconfig.reg.format = dstinfo->format.format;
 	gcmofill->dstconfig.reg.command = GCREG_DEST_CONFIG_COMMAND_CLEAR;
 
 	/* Set ROP3. */

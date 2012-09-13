@@ -83,12 +83,7 @@ GCDBG_FILTERDEF(gcparser, GCZONE_NONE,
 	(gcrect)->right = (bvrect)->left + (bvrect)->width; \
 	(gcrect)->bottom = (bvrect)->top + (bvrect)->height; \
 	\
-	GCDBG(zone, \
-	      name " = (%d,%d)-(%d,%d), %dx%d\n", \
-	      (gcrect)->left, (gcrect)->top, \
-	      (gcrect)->right, (gcrect)->bottom, \
-	      (gcrect)->right - (gcrect)->left, \
-	      (gcrect)->bottom - (gcrect)->top); \
+	GCPRINT_RECT(zone, name, gcrect); \
 }
 
 
@@ -96,38 +91,8 @@ GCDBG_FILTERDEF(gcparser, GCZONE_NONE,
  * Pixel format parser.
  */
 
-/* FIXME/TODO: change to use BLTsvile defines. */
-
-#if defined(OCDFMTDEF_ALPHA_SHIFT)
-#	undef OCDFMTDEF_ALPHA_SHIFT
-#endif
-
-#if defined(OCDFMTDEF_ALPHA_MASK)
-#	undef OCDFMTDEF_ALPHA_MASK
-#endif
-
-#define OCDFMTDEF_ALPHA_SHIFT 18
-#define OCDFMTDEF_ALPHA_MASK (1 << OCDFMTDEF_ALPHA_SHIFT)
-
 #define OCDFMTDEF_PLACEMENT_SHIFT 9
 #define OCDFMTDEF_PLACEMENT_MASK (3 << OCDFMTDEF_PLACEMENT_SHIFT)
-
-#define OCDFMTDEF_BITS_SHIFT 3
-#define OCDFMTDEF_BITS_MASK (3 << OCDFMTDEF_BITS_SHIFT)
-
-#define OCDFMTDEF_BITS12 (0 << OCDFMTDEF_BITS_SHIFT)
-#define OCDFMTDEF_BITS15 (1 << OCDFMTDEF_BITS_SHIFT)
-#define OCDFMTDEF_BITS16 (2 << OCDFMTDEF_BITS_SHIFT)
-#define OCDFMTDEF_BITS24 (3 << OCDFMTDEF_BITS_SHIFT)
-
-#define BVFORMATRGBA(BPP, Format, Swizzle, R, G, B, A) \
-{ \
-	BVFMT_RGB, \
-	BPP, \
-	GCREG_DE_FORMAT_ ## Format, \
-	GCREG_DE_SWIZZLE_ ## Swizzle, \
-	{ R, G, B, A } \
-}
 
 #define BVCOMP(Shift, Size) \
 	{ Shift, Size, ((1 << Size) - 1) << Shift }
@@ -144,255 +109,230 @@ GCDBG_FILTERDEF(gcparser, GCZONE_NONE,
 #define BVALPHA(Shift, Size) \
 	BVCOMP(Shift, Size)
 
-#define BVFORMATINVALID \
-	{ 0, 0, 0, 0, { { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 } } }
-
-static struct bvformatxlate g_format_nv12 = {
-	.type = BVFMT_PLANAR_YUV,
-	.bitspp = 8,
-	.format = GCREG_DE_FORMAT_NV12,
-};
-static struct bvformatxlate g_format_uyvy = {
-	.type = BVFMT_PACKED_YUV,
-	.bitspp = 16,
-	.format = GCREG_DE_FORMAT_UYVY
-};
-static struct bvformatxlate g_format_yuy2 = {
-	.type = BVFMT_PACKED_YUV,
-	.bitspp = 16,
-	.format = GCREG_DE_FORMAT_YUY2
+static const unsigned int rgba16swizzle[] = {
+	GCREG_DE_SWIZZLE_ARGB,
+	GCREG_DE_SWIZZLE_RGBA,
+	GCREG_DE_SWIZZLE_ABGR,
+	GCREG_DE_SWIZZLE_BGRA
 };
 
-static struct bvformatxlate formatxlate[] = {
-	/*  #0: OCDFMT_xRGB12
-		BITS=12 ALPHA=0 REVERSED=0 LEFT_JUSTIFIED=0 */
-	BVFORMATRGBA(16, X4R4G4B4, ARGB,
-		BVRED(8, 4), BVGREEN(4, 4), BVBLUE(0, 4), BVALPHA(12, 0)),
-
-	/*  #1: OCDFMT_RGBx12
-		BITS=12 ALPHA=0 REVERSED=0 LEFT_JUSTIFIED=1 */
-	BVFORMATRGBA(16, X4R4G4B4, RGBA,
-		BVRED(12, 4), BVGREEN(8, 4), BVBLUE(4, 4), BVALPHA(0, 0)),
-
-	/*  #2: OCDFMT_xBGR12
-		BITS=12 ALPHA=0 REVERSED=1 LEFT_JUSTIFIED=0 */
-	BVFORMATRGBA(16, X4R4G4B4, ABGR,
-		BVRED(0, 4), BVGREEN(4, 4), BVBLUE(8, 4), BVALPHA(12, 0)),
-
-	/*  #3: OCDFMT_BGRx12
-		BITS=12 ALPHA=0 REVERSED=1 LEFT_JUSTIFIED=1 */
-	BVFORMATRGBA(16, X4R4G4B4, BGRA,
-		BVRED(4, 4), BVGREEN(8, 4), BVBLUE(12, 4), BVALPHA(0, 0)),
-
-	/*  #4: OCDFMT_ARGB12
-		BITS=12 ALPHA=1 REVERSED=0 LEFT_JUSTIFIED=0 */
-	BVFORMATRGBA(16, A4R4G4B4, ARGB,
-		BVRED(8, 4), BVGREEN(4, 4), BVBLUE(0, 4), BVALPHA(12, 4)),
-
-	/*  #5: OCDFMT_RGBA12
-		BITS=12 ALPHA=1 REVERSED=0 LEFT_JUSTIFIED=1 */
-	BVFORMATRGBA(16, A4R4G4B4, RGBA,
-		BVRED(12, 4), BVGREEN(8, 4), BVBLUE(4, 4), BVALPHA(0, 4)),
-
-	/*  #6: OCDFMT_ABGR12
-		BITS=12 ALPHA=1 REVERSED=1 LEFT_JUSTIFIED=0 */
-	BVFORMATRGBA(16, A4R4G4B4, ABGR,
-		BVRED(0, 4), BVGREEN(4, 4), BVBLUE(8, 4), BVALPHA(12, 4)),
-
-	/*  #7: OCDFMT_BGRA12
-		BITS=12 ALPHA=1 REVERSED=1 LEFT_JUSTIFIED=1 */
-	BVFORMATRGBA(16, A4R4G4B4, BGRA,
-		BVRED(4, 4), BVGREEN(8, 4), BVBLUE(12, 4), BVALPHA(0, 4)),
-
-	/***********************************************/
-
-	/*  #8: OCDFMT_xRGB15
-		BITS=15 ALPHA=0 REVERSED=0 LEFT_JUSTIFIED=0 */
-	BVFORMATRGBA(16, X1R5G5B5, ARGB,
-		BVRED(10, 5), BVGREEN(5, 5), BVBLUE(0, 5), BVALPHA(15, 0)),
-
-	/*  #9: OCDFMT_RGBx15
-		BITS=15 ALPHA=0 REVERSED=0 LEFT_JUSTIFIED=1 */
-	BVFORMATRGBA(16, X1R5G5B5, RGBA,
-		BVRED(11, 5), BVGREEN(6, 5), BVBLUE(1, 5), BVALPHA(0, 0)),
-
-	/* #10: OCDFMT_xBGR15
-		BITS=15 ALPHA=0 REVERSED=1 LEFT_JUSTIFIED=0 */
-	BVFORMATRGBA(16, X1R5G5B5, ABGR,
-		BVRED(0, 5), BVGREEN(5, 5), BVBLUE(10, 5), BVALPHA(15, 0)),
-
-	/* #11: OCDFMT_BGRx15
-		BITS=15 ALPHA=0 REVERSED=1 LEFT_JUSTIFIED=1 */
-	BVFORMATRGBA(16, X1R5G5B5, BGRA,
-		BVRED(1, 5), BVGREEN(6, 5), BVBLUE(11, 5), BVALPHA(0, 0)),
-
-	/* #12: OCDFMT_ARGB15
-		BITS=15 ALPHA=1 REVERSED=0 LEFT_JUSTIFIED=0 */
-	BVFORMATRGBA(16, A1R5G5B5, ARGB,
-		BVRED(10, 5), BVGREEN(5, 5), BVBLUE(0, 5), BVALPHA(15, 1)),
-
-	/* #13: OCDFMT_RGBA15
-		BITS=15 ALPHA=1 REVERSED=0 LEFT_JUSTIFIED=1 */
-	BVFORMATRGBA(16, A1R5G5B5, RGBA,
-		BVRED(11, 5), BVGREEN(6, 5), BVBLUE(1, 5), BVALPHA(0, 1)),
-
-	/* #14: OCDFMT_ABGR15
-		BITS=15 ALPHA=1 REVERSED=1 LEFT_JUSTIFIED=0 */
-	BVFORMATRGBA(16, A1R5G5B5, ABGR,
-		BVRED(0, 5), BVGREEN(5, 5), BVBLUE(10, 5), BVALPHA(15, 1)),
-
-	/* #15: OCDFMT_BGRA15
-		BITS=15 ALPHA=1 REVERSED=1 LEFT_JUSTIFIED=1 */
-	BVFORMATRGBA(16, A1R5G5B5, BGRA,
-		BVRED(1, 5), BVGREEN(6, 5), BVBLUE(11, 5), BVALPHA(0, 1)),
-
-	/***********************************************/
-
-	/* #16: OCDFMT_RGB16
-		BITS=16 ALPHA=0 REVERSED=0 LEFT_JUSTIFIED=0 */
-	BVFORMATRGBA(16, R5G6B5, ARGB,
-		BVRED(11, 5), BVGREEN(5, 6), BVBLUE(0, 5), BVALPHA(0, 0)),
-
-	/* #17: OCDFMT_RGB16
-		BITS=16 ALPHA=0 REVERSED=0 LEFT_JUSTIFIED=1 */
-	BVFORMATRGBA(16, R5G6B5, ARGB,
-		BVRED(11, 5), BVGREEN(5, 6), BVBLUE(0, 5), BVALPHA(0, 0)),
-
-	/* #18: OCDFMT_BGR16
-		BITS=16 ALPHA=0 REVERSED=1 LEFT_JUSTIFIED=0 */
-	BVFORMATRGBA(16, R5G6B5, ABGR,
-		BVRED(0, 5), BVGREEN(5, 6), BVBLUE(11, 5), BVALPHA(0, 0)),
-
-	/* #19: OCDFMT_BGR16
-		BITS=16 ALPHA=0 REVERSED=1 LEFT_JUSTIFIED=1 */
-	BVFORMATRGBA(16, R5G6B5, ABGR,
-		BVRED(0, 5), BVGREEN(5, 6), BVBLUE(11, 5), BVALPHA(0, 0)),
-
-	/* #20 */
-	BVFORMATINVALID,
-
-	/* #21 */
-	BVFORMATINVALID,
-
-	/* #22 */
-	BVFORMATINVALID,
-
-	/* #23 */
-	BVFORMATINVALID,
-
-	/***********************************************/
-
-	/* #24: OCDFMT_xRGB24
-		BITS=24 ALPHA=0 REVERSED=0 LEFT_JUSTIFIED=0 */
-	BVFORMATRGBA(32, X8R8G8B8, BGRA,
-		BVRED(8, 8), BVGREEN(16, 8), BVBLUE(24, 8), BVALPHA(0, 0)),
-
-	/* #25: OCDFMT_RGBx24
-		BITS=24 ALPHA=0 REVERSED=0 LEFT_JUSTIFIED=1 */
-	BVFORMATRGBA(32, X8R8G8B8, ABGR,
-		BVRED(0, 8), BVGREEN(8, 8), BVBLUE(16, 8), BVALPHA(24, 0)),
-
-	/* #26: OCDFMT_xBGR24
-		BITS=24 ALPHA=0 REVERSED=1 LEFT_JUSTIFIED=0 */
-	BVFORMATRGBA(32, X8R8G8B8, RGBA,
-		BVRED(24, 8), BVGREEN(16, 8), BVBLUE(8, 8), BVALPHA(0, 0)),
-
-	/* #27: OCDFMT_BGRx24
-		BITS=24 ALPHA=0 REVERSED=1 LEFT_JUSTIFIED=1 */
-	BVFORMATRGBA(32, X8R8G8B8, ARGB,
-		BVRED(16, 8), BVGREEN(8, 8), BVBLUE(0, 8), BVALPHA(24, 0)),
-
-	/* #28: OCDFMT_ARGB24
-		BITS=24 ALPHA=1 REVERSED=0 LEFT_JUSTIFIED=0 */
-	BVFORMATRGBA(32, A8R8G8B8, BGRA,
-		BVRED(8, 8), BVGREEN(16, 8), BVBLUE(24, 8), BVALPHA(0, 8)),
-
-	/* #29: OCDFMT_RGBA24
-		BITS=24 ALPHA=1 REVERSED=0 LEFT_JUSTIFIED=1 */
-	BVFORMATRGBA(32, A8R8G8B8, ABGR,
-		BVRED(0, 8), BVGREEN(8, 8), BVBLUE(16, 8), BVALPHA(24, 8)),
-
-	/* #30: OCDFMT_ABGR24
-		BITS=24 ALPHA=1 REVERSED=1 LEFT_JUSTIFIED=0 */
-	BVFORMATRGBA(32, A8R8G8B8, RGBA,
-		BVRED(24, 8), BVGREEN(16, 8), BVBLUE(8, 8), BVALPHA(0, 8)),
-
-	/* #31: OCDFMT_BGRA24
-		BITS=24 ALPHA=1 REVERSED=1 LEFT_JUSTIFIED=1 */
-	BVFORMATRGBA(32, A8R8G8B8, ARGB,
-		BVRED(16, 8), BVGREEN(8, 8), BVBLUE(0, 8), BVALPHA(24, 8)),
+static const unsigned int rgb16swizzle[] = {
+	GCREG_DE_SWIZZLE_ARGB,
+	GCREG_DE_SWIZZLE_ARGB,
+	GCREG_DE_SWIZZLE_ABGR,
+	GCREG_DE_SWIZZLE_ABGR
 };
 
-static enum bverror parse_format(struct bvbltparams *bvbltparams,
-				 struct surfaceinfo *surfaceinfo)
+static const unsigned int rgba32swizzle[] = {
+	GCREG_DE_SWIZZLE_BGRA,
+	GCREG_DE_SWIZZLE_ABGR,
+	GCREG_DE_SWIZZLE_RGBA,
+	GCREG_DE_SWIZZLE_ARGB
+};
+
+static const struct bvcsrgb xrgb4444_bits[] = {
+	{ BVRED(8,  4), BVGREEN(4, 4), BVBLUE(0,  4), BVALPHA(12, 0) },
+	{ BVRED(12, 4), BVGREEN(8, 4), BVBLUE(4,  4), BVALPHA(0,  0) },
+	{ BVRED(0,  4), BVGREEN(4, 4), BVBLUE(8,  4), BVALPHA(12, 0) },
+	{ BVRED(4,  4), BVGREEN(8, 4), BVBLUE(12, 4), BVALPHA(0,  0) }
+};
+
+static const struct bvcsrgb argb4444_bits[] = {
+	{ BVRED(8,  4), BVGREEN(4, 4), BVBLUE(0,  4), BVALPHA(12, 4) },
+	{ BVRED(12, 4), BVGREEN(8, 4), BVBLUE(4,  4), BVALPHA(0,  4) },
+	{ BVRED(0,  4), BVGREEN(4, 4), BVBLUE(8,  4), BVALPHA(12, 4) },
+	{ BVRED(4,  4), BVGREEN(8, 4), BVBLUE(12, 4), BVALPHA(0,  4) }
+};
+
+static const struct bvcsrgb xrgb1555_bits[] = {
+	{ BVRED(10, 5), BVGREEN(5, 5), BVBLUE(0,  5), BVALPHA(15, 0) },
+	{ BVRED(11, 5), BVGREEN(6, 5), BVBLUE(1,  5), BVALPHA(0,  0) },
+	{ BVRED(0,  5), BVGREEN(5, 5), BVBLUE(10, 5), BVALPHA(15, 0) },
+	{ BVRED(1,  5), BVGREEN(6, 5), BVBLUE(11, 5), BVALPHA(0,  0) }
+};
+
+static const struct bvcsrgb argb1555_bits[] = {
+	{ BVRED(10, 5), BVGREEN(5, 5), BVBLUE(0,  5), BVALPHA(15, 1) },
+	{ BVRED(11, 5), BVGREEN(6, 5), BVBLUE(1,  5), BVALPHA(0,  1) },
+	{ BVRED(0,  5), BVGREEN(5, 5), BVBLUE(10, 5), BVALPHA(15, 1) },
+	{ BVRED(1,  5), BVGREEN(6, 5), BVBLUE(11, 5), BVALPHA(0,  1) }
+};
+
+static const struct bvcsrgb rgb565_bits[] = {
+	{ BVRED(11, 5), BVGREEN(5, 6), BVBLUE(0,  5), BVALPHA(0, 0) },
+	{ BVRED(11, 5), BVGREEN(5, 6), BVBLUE(0,  5), BVALPHA(0, 0) },
+	{ BVRED(0,  5), BVGREEN(5, 6), BVBLUE(11, 5), BVALPHA(0, 0) },
+	{ BVRED(0,  5), BVGREEN(5, 6), BVBLUE(11, 5), BVALPHA(0, 0) }
+};
+
+static const struct bvcsrgb xrgb8888_bits[] = {
+	{ BVRED(8,  8), BVGREEN(16, 8), BVBLUE(24, 8), BVALPHA(0,  0) },
+	{ BVRED(0,  8), BVGREEN(8,  8), BVBLUE(16, 8), BVALPHA(24, 0) },
+	{ BVRED(24, 8), BVGREEN(16, 8), BVBLUE(8,  8), BVALPHA(0,  0) },
+	{ BVRED(16, 8), BVGREEN(8,  8), BVBLUE(0,  8), BVALPHA(24, 0) }
+};
+
+static const struct bvcsrgb argb8888_bits[] = {
+	{ BVRED(8,  8), BVGREEN(16, 8), BVBLUE(24, 8), BVALPHA(0,  8) },
+	{ BVRED(0,  8), BVGREEN(8,  8), BVBLUE(16, 8), BVALPHA(24, 8) },
+	{ BVRED(24, 8), BVGREEN(16, 8), BVBLUE(8,  8), BVALPHA(0,  8) },
+	{ BVRED(16, 8), BVGREEN(8,  8), BVBLUE(0,  8), BVALPHA(24, 8) }
+};
+
+static const unsigned int container[] = {
+	  8,	/* OCDFMTDEF_CONTAINER_8BIT */
+	 16,	/* OCDFMTDEF_CONTAINER_16BIT */
+	 24,	/* OCDFMTDEF_CONTAINER_24BIT */
+	 32,	/* OCDFMTDEF_CONTAINER_32BIT */
+	~0U,	/* reserved */
+	 48,	/* OCDFMTDEF_CONTAINER_48BIT */
+	~0U,	/* reserved */
+	 64	/* OCDFMTDEF_CONTAINER_64BIT */
+};
+
+enum bverror parse_format(struct bvbltparams *bvbltparams,
+			  struct surfaceinfo *surfaceinfo)
 {
-	static unsigned int containers[] = {
-		  8,	/* OCDFMTDEF_CONTAINER_8BIT */
-		 16,	/* OCDFMTDEF_CONTAINER_16BIT */
-		 24,	/* OCDFMTDEF_CONTAINER_24BIT */
-		 32,	/* OCDFMTDEF_CONTAINER_32BIT */
-		~0U,	/* reserved */
-		 48,	/* OCDFMTDEF_CONTAINER_48BIT */
-		~0U,	/* reserved */
-		 64	/* OCDFMTDEF_CONTAINER_64BIT */
-	};
-
 	enum bverror bverror = BVERR_NONE;
+	struct bvformatxlate *format;
 	enum ocdformat ocdformat;
-	unsigned int cs;
-	unsigned int bits;
-	unsigned int swizzle;
-	unsigned int alpha;
-	unsigned int index;
-	unsigned int cont;
+	unsigned int cs, std, alpha, subsample, layout;
+	unsigned int reversed, leftjust, swizzle, cont, bits;
 
+	format = &surfaceinfo->format;
 	ocdformat = surfaceinfo->geom->format;
 	GCENTERARG(GCZONE_FORMAT, "ocdformat = 0x%08X\n", ocdformat);
 
-	cs = (ocdformat & OCDFMTDEF_CS_MASK) >> OCDFMTDEF_CS_SHIFT;
-	bits = (ocdformat & OCDFMTDEF_COMPONENTSIZEMINUS1_MASK)
-		>> OCDFMTDEF_COMPONENTSIZEMINUS1_SHIFT;
+	cs = (ocdformat & OCDFMTDEF_CS_MASK)
+		>> OCDFMTDEF_CS_SHIFT;
+	std = (ocdformat & OCDFMTDEF_STD_MASK)
+		>> OCDFMTDEF_STD_SHIFT;
+	alpha = ocdformat & OCDFMTDEF_ALPHA;
+	subsample = (ocdformat & OCDFMTDEF_SUBSAMPLE_MASK)
+		>> OCDFMTDEF_SUBSAMPLE_SHIFT;
+	layout = (ocdformat & OCDFMTDEF_LAYOUT_MASK)
+		>> OCDFMTDEF_LAYOUT_SHIFT;
 	cont = (ocdformat & OCDFMTDEF_CONTAINER_MASK)
 		>> OCDFMTDEF_CONTAINER_SHIFT;
+	bits = ((ocdformat & OCDFMTDEF_COMPONENTSIZEMINUS1_MASK)
+		>> OCDFMTDEF_COMPONENTSIZEMINUS1_SHIFT) + 1;
+
+	GCDBG(GCZONE_FORMAT, "std = %d\n", std);
 	GCDBG(GCZONE_FORMAT, "cs = %d\n", cs);
-	GCDBG(GCZONE_FORMAT, "bits = %d\n", bits);
+	GCDBG(GCZONE_FORMAT, "alpha = %d\n", alpha ? 1 : 0);
+	GCDBG(GCZONE_FORMAT, "subsample = %d\n", subsample);
+	GCDBG(GCZONE_FORMAT, "layout = %d\n", layout);
 	GCDBG(GCZONE_FORMAT, "cont = %d\n", cont);
+	GCDBG(GCZONE_FORMAT, "bits = %d\n", bits);
 
 	switch (cs) {
 	case (OCDFMTDEF_CS_RGB >> OCDFMTDEF_CS_SHIFT):
 		GCDBG(GCZONE_FORMAT, "OCDFMTDEF_CS_RGB\n");
 
-		if ((ocdformat & OCDFMTDEF_LAYOUT_MASK) != OCDFMTDEF_PACKED) {
+		/* Determine the swizzle. */
+		swizzle = (ocdformat & OCDFMTDEF_PLACEMENT_MASK)
+			>> OCDFMTDEF_PLACEMENT_SHIFT;
+		GCDBG(GCZONE_FORMAT, "swizzle = %d\n", swizzle);
+
+		/* RGB color space. */
+		format->type = BVFMT_RGB;
+
+		/* Has to be 0 for RGB. */
+		if (std != 0) {
+			BVSETBLTERROR(BVERR_UNK,
+				      "unsupported standard");
+			goto exit;
+		}
+
+		/* Determine premultuplied or not. */
+		if (alpha == OCDFMTDEF_ALPHA) {
+			format->premultiplied
+				= ((ocdformat & OCDFMTDEF_NON_PREMULT) == 0);
+		} else {
+			format->premultiplied = true;
+
+			if ((ocdformat & OCDFMTDEF_FILL_EMPTY_0) != 0) {
+				BVSETBLTERROR(BVERR_UNK,
+					      "0 filling is not supported");
+				goto exit;
+			}
+		}
+		GCDBG(GCZONE_FORMAT, "premultiplied = %d\n",
+		      format->premultiplied);
+
+		/* No subsample support. */
+		if (subsample !=
+		    (OCDFMTDEF_SUBSAMPLE_NONE >> OCDFMTDEF_SUBSAMPLE_SHIFT)) {
+			BVSETBLTERROR(BVERR_UNK,
+					"subsampling for RGB is not supported");
+			goto exit;
+		}
+
+		/* Only packed RGB is supported. */
+		if (layout !=
+		    (OCDFMTDEF_PACKED >> OCDFMTDEF_LAYOUT_SHIFT)) {
 			BVSETBLTERROR(BVERR_UNK,
 				      "only packed RGBA formats are supported");
 			goto exit;
 		}
 
-		swizzle = (ocdformat & OCDFMTDEF_PLACEMENT_MASK)
-			>> OCDFMTDEF_PLACEMENT_SHIFT;
-		alpha = (ocdformat & OCDFMTDEF_ALPHA_MASK)
-			>> OCDFMTDEF_ALPHA_SHIFT;
-
-		GCDBG(GCZONE_FORMAT, "swizzle = %d\n", swizzle);
-		GCDBG(GCZONE_FORMAT, "alpha = %d\n", alpha);
-
-		index = swizzle | (alpha << 2);
-
+		/* Determine the format. */
 		switch (bits) {
-		case 12 - 1:
-			index |= OCDFMTDEF_BITS12;
+		case 12:
+			format->bitspp = 16;
+			format->allocbitspp = 16;
+			format->swizzle = rgba16swizzle[swizzle];
+
+			if (alpha == OCDFMTDEF_ALPHA) {
+				format->format = GCREG_DE_FORMAT_A4R4G4B4;
+				format->cs.rgb.comp = &argb4444_bits[swizzle];
+			} else {
+				format->format = GCREG_DE_FORMAT_X4R4G4B4;
+				format->cs.rgb.comp = &xrgb4444_bits[swizzle];
+			}
 			break;
 
-		case 15 - 1:
-			index |= OCDFMTDEF_BITS15;
+		case 15:
+			format->bitspp = 16;
+			format->allocbitspp = 16;
+			format->swizzle = rgba16swizzle[swizzle];
+
+			if (alpha == OCDFMTDEF_ALPHA) {
+				format->format = GCREG_DE_FORMAT_A1R5G5B5;
+				format->cs.rgb.comp = &argb1555_bits[swizzle];
+			} else {
+				format->format = GCREG_DE_FORMAT_X1R5G5B5;
+				format->cs.rgb.comp = &xrgb1555_bits[swizzle];
+			}
 			break;
 
-		case 16 - 1:
-			index |= OCDFMTDEF_BITS16;
+		case 16:
+			if (alpha == OCDFMTDEF_ALPHA) {
+				BVSETBLTERROR(BVERR_UNK,
+					      "alpha component is not supported"
+					      "for this format.");
+				goto exit;
+			}
+
+			format->bitspp = 16;
+			format->allocbitspp = 16;
+			format->swizzle = rgb16swizzle[swizzle];
+			format->format = GCREG_DE_FORMAT_R5G6B5;
+			format->cs.rgb.comp = &rgb565_bits[swizzle];
 			break;
 
-		case 24 - 1:
-			index |= OCDFMTDEF_BITS24;
+		case 24:
+			format->bitspp = 32;
+			format->allocbitspp = 32;
+			format->swizzle = rgba32swizzle[swizzle];
+
+			if (alpha == OCDFMTDEF_ALPHA) {
+				format->format = GCREG_DE_FORMAT_A8R8G8B8;
+				format->cs.rgb.comp = &argb8888_bits[swizzle];
+			} else {
+				format->format = GCREG_DE_FORMAT_X8R8G8B8;
+				format->cs.rgb.comp = &xrgb8888_bits[swizzle];
+			}
 			break;
 
 		default:
@@ -401,34 +341,149 @@ static enum bverror parse_format(struct bvbltparams *bvbltparams,
 			goto exit;
 		}
 
-		GCDBG(GCZONE_FORMAT, "index = %d\n", index);
+		if (format->allocbitspp != container[cont]) {
+			BVSETBLTERROR(BVERR_UNK,
+				      "unsupported container");
+			goto exit;
+		}
 		break;
 
 	case (OCDFMTDEF_CS_YCbCr >> OCDFMTDEF_CS_SHIFT):
 		GCDBG(GCZONE_FORMAT, "OCDFMTDEF_CS_YCbCr\n");
 
-		/* FIXME/TODO: add proper YUV parsing. */
-		switch (ocdformat) {
-		case OCDFMT_NV12:
-			GCDBG(GCZONE_FORMAT, "OCDFMT_NV12\n");
-			surfaceinfo->format = &g_format_nv12;
-			goto exit;
+		/* YUV color space. */
+		format->type = BVFMT_YUV;
 
-		case OCDFMT_UYVY:
-			GCDBG(GCZONE_FORMAT, "OCDFMT_UYVY\n");
-			surfaceinfo->format = &g_format_uyvy;
-			goto exit;
+		/* Determine the swizzle. */
+		reversed = ocdformat & OCDFMTDEF_REVERSED;
+		leftjust = ocdformat & OCDFMTDEF_LEFT_JUSTIFIED;
+		GCDBG(GCZONE_FORMAT, "reversed = %d\n", reversed ? 1 : 0);
+		GCDBG(GCZONE_FORMAT, "leftjust = %d\n", leftjust ? 1 : 0);
 
-		case OCDFMT_YUY2:
-			GCDBG(GCZONE_FORMAT, "OCDFMT_YUY2\n");
-			surfaceinfo->format = &g_format_yuy2;
-			goto exit;
+		/* Parse the standard. */
+		switch (std) {
+		case OCDFMTDEF_STD_ITUR_601_YCbCr >> OCDFMTDEF_STD_SHIFT:
+			format->cs.yuv.std = GCREG_PE_CONTROL_YUV_601;
+			break;
+
+		case OCDFMTDEF_STD_ITUR_709_YCbCr >> OCDFMTDEF_STD_SHIFT:
+			format->cs.yuv.std = GCREG_PE_CONTROL_YUV_709;
+			break;
 
 		default:
 			BVSETBLTERROR(BVERR_UNK,
-				      "unsupported YUV format %d", ocdformat);
+				      "unsupported color standard");
 			goto exit;
 		}
+
+		/* Alpha is not supported. */
+		if (alpha == OCDFMTDEF_ALPHA) {
+			BVSETBLTERROR(BVERR_UNK,
+				      "alpha channel is not supported");
+			goto exit;
+		}
+
+		format->premultiplied = true;
+
+		/* Parse subsampling. */
+		switch (subsample) {
+		case OCDFMTDEF_SUBSAMPLE_422_YCbCr >> OCDFMTDEF_SUBSAMPLE_SHIFT:
+			GCDBG(GCZONE_FORMAT, "OCDFMTDEF_SUBSAMPLE_422_YCbCr\n");
+
+			/* Parse layout. */
+			switch (layout) {
+			case OCDFMTDEF_PACKED >> OCDFMTDEF_LAYOUT_SHIFT:
+				GCDBG(GCZONE_FORMAT, "OCDFMTDEF_PACKED\n");
+
+				if (container[cont] != 32) {
+					BVSETBLTERROR(BVERR_UNK,
+						      "unsupported container");
+					goto exit;
+				}
+
+				format->bitspp = 16;
+				format->allocbitspp = 16;
+				format->format = leftjust
+					? GCREG_DE_FORMAT_YUY2
+					: GCREG_DE_FORMAT_UYVY;
+				format->swizzle = reversed
+					? GCREG_PE_CONTROL_UV_SWIZZLE_VU
+					: GCREG_PE_CONTROL_UV_SWIZZLE_UV;
+				format->cs.yuv.planecount = 1;
+				break;
+
+			default:
+				BVSETBLTERROR(BVERR_UNK,
+					      "specified 4:2:2 layout "
+					      "is not supported");
+				goto exit;
+			}
+			break;
+
+		case OCDFMTDEF_SUBSAMPLE_420_YCbCr >> OCDFMTDEF_SUBSAMPLE_SHIFT:
+
+			/* Parse layout. */
+			switch (layout) {
+			case OCDFMTDEF_2_PLANE_YCbCr
+						>> OCDFMTDEF_LAYOUT_SHIFT:
+				GCDBG(GCZONE_FORMAT,
+				      "OCDFMTDEF_2_PLANE_YCbCr\n");
+
+				if (container[cont] != 48) {
+					BVSETBLTERROR(BVERR_UNK,
+						      "unsupported container");
+					goto exit;
+				}
+
+				format->bitspp = 8;
+				format->allocbitspp = 12;
+				format->format = GCREG_DE_FORMAT_NV12;
+				format->swizzle = reversed
+					? GCREG_PE_CONTROL_UV_SWIZZLE_VU
+					: GCREG_PE_CONTROL_UV_SWIZZLE_UV;
+				format->cs.yuv.planecount = 2;
+				break;
+
+			case OCDFMTDEF_3_PLANE_STACKED
+						>> OCDFMTDEF_LAYOUT_SHIFT:
+				GCDBG(GCZONE_FORMAT,
+				      "OCDFMTDEF_3_PLANE_STACKED\n");
+
+				if (container[cont] != 48) {
+					BVSETBLTERROR(BVERR_UNK,
+						      "unsupported container");
+					goto exit;
+				}
+
+				format->bitspp = 8;
+				format->allocbitspp = 12;
+				format->format = GCREG_DE_FORMAT_YV12;
+				format->swizzle = reversed
+					? GCREG_PE_CONTROL_UV_SWIZZLE_VU
+					: GCREG_PE_CONTROL_UV_SWIZZLE_UV;
+				format->cs.yuv.planecount = 3;
+				break;
+
+			default:
+				BVSETBLTERROR(BVERR_UNK,
+					      "specified 4:2:2 layout "
+					      "is not supported");
+				goto exit;
+			}
+			break;
+
+		default:
+			BVSETBLTERROR(BVERR_UNK,
+				      "specified subsampling is not supported");
+			goto exit;
+		}
+
+		if (format->allocbitspp != bits) {
+			BVSETBLTERROR(BVERR_UNK,
+				      "unsupported bit width %d", bits);
+			goto exit;
+		}
+		break;
 
 	default:
 		BVSETBLTERROR(BVERR_UNK,
@@ -436,19 +491,9 @@ static enum bverror parse_format(struct bvbltparams *bvbltparams,
 		goto exit;
 	}
 
-	if (formatxlate[index].bitspp != containers[cont]) {
-		BVSETBLTERROR(BVERR_UNK,
-			      "unsupported bit width %d", bits);
-		goto exit;
-	}
-
-	surfaceinfo->format = &formatxlate[index];
-
-	GCDBG(GCZONE_FORMAT, "format record = 0x%08X\n",
-	      (unsigned int) &formatxlate[index]);
-	GCDBG(GCZONE_FORMAT, "  bpp = %d\n", formatxlate[index].bitspp);
-	GCDBG(GCZONE_FORMAT, "  format = %d\n", formatxlate[index].format);
-	GCDBG(GCZONE_FORMAT, "  swizzle = %d\n", formatxlate[index].swizzle);
+	GCDBG(GCZONE_FORMAT, "bpp = %d\n", format->bitspp);
+	GCDBG(GCZONE_FORMAT, "gcformat = %d\n", format->format);
+	GCDBG(GCZONE_FORMAT, "gcswizzle = %d\n", format->swizzle);
 
 	bverror = BVERR_NONE;
 
@@ -1218,7 +1263,7 @@ static bool valid_geom(struct surfaceinfo *surfaceinfo)
 	/* Compute the size of the surface. */
 	size = (surfaceinfo->geom->width *
 		surfaceinfo->geom->height *
-		surfaceinfo->format->bitspp) / 8;
+		surfaceinfo->format.bitspp) / 8;
 
 	/* Make sure the size is not greater then the surface. */
 	if (size > surfaceinfo->buf.desc->length) {
@@ -1226,7 +1271,7 @@ static bool valid_geom(struct surfaceinfo *surfaceinfo)
 		GCERR("  specified dimensions: %dx%d, %d bitspp\n",
 		      surfaceinfo->geom->width,
 		      surfaceinfo->geom->height,
-		      surfaceinfo->format->bitspp);
+		      surfaceinfo->format.bitspp);
 		GCERR("  surface size based on the dimensions: %d\n",
 		      size);
 		GCERR("  specified surface size: %lu\n",
@@ -1247,11 +1292,11 @@ int get_pixel_offset(struct surfaceinfo *surfaceinfo, int offset)
 	GCENTERARG(GCZONE_OFFSET, "surfaceinfo=0x%08X, offset=%d\n",
 		   surfaceinfo, offset);
 
-	alignment = ((surfaceinfo->format->type & BVFMT_MASK) == BVFMT_YUV)
+	alignment = (surfaceinfo->format.type == BVFMT_YUV)
 		? (64 - 1)
 		: (16 - 1);
 
-	GCDBG(GCZONE_OFFSET, "bpp = %d\n", surfaceinfo->format->bitspp);
+	GCDBG(GCZONE_OFFSET, "bpp = %d\n", surfaceinfo->format.bitspp);
 	GCDBG(GCZONE_OFFSET, "alignment = %d\n", alignment);
 
 	/* Determine offset in bytes from the base modified by the
@@ -1277,7 +1322,7 @@ int get_pixel_offset(struct surfaceinfo *surfaceinfo, int offset)
 	alignedoffset = byteoffset & alignment;
 
 	/* Convert to pixels. */
-	pixeloffset = alignedoffset * 8 / surfaceinfo->format->bitspp;
+	pixeloffset = alignedoffset * 8 / surfaceinfo->format.bitspp;
 
 	GCDBG(GCZONE_OFFSET, "alignedoffset = %d\n", alignedoffset);
 	GCDBG(GCZONE_OFFSET, "pixeloffset = %d\n", pixeloffset);
@@ -1296,7 +1341,6 @@ enum bverror parse_destination(struct bvbltparams *bvbltparams,
 	/* Did the destination surface change? */
 	if ((batch->batchflags & BVBATCH_DST) != 0) {
 		struct surfaceinfo *dstinfo;
-		unsigned int stridealign;
 
 		/* Initialize the destination descriptor. */
 		dstinfo = &batch->dstinfo;
@@ -1335,8 +1379,8 @@ enum bverror parse_destination(struct bvbltparams *bvbltparams,
 		}
 
 		/* Destination stride must be 8 pixel aligned. */
-		stridealign = dstinfo->format->bitspp - 1;
-		if ((dstinfo->geom->virtstride & stridealign) != 0) {
+		if ((dstinfo->geom->virtstride
+				& (dstinfo->format.bitspp - 1)) != 0) {
 			BVSETBLTERROR(BVERR_DSTGEOM_STRIDE,
 				      "destination stride must be 8 pixel "
 				      "aligned.");
@@ -1355,7 +1399,7 @@ enum bverror parse_destination(struct bvbltparams *bvbltparams,
 		 * for the surface base address misalignment if any. */
 		dstinfo->pixalign = get_pixel_offset(dstinfo, 0);
 		dstinfo->bytealign = (dstinfo->pixalign
-				   * (int) dstinfo->format->bitspp) / 8;
+				   * (int) dstinfo->format.bitspp) / 8;
 
 		switch (dstinfo->angle) {
 		case ROT_ANGLE_0:
@@ -1467,14 +1511,6 @@ enum bverror parse_destination(struct bvbltparams *bvbltparams,
 
 		/* Determine destination rectangle. */
 		dstrect = &dstinfo->rect;
-
-		GCDBG(GCZONE_DEST,
-		      "destination = (%d,%d) %dx%d\n",
-		      bvbltparams->dstrect.left,
-		      bvbltparams->dstrect.top,
-		      bvbltparams->dstrect.width,
-		      bvbltparams->dstrect.height);
-
 		GCCONVERT_RECT(GCZONE_DEST,
 			       "destination",
 			       &bvbltparams->dstrect,
@@ -1485,23 +1521,16 @@ enum bverror parse_destination(struct bvbltparams *bvbltparams,
 
 		/* Is clipping rectangle specified? */
 		if ((bvbltparams->flags & BVFLAG_CLIP) == BVFLAG_CLIP) {
-			/* Convert and validate clipping rectangle. */
-			GCDBG(GCZONE_DEST,
-			      "clip = (%d,%d) %dx%d\n",
-			      bvbltparams->cliprect.left,
-			      bvbltparams->cliprect.top,
-			      bvbltparams->cliprect.width,
-			      bvbltparams->cliprect.height);
-
+			/* Convert the clipping rectangle. */
 			GCCONVERT_RECT(GCZONE_DEST,
 				       "clipping",
 				       &bvbltparams->cliprect,
 				       &cliprect);
 
-			if (cliprect.left < GC_CLIP_RESET_LEFT ||
-			    cliprect.top < GC_CLIP_RESET_TOP ||
-			    cliprect.right > GC_CLIP_RESET_RIGHT ||
-			    cliprect.bottom > GC_CLIP_RESET_BOTTOM) {
+			if ((cliprect.left   < GC_CLIP_RESET_LEFT)  ||
+			    (cliprect.top    < GC_CLIP_RESET_TOP)   ||
+			    (cliprect.right  > GC_CLIP_RESET_RIGHT) ||
+			    (cliprect.bottom > GC_CLIP_RESET_BOTTOM)) {
 				BVSETERROR(BVERR_CLIP_RECT,
 					   "clip rect is invalid");
 				goto exit;
@@ -1588,16 +1617,8 @@ enum bverror parse_destination(struct bvbltparams *bvbltparams,
 					       &batch->dstclippedaux);
 		}
 
-		GCDBG(GCZONE_DEST,
-		      "clipped dest = (%d,%d)-(%d,%d), %dx%d\n",
-		      batch->dstclipped.left,
-		      batch->dstclipped.top,
-		      batch->dstclipped.right,
-		      batch->dstclipped.bottom,
-		      batch->dstclipped.right -
-		      batch->dstclipped.left,
-		      batch->dstclipped.bottom -
-		      batch->dstclipped.top);
+		GCPRINT_RECT(GCZONE_DEST, "clipped dest",
+			     &batch->dstclipped);
 
 		/* Check for valid dest rect after clipping. */
 		if (batch->dstclipped.left < 0 ||
@@ -1610,16 +1631,8 @@ enum bverror parse_destination(struct bvbltparams *bvbltparams,
 		}
 
 		if (haveaux)
-			GCDBG(GCZONE_DEST,
-			      "clipped aux dest = (%d,%d)-(%d,%d), %dx%d\n",
-			      batch->dstclippedaux.left,
-			      batch->dstclippedaux.top,
-			      batch->dstclippedaux.right,
-			      batch->dstclippedaux.bottom,
-			      batch->dstclippedaux.right -
-			      batch->dstclippedaux.left,
-			      batch->dstclippedaux.bottom -
-			      batch->dstclippedaux.top);
+			GCPRINT_RECT(GCZONE_DEST, "clipped aux dest",
+				     &batch->dstclippedaux);
 
 		GCDBG(GCZONE_DEST,
 		      "clipping delta = (%d,%d)-(%d,%d)\n",
@@ -1641,7 +1654,6 @@ enum bverror parse_source(struct bvbltparams *bvbltparams,
 			  struct surfaceinfo *srcinfo)
 {
 	enum bverror bverror = BVERR_NONE;
-	unsigned int stridealign;
 
 	/* Convert the rectangle. */
 	GCCONVERT_RECT(GCZONE_SRC,
@@ -1668,8 +1680,8 @@ enum bverror parse_source(struct bvbltparams *bvbltparams,
 	}
 
 	/* Source must be 8 pixel aligned. */
-	stridealign = srcinfo->format->bitspp - 1;
-	if ((srcinfo->geom->virtstride & stridealign) != 0) {
+	if ((srcinfo->geom->virtstride
+			& (srcinfo->format.bitspp - 1)) != 0) {
 		BVSETBLTERROR((srcinfo->index == 0)
 					? BVERR_SRC1GEOM_STRIDE
 					: BVERR_SRC2GEOM_STRIDE,
