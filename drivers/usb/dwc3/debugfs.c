@@ -442,7 +442,7 @@ static ssize_t dwc3_mode_write(struct file *file,
 		return -EFAULT;
 
 	if (!strncmp(buf, "host", 4))
-		mode |= DWC3_GCTL_PRTCAP_HOST;
+		dev_dbg(dwc->dev, "dwc3: mode not switched to host\n");
 
 	if (!strncmp(buf, "device", 6))
 		mode |= DWC3_GCTL_PRTCAP_DEVICE;

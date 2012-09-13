@@ -33,6 +33,30 @@ static int xhci_plat_setup(struct usb_hcd *hcd)
 	return xhci_gen_setup(hcd, xhci_plat_quirks);
 }
 
+static int xhci_plat_bus_suspend(struct usb_hcd *hcd)
+{
+	struct device *dev = hcd->self.controller;
+	int ret = 0;
+
+	ret = xhci_bus_suspend(hcd);
+	if (ret != 0) {
+		dev_dbg(dev, "xhci_omap_bus_suspend failed %d\n", ret);
+		return ret;
+	}
+	pm_runtime_put_sync(dev);
+
+	return ret;
+}
+
+static int xhci_plat_bus_resume(struct usb_hcd *hcd)
+{
+	struct device *dev = hcd->self.controller;
+
+	pm_runtime_get_sync(dev);
+
+	return xhci_bus_resume(hcd);
+}
+
 static const struct hc_driver xhci_plat_xhci_driver = {
 	.description =		"xhci-hcd",
 	.product_desc =		"xHCI Host Controller",
@@ -78,8 +102,8 @@ static const struct hc_driver xhci_plat_xhci_driver = {
 	/* Root hub support */
 	.hub_control =		xhci_hub_control,
 	.hub_status_data =	xhci_hub_status_data,
-	.bus_suspend =		xhci_bus_suspend,
-	.bus_resume =		xhci_bus_resume,
+	.bus_suspend =		xhci_plat_bus_suspend,
+	.bus_resume =		xhci_plat_bus_resume,
 };
 
 static int xhci_plat_probe(struct platform_device *pdev)

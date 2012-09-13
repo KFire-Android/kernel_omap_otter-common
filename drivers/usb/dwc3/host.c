@@ -83,5 +83,6 @@ err0:
 
 void dwc3_host_exit(struct dwc3 *dwc)
 {
+	dwc3_set_mode(dwc, DWC3_GCTL_PRTCAP_DEVICE);
 	platform_device_unregister(dwc->xhci);
 }
