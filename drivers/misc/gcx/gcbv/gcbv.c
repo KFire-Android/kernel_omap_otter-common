@@ -547,15 +547,6 @@ exit:
  * Surface compare and validation.
  */
 
-static inline bool valid_rect(struct bvsurfgeom *bvsurfgeom,
-			      struct gcrect *gcrect)
-{
-	return (((gcrect->right  - gcrect->left) > 0) &&
-		((gcrect->bottom - gcrect->top)  > 0) &&
-		 (gcrect->right  <= (int) bvsurfgeom->width) &&
-		 (gcrect->bottom <= (int) bvsurfgeom->height));
-}
-
 static inline bool equal_rects(struct bvrect *rect1, struct bvrect *rect2)
 {
 	if (rect1->left != rect2->left)
@@ -1123,22 +1114,6 @@ enum bverror bv_blt(struct bvbltparams *bvbltparams)
 		if (bverror != BVERR_NONE)
 			goto exit;
 
-		/* Validate destination rectangles. */
-		if (!valid_rect(bvbltparams->dstgeom,
-				&gcbatch->dstclipped)) {
-			GCDBG(GCZONE_DEST,
-			      "invalid destination rectangle.\n");
-			goto exit;
-		}
-
-		if (((bvbltparams->flags & BVFLAG_SRC2_AUXDSTRECT) != 0) &&
-		    !valid_rect(bvbltparams->dstgeom,
-				&gcbatch->dstclippedaux)) {
-			GCDBG(GCZONE_DEST,
-			      "invalid aux destination rectangle.\n");
-			goto exit;
-		}
-
 		/* Reset the number of sources. */
 		srccount = 0;
 
@@ -1305,18 +1280,6 @@ enum bverror bv_blt(struct bvbltparams *bvbltparams)
 							  &srcinfo[i]);
 				} else {
 					GCDBG(GCZONE_BLIT, "  op: filter.\n");
-
-					/* Finish previous batch if any. */
-					bverror = gcbatch->batchend(
-						bvbltparams, gcbatch);
-					if (bverror != BVERR_NONE)
-						goto exit;
-
-					bverror = parse_scalemode(bvbltparams,
-								  gcbatch);
-					if (bverror != BVERR_NONE)
-						goto exit;
-
 					bverror = do_filter(bvbltparams,
 							    gcbatch,
 							    &srcinfo[i]);

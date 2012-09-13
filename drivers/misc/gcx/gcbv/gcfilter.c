@@ -974,6 +974,23 @@ enum bverror do_filter(struct bvbltparams *bvbltparams,
 
 	GCENTER(GCZONE_FILTER);
 
+	/* Finish previous batch if any. */
+	bverror = batch->batchend(bvbltparams, batch);
+	if (bverror != BVERR_NONE)
+		goto exit;
+
+	/* ROP is not supported by the filters. */
+	if ((srcinfo->rop & 0xFF) != 0xCC) {
+		BVSETBLTERROR(BVERR_ROP,
+			      "only copy ROP is supported in scaling mode");
+		goto exit;
+	}
+
+	/* Parse the scale mode. */
+	bverror = parse_scalemode(bvbltparams, batch);
+	if (bverror != BVERR_NONE)
+		goto exit;
+
 	/* Additional stride requirements. */
 	if (srcinfo->format.format == GCREG_DE_FORMAT_NV12) {
 		/* Nv12 may be shifted up to 32 bytes for alignment.
