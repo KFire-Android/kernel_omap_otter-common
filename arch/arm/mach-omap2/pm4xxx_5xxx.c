@@ -610,6 +610,25 @@ static void __init prcm_setup_regs(void)
 			OMAP4_PRM_LDO_SRAM_IVA_SETUP_OFFSET);
 	}
 
+	/* Allow SRAM LDO to enter RET during  low power state*/
+	if (cpu_is_omap446x()) {
+		omap4_prminst_rmw_inst_reg_bits(OMAP4430_RETMODE_ENABLE_MASK,
+			0x1 << OMAP4430_RETMODE_ENABLE_SHIFT,
+			OMAP4430_PRM_PARTITION,
+			OMAP4430_PRM_DEVICE_INST,
+			OMAP4_PRM_LDO_SRAM_CORE_CTRL_OFFSET);
+		omap4_prminst_rmw_inst_reg_bits(OMAP4430_RETMODE_ENABLE_MASK,
+			0x1 << OMAP4430_RETMODE_ENABLE_SHIFT,
+			OMAP4430_PRM_PARTITION,
+			OMAP4430_PRM_DEVICE_INST,
+			OMAP4_PRM_LDO_SRAM_MPU_CTRL_OFFSET);
+		omap4_prminst_rmw_inst_reg_bits(OMAP4430_RETMODE_ENABLE_MASK,
+			0x1 << OMAP4430_RETMODE_ENABLE_SHIFT,
+			OMAP4430_PRM_PARTITION,
+			OMAP4430_PRM_DEVICE_INST,
+			OMAP4_PRM_LDO_SRAM_IVA_CTRL_OFFSET);
+	}
+
 	/*
 	 * Toggle CLKREQ in RET and OFF states
 	 * 0x2: CLKREQ is de-asserted when system clock is not
