@@ -385,6 +385,9 @@ struct gcblit {
 	 * setup can be modified to match new destination and source
 	 * geometry. */
 	struct gcrect dstrect;
+
+	/* Block walker enable. */
+	int blockenable;
 };
 
 /* Filter states. */
@@ -418,34 +421,35 @@ struct gcbatch {
 	/* Destination surface. */
 	struct surfaceinfo dstinfo;
 
-	/* Clipping deltas; used to correct the source coordinates for
-	 * single source blits. */
-	struct gcrect clipdelta;
-
 	/* Clipped destination rectangle coordinates. */
 	struct gcrect dstclipped;
 	struct gcrect dstclippedaux;
 
-	/* Destination origin offset caused by surface base misalignment. */
-	unsigned int dstoffsetX;
-	unsigned int dstoffsetY;
+	/* Destination rectangles that were clipped and adjusted for
+	 * surface misalignment if any. */
+	struct gcrect dstadjusted;
+	struct gcrect dstadjustedaux;
+
+	/* Clipping deltas; used to correct the source coordinates for
+	 * single source blits. */
+	struct gcrect clipdelta;
 
 	/* Adjusted geometry size of the destination surface. */
 	unsigned int dstwidth;
 	unsigned int dstheight;
 
-	/* Physical size of the matched destination and source surfaces
-	 * for multi-source setup. */
-	unsigned int physwidth;
-	unsigned int physheight;
+	/* Physical size of the destination surface. */
+	unsigned int dstphyswidth;
+	unsigned int dstphysheight;
 
 	/* Alignment byte offset for the destination surface; in multi-
 	 * source setup can be modified to match new destination and source
 	 * geometry. */
 	int dstbyteshift;
 
-	/* Block walker enable. */
-	int blockenable;
+	/* Destination rectangle adjustment offsets. */
+	int dstoffsetX;
+	int dstoffsetY;
 
 #if GCDEBUG_ENABLE
 	/* Rectangle validation storage. */
@@ -490,6 +494,10 @@ enum bverror parse_source(struct bvbltparams *bvbltparams,
 			  struct surfaceinfo *srcinfo);
 enum bverror parse_scalemode(struct bvbltparams *bvbltparams,
 			     struct gcbatch *batch);
+
+/* Setup destination rotation parameters. */
+void process_dest_rotation(struct bvbltparams *bvbltparams,
+			   struct gcbatch *batch);
 
 /* Return surface alignment offset. */
 int get_pixel_offset(struct surfaceinfo *surfaceinfo, int offset);

@@ -1410,72 +1410,6 @@ enum bverror parse_destination(struct bvbltparams *bvbltparams,
 		dstinfo->bytealign = (dstinfo->pixalign
 				   * (int) dstinfo->format.bitspp) / 8;
 
-		switch (dstinfo->angle) {
-		case ROT_ANGLE_0:
-			/* Determine the physical size. */
-			dstinfo->physwidth = dstinfo->geom->width
-					   - dstinfo->pixalign;
-			dstinfo->physheight = dstinfo->geom->height;
-
-			/* Determine geometry size. */
-			batch->dstwidth = dstinfo->geom->width
-					- dstinfo->pixalign;
-			batch->dstheight = dstinfo->geom->height;
-
-			/* Determine the origin offset. */
-			batch->dstoffsetX = -dstinfo->pixalign;
-			batch->dstoffsetY = 0;
-			break;
-
-		case ROT_ANGLE_90:
-			/* Determine the physical size. */
-			dstinfo->physwidth = dstinfo->geom->height
-					   - dstinfo->pixalign;
-			dstinfo->physheight = dstinfo->geom->width;
-
-			/* Determine geometry size. */
-			batch->dstwidth = dstinfo->geom->width;
-			batch->dstheight = dstinfo->geom->height
-					 - dstinfo->pixalign;
-
-			/* Determine the origin offset. */
-			batch->dstoffsetX = 0;
-			batch->dstoffsetY = -dstinfo->pixalign;
-			break;
-
-		case ROT_ANGLE_180:
-			/* Determine the physical size. */
-			dstinfo->physwidth = dstinfo->geom->width
-					   - dstinfo->pixalign;
-			dstinfo->physheight = dstinfo->geom->height;
-
-			/* Determine geometry size. */
-			batch->dstwidth = dstinfo->geom->width
-					- dstinfo->pixalign;
-			batch->dstheight = dstinfo->geom->height;
-
-			/* Determine the origin offset. */
-			batch->dstoffsetX = 0;
-			batch->dstoffsetY = 0;
-			break;
-
-		case ROT_ANGLE_270:
-			/* Determine the physical size. */
-			dstinfo->physwidth = dstinfo->geom->height
-					   - dstinfo->pixalign;
-			dstinfo->physheight = dstinfo->geom->width;
-
-			/* Determine geometry size. */
-			batch->dstwidth = dstinfo->geom->width;
-			batch->dstheight = dstinfo->geom->height
-					 - dstinfo->pixalign;
-
-			/* Determine the origin offset. */
-			batch->dstoffsetX = 0;
-			batch->dstoffsetY = 0;
-			break;
-		}
-
 		GCDBG(GCZONE_DEST, "destination surface:\n");
 		GCDBG(GCZONE_DEST, "  rotation %d degrees.\n",
 		      dstinfo->angle * 90);
@@ -1495,14 +1429,10 @@ enum bverror parse_destination(struct bvbltparams *bvbltparams,
 		      dstinfo->geom->virtstride);
 		GCDBG(GCZONE_DEST, "  geometry size = %dx%d\n",
 		      dstinfo->geom->width, dstinfo->geom->height);
-		GCDBG(GCZONE_DEST, "  aligned geometry size = %dx%d\n",
-		      batch->dstwidth, batch->dstheight);
-		GCDBG(GCZONE_DEST, "  aligned physical size = %dx%d\n",
-		      dstinfo->physwidth, dstinfo->physheight);
-		GCDBG(GCZONE_DEST, "  origin offset (pixels) = %d,%d\n",
-		      batch->dstoffsetX, batch->dstoffsetY);
 		GCDBG(GCZONE_DEST, "  surface offset (pixels) = %d,0\n",
 		      dstinfo->pixalign);
+		GCDBG(GCZONE_DEST, "  surface offset (bytes) = %d\n",
+		      dstinfo->bytealign);
 	}
 
 	/* Did clipping/destination rects change? */
@@ -1672,6 +1602,117 @@ exit:
 	GCEXITARG(GCZONE_DEST, "bv%s = %d\n",
 		  (bverror == BVERR_NONE) ? "result" : "error", bverror);
 	return bverror;
+}
+
+void process_dest_rotation(struct bvbltparams *bvbltparams,
+			   struct gcbatch *batch)
+{
+	GCENTER(GCZONE_DEST);
+
+	/* Did clipping/destination rects change? */
+	if ((batch->batchflags & (BVBATCH_CLIPRECT |
+				  BVBATCH_DESTRECT |
+				  BVBATCH_DST)) != 0) {
+		struct surfaceinfo *dstinfo;
+		int dstoffsetX, dstoffsetY;
+
+		/* Initialize the destination descriptor. */
+		dstinfo = &batch->dstinfo;
+
+		switch (dstinfo->angle) {
+		case ROT_ANGLE_0:
+			/* Determine the origin offset. */
+			dstoffsetX = dstinfo->pixalign;
+			dstoffsetY = 0;
+
+			/* Determine geometry size. */
+			batch->dstwidth  = dstinfo->geom->width
+					 - dstinfo->pixalign;
+			batch->dstheight = dstinfo->geom->height;
+
+			/* Determine the physical size. */
+			dstinfo->physwidth  = batch->dstwidth;
+			dstinfo->physheight = batch->dstheight;
+			break;
+
+		case ROT_ANGLE_90:
+			/* Determine the origin offset. */
+			dstoffsetX = 0;
+			dstoffsetY = dstinfo->pixalign;
+
+			/* Determine geometry size. */
+			batch->dstwidth  = dstinfo->geom->width;
+			batch->dstheight = dstinfo->geom->height
+					 - dstinfo->pixalign;
+
+			/* Determine the physical size. */
+			dstinfo->physwidth  = dstinfo->geom->height
+					    - dstinfo->pixalign;
+			dstinfo->physheight = dstinfo->geom->width;
+			break;
+
+		case ROT_ANGLE_180:
+			/* Determine the origin offset. */
+			dstoffsetX = 0;
+			dstoffsetY = 0;
+
+			/* Determine geometry size. */
+			batch->dstwidth  = dstinfo->geom->width
+					 - dstinfo->pixalign;
+			batch->dstheight = dstinfo->geom->height;
+
+			/* Determine the physical size. */
+			dstinfo->physwidth  = batch->dstwidth;
+			dstinfo->physheight = batch->dstheight;
+			break;
+
+		case ROT_ANGLE_270:
+			/* Determine the origin offset. */
+			dstoffsetX = 0;
+			dstoffsetY = 0;
+
+			/* Determine geometry size. */
+			batch->dstwidth  = dstinfo->geom->width;
+			batch->dstheight = dstinfo->geom->height
+					 - dstinfo->pixalign;
+
+			/* Determine the physical size. */
+			dstinfo->physwidth  = dstinfo->geom->height
+					    - dstinfo->pixalign;
+			dstinfo->physheight = dstinfo->geom->width;
+			break;
+
+		default:
+			dstoffsetX = 0;
+			dstoffsetY = 0;
+		}
+
+		/* Compute adjusted destination rectangles. */
+		batch->dstadjusted.left
+			= batch->dstclipped.left
+			- dstoffsetX;
+		batch->dstadjusted.top
+			= batch->dstclipped.top
+			- dstoffsetY;
+		batch->dstadjusted.right
+			= batch->dstclipped.right
+			- dstoffsetX;
+		batch->dstadjusted.bottom
+			= batch->dstclipped.bottom
+			- dstoffsetY;
+
+		GCPRINT_RECT(GCZONE_DEST, "adjusted dest",
+			     &batch->dstadjusted);
+
+		GCDBG(GCZONE_DEST, "aligned geometry size = %dx%d\n",
+		      batch->dstwidth, batch->dstheight);
+		GCDBG(GCZONE_DEST, "aligned physical size = %dx%d\n",
+		      dstinfo->physwidth, dstinfo->physheight);
+		GCDBG(GCZONE_DEST, "origin offset (pixels) = %d,%d\n",
+		      dstoffsetX, dstoffsetY);
+	}
+
+	GCEXIT(GCZONE_DEST);
 }
 
 enum bverror parse_source(struct bvbltparams *bvbltparams,
