@@ -6354,6 +6354,38 @@ struct gcregcolormultiplymodes {
 #define   GCREG_PE_CONTROL_MASK_YUVRGB_ENABLED                               0x0
 #define   GCREG_PE_CONTROL_MASK_YUVRGB_MASKED                                0x1
 
+struct gcregpecontrol {
+	/* gcregPEControlRegAddrs:YUV */
+	unsigned int standard:1;
+
+	/* gcregPEControlRegAddrs:reserved */
+	unsigned int _reserved_1_2:2;
+
+	/* gcregPEControlRegAddrs:MASK_YUV */
+	unsigned int standard_mask:1;
+
+	/* gcregPEControlRegAddrs:UV_SWIZZLE */
+	unsigned int swizzle:1;
+
+	/* gcregPEControlRegAddrs:reserved */
+	unsigned int _reserved_5_6:2;
+
+	/* gcregPEControlRegAddrs:MASK_UV_SWIZZLE */
+	unsigned int swizzle_mask:1;
+
+	/* gcregPEControlRegAddrs:YUVRGB */
+	unsigned int convert:1;
+
+	/* gcregPEControlRegAddrs:reserved */
+	unsigned int _reserved_9_10:2;
+
+	/* gcregPEControlRegAddrs:MASK_YUVRGB */
+	unsigned int convert_mask:1;
+
+	/* gcregPEControlRegAddrs:reserved */
+	unsigned int _reserved_12_31:20;
+};
+
 /*******************************************************************************
 ** State gcregSrcColorKeyHigh
 */
@@ -9394,36 +9426,76 @@ struct gcmoxsrcalpha {
 ** Modular operations: yuv
 */
 
-static const struct gccmdldstate gcmoyuv_plane_ldst =
-	GCLDSTATE(gcregUPlaneAddressRegAddrs, 4);
-
 static const struct gccmdldstate gcmoyuv_pectrl_ldst =
 	GCLDSTATE(gcregPEControlRegAddrs, 1);
 
-struct gcmoyuv {
+static const struct gccmdldstate gcmoyuv2_plane_ldst =
+	GCLDSTATE(gcregUPlaneAddressRegAddrs, 2);
+
+static const struct gccmdldstate gcmoyuv3_plane_ldst =
+	GCLDSTATE(gcregUPlaneAddressRegAddrs, 4);
+
+struct gcmoyuv1 {
+	/* gcregPEControlRegAddrs */
+	struct gccmdldstate pectrl_ldst;
+
+		/* gcregPEControlRegAddrs */
+		union {
+			struct gcregpecontrol reg;
+			unsigned int raw;
+		} pectrl;
+};
+
+struct gcmoyuv2 {
+	/* gcregPEControlRegAddrs */
+	struct gccmdldstate pectrl_ldst;
+
+		/* gcregPEControlRegAddrs */
+		union {
+			struct gcregpecontrol reg;
+			unsigned int raw;
+		} pectrl;
+
 	/* Plane state block. */
 	struct gccmdldstate plane_ldst;
 
-		/* gcregBlock4UPlaneAddressRegAddrs */
+		/* gcregUPlaneAddressRegAddrs */
 		unsigned int uplaneaddress;
 
-		/* gcregBlock4UPlaneStrideRegAddrs */
+		/* gcregUPlaneStrideRegAddrs */
 		unsigned int uplanestride;
 
-		/* gcregBlock4VPlaneAddressRegAddrs */
+		/* Alignment filler. */
+		unsigned int _filler1;
+};
+
+struct gcmoyuv3 {
+	/* gcregPEControlRegAddrs */
+	struct gccmdldstate pectrl_ldst;
+
+		/* gcregPEControlRegAddrs */
+		union {
+			struct gcregpecontrol reg;
+			unsigned int raw;
+		} pectrl;
+
+	/* Plane state block. */
+	struct gccmdldstate plane_ldst;
+
+		/* gcregUPlaneAddressRegAddrs */
+		unsigned int uplaneaddress;
+
+		/* gcregUPlaneStrideRegAddrs */
+		unsigned int uplanestride;
+
+		/* gcregVPlaneAddressRegAddrs */
 		unsigned int vplaneaddress;
 
-		/* gcregBlock4VPlaneStrideRegAddrs */
+		/* gcregVPlaneStrideRegAddrs */
 		unsigned int vplanestride;
 
 		/* Alignment filler. */
 		unsigned int _filler1;
-
-	/* gcregBlock4PEControlRegAddrs */
-	struct gccmdldstate pectrl_ldst;
-
-		/* gcregBlock4PEControlRegAddrs */
-		unsigned int pectrl;
 };
 
 /*******************************************************************************
@@ -9465,7 +9537,50 @@ static const struct gccmdldstate gcmoxsrcyuv_pectrl_ldst[4] = {
 	GCLDSTATE(gcregBlock4PEControlRegAddrs + 3, 1),
 };
 
-struct gcmoxsrcyuv {
+struct gcmoxsrcyuv1 {
+	/* gcregBlock4PEControlRegAddrs */
+	struct gccmdldstate pectrl_ldst;
+
+		/* gcregBlock4PEControlRegAddrs */
+		union {
+			struct gcregpecontrol reg;
+			unsigned int raw;
+		} pectrl;
+};
+
+struct gcmoxsrcyuv2 {
+	/* gcregBlock4PEControlRegAddrs */
+	struct gccmdldstate pectrl_ldst;
+
+		/* gcregBlock4PEControlRegAddrs */
+		union {
+			struct gcregpecontrol reg;
+			unsigned int raw;
+		} pectrl;
+
+	/* gcregBlock4UPlaneAddressRegAddrs */
+	struct gccmdldstate uplaneaddress_ldst;
+
+		/* gcregBlock4UPlaneAddressRegAddrs */
+		unsigned int uplaneaddress;
+
+	/* gcregBlock4UPlaneStrideRegAddrs */
+	struct gccmdldstate uplanestride_ldst;
+
+		/* gcregBlock4UPlaneStrideRegAddrs */
+		unsigned int uplanestride;
+};
+
+struct gcmoxsrcyuv3 {
+	/* gcregBlock4PEControlRegAddrs */
+	struct gccmdldstate pectrl_ldst;
+
+		/* gcregBlock4PEControlRegAddrs */
+		union {
+			struct gcregpecontrol reg;
+			unsigned int raw;
+		} pectrl;
+
 	/* gcregBlock4UPlaneAddressRegAddrs */
 	struct gccmdldstate uplaneaddress_ldst;
 
@@ -9489,12 +9604,6 @@ struct gcmoxsrcyuv {
 
 		/* gcregBlock4VPlaneStrideRegAddrs */
 		unsigned int vplanestride;
-
-	/* gcregBlock4PEControlRegAddrs */
-	struct gccmdldstate pectrl_ldst;
-
-		/* gcregBlock4PEControlRegAddrs */
-		unsigned int pectrl;
 };
 
 /*******************************************************************************
