@@ -1140,6 +1140,13 @@ enum bverror bv_blt(struct bvbltparams *bvbltparams)
 				srcinfo[srccount].index = 0;
 				srcinfo[srccount].buf = bvbltparams->src1;
 				srcinfo[srccount].geom = bvbltparams->src1geom;
+				srcinfo[srccount].newgeom
+					= gcbatch->batchflags
+						& BVBATCH_SRC1;
+				srcinfo[srccount].newrect
+					= gcbatch->batchflags
+						& (BVBATCH_SRC1RECT_ORIGIN |
+						   BVBATCH_SRC1RECT_SIZE);
 				srcrect[srccount] = &bvbltparams->src1rect;
 
 				bverror = parse_source(bvbltparams, gcbatch,
@@ -1180,6 +1187,13 @@ enum bverror bv_blt(struct bvbltparams *bvbltparams)
 				srcinfo[srccount].index = 1;
 				srcinfo[srccount].buf = bvbltparams->src2;
 				srcinfo[srccount].geom = bvbltparams->src2geom;
+				srcinfo[srccount].newgeom
+					= gcbatch->batchflags
+						& BVBATCH_SRC2;
+				srcinfo[srccount].newrect
+					= gcbatch->batchflags
+						& (BVBATCH_SRC2RECT_ORIGIN |
+						   BVBATCH_SRC2RECT_SIZE);
 				srcrect[srccount] = &bvbltparams->src2rect;
 
 				bverror = parse_source(bvbltparams, gcbatch,

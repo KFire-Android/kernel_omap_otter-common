@@ -1442,8 +1442,7 @@ enum bverror parse_destination(struct bvbltparams *bvbltparams,
 		struct surfaceinfo *dstinfo;
 		struct gcrect cliprect;
 		struct gcrect *dstrect;
-		struct gcrect dstrectaux;
-		bool haveaux;
+		struct gcrect *dstrectaux;
 
 		/* Get a shortcut to the destination surface. */
 		dstinfo = &batch->dstinfo;
@@ -1456,8 +1455,9 @@ enum bverror parse_destination(struct bvbltparams *bvbltparams,
 			       dstrect);
 
 		/* Determine whether aux destination is specified. */
-		haveaux = ((bvbltparams->flags & BVFLAG_SRC2_AUXDSTRECT) != 0);
-		GCDBG(GCZONE_DEST, "aux dest = %d\n", haveaux);
+		batch->haveaux
+			= ((bvbltparams->flags & BVFLAG_SRC2_AUXDSTRECT) != 0);
+		GCDBG(GCZONE_DEST, "aux dest = %d\n", batch->haveaux);
 
 		/* Is clipping rectangle specified? */
 		if ((bvbltparams->flags & BVFLAG_CLIP) == BVFLAG_CLIP) {
@@ -1515,37 +1515,38 @@ enum bverror parse_destination(struct bvbltparams *bvbltparams,
 			}
 
 			/* Clip the aux destination. */
-			if (haveaux) {
-				/* Convert and validate aux rectangle. */
+			if (batch->haveaux) {
+				/* Convert the aux rectangle. */
+				dstrectaux = &batch->dstrectaux;
 				GCCONVERT_RECT(GCZONE_DEST,
 					       "aux destination",
 					       &bvbltparams->src2auxdstrect,
-					       &dstrectaux);
+					       dstrectaux);
 
-				if (cliprect.left <= dstrectaux.left)
+				if (cliprect.left <= dstrectaux->left)
 					batch->dstclippedaux.left
-						= dstrectaux.left;
+						= dstrectaux->left;
 				else
 					batch->dstclippedaux.left
 						= cliprect.left;
 
-				if (cliprect.top <= dstrectaux.top)
+				if (cliprect.top <= dstrectaux->top)
 					batch->dstclippedaux.top
-						= dstrectaux.top;
+						= dstrectaux->top;
 				else
 					batch->dstclippedaux.top
 						= cliprect.top;
 
-				if (cliprect.right >= dstrectaux.right)
+				if (cliprect.right >= dstrectaux->right)
 					batch->dstclippedaux.right
-						= dstrectaux.right;
+						= dstrectaux->right;
 				else
 					batch->dstclippedaux.right
 						= cliprect.right;
 
-				if (cliprect.bottom >= dstrectaux.bottom)
+				if (cliprect.bottom >= dstrectaux->bottom)
 					batch->dstclippedaux.bottom
-						= dstrectaux.bottom;
+						= dstrectaux->bottom;
 				else
 					batch->dstclippedaux.bottom
 						= cliprect.bottom;
@@ -1557,8 +1558,8 @@ enum bverror parse_destination(struct bvbltparams *bvbltparams,
 			batch->clipdelta.bottom = 0;
 
 			batch->dstclipped = *dstrect;
-			if (haveaux)
-				/* Convert and validate aux rectangle. */
+			if (batch->haveaux)
+				/* Convert the aux rectangle. */
 				GCCONVERT_RECT(GCZONE_DEST,
 					       "aux destination",
 					       &bvbltparams->src2auxdstrect,
@@ -1576,7 +1577,7 @@ enum bverror parse_destination(struct bvbltparams *bvbltparams,
 			goto exit;
 		}
 
-		if (haveaux) {
+		if (batch->haveaux) {
 			GCPRINT_RECT(GCZONE_DEST, "clipped aux dest",
 				     &batch->dstclippedaux);
 
