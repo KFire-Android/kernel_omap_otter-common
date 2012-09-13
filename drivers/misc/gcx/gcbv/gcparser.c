@@ -1256,6 +1256,17 @@ static inline int get_angle(int orientation)
  * Surface compare and validation.
  */
 
+static inline bool valid_rect(struct bvsurfgeom *bvsurfgeom,
+			      struct gcrect *gcrect)
+{
+	return ((gcrect->left >= 0) &&
+		(gcrect->top  >= 0) &&
+		((gcrect->right  - gcrect->left) > 0) &&
+		((gcrect->bottom - gcrect->top)  > 0) &&
+		 (gcrect->right  <= (int) bvsurfgeom->width) &&
+		 (gcrect->bottom <= (int) bvsurfgeom->height));
+}
+
 static bool valid_geom(struct surfaceinfo *surfaceinfo)
 {
 	unsigned int size;
@@ -1353,21 +1364,18 @@ enum bverror parse_destination(struct bvbltparams *bvbltparams,
 		dstinfo->rop = 0;
 		dstinfo->gca = NULL;
 
-		/* Check for unsupported dest formats. */
-		switch (dstinfo->geom->format) {
-		case OCDFMT_NV12:
-			BVSETBLTERROR(BVERR_DSTGEOM_FORMAT,
-				      "destination format unsupported");
-			goto exit;
-
-		default:
-			break;
-		}
-
 		/* Parse the destination format. */
 		GCDBG(GCZONE_FORMAT, "parsing destination format.\n");
 		if (parse_format(bvbltparams, dstinfo) != BVERR_NONE) {
 			bverror = BVERR_DSTGEOM_FORMAT;
+			goto exit;
+		}
+
+		/* Check for unsupported dest formats. */
+		if ((dstinfo->format.type == BVFMT_YUV) &&
+		    (dstinfo->format.cs.yuv.planecount > 1)) {
+			BVSETBLTERROR(BVERR_DSTGEOM_FORMAT,
+				      "destination format unsupported");
 			goto exit;
 		}
 
@@ -1393,6 +1401,7 @@ enum bverror parse_destination(struct bvbltparams *bvbltparams,
 			BVSETBLTERROR(BVERR_DSTGEOM,
 				      "unsupported destination orientation %d.",
 				      dstinfo->geom->orientation);
+			goto exit;
 		}
 
 		/* Compute the destination alignments needed to compensate
@@ -1518,6 +1527,7 @@ enum bverror parse_destination(struct bvbltparams *bvbltparams,
 
 		/* Determine whether aux destination is specified. */
 		haveaux = ((bvbltparams->flags & BVFLAG_SRC2_AUXDSTRECT) != 0);
+		GCDBG(GCZONE_DEST, "aux dest = %d\n", haveaux);
 
 		/* Is clipping rectangle specified? */
 		if ((bvbltparams->flags & BVFLAG_CLIP) == BVFLAG_CLIP) {
@@ -1582,25 +1592,33 @@ enum bverror parse_destination(struct bvbltparams *bvbltparams,
 					       &bvbltparams->src2auxdstrect,
 					       &dstrectaux);
 
-				batch->dstclippedaux.left
-					= (cliprect.left <= dstrectaux.left)
-						? dstrectaux.left
-						: cliprect.left;
+				if (cliprect.left <= dstrectaux.left)
+					batch->dstclippedaux.left
+						= dstrectaux.left;
+				else
+					batch->dstclippedaux.left
+						= cliprect.left;
 
-				batch->dstclippedaux.top
-					= (cliprect.top <= dstrectaux.top)
-						? dstrectaux.top
-						: cliprect.top;
+				if (cliprect.top <= dstrectaux.top)
+					batch->dstclippedaux.top
+						= dstrectaux.top;
+				else
+					batch->dstclippedaux.top
+						= cliprect.top;
 
-				batch->dstclippedaux.right
-					= (cliprect.right >= dstrectaux.right)
-						? dstrectaux.right
-						: cliprect.right;
+				if (cliprect.right >= dstrectaux.right)
+					batch->dstclippedaux.right
+						= dstrectaux.right;
+				else
+					batch->dstclippedaux.right
+						= cliprect.right;
 
-				batch->dstclippedaux.bottom
-					= (cliprect.bottom >= dstrectaux.bottom)
-						? dstrectaux.bottom
-						: cliprect.bottom;
+				if (cliprect.bottom >= dstrectaux.bottom)
+					batch->dstclippedaux.bottom
+						= dstrectaux.bottom;
+				else
+					batch->dstclippedaux.bottom
+						= cliprect.bottom;
 			}
 		} else {
 			batch->clipdelta.left =
@@ -1620,19 +1638,27 @@ enum bverror parse_destination(struct bvbltparams *bvbltparams,
 		GCPRINT_RECT(GCZONE_DEST, "clipped dest",
 			     &batch->dstclipped);
 
-		/* Check for valid dest rect after clipping. */
-		if (batch->dstclipped.left < 0 ||
-		    batch->dstclipped.top < 0 ||
-		    batch->dstclipped.right > dstinfo->geom->width ||
-		    batch->dstclipped.bottom > dstinfo->geom->height) {
+		/* Validate the destination rectangle. */
+		if (!valid_rect(bvbltparams->dstgeom,
+				&batch->dstclipped)) {
 			BVSETBLTERROR(BVERR_DSTRECT,
-				      "destination rect invalid");
+				      "invalid destination rectangle.");
 			goto exit;
 		}
 
-		if (haveaux)
+		if (haveaux) {
 			GCPRINT_RECT(GCZONE_DEST, "clipped aux dest",
 				     &batch->dstclippedaux);
+
+			/* Validate the aux destination rectangle. */
+			if (!valid_rect(bvbltparams->dstgeom,
+					&batch->dstclippedaux)) {
+				BVSETBLTERROR(BVERR_DSTRECT,
+					      "invalid aux destination "
+					      "rectangle.");
+				goto exit;
+			}
+		}
 
 		GCDBG(GCZONE_DEST,
 		      "clipping delta = (%d,%d)-(%d,%d)\n",
@@ -1689,6 +1715,21 @@ enum bverror parse_source(struct bvbltparams *bvbltparams,
 		goto exit;
 	}
 
+	/* Check base address alignment for planar YUV. */
+	if ((srcinfo->format.type == BVFMT_YUV) &&
+	    (srcinfo->format.cs.yuv.planecount > 1)) {
+		int pixalign;
+		pixalign = get_pixel_offset(srcinfo, 0);
+		if (pixalign != 0) {
+			BVSETBLTERROR((srcinfo->index == 0)
+					? BVERR_SRC1DESC_ALIGNMENT
+					: BVERR_SRC2DESC_ALIGNMENT,
+				      "planar YUV base address must be "
+				      "64 byte aligned.");
+			goto exit;
+		}
+	}
+
 	/* Parse orientation. */
 	srcinfo->angle = get_angle(srcinfo->geom->orientation);
 	if (srcinfo->angle == ROT_ANGLE_INVALID) {
@@ -1698,6 +1739,17 @@ enum bverror parse_source(struct bvbltparams *bvbltparams,
 			      "unsupported source%d orientation %d.",
 			      srcinfo->index + 1,
 			      srcinfo->geom->orientation);
+		goto exit;
+	}
+
+	/* Rotated YUV (packed and planar) source is not supported. */
+	if ((srcinfo->angle != ROT_ANGLE_0) &&
+	    (srcinfo->format.type == BVFMT_YUV)) {
+		BVSETBLTERROR((srcinfo->index == 0)
+					? BVERR_SRC1_ROT
+					: BVERR_SRC2_ROT,
+			      "rotation of YUV is not supported");
+		goto exit;
 	}
 
 	/* Determine source mirror. */
