@@ -93,15 +93,13 @@ static irqreturn_t pwron_irq(int irq, void *palmas_pwron)
 	struct input_dev *input_dev = pwron->input_dev;
 
 	cancel_delayed_work_sync(&pwron->input_work);
-	pwron->current_state = palmas_get_pwr_state(pwron);
-	if (pwron->current_state < 0)
-		return IRQ_HANDLED;
+
+	pwron->current_state = PALMAS_PWR_KEY_PRESS;
 
 	input_report_key(input_dev, KEY_POWER, pwron->current_state);
 	input_sync(input_dev);
 
-	if (pwron->current_state == PALMAS_PWR_KEY_PRESS)
-		schedule_delayed_work(&pwron->input_work, 0);
+	schedule_delayed_work(&pwron->input_work, 0);
 
 	return IRQ_HANDLED;
 }
