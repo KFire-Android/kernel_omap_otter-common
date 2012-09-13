@@ -515,6 +515,12 @@ int omap_aess_write_gain(struct omap_aess *abe,
 	u32 ramp_index;
 	u32 ramp;
 
+	/* update muted gain only, no memory access needed */
+	if (abe->muted_gains_indicator[id]) {
+		abe->muted_gains_decibel[id] = f_g;
+		return 0;
+	}
+
 	gain_index = ((f_g - min_mdb) / 100);
 	gain_index = maximum(gain_index, 0);
 	gain_index = minimum(gain_index, sizeof_db2lin_table);
@@ -527,17 +533,12 @@ int omap_aess_write_gain(struct omap_aess *abe,
 	mixer_target = omap_aess_map[OMAP_AESS_SMEM_GTARGET1_ID].offset;
 	mixer_target += (id<<2);
 
-	if (abe->compensated_mixer_gain) {
-	} else {
-		if (!abe->muted_gains_indicator[id])
-			/* load the S_G_Target SMEM table */
-			omap_abe_mem_write(abe, OMAP_ABE_SMEM,
-				       mixer_target, (u32 *) &lin_g,
-				       sizeof(lin_g));
-		else
-			/* update muted gain with new value */
-			abe->muted_gains_decibel[id] = f_g;
+	if (!abe->compensated_mixer_gain) {
+		/* load the S_G_Target SMEM table */
+		omap_abe_mem_write(abe, OMAP_ABE_SMEM,
+				   mixer_target, (u32 *)&lin_g, sizeof(lin_g));
 	}
+
 	ramp = maximum(minimum(RAMP_MAXLENGTH, ramp), RAMP_MINLENGTH);
 	/* ramp data should be interpolated in the table instead */
 	ramp_index = 3;

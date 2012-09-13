@@ -253,7 +253,7 @@ static int __devinit register_hsi_devices(struct hsi_dev *hsi_ctrl)
 	return 0;
 }
 
-static void __devexit unregister_hsi_devices(struct hsi_dev *hsi_ctrl)
+static void unregister_hsi_devices(struct hsi_dev *hsi_ctrl)
 {
 	struct hsi_port *hsi_p;
 	struct hsi_device *device;
