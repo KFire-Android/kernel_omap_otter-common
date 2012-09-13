@@ -113,6 +113,16 @@ do { \
 	bverror = error; \
 } while (0)
 
+#define GCPRINT_RECT(zone, name, rect) \
+{ \
+	GCDBG(zone, \
+	      name " = (%d,%d)-(%d,%d), %dx%d\n", \
+	      (rect)->left, (rect)->top, \
+	      (rect)->right, (rect)->bottom, \
+	      (rect)->right - (rect)->left, \
+	      (rect)->bottom - (rect)->top); \
+}
+
 
 /*******************************************************************************
  * Kernel table definitions.
@@ -217,13 +227,8 @@ struct bvbuffmapinfo {
  * Color format.
  */
 
-#define BVFMT_PLANAR		0x100
-#define BVFMT_MASK		0xFF
-
-#define BVFMT_RGB		1
-#define BVFMT_YUV		2
-#define BVFMT_PACKED_YUV	(BVFMT_YUV)
-#define BVFMT_PLANAR_YUV	(BVFMT_YUV | BVFMT_PLANAR)
+#define BVFMT_RGB	1
+#define BVFMT_YUV	2
 
 struct bvcomponent {
 	unsigned int shift;
@@ -241,9 +246,21 @@ struct bvcsrgb {
 struct bvformatxlate {
 	unsigned int type;
 	unsigned int bitspp;
+	unsigned int allocbitspp;
 	unsigned int format;
 	unsigned int swizzle;
-	struct bvcsrgb rgba;
+	bool premultiplied;
+
+	union {
+		struct {
+			const struct bvcsrgb *comp;
+		} rgb;
+
+		struct {
+			unsigned int std;
+			unsigned int planecount;
+		} yuv;
+	} cs;
 };
 
 
@@ -320,7 +337,7 @@ struct surfaceinfo {
 	struct gcrect rect;
 
 	/* Surface format. */
-	struct bvformatxlate *format;
+	struct bvformatxlate format;
 
 	/* Physical size of the surface (accounted for rotation). */
 	unsigned int physwidth;
@@ -460,6 +477,8 @@ struct gcbatch {
 struct gccontext *get_context(void);
 
 /* Parsers. */
+enum bverror parse_format(struct bvbltparams *bvbltparams,
+			  struct surfaceinfo *surfaceinfo);
 enum bverror parse_blend(struct bvbltparams *bvbltparams,
 			 enum bvblend blend,
 			 struct gcalpha *gca);

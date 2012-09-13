@@ -116,17 +116,15 @@ static enum bverror do_blit_end(struct bvbltparams *bvbltparams,
 	}
 
 	/* Set destination configuration. */
-	GCDBG(GCZONE_BLIT, "format entry = 0x%08X\n",
-	      (unsigned int) dstinfo->format);
 	GCDBG(GCZONE_BLIT, "  swizzle code = %d\n",
-	      dstinfo->format->swizzle);
+	      dstinfo->format.swizzle);
 	GCDBG(GCZONE_BLIT, "  format code = %d\n",
-	      dstinfo->format->format);
+	      dstinfo->format.format);
 
 	gcmobltconfig->dstconfig_ldst = gcmobltconfig_dstconfig_ldst;
 	gcmobltconfig->dstconfig.raw = 0;
-	gcmobltconfig->dstconfig.reg.swizzle = dstinfo->format->swizzle;
-	gcmobltconfig->dstconfig.reg.format = dstinfo->format->format;
+	gcmobltconfig->dstconfig.reg.swizzle = dstinfo->format.swizzle;
+	gcmobltconfig->dstconfig.reg.format = dstinfo->format.format;
 	gcmobltconfig->dstconfig.reg.command = gcblit->multisrc
 		? GCREG_DEST_CONFIG_COMMAND_MULTI_SOURCE_BLT
 		: GCREG_DEST_CONFIG_COMMAND_BIT_BLT;
@@ -264,7 +262,7 @@ enum bverror do_blit(struct bvbltparams *bvbltparams,
 
 	/* Compute the source surface offset in bytes. */
 	srcbyteshift = srcshiftY * (int) srcinfo->geom->virtstride
-		     + srcshiftX * (int) srcinfo->format->bitspp / 8;
+		     + srcshiftX * (int) srcinfo->format.bitspp / 8;
 
 	/* Compute the source offset in pixels needed to compensate
 	 * for the surface base address misalignment if any. */
@@ -279,7 +277,7 @@ enum bverror do_blit(struct bvbltparams *bvbltparams,
 	      srcalign);
 
 	/* Apply the source alignment. */
-	srcbyteshift += srcalign * (int) srcinfo->format->bitspp / 8;
+	srcbyteshift += srcalign * (int) srcinfo->format.bitspp / 8;
 	srcshiftX += srcalign;
 
 	GCDBG(GCZONE_SURF, "  adjusted surface offset (pixels) = %d,%d\n",
@@ -294,7 +292,7 @@ enum bverror do_blit(struct bvbltparams *bvbltparams,
 
 	/* Compute the destination surface offset in bytes. */
 	dstbyteshift = dstshiftY * (int) dstinfo->geom->virtstride
-		     + dstshiftX * (int) dstinfo->format->bitspp / 8;
+		     + dstshiftX * (int) dstinfo->format.bitspp / 8;
 
 	/* Compute the destination offset in pixels needed to compensate
 		* for the surface base address misalignment if any. */
@@ -308,7 +306,7 @@ enum bverror do_blit(struct bvbltparams *bvbltparams,
 	GCDBG(GCZONE_SURF, "  realignment = %d\n",
 	      dstalign);
 
-	if ((srcinfo->format->format == GCREG_DE_FORMAT_NV12) ||
+	if ((srcinfo->format.format == GCREG_DE_FORMAT_NV12) ||
 	    (dstalign != 0) ||
 	    ((srcalign != 0) && (srcinfo->angle == dstinfo->angle))) {
 		/* Compute the source offset in pixels needed to compensate
@@ -316,7 +314,7 @@ enum bverror do_blit(struct bvbltparams *bvbltparams,
 		srcalign = get_pixel_offset(srcinfo, 0);
 
 		/* Compute the surface offsets in bytes. */
-		srcbyteshift = srcalign * (int) srcinfo->format->bitspp / 8;
+		srcbyteshift = srcalign * (int) srcinfo->format.bitspp / 8;
 
 		GCDBG(GCZONE_SURF, "recomputed for single-source setup:\n");
 		GCDBG(GCZONE_SURF, "  srcalign = %d\n",
@@ -549,8 +547,8 @@ enum bverror do_blit(struct bvbltparams *bvbltparams,
 
 	gcmosrc->config_ldst = gcmosrc_config_ldst[index];
 	gcmosrc->config.raw = 0;
-	gcmosrc->config.reg.swizzle = srcinfo->format->swizzle;
-	gcmosrc->config.reg.format = srcinfo->format->format;
+	gcmosrc->config.reg.swizzle = srcinfo->format.swizzle;
+	gcmosrc->config.reg.format = srcinfo->format.format;
 
 	gcmosrc->origin_ldst = gcmosrc_origin_ldst[index];
 	gcmosrc->origin.reg.x = srcleft;
@@ -581,25 +579,25 @@ enum bverror do_blit(struct bvbltparams *bvbltparams,
 	gcmosrc->mult.reg.srcglobalpremul
 	= GCREG_COLOR_MULTIPLY_MODES_SRC_GLOBAL_PREMULTIPLY_DISABLE;
 
-	if ((srcinfo->geom->format & OCDFMTDEF_NON_PREMULT) != 0)
-		gcmosrc->mult.reg.srcpremul
-		= GCREG_COLOR_MULTIPLY_MODES_SRC_PREMULTIPLY_ENABLE;
-	else
+	if (srcinfo->format.premultiplied)
 		gcmosrc->mult.reg.srcpremul
 		= GCREG_COLOR_MULTIPLY_MODES_SRC_PREMULTIPLY_DISABLE;
-
-	if ((dstinfo->geom->format & OCDFMTDEF_NON_PREMULT) != 0) {
-		gcmosrc->mult.reg.dstpremul
+	else
+		gcmosrc->mult.reg.srcpremul
 		= GCREG_COLOR_MULTIPLY_MODES_SRC_PREMULTIPLY_ENABLE;
 
-		gcmosrc->mult.reg.dstdemul
-		= GCREG_COLOR_MULTIPLY_MODES_DST_DEMULTIPLY_ENABLE;
-	} else {
+	if (dstinfo->format.premultiplied) {
 		gcmosrc->mult.reg.dstpremul
 		= GCREG_COLOR_MULTIPLY_MODES_SRC_PREMULTIPLY_DISABLE;
 
 		gcmosrc->mult.reg.dstdemul
 		= GCREG_COLOR_MULTIPLY_MODES_DST_DEMULTIPLY_DISABLE;
+	} else {
+		gcmosrc->mult.reg.dstpremul
+		= GCREG_COLOR_MULTIPLY_MODES_SRC_PREMULTIPLY_ENABLE;
+
+		gcmosrc->mult.reg.dstdemul
+		= GCREG_COLOR_MULTIPLY_MODES_DST_DEMULTIPLY_ENABLE;
 	}
 
 	if (srcinfo->gca == NULL) {
@@ -658,7 +656,7 @@ enum bverror do_blit(struct bvbltparams *bvbltparams,
 		gcmoxsrcalpha->dstglobal.raw = srcinfo->gca->dst_global_color;
 	}
 
-	if (srcinfo->format->format == GCREG_DE_FORMAT_NV12) {
+	if (srcinfo->format.format == GCREG_DE_FORMAT_NV12) {
 		struct gcmoxsrcyuv *gcmoxsrcyuv;
 		int uvshift = srcbyteshift;
 
