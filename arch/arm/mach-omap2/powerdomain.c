@@ -840,6 +840,9 @@ int pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst)
 	if (!pwrdm)
 		return -EINVAL;
 
+	if (pwrdm->pwrsts == PWRSTS_ON)
+		return 0;
+
 	switch (pwrst) {
 	case PWRDM_POWER_CSWR:
 	case PWRDM_POWER_OSWR:
@@ -890,6 +893,9 @@ int pwrdm_read_next_pwrst(struct powerdomain *pwrdm)
 
 	if (!pwrdm)
 		return -EINVAL;
+
+	if (pwrdm->pwrsts == PWRSTS_ON)
+		return PWRDM_POWER_ON;
 
 	if (arch_pwrdm && arch_pwrdm->pwrdm_read_next_pwrst)
 		ret = arch_pwrdm->pwrdm_read_next_pwrst(pwrdm);
@@ -949,6 +955,9 @@ int pwrdm_read_prev_pwrst(struct powerdomain *pwrdm)
 
 	if (!pwrdm)
 		return -EINVAL;
+
+	if (pwrdm->pwrsts == PWRSTS_ON)
+		return PWRDM_POWER_ON;
 
 	if (arch_pwrdm && arch_pwrdm->pwrdm_lost_context_rff &&
 	    arch_pwrdm->pwrdm_lost_context_rff(pwrdm))
@@ -1297,6 +1306,9 @@ int pwrdm_clear_all_prev_pwrst(struct powerdomain *pwrdm)
 
 	if (!pwrdm)
 		return ret;
+
+	if (pwrdm->pwrsts == PWRSTS_ON)
+		return 0;
 
 	/*
 	 * XXX should get the powerdomain's current state here;
