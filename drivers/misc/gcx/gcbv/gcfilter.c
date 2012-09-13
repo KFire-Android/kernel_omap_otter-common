@@ -991,6 +991,14 @@ enum bverror do_filter(struct bvbltparams *bvbltparams,
 	if (bverror != BVERR_NONE)
 		goto exit;
 
+	/* Parse destination parameters. */
+	bverror = parse_destination(bvbltparams, batch);
+	if (bverror != BVERR_NONE)
+		goto exit;
+
+	/* Setup rotation. */
+	process_dest_rotation(bvbltparams, batch);
+
 	/* Additional stride requirements. */
 	if (srcinfo->format.format == GCREG_DE_FORMAT_NV12) {
 		/* Nv12 may be shifted up to 32 bytes for alignment.

@@ -162,17 +162,25 @@ enum bverror do_fill(struct bvbltparams *bvbltparams,
 	if (bverror != BVERR_NONE)
 		goto exit;
 
+	/* Parse destination parameters. */
+	bverror = parse_destination(bvbltparams, batch);
+	if (bverror != BVERR_NONE)
+		goto exit;
+
+	/* Setup rotation. */
+	process_dest_rotation(bvbltparams, batch);
+
 	/* Get a shortcut to the destination surface. */
 	dstinfo = &batch->dstinfo;
 
 	/* Verify if the destination parameter have been modified. */
 	if ((batch->dstbyteshift != dstinfo->bytealign) ||
-	    (batch->physwidth != dstinfo->physwidth) ||
-	    (batch->physheight != dstinfo->physheight)) {
+	    (batch->dstphyswidth != dstinfo->physwidth) ||
+	    (batch->dstphysheight != dstinfo->physheight)) {
 		/* Set new values. */
 		batch->dstbyteshift = dstinfo->bytealign;
-		batch->physwidth = dstinfo->physwidth;
-		batch->physheight = dstinfo->physheight;
+		batch->dstphyswidth = dstinfo->physwidth;
+		batch->dstphysheight = dstinfo->physheight;
 
 		/* Mark as modified. */
 		batch->batchflags |= BVBATCH_DST;
@@ -260,10 +268,10 @@ enum bverror do_fill(struct bvbltparams *bvbltparams,
 	gcmofill->startde.cmd.fld = gcfldstartde;
 
 	/* Set destination rectangle. */
-	gcmofill->rect.left = batch->dstclipped.left + batch->dstoffsetX;
-	gcmofill->rect.top = batch->dstclipped.top + batch->dstoffsetY;
-	gcmofill->rect.right = batch->dstclipped.right + batch->dstoffsetX;
-	gcmofill->rect.bottom = batch->dstclipped.bottom + batch->dstoffsetY;
+	gcmofill->rect.left = batch->dstadjusted.left;
+	gcmofill->rect.top = batch->dstadjusted.top;
+	gcmofill->rect.right = batch->dstadjusted.right;
+	gcmofill->rect.bottom = batch->dstadjusted.bottom;
 
 exit:
 	GCEXITARG(GCZONE_FILL, "bv%s = %d\n",

@@ -523,10 +523,10 @@ enum bverror set_dst(struct bvbltparams *bvbltparams,
 
 		/* Set surface width and height. */
 		gcmodst->rotation.raw = 0;
-		gcmodst->rotation.reg.surf_width = batch->physwidth;
+		gcmodst->rotation.reg.surf_width = batch->dstphyswidth;
 		gcmodst->rotationheight_ldst = gcmodst_rotationheight_ldst;
 		gcmodst->rotationheight.raw = 0;
-		gcmodst->rotationheight.reg.height = batch->physheight;
+		gcmodst->rotationheight.reg.height = batch->dstphysheight;
 
 		/* Disable hardware clipping. */
 		gcmodst->clip_ldst = gcmodst_clip_ldst;
@@ -1108,11 +1108,6 @@ enum bverror bv_blt(struct bvbltparams *bvbltparams)
 			BVSETBLTERROR(BVERR_OP, "unrecognized operation");
 			goto exit;
 		}
-
-		/* Parse destination parameters. */
-		bverror = parse_destination(bvbltparams, gcbatch);
-		if (bverror != BVERR_NONE)
-			goto exit;
 
 		/* Reset the number of sources. */
 		srccount = 0;
