@@ -799,48 +799,6 @@ static enum bverror startvr(struct bvbltparams *bvbltparams,
 		= GCREG_COLOR_MULTIPLY_MODES_DST_DEMULTIPLY_DISABLE;
 	}
 
-	if (srcinfo->format.format == GCREG_DE_FORMAT_NV12) {
-		struct gcmoxsrcyuv *gcmoxsrcyuv;
-		int index = 0;
-		int uvshift;
-
-		uvshift = srcbytealign
-			+ srcinfo->geom->virtstride
-			* srcinfo->geom->height;
-		GCDBG(GCZONE_FILTER, "  uvshift = 0x%08X (%d)\n",
-			uvshift, uvshift);
-
-		bverror = claim_buffer(bvbltparams, batch,
-				       sizeof(struct gcmoxsrcyuv),
-				       (void **) &gcmoxsrcyuv);
-		if (bverror != BVERR_NONE)
-			goto exit;
-
-		gcmoxsrcyuv->uplaneaddress_ldst =
-			gcmoxsrcyuv_uplaneaddress_ldst[index];
-		gcmoxsrcyuv->uplaneaddress = GET_MAP_HANDLE(srcmap);
-		add_fixup(bvbltparams, batch, &gcmoxsrcyuv->uplaneaddress,
-			  uvshift);
-
-		gcmoxsrcyuv->uplanestride_ldst =
-			gcmoxsrcyuv_uplanestride_ldst[index];
-		gcmoxsrcyuv->uplanestride = srcinfo->geom->virtstride;
-
-		gcmoxsrcyuv->vplaneaddress_ldst =
-			gcmoxsrcyuv_vplaneaddress_ldst[index];
-		gcmoxsrcyuv->vplaneaddress = GET_MAP_HANDLE(srcmap);
-		add_fixup(bvbltparams, batch, &gcmoxsrcyuv->vplaneaddress,
-			  uvshift);
-
-		gcmoxsrcyuv->vplanestride_ldst =
-			gcmoxsrcyuv_vplanestride_ldst[index];
-		gcmoxsrcyuv->vplanestride = srcinfo->geom->virtstride;
-
-		gcmoxsrcyuv->pectrl_ldst =
-			gcmoxsrcyuv_pectrl_ldst[index];
-		gcmoxsrcyuv->pectrl = GCREG_PE_CONTROL_ResetValue;
-	}
-
 	/***********************************************************************
 	 * Program blending.
 	 */

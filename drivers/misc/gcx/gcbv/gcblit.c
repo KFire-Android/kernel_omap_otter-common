@@ -299,8 +299,7 @@ enum bverror do_blit(struct bvbltparams *bvbltparams,
 	GCDBG(GCZONE_SURF, "  realignment = %d\n",
 	      dstpixalign);
 
-	if ((srcinfo->format.format == GCREG_DE_FORMAT_NV12) ||
-	    (dstpixalign != 0) ||
+	if ((dstpixalign != 0) ||
 	    ((srcpixalign != 0) && (srcinfo->angle == dstinfo->angle))) {
 		/* Compute the source offset in pixels needed to compensate
 		 * for the surface base address misalignment if any. */
@@ -689,58 +688,123 @@ enum bverror do_blit(struct bvbltparams *bvbltparams,
 		gcmoxsrcalpha->dstglobal.raw = srcinfo->gca->dst_global_color;
 	}
 
-	if (srcinfo->format.format == GCREG_DE_FORMAT_NV12) {
-		struct gcmoxsrcyuv *gcmoxsrcyuv;
-		int uvshift = srcbyteshift;
+	/* Program YUV source. */
+	if (srcinfo->format.type == BVFMT_YUV) {
+		struct gcmoxsrcyuv1 *gcmoxsrcyuv1;
+		struct gcmoxsrcyuv2 *gcmoxsrcyuv2;
+		struct gcmoxsrcyuv3 *gcmoxsrcyuv3;
+		int ushift, vshift;
+		unsigned int srcheight;
 
-		/* add fixed offset from Y plane */
-		switch (srcinfo->angle) {
-		case ROT_ANGLE_0:
-		case ROT_ANGLE_180:
-			uvshift += srcinfo->geom->virtstride *
-				srcinfo->geom->height;
+		switch (srcinfo->format.cs.yuv.planecount) {
+		case 1:
+			bverror = claim_buffer(bvbltparams, batch,
+					       sizeof(struct gcmoxsrcyuv1),
+					       (void **) &gcmoxsrcyuv1);
+			if (bverror != BVERR_NONE)
+				goto exit;
+
+			gcmoxsrcyuv1->pectrl_ldst
+				= gcmoxsrcyuv_pectrl_ldst[index];
+			gcmoxsrcyuv1->pectrl.raw = 0;
+			gcmoxsrcyuv1->pectrl.reg.standard
+				= srcinfo->format.cs.yuv.std;
+			gcmoxsrcyuv1->pectrl.reg.swizzle
+				= srcinfo->format.swizzle;
 			break;
-		case ROT_ANGLE_90:
-		case ROT_ANGLE_270:
-			/* NV12 has stride requirement of actual stride + 32
-			 * Changing the UV plane address for rotation */
-			uvshift += (srcinfo->geom->virtstride) *
-				srcinfo->geom->width;
+
+		case 2:
+			bverror = claim_buffer(bvbltparams, batch,
+					       sizeof(struct gcmoxsrcyuv2),
+					       (void **) &gcmoxsrcyuv2);
+			if (bverror != BVERR_NONE)
+				goto exit;
+
+			gcmoxsrcyuv2->pectrl_ldst
+				= gcmoxsrcyuv_pectrl_ldst[index];
+			gcmoxsrcyuv2->pectrl.raw = 0;
+			gcmoxsrcyuv2->pectrl.reg.standard
+				= srcinfo->format.cs.yuv.std;
+			gcmoxsrcyuv2->pectrl.reg.swizzle
+				= srcinfo->format.swizzle;
+
+			srcheight = ((srcinfo->angle % 2) == 0)
+				? srcinfo->geom->height
+				: srcinfo->geom->width;
+
+			ushift = srcbyteshift
+			       + srcinfo->geom->virtstride
+			       * srcheight;
+			GCDBG(GCZONE_SURF, "ushift = 0x%08X (%d)\n",
+			      ushift, ushift);
+
+			add_fixup(bvbltparams, batch,
+				  &gcmoxsrcyuv2->uplaneaddress, ushift);
+
+			gcmoxsrcyuv2->uplaneaddress_ldst
+				= gcmoxsrcyuv_uplaneaddress_ldst[index];
+			gcmoxsrcyuv2->uplaneaddress = GET_MAP_HANDLE(srcmap);
+
+			gcmoxsrcyuv2->uplanestride_ldst
+				= gcmoxsrcyuv_uplanestride_ldst[index];
+			gcmoxsrcyuv2->uplanestride = srcinfo->geom->virtstride;
+			break;
+
+		case 3:
+			bverror = claim_buffer(bvbltparams, batch,
+					       sizeof(struct gcmoxsrcyuv3),
+					       (void **) &gcmoxsrcyuv3);
+			if (bverror != BVERR_NONE)
+				goto exit;
+
+			gcmoxsrcyuv3->pectrl_ldst
+				= gcmoxsrcyuv_pectrl_ldst[index];
+			gcmoxsrcyuv3->pectrl.raw = 0;
+			gcmoxsrcyuv3->pectrl.reg.standard
+				= srcinfo->format.cs.yuv.std;
+			gcmoxsrcyuv3->pectrl.reg.swizzle
+				= srcinfo->format.swizzle;
+
+			srcheight = ((srcinfo->angle % 2) == 0)
+				? srcinfo->geom->height
+				: srcinfo->geom->width;
+
+			ushift = srcbyteshift
+			       + srcinfo->geom->virtstride
+			       * srcheight;
+			vshift = ushift
+			       + srcinfo->geom->virtstride
+			       * srcheight / 4;
+
+			GCDBG(GCZONE_SURF, "ushift = 0x%08X (%d)\n",
+			      ushift, ushift);
+			GCDBG(GCZONE_SURF, "vshift = 0x%08X (%d)\n",
+			      vshift, vshift);
+
+			add_fixup(bvbltparams, batch,
+				  &gcmoxsrcyuv3->uplaneaddress, ushift);
+			add_fixup(bvbltparams, batch,
+				  &gcmoxsrcyuv3->vplaneaddress, vshift);
+
+			gcmoxsrcyuv3->uplaneaddress_ldst
+				= gcmoxsrcyuv_uplaneaddress_ldst[index];
+			gcmoxsrcyuv3->uplaneaddress = GET_MAP_HANDLE(srcmap);
+
+			gcmoxsrcyuv3->uplanestride_ldst
+				= gcmoxsrcyuv_uplanestride_ldst[index];
+			gcmoxsrcyuv3->uplanestride
+				= srcinfo->geom->virtstride / 2;
+
+			gcmoxsrcyuv3->vplaneaddress_ldst
+				= gcmoxsrcyuv_vplaneaddress_ldst[index];
+			gcmoxsrcyuv3->vplaneaddress = GET_MAP_HANDLE(srcmap);
+
+			gcmoxsrcyuv3->vplanestride_ldst
+				= gcmoxsrcyuv_vplanestride_ldst[index];
+			gcmoxsrcyuv3->vplanestride
+				= srcinfo->geom->virtstride / 2;
 			break;
 		}
-
-		GCDBG(GCZONE_SURF, "  uvshift = 0x%08X (%d)\n",
-			uvshift, uvshift);
-
-		bverror = claim_buffer(bvbltparams, batch,
-				       sizeof(struct gcmoxsrcyuv),
-				       (void **) &gcmoxsrcyuv);
-		if (bverror != BVERR_NONE)
-			goto exit;
-
-		gcmoxsrcyuv->uplaneaddress_ldst =
-			gcmoxsrcyuv_uplaneaddress_ldst[index];
-		gcmoxsrcyuv->uplaneaddress = GET_MAP_HANDLE(srcmap);
-		add_fixup(bvbltparams, batch, &gcmoxsrcyuv->uplaneaddress,
-			  uvshift);
-
-		gcmoxsrcyuv->uplanestride_ldst =
-			gcmoxsrcyuv_uplanestride_ldst[index];
-		gcmoxsrcyuv->uplanestride = srcinfo->geom->virtstride;
-
-		gcmoxsrcyuv->vplaneaddress_ldst =
-			gcmoxsrcyuv_vplaneaddress_ldst[index];
-		gcmoxsrcyuv->vplaneaddress = GET_MAP_HANDLE(srcmap);
-		add_fixup(bvbltparams, batch, &gcmoxsrcyuv->vplaneaddress,
-			  uvshift);
-
-		gcmoxsrcyuv->vplanestride_ldst =
-			gcmoxsrcyuv_vplanestride_ldst[index];
-		gcmoxsrcyuv->vplanestride = srcinfo->geom->virtstride;
-
-		gcmoxsrcyuv->pectrl_ldst =
-			gcmoxsrcyuv_pectrl_ldst[index];
-		gcmoxsrcyuv->pectrl = GCREG_PE_CONTROL_ResetValue;
 	}
 
 	batch->op.blit.srccount += 1;
