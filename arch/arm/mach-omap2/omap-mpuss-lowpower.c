@@ -534,6 +534,9 @@ int omap_enter_lowpower(unsigned int cpu, unsigned int power_state)
 
 	pwrdm_pre_transition(NULL);
 
+	/* Decrease mpu / core usecounts to indicate we are entering idle */
+	omap_dec_mpu_core_pwrdm_usecount();
+
 	/*
 	 * Check MPUSS next state and save interrupt controller if needed.
 	 * In MPUSS OSWR or device OFF, interrupt controller  contest is lost.
@@ -577,16 +580,10 @@ int omap_enter_lowpower(unsigned int cpu, unsigned int power_state)
 	omap_pm_ops.scu_prepare(cpu, power_state);
 	l2x0_pwrst_prepare(cpu, save_state);
 
-	/* Decrease mpu / core usecounts to indicate we are entering idle */
-	omap_dec_mpu_core_pwrdm_usecount();
-
 	/*
 	 * Call low level function  with targeted low power state.
 	 */
 	cpu_suspend(save_state, omap_pm_ops.finish_suspend);
-
-	/* Increase mpu / core usecounts to indicate we are leaving idle */
-	omap_inc_mpu_core_pwrdm_usecount();
 
 	/*
 	 * Restore the CPUx power state to ON otherwise CPUx
@@ -617,6 +614,9 @@ abort_suspend:
 	}
 
 sar_save_failed:
+	/* Increase mpu / core usecounts to indicate we are leaving idle */
+	omap_inc_mpu_core_pwrdm_usecount();
+
 	pwrdm_post_transition(NULL);
 
 	return 0;

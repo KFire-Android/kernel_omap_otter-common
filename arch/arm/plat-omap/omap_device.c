@@ -787,7 +787,7 @@ static int __init omap_early_device_register(struct platform_device *pdev)
 }
 
 #ifdef CONFIG_PM_RUNTIME
-static int _od_runtime_suspend(struct device *dev)
+int omap_device_runtime_suspend(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
 	int ret;
@@ -805,7 +805,7 @@ static int _od_runtime_idle(struct device *dev)
 	return pm_generic_runtime_idle(dev);
 }
 
-static int _od_runtime_resume(struct device *dev)
+int omap_device_runtime_resume(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
 
@@ -831,12 +831,12 @@ static int _od_suspend_noirq(struct device *dev)
 	ret = pm_generic_suspend_noirq(dev);
 
 	if (!ret && !pm_runtime_status_suspended(dev)) {
-		if (pm_generic_runtime_suspend(dev) == 0) {
-			if (!(od->flags & OMAP_DEVICE_NO_IDLE_ON_SUSPEND))
+		if (!(od->flags & OMAP_DEVICE_NO_IDLE_ON_SUSPEND))
+			if (pm_generic_runtime_suspend(dev) == 0) {
 				omap_device_idle(pdev);
-			od->flags |= OMAP_DEVICE_SUSPENDED;
+				od->flags |= OMAP_DEVICE_SUSPENDED;
+			}
 		}
-	}
 
 	return ret;
 }
@@ -869,7 +869,8 @@ static int _od_resume_noirq(struct device *dev)
 
 struct dev_pm_domain omap_device_pm_domain = {
 	.ops = {
-		SET_RUNTIME_PM_OPS(_od_runtime_suspend, _od_runtime_resume,
+		SET_RUNTIME_PM_OPS(omap_device_runtime_suspend,
+				   omap_device_runtime_resume,
 				   _od_runtime_idle)
 		USE_PLATFORM_PM_SLEEP_OPS
 		.suspend_noirq = _od_suspend_noirq,

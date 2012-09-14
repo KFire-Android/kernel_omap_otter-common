@@ -32,6 +32,7 @@
 #include <asm/irq.h>
 #include <mach/irqs.h>
 #include <asm/mach/irq.h>
+#include <plat/omap_device.h>
 
 #include "../mux.h"
 
@@ -93,6 +94,7 @@ struct gpio_bank {
 	struct omap_gpio_reg_offs *regs;
 };
 
+static struct clk *gpio8_dbck;
 #define GPIO_INDEX(bank, gpio) (gpio % bank->width)
 #define GPIO_BIT(bank, gpio) (1 << GPIO_INDEX(bank, gpio))
 #define GPIO_MOD_CTRL_BIT	BIT(0)
@@ -1179,6 +1181,24 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, bank);
 
+	/*
+	 * For GPIO h/w bug (OMAP5430-1.0BUG01667) WA to be effective it is
+	 * necessary that L4PER is ON. This debounce clk is enabled now and
+	 * disabled after WA is applied in idle notifier. It is enabled again
+	 * in resume notifier for WA to be effectively removed.
+	 */
+	if (cpu_is_omap54xx() &&
+		(omap_rev() == OMAP5430_REV_ES1_0 ||
+		 omap_rev() == OMAP5432_REV_ES1_0)) {
+		if (bank->id == 7) {
+			gpio8_dbck = clk_get(bank->dev, "dbclk");
+			if (IS_ERR(gpio8_dbck))
+				dev_err(bank->dev, "Could not get gpio dbck\n");
+			else
+				clk_enable(gpio8_dbck);
+		}
+	}
+
 	pm_runtime_enable(bank->dev);
 	pm_runtime_irq_safe(bank->dev);
 	pm_runtime_get_sync(bank->dev);
@@ -1192,6 +1212,9 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
 
 	if (bank->loses_context)
 		bank->get_context_loss_count = pdata->get_context_loss_count;
+
+	/* Don't idle omap device during suspend */
+	omap_device_disable_idle_on_suspend(pdev);
 
 	pm_runtime_put(bank->dev);
 
@@ -1460,12 +1483,20 @@ void omap2_gpio_prepare_for_idle(int pwr_mode)
 
 		if (is_idle_task(current))
 			omap_gpio_pm_idle(bank->dev);
+		else
+			omap_device_runtime_suspend(bank->dev);
 	}
+
+	if (gpio8_dbck)
+		clk_disable(gpio8_dbck);
 }
 
 void omap2_gpio_resume_after_idle(void)
 {
 	struct gpio_bank *bank;
+
+	if (gpio8_dbck)
+		clk_enable(gpio8_dbck);
 
 	list_for_each_entry(bank, &omap_gpio_list, node) {
 		if (!bank->mod_usage || !bank->loses_context)
@@ -1473,6 +1504,8 @@ void omap2_gpio_resume_after_idle(void)
 
 		if (is_idle_task(current))
 			omap_gpio_pm_noidle(bank->dev);
+		else
+			omap_device_runtime_resume(bank->dev);
 	}
 }
 

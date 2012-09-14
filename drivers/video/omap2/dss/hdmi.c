@@ -1223,20 +1223,24 @@ int hdmi_compute_acr(u32 sample_freq, u32 *n, u32 *cts)
 
 int hdmi_audio_enable(bool enable)
 {
+	int r = -EINVAL;
 	DSSDBG("audio_enable\n");
-
-	hdmi.ip_data.ops->audio_enable(&hdmi.ip_data, enable);
-
-	return 0;
+	if (hdmi.dssdev->state == OMAP_DSS_DISPLAY_ACTIVE) {
+		hdmi.ip_data.ops->audio_enable(&hdmi.ip_data, enable);
+		r = 0;
+	}
+	return r;
 }
 
 int hdmi_audio_start(bool start)
 {
+	int r = -EINVAL;
 	DSSDBG("audio_enable\n");
-
-	hdmi.ip_data.ops->audio_start(&hdmi.ip_data, start);
-
-	return 0;
+	if (hdmi.dssdev->state == OMAP_DSS_DISPLAY_ACTIVE) {
+		hdmi.ip_data.ops->audio_start(&hdmi.ip_data, start);
+		r = 0;
+	}
+	return r;
 }
 
 bool hdmi_mode_has_audio(void)
@@ -1250,7 +1254,12 @@ bool hdmi_mode_has_audio(void)
 int hdmi_audio_config(struct snd_aes_iec958 *iec,
 		struct snd_cea_861_aud_if *aud_if)
 {
-	return hdmi.ip_data.ops->audio_config(&hdmi.ip_data, iec, aud_if);
+	int r = -EINVAL;
+
+	if (hdmi.dssdev->state == OMAP_DSS_DISPLAY_ACTIVE)
+		r = hdmi.ip_data.ops->audio_config(&hdmi.ip_data, iec, aud_if);
+
+	return r;
 }
 
 #endif
