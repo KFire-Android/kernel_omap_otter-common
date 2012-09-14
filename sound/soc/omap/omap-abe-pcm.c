@@ -143,13 +143,22 @@ static int modem_get_dai(struct snd_pcm_substream *substream,
 
 static int omap_abe_dl1_enabled(struct omap_abe *abe)
 {
+	int dl1;
+
 	/* DL1 path is common for PDM_DL1, BT_VX_DL and MM_EXT_DL */
-	return omap_abe_port_is_enabled(abe->aess,
+	dl1 = omap_abe_port_is_enabled(abe->aess,
 				abe->dai.port[OMAP_ABE_BE_PORT_PDM_DL1]) +
 		omap_abe_port_is_enabled(abe->aess,
 				abe->dai.port[OMAP_ABE_BE_PORT_BT_VX_DL]) +
 		omap_abe_port_is_enabled(abe->aess,
 				abe->dai.port[OMAP_ABE_BE_PORT_MM_EXT_DL]);
+
+#if !defined(CONFIG_SND_OMAP_SOC_ABE_DL2)
+	dl1 += omap_abe_port_is_enabled(abe->aess,
+				abe->dai.port[OMAP_ABE_BE_PORT_PDM_DL2]);
+#endif
+
+	return dl1;
 }
 
 static void mute_be(struct snd_soc_pcm_runtime *be,
@@ -176,8 +185,16 @@ static void mute_be(struct snd_soc_pcm_runtime *be,
 			}
 			break;
 		case OMAP_ABE_DAI_PDM_DL2:
+#if defined(CONFIG_SND_OMAP_SOC_ABE_DL2)
 			omap_aess_mute_gain(abe->aess, OMAP_AESS_GAIN_DL2_LEFT);
 			omap_aess_mute_gain(abe->aess, OMAP_AESS_GAIN_DL2_RIGHT);
+#else
+			if (omap_abe_dl1_enabled(abe) == 1) {
+				omap_aess_mute_gain(abe->aess, OMAP_AESS_GAIN_DL1_LEFT);
+				omap_aess_mute_gain(abe->aess, OMAP_AESS_GAIN_DL1_RIGHT);
+				omap_aess_mute_gain(abe->aess, OMAP_AESS_MIXSDT_DL);
+			}
+#endif
 			break;
 		case OMAP_ABE_DAI_PDM_VIB:
 		case OMAP_ABE_DAI_MODEM:
@@ -234,8 +251,14 @@ static void unmute_be(struct snd_soc_pcm_runtime *be,
 			omap_aess_unmute_gain(abe->aess, OMAP_AESS_MIXSDT_DL);
 			break;
 		case OMAP_ABE_DAI_PDM_DL2:
+#if defined(CONFIG_SND_OMAP_SOC_ABE_DL2)
 			omap_aess_unmute_gain(abe->aess, OMAP_AESS_GAIN_DL2_LEFT);
 			omap_aess_unmute_gain(abe->aess, OMAP_AESS_GAIN_DL2_RIGHT);
+#else
+			omap_aess_unmute_gain(abe->aess, OMAP_AESS_GAIN_DL1_LEFT);
+			omap_aess_unmute_gain(abe->aess, OMAP_AESS_GAIN_DL1_RIGHT);
+			omap_aess_unmute_gain(abe->aess, OMAP_AESS_MIXSDT_DL);
+#endif
 			break;
 		case OMAP_ABE_DAI_PDM_VIB:
 			break;

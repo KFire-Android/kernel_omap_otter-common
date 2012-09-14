@@ -110,6 +110,7 @@ static DECLARE_TLV_DB_SCALE(voice_dl1_tlv, -12000, 100, 3000);
 /* Media DL1 volume control from -120 to 30 dB in 1 dB steps */
 static DECLARE_TLV_DB_SCALE(capture_dl1_tlv, -12000, 100, 3000);
 
+#if defined(CONFIG_SND_OMAP_SOC_ABE_DL2)
 /* Media DL2 volume control from -120 to 30 dB in 1 dB steps */
 static DECLARE_TLV_DB_SCALE(mm_dl2_tlv, -12000, 100, 3000);
 
@@ -121,6 +122,7 @@ static DECLARE_TLV_DB_SCALE(voice_dl2_tlv, -12000, 100, 3000);
 
 /* Media DL2 volume control from -120 to 30 dB in 1 dB steps */
 static DECLARE_TLV_DB_SCALE(capture_dl2_tlv, -12000, 100, 3000);
+#endif
 
 /* SDT volume control from -120 to 30 dB in 1 dB steps */
 static DECLARE_TLV_DB_SCALE(sdt_ul_tlv, -12000, 100, 3000);
@@ -628,6 +630,7 @@ static const struct snd_kcontrol_new dl1_mixer_controls[] = {
 		abe_get_mixer, put_mixer),
 };
 
+#if defined(CONFIG_SND_OMAP_SOC_ABE_DL2)
 /* DL2 mixer paths */
 static const struct snd_kcontrol_new dl2_mixer_controls[] = {
 	SOC_SINGLE_EXT("Tones",
@@ -643,6 +646,7 @@ static const struct snd_kcontrol_new dl2_mixer_controls[] = {
 		OMAP_ABE_MIX, OMAP_AESS_MIXDL2_MM_DL, 1, 0,
 		abe_get_mixer, put_mixer),
 };
+#endif
 
 /* AUDUL ("Voice Capture Mixer") mixer paths */
 static const struct snd_kcontrol_new audio_ul_mixer_controls[] = {
@@ -693,11 +697,19 @@ static const struct snd_kcontrol_new echo_mixer_controls[] = {
 		abe_get_mixer, put_mixer),
 };
 
-/* Virtual PDM_DL Switch */
+/* Virtual PDM_DL1 Switch */
 static const struct snd_kcontrol_new pdm_dl1_switch_controls =
 	SOC_SINGLE_EXT("Switch",
-		OMAP_ABE_VIRTUAL_SWITCH, MIX_SWITCH_PDM_DL, 1, 0,
+		OMAP_ABE_VIRTUAL_SWITCH, MIX_SWITCH_PDM_DL1, 1, 0,
 		abe_get_switch, abe_put_switch);
+
+#if !defined(CONFIG_SND_OMAP_SOC_ABE_DL2)
+/* Virtual PDM_DL2 Switch: DL1 -> PDM_DL2 */
+static const struct snd_kcontrol_new pdm_dl2_switch_controls =
+	SOC_SINGLE_EXT("Switch",
+		OMAP_ABE_VIRTUAL_SWITCH, MIX_SWITCH_PDM_DL2, 1, 0,
+		abe_get_switch, abe_put_switch);
+#endif
 
 /* Virtual BT_VX_DL Switch */
 static const struct snd_kcontrol_new bt_vx_dl_switch_controls =
@@ -726,6 +738,7 @@ static const struct snd_kcontrol_new abe_controls[] = {
 		OMAP_AESS_MIXDL1_MM_UL2, 0, 149, 0,
 		volume_get_mixer, volume_put_mixer, capture_dl1_tlv),
 
+#if defined(CONFIG_SND_OMAP_SOC_ABE_DL2)
 	/* DL2 mixer gains */
 	SOC_SINGLE_EXT_TLV("DL2 Media Playback Volume",
 		OMAP_AESS_MIXDL2_MM_DL, 0, 149, 0,
@@ -739,6 +752,7 @@ static const struct snd_kcontrol_new abe_controls[] = {
 	SOC_SINGLE_EXT_TLV("DL2 Capture Playback Volume",
 		OMAP_AESS_MIXDL2_MM_UL2, 0, 149, 0,
 		volume_get_mixer, volume_put_mixer, capture_dl2_tlv),
+#endif
 
 	/* VXREC mixer gains */
 	SOC_SINGLE_EXT_TLV("VXREC Media Volume",
@@ -806,8 +820,10 @@ static const struct snd_kcontrol_new abe_controls[] = {
 		volume_get_gain, volume_put_gain, btul_tlv),
 	SOC_SINGLE_EXT("DL1 Mono Mixer", MIXDL1, MIX_DL1_MONO, 1, 0,
 		abe_get_mono_mixer, abe_put_mono_mixer),
+#if defined(CONFIG_SND_OMAP_SOC_ABE_DL2)
 	SOC_SINGLE_EXT("DL2 Mono Mixer", MIXDL2, MIX_DL2_MONO, 1, 0,
 		abe_get_mono_mixer, abe_put_mono_mixer),
+#endif
 	SOC_SINGLE_EXT("AUDUL Mono Mixer", MIXAUDUL, MIX_AUDUL_MONO, 1, 0,
 		abe_get_mono_mixer, abe_put_mono_mixer),
 };
@@ -843,8 +859,13 @@ static const struct snd_soc_dapm_widget abe_dapm_widgets[] = {
 			OMAP_ABE_AIF_PDM_UL1, OMAP_ABE_OPP_50, 0),
 	SND_SOC_DAPM_AIF_OUT("PDM_DL1", NULL, 0,
 			OMAP_ABE_AIF_PDM_DL1, OMAP_ABE_OPP_25, 0),
+#if defined(CONFIG_SND_OMAP_SOC_ABE_DL2)
 	SND_SOC_DAPM_AIF_OUT("PDM_DL2", NULL, 0,
 			OMAP_ABE_AIF_PDM_DL2, OMAP_ABE_OPP_100, 0),
+#else
+	SND_SOC_DAPM_AIF_OUT("PDM_DL2", "HF Playback", 0,
+			OMAP_ABE_AIF_PDM_DL2, OMAP_ABE_OPP_25, 0),
+#endif
 	SND_SOC_DAPM_AIF_OUT("PDM_VIB", NULL, 0,
 			OMAP_ABE_AIF_PDM_VIB, OMAP_ABE_OPP_100, 0),
 	SND_SOC_DAPM_AIF_IN("BT_VX_UL", "BT Capture", 0,
@@ -896,9 +917,11 @@ static const struct snd_soc_dapm_widget abe_dapm_widgets[] = {
 	SND_SOC_DAPM_MIXER("DL1 Mixer",
 			OMAP_ABE_MIXER_DL1, OMAP_ABE_OPP_25, 0, dl1_mixer_controls,
 			ARRAY_SIZE(dl1_mixer_controls)),
+#if defined(CONFIG_SND_OMAP_SOC_ABE_DL2)
 	SND_SOC_DAPM_MIXER("DL2 Mixer",
 			OMAP_ABE_MIXER_DL2, OMAP_ABE_OPP_100, 0, dl2_mixer_controls,
 			ARRAY_SIZE(dl2_mixer_controls)),
+#endif
 
 	/* DL1 Mixer Input volumes ?????*/
 	SND_SOC_DAPM_PGA("DL1 Media Volume",
@@ -930,8 +953,14 @@ static const struct snd_soc_dapm_widget abe_dapm_widgets[] = {
 	 */
 
 	/* Virtual PDM_DL1 Switch */
-	SND_SOC_DAPM_MIXER("DL1 PDM", OMAP_ABE_VSWITCH_DL1_PDM,
+	SND_SOC_DAPM_MIXER("DL1 PDM", OMAP_ABE_VSWITCH_DL1_PDM1,
 			OMAP_ABE_OPP_25, 0, &pdm_dl1_switch_controls, 1),
+
+#if !defined(CONFIG_SND_OMAP_SOC_ABE_DL2)
+	/* Virtual PDM_DL2 Switch */
+	SND_SOC_DAPM_MIXER("DL1 PDM_DL2", OMAP_ABE_VSWITCH_DL1_PDM2,
+			OMAP_ABE_OPP_25, 0, &pdm_dl2_switch_controls, 1),
+#endif
 
 	/* Virtual BT_VX_DL Switch */
 	SND_SOC_DAPM_MIXER("DL1 BT_VX", OMAP_ABE_VSWITCH_DL1_BT_VX,
@@ -945,7 +974,9 @@ static const struct snd_soc_dapm_widget abe_dapm_widgets[] = {
 	SND_SOC_DAPM_MIXER("Sidetone Capture VMixer", SND_SOC_NOPM, 0, 0, NULL, 0),
 	SND_SOC_DAPM_MIXER("Voice Capture VMixer", SND_SOC_NOPM, 0, 0, NULL, 0),
 	SND_SOC_DAPM_MIXER("DL1 Capture VMixer", SND_SOC_NOPM, 0, 0, NULL, 0),
+#if defined(CONFIG_SND_OMAP_SOC_ABE_DL2)
 	SND_SOC_DAPM_MIXER("DL2 Capture VMixer", SND_SOC_NOPM, 0, 0, NULL, 0),
+#endif
 
 	/* Virtual MODEM and VX_UL mixer */
 	SND_SOC_DAPM_MIXER("VX UL VMixer", SND_SOC_NOPM, 0, 0, NULL, 0),
@@ -1210,6 +1241,7 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"MM_EXT_DL", NULL, "DL1 MM_EXT"},
 
 	/* Handsfree (DL2) playback path */
+#if defined(CONFIG_SND_OMAP_SOC_ABE_DL2)
 	{"DL2 Mixer", "Tones", "TONES_DL"},
 	{"DL2 Mixer", "Voice", "VX DL VMixer"},
 	{"DL2 Mixer", "Capture", "DL2 Capture VMixer"},
@@ -1217,6 +1249,10 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"DL2 Capture VMixer", NULL, "MUX_UL11"},
 	{"DL2 Mixer", "Multimedia", "MM_DL"},
 	{"PDM_DL2", NULL, "DL2 Mixer"},
+#else
+	{"DL1 PDM_DL2", "Switch", "Sidetone Mixer"},
+	{"PDM_DL2", NULL, "DL1 PDM_DL2"},
+#endif
 
 	/* VxREC Mixer */
 	{"Capture Mixer", "Tones", "VXREC"},

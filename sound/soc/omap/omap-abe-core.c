@@ -290,6 +290,12 @@ static int abe_probe(struct snd_soc_platform *platform)
 	omap_aess_set_auto_gating(abe->aess);
 	abe_init_gains(abe->aess);
 
+#if defined(CONFIG_SND_OMAP_SOC_ABE_DL2)
+	omap_aess_select_pdm_output(abe->aess, OMAP_ABE_DL1_HS_DL2_HF);
+#else
+	omap_aess_select_pdm_output(abe->aess, OMAP_ABE_DL1_HS_HF);
+#endif
+
 	/* Stop the engine */
 	omap_aess_stop_event_generator(abe->aess);
 	omap_aess_disable_irq(abe->aess);

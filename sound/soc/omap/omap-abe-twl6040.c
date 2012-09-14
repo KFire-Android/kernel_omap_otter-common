@@ -483,12 +483,20 @@ static int omap_abe_set_pdm_dl1_gains(struct snd_soc_dapm_context *dapm)
 	struct snd_soc_platform *platform = abe_data->abe_platform;
 	struct omap_abe *abe = snd_soc_platform_get_drvdata(platform);
 
-	if (codec)
-		gain_dB = twl6040_get_dl1_gain(codec);
+	if (codec) {
+#if !defined(CONFIG_SND_OMAP_SOC_ABE_DL2)
+		gain_dB = twl6040_get_dl2_gain(codec);
+#endif
+		if (!gain_dB)
+			gain_dB = twl6040_get_dl1_gain(codec);
+	}
 
 	switch (gain_dB) {
 	case -8:
 		gain = GAIN_M8dB;
+		break;
+	case -7:
+		gain = GAIN_M7dB;
 		break;
 	case -1:
 		gain = GAIN_M1dB;

@@ -29,6 +29,14 @@ config SND_OMAP_SOC_ABE
 	select SND_OMAP_SOC_ABE_VXREC
 	select SND_OMAP_SOC_ABE_ECHO
 
+config SND_OMAP_SOC_ABE_DL2
+	bool "Use OMAP4/5 Audio Backend DL2 path"
+	depends on SND_OMAP_SOC && SND_OMAP_SOC_ABE
+	default n
+	help
+	  Say Y if you want to enable ABE DL2 path for PDM_DL2, otherwise it will be
+	  connected to DL1 path.
+
 config SND_OMAP_SOC_N810
 	tristate "SoC Audio support for Nokia N810"
 	depends on SND_OMAP_SOC && MACH_NOKIA_N810 && I2C
