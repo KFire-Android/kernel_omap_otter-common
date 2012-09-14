@@ -404,6 +404,7 @@ enum rproc_crash_type {
  * @table_ptr: pointer to the resource table in effect
  * @cached_table: copy of the resource table
  * @table_csum: checksum of the resource table
+ * @fw_version: human readable version information extracted from f/w
  */
 struct rproc {
 	struct klist_node node;
@@ -435,6 +436,7 @@ struct rproc {
 	struct resource_table *table_ptr;
 	struct resource_table *cached_table;
 	u32 table_csum;
+	char *fw_version;
 };
 
 /* we currently support only two vrings per rvdev */
