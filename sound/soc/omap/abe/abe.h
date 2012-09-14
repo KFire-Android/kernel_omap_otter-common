@@ -118,6 +118,11 @@
 
 #define OMAP_ABE_MAX_PORT_ID	OMAP_ABE_FE_PORT_MM_DL_LP
 
+/* DL1/DL2 -> PDM routing options */
+#define OMAP_ABE_DL1_HS_DL2_HF		0
+#define OMAP_ABE_DL1_HF			1
+#define OMAP_ABE_DL1_HS_HF		2
+
 /* ports can either be enabled or disabled */
 enum port_state {
 	PORT_DISABLED = 0,
@@ -178,6 +183,7 @@ struct omap_aess {
 	int pp_first_irq;
 	struct mutex mutex;
 	u32 warm_boot;
+	u32 mcpdm_path;
 
 	/* base addresses of the ping pong buffers in bytes addresses */
 	u32 base_address_pingpong[MAX_PINGPONG_BUFFERS];
@@ -285,6 +291,7 @@ int omap_aess_connect_irq_ping_pong_port(struct omap_aess *abe,
 					u32 subroutine_id, u32 size,
 					u32 *sink, u32 dsp_mcu_flag);
 void omap_aess_write_pdmdl_offset(struct omap_aess *abe, u32 path, u32 offset_left, u32 offset_right);
+void omap_aess_select_pdm_output(struct omap_aess *abe, u32 path);
 int omap_aess_enable_data_transfer(struct omap_aess *abe, u32 id);
 int omap_aess_disable_data_transfer(struct omap_aess *abe, u32 id);
 
