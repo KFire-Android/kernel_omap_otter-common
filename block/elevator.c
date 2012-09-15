@@ -739,6 +739,20 @@ void elv_add_request(struct request_queue *q, struct request *rq, int where)
 }
 EXPORT_SYMBOL(elv_add_request);
 
+int elv_queue_empty(struct request_queue *q)
+{
+	struct elevator_queue *e = q->elevator;
+
+	if (!list_empty(&q->queue_head))
+		return 0;
+
+	if (e->ops->elevator_queue_empty_fn)
+		return e->ops->elevator_queue_empty_fn(q);
+
+	return 1;
+}
+EXPORT_SYMBOL(elv_queue_empty);
+
 struct request *elv_latter_request(struct request_queue *q, struct request *rq)
 {
 	struct elevator_queue *e = q->elevator;
