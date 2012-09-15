@@ -19,6 +19,7 @@
 #define __LINUX_THERMAL_FRAMEWORK_H__
 
 #include <linux/seq_file.h>
+#include <linux/dcache.h>
 
 struct thermal_dev;
 struct thermal_domain;
@@ -97,6 +98,7 @@ struct thermal_dev {
 	int		constant_offset;
 	int		sen_id;
 	struct thermal_domain   *domain;
+	struct dentry *debug_dentry;
 };
 
 /**
@@ -148,6 +150,9 @@ struct thermal_dev {
 })
 
 #ifdef CONFIG_THERMAL_FRAMEWORK
+extern int thermal_insert_cooling_action(struct thermal_dev *tdev,
+					 unsigned int priority,
+					 unsigned int reduction);
 extern int thermal_request_temp(struct thermal_dev *tdev);
 extern int thermal_lookup_temp(const char *domain_name);
 extern int thermal_lookup_slope(const char *domain_name, const char *rel);
@@ -165,6 +170,9 @@ extern int thermal_governor_dev_register(struct thermal_dev *tdev);
 extern void thermal_governor_dev_unregister(struct thermal_dev *tdev);
 extern int thermal_check_domain(const char *domain_name);
 #else
+static int thermal_insert_cooling_action(struct thermal_dev *tdev,
+					 unsigned int priority,
+					 unsigned int reduction);
 static inline int thermal_request_temp(struct thermal_dev *tdev)
 {
 	return 0;
