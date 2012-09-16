@@ -432,33 +432,6 @@ static ssize_t show_offset(struct device *dev,
 	return status;
 }
 
-///////////////leon add for NTC////////////////////////////////
-static ssize_t show_value(struct device *dev,
-		struct device_attribute *devattr, char *buf)
-{
-	struct sensor_device_attribute *attr = to_sensor_dev_attr(devattr);
-	int temp1 = 0;
-	int temp2 = 0;
-	int ret;
-	int status;
-	struct twl6030_gpadc_request req;
-
-	req.channels = (1 << attr->index);
-	req.method = TWL6030_GPADC_SW2;
-	req.active = 0;
-	req.func_cb = NULL;
-	ret = twl6030_gpadc_conversion(&req);
-	if (ret < 0)
-		return ret;
-
-	if (req.rbuf[attr->index] > 0) {
-		temp1 = req.rbuf[attr->index];
-		temp2 = req.buf[attr->index].raw_code;
-		}
-		status = sprintf(buf, "%d\n", temp1);
-	return status;
-}
-
 static ssize_t show_temperature(struct device *dev,
 		struct device_attribute *devattr, char *buf)
 {
@@ -570,6 +543,32 @@ static ssize_t set_offset(struct device *dev,
 	twl6030_calib_tbl[attr->index].offset_error = val;
 
 	return status;
+}
+
+static ssize_t show_value(struct device *dev,
+                struct device_attribute *devattr, char *buf)
+{
+        struct sensor_device_attribute *attr = to_sensor_dev_attr(devattr);
+        int temp1 = 0;
+        int temp2 = 0;
+        int ret;
+        int status;
+        struct twl6030_gpadc_request req;
+
+        req.channels = (1 << attr->index);
+        req.method = TWL6030_GPADC_SW2;
+        req.active = 0;
+        req.func_cb = NULL;
+        ret = twl6030_gpadc_conversion(&req);
+        if (ret < 0)
+                return ret;
+
+        if (req.rbuf[attr->index] > 0) {
+                temp1 = req.rbuf[attr->index];
+                temp2 = req.buf[attr->index].raw_code;
+                }
+                status = sprintf(buf, "%d\n", temp1);
+        return status;
 }
 
 static int twl6030_gpadc_read(struct twl6030_gpadc_data *gpadc, u8 reg)

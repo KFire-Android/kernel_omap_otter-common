@@ -56,7 +56,6 @@
  * specifies mapping between interrupt number and the associated module.
  *
  */
-struct wake_lock pmic_lock;
 
 static int twl6030_interrupt_mapping_table[24] = {
 	PWR_INTR_OFFSET,	/* Bit 0	PWRON			*/
@@ -118,11 +117,14 @@ static int twl6032_interrupt_mapping_table[24] = {
 
 static int *twl6030_interrupt_mapping = twl6030_interrupt_mapping_table;
 /*----------------------------------------------------------------------*/
+/*VBAT_MONITORING = 3.2 V (setting value=0x18)*/
+#define VBAT_MONITORING_THRESHOLD 0x18
+#define VLOW_TEMPORARY_HOLD_TIME 5000
 
 static unsigned twl6030_irq_base, twl6030_irq_end;
 static int twl_irq;
 static bool twl_irq_wake_enabled;
-
+static struct wake_lock vlow_wakelock;
 static struct task_struct *task;
 static struct completion irq_event;
 static atomic_t twl6030_wakeirqs = ATOMIC_INIT(0);
@@ -221,6 +223,19 @@ static int twl6030_irq_thread(void *data)
 			}
 		}
 
+		/*
+                 * NOTE:
+                 * Simulation confirms that documentation is wrong w.r.t the
+                 * interrupt status clear operation. A single *byte* write to
+                 * any one of STS_A to STS_C register results in all three
+                 * STS registers being reset. Since it does not matter which
+                 * value is written, all three registers are cleared on a
+                 * single byte write, so we just use 0x0 to clear.
+                 */
+                ret = twl_i2c_write_u8(TWL_MODULE_PIH, 0x00, REG_INT_STS_A);
+                if (ret)
+                        pr_warning("twl6030: I2C error in clearing PIH ISR\n");
+
 		sts.bytes[3] = 0; /* Only 24 bits are valid*/
 
 		/*
@@ -251,12 +266,13 @@ static int twl6030_irq_thread(void *data)
 		 * value is written, all three registers are cleared on a
 		 * single byte write, so we just use 0x0 to clear.
 		 */
+#if 0
 		ret = twl_i2c_write_u8(TWL_MODULE_PIH, 0x00, REG_INT_STS_A);
 		if (ret)
 			pr_warning("twl6030: I2C error in clearing PIH ISR\n");
+#endif
 
 		enable_irq(irq);
-		wake_unlock(&pmic_lock);
 	}
 
 	return 0;
@@ -274,7 +290,6 @@ static int twl6030_irq_thread(void *data)
 static irqreturn_t handle_twl6030_pih(int irq, void *devid)
 {
 	disable_irq_nosync(irq);
-	wake_lock(&pmic_lock);
 	complete(devid);
 	return IRQ_HANDLED;
 }
@@ -290,8 +305,11 @@ static irqreturn_t handle_twl6030_vlow(int irq, void *unused)
 
 #if 1 /* temporary */
 	pr_err("%s: disabling BAT_VLOW interrupt\n", __func__);
-	disable_irq_nosync(twl6030_irq_base + TWL_VLOW_INTR_OFFSET);
-	WARN_ON(1);
+	wake_lock_timeout(&vlow_wakelock,
+		msecs_to_jiffies(VLOW_TEMPORARY_HOLD_TIME));
+	twl6030_interrupt_mask(VLOW_INT_MASK, REG_INT_MSK_STS_A);
+	// disable_irq_nosync(twl6030_irq_base + TWL_VLOW_INTR_OFFSET);
+	// WARN_ON(1);
 #else
 	pr_emerg("handle_twl6030_vlow: kernel_power_off()\n");
 	kernel_power_off();
@@ -473,6 +491,8 @@ int twl6030_vlow_init(int vlow_irq)
 		return status;
 	}
 
+	/*Only enable this interrupt when system go to suspend.*/
+#if 0
 	status = twl_i2c_read_u8(TWL_MODULE_PIH, &val, REG_INT_MSK_STS_A);
 	if (status < 0) {
 		pr_err("twl6030: I2C err reading REG_INT_MSK_STS_A: %d\n",
@@ -487,7 +507,8 @@ int twl6030_vlow_init(int vlow_irq)
 				status);
 		return status;
 	}
-
+#endif
+	vbatmin_hi_threshold = VBAT_MONITORING_THRESHOLD;
 	twl_i2c_read_u8(TWL_MODULE_PM_MASTER, &vbatmin_hi_threshold,
 			TWL6030_VBATMIN_HI_THRESHOLD);
 
@@ -500,7 +521,7 @@ int twl6030_vlow_init(int vlow_irq)
 				status);
 		return status;
 	}
-
+	wake_lock_init(&vlow_wakelock, WAKE_LOCK_SUSPEND, "vlow");
 	return 0;
 }
 
@@ -549,7 +570,6 @@ int twl6030_init_irq(int irq_num, unsigned irq_base, unsigned irq_end,
 	twl6030_irq_next = i;
 	pr_info("twl6030: %s (irq %d) chaining IRQs %d..%d\n", "PIH",
 			irq_num, irq_base, twl6030_irq_next - 1);
-	wake_lock_init(&pmic_lock, WAKE_LOCK_SUSPEND, "pmic_wake_lock");
 	/* install an irq handler to demultiplex the TWL6030 interrupt */
 	init_completion(&irq_event);
 	task = kthread_run(twl6030_irq_thread, (void *)irq_num, "twl6030-irq");
@@ -591,7 +611,7 @@ int twl6030_exit_irq(void)
 {
 	int i;
 	unregister_pm_notifier(&twl6030_irq_pm_notifier_block);
-
+	wake_lock_destroy(&vlow_wakelock);
 	if (task)
 		kthread_stop(task);
 
