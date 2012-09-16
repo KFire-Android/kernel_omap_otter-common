@@ -256,6 +256,19 @@ static void musb_otg_notifier_work(struct work_struct *data_notifier_work)
 
 	kfree(otg_work);
 
+	/* Protection from unnecessary double events */
+	if (musb->xceiv->last_event == xceiv_event)
+		return;
+
+	/* Protection from quick plug/unplug, without
+	   enough time to detect source type. */
+	if (xceiv_event == USB_EVENT_NONE &&
+	    musb->xceiv->last_event == USB_EVENT_DETECT_SOURCE)
+		return;
+
+	/* Remember current event */
+	musb->xceiv->last_event = xceiv_event;
+
 	switch (xceiv_event) {
 	case USB_EVENT_ID:
 		dev_dbg(musb->controller, "ID GND\n");

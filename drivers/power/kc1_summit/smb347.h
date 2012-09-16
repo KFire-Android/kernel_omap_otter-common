@@ -58,6 +58,12 @@
 
 #include <linux/i2c/twl.h>
 
+#include <linux/thermal_framework.h>
+#ifdef CONFIG_LAB126
+#include <linux/metricslog.h>
+#define THERMO_METRICS_STR_LEN 128
+#endif
+
 #define CONTROL_DEV_CONF                0x300
 #define PHY_PD                          0x1
 #define CONTROLLER_STAT1    0x03
@@ -91,6 +97,12 @@ struct summit_smb347_info {
     int                         pin_en;
     int                         pin_susp;
     void __iomem                *usb_phy;
+    int							thermal_adjust_mode;
+    int                         max_aicl;
+    int                         pre_max_aicl;
+
+    int                         charge_current;
+    int                         charge_current_redunction;
     struct proc_dir_entry       *summit_proc_fs;
     struct power_supply	        usb;
     struct power_supply	        ac;
@@ -104,6 +116,7 @@ struct summit_smb347_info {
 	struct delayed_work	disconnect_work;
     struct wake_lock chrg_lock;
     struct wake_lock summit_lock;
+    struct thermal_dev tdev;
 };
 enum usb_charger_states
 {
@@ -183,10 +196,12 @@ enum usb_charger_events
     EVENT_TEMP_PROTECT_STEP_8,//  60 < temp
     EVENT_RECHECK_PROTECTION,
 	EVENT_SHUTDOWN,
+    EVENT_CURRENT_THERMAL_ADJUST,
 };
 
 /* I2C chip addresses */
-#define SMB347_ADDRESS        0x6
+#define SUMMIT_SMB347_I2C_ADDRESS	0x5F
+#define SUMMIT_SMB347_I2C_ADDRESS_SECONDARY	0x06
 
 #define SET_BAT_FULL(X) SET_BIT(X,0)
 #define CLEAR_BAT_FULL(X) CLEAR_BIT(X,0)
@@ -712,7 +727,7 @@ enum usb_charger_events
     #define AICL_1800            6
     #define AICL_2000            7
     #define AICL_2200            8
-void summit_smb347_read_id(struct summit_smb347_info *di);
+int summit_smb347_read_id(struct summit_smb347_info *di);
 int summit_usb_notifier_call(struct notifier_block *nb, unsigned long val,void *priv);
 int summit_charge_reset( struct summit_smb347_info *di);
 void summit_set_input_current_limit(struct otg_transceiver *otg,unsigned mA);
@@ -739,6 +754,7 @@ void summit_disable_fault_interrupt(struct summit_smb347_info *di,int disable);
 void summit_enable_stat_interrupt(struct summit_smb347_info *di,int enable);
 void summit_disable_stat_interrupt(struct summit_smb347_info *di,int disable);
 int summit_get_mode(struct summit_smb347_info *di);
+void summit_config_inpu_current(struct summit_smb347_info *di ,int dc_in , int usb_in);
 int summit_get_aicl_result(struct summit_smb347_info *di);
 int summit_get_apsd_result(struct summit_smb347_info *di);
 void summit_write_config(struct summit_smb347_info *di,int enable);
@@ -770,9 +786,13 @@ void writeIntoCBuffer(circular_buffer_t* cbuffer,int data);
 int isCBufferNotEmpty(circular_buffer_t* cbuffer);
 
 /*interface*/
+void create_summit_powersupplyfs(struct summit_smb347_info *di);
+void remove_summit_powersupplyfs(struct summit_smb347_info *di);
 void create_summit_procfs( struct summit_smb347_info *di);
 void remove_summit_procfs(void);
 int create_summit_sysfs( struct summit_smb347_info *di);
 int remove_summit_sysfs( struct summit_smb347_info *di);
-
+int summit_find_pre_cc(int cc);
+int summit_find_fast_cc(int cc);
+int summit_find_aicl(int aicl);
 #endif  /* __SMB347_H__ */
