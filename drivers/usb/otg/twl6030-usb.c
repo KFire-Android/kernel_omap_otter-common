@@ -392,7 +392,6 @@ static irqreturn_t twl6030_usbotg_irq(int irq, void *_twl)
 			twl6030_writeb(twl, TWL6030_MODULE_ID0, misc2_data,
 							TWL6030_MISC2);
 
-<<<<<<< HEAD
 			regulator_enable(twl->usb3v3);
 			twl->asleep = 1;
 			twl6030_writeb(twl, TWL_MODULE_USB, 0x1,
@@ -403,29 +402,9 @@ static irqreturn_t twl6030_usbotg_irq(int irq, void *_twl)
 			status = USB_EVENT_ID;
 			twl->otg.default_a = true;
 			twl->otg.state = OTG_STATE_A_IDLE;
-			twl->linkstat = status;
-			twl->otg.last_event = status;
+//			twl->linkstat = status;
+//			twl->otg.last_event = status;
 			atomic_notifier_call_chain(&twl->otg.notifier, status,
-=======
-		/* Program MISC2 register and set bit VUSB_IN_VBAT */
-		misc2_data = twl6030_readb(twl, TWL6030_MODULE_ID0,
-						TWL6030_MISC2);
-		misc2_data |= 0x10;
-		twl6030_writeb(twl, TWL6030_MODULE_ID0, misc2_data,
-						TWL6030_MISC2);
-		regulator_enable(twl->usb3v3);
-		twl->asleep = 1;
-		twl6030_writeb(twl, TWL_MODULE_USB, 0x1, USB_ID_INT_EN_HI_CLR);
-		twl6030_writeb(twl, TWL_MODULE_USB, 0x10, USB_ID_INT_EN_HI_SET);
-		status = USB_EVENT_ID;
-		twl->otg.default_a = true;
-		twl->otg.state = OTG_STATE_A_IDLE;
-#if 0
-		twl->linkstat = status;
-		twl->otg.last_event = status;
-#endif
-		atomic_notifier_call_chain(&twl->otg.notifier, status,
->>>>>>> f7f53a51b125ace5e2778f2653b1899218d37579
 							twl->otg.gadget);
 			/*
 			 * NOTE:
