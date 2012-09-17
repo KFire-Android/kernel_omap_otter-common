@@ -443,8 +443,14 @@ static int dwc3_gadget_set_ep_config(struct dwc3 *dwc, struct dwc3_ep *dep,
 	memset(&params, 0x00, sizeof(params));
 
 	params.param0 = DWC3_DEPCFG_EP_TYPE(usb_endpoint_type(desc))
-		| DWC3_DEPCFG_MAX_PACKET_SIZE(usb_endpoint_maxp(desc))
-		| DWC3_DEPCFG_BURST_SIZE(dep->endpoint.maxburst - 1);
+		| DWC3_DEPCFG_MAX_PACKET_SIZE(usb_endpoint_maxp(desc));
+
+	/* Burst size is only needed in SuperSpeed mode */
+	if (dwc->gadget.speed == USB_SPEED_SUPER) {
+		u32 burst = dep->endpoint.maxburst - 1;
+
+		params.param0 |= DWC3_DEPCFG_BURST_SIZE(burst);
+	}
 
 	if (ignore)
 		params.param0 |= DWC3_DEPCFG_IGN_SEQ_NUM;
@@ -1015,6 +1021,7 @@ static void __dwc3_gadget_start_isoc(struct dwc3 *dwc,
 	if (list_empty(&dep->request_list)) {
 		dev_vdbg(dwc->dev, "ISOC ep %s run out for requests.\n",
 			dep->name);
+		dep->flags |= DWC3_EP_PENDING_REQUEST;
 		return;
 	}
 
@@ -1076,6 +1083,17 @@ static int __dwc3_gadget_ep_queue(struct dwc3_ep *dep, struct dwc3_request *req)
 	 *
 	 */
 	if (dep->flags & DWC3_EP_PENDING_REQUEST) {
+		/*
+		 * If xfernotready is already elapsed and it is a case
+		 * of isoc transfer, then issue END TRANSFER, so that
+		 * you can receive xfernotready again and can have
+		 * notion of current microframe.
+		 */
+		if (usb_endpoint_xfer_isoc(dep->endpoint.desc)) {
+			dwc3_stop_active_transfer(dwc, dep->number);
+			return 0;
+		}
+
 		ret = __dwc3_gadget_kick_transfer(dep, 0, true);
 		if (ret && ret != -EBUSY)
 			dev_dbg(dwc->dev, "%s: failed to kick transfers\n",
