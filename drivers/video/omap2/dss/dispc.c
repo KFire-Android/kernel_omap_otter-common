@@ -1951,6 +1951,15 @@ static int dispc_ovl_calc_scaling(enum omap_plane plane,
 	return 0;
 }
 
+static void dispc_enable_arbitration(enum omap_plane plane, bool enable)
+{
+	DSSDBG("dispc_enable_arbitration %d, %d\n", plane, enable);
+
+	REG_FLD_MOD(DISPC_OVL_ATTRIBUTES(plane), enable ? 1 : 0, 14, 14);
+
+	return;
+}
+
 int dispc_ovl_setup(enum omap_plane plane, struct omap_overlay_info *oi,
 		bool ilace, bool replication, int x_decim, int y_decim,
 		bool five_taps)
@@ -2179,6 +2188,10 @@ int dispc_ovl_setup(enum omap_plane plane, struct omap_overlay_info *oi,
 
 	if (plane != OMAP_DSS_GFX)
 		dispc_mgr_setup_color_conv_coef(plane, &oi->cconv);
+
+	if (plane == OMAP_DSS_GFX && (omap_rev() == OMAP5430_REV_ES1_0 ||
+					omap_rev() == OMAP5432_REV_ES1_0))
+		dispc_enable_arbitration(plane, true);
 
 	return 0;
 }
