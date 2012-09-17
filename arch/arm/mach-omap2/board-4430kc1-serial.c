@@ -17,7 +17,7 @@
 
 #include <plat/omap-serial.h>
 #include "mux.h"
-
+#if 0
 static struct omap_device_pad tablet_uart1_pads[] __initdata = {
 	{
 		.name	= "uart1_cts.uart1_cts",
@@ -33,9 +33,9 @@ static struct omap_device_pad tablet_uart1_pads[] __initdata = {
 	},
 	{
 		.name	= "uart1_rx.uart1_rx",
-		.flags	= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
+//		.flags	= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
 		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
-		.idle	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
+//		.idle	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
 	},
 };
 
@@ -43,15 +43,15 @@ static struct omap_device_pad tablet_uart2_pads[] __initdata = {
 	{
 		.name	= "uart2_cts.uart2_cts",
 		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
-		.flags  = OMAP_DEVICE_PAD_REMUX,
-		.idle   = OMAP_WAKEUP_EN | OMAP_PIN_OFF_INPUT_PULLUP |
-			  OMAP_MUX_MODE0,
+//		.flags  = OMAP_DEVICE_PAD_REMUX,
+//		.idle   = OMAP_WAKEUP_EN | OMAP_PIN_OFF_INPUT_PULLUP |
+//			  OMAP_MUX_MODE0,
 	},
 	{
 		.name	= "uart2_rts.uart2_rts",
-		.flags  = OMAP_DEVICE_PAD_REMUX,
+//		.flags  = OMAP_DEVICE_PAD_REMUX,
 		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
-		.idle   = OMAP_PIN_OFF_INPUT_PULLUP | OMAP_MUX_MODE7,
+//		.idle   = OMAP_PIN_OFF_INPUT_PULLUP | OMAP_MUX_MODE7,
 	},
 	{
 		.name	= "uart2_tx.uart2_tx",
@@ -62,15 +62,15 @@ static struct omap_device_pad tablet_uart2_pads[] __initdata = {
 		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
 	},
 };
-
+#endif
 static struct omap_device_pad tablet_uart3_pads[] __initdata = {
 	{
 		.name	= "uart3_cts_rctx.uart3_cts_rctx",
-		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
+		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE7,
 	},
 	{
 		.name	= "uart3_rts_sd.uart3_rts_sd",
-		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
+		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE7,
 	},
 	{
 		.name	= "uart3_tx_irtx.uart3_tx_irtx",
@@ -79,11 +79,11 @@ static struct omap_device_pad tablet_uart3_pads[] __initdata = {
 	{
 		.name	= "uart3_rx_irrx.uart3_rx_irrx",
 		.flags	= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
-		.enable	= OMAP_PIN_INPUT | OMAP_MUX_MODE0,
-		.idle	= OMAP_PIN_INPUT | OMAP_MUX_MODE0,
+		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
+		.idle	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
 	},
 };
-
+#if 0
 static struct omap_device_pad tablet_uart4_pads[] __initdata = {
 	{
 		.name	= "uart4_tx.uart4_tx",
@@ -102,6 +102,7 @@ static struct omap_uart_port_info tablet_uart_info_uncon __initdata = {
 	.auto_sus_timeout = DEFAULT_AUTOSUSPEND_DELAY,
 	.wer = 0,
 };
+#endif
 
 static struct omap_uart_port_info tablet_uart_info __initdata = {
 	.use_dma	= 0,
@@ -111,13 +112,13 @@ static struct omap_uart_port_info tablet_uart_info __initdata = {
 
 void __init board_serial_init(void)
 {
-	omap_serial_init_port_pads(0, tablet_uart1_pads,
-		ARRAY_SIZE(tablet_uart1_pads), &tablet_uart_info_uncon);
-	omap_serial_init_port_pads(1, tablet_uart2_pads,
-		ARRAY_SIZE(tablet_uart2_pads), &tablet_uart_info);
+//	omap_serial_init_port_pads(0, tablet_uart1_pads,
+//		ARRAY_SIZE(tablet_uart1_pads), &tablet_uart_info_uncon);
+//	omap_serial_init_port_pads(1, tablet_uart2_pads,
+//		ARRAY_SIZE(tablet_uart2_pads), &tablet_uart_info);
 	omap_serial_init_port_pads(2, tablet_uart3_pads,
 		ARRAY_SIZE(tablet_uart3_pads), &tablet_uart_info);
-	omap_serial_init_port_pads(3, tablet_uart4_pads,
-		ARRAY_SIZE(tablet_uart4_pads), &tablet_uart_info_uncon);
+//	omap_serial_init_port_pads(3, tablet_uart4_pads,
+//		ARRAY_SIZE(tablet_uart4_pads), &tablet_uart_info_uncon);
 }
 
