@@ -1270,6 +1270,7 @@ static inline bool valid_rect(struct bvsurfgeom *bvsurfgeom,
 static bool valid_geom(struct surfaceinfo *surfaceinfo)
 {
 	unsigned int size;
+	unsigned int height;
 
 	/* Compute the size of the surface. */
 	size = (surfaceinfo->geom->width *
@@ -1285,6 +1286,29 @@ static bool valid_geom(struct surfaceinfo *surfaceinfo)
 		      surfaceinfo->format.bitspp);
 		GCERR("  surface size based on the dimensions: %d\n",
 		      size);
+		GCERR("  specified surface size: %lu\n",
+		      surfaceinfo->buf.desc->length);
+		return false;
+	}
+
+	/* Determine the height of the image. */
+	height = ((surfaceinfo->angle % 2) == 0)
+	       ? surfaceinfo->geom->height
+	       : surfaceinfo->geom->width;
+
+	/* Compute the size using the stide. */
+	size = surfaceinfo->geom->virtstride * height;
+
+	/* Make sure the size is not greater then the surface. */
+	if (size > surfaceinfo->buf.desc->length) {
+		GCERR("invalid geometry detected:\n");
+		GCERR("  specified dimensions: %dx%d, %d bitspp\n",
+		      surfaceinfo->geom->width,
+		      surfaceinfo->geom->height,
+		      surfaceinfo->format.bitspp);
+		GCERR("  physical image height = %d\n", height);
+		GCERR("  image stride = %d\n", surfaceinfo->geom->virtstride);
+		GCERR("  computed surface size = %d\n", size);
 		GCERR("  specified surface size: %lu\n",
 		      surfaceinfo->buf.desc->length);
 		return false;
@@ -1379,13 +1403,6 @@ enum bverror parse_destination(struct bvbltparams *bvbltparams,
 			goto exit;
 		}
 
-		/* Validate geometry. */
-		if (!valid_geom(dstinfo)) {
-			BVSETBLTERROR(BVERR_DSTGEOM,
-				      "destination geom exceeds surface size");
-			goto exit;
-		}
-
 		/* Destination stride must be 8 pixel aligned. */
 		if ((dstinfo->geom->virtstride
 				& (dstinfo->format.bitspp - 1)) != 0) {
@@ -1433,6 +1450,13 @@ enum bverror parse_destination(struct bvbltparams *bvbltparams,
 		      dstinfo->pixalign);
 		GCDBG(GCZONE_DEST, "  surface offset (bytes) = %d\n",
 		      dstinfo->bytealign);
+
+		/* Validate geometry. */
+		if (!valid_geom(dstinfo)) {
+			BVSETBLTERROR(BVERR_DSTGEOM,
+				      "destination geom exceeds surface size");
+			goto exit;
+		}
 	}
 
 	/* Did clipping/destination rects change? */
@@ -1737,16 +1761,6 @@ enum bverror parse_source(struct bvbltparams *bvbltparams,
 		goto exit;
 	}
 
-	/* Validate source geometry. */
-	if (!valid_geom(srcinfo)) {
-		BVSETBLTERROR((srcinfo->index == 0)
-					? BVERR_SRC1GEOM
-					: BVERR_SRC2GEOM,
-			      "source%d geom exceeds surface size.",
-			      srcinfo->index + 1);
-		goto exit;
-	}
-
 	/* Source must be 8 pixel aligned. */
 	if ((srcinfo->geom->virtstride
 			& (srcinfo->format.bitspp - 1)) != 0) {
@@ -1819,6 +1833,16 @@ enum bverror parse_source(struct bvbltparams *bvbltparams,
 	GCDBG(GCZONE_SRC, "  geometry size = %dx%d\n",
 	      srcinfo->geom->width, srcinfo->geom->height);
 	GCDBG(GCZONE_SRC, "  mirror = %d\n", srcinfo->mirror);
+
+	/* Validate source geometry. */
+	if (!valid_geom(srcinfo)) {
+		BVSETBLTERROR((srcinfo->index == 0)
+					? BVERR_SRC1GEOM
+					: BVERR_SRC2GEOM,
+			      "source%d geom exceeds surface size.",
+			      srcinfo->index + 1);
+		goto exit;
+	}
 
 exit:
 	return bverror;
