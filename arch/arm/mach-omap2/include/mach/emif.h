@@ -266,4 +266,6 @@ int omap_emif_setup_device_details(
 			const struct emif_device_details *emif2_devices);
 
 void emif_clear_irq(int emif_id);
+int omap_sdram_vendor(void);
+int omap_sdram_density(void);
 #endif
