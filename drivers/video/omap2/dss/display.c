@@ -497,6 +497,7 @@ static int dss_suspend_device(struct device *dev, void *data)
 
 	if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE) {
 		dssdev->activate_after_resume = false;
+		return 0;
 	}
 
 	if (!dssdev->driver->suspend) {

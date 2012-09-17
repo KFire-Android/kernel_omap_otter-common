@@ -53,23 +53,7 @@
 #define TWL6030_TOGGLE3			0x92
 
 
-static int tablet_panel_enable_lcd(struct omap_dss_device *dssdev)
-{
-	pr_info("Boxer LCD Enable!\n");
-	return 0;
-}
-
-static void tablet_panel_disable_lcd(struct omap_dss_device *dssdev)
-{
-  	pr_info("Boxer LCD Disable!\n");
-}
-
 static struct omap_dss_device tablet_lcd_device = {
-	.phy		= {
-		.dpi	= {
-			.data_lines	= 24,
-		},
-	},
 	.clocks		= {
 		.dispc	= {
 			.channel	= {
@@ -79,15 +63,6 @@ static struct omap_dss_device tablet_lcd_device = {
 			},
 			.dispc_fclk_src = OMAP_DSS_CLK_SRC_DSI2_PLL_HSDIV_DISPC,
 		},
-#if 0
-		.dsi	= {
-			.regn		= 16, /*it is (N+1)*/
-			.regm		= 115,
-			.regm_dispc	= 3,
-			.regm_dsi	= 3,
-			.dsi_fclk_src   = OMAP_DSS_CLK_SRC_DSI2_PLL_HSDIV_DSI,
-		},
-#endif
 	},
         .panel          = {
 		.config		= OMAP_DSS_LCD_TFT | OMAP_DSS_LCD_IVS |
@@ -106,19 +81,18 @@ static struct omap_dss_device tablet_lcd_device = {
         	.width_in_um = 158000,
         	.height_in_um = 92000,
         },
-#if 0
 	.ctrl = {
 		.pixel_size = 24,
 	},
-#endif
 	.name			= "lcd2",
 	.driver_name		= "otter1_panel_drv",
 	.type			= OMAP_DISPLAY_TYPE_DPI,
+	.phy.dpi.data_lines	= 24,
 	.channel		= OMAP_DSS_CHANNEL_LCD2,
-  	.platform_enable	= tablet_panel_enable_lcd,
-  	.platform_disable	= tablet_panel_disable_lcd,
-	.max_backlight_level	= 255,
 };
+
+static bool enable_suspend_off = true;
+module_param(enable_suspend_off, bool, S_IRUSR | S_IRGRP | S_IROTH);
 
 static struct omap_dss_device *sdp4430_dss_devices[] = {
 	&tablet_lcd_device,
@@ -183,49 +157,40 @@ static struct omap4430_sdp_disp_led_platform_data sdp4430_disp_led_data = {
 };
 
 static struct platform_device sdp4430_disp_led = {
-	.name	=	"display_led",
-	.id	=	-1,
+	.name	= "display_led",
+	.id	= -1,
 	.dev	= {
 		.platform_data = &sdp4430_disp_led_data,
 	},
 };
 
 static struct platform_device sdp4430_keypad_led = {
-	.name	=	"keypad_led",
-	.id	=	-1,
+	.name	= "keypad_led",
+	.id	= -1,
 	.dev	= {
 		.platform_data = NULL,
 	},
 };
 
-static void bkl_set_power(struct omap_pwm_led_platform_data *self, int on_off)
-{
-	pr_debug("%s: on_off:%d\n", __func__, on_off);
-
-	msleep(1);
-}
-
-static struct omap_pwm_led_platform_data board_backlight_data = {
-	.name			= "lcd-backlight",
-	.default_trigger	= "backlight",
-	.intensity_timer	= 10,
-	.bkl_max		= 254,
-	.bkl_min		= 0,
-	.bkl_freq		= 30000,
-//	.set_power		= &bkl_set_power,
+static struct omap_pwm_led_platform_data kc1_led_data = {
+	.name		 = "lcd-backlight",
+	.intensity_timer = 10,
+	.def_brightness	 = 0x7F,
 };
 
-static struct platform_device board_backlight_device = {
-	.name		= "omap_pwm_led",
-	.id		= 0,
-	.dev.platform_data = &board_backlight_data,
+static struct platform_device kc1_led_device = {
+	.name	= "omap_pwm_led",
+	.id	= -1,
+	.dev	= {
+		.platform_data = &kc1_led_data,
+	},
 };
 
 
 static struct platform_device __initdata *sdp4430_panel_devices[] = {
 	&sdp4430_disp_led,
 	&sdp4430_keypad_led,
-	&board_backlight_device,
+	&kc1_led_device,
 };
 
 void omap4_kc1_android_display_setup(struct omap_ion_platform_data *ion)

@@ -117,43 +117,6 @@ static struct platform_device sdp4430_aic3110 = {
         .id             = -1,
 };
 
-/* Panel Power */
-static struct regulator_consumer_supply lcd_supply[] = {
-//	REGULATOR_SUPPLY("vlcd", "otter1_panel_drv"),
-	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dss"),
-	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dsi1"),
-	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dsi2"),
-//	{ .supply = "vdds_dsi", },
-};
-
-static struct regulator_init_data lcd_vinit = {
-	.constraints = {
-		.min_uV = 3300000,
-		.max_uV = 3300000,
-		.valid_modes_mask = REGULATOR_MODE_NORMAL,
-		.valid_ops_mask = REGULATOR_CHANGE_STATUS,
-	},
-	.num_consumer_supplies = ARRAY_SIZE(lcd_supply),
-	.consumer_supplies = lcd_supply,
-};
-
-static struct fixed_voltage_config lcd_reg_data = {
-	.supply_name = "vdd_lcd",
-	.microvolts = 3300000,
-	.gpio = 47,
-	.enable_high = 1,
-	.enabled_at_boot = 0,
-	.init_data = &lcd_vinit,
-};
-
-static struct platform_device lcd_regulator_device = {
-	.name   = "reg-fixed-voltage",
-	.id     = -1,
-	.dev    = {
-		.platform_data = &lcd_reg_data,
-	},
-};
-
 /* Board IDs */
 static u8 quanta_mbid;
 static u8 quanta_touchid;
@@ -203,7 +166,6 @@ static void __init quanta_boardids(void)
 
 static struct platform_device __initdata *sdp4430_devices[] = {
      &sdp4430_aic3110,
-     &lcd_regulator_device,
 };
 
 static struct omap_board_config_kernel __initdata sdp4430_config[] = {
@@ -227,7 +189,7 @@ static struct omap_musb_board_data musb_board_data = {
 #elif defined(CONFIG_USB_GADGET_MUSB_HDRC)
 	.mode			= MUSB_PERIPHERAL,
 #endif
-	.power			= 100,
+	.power			= 200,
 };
 
 static int sdp4430_wifi_power_state;
@@ -249,12 +211,13 @@ static struct omap2_hsmmc_info mmc[] = {
 		.caps = MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA | MMC_CAP_1_8V_DDR,
 		.gpio_cd = -EINVAL,
 		.gpio_wp = -EINVAL,
-		.ocr_mask = MMC_VDD_165_195,
+		.ocr_mask = MMC_VDD_29_30,
 		.nonremovable = true,
 #ifdef CONFIG_PM_RUNTIME
 		.power_saving	= true,
 #endif
 	},
+#if 0
 	{
 		.mmc = 1,
 		.caps = MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA | MMC_CAP_1_8V_DDR,
@@ -262,15 +225,6 @@ static struct omap2_hsmmc_info mmc[] = {
 #ifdef CONFIG_PM_RUNTIME
 		.power_saving	= true,
 #endif
-	},
-#if 0
-	{
-		.mmc = 5,
-		.caps = MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA,
-		.gpio_cd = -EINVAL,
-		.gpio_wp = 4,
-		.ocr_mask = MMC_VDD_165_195,
-		.nonremovable = true,
 	},
 #endif
 	{
@@ -284,16 +238,9 @@ static struct omap2_hsmmc_info mmc[] = {
 	{}	/* Terminator */
 };
 
-#if 0
 static struct wl12xx_platform_data __initdata omap4_kc1_wlan_data = {
 	.irq = OMAP_GPIO_IRQ(GPIO_WIFI_IRQ),
-	.board_ref_clock = WL12XX_REFCLOCK_26,
-	.board_tcxo_clock = 0,
-};
-#endif
-static struct wl12xx_platform_data __initdata omap4_kc1_wlan_data = {
-	.irq = OMAP_GPIO_IRQ(GPIO_WIFI_IRQ),
-	.board_ref_clock = WL12XX_REFCLOCK_38,
+	.board_ref_clock = WL12XX_REFCLOCK_38_XTAL,
 };
 
 static struct regulator_consumer_supply omap4_sdp4430_vmmc5_supply = {
@@ -338,10 +285,10 @@ static int omap4_twl6030_hsmmc_late_init(struct device *dev)
 						MMCDETECT_INTR_OFFSET;
 		pdata->slots[0].card_detect = twl6030_mmc_card_detect;
 	}
-
-	/* Set the MMC5 (wlan) power function */
-	if (pdev->id == 4)
+	if (pdev->id == 4) {
+		pdata->slots[0].mmc_data.built_in = 1;
 		pdata->slots[0].set_power = wifi_set_power;
+	}
 
 	return ret;
 }
@@ -603,11 +550,152 @@ static void omap_ilitek_init(void)
 
 
 #ifdef CONFIG_OMAP_MUX
-static struct omap_board_mux __initdata board_mux[] = {
-	{ .reg_offset = OMAP_MUX_TERMINATOR },
+static struct omap_board_mux board_mux[] __initdata = {
+    /* OMAP4_MUX(USBB2_ULPITLL_CLK, OMAP_MUX_MODE3 | OMAP_PIN_OUTPUT), */
+    OMAP4_MUX(ABE_DMIC_CLK1,OMAP_MUX_MODE3 | OMAP_OFF_EN),//+5V ADO_SPEAK_ENABLE
+    OMAP4_MUX(GPMC_AD0, OMAP_MUX_MODE1 | OMAP_PIN_INPUT | OMAP_OFF_EN | OMAP_OFFOUT_EN), // SDMMC2_DAT0
+    OMAP4_MUX(GPMC_AD1, OMAP_MUX_MODE1 | OMAP_PIN_INPUT | OMAP_OFF_EN | OMAP_OFFOUT_EN), // SDMMC2_DAT1
+    OMAP4_MUX(GPMC_AD2, OMAP_MUX_MODE1 | OMAP_PIN_INPUT | OMAP_OFF_EN | OMAP_OFFOUT_EN), // SDMMC2_DAT2
+    OMAP4_MUX(GPMC_AD3, OMAP_MUX_MODE1 | OMAP_PIN_INPUT | OMAP_OFF_EN | OMAP_OFFOUT_EN), // SDMMC2_DAT3
+    OMAP4_MUX(GPMC_AD4, OMAP_MUX_MODE1 | OMAP_PIN_INPUT | OMAP_OFF_EN | OMAP_OFFOUT_EN), // SDMMC2_DAT4
+    OMAP4_MUX(GPMC_AD5, OMAP_MUX_MODE1 | OMAP_PIN_INPUT | OMAP_OFF_EN | OMAP_OFFOUT_EN), // SDMMC2_DAT5
+    OMAP4_MUX(GPMC_AD6, OMAP_MUX_MODE1 | OMAP_PIN_INPUT | OMAP_OFF_EN | OMAP_OFFOUT_EN), // SDMMC2_DAT6
+    OMAP4_MUX(GPMC_AD7, OMAP_MUX_MODE1 | OMAP_PIN_INPUT | OMAP_OFF_EN | OMAP_OFFOUT_EN), // SDMMC2_DAT7
+    OMAP4_MUX(GPMC_AD9, OMAP_MUX_MODE3 | OMAP_PIN_INPUT | OMAP_PULL_ENA | OMAP_PULL_UP),
+    OMAP4_MUX(GPMC_AD10, OMAP_MUX_MODE3 | OMAP_PIN_INPUT | OMAP_PULL_ENA | OMAP_PULL_UP),
+    OMAP4_MUX(GPMC_AD11, OMAP_MUX_MODE3 | OMAP_PIN_INPUT | OMAP_PULL_ENA),
+    OMAP4_MUX(GPMC_AD12, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // gpio 36
+    OMAP4_MUX(GPMC_AD13,OMAP_MUX_MODE3 | OMAP_OFF_EN),//OMAP_RGB_SHTDN
+    OMAP4_MUX(GPMC_AD14, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // gpio 38
+    OMAP4_MUX(GPMC_A18, OMAP_MUX_MODE3), // gpio 42
+    OMAP4_MUX(GPMC_A19, OMAP_MUX_MODE3 | OMAP_PULL_ENA | OMAP_PULL_UP), // gpio 43
+    OMAP4_MUX(GPMC_A20, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // gpio 44
+    OMAP4_MUX(GPMC_A21, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // gpio 45
+    OMAP4_MUX(GPMC_A23,OMAP_MUX_MODE3 | OMAP_OFF_EN),//OMAP_3V_ENABLE ,LCDVCC
+    OMAP4_MUX(GPMC_A24, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // gpio 48
+    OMAP4_MUX(GPMC_A25, OMAP_MUX_MODE3 | OMAP_PIN_INPUT), // gpio 49
+    OMAP4_MUX(GPMC_CLK, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // gpio 55
+    OMAP4_MUX(GPMC_NADV_ALE, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // gpio 56
+    OMAP4_MUX(GPMC_NWE, OMAP_MUX_MODE1 | OMAP_PIN_INPUT | OMAP_OFF_EN | OMAP_OFFOUT_EN), // sdmmc2_cmd
+    OMAP4_MUX(GPMC_NBE0_CLE, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // gpio 59
+    OMAP4_MUX(GPMC_WAIT0, OMAP_MUX_MODE7 | OMAP_PULL_ENA | OMAP_PULL_UP), // gpio 61
+    OMAP4_MUX(GPMC_WAIT1, OMAP_MUX_MODE7 | OMAP_PULL_ENA | OMAP_PULL_UP), // gpio 62
+    OMAP4_MUX(C2C_DATA12, OMAP_MUX_MODE3 | OMAP_OFF_EN ),//Charger en pin
+    OMAP4_MUX(C2C_DATA13, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // gpio 102
+    OMAP4_MUX(UART4_RX, OMAP_MUX_MODE3 | OMAP_OFF_EN | OMAP_OFFOUT_VAL ),//Charger susp pin,
+    OMAP4_MUX(USBB1_ULPITLL_DAT6, OMAP_MUX_MODE1 ),//Backlight GPTimer 10,
+    OMAP4_MUX(C2C_DATA14, OMAP_MUX_MODE3 | OMAP_PIN_INPUT_PULLDOWN ),//gpio 103: MP/ENG Detect,
+    OMAP4_MUX(UNIPRO_TX1, OMAP_MUX_MODE3 | OMAP_PIN_INPUT_PULLDOWN ),//gpio 174: mbid1,
+    OMAP4_MUX(UNIPRO_TY1, OMAP_MUX_MODE3 | OMAP_PIN_INPUT_PULLDOWN ),//gpio 173: mbid0,
+    OMAP4_MUX(UNIPRO_RX1, OMAP_MUX_MODE3 | OMAP_PIN_INPUT_PULLDOWN ),//gpio 177: mbid3,
+    OMAP4_MUX(UNIPRO_RY1, OMAP_MUX_MODE3 | OMAP_PIN_INPUT_PULLDOWN ),//gpio 178: mbid2,
+    OMAP4_MUX(UNIPRO_RX0, OMAP_MUX_MODE3 | OMAP_INPUT_EN ),//gpio 175: LCDid1,
+    OMAP4_MUX(UNIPRO_RY0, OMAP_MUX_MODE3 | OMAP_INPUT_EN ),//gpio 176: LCDid0,
+    OMAP4_MUX(GPMC_NCS0, OMAP_MUX_MODE3 | OMAP_INPUT_EN ),//gpio 50: TPid0,
+    OMAP4_MUX(GPMC_NCS1, OMAP_MUX_MODE3 | OMAP_INPUT_EN ),//gpio 51: TPid1,
+    OMAP4_MUX(UNIPRO_TX0, OMAP_MUX_MODE3 | OMAP_PIN_INPUT_PULLUP ),//gpio 171: Wifi IP select,
+    OMAP4_MUX(UNIPRO_TY0, OMAP_MUX_MODE3 | OMAP_PIN_INPUT_PULLUP ),//gpio 172: Wifi IP select,
+    /* OMAP4_MUX(C2C_DATA11, OMAP_MUX_MODE3 | OMAP_PIN_INPUT | OMAP_WAKEUP_EN |OMAP_PIN_OFF_INPUT_PULLUP),//Power button, same as GPMC_WAIT2*/
+    /* OMAP4_MUX(C2C_DATA15, OMAP_MUX_MODE7 | OMAP_PULL_ENA),//Power button, same as GPMC_NCS7 */
+    OMAP4_MUX(HDMI_HPD, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // HDMI_HDP
+    OMAP4_MUX(HDMI_CEC, OMAP_MUX_MODE7 | OMAP_PULL_ENA | OMAP_PULL_UP), // HDMI_CEC
+    OMAP4_MUX(HDMI_DDC_SCL, OMAP_MUX_MODE7 | OMAP_PULL_ENA | OMAP_PULL_UP), // HDMI_DDC_SCL
+    OMAP4_MUX(HDMI_DDC_SDA, OMAP_MUX_MODE7 | OMAP_PULL_ENA | OMAP_PULL_UP), // HDMI_DDC_SDA
+    OMAP4_MUX(CSI21_DX0, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // CSI21_DX0
+    OMAP4_MUX(CSI21_DY0, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // CSI21_DY0
+    OMAP4_MUX(CSI21_DX1, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // CSI21_DX1
+    OMAP4_MUX(CSI21_DY1, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // CSI21_DY1
+    OMAP4_MUX(CSI21_DX2, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // CSI21_DX2
+    OMAP4_MUX(CSI21_DY2, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // CSI21_DY2
+    OMAP4_MUX(CSI22_DX0, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // CSI22_DX0
+    OMAP4_MUX(CSI22_DY0, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // CSI22_DY0
+    OMAP4_MUX(CSI22_DX1, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // CSI22_DX1
+    OMAP4_MUX(CSI22_DY1, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // CSI22_DY1
+    OMAP4_MUX(CAM_SHUTTER, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // CAM_SHUTTER
+    OMAP4_MUX(CAM_STROBE, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // CAM_STROBE
+    OMAP4_MUX(CAM_GLOBALRESET, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // gpio 83 
+    OMAP4_MUX(USBB1_ULPITLL_CLK, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // gpio 84 
+    OMAP4_MUX(USBB1_ULPITLL_STP, OMAP_MUX_MODE7 | OMAP_PULL_ENA | OMAP_PULL_UP), // gpio 85 
+    OMAP4_MUX(USBB1_ULPITLL_DIR, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // gpio 86 
+    OMAP4_MUX(USBB1_ULPITLL_NXT, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // gpio 87 
+    OMAP4_MUX(USBB1_ULPITLL_DAT0, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // gpio 88 
+    OMAP4_MUX(USBB1_ULPITLL_DAT1, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // gpio 89 
+    OMAP4_MUX(USBB1_ULPITLL_DAT2, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // gpio 90 
+    OMAP4_MUX(USBB1_ULPITLL_DAT3, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // gpio 91 
+    OMAP4_MUX(USBB1_ULPITLL_DAT4, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // gpio 92 
+    OMAP4_MUX(USBB1_ULPITLL_DAT5, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // gpio 93 
+    OMAP4_MUX(USBB1_ULPITLL_DAT7, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // USBB1_ULPITLL_DAT7
+    OMAP4_MUX(USBB1_HSIC_DATA, OMAP_MUX_MODE7), // USBB1_HSIC_DATA
+    OMAP4_MUX(USBB1_HSIC_STROBE, OMAP_MUX_MODE7), // USBB1_HSIC_STROBE
+    OMAP4_MUX(USBC1_ICUSB_DP, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // USBC1_ICUSB_DP
+    OMAP4_MUX(USBC1_ICUSB_DM, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // USBC1_ICUSB_DM
+    OMAP4_MUX(SDMMC1_CLK, OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP | OMAP_PIN_OFF_INPUT_PULLDOWN), // SDMMC1_CLK
+
+    OMAP4_MUX(ABE_MCBSP2_CLKX, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // ABE_MCBSP2_CLKX
+    OMAP4_MUX(ABE_MCBSP2_DR, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // ABE_MCBSP2_DR
+    OMAP4_MUX(ABE_MCBSP2_DX, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // ABE_MCBSP2_DX
+    OMAP4_MUX(ABE_MCBSP2_FSX, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // ABE_MCBSP2_FSX
+    OMAP4_MUX(ABE_MCBSP1_CLKX, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // ABE_MCBSP1_CLKX
+    OMAP4_MUX(ABE_MCBSP1_DR, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // ABE_MCBSP1_DR
+    OMAP4_MUX(ABE_MCBSP1_DX, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // ABE_MCBSP1_DX
+    OMAP4_MUX(ABE_MCBSP1_FSX, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // ABE_MCBSP1_FSX
+    OMAP4_MUX(ABE_PDM_UL_DATA, OMAP_MUX_MODE1 | OMAP_PIN_INPUT_PULLDOWN | OMAP_PIN_OFF_OUTPUT_LOW), // ABE_PDM_UL_DATA
+    OMAP4_MUX(ABE_DMIC_DIN1, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // gpio 120
+    OMAP4_MUX(ABE_DMIC_DIN2, OMAP_MUX_MODE3 | OMAP_PULL_ENA), // gpio 121
+    OMAP4_MUX(ABE_DMIC_DIN3, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // ABE_DMIC_DIN3
+    OMAP4_MUX(UART2_CTS, OMAP_MUX_MODE7 | OMAP_PULL_ENA | OMAP_PULL_UP), // UART2_CTS
+    OMAP4_MUX(UART2_RTS, OMAP_MUX_MODE7 | OMAP_PULL_ENA | OMAP_PULL_UP), // UART2_RTS
+    OMAP4_MUX(UART2_RX, OMAP_MUX_MODE7 | OMAP_PULL_ENA | OMAP_PULL_UP), // UART2_RX
+    OMAP4_MUX(UART2_TX, OMAP_MUX_MODE7 | OMAP_PULL_ENA | OMAP_PULL_UP), // UART2_TX
+    OMAP4_MUX(HDQ_SIO, OMAP_MUX_MODE7), // gpio 127
+    OMAP4_MUX(MCSPI1_CS2, OMAP_MUX_MODE7 | OMAP_PULL_ENA | OMAP_PULL_UP), // gpio 139
+    OMAP4_MUX(MCSPI1_CS3, OMAP_MUX_MODE7 | OMAP_PULL_ENA | OMAP_PULL_UP), // gpio 140
+    OMAP4_MUX(UART4_TX, OMAP_MUX_MODE7 | OMAP_PULL_ENA | OMAP_PULL_UP), // gpio 156
+    OMAP4_MUX(USBB2_ULPITLL_CLK, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // gpio 157
+    OMAP4_MUX(USBB2_HSIC_DATA, OMAP_MUX_MODE7), // gpio 169
+    OMAP4_MUX(USBB2_HSIC_STROBE, OMAP_MUX_MODE7), // gpio 170
+    OMAP4_MUX(UNIPRO_TX0, OMAP_MUX_MODE3 | OMAP_PIN_INPUT_PULLUP | OMAP_PIN_OFF_INPUT_PULLDOWN), // gpio 171,for factory rndis
+    OMAP4_MUX(UNIPRO_TY0, OMAP_MUX_MODE3 | OMAP_PIN_INPUT_PULLUP | OMAP_PIN_OFF_INPUT_PULLDOWN), // gpio 172,for factory rndis
+    OMAP4_MUX(FREF_CLK1_OUT, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // fref_clk1_out
+    OMAP4_MUX(DPM_EMU2, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // dpm_emu2
+    OMAP4_MUX(I2C1_SCL, OMAP_MUX_MODE0 | OMAP_INPUT_EN), // I2C1_SCL
+    OMAP4_MUX(I2C1_SDA, OMAP_MUX_MODE0 | OMAP_INPUT_EN), // I2C1_SDA
+    OMAP4_MUX(I2C2_SCL, OMAP_MUX_MODE0 | OMAP_INPUT_EN), // I2C2_SCL
+    OMAP4_MUX(I2C2_SDA, OMAP_MUX_MODE0 | OMAP_INPUT_EN), // I2C2_SDA
+    OMAP4_MUX(MCSPI1_CLK, OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLDOWN | OMAP_PIN_OFF_INPUT_PULLDOWN), // MCSPI1_CLK
+    OMAP4_MUX(MCSPI1_SOMI, OMAP_MUX_MODE0), // MCSPI1_SOMI
+    OMAP4_MUX(MCSPI1_SIMO, OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLDOWN | OMAP_PIN_OFF_INPUT_PULLDOWN), // MCSPI1_SIMO
+    OMAP4_MUX(MCSPI1_CS0, OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLDOWN | OMAP_PIN_OFF_INPUT_PULLDOWN), // MCSPI1_CS0
+    OMAP4_MUX(MCSPI1_CS1, OMAP_MUX_MODE7 | OMAP_INPUT_EN), // MCSPI1_CS1
+    OMAP4_MUX(UART3_CTS_RCTX, OMAP_MUX_MODE7 | OMAP_INPUT_EN | OMAP_PULL_ENA | OMAP_PULL_UP), // UART3_CTS_RCTX
+    OMAP4_MUX(UART3_RTS_SD, OMAP_MUX_MODE7 | OMAP_INPUT_EN | OMAP_PULL_ENA | OMAP_PULL_UP), // UART3_RTS_SD
+    OMAP4_MUX(UART3_RX_IRRX, OMAP_MUX_MODE0 | OMAP_INPUT_EN | OMAP_PULL_ENA | OMAP_PULL_UP), // UART3_RX_IRRX
+    OMAP4_MUX(MCSPI4_SOMI, OMAP_MUX_MODE7 | OMAP_PULL_ENA | OMAP_PULL_UP), // MCSPI4_SOMI
+    OMAP4_MUX(DPM_EMU0, OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP), // DPM_EMU0
+    OMAP4_MUX(DPM_EMU1, OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP), // DPM_EMU1
+    OMAP4_MUX(DPM_EMU7, OMAP_MUX_MODE5 | OMAP_PIN_INPUT_PULLDOWN), // DISPC2_HSYNC
+
+    OMAP4_MUX(GPMC_NCS7, OMAP_MUX_MODE7 | OMAP_PULL_ENA),				//gpmc_ncs7=GPIO_104-OMAP_TP_RESET
+    OMAP4_MUX(GPMC_WAIT2, OMAP_MUX_MODE3 | OMAP_PIN_INPUT | OMAP_WAKEUP_EN |OMAP_PIN_OFF_INPUT_PULLUP),		//GPIO_100-ON_BUTTON
+    { .reg_offset = OMAP_MUX_TERMINATOR },
 };
+
+static struct omap_board_mux board_wkup_mux[] __initdata = {
+    OMAP4_MUX(SIM_IO, OMAP_MUX_MODE7 | OMAP_PULL_ENA),
+    OMAP4_MUX(SIM_CLK, OMAP_MUX_MODE7 | OMAP_PULL_ENA),
+    OMAP4_MUX(SIM_RESET, OMAP_MUX_MODE7 | OMAP_PULL_ENA),
+    OMAP4_MUX(SIM_CD, OMAP_MUX_MODE7 | OMAP_PULL_ENA | OMAP_PULL_UP),
+    OMAP4_MUX(SIM_PWRCTRL, OMAP_MUX_MODE7 | OMAP_PULL_ENA),
+    OMAP4_MUX(FREF_CLK3_REQ, OMAP_MUX_MODE7 | OMAP_PULL_ENA),
+    OMAP4_MUX(SR_SCL, OMAP_MUX_MODE0 | OMAP_INPUT_EN),		//No need to use PAD PU
+    OMAP4_MUX(SR_SDA, OMAP_MUX_MODE0 | OMAP_INPUT_EN),		//No need to use PAD PU
+    OMAP4_MUX(FREF_CLK3_OUT, OMAP_MUX_MODE7 | OMAP_PULL_ENA),		//FREF_CLK3_OUT
+    OMAP4_MUX(SYS_PWR_REQ, OMAP_MUX_MODE0 | OMAP_PULL_ENA),		// SYS_PWR_REQ
+    OMAP4_MUX(SYS_BOOT7, OMAP_MUX_MODE3 | OMAP_INPUT_EN),		// GPIO_WK10
+    { .reg_offset = OMAP_MUX_TERMINATOR },
 #else
 #define board_mux	NULL
+#define board_wkup_mux NULL
 #endif
 
 /*
@@ -622,8 +710,21 @@ static struct omap_board_mux __initdata board_mux[] = {
  *
  * Same devices installed on EMIF1 and EMIF2
  */
-static struct emif_device_details __initdata emif_devices = {
+#if defined(CONFIG_OTTER2)
+static __initdata struct emif_device_details emif_devices_1g_1cs = {
+	.cs0_device = &lpddr2_elpida_4G_S4_dev,
+	.cs1_device = NULL
+};
+
+static __initdata struct emif_device_details emif_devices_1g_2cs = {
 	.cs0_device = &lpddr2_elpida_2G_S4_dev,
+	.cs1_device = &lpddr2_elpida_2G_S4_dev
+};
+#endif
+
+static struct emif_device_details __initdata emif_devices_512m = {
+	.cs0_device = &lpddr2_elpida_2G_S4_dev,
+	.cs1_device = NULL
 };
 
 static void enable_rtc_gpio(void){
@@ -739,15 +840,25 @@ static struct notifier_block kc1_reboot_notifier = {
 
 static void __init omap_kc1_init(void)
 {
+	int sd_density;
 	int package = OMAP_PACKAGE_CBS;
 
 	quanta_boardids();
 	if (omap_rev() == OMAP4430_REV_ES1_0)
 		package = OMAP_PACKAGE_CBL;
 
-	omap4_mux_init(board_mux, NULL, package);
+	omap4_mux_init(board_mux, board_wkup_mux, package);
 
-	omap_emif_setup_device_details(&emif_devices, &emif_devices);
+#if 1
+	omap_emif_setup_device_details(&emif_devices_512m, &emif_devices_512m);
+#else
+	sd_density = omap_sdram_density();
+	if (sd_density == 0x14) {
+		omap_emif_setup_device_details(&emif_devices_1g_2cs, &emif_devices_1g_2cs);
+	}else {
+		omap_emif_setup_device_details(&emif_devices_1g_1cs, &emif_devices_1g_1cs);
+	}
+#endif
 
 	omap_board_config = sdp4430_config;
 	omap_board_config_size = ARRAY_SIZE(sdp4430_config);

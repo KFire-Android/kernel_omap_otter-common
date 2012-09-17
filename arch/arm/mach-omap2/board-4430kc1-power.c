@@ -27,7 +27,7 @@
 #include "board-4430kc1-tablet.h"
 
 static struct regulator_consumer_supply vmmc_supply[] = {
-	{ .supply = "vmmc", .dev_name = "mmci-omap-hs.0", },
+	{ .supply = "vmmc", .dev_name = "omap_hsmmc.0", },
 };
 
 /* VMMC1 for MMC1 card */
@@ -52,6 +52,7 @@ static struct regulator_init_data sdp4430_vpp = {
 		.valid_modes_mask	= REGULATOR_MODE_NORMAL | REGULATOR_MODE_STANDBY,
 		.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE | REGULATOR_CHANGE_MODE | REGULATOR_CHANGE_STATUS,
 		.state_mem		= { .enabled = false, .disabled = true, },
+		.initial_state          = PM_SUSPEND_MEM,
 	},
 };
 
@@ -62,7 +63,7 @@ static struct regulator_consumer_supply audio_supply[] = {
 static struct regulator_init_data sdp4430_vusim = {
 	.constraints = {
 		.min_uV			= 1200000,
-		.max_uV			= 3000000,
+		.max_uV			= 3300000,
 		.apply_uV		= true,
 		.valid_modes_mask	= REGULATOR_MODE_NORMAL | REGULATOR_MODE_STANDBY,
 		.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE | REGULATOR_CHANGE_MODE | REGULATOR_CHANGE_STATUS,
@@ -83,6 +84,12 @@ static struct regulator_init_data sdp4430_vana = {
 	},
 };
 
+static struct regulator_consumer_supply sdp4430_vcxio_supply[] = {
+	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dss"),
+	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dsi.0"),
+	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dsi.1"),
+};
+
 static struct regulator_init_data sdp4430_vcxio = {
 	.constraints = {
 		.min_uV			= 1800000,
@@ -92,6 +99,8 @@ static struct regulator_init_data sdp4430_vcxio = {
 		.state_mem		= { .enabled = false, .disabled = true, },
 		.always_on		= true,
 	},
+	.num_consumer_supplies	= ARRAY_SIZE(sdp4430_vcxio_supply),
+	.consumer_supplies	= sdp4430_vcxio_supply,
 };
 
 static struct regulator_consumer_supply vdac_supply[] = {
@@ -132,8 +141,7 @@ static struct regulator_init_data sdp4430_vusb = {
 };
 
 static struct regulator_consumer_supply emmc_supply[] = {
-//	REGULATOR_SUPPLY("emmc-pwr", "omap_hsmmc.1"),
-	{ .supply = "emmc-pwr", },
+	REGULATOR_SUPPLY("vmmc", "omap_hsmmc.1"),
 };
 
 static struct regulator_init_data sdp4430_vaux1 = {
@@ -157,7 +165,7 @@ static struct regulator_consumer_supply gsensor_supply[] = {
 static struct regulator_init_data sdp4430_vaux2 = {
 	.constraints = {
 		.min_uV			= 1200000,
-		.max_uV			= 2800000,
+		.max_uV			= 3300000,
 		.apply_uV		= true,
 		.valid_modes_mask	= REGULATOR_MODE_NORMAL | REGULATOR_MODE_STANDBY,
 		.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE | REGULATOR_CHANGE_MODE | REGULATOR_CHANGE_STATUS,
@@ -202,47 +210,6 @@ static struct regulator_init_data sdp4430_clk32kg = {
 	},
 };
 
-static struct regulator_init_data sdp4430_clk32kaudio = {
-	.constraints = {
-		.valid_modes_mask	= REGULATOR_MODE_NORMAL,
-		.valid_ops_mask		= REGULATOR_CHANGE_STATUS,
-		.always_on		= true,
-	},
-};
-
-static struct regulator_init_data sdp4430_v2v1 = {
-	.constraints = {
-		.valid_ops_mask		= REGULATOR_CHANGE_STATUS,
-		.always_on		= true,
-		.state_mem = {
-			.disabled	= true,
-		},
-		.initial_state		= PM_SUSPEND_MEM,
-	},
-};
-
-static struct regulator_init_data sdp4430_vcore1	= {
-	.constraints = {
-		.valid_ops_mask         = REGULATOR_CHANGE_STATUS,
-		.always_on              = true,
-		.state_mem = {
-			.disabled       = true,
-		},
-		.initial_state          = PM_SUSPEND_MEM,
-	},
-};
-
-static struct regulator_init_data sdp4430_vcore2	= {
-	.constraints = {
-		.valid_ops_mask         = REGULATOR_CHANGE_STATUS,
-		.always_on              = true,
-		.state_mem = {
-			.disabled       = true,
-		},
-		.initial_state          = PM_SUSPEND_MEM,
-	},
-};
-
 static struct twl4030_usb_data omap4_usbphy_data = {
 	.phy_init	= omap4430_phy_init,
 	.phy_exit	= omap4430_phy_exit,
@@ -250,30 +217,6 @@ static struct twl4030_usb_data omap4_usbphy_data = {
 	.phy_set_clock	= omap4430_phy_set_clk,
 	.phy_suspend	= omap4430_phy_suspend,
 };
-
-#if 0
-static struct twl4030_codec_audio_data twl6040_audio = {
-	/* single-step ramp for headset and handsfree */
-	.hs_left_step   = 0x0f,
-	.hs_right_step  = 0x0f,
-	.hf_left_step   = 0x1d,
-	.hf_right_step  = 0x1d,
-};
-
-static struct twl4030_codec_vibra_data twl6040_vibra = {
-	.max_timeout	= 15000,
-	.initial_vibrate = 0,
-	.voltage_raise_speed = 0x26,
-};
-
-static struct twl4030_codec_data twl6040_codec = {
-	.audio          = &twl6040_audio,
-	.vibra          = &twl6040_vibra,
-//	.audpwron_gpio  = 127,  ??
-	.naudint_irq    = OMAP44XX_IRQ_SYS_2N,
-	.irq_base       = TWL6040_CODEC_IRQ_BASE,
-};
-#endif
 
 static struct twl4030_platform_data sdp4430_twldata = {
 	.irq_base	= TWL6030_IRQ_BASE,
@@ -293,14 +236,6 @@ static struct twl4030_platform_data sdp4430_twldata = {
 
 	/* TWL6030/6032 common resources */
 	.clk32kg	= &sdp4430_clk32kg,
-	.clk32kaudio	= &sdp4430_clk32kaudio,
-
-//	.qcharger	= &kc1_charger_data,
-
-	/* SMPS */
-	.vdd1		= &sdp4430_vcore1,
-	.vdd2		= &sdp4430_vcore2,
-	.v2v1		= &sdp4430_v2v1,
 
 	/* children */
 //	.bci            = &sdp4430_bci_data,
