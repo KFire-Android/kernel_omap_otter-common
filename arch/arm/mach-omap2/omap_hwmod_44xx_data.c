@@ -1756,7 +1756,9 @@ static struct omap_hwmod_opt_clk dss_opt_clks[] = {
 static struct omap_hwmod omap44xx_dss_hwmod = {
 	.name		= "dss_core",
 	.class		= &omap44xx_dss_hwmod_class,
-#ifdef CONFIG_FB_OMAP_BOOTLOADER_INIT
+//#ifdef CONFIG_FB_OMAP_BOOTLOADER_INIT
+/* FIXME-HASH: Need a better check */
+#if 1
 	.flags		= HWMOD_INIT_NO_RESET,
 #endif
 	.main_clk	= "dss_fck",
@@ -1863,7 +1865,9 @@ static struct omap_hwmod_opt_clk dispc_opt_clks[] = {
 static struct omap_hwmod omap44xx_dss_dispc_hwmod = {
 	.name		= "dss_dispc",
 	.class		= &omap44xx_dispc_hwmod_class,
-#ifdef CONFIG_FB_OMAP_BOOTLOADER_INIT
+//#ifdef CONFIG_FB_OMAP_BOOTLOADER_INIT
+/* FIXME-HASH: Need a better check here */
+#if 1
 	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET | HWMOD_INIT_NO_RESET,
 #else
 	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
@@ -2060,8 +2064,8 @@ static struct omap_hwmod omap44xx_dss_dsi2_hwmod = {
 			.clkctrl_reg = OMAP4430_CM_DSS_DSS_CLKCTRL,
 		},
 	},
-	.opt_clks	= dsi2_opt_clks,
-	.opt_clks_cnt	= ARRAY_SIZE(dsi2_opt_clks),
+	.opt_clks       = dsi2_opt_clks,
+	.opt_clks_cnt   = ARRAY_SIZE(dsi2_opt_clks),
 	.slaves		= omap44xx_dss_dsi2_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap44xx_dss_dsi2_slaves),
 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP44XX),
@@ -2661,6 +2665,11 @@ static struct omap_hwmod omap44xx_gpio2_hwmod = {
 	.mpu_irqs	= omap44xx_gpio2_irqs,
 	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_gpio2_irqs),
 	.main_clk	= "gpio2_ick",
+//#if defined(CONFIG_OTTER) || defined(CONFIG_OTTER2)
+/* FIXME-HASH: Need a better check */
+#if 1
+	.flags		= HWMOD_INIT_NO_RESET,
+#endif
 	.prcm = {
 		.omap4 = {
 			.clkctrl_reg = OMAP4430_CM_L4PER_GPIO2_CLKCTRL,
@@ -5449,6 +5458,11 @@ static struct omap_hwmod_ocp_if *omap44xx_timer10_slaves[] = {
 static struct omap_hwmod omap44xx_timer10_hwmod = {
 	.name		= "timer10",
 	.class		= &omap44xx_timer_1ms_hwmod_class,
+//#if defined(CONFIG_OTTER) || defined(CONFIG_OTTER2)
+/* FIXME-HASH: Need a better check */
+#if 1
+	.flags		= HWMOD_INIT_NO_RESET,
+#endif
 	.mpu_irqs	= omap44xx_timer10_irqs,
 	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_timer10_irqs),
 	.main_clk	= "timer10_fck",
