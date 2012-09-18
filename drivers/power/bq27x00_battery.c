@@ -33,6 +33,9 @@
 #include <linux/power_supply.h>
 #include <linux/idr.h>
 #include <linux/i2c.h>
+#include <plat/mux.h>
+#include <linux/interrupt.h>
+#include <linux/gpio.h>
 #include <linux/slab.h>
 #include <asm/unaligned.h>
 
@@ -91,6 +94,8 @@ struct bq27x00_reg_cache {
 struct bq27x00_device_info {
 	struct device 		*dev;
 	int			id;
+	int			gpio;
+	int			gpio_irq;
 	enum bq27x00_chip	chip;
 
 	struct bq27x00_reg_cache cache;
@@ -100,8 +105,11 @@ struct bq27x00_device_info {
 	struct delayed_work work;
 
 	struct power_supply	bat;
+	struct power_supply	ac;
+	struct power_supply	bat_sim;
 
 	struct bq27x00_access_methods bus;
+	bool battery_present;
 
 	struct mutex lock;
 };
@@ -125,7 +133,13 @@ static enum power_supply_property bq27x00_battery_props[] = {
 	POWER_SUPPLY_PROP_ENERGY_NOW,
 };
 
-static unsigned int poll_interval = 360;
+static unsigned int poll_interval = 1;
+
+static enum power_supply_property bq27x00_ac_props[] = {
+	POWER_SUPPLY_PROP_ONLINE,
+	POWER_SUPPLY_PROP_VOLTAGE_NOW,
+};
+
 module_param(poll_interval, uint, 0644);
 MODULE_PARM_DESC(poll_interval, "battery poll interval in seconds - " \
 				"0 disables polling");
@@ -559,6 +573,51 @@ static int bq27x00_battery_get_property(struct power_supply *psy,
 	return ret;
 }
 
+static int bq27x00_bat_sim_get_property(struct power_supply *psy,
+					enum power_supply_property psp,
+					union power_supply_propval *val)
+{
+	switch (psp) {
+	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
+		val->intval = 3800000;
+		break;
+	case POWER_SUPPLY_PROP_ONLINE:
+		val->intval = POWER_SUPPLY_TYPE_MAINS;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+static int bq27x00_ac_get_property(struct power_supply *psy,
+					enum power_supply_property psp,
+					union power_supply_propval *val)
+{
+	int ret = 0;
+	struct bq27x00_device_info *di =
+		container_of(psy, struct bq27x00_device_info, ac);
+
+	switch (psp) {
+	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
+		ret = bq27x00_battery_voltage(di, val);
+		break;
+	case POWER_SUPPLY_PROP_ONLINE:
+		ret = bq27x00_battery_status(di, val);
+		if (val->intval == POWER_SUPPLY_STATUS_CHARGING)
+			val->intval = POWER_SUPPLY_TYPE_MAINS;
+		else
+			val->intval = POWER_SUPPLY_TYPE_UNKNOWN;
+
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	return ret;
+}
+
 static void bq27x00_external_power_changed(struct power_supply *psy)
 {
 	struct bq27x00_device_info *di = to_bq27x00_device_info(psy);
@@ -567,12 +626,20 @@ static void bq27x00_external_power_changed(struct power_supply *psy)
 	schedule_delayed_work(&di->work, 0);
 }
 
+static irqreturn_t bq27x00_irq_handler(int irq, void *_priv)
+{
+	struct bq27x00_device_info *di = _priv;
+
+	power_supply_changed(&di->ac);
+	return IRQ_HANDLED;
+}
+
 static int bq27x00_powersupply_init(struct bq27x00_device_info *di)
 {
 	int ret;
 	union power_supply_propval volt_val;
 	union power_supply_propval curr_val;
-	bool battery_present;
+	int status;
 	/*
 	 * Get the current consumption by battery. If it is 0mA
 	 * or a small leaking current of 100mA either battery is
@@ -596,15 +663,16 @@ static int bq27x00_powersupply_init(struct bq27x00_device_info *di)
 			dev_err(di->dev, "failed to get voltage: %d\n", ret);
 			return ret;
 		}
+		/* Check if voltage is greater than 3.9v */
 		if (volt_val.intval > 3900000)
-			battery_present = true;
+			di->battery_present = true;
 		else
-			battery_present = false; /* Voltage is less than 4V */
+			di->battery_present = false;
 	} else {
-		battery_present = true; /* Current is non-zero or no leak */
+		di->battery_present = true; /* Current is non-zero or no leak */
 	}
 
-	if (battery_present) {
+	if (di->battery_present) {
 		di->bat.type = POWER_SUPPLY_TYPE_BATTERY;
 		di->bat.properties = bq27x00_battery_props;
 		di->bat.num_properties = ARRAY_SIZE(bq27x00_battery_props);
@@ -622,9 +690,46 @@ static int bq27x00_powersupply_init(struct bq27x00_device_info *di)
 
 		dev_info(di->dev, "support ver. %s enabled\n", DRIVER_VERSION);
 
-		bq27x00_update(di);
-	}
+		di->ac.name = "ac-supply";
+		di->ac.type = POWER_SUPPLY_TYPE_MAINS;
+		di->ac.properties = bq27x00_ac_props;
+		di->ac.num_properties = ARRAY_SIZE(bq27x00_ac_props);
+		di->ac.get_property = bq27x00_ac_get_property;
 
+		ret = power_supply_register(di->dev, &di->ac);
+		if (ret) {
+			dev_err(di->dev, "fail to register AC: %d\n", ret);
+			power_supply_unregister(&di->bat);
+			return ret;
+		}
+
+		status = request_threaded_irq(di->gpio_irq, NULL,
+				bq27x00_irq_handler,
+				IRQF_TRIGGER_LOW, "bq27x00_soc_int",
+				di);
+		if (status) {
+			dev_err(di->dev, "request irq failed for bq27x00_soc_int");
+			power_supply_unregister(&di->bat);
+			power_supply_unregister(&di->ac);
+			return status;
+		}
+
+		bq27x00_update(di);
+	} else {
+
+		di->bat_sim.name = "bat-sim";
+		di->bat_sim.type = POWER_SUPPLY_TYPE_MAINS;
+		di->bat_sim.properties = bq27x00_ac_props;
+		di->bat_sim.num_properties = ARRAY_SIZE(bq27x00_ac_props);
+		di->bat_sim.get_property = bq27x00_bat_sim_get_property;
+
+		ret = power_supply_register(di->dev, &di->bat_sim);
+		if (ret) {
+			dev_err(di->dev, "fail to register bat sim: %d\n", ret);
+			return ret;
+		}
+		dev_info(di->dev, "support ver. %s enabled\n", DRIVER_VERSION);
+	}
 	return 0;
 }
 
@@ -642,6 +747,8 @@ static void bq27x00_powersupply_unregister(struct bq27x00_device_info *di)
 
 	power_supply_unregister(&di->bat);
 
+	free_irq(di->gpio_irq, NULL);
+	gpio_free(di->gpio);
 	mutex_destroy(&di->lock);
 }
 
@@ -726,14 +833,26 @@ static int bq27x00_battery_probe(struct i2c_client *client,
 	di->chip = id->driver_data;
 	di->bat.name = name;
 	di->bus.read = &bq27x00_read_i2c;
+	di->gpio = client->irq;
+	retval = gpio_request_one(di->gpio, GPIOF_IN, "bq_gpio");
+	if (retval < 0) {
+		dev_err(di->dev, "Could not request for GPIO:%i\n",
+				di->gpio);
+		goto batt_failed_3;
+	}
+
+	di->gpio_irq = gpio_to_irq(di->gpio);
 
 	if (bq27x00_powersupply_init(di))
-		goto batt_failed_3;
+		goto batt_failed_4;
 
 	i2c_set_clientdata(client, di);
 
 	return 0;
 
+batt_failed_4:
+	gpio_free(di->gpio);
+	free_irq(di->gpio_irq, NULL);
 batt_failed_3:
 	kfree(di);
 batt_failed_2:

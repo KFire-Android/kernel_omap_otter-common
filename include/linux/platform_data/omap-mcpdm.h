@@ -1,11 +1,9 @@
 /*
- * omap-abe.h  --  OMAP Audio Backend
+ * omap-mcpdm.h  --  OMAP McPDM
  *
  * Copyright (C) 2012 Texas Instruments
  *
- * Contact: Liam Girdwood <lrg@ti.com>
- *          Misael Lopez Cruz <misael.lopez@ti.com>
- *          Sebastien Guiriec <s-guiriec@ti.com>
+ * Contact: Misael Lopez Cruz <misael.lopez@ti.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -23,13 +21,10 @@
  *
  */
 
-#ifndef _OMAP_ABE_H
-#define _OMAP_ABE_H
+#ifndef _SND_OMAP_MCPDM_H
+#define _SND_OMAP_MCPDM_H
 
-struct omap_abe_pdata {
-	int (*get_context_loss_count)(struct device *dev);
-	int (*device_scale)(struct device *target_dev,
-			    unsigned long rate);
+struct omap_mcpdm_pdata {
 	void (*disable_idle_on_suspend)(struct platform_device *pdev);
 };
 

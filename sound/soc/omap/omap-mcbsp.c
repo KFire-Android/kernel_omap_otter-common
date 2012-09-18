@@ -781,6 +781,10 @@ static __devinit int asoc_mcbsp_probe(struct platform_device *pdev)
 	mcbsp->dev = &pdev->dev;
 	platform_set_drvdata(pdev, mcbsp);
 
+	/* McBSP must be active during suspend in voice calls */
+	if (pdata->disable_idle_on_suspend)
+		pdata->disable_idle_on_suspend(pdev);
+
 	ret = omap_mcbsp_init(pdev);
 	if (!ret)
 		return snd_soc_register_dai(&pdev->dev, &omap_mcbsp_dai);

@@ -32,6 +32,7 @@
 #include <linux/io.h>
 #include <linux/slab.h>
 #include <linux/pm_runtime.h>
+#include <linux/platform_data/omap-dmic.h>
 #include <plat/dma.h>
 
 #include <sound/core.h>
@@ -520,6 +521,7 @@ static struct snd_soc_dai_driver omap_dmic_dai[] = {
 
 static __devinit int asoc_dmic_probe(struct platform_device *pdev)
 {
+	struct omap_dmic_pdata *pdata = dev_get_platdata(&pdev->dev);
 	struct omap_dmic *dmic;
 	struct resource *res;
 	int ret;
@@ -576,6 +578,10 @@ static __devinit int asoc_dmic_probe(struct platform_device *pdev)
 		ret = -ENOMEM;
 		goto err_put_clk;
 	}
+
+	/* DMic modules can remain active on suspend during voice call */
+	if (pdata && pdata->disable_idle_on_suspend)
+		pdata->disable_idle_on_suspend(pdev);
 
 	ret = snd_soc_register_dais(&pdev->dev, omap_dmic_dai,
 			ARRAY_SIZE(omap_dmic_dai));

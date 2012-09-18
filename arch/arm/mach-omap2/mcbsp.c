@@ -214,6 +214,9 @@ static int __init omap_init_mcbsp(struct omap_hwmod *oh, void *unused)
 		pdata->enable_st_clock = omap3_enable_st_clock;
 		count++;
 	}
+
+	pdata->disable_idle_on_suspend = omap_device_disable_idle_on_suspend;
+
 	pdev = omap_device_build_ss(name, id, oh_device, count, pdata,
 				sizeof(*pdata), NULL, 0, false);
 	kfree(pdata);
