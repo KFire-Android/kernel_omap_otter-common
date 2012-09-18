@@ -221,7 +221,7 @@ static struct device_info dsp_dev_info = {
 	.voltdm_name	= "iva",
 };
 
-static struct omap_opp_def __initdata omap443x_opp_def_list[] = {
+static struct omap_opp_def omap443x_opp_def_list[] = {
 	/* MPU OPP1 - OPP50 */
 	OPP_INITIALIZER(&mpu_dev_info, true, 300000000, OMAP4430_VDD_MPU_OPP50_UV),
 	/* MPU OPP2 - OPP100 */
@@ -357,7 +357,7 @@ static struct device_info omap4460_mpu_dev_info = {
 	.voltdm_name	= "mpu",
 };
 
-static struct omap_opp_def __initdata omap446x_opp_def_list[] = {
+static struct omap_opp_def omap446x_opp_def_list[] = {
 	/* MPU OPP1 - OPP50 */
 	OPP_INITIALIZER(&omap4460_mpu_dev_info, true, 350000000, OMAP4460_VDD_MPU_OPP50_UV),
 	/* MPU OPP2 - OPP100 */
@@ -524,7 +524,7 @@ static struct device_info bb2d_dev_info = {
 
 #define OMAP4470_LP_OPP_SET_CORE_DPLL_FREQ 1600000000
 
-static struct omap_opp_def __initdata omap447x_opp_low_def_list[] = {
+static struct omap_opp_def omap447x_opp_low_def_list[] = {
 	/* MPU OPP1 - OPP50 */
 	OPP_INITIALIZER(&omap4460_mpu_dev_info, true, 396800000, OMAP4470_VDD_MPU_OPP50_UV),
 	/* MPU OPP2 - OPP100 */
@@ -584,7 +584,7 @@ static struct omap_opp_def __initdata omap447x_opp_low_def_list[] = {
 	/* TODO: Add DSS */
 };
 
-static struct omap_opp_def __initdata omap447x_opp_high_def_list[] = {
+static struct omap_opp_def omap447x_opp_high_def_list[] = {
 	/* MPU OPP1 - OPP50 */
 	OPP_INITIALIZER(&omap4460_mpu_dev_info, true, 396800000, OMAP4470_VDD_MPU_OPP50_UV),
 	/* MPU OPP2 - OPP100 */

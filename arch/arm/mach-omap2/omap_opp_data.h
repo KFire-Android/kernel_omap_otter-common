@@ -122,7 +122,7 @@ struct omap_opp_def {
 	.opp_sel	= _opp_sel,				       \
 }
 /* Use this to initialize the default table */
-extern int __init omap_init_opp_table(struct omap_opp_def *opp_def,
+extern int __initdata omap_init_opp_table(struct omap_opp_def *opp_def,
 		u32 opp_def_size);
 
 

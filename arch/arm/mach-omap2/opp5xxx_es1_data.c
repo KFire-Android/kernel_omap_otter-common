@@ -249,7 +249,7 @@ static struct device_info gpu_dev_info = {
 	.voltdm_name	= "mm",
 };
 
-static struct omap_opp_def __initdata omap5430_es1_opp_def_list[] = {
+static struct omap_opp_def omap5430_es1_opp_def_list[] = {
 #ifdef CONFIG_MACH_OMAP_5430ZEBU
 	/* MPU OPP1 - OPPLOW */
 	OPP_INITIALIZER(&mpu_dev_info, true, 550000000, OMAP5430_VDD_MPU_OPP_LOW),
@@ -322,7 +322,7 @@ static struct omap_opp_def __initdata omap5430_es1_opp_def_list[] = {
  * domain to stay at OPP NOM. Anything sourced from VDD_CORE must stay
  * at OPP NOM as well.
  */
-static struct omap_opp_def __initdata omap5432_es1_opp_def_list[] = {
+static struct omap_opp_def omap5432_es1_opp_def_list[] = {
 	/* MPU OPP1 - OPPLOW */
 	OPP_INITIALIZER(&mpu_dev_info, true, 400000000, OMAP5432_VDD_MPU_OPP_LOW),
 	/* MPU OPP2 - OPPNOM */
