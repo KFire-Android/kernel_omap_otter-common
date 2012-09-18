@@ -52,6 +52,9 @@ struct palmas {
 	/* Stored chip id */
 	int id;
 
+	/* Stored revision of palmas */
+	int revision;
+
 	/* Silicon Errata */
 	u32 errata;
 
@@ -321,6 +324,13 @@ extern int palmas_gpadc_rt_result(struct palmas_gpadc *gpadc,
 extern int palmas_gpadc_configure_ilmonitor(struct palmas_gpadc *gpadc,
 		int enable, int rext, int channel);
 
+/* revision for twl6035 and twl6037 */
+enum palmas_revision {
+	PALMAS_REV_ES1_0,
+	PALMAS_REV_ES2_0,
+	PALMAS_REV_ES2_1,
+};
+
 /* Define the palmas IRQ numbers */
 enum palmas_irqs {
 	/* INT1 registers */
@@ -529,6 +539,8 @@ enum usb_irq_events {
 #define PALMAS_GPIO_BASE					0x280
 #define PALMAS_USB_BASE						0x290
 #define PALMAS_GPADC_BASE					0x2C0
+/* applicable for twl6035 & twl6037 */
+#define PALMAS_DESIGNREV_BASE					0x357
 #define PALMAS_TRIM_GPADC_BASE					0x3CD
 
 /* Registers for function RTC */
