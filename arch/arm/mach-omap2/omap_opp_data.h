@@ -124,6 +124,7 @@ struct omap_opp_def {
 /* Use this to initialize the default table */
 extern int __initdata omap_init_opp_table(struct omap_opp_def *opp_def,
 		u32 opp_def_size);
+extern int __initdata set_device_opp(void);
 
 
 extern struct omap_volt_data omap34xx_vddmpu_volt_data[];

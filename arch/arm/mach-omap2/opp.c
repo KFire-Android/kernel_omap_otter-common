@@ -32,6 +32,21 @@
 static struct omap_opp_def *opp_table;
 static u32 opp_table_size;
 
+static void __init omap_opp_set_min_rate(struct omap_opp_def *opp_def)
+{
+	struct clk *clk;
+	long round_rate;
+	clk = omap_clk_get_by_name(opp_def->dev_info->clk_name);
+	if (clk) {
+		round_rate = clk_round_rate(clk, opp_def->freq);
+		clk_set_rate(clk, round_rate);
+		pr_info("%s: Missing opp info for hwmod %s\n",
+			__func__, opp_def->dev_info->hwmod_name);
+		pr_info("Forcing clock %s to minimum rate %ld\n",
+			opp_def->dev_info->clk_name, round_rate);
+	}
+}
+
 /**
  * omap_opp_register() - Initialize opp table as per the CPU type
  * @dev: device registering for OPP
@@ -126,6 +141,50 @@ int __init omap_init_opp_table(struct omap_opp_def *opp_def,
 	if (!opp_table) {
 		opp_table = opp_def;
 		opp_table_size = opp_def_size;
+	}
+
+	return 0;
+}
+
+/**
+ * set_device_opp() - set the default OPP for devices that are not
+ * registered
+ *
+ * Sets the frequency for devices that are not available to lowest
+ * possible one so that they will not prevent DVFS  transition.
+ */
+int __init set_device_opp(void)
+{
+	int i;
+	struct omap_opp_def *opp_def = opp_table;
+	u32 opp_def_size = opp_table_size;
+	struct device_info *last_dev_info = NULL;
+
+	if (!opp_def || !opp_def_size) {
+		pr_err("%s: invalid params!\n", __func__);
+		return -EINVAL;
+	}
+
+	/* Lets now register with OPP library */
+	for (i = 0; i < opp_def_size; i++, opp_def++) {
+		struct omap_hwmod *oh;
+
+		if (!opp_def->default_available)
+			continue;
+
+		if (!opp_def->dev_info->hwmod_name) {
+			WARN_ONCE(1, "%s: NULL name of omap_hwmod, " \
+				  "failing [%d].\n", __func__, i);
+			return -EINVAL;
+		}
+
+		if (last_dev_info != opp_def->dev_info) {
+			oh = omap_hwmod_lookup(opp_def->dev_info->hwmod_name);
+			if (!oh || !oh->od) {
+				omap_opp_set_min_rate(opp_def);
+				last_dev_info = opp_def->dev_info;
+			}
+		}
 	}
 
 	return 0;

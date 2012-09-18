@@ -34,6 +34,7 @@
 #include "pm.h"
 #include "twl-common.h"
 #include "abb.h"
+#include "omap_opp_data.h"
 
 static struct device *l3_dev;
 static struct powerdomain *core_pd;
@@ -664,6 +665,8 @@ next:
 
 	/* Initialize Core PM */
 	omap4_pm_init();
+
+	set_device_opp();
 
 	omap_pm_is_ready_status = true;
 	/* let the other CPU know as well */
