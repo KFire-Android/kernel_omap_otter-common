@@ -105,6 +105,9 @@ static int omap_ion_probe(struct platform_device *pdev)
 				nonsecure_tiler_heap = heaps[i];
 			else
 				tiler_heap = heaps[i];
+		} else if (heap_data->type ==
+				OMAP_ION_HEAP_TYPE_TILER_RESERVATION) {
+			heaps[i] = omap_tiler_heap_create(heap_data);
 		} else {
 			heaps[i] = ion_heap_create(heap_data);
 		}
