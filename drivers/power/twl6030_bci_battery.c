@@ -301,7 +301,6 @@ struct twl6030_bci_device_info {
 	unsigned int		capacity;
 	unsigned int		capacity_debounce_count;
 	unsigned int		boot_capacity_mAh;
-	unsigned long		ac_next_refresh;
 	unsigned int		prev_capacity;
 	unsigned int		wakelock_enabled;
 
@@ -1661,8 +1660,6 @@ static int capacity_lookup(int volt)
 static int capacity_changed(struct twl6030_bci_device_info *di)
 {
 	int curr_capacity = di->capacity;
-	int charger_source = di->charger_source;
-	int charging_disabled = 0;
 	s32 acc_value, samples = 0;
 	int accumulated_charge;
 	int ret;
@@ -1674,60 +1671,6 @@ static int capacity_changed(struct twl6030_bci_device_info *di)
 	 * Since Voltage measured during charging is Voreg ~4.2v,
 	 * we dont update capacity if we are charging.
 	 */
-
-	/* if it has been more than 10 minutes since our last update
-	 * and we are charging we force a update.
-	 */
-
-	if (time_after(jiffies, di->ac_next_refresh)
-		&& (di->charger_source != POWER_SUPPLY_TYPE_BATTERY)) {
-
-		charging_disabled = 1;
-		di->ac_next_refresh = jiffies +
-			msecs_to_jiffies(CHARGING_CAPACITY_UPDATE_PERIOD);
-		di->capacity = -1;
-
-		/* We have to disable charging to read correct
-		 * voltages.
-		 */
-		twl6030_stop_charger(di);
-		/*voltage setteling time*/
-		msleep(200);
-
-		di->voltage_mV = twl6030_get_gpadc_conversion(di,
-						di->gpadc_vbat_chnl);
-	}
-
-	/* Setting the capacity level only makes sense when on
-	 * the battery is powering the board.
-	 */
-	if ((di->charge_status == POWER_SUPPLY_STATUS_DISCHARGING) ||
-		(di->charge_status == POWER_SUPPLY_STATUS_NOT_CHARGING)) {
-
-		if (di->voltage_mV < 3500)
-			curr_capacity = 5;
-		else if (di->voltage_mV < 3600 && di->voltage_mV >= 3500)
-			curr_capacity = 20;
-		else if (di->voltage_mV < 3700 && di->voltage_mV >= 3600)
-			curr_capacity = 50;
-		else if (di->voltage_mV < 3800 && di->voltage_mV >= 3700)
-			curr_capacity = 75;
-		else if (di->voltage_mV < 3900 && di->voltage_mV >= 3800)
-			curr_capacity = 90;
-		else if (di->voltage_mV >= 3900)
-			curr_capacity = 100;
-	}
-
-	/* if we disabled charging to check capacity,
-	 * enable it again after we read the
-	 * correct voltage.
-	 */
-	if (charging_disabled) {
-		if (charger_source == POWER_SUPPLY_TYPE_MAINS)
-			twl6030_start_ac_charger(di);
-		else if (charger_source == POWER_SUPPLY_TYPE_USB)
-			twl6030_start_usb_charger(di);
-	}
 
 	/* FG_REG_01, 02, 03 is 24 bit unsigned sample counter value */
 	ret = twl_i2c_read(TWL6030_MODULE_GASGAUGE, (u8 *) &samples,
@@ -1775,13 +1718,6 @@ static int capacity_changed(struct twl6030_bci_device_info *di)
 	 */
 	if (!is_battery_present(di))
 		curr_capacity = 100;
-
-       /* Debouncing of voltage change. */
-	if (di->capacity == -1) {
-		di->capacity = curr_capacity;
-		di->capacity_debounce_count = 0;
-		return 1;
-	}
 
 	if (curr_capacity != di->prev_capacity) {
 		di->prev_capacity = curr_capacity;
@@ -2756,7 +2692,6 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 	di->vac_priority = 2;
 	di->capacity = -1;
 	di->capacity_debounce_count = 0;
-	di->ac_next_refresh = jiffies - 1;
 	platform_set_drvdata(pdev, di);
 
 	/* calculate current max scale from sense */
