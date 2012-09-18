@@ -378,7 +378,6 @@ config MACH_OMAP5_SEVM
 	depends on ARCH_OMAP5
 	select GPIO_PCA953X
 	select GPIO_PCA953X_IRQ
-	select OMAP_SEVM_DOCK if SWITCH
 
 config MACH_OMAP5_PANDA
 	bool "OMAP5 Panda board"
