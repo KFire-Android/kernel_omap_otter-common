@@ -857,16 +857,21 @@ static __devinit int palmas_probe(struct platform_device *pdev)
 	 * Errata Registration
 	 * TBD - Handle based on revision once we are sure of fix
 	 */
-	if (palmas->id == PALMAS_ID_TWL6035) {
+
+	if (palmas->id == PALMAS_ID_TWL6035 &&
+	    palmas->revision <= PALMAS_REV_ES2_0) {
 		set_palmas_erratum(palmas, SMPS_OUTPUT_VOLT_DROP);
 		dev_warn(&pdev->dev, "Erratum SMPS_OUTPUT_VOLT_DROP!");
 	}
 
-	if (palmas->id == PALMAS_ID_TWL6035) {
+	if (palmas->id == PALMAS_ID_TWL6035 &&
+	    palmas->revision <= PALMAS_REV_ES2_0) {
 		set_palmas_erratum(palmas, SMPS_MIXED_PHASE_ZERO_CROSS_DETECT);
 		dev_warn(&pdev->dev,
 			 "Erratum SMPS_MIXED_PHASE_ZERO_CROSS_DETECT!");
+	}
 
+	if (is_palmas_erratum(palmas, SMPS_MIXED_PHASE_ZERO_CROSS_DETECT)) {
 		ret = palmas_smps_read(palmas, PALMAS_SMPS_CTRL, &reg);
 		if (ret)
 			goto err_unregister_regulator;
