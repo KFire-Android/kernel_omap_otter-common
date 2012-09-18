@@ -376,7 +376,6 @@ config MACH_OMAP5_SEVM
 	bool "OMAP5 EVM board"
 	default y
 	depends on ARCH_OMAP5
-	select INPUT_TSL2771
 	select INPUT_BMP085
 	select DRV2667_HAPTICS if ANDROID_TIMED_OUTPUT
 	select BATTERY_BQ27x00
