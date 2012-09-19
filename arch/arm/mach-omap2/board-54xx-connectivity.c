@@ -145,12 +145,21 @@ static int plat_wlink_kim_resume(struct platform_device *pdev)
 static bool uart_req;
 static struct wake_lock st_wk_lock;
 /* Call the uart disable of serial driver */
-static int plat_uart_disable(struct kim_data_s *un_used)
+static int plat_uart_disable(struct kim_data_s *kdata)
 {
 	int port_id = 0;
 	int err = 0;
 	if (uart_req) {
-		sscanf(WILINK_UART_DEV_NAME, "/dev/ttyO%d", &port_id);
+		if (!kdata) {
+			pr_err("%s: NULL kim_data pointer\n", __func__);
+			return -EINVAL;
+		}
+		err = sscanf(kdata->dev_name, "/dev/ttyO%d", &port_id);
+		if (!err) {
+			pr_err("%s: Wrong UART name: %s\n", __func__,
+				kdata->dev_name);
+			return -EINVAL;
+		}
 		err = omap_serial_ext_uart_disable(port_id);
 		if (!err)
 			uart_req = false;
@@ -160,12 +169,21 @@ static int plat_uart_disable(struct kim_data_s *un_used)
 }
 
 /* Call the uart enable of serial driver */
-static int plat_uart_enable(struct kim_data_s *un_used)
+static int plat_uart_enable(struct kim_data_s *kdata)
 {
 	int port_id = 0;
 	int err = 0;
 	if (!uart_req) {
-		sscanf(WILINK_UART_DEV_NAME, "/dev/ttyO%d", &port_id);
+		if (!kdata) {
+			pr_err("%s: NULL kim_data pointer\n", __func__);
+			return -EINVAL;
+		}
+		err = sscanf(kdata->dev_name, "/dev/ttyO%d", &port_id);
+		if (!err) {
+			pr_err("%s: Wrong UART name: %s\n", __func__,
+				kdata->dev_name);
+			return -EINVAL;
+		}
 		err = omap_serial_ext_uart_enable(port_id);
 		if (!err)
 			uart_req = true;
