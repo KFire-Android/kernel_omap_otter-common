@@ -877,10 +877,12 @@ static int cfhsi_rx_desc(struct cfhsi_desc *desc, struct cfhsi *cfhsi)
 		struct sk_buff *skb;
 		u8 *dst = NULL;
 		int len = 0;
+		int padding;
 		pfrm = ((u8 *)desc) + desc->offset;
 
 		/* Remove offset padding. */
-		pfrm += *pfrm + 1;
+		padding = *pfrm + 1;
+		pfrm += padding;
 
 		/* Read length of CAIF frame (little endian). */
 		len = *pfrm;
@@ -895,7 +897,7 @@ static int cfhsi_rx_desc(struct cfhsi_desc *desc, struct cfhsi *cfhsi)
 		}
 
 		/* Allocate SKB (OK even in IRQ context). */
-		skb = alloc_skb(len + 1, GFP_ATOMIC);
+		skb = alloc_skb(len + padding + 1, GFP_ATOMIC);
 		if (!skb) {
 			netdev_err(cfhsi->ndev, "%s: Out of memory !\n",
 				__func__);
@@ -903,6 +905,7 @@ static int cfhsi_rx_desc(struct cfhsi_desc *desc, struct cfhsi *cfhsi)
 		}
 		caif_assert(skb != NULL);
 
+		skb_reserve(skb, padding);
 		dst = skb_put(skb, len);
 		memcpy(dst, pfrm, len);
 
@@ -1016,9 +1019,11 @@ static int cfhsi_rx_pld(struct cfhsi_desc *desc, struct cfhsi *cfhsi)
 		u8 *dst = NULL;
 		u8 *pcffrm = NULL;
 		int len;
+		int padding;
 
 		/* CAIF frame starts after head padding. */
-		pcffrm = pfrm + *pfrm + 1;
+		padding = *pfrm + 1;
+		pcffrm = pfrm + padding;
 
 		/* Read length of CAIF frame (little endian). */
 		len = *pcffrm;
@@ -1033,7 +1038,7 @@ static int cfhsi_rx_pld(struct cfhsi_desc *desc, struct cfhsi *cfhsi)
 		}
 
 		/* Allocate SKB (OK even in IRQ context). */
-		skb = alloc_skb(len + 1, GFP_ATOMIC);
+		skb = alloc_skb(len + padding + 1, GFP_ATOMIC);
 		if (!skb) {
 			netdev_err(cfhsi->ndev, "%s: Out of memory !\n",
 				__func__);
@@ -1042,6 +1047,7 @@ static int cfhsi_rx_pld(struct cfhsi_desc *desc, struct cfhsi *cfhsi)
 		}
 		caif_assert(skb != NULL);
 
+		skb_reserve(skb, padding);
 		dst = skb_put(skb, len);
 		memcpy(dst, pcffrm, len);
 
