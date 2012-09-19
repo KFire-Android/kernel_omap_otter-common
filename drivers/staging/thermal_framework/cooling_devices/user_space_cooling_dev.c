@@ -67,6 +67,16 @@ static struct thermal_dev_ops user_cooling_ops = {
 	.cool_device = user_apply_cooling,
 };
 
+static ssize_t
+level_show(struct device *dev, struct device_attribute *attr,
+	   char *buf)
+{
+	struct user_cooling_dev *cooling_dev = dev_get_drvdata(dev);
+
+	return sprintf(buf, "%d\n", cooling_dev->cur_cooling_level);
+}
+static DEVICE_ATTR(level, 0444, level_show, NULL);
+
 static int __devinit user_cooling_dev_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
@@ -81,7 +91,6 @@ static int __devinit user_cooling_dev_probe(struct platform_device *pdev)
 
 	cooling_dev->dev = dev;
 	platform_set_drvdata(pdev, cooling_dev);
-	kobject_uevent(&pdev->dev.kobj, KOBJ_ADD);
 
 	cooling_dev->therm_fw = devm_kzalloc(&pdev->dev,
 					     sizeof(struct thermal_dev),
@@ -100,6 +109,12 @@ static int __devinit user_cooling_dev_probe(struct platform_device *pdev)
 	}
 
 	cooling_dev->cur_cooling_level = 0;
+
+	ret = device_create_file(cooling_dev->dev, &dev_attr_level);
+	if (ret)
+		goto free_user_cooling;
+
+	kobject_uevent(&pdev->dev.kobj, KOBJ_ADD);
 
 	dev_info(&pdev->dev, "%s: Initialised\n", cooling_dev->therm_fw->name);
 
