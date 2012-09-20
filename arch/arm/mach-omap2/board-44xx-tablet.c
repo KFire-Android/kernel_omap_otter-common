@@ -281,6 +281,13 @@ static struct regulator_init_data tablet_vusim = {
 	},
 };
 
+static struct regulator_init_data clk32kg = {
+	.constraints = {
+		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
+		.always_on		= true,
+	},
+};
+
 static struct twl6040_codec_data twl6040_codec = {
 	/* single-step ramp for headset and handsfree */
 	.hs_left_step	= 0x0f,
@@ -309,6 +316,7 @@ static struct twl4030_platform_data tablet_twldata = {
 	/* Regulators */
 	.vusim		= &tablet_vusim,
 	.vaux1		= &tablet_vaux1,
+	.clk32kg	= &clk32kg,
 };
 
 static int __init omap4_i2c_init(void)
