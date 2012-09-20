@@ -845,6 +845,11 @@ static void lg_panel_set_power(bool enable)
 static struct panel_lg4591_data dsi_panel = {
 	.reset_gpio = 183,
 	.set_power = lg_panel_set_power,
+	.number_actions = 2,
+	.cooling_actions = {
+		{ .priority = 0, .percentage = 100 },
+		{ .priority = 1, .percentage = 75 },
+	},
 };
 
 static struct omap_dss_device omap5evm_lcd_device = {
