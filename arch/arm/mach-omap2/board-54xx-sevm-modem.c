@@ -19,6 +19,7 @@
 
 #include <linux/gpio.h>
 #include <linux/delay.h>
+#include <linux/interrupt.h>
 #include "mux.h"
 #include "board-omap5evm.h"
 #include <plat/omap_hsi.h>
@@ -167,10 +168,7 @@ err_pwrstate:
 	if (!modem_detected)
 		omap5evm_modem_pad_conf_disable();
 	else
-		omap_mux_init_gpio(OMAP5_GPIO_MOD_RESOUT2, \
-			OMAP_PIN_INPUT_PULLDOWN | \
-			OMAP_PIN_OFF_NONE | \
-			OMAP_PIN_OFF_WAKEUPENABLE);
+		enable_irq_wake(gpio_to_irq(OMAP5_GPIO_MOD_RESOUT2));
 
 	if (modem_detected || force_mux) {
 		/* Load HSI driver for platform */

@@ -213,6 +213,7 @@ extern void omap2_gpio_prepare_for_idle(int off_mode);
 extern void omap2_gpio_resume_after_idle(void);
 extern void omap_set_gpio_debounce(int gpio, int enable);
 extern void omap_set_gpio_debounce_time(int gpio, int enable);
+extern void omap2_gpio_trigger_wakeup_irqs(void);
 /*-------------------------------------------------------------------------*/
 
 /*
