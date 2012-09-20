@@ -22,9 +22,16 @@
 #ifndef __LINUX_PLATFORM_DATA_PANEL_LG4591_H
 #define __LINUX_PLATFORM_DATA_PANEL_LF4591_H
 
+struct lg4591_cooling_actions {
+	int priority;
+	int percentage;
+};
+
 struct panel_lg4591_data {
 	int	reset_gpio;
 	void	(*set_power)(bool enable);
+	int	number_actions;
+	struct	lg4591_cooling_actions cooling_actions[];
 };
 
 #endif
