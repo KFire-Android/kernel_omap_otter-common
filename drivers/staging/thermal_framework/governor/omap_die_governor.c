@@ -29,6 +29,8 @@
 
 #include <linux/thermal_framework.h>
 
+#include <plat/cpu.h>
+
 /* Zone information */
 #define FATAL_ZONE	5
 #define PANIC_ZONE	4
@@ -37,8 +39,12 @@
 #define SAFE_ZONE	1
 #define NO_ACTION	0
 #define MAX_NO_MON_ZONES PANIC_ZONE
-#define OMAP_FATAL_TEMP 125000
-#define OMAP_PANIC_TEMP 110000
+#define OMAP_FATAL_DEFAULT_TEMP 125000
+#define OMAP_PANIC_DEFAULT_TEMP 110000
+#define OMAP_FATAL_TEMP ((omap_rev() == OMAP5430_REV_ES1_0) || \
+			 (omap_rev() == OMAP5432_REV_ES1_0) ? 120000 : 125000)
+#define OMAP_PANIC_TEMP ((omap_rev() == OMAP5430_REV_ES1_0) || \
+			 (omap_rev() == OMAP5432_REV_ES1_0) ? 105000 : 110000)
 #define OMAP_ALERT_TEMP 100000
 #define OMAP_MONITOR_TEMP 85000
 #define OMAP_SAFE_TEMP  25000
@@ -46,7 +52,10 @@
 /* TODO: Define this via a configurable file */
 #define HYSTERESIS_VALUE 5000
 #define NORMAL_TEMP_MONITORING_RATE 1000
-#define FAST_TEMP_MONITORING_RATE 250
+#define FAST_TEMP_DEFAULT_MONITORING_RATE 250
+#define FAST_TEMP_MONITORING_RATE ((omap_rev() == OMAP5430_REV_ES1_0) || \
+				   (omap_rev() == OMAP5432_REV_ES1_0)	 \
+				   ? 125 : 250)
 #define AVERAGE_NUMBER 20
 
 
@@ -107,16 +116,22 @@ struct omap_governor {
 /* Initial set of thersholds for different thermal zones */
 static struct omap_thermal_zone omap_thermal_init_zones[] __initdata = {
 	OMAP_THERMAL_ZONE("safe", 0, OMAP_SAFE_TEMP, OMAP_MONITOR_TEMP,
-			FAST_TEMP_MONITORING_RATE, NORMAL_TEMP_MONITORING_RATE),
+			FAST_TEMP_DEFAULT_MONITORING_RATE,
+			NORMAL_TEMP_MONITORING_RATE),
 	OMAP_THERMAL_ZONE("monitor", 0,
 			OMAP_MONITOR_TEMP - HYSTERESIS_VALUE, OMAP_ALERT_TEMP,
-			FAST_TEMP_MONITORING_RATE, FAST_TEMP_MONITORING_RATE),
+			FAST_TEMP_DEFAULT_MONITORING_RATE,
+			FAST_TEMP_DEFAULT_MONITORING_RATE),
 	OMAP_THERMAL_ZONE("alert", 0,
-			OMAP_ALERT_TEMP - HYSTERESIS_VALUE, OMAP_PANIC_TEMP,
-			FAST_TEMP_MONITORING_RATE, FAST_TEMP_MONITORING_RATE),
+			OMAP_ALERT_TEMP - HYSTERESIS_VALUE,
+			OMAP_PANIC_DEFAULT_TEMP,
+			FAST_TEMP_DEFAULT_MONITORING_RATE,
+			FAST_TEMP_DEFAULT_MONITORING_RATE),
 	OMAP_THERMAL_ZONE("panic", 1,
-			OMAP_PANIC_TEMP - HYSTERESIS_VALUE, OMAP_FATAL_TEMP,
-			FAST_TEMP_MONITORING_RATE, FAST_TEMP_MONITORING_RATE),
+			OMAP_PANIC_DEFAULT_TEMP - HYSTERESIS_VALUE,
+			OMAP_FATAL_DEFAULT_TEMP,
+			FAST_TEMP_DEFAULT_MONITORING_RATE,
+			FAST_TEMP_DEFAULT_MONITORING_RATE),
 };
 
 static struct omap_governor *omap_gov_instance[OMAP_GOV_MAX_INSTANCE];
@@ -670,7 +685,8 @@ static struct notifier_block omap_die_pm_notifier = {
 
 static int __init omap_governor_init(void)
 {
-	int i;
+	int i, zone;
+	struct omap_thermal_zone *t_zone;
 
 	for (i = 0; i < OMAP_GOV_MAX_INSTANCE; i++) {
 		omap_gov_instance[i] = kzalloc(sizeof(struct omap_governor),
@@ -753,6 +769,22 @@ static int __init omap_governor_init(void)
 	omap_gov_instance[OMAP_GOV_GPU_INSTANCE]->thermal_fw.domain_name,
 	omap_gov_instance[OMAP_GOV_GPU_INSTANCE]->omap_gradient_slope,
 	omap_gov_instance[OMAP_GOV_GPU_INSTANCE]->omap_gradient_const);
+
+	for (i = 0; i < OMAP_GOV_MAX_INSTANCE; i++) {
+		t_zone = omap_gov_instance[i]->omap_thermal_zones;
+
+		t_zone[ALERT_ZONE].temp_upper = OMAP_PANIC_TEMP;
+		t_zone[PANIC_ZONE].temp_lower = OMAP_FATAL_TEMP -
+							HYSTERESIS_VALUE;
+		t_zone[PANIC_ZONE].temp_upper = OMAP_FATAL_TEMP;
+
+		for (zone = 0; zone <= MAX_NO_MON_ZONES; zone++) {
+			t_zone[zone].update_rate = FAST_TEMP_MONITORING_RATE;
+			if (zone != SAFE_ZONE)
+				t_zone[zone].average_rate =
+						FAST_TEMP_MONITORING_RATE;
+		}
+	}
 
 	return 0;
 
