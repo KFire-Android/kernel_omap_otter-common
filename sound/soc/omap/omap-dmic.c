@@ -92,7 +92,33 @@ static inline void omap_dmic_start(struct omap_dmic *dmic)
 	omap_dmic_write(dmic, OMAP_DMIC_DMAENABLE_SET_REG,
 			OMAP_DMIC_DMA_ENABLE);
 
-	omap_dmic_write(dmic, OMAP_DMIC_CTRL_REG, ctrl | dmic->ch_enabled);
+	if (cpu_is_omap44xx()) {
+		/*
+		 * Errata i653: Uplink FIFO is correctly reset but the dma
+		 * pending signal is kept asserted when transferring data and
+		 * the path is reset by SW_DMIC_RST.
+		 * Workaround is:
+		 * - Enable: SW_DMIC_RST = 1, enable channels, SW_DMIC_RST = 0
+		 * - Disable: SW_DMIC_RST = 1, disable channels, SW_DMIC_RST = 0
+		 */
+
+		/* avoid unnecessary path reset due to errata workaround */
+		if (dmic->ch_enabled == (ctrl & OMAP_DMIC_UP_ENABLE_MASK))
+			return;
+
+		ctrl |= OMAP_DMIC_RESET;
+		omap_dmic_write(dmic, OMAP_DMIC_CTRL_REG, ctrl);
+
+		ctrl &= ~OMAP_DMIC_UP_ENABLE_MASK;
+		ctrl |= dmic->ch_enabled;
+		omap_dmic_write(dmic, OMAP_DMIC_CTRL_REG, ctrl);
+
+		ctrl &= ~OMAP_DMIC_RESET;
+		omap_dmic_write(dmic, OMAP_DMIC_CTRL_REG, ctrl);
+	} else {
+		omap_dmic_write(dmic, OMAP_DMIC_CTRL_REG,
+				ctrl | dmic->ch_enabled);
+	}
 }
 
 static inline void omap_dmic_stop(struct omap_dmic *dmic)
