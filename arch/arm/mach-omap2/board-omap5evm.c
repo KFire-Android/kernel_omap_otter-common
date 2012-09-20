@@ -131,6 +131,14 @@ static struct platform_device sevm_leds_gpio = {
 	},
 };
 
+static struct platform_device evm_user_cooling_device = {
+	.name	= "user_cooling_device",
+	.id	= -1,
+	.dev	= {
+		.platform_data = "case",
+	},
+};
+
 #ifdef CONFIG_OMAP_MUX
 static struct omap_board_mux board_mux[] __initdata = {
 	OMAP5_MUX(ABESLIMBUS1_DATA, OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE1),
@@ -764,6 +772,7 @@ static struct platform_device *omap5evm_devices[] __initdata = {
 	&omap5evm_hdmi_audio_codec,
 	&omap5evm_abe_audio,
 	&sevm_leds_gpio,
+	&evm_user_cooling_device,
 };
 
 static struct regulator_consumer_supply omap5_evm_vmmc1_supply[] = {
