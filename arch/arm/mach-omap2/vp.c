@@ -33,6 +33,10 @@ unsigned long omap_vp_get_curr_volt(struct voltagedomain *voltdm)
 	}
 
 	vp = voltdm->vp;
+	if (IS_ERR_OR_NULL(vp)) {
+		pr_err("%s: No VP info for vdd_%s\n", __func__, voltdm->name);
+		return 0;
+	}
 
 	curr_vsel = (voltdm->read(vp->voltage) & vp->common->vpvoltage_mask)
 		>> __ffs(vp->common->vpvoltage_mask);
@@ -114,9 +118,14 @@ static u32 _vp_set_init_voltage(struct voltagedomain *voltdm,
 /* Generic voltage init functions */
 void __init omap_vp_init(struct voltagedomain *voltdm)
 {
-	struct omap_vp_instance *vp = voltdm->vp;
+	struct omap_vp_instance *vp;
 	u32 val, sys_clk_rate, timeout, waittime;
 	u32 vddmin, vddmax, vstepmin, vstepmax;
+
+	if (IS_ERR_OR_NULL(voltdm)) {
+		pr_err("%s: VDD specified does not exist!\n", __func__);
+		return;
+	}
 
 	if (!voltdm->pmic || !voltdm->pmic->uv_to_vsel) {
 		pr_err("%s: No PMIC info for vdd_%s\n", __func__, voltdm->name);
@@ -126,6 +135,24 @@ void __init omap_vp_init(struct voltagedomain *voltdm)
 	if (!voltdm->read || !voltdm->write) {
 		pr_err("%s: No read/write API for accessing vdd_%s regs\n",
 			__func__, voltdm->name);
+		return;
+	}
+
+	vp = voltdm->vp;
+	if (IS_ERR_OR_NULL(vp)) {
+		pr_err("%s: No VP info for vdd_%s\n", __func__, voltdm->name);
+		return;
+	}
+
+	if (IS_ERR_OR_NULL(voltdm->vc_param)) {
+		pr_err("%s: No vc_param info for vdd_%s\n",
+		       __func__, voltdm->name);
+		return;
+	}
+
+	if (IS_ERR_OR_NULL(voltdm->vp_param)) {
+		pr_err("%s: No vp_param info for vdd_%s\n",
+		       __func__, voltdm->name);
 		return;
 	}
 
@@ -175,13 +202,24 @@ void __init omap_vp_init(struct voltagedomain *voltdm)
 int omap_vp_update_errorgain(struct voltagedomain *voltdm,
 			     struct omap_volt_data *volt_data)
 {
+	if (IS_ERR_OR_NULL(voltdm)) {
+		pr_err("%s: VDD specified does not exist!\n", __func__);
+		return 0;
+	}
+
 	if (!voltdm->vp)
 		return -EINVAL;
 
-	if (IS_ERR(volt_data)) {
+	if (IS_ERR_OR_NULL(volt_data)) {
 		pr_err("%s: vdm %s no voltage data for %p\n", __func__,
 		       voltdm->name, volt_data);
 		return -EINVAL;
+	}
+
+	if (IS_ERR_OR_NULL(voltdm->rmw)) {
+		pr_err("%s: No rmw API for reading vdd_%s regs\n",
+		       __func__, voltdm->name);
+		return 0;
 	}
 
 	/* Setting vp errorgain based on the voltage */
@@ -222,11 +260,36 @@ do {									\
 int omap_vp_forceupdate_scale(struct voltagedomain *voltdm,
 			      struct omap_volt_data *target_v)
 {
-	struct omap_vp_instance *vp = voltdm->vp;
+	struct omap_vp_instance *vp;
 	u32 vpconfig;
 	u8 target_vsel, current_vsel;
 	int ret, timeout = 0;
-	unsigned long target_volt = omap_get_operation_voltage(target_v);
+	unsigned long target_volt;
+
+	if (IS_ERR_OR_NULL(voltdm)) {
+		pr_err("%s: VDD specified does not exist!\n", __func__);
+		return -EINVAL;
+	}
+
+	if (IS_ERR_OR_NULL(voltdm->write)) {
+		pr_err("%s: No write API for writing vdd_%s regs\n",
+		       __func__, voltdm->name);
+		return -EINVAL;
+	}
+
+	if (IS_ERR_OR_NULL(target_v)) {
+		pr_err("%s: No target_v info to scale vdd_%s\n",
+		       __func__, voltdm->name);
+		return -EINVAL;
+	}
+
+	vp = voltdm->vp;
+	if (IS_ERR_OR_NULL(vp)) {
+		pr_err("%s: No VP info for vdd_%s\n", __func__, voltdm->name);
+		return -EINVAL;
+	}
+
+	target_volt = omap_get_operation_voltage(target_v);
 
 	ret = _vp_wait_for_idle(voltdm, vp);
 	if (ret) {
@@ -325,12 +388,17 @@ void omap_vp_enable(struct voltagedomain *voltdm)
 	u32 vpconfig;
 	struct omap_volt_data *volt;
 
-	if (!voltdm || IS_ERR(voltdm)) {
-		pr_warning("%s: VDD specified does not exist!\n", __func__);
+	if (IS_ERR_OR_NULL(voltdm)) {
+		pr_err("%s: VDD specified does not exist!\n", __func__);
 		return;
 	}
 
 	vp = voltdm->vp;
+	if (IS_ERR_OR_NULL(vp)) {
+		pr_err("%s: No VP info for vdd_%s\n", __func__, voltdm->name);
+		return;
+	}
+
 	if (!voltdm->read || !voltdm->write) {
 		pr_err("%s: No read/write API for accessing vdd_%s regs\n",
 			__func__, voltdm->name);
@@ -370,12 +438,17 @@ void omap_vp_disable(struct voltagedomain *voltdm)
 	struct omap_vp_instance *vp;
 	u32 vpconfig;
 
-	if (!voltdm || IS_ERR(voltdm)) {
-		pr_warning("%s: VDD specified does not exist!\n", __func__);
+	if (IS_ERR_OR_NULL(voltdm)) {
+		pr_err("%s: VDD specified does not exist!\n", __func__);
 		return;
 	}
 
 	vp = voltdm->vp;
+	if (IS_ERR_OR_NULL(vp)) {
+		pr_err("%s: No VP info for vdd_%s\n", __func__, voltdm->name);
+		return;
+	}
+
 	if (!voltdm->read || !voltdm->write) {
 		pr_err("%s: No read/write API for accessing vdd_%s regs\n",
 			__func__, voltdm->name);
