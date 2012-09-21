@@ -118,17 +118,6 @@ static void disable_put_regulator(
 	}
 }
 
-static irqreturn_t ehci_omap_irq(struct usb_hcd *hcd)
-{
-	struct device *dev = hcd->self.controller;
-
-	if (unlikely(pm_runtime_suspended(dev))) {
-		pm_runtime_resume(dev);
-		return IRQ_HANDLED;
-	}
-	return ehci_irq(hcd);
-}
-
 /* configure so an HC device and id are always provided */
 /* always called with process context; sleeping is OK */
 
@@ -397,7 +386,7 @@ static const struct hc_driver ehci_omap_hc_driver = {
 	/*
 	 * generic hardware linkage
 	 */
-	.irq			= ehci_omap_irq,
+	.irq			= ehci_irq,
 	.flags			= HCD_MEMORY | HCD_USB2,
 
 	/*

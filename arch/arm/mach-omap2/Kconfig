@@ -355,7 +355,7 @@ config MACH_OMAP_4430SDP
 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
 	select OMAP_TPS6236X
 
-config MACH_OMAP_44XX_TABLET
+config MACH_OMAP_BLAZE
 	bool "OMAP 44XX Tablet board"
 	default y
 	depends on ARCH_OMAP4

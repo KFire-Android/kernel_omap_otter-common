@@ -261,7 +261,8 @@ obj-$(CONFIG_MACH_CM_T3517)		+= board-cm-t3517.o
 obj-$(CONFIG_MACH_IGEP0020)		+= board-igep0020.o
 obj-$(CONFIG_MACH_OMAP3_TOUCHBOOK)	+= board-omap3touchbook.o
 obj-$(CONFIG_MACH_OMAP_4430SDP)		+= board-4430sdp.o
-obj-$(CONFIG_MACH_OMAP_44XX_TABLET)	+= board-44xx-tablet.o \
+
+obj-$(CONFIG_MACH_OMAP_BLAZE)           += board-44xx-tablet.o
 					   board-44xx-tablet-panel.o \
 					   board-44xx-tablet-touch.o \
 					   board-44xx-tablet-buttons.o \

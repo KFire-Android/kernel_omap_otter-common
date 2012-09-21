@@ -570,6 +570,7 @@ static int omap_abe_twl6040_init(struct snd_soc_pcm_runtime *rtd)
 		ret = snd_soc_jack_add_pins(&hs_jack, ARRAY_SIZE(hs_jack_pins),
 					hs_jack_pins);
 		if (machine_is_omap_4430sdp() ||
+			machine_is_omap_tabletblaze() ||
 			machine_is_omap5_sevm() ||
 			machine_is_omap5_panda())
 			twl6040_hs_jack_detect(codec, &hs_jack, SND_JACK_HEADSET);
@@ -577,8 +578,8 @@ static int omap_abe_twl6040_init(struct snd_soc_pcm_runtime *rtd)
 			snd_soc_jack_report(&hs_jack, SND_JACK_HEADSET, SND_JACK_HEADSET);
 	}
 
-	/* Only configure the TPS6130x on SDP4430 */
-	if (machine_is_omap_4430sdp()) {
+	/* Only configure the TPS6130x on SDP4430 and 44xx_Tablet*/
+	if (machine_is_omap_4430sdp() || machine_is_omap_tabletblaze()) {
 		card_data->adapter = i2c_get_adapter(1);
 		if (!card_data->adapter) {
 			dev_err(card->dev, "can't get i2c adapter\n");
@@ -1494,7 +1495,7 @@ static int __devexit omap_abe_remove(struct platform_device *pdev)
 
 	snd_soc_unregister_card(card);
 
-	if (machine_is_omap_4430sdp()) {
+	if (machine_is_omap_4430sdp() || machine_is_omap_tabletblaze()) {
 		i2c_unregister_device(card_data->tps6130x);
 		i2c_put_adapter(card_data->adapter);
 	}

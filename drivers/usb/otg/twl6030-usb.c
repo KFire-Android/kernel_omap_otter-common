@@ -262,25 +262,22 @@ static irqreturn_t twl6030_usbotg_irq(int irq, void *_twl)
 
 		regulator_enable(twl->usb3v3);
 		twl->asleep = 1;
-		twl6030_writeb(twl, TWL_MODULE_USB, USB_ID_INT_EN_HI_CLR, 0x1);
-		twl6030_writeb(twl, TWL_MODULE_USB, USB_ID_INT_EN_HI_SET,
-								0x10);
+		twl6030_writeb(twl, TWL_MODULE_USB, 0x1, USB_ID_INT_EN_HI_CLR);
+		twl6030_writeb(twl, TWL_MODULE_USB, 0x10, USB_ID_INT_EN_HI_SET);
 		status = USB_EVENT_ID;
 		omap_musb_mailbox(OMAP_MUSB_ID_GROUND);
 	} else  {
-		twl6030_writeb(twl, TWL_MODULE_USB, USB_ID_INT_EN_HI_CLR,
-								0x10);
-		twl6030_writeb(twl, TWL_MODULE_USB, USB_ID_INT_EN_HI_SET,
-								0x1);
+		twl6030_writeb(twl, TWL_MODULE_USB, 0x10, USB_ID_INT_EN_HI_CLR);
+		twl6030_writeb(twl, TWL_MODULE_USB, 0x1, USB_ID_INT_EN_HI_SET);
 	}
-	twl6030_writeb(twl, TWL_MODULE_USB, USB_ID_INT_LATCH_CLR, status);
+	twl6030_writeb(twl, TWL_MODULE_USB, status, USB_ID_INT_LATCH_CLR);
 
 	return IRQ_HANDLED;
 }
 
 static int twl6030_enable_irq(struct twl6030_usb *twl)
 {
-	twl6030_writeb(twl, TWL_MODULE_USB, USB_ID_INT_EN_HI_SET, 0x1);
+	twl6030_writeb(twl, TWL_MODULE_USB, 0x1, USB_ID_INT_EN_HI_SET);
 	twl6030_interrupt_unmask(0x05, REG_INT_MSK_LINE_C);
 	twl6030_interrupt_unmask(0x05, REG_INT_MSK_STS_C);
 
