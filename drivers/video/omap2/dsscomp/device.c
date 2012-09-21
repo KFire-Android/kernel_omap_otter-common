@@ -333,6 +333,12 @@ static long query_display(struct dsscomp_dev *cdev,
 		else if (!cdev->ovls[i]->is_enabled(cdev->ovls[i]))
 			dis->overlays_available |= 1 << i;
 	}
+	if (cdev->wb_ovl) {
+		if (cdev->wb_ovl->info.source == (int)mgr->id)
+			dis->overlays_owned |= 1 << OMAP_DSS_WB;
+		else if (!cdev->wb_ovl->info.enabled)
+			dis->overlays_available |= 1 << OMAP_DSS_WB;
+	}
 	dis->overlays_available |= dis->overlays_owned;
 
 	/* fill out manager information */
@@ -476,6 +482,8 @@ static void fill_cache(struct dsscomp_dev *cdev)
 	for (i = 0; i < cdev->num_ovls; i++)
 		cdev->ovls[i] = omap_dss_get_overlay(i);
 
+	cdev->wb_ovl = omap_dss_get_wb(0);
+
 	cdev->num_mgrs = min(omap_dss_get_num_overlay_managers(), MAX_MANAGERS);
 	for (i = 0; i < cdev->num_mgrs; i++)
 		cdev->mgrs[i] = omap_dss_get_overlay_manager(i);
@@ -497,8 +505,9 @@ static void fill_cache(struct dsscomp_dev *cdev)
 		blocking_notifier_chain_register(&dssdev->state_notifiers,
 					cdev->state_notifiers + i);
 	}
-	dev_info(DEV(cdev), "found %d displays and %d overlays\n",
-				cdev->num_displays, cdev->num_ovls);
+	dev_info(DEV(cdev), "found %d displays and %d overlays, WB overlay %d\n",
+				cdev->num_displays, cdev->num_ovls,
+				cdev->wb_ovl ? 1 : 0);
 
 	/*
 	 * :FIXME: for now DSS has this as an ovl cap, even though it relates
