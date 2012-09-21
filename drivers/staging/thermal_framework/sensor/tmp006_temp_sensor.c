@@ -173,6 +173,32 @@ static int get_current_temp(void *data, u64 *val)
 }
 DEFINE_SIMPLE_ATTRIBUTE(tmp006_fops, get_current_temp, NULL, "%llu\n");
 
+static int report_period_get(void *data, u64 *val)
+{
+	struct thermal_dev *tdev = data;
+	struct i2c_client *client = to_i2c_client(tdev->dev);
+	struct tmp006_temp_sensor *tmp006 = i2c_get_clientdata(client);
+
+	*val = tmp006->work_time_period;
+
+	return 0;
+}
+
+static int report_period_set(void *data, u64 val)
+{
+	struct thermal_dev *tdev = data;
+	struct i2c_client *client = to_i2c_client(tdev->dev);
+	struct tmp006_temp_sensor *tmp006 = i2c_get_clientdata(client);
+
+	mutex_lock(&tmp006->sensor_mutex);
+	tmp006->work_time_period = (int)val;
+	mutex_unlock(&tmp006->sensor_mutex);
+
+	return 0;
+}
+DEFINE_SIMPLE_ATTRIBUTE(report_period_fops, report_period_get,
+						report_period_set, "%llu\n");
+
 #ifdef CONFIG_THERMAL_FRAMEWORK_DEBUG
 static int tmp006_sensor_register_debug_entries(struct thermal_dev *tdev,
 					struct dentry *d)
@@ -181,6 +207,11 @@ static int tmp006_sensor_register_debug_entries(struct thermal_dev *tdev,
 	(void) debugfs_create_file("current_temp",
 			S_IRUGO, d, tdev,
 			&tmp006_fops);
+
+	/* Read/Write - Debug properties of tmp006 sensor */
+	(void) debugfs_create_file("report_period_ms",
+			S_IRUGO | S_IWUSR, d, tdev,
+			&report_period_fops);
 	return 0;
 }
 #endif
