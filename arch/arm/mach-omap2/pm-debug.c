@@ -124,8 +124,6 @@ static int pwrdm_dbg_show_timer(struct powerdomain *pwrdm, void *user)
 		strncmp(pwrdm->name, "dpll", 4) == 0)
 		return 0;
 
-	pwrdm_state_switch(pwrdm);
-
 	seq_printf(s, "%s (%s)", pwrdm->name,
 		pwrdm_state_names[_PWRDM_STATE_COUNT_IDX(pwrdm->state)]);
 
