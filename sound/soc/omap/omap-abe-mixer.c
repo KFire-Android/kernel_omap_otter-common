@@ -558,8 +558,6 @@ static const struct soc_enum abe_enum[] = {
 		SOC_ENUM_SINGLE(MUX_MM_UL13, 0, 17, route_ul_texts),
 		SOC_ENUM_SINGLE(MUX_MM_UL14, 0, 17, route_ul_texts),
 		SOC_ENUM_SINGLE(MUX_MM_UL15, 0, 17, route_ul_texts),
-		SOC_ENUM_SINGLE(MUX_MM_UL16, 0, 17, route_ul_texts),
-		SOC_ENUM_SINGLE(MUX_MM_UL17, 0, 17, route_ul_texts),
 		SOC_ENUM_SINGLE(MUX_MM_UL20, 0, 17, route_ul_texts),
 		SOC_ENUM_SINGLE(MUX_MM_UL21, 0, 17, route_ul_texts),
 		SOC_ENUM_SINGLE(MUX_VX_UL0, 0, 17, route_ul_texts),
@@ -590,28 +588,20 @@ static const struct snd_kcontrol_new mm_ul05_control =
 	SOC_DAPM_ENUM_EXT("Route", abe_enum[5],
 	ul_mux_get_route, ul_mux_put_route);
 
-static const struct snd_kcontrol_new mm_ul06_control =
+static const struct snd_kcontrol_new mm_ul10_control =
 	SOC_DAPM_ENUM_EXT("Route", abe_enum[6],
 	ul_mux_get_route, ul_mux_put_route);
 
-static const struct snd_kcontrol_new mm_ul07_control =
+static const struct snd_kcontrol_new mm_ul11_control =
 	SOC_DAPM_ENUM_EXT("Route", abe_enum[7],
 	ul_mux_get_route, ul_mux_put_route);
 
-static const struct snd_kcontrol_new mm_ul10_control =
+static const struct snd_kcontrol_new mm_vx0_control =
 	SOC_DAPM_ENUM_EXT("Route", abe_enum[8],
 	ul_mux_get_route, ul_mux_put_route);
 
-static const struct snd_kcontrol_new mm_ul11_control =
-	SOC_DAPM_ENUM_EXT("Route", abe_enum[9],
-	ul_mux_get_route, ul_mux_put_route);
-
-static const struct snd_kcontrol_new mm_vx0_control =
-	SOC_DAPM_ENUM_EXT("Route", abe_enum[10],
-	ul_mux_get_route, ul_mux_put_route);
-
 static const struct snd_kcontrol_new mm_vx1_control =
-	SOC_DAPM_ENUM_EXT("Route", abe_enum[11],
+	SOC_DAPM_ENUM_EXT("Route", abe_enum[9],
 	ul_mux_get_route, ul_mux_put_route);
 
 /* DL1 mixer paths */
@@ -900,10 +890,6 @@ static const struct snd_soc_dapm_widget abe_dapm_widgets[] = {
 			OMAP_ABE_MUX_UL04, OMAP_ABE_OPP_50, 0, &mm_ul04_control),
 	SND_SOC_DAPM_MUX("MUX_UL05",
 			OMAP_ABE_MUX_UL05, OMAP_ABE_OPP_50, 0, &mm_ul05_control),
-	SND_SOC_DAPM_MUX("MUX_UL06",
-			OMAP_ABE_MUX_UL06, OMAP_ABE_OPP_50, 0, &mm_ul06_control),
-	SND_SOC_DAPM_MUX("MUX_UL07",
-			OMAP_ABE_MUX_UL07, OMAP_ABE_OPP_50, 0, &mm_ul07_control),
 	SND_SOC_DAPM_MUX("MUX_UL10",
 			OMAP_ABE_MUX_UL10, OMAP_ABE_OPP_50, 0, &mm_ul10_control),
 	SND_SOC_DAPM_MUX("MUX_UL11",
@@ -1105,44 +1091,6 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"MUX_UL05", "Echo Left", "Echo Mixer"},
 	{"MUX_UL05", "Echo Right", "Echo Mixer"},
 	{"MM_UL1", NULL, "MUX_UL05"},
-
-	/* MUX_UL06 - ROUTE_UL - Chan 6  */
-	{"MUX_UL06", "DMic0L", "DMIC0"},
-	{"MUX_UL06", "DMic0R", "DMIC0"},
-	{"MUX_UL06", "DMic1L", "DMIC1"},
-	{"MUX_UL06", "DMic1R", "DMIC1"},
-	{"MUX_UL06", "DMic2L", "DMIC2"},
-	{"MUX_UL06", "DMic2R", "DMIC2"},
-	{"MUX_UL06", "BT Left", "BT_VX_UL"},
-	{"MUX_UL06", "BT Right", "BT_VX_UL"},
-	{"MUX_UL06", "MMExt Left", "MM_EXT_UL"},
-	{"MUX_UL06", "MMExt Right", "MM_EXT_UL"},
-	{"MUX_UL06", "AMic0", "PDM_UL1"},
-	{"MUX_UL06", "AMic1", "PDM_UL1"},
-	{"MUX_UL06", "VX Left", "Capture Mixer"},
-	{"MUX_UL06", "VX Right", "Capture Mixer"},
-	{"MUX_UL06", "Echo Left", "Echo Mixer"},
-	{"MUX_UL06", "Echo Right", "Echo Mixer"},
-	{"MM_UL1", NULL, "MUX_UL06"},
-
-	/* MUX_UL07 - ROUTE_UL - Chan 7  */
-	{"MUX_UL07", "DMic0L", "DMIC0"},
-	{"MUX_UL07", "DMic0R", "DMIC0"},
-	{"MUX_UL07", "DMic1L", "DMIC1"},
-	{"MUX_UL07", "DMic1R", "DMIC1"},
-	{"MUX_UL07", "DMic2L", "DMIC2"},
-	{"MUX_UL07", "DMic2R", "DMIC2"},
-	{"MUX_UL07", "BT Left", "BT_VX_UL"},
-	{"MUX_UL07", "BT Right", "BT_VX_UL"},
-	{"MUX_UL07", "MMExt Left", "MM_EXT_UL"},
-	{"MUX_UL07", "MMExt Right", "MM_EXT_UL"},
-	{"MUX_UL07", "AMic0", "PDM_UL1"},
-	{"MUX_UL07", "AMic1", "PDM_UL1"},
-	{"MUX_UL07", "VX Left", "Capture Mixer"},
-	{"MUX_UL07", "VX Right", "Capture Mixer"},
-	{"MUX_UL07", "Echo Left", "Echo Mixer"},
-	{"MUX_UL07", "Echo Right", "Echo Mixer"},
-	{"MM_UL1", NULL, "MUX_UL07"},
 
 	/* MUX_UL10 - ROUTE_UL - Chan 0  */
 	{"MUX_UL10", "DMic0L", "DMIC0"},
