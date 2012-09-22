@@ -31,6 +31,7 @@
 
 #include <linux/i2c/pca953x.h>
 #include <linux/i2c/tmp102.h>
+#include <linux/i2c/tmp006.h>
 #include <linux/i2c/twl.h>
 #include <linux/mfd/twl6040.h>
 #include <linux/platform_data/omap-abe-twl6040.h>
@@ -955,6 +956,12 @@ static struct tmp102_platform_data tmp102_slope_offset_info = {
 	.offset_cpu = -154,
 };
 
+/* TMP006 IR Case Temperature sensor */
+static struct tmp006_platform_data tmp006_update_rate = {
+/* Period in milliseconds, temperature report sent to TI-TFW */
+	.update_period = 5000,
+};
+
 static struct i2c_board_info __initdata omap5evm_i2c_4_boardinfo[] = {
 	{
 		I2C_BOARD_INFO("tmp102_temp_sensor", 0x48),
@@ -962,6 +969,7 @@ static struct i2c_board_info __initdata omap5evm_i2c_4_boardinfo[] = {
 	},
 	{
 		I2C_BOARD_INFO("tmp006_temp_sensor", 0x40),
+		.platform_data = &tmp006_update_rate,
 	},
 };
 
