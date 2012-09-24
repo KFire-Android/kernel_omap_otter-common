@@ -856,7 +856,11 @@ void process_rotation(struct bvbltparams *bvbltparams,
 		gcfilter->dstadjusted.bottom
 			= gcfilter->dstclipped.bottom - dstoffsetY;
 
-		GCPRINT_RECT(GCZONE_DEST, "dstadjusted",
+		GCPRINT_RECT(GCZONE_DEST, "rotated dstrect",
+			     &gcfilter->dstrect);
+		GCPRINT_RECT(GCZONE_DEST, "rotated dstclipped",
+			     &gcfilter->dstclipped);
+		GCPRINT_RECT(GCZONE_DEST, "rotated dstadjusted",
 			     &gcfilter->dstadjusted);
 
 		if (batch->haveaux) {
@@ -881,7 +885,11 @@ void process_rotation(struct bvbltparams *bvbltparams,
 			gcfilter->dstadjustedaux.bottom
 				= batch->dstclippedaux.bottom - dstoffsetY;
 
-			GCPRINT_RECT(GCZONE_DEST, "dstadjustedaux",
+			GCPRINT_RECT(GCZONE_DEST, "rotated dstrectaux",
+				     &gcfilter->dstrectaux);
+			GCPRINT_RECT(GCZONE_DEST, "rotated dstclippedaux",
+				     &gcfilter->dstclippedaux);
+			GCPRINT_RECT(GCZONE_DEST, "rotated dstadjustedaux",
 				     &gcfilter->dstadjustedaux);
 		}
 
@@ -1330,8 +1338,9 @@ enum bverror do_filter(struct bvbltparams *bvbltparams,
 	struct bvsurfgeom dstrotated0geom;
 	struct gcrect  dstrotated0;
 
-	int dstleftoffs, dsttopoffs, dstrightoffs;
-	int srcleftoffs, srctopoffs, srcrightoffs;
+	struct gcrect dstdelta;
+	struct gcrect srcdelta;
+	struct gcrect srcclipped;
 
 	struct bvbuffmap *srcmap = NULL;
 	struct bvbuffmap *tmpmap = NULL;
@@ -1378,7 +1387,7 @@ enum bverror do_filter(struct bvbltparams *bvbltparams,
 	 * for the surface base address misalignment if any. */
 	srcinfo->pixalign  = get_pixel_offset(srcinfo, 0);
 	srcinfo->bytealign = (srcinfo->pixalign
-				* (int) srcinfo->format.bitspp) / 8;
+			   * (int) srcinfo->format.bitspp) / 8;
 	GCDBG(GCZONE_SRC, "source surface offset (pixels) = %d,0\n",
 		srcinfo->pixalign);
 	GCDBG(GCZONE_SRC, "source surface offset (bytes) = %d\n",
@@ -1408,9 +1417,11 @@ enum bverror do_filter(struct bvbltparams *bvbltparams,
 
 	/* Rotate the source rectangle to 0 degree. */
 	srcrect = &srcinfo->rect;
+	GCPRINT_RECT(GCZONE_FILTER, "full src", srcrect);
 	rotate_gcrect(adjangle,
-		      srcinfo->geom, &srcinfo->rect,
-		      srcinfo->geom, &srcinfo->rect);
+		      srcinfo->geom, srcrect,
+		      srcinfo->geom, srcrect);
+	GCPRINT_RECT(GCZONE_FILTER, "full adjusted src", srcrect);
 
 	/* Get destination rect shortcuts. */
 	if ((srcinfo->index == 1) && batch->haveaux) {
@@ -1423,8 +1434,9 @@ enum bverror do_filter(struct bvbltparams *bvbltparams,
 		dstadjusted = &gcfilter->dstadjusted;
 	}
 
-	/* Get source rect shortcut. */
-	srcrect = &srcinfo->rect;
+	GCPRINT_RECT(GCZONE_FILTER, "full adjusted dst", dstrect);
+	GCPRINT_RECT(GCZONE_FILTER, "clipped adjusted dst", dstclipped);
+	GCPRINT_RECT(GCZONE_FILTER, "aligned adjusted dst", dstadjusted);
 
 	/* Determine the source and destination rectangles. */
 	srcwidth  = srcrect->right  - srcrect->left;
@@ -1473,31 +1485,52 @@ enum bverror do_filter(struct bvbltparams *bvbltparams,
 	GCDBG(GCZONE_FILTER, "verscalefactor = 0x%08X\n", verscalefactor);
 
 	/* Compute the destination offsets. */
-	dstleftoffs  = dstclipped->left  - dstrect->left;
-	dsttopoffs   = dstclipped->top   - dstrect->top;
-	dstrightoffs = dstclipped->right - dstrect->left;
+	dstdelta.left   = dstclipped->left   - dstrect->left;
+	dstdelta.top    = dstclipped->top    - dstrect->top;
+	dstdelta.right  = dstclipped->right  - dstrect->left;
+	dstdelta.bottom = dstclipped->bottom - dstrect->top;
 
 	/* Compute the source offsets. */
-	srcleftoffs  =  dstleftoffs       * horscalefactor;
-	srctopoffs   =  dsttopoffs        * verscalefactor;
-	srcrightoffs = (dstrightoffs - 1) * horscalefactor + (1 << 16);
+	srcdelta.left   =  dstdelta.left        * horscalefactor;
+	srcdelta.top    =  dstdelta.top         * verscalefactor;
+	srcdelta.right  = (dstdelta.right  - 1) * horscalefactor + (1 << 16);
+	srcdelta.bottom = (dstdelta.bottom - 1) * verscalefactor + (1 << 16);
 
 	GCDBG(GCZONE_FILTER, "offsets (dst, src):\n");
-	GCDBG(GCZONE_FILTER, "  left  = %d, 0x%08X\n",
-	      dstleftoffs, srcleftoffs);
-	GCDBG(GCZONE_FILTER, "  top   = %d, 0x%08X\n",
-	      dsttopoffs, srctopoffs);
-	GCDBG(GCZONE_FILTER, "  right = %d, 0x%08X\n",
-	      dstrightoffs, srcrightoffs);
+	GCDBG(GCZONE_FILTER, "  left   = %d, 0x%08X\n",
+	      dstdelta.left, srcdelta.left);
+	GCDBG(GCZONE_FILTER, "  top    = %d, 0x%08X\n",
+	      dstdelta.top, srcdelta.top);
+	GCDBG(GCZONE_FILTER, "  right  = %d, 0x%08X\n",
+	      dstdelta.right, srcdelta.right);
+	GCDBG(GCZONE_FILTER, "  bottom = %d, 0x%08X\n",
+	      dstdelta.bottom, srcdelta.bottom);
 
 	/* Before rendering each destination pixel, the HW will select the
 	 * corresponding source center pixel to apply the kernel around.
 	 * To make this process precise we need to add 0.5 to source initial
 	 * coordinates here; this will make HW pick the next source pixel if
 	 * the fraction is equal or greater then 0.5. */
-	srcleftoffs  += 0x00008000;
-	srctopoffs   += 0x00008000;
-	srcrightoffs += 0x00008000;
+	srcdelta.left   += 0x00008000;
+	srcdelta.top    += 0x00008000;
+	srcdelta.right  += 0x00008000;
+	srcdelta.bottom += 0x00008000;
+
+	/* Determine clipped source rectangle. */
+	srcclipped.left   = srcrect->left   + (srcdelta.left   >> 16);
+	srcclipped.top    = srcrect->top    + (srcdelta.top    >> 16);
+	srcclipped.right  = srcrect->left   + (srcdelta.right  >> 16);
+	srcclipped.bottom = srcrect->top    + (srcdelta.bottom >> 16);
+	GCPRINT_RECT(GCZONE_FILTER, "  clipped source", &srcclipped);
+
+	/* Validate the source rectangle. */
+	if (!valid_rect(srcinfo->geom, &srcclipped)) {
+		BVSETBLTERROR((srcinfo->index == 0)
+					? BVERR_SRC1RECT
+					: BVERR_SRC2RECT,
+			      "invalid source rectangle.");
+		goto exit;
+	}
 
 	GCDBG(GCZONE_FILTER, "source:\n");
 	GCDBG(GCZONE_FILTER, "  stride = %d, geom = %dx%d\n",
@@ -1506,8 +1539,8 @@ enum bverror do_filter(struct bvbltparams *bvbltparams,
 	GCDBG(GCZONE_FILTER, "  rotation = %d\n",
 	      srcinfo->angle);
 	GCDBG(GCZONE_FILTER, "  rect offsets = "
-	      "(0x%08X,0x%08X)-(0x%08X,---)\n",
-	      srcleftoffs, srctopoffs, srcrightoffs);
+	      "(0x%08X,0x%08X)-(0x%08X,0x%08X)\n",
+	      srcdelta.left, srcdelta.top, srcdelta.right, srcdelta.bottom);
 
 	GCDBG(GCZONE_FILTER, "destination:\n");
 	GCDBG(GCZONE_FILTER, "  stride = %d, geom size = %dx%d\n",
@@ -1551,8 +1584,8 @@ enum bverror do_filter(struct bvbltparams *bvbltparams,
 			= GCREG_VR_CONFIG_EX_MASK_FILTER_TAP_ENABLED;
 
 		/* Setup single pass. */
-		srcx = (srcrect->left << 16) + srcleftoffs;
-		srcy = (srcrect->top  << 16) + srctopoffs;
+		srcx = (srcrect->left << 16) + srcdelta.left;
+		srcy = (srcrect->top  << 16) + srcdelta.top;
 		GCDBG(GCZONE_SRC, "src origin: 0x%08X,0x%08X\n", srcx, srcy);
 
 		/* Load the horizontal filter. */
@@ -1635,8 +1668,8 @@ enum bverror do_filter(struct bvbltparams *bvbltparams,
 		 * kernel information on the edges of the image. */
 		horkernelhalf = gcfilter->horkernelsize >> 1;
 
-		leftextra  = srcleftoffs >> 16;
-		rightextra = srcwidth - (srcrightoffs >> 16);
+		leftextra  = srcdelta.left >> 16;
+		rightextra = srcwidth - (srcdelta.right >> 16);
 
 		if (leftextra > horkernelhalf)
 			leftextra = horkernelhalf;
@@ -1648,13 +1681,13 @@ enum bverror do_filter(struct bvbltparams *bvbltparams,
 		      leftextra, rightextra);
 
 		/* Determine the source origin. */
-		srcx = ((srcrect->left - leftextra) << 16) + srcleftoffs;
-		srcy =  (srcrect->top << 16) + srctopoffs;
+		srcx = ((srcrect->left - leftextra) << 16) + srcdelta.left;
+		srcy =  (srcrect->top << 16) + srcdelta.top;
 		GCDBG(GCZONE_SRC, "src origin: 0x%08X,0x%08X\n", srcx, srcy);
 
 		/* Determine the size of the temporary image. */
 		tmprectwidth = leftextra + rightextra
-			     + ((srcrightoffs >> 16) - (srcleftoffs >> 16));
+			     + ((srcdelta.right >> 16) - (srcdelta.left >> 16));
 		tmprectheight = dstadjusted->bottom - dstadjusted->top;
 		GCDBG(GCZONE_FILTER, "tmp rect size: %dx%d\n",
 		      tmprectwidth, tmprectheight);
@@ -1764,9 +1797,9 @@ enum bverror do_filter(struct bvbltparams *bvbltparams,
 
 		/* Determine the source origin. */
 		srcx = ((leftextra + tmpinfo.rect.left) << 16)
-			+ (srcleftoffs & 0xFFFF);
+			+ (srcdelta.left & 0xFFFF);
 		srcy = (tmpinfo.rect.top << 16)
-			+ (srctopoffs & 0xFFFF);
+			+ (srcdelta.top & 0xFFFF);
 		GCDBG(GCZONE_SRC, "src origin: 0x%08X,0x%08X\n",
 		      srcx, srcy);
 
@@ -1796,8 +1829,8 @@ enum bverror do_filter(struct bvbltparams *bvbltparams,
 		      scalex ? "horizontal" : "vertical");
 
 		/* Setup single pass. */
-		srcx = (srcrect->left << 16) + srcleftoffs;
-		srcy = (srcrect->top  << 16) + srctopoffs;
+		srcx = (srcrect->left << 16) + srcdelta.left;
+		srcy = (srcrect->top  << 16) + srcdelta.top;
 		GCDBG(GCZONE_SRC, "src origin: 0x%08X,0x%08X\n", srcx, srcy);
 
 		if (scalex) {

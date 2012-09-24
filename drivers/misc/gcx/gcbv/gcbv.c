@@ -957,8 +957,6 @@ enum bverror bv_blt(struct bvbltparams *bvbltparams)
 	bvbltparams->errdesc = NULL;
 
 	/* Verify the destination parameters structure. */
-	GCDBG(GCZONE_DEST, "verifying destination parameters.\n");
-
 	res = verify_surface(0, (union bvinbuff *) &bvbltparams->dstdesc,
 				bvbltparams->dstgeom);
 	if (res != -1) {
@@ -1114,9 +1112,7 @@ enum bverror bv_blt(struct bvbltparams *bvbltparams)
 
 		/* Verify the src1 parameters structure. */
 		if (src1used) {
-			GCDBG(GCZONE_SRC, "src1used\n");
-			GCDBG(GCZONE_SRC, "verifying source1 parameters.\n");
-
+			GCDBG(GCZONE_SRC, "source #1: used\n");
 			res = verify_surface(
 				bvbltparams->flags & BVBATCH_TILE_SRC1,
 				&bvbltparams->src1, bvbltparams->src1geom);
@@ -1135,7 +1131,7 @@ enum bverror bv_blt(struct bvbltparams *bvbltparams)
 					   &bvbltparams->src1rect,
 					   bvbltparams->dstdesc,
 					   dstrect)) {
-				GCDBG(GCZONE_BLIT, "src1 is the same as dst\n");
+				GCDBG(GCZONE_BLIT, "  same as destination\n");
 			} else {
 				srcinfo[srccount].index = 0;
 				srcinfo[srccount].buf = bvbltparams->src1;
@@ -1161,9 +1157,7 @@ enum bverror bv_blt(struct bvbltparams *bvbltparams)
 
 		/* Verify the src2 parameters structure. */
 		if (src2used) {
-			GCDBG(GCZONE_SRC, "src2used\n");
-			GCDBG(GCZONE_SRC, "verifying source2 parameters.\n");
-
+			GCDBG(GCZONE_SRC, "source #2: used\n");
 			res = verify_surface(
 				bvbltparams->flags & BVBATCH_TILE_SRC2,
 				&bvbltparams->src2, bvbltparams->src2geom);
@@ -1182,7 +1176,7 @@ enum bverror bv_blt(struct bvbltparams *bvbltparams)
 					   &bvbltparams->src2rect,
 					   bvbltparams->dstdesc,
 					   dstrect)) {
-				GCDBG(GCZONE_BLIT, "src2 is the same as dst\n");
+				GCDBG(GCZONE_BLIT, "  same as destination\n");
 			} else {
 				srcinfo[srccount].index = 1;
 				srcinfo[srccount].buf = bvbltparams->src2;
@@ -1208,9 +1202,7 @@ enum bverror bv_blt(struct bvbltparams *bvbltparams)
 
 		/* Verify the mask parameters structure. */
 		if (maskused) {
-			GCDBG(GCZONE_MASK, "maskused\n");
-			GCDBG(GCZONE_MASK, "verifying mask parameters.\n");
-
+			GCDBG(GCZONE_MASK, "mask: used\n");
 			res = verify_surface(
 				bvbltparams->flags & BVBATCH_TILE_MASK,
 				&bvbltparams->mask, bvbltparams->maskgeom);
@@ -1240,7 +1232,7 @@ enum bverror bv_blt(struct bvbltparams *bvbltparams)
 				int srcw, srch;
 				GCDBG(GCZONE_BLIT,
 				      "processing source %d.\n",
-				      srcinfo[i].index);
+				      srcinfo[i].index + 1);
 
 				if (gca == NULL) {
 					GCDBG(GCZONE_BLIT,
