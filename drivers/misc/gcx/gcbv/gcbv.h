@@ -513,6 +513,9 @@ struct gcbatch {
 /* Get the pointer to the context. */
 struct gccontext *get_context(void);
 
+/* Validation. */
+bool valid_rect(struct bvsurfgeom *bvsurfgeom, struct gcrect *gcrect);
+
 /* Parsers. */
 enum bverror parse_format(struct bvbltparams *bvbltparams,
 			  struct surfaceinfo *surfaceinfo);

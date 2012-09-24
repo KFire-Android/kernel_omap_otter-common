@@ -189,7 +189,7 @@ enum bverror do_blit(struct bvbltparams *bvbltparams,
 	int srcshiftX, srcshiftY;
 	int srcpixalign, srcbyteshift;
 
-	int srcleft, srctop;
+	struct gcrect srcclipped;
 	int srcsurfwidth, srcsurfheight;
 	unsigned int physwidth, physheight;
 	int orthogonal;
@@ -217,34 +217,45 @@ enum bverror do_blit(struct bvbltparams *bvbltparams,
 	 * to each other. */
 	orthogonal = (srcinfo->angle % 2) != (dstinfo->angle % 2);
 
-	/* Compute clipped source origin. */
-	srcleft = srcinfo->rect.left + batch->clipdelta.left;
-	srctop = srcinfo->rect.top + batch->clipdelta.top;
+	/* Compute clipped source rectangle. */
+	srcclipped.left   = srcinfo->rect.left   + batch->clipdelta.left;
+	srcclipped.top    = srcinfo->rect.top    + batch->clipdelta.top;
+	srcclipped.right  = srcinfo->rect.right  + batch->clipdelta.right;
+	srcclipped.bottom = srcinfo->rect.bottom + batch->clipdelta.bottom;
+
+	/* Validate the source rectangle. */
+	if (!valid_rect(srcinfo->geom, &srcclipped)) {
+		BVSETBLTERROR((srcinfo->index == 0)
+					? BVERR_SRC1RECT
+					: BVERR_SRC2RECT,
+			      "invalid source rectangle.");
+		goto exit;
+	}
 
 	/* Compute the source surface shift. */
 	switch (srcinfo->angle) {
 	case ROT_ANGLE_0:
-		srcshiftX = srcleft - batch->dstadjusted.left;
-		srcshiftY = srctop  - batch->dstadjusted.top;
+		srcshiftX = srcclipped.left - batch->dstadjusted.left;
+		srcshiftY = srcclipped.top  - batch->dstadjusted.top;
 		break;
 
 	case ROT_ANGLE_90:
-		srcshiftX = srctop - batch->dstadjusted.top;
-		srcshiftY = (srcinfo->geom->width - srcleft)
+		srcshiftX = srcclipped.top - batch->dstadjusted.top;
+		srcshiftY = (srcinfo->geom->width - srcclipped.left)
 			  - (batch->dstwidth - batch->dstadjusted.left);
 		break;
 
 	case ROT_ANGLE_180:
-		srcshiftX = (srcinfo->geom->width - srcleft)
+		srcshiftX = (srcinfo->geom->width - srcclipped.left)
 			  - (batch->dstwidth - batch->dstadjusted.left);
-		srcshiftY = (srcinfo->geom->height - srctop)
+		srcshiftY = (srcinfo->geom->height - srcclipped.top)
 			  - (batch->dstheight - batch->dstadjusted.top);
 		break;
 
 	case ROT_ANGLE_270:
-		srcshiftX = (srcinfo->geom->height - srctop)
+		srcshiftX = (srcinfo->geom->height - srcclipped.top)
 			  - (batch->dstheight - batch->dstadjusted.top);
-		srcshiftY = srcleft - batch->dstadjusted.left;
+		srcshiftY = srcclipped.left - batch->dstadjusted.left;
 		break;
 
 	default:
@@ -319,7 +330,7 @@ enum bverror do_blit(struct bvbltparams *bvbltparams,
 		switch (srcinfo->angle) {
 		case ROT_ANGLE_0:
 			/* Adjust left coordinate. */
-			srcleft -= srcpixalign;
+			srcclipped.left -= srcpixalign;
 
 			/* Determine source size. */
 			srcsurfwidth = srcinfo->geom->width - srcpixalign;
@@ -328,7 +339,7 @@ enum bverror do_blit(struct bvbltparams *bvbltparams,
 
 		case ROT_ANGLE_90:
 			/* Adjust top coordinate. */
-			srctop -= srcpixalign;
+			srcclipped.top -= srcpixalign;
 
 			/* Determine source size. */
 			srcsurfwidth = srcinfo->geom->height - srcpixalign;
@@ -353,7 +364,7 @@ enum bverror do_blit(struct bvbltparams *bvbltparams,
 		}
 
 		GCDBG(GCZONE_SURF, "srcrect origin = %d,%d\n",
-		      srcleft, srctop);
+		      srcclipped.left, srcclipped.top);
 		GCDBG(GCZONE_SURF, "source physical size = %dx%d\n",
 		      srcsurfwidth, srcsurfheight);
 
@@ -372,8 +383,8 @@ enum bverror do_blit(struct bvbltparams *bvbltparams,
 		GCDBG(GCZONE_SURF, "multi-source disabled.\n");
 	} else {
 		/* Source origin is not used in multi-source setup. */
-		srcleft = 0;
-		srctop = 0;
+		srcclipped.left = 0;
+		srcclipped.top = 0;
 
 		/* Adjust the destination to match the source geometry. */
 		switch (srcinfo->angle) {
@@ -583,8 +594,8 @@ enum bverror do_blit(struct bvbltparams *bvbltparams,
 	gcmosrc->config.reg.format = srcinfo->format.format;
 
 	gcmosrc->origin_ldst = gcmosrc_origin_ldst[index];
-	gcmosrc->origin.reg.x = srcleft;
-	gcmosrc->origin.reg.y = srctop;
+	gcmosrc->origin.reg.x = srcclipped.left;
+	gcmosrc->origin.reg.y = srcclipped.top;
 
 	gcmosrc->size_ldst = gcmosrc_size_ldst[index];
 	gcmosrc->size.reg = gcregsrcsize_max;

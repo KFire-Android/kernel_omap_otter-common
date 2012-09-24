@@ -57,14 +57,16 @@
 #define GCZONE_NONE		0
 #define GCZONE_ALL		(~0U)
 #define GCZONE_FORMAT		(1 << 0)
-#define GCZONE_BLEND		(1 << 1)
-#define GCZONE_OFFSET		(1 << 2)
-#define GCZONE_DEST		(1 << 3)
-#define GCZONE_SRC		(1 << 4)
-#define GCZONE_SCALING		(1 << 5)
+#define GCZONE_FORMAT_VERBOSE	(1 << 1)
+#define GCZONE_BLEND		(1 << 2)
+#define GCZONE_OFFSET		(1 << 3)
+#define GCZONE_DEST		(1 << 4)
+#define GCZONE_SRC		(1 << 5)
+#define GCZONE_SCALING		(1 << 6)
 
 GCDBG_FILTERDEF(gcparser, GCZONE_NONE,
 		"format",
+		"formatverbose",
 		"blend",
 		"offset",
 		"dest",
@@ -217,13 +219,13 @@ enum bverror parse_format(struct bvbltparams *bvbltparams,
 	bits = ((ocdformat & OCDFMTDEF_COMPONENTSIZEMINUS1_MASK)
 		>> OCDFMTDEF_COMPONENTSIZEMINUS1_SHIFT) + 1;
 
-	GCDBG(GCZONE_FORMAT, "std = %d\n", std);
-	GCDBG(GCZONE_FORMAT, "cs = %d\n", cs);
-	GCDBG(GCZONE_FORMAT, "alpha = %d\n", alpha ? 1 : 0);
-	GCDBG(GCZONE_FORMAT, "subsample = %d\n", subsample);
-	GCDBG(GCZONE_FORMAT, "layout = %d\n", layout);
-	GCDBG(GCZONE_FORMAT, "cont = %d\n", cont);
-	GCDBG(GCZONE_FORMAT, "bits = %d\n", bits);
+	GCDBG(GCZONE_FORMAT_VERBOSE, "std = %d\n", std);
+	GCDBG(GCZONE_FORMAT_VERBOSE, "cs = %d\n", cs);
+	GCDBG(GCZONE_FORMAT_VERBOSE, "alpha = %d\n", alpha ? 1 : 0);
+	GCDBG(GCZONE_FORMAT_VERBOSE, "subsample = %d\n", subsample);
+	GCDBG(GCZONE_FORMAT_VERBOSE, "layout = %d\n", layout);
+	GCDBG(GCZONE_FORMAT_VERBOSE, "cont = %d\n", cont);
+	GCDBG(GCZONE_FORMAT_VERBOSE, "bits = %d\n", bits);
 
 	switch (cs) {
 	case (OCDFMTDEF_CS_RGB >> OCDFMTDEF_CS_SHIFT):
@@ -357,16 +359,20 @@ enum bverror parse_format(struct bvbltparams *bvbltparams,
 		/* Determine the swizzle. */
 		reversed = ocdformat & OCDFMTDEF_REVERSED;
 		leftjust = ocdformat & OCDFMTDEF_LEFT_JUSTIFIED;
-		GCDBG(GCZONE_FORMAT, "reversed = %d\n", reversed ? 1 : 0);
-		GCDBG(GCZONE_FORMAT, "leftjust = %d\n", leftjust ? 1 : 0);
+		GCDBG(GCZONE_FORMAT_VERBOSE, "reversed = %d\n",
+		      reversed ? 1 : 0);
+		GCDBG(GCZONE_FORMAT_VERBOSE, "leftjust = %d\n",
+		      leftjust ? 1 : 0);
 
 		/* Parse the standard. */
 		switch (std) {
 		case OCDFMTDEF_STD_ITUR_601_YCbCr >> OCDFMTDEF_STD_SHIFT:
+			GCDBG(GCZONE_FORMAT, "OCDFMTDEF_STD_ITUR_601_YCbCr\n");
 			format->cs.yuv.std = GCREG_PE_CONTROL_YUV_601;
 			break;
 
 		case OCDFMTDEF_STD_ITUR_709_YCbCr >> OCDFMTDEF_STD_SHIFT:
+			GCDBG(GCZONE_FORMAT, "OCDFMTDEF_STD_ITUR_709_YCbCr\n");
 			format->cs.yuv.std = GCREG_PE_CONTROL_YUV_709;
 			break;
 
@@ -1256,8 +1262,7 @@ static inline int get_angle(int orientation)
  * Surface compare and validation.
  */
 
-static inline bool valid_rect(struct bvsurfgeom *bvsurfgeom,
-			      struct gcrect *gcrect)
+bool valid_rect(struct bvsurfgeom *bvsurfgeom, struct gcrect *gcrect)
 {
 	return ((gcrect->left >= 0) &&
 		(gcrect->top  >= 0) &&
@@ -1373,6 +1378,8 @@ enum bverror parse_destination(struct bvbltparams *bvbltparams,
 
 	GCENTER(GCZONE_DEST);
 
+	GCDBG(GCZONE_DEST, "parsing destination\n");
+
 	/* Did the destination surface change? */
 	if ((batch->batchflags & BVBATCH_DST) != 0) {
 		struct surfaceinfo *dstinfo;
@@ -1389,7 +1396,6 @@ enum bverror parse_destination(struct bvbltparams *bvbltparams,
 		dstinfo->gca = NULL;
 
 		/* Parse the destination format. */
-		GCDBG(GCZONE_FORMAT, "parsing destination format.\n");
 		if (parse_format(bvbltparams, dstinfo) != BVERR_NONE) {
 			bverror = BVERR_DSTGEOM_FORMAT;
 			goto exit;
@@ -1427,7 +1433,8 @@ enum bverror parse_destination(struct bvbltparams *bvbltparams,
 		dstinfo->bytealign = (dstinfo->pixalign
 				   * (int) dstinfo->format.bitspp) / 8;
 
-		GCDBG(GCZONE_DEST, "destination surface:\n");
+		GCDBG(GCZONE_DEST, "  buffer length = %d\n",
+		      dstinfo->buf.desc->length);
 		GCDBG(GCZONE_DEST, "  rotation %d degrees.\n",
 		      dstinfo->angle * 90);
 
@@ -1474,20 +1481,20 @@ enum bverror parse_destination(struct bvbltparams *bvbltparams,
 		/* Determine destination rectangle. */
 		dstrect = &dstinfo->rect;
 		GCCONVERT_RECT(GCZONE_DEST,
-			       "destination",
+			       "  rect",
 			       &bvbltparams->dstrect,
 			       dstrect);
 
 		/* Determine whether aux destination is specified. */
 		batch->haveaux
 			= ((bvbltparams->flags & BVFLAG_SRC2_AUXDSTRECT) != 0);
-		GCDBG(GCZONE_DEST, "aux dest = %d\n", batch->haveaux);
+		GCDBG(GCZONE_DEST, "  have aux dest = %d\n", batch->haveaux);
 
 		/* Is clipping rectangle specified? */
 		if ((bvbltparams->flags & BVFLAG_CLIP) == BVFLAG_CLIP) {
 			/* Convert the clipping rectangle. */
 			GCCONVERT_RECT(GCZONE_DEST,
-				       "clipping",
+				       "  clipping",
 				       &bvbltparams->cliprect,
 				       &cliprect);
 
@@ -1543,7 +1550,7 @@ enum bverror parse_destination(struct bvbltparams *bvbltparams,
 				/* Convert the aux rectangle. */
 				dstrectaux = &batch->dstrectaux;
 				GCCONVERT_RECT(GCZONE_DEST,
-					       "aux destination",
+					       "  aux rect",
 					       &bvbltparams->src2auxdstrect,
 					       dstrectaux);
 
@@ -1585,29 +1592,27 @@ enum bverror parse_destination(struct bvbltparams *bvbltparams,
 			if (batch->haveaux)
 				/* Convert the aux rectangle. */
 				GCCONVERT_RECT(GCZONE_DEST,
-					       "aux destination",
+					       "   aux rect",
 					       &bvbltparams->src2auxdstrect,
 					       &batch->dstclippedaux);
 		}
 
-		GCPRINT_RECT(GCZONE_DEST, "clipped dest",
+		GCPRINT_RECT(GCZONE_DEST, "  clipped rect",
 			     &batch->dstclipped);
 
 		/* Validate the destination rectangle. */
-		if (!valid_rect(bvbltparams->dstgeom,
-				&batch->dstclipped)) {
+		if (!valid_rect(dstinfo->geom, &batch->dstclipped)) {
 			BVSETBLTERROR(BVERR_DSTRECT,
 				      "invalid destination rectangle.");
 			goto exit;
 		}
 
 		if (batch->haveaux) {
-			GCPRINT_RECT(GCZONE_DEST, "clipped aux dest",
+			GCPRINT_RECT(GCZONE_DEST, "  clipped aux rect",
 				     &batch->dstclippedaux);
 
 			/* Validate the aux destination rectangle. */
-			if (!valid_rect(bvbltparams->dstgeom,
-					&batch->dstclippedaux)) {
+			if (!valid_rect(dstinfo->geom, &batch->dstclippedaux)) {
 				BVSETBLTERROR(BVERR_DSTRECT,
 					      "invalid aux destination "
 					      "rectangle.");
@@ -1616,7 +1621,7 @@ enum bverror parse_destination(struct bvbltparams *bvbltparams,
 		}
 
 		GCDBG(GCZONE_DEST,
-		      "clipping delta = (%d,%d)-(%d,%d)\n",
+		      "  clipping delta = (%d,%d)-(%d,%d)\n",
 		      batch->clipdelta.left,
 		      batch->clipdelta.top,
 		      batch->clipdelta.right,
@@ -1747,13 +1752,10 @@ enum bverror parse_source(struct bvbltparams *bvbltparams,
 {
 	enum bverror bverror = BVERR_NONE;
 
-	/* Convert the rectangle. */
-	GCCONVERT_RECT(GCZONE_SRC,
-		       "source", srcrect, &srcinfo->rect);
+	GCDBG(GCZONE_SRC, "parsing source #%d\n",
+	      srcinfo->index + 1);
 
 	/* Parse the source format. */
-	GCDBG(GCZONE_FORMAT, "parsing source%d format.\n",
-	      srcinfo->index + 1);
 	if (parse_format(bvbltparams, srcinfo) != BVERR_NONE) {
 		bverror = (srcinfo->index == 0)
 			? BVERR_SRC1GEOM_FORMAT
@@ -1815,16 +1817,16 @@ enum bverror parse_source(struct bvbltparams *bvbltparams,
 			: (bvbltparams->flags >> BVFLAG_FLIP_SRC2_SHIFT)
 			   & BVFLAG_FLIP_MASK;
 
-	GCDBG(GCZONE_SRC, "source surface %d:\n", srcinfo->index + 1);
+	GCDBG(GCZONE_SRC, "  buffer length = %d\n", srcinfo->buf.desc->length);
 	GCDBG(GCZONE_SRC, "  rotation %d degrees.\n", srcinfo->angle * 90);
 
 	if (srcinfo->buf.desc->auxtype == BVAT_PHYSDESC) {
 		struct bvphysdesc *bvphysdesc;
 		bvphysdesc = (struct bvphysdesc *) srcinfo->buf.desc->auxptr;
-		GCDBG(GCZONE_DEST, "  page offset = 0x%08X\n",
+		GCDBG(GCZONE_SRC, "  page offset = 0x%08X\n",
 			bvphysdesc->pageoffset);
 	} else {
-		GCDBG(GCZONE_DEST, "  virtual address = 0x%08X\n",
+		GCDBG(GCZONE_SRC, "  virtual address = 0x%08X\n",
 			(unsigned int) srcinfo->buf.desc->virtaddr);
 	}
 
@@ -1833,6 +1835,10 @@ enum bverror parse_source(struct bvbltparams *bvbltparams,
 	GCDBG(GCZONE_SRC, "  geometry size = %dx%d\n",
 	      srcinfo->geom->width, srcinfo->geom->height);
 	GCDBG(GCZONE_SRC, "  mirror = %d\n", srcinfo->mirror);
+
+	/* Convert the rectangle. */
+	GCCONVERT_RECT(GCZONE_SRC,
+		       "  rect", srcrect, &srcinfo->rect);
 
 	/* Validate source geometry. */
 	if (!valid_geom(srcinfo)) {
@@ -1927,6 +1933,10 @@ static enum bverror parse_implicitscale(struct bvbltparams *bvbltparams,
 		goto exit;
 	}
 
+	GCDBG(GCZONE_SCALING, "kernel size = %dx%d\n",
+	      batch->op.filter.horkernelsize,
+	      batch->op.filter.verkernelsize);
+
 exit:
 	GCEXIT(GCZONE_SCALING);
 	return bverror;
@@ -2006,6 +2016,10 @@ static enum bverror parse_explicitscale(struct bvbltparams *bvbltparams,
 			      "unsupported vertical kernel size %d", versize);
 		goto exit;
 	}
+
+	GCDBG(GCZONE_SCALING, "kernel size = %dx%d\n",
+	      batch->op.filter.horkernelsize,
+	      batch->op.filter.verkernelsize);
 
 exit:
 	GCEXIT(GCZONE_SCALING);
