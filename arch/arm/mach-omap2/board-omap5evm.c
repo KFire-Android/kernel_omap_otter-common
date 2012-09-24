@@ -59,6 +59,10 @@
 #include "mux.h"
 #include "omap5_ion.h"
 #include "omap_ram_console.h"
+#include "control.h"
+
+#include <video/omapdss.h>
+#include <video/omap-panel-lg4591.h>
 
 /* USBB3 to SMSC LAN9730 */
 #define GPIO_ETH_NRESET	172
@@ -676,10 +680,31 @@ static struct twl6040_vibra_data twl6040_vibra = {
 	.vddvibr_uV = 0,	/* fixed volt supply - VBAT */
 };
 
+static int omap5evm_twl6040_set_pll_input(int pll_id, int on)
+{
+	u32 reg_offset = OMAP5_CTRL_MODULE_WKUP_PAD_CONTROL_CKOBUFFER;
+	void __iomem *reg = OMAP5_CTRL_MODULE_WKUP_PAD_REGADDR(reg_offset);
+	u32 val = __raw_readl(reg);
+
+	/* nothing to do for clk32k */
+	if (pll_id == TWL6040_SYSCLK_SEL_LPPLL)
+		return 0;
+
+	if (on)
+		val |= OMAP5_CKOBUFFER_CLK_EN_MASK;
+	else
+		val &= ~OMAP5_CKOBUFFER_CLK_EN_MASK;
+
+	writel(val, reg);
+
+	return 0;
+}
+
 static struct twl6040_platform_data twl6040_data = {
 	.codec		= &twl6040_codec,
 	.vibra		= &twl6040_vibra,
 	.audpwron_gpio	= 145,
+	.set_pll_input	= omap5evm_twl6040_set_pll_input,
 };
 
 #ifdef CONFIG_OMAP5_SEVM_PALMAS

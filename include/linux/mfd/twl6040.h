@@ -201,6 +201,7 @@ struct twl6040_vibra_data {
 struct twl6040_platform_data {
 	int audpwron_gpio;	/* audio power-on gpio */
 	unsigned int irq_base;
+	int (*set_pll_input)(int pll_id, int enable);
 
 	struct twl6040_codec_data *codec;
 	struct twl6040_vibra_data *vibra;
@@ -227,6 +228,7 @@ struct twl6040 {
 	int pll;
 	unsigned int sysclk;
 	unsigned int mclk;
+	int (*set_pll_input)(int pll_id, int enable);
 
 	unsigned int irq;
 	unsigned int irq_base;
