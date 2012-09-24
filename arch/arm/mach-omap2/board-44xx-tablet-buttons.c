@@ -38,12 +38,12 @@ static struct gpio_led tablet_gpio_leds[] = {
 	{
 		.name	= "blue",
 		.default_trigger = "timer",
-		.gpio	= 104,
+		.gpio	= 169,
 	},
 	{
 		.name	= "red",
 		.default_trigger = "timer",
-		.gpio	= 36,
+		.gpio	= 170,
 	},
 	{
 		.name	= "green",
@@ -144,6 +144,11 @@ int __init tablet_button_init(void)
 			OMAP_MUX_MODE3 | OMAP_PIN_OUTPUT);
 		tablet_gpio_leds[0].gpio = TABLET2_GREEN_DBG2_LED_GPIO;
 		tablet_gpio_leds[4].gpio = TABLET2_GREEN_LED_GPIO;
+	}
+
+	if (omap_board_uses_hsic()) {
+		tablet_gpio_leds[2].gpio = 104;
+		tablet_gpio_leds[3].gpio = 36;
 	}
 
 	platform_add_devices(tablet_devices, ARRAY_SIZE(tablet_devices));

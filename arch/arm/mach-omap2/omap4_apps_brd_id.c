@@ -27,6 +27,7 @@
 
 static int board_revision;
 static int board_id;
+bool omap4_tablet_uses_hsic;
 
 bool omap_is_board_version(int req_board_version)
 {
@@ -34,6 +35,11 @@ bool omap_is_board_version(int req_board_version)
 		return true;
 
 	return false;
+}
+
+bool omap_board_uses_hsic(void)
+{
+	return omap4_tablet_uses_hsic;
 }
 
 int omap_get_board_version(void)

@@ -578,9 +578,9 @@ static void omap4_tablet_wifi_init(void)
 }
 
 #if defined(CONFIG_USB_EHCI_HCD_OMAP) || defined(CONFIG_USB_OHCI_HCD_OMAP3)
-static const struct usbhs_omap_board_data usbhs_bdata __initconst = {
-	.port_mode[0] = OMAP_USBHS_PORT_MODE_UNUSED,
-	.port_mode[1] = OMAP_EHCI_PORT_MODE_HSIC,
+static struct usbhs_omap_board_data usbhs_bdata __initdata = {
+	.port_mode[0] = OMAP_EHCI_PORT_MODE_PHY,
+	.port_mode[1] = OMAP_USBHS_PORT_MODE_UNUSED,
 	.port_mode[2] = OMAP_USBHS_PORT_MODE_UNUSED,
 	.phy_reset  = false,
 	.reset_gpio_port[0] = -EINVAL,
@@ -590,6 +590,18 @@ static const struct usbhs_omap_board_data usbhs_bdata __initconst = {
 	.hsic_aux_port[1] = OMAP4_HSIC_AUX_GPIO,
 	.hsic_aux_port[2] = -EINVAL
 };
+
+static int __init setup_usb_hsic(char *buf)
+{
+	extern bool omap4_tablet_uses_hsic;
+
+	omap4_tablet_uses_hsic = true;
+	usbhs_bdata.port_mode[0] = OMAP_USBHS_PORT_MODE_UNUSED;
+	usbhs_bdata.port_mode[1] = OMAP_EHCI_PORT_MODE_HSIC;
+	return 0;
+}
+
+early_param("omap4_tablet_uses_hsic", setup_usb_hsic);
 
 static void __init omap4_ehci_ohci_init(void)
 {
@@ -607,6 +619,13 @@ static void __init omap4_ehci_ohci_init(void)
 	omap_mux_init_signal("usbb2_ulpitll_clk.gpio_157", \
 		OMAP_PIN_OUTPUT | \
 		OMAP_PIN_OFF_NONE);
+
+	/* Power on the ULPI PHY */
+	if ((usbhs_bdata.port_mode[0] == OMAP_EHCI_PORT_MODE_PHY) &&
+			gpio_is_valid(OMAP4_MDM_PWR_EN_GPIO)) {
+		gpio_request(OMAP4_MDM_PWR_EN_GPIO, "USBB1 PHY VMDM_3V3");
+		gpio_direction_output(OMAP4_MDM_PWR_EN_GPIO, 1);
+	}
 
 	omap_mux_init_signal("gpmc_a18.gpio_42",
 			OMAP_PIN_INPUT_PULLUP | OMAP_PIN_OFF_INPUT_PULLUP);
