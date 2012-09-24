@@ -456,6 +456,13 @@ int sr_configure_errgen(struct omap_sr *sr)
 		return sr ? PTR_ERR(sr) : -EINVAL;
 	}
 
+	/* Check if SR clocks are already disabled. If yes do nothing */
+	if (pm_runtime_suspended(&sr->pdev->dev)) {
+		dev_err(&sr->pdev->dev, "%s: AVS clk is disabled from %pF\n",
+			__func__, (void *)_RET_IP_);
+		return -EINVAL;
+	}
+
 	if (!sr->clk_length)
 		sr_set_clk_length(sr);
 
@@ -525,6 +532,13 @@ int sr_disable_errgen(struct omap_sr *sr)
 		pr_warning("%s: bad omap_sr %p from %pF\n", __func__,
 			   sr, (void *)_RET_IP_);
 		return sr ? PTR_ERR(sr) : -EINVAL;
+	}
+
+	/* Check if SR clocks are already disabled. If yes do nothing */
+	if (pm_runtime_suspended(&sr->pdev->dev)) {
+		dev_err(&sr->pdev->dev, "%s: AVS clk is disabled from %pF\n",
+			__func__, (void *)_RET_IP_);
+		return -EINVAL;
 	}
 
 	switch (sr->ip_type) {
