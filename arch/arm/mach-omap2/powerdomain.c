@@ -42,9 +42,7 @@
 #define PWRDM_TRACE_STATES_FLAG	(1<<31)
 
 enum {
-	PWRDM_STATE_NOW = 0,
-	PWRDM_STATE_PREV,
-	PWRDM_STATE_HIGH2LOW,
+	PWRDM_STATE_HIGH2LOW = 0,
 	PWRDM_STATE_LOW2HIGH,
 };
 
@@ -277,19 +275,6 @@ static int _pwrdm_state_switch(struct powerdomain *pwrdm, int flag)
 
 	pwrdm->state = current_state;
 
-	return 0;
-}
-
-static int _pwrdm_pre_transition_cb(struct powerdomain *pwrdm, void *unused)
-{
-	pwrdm_clear_all_prev_pwrst(pwrdm);
-	_pwrdm_state_switch(pwrdm, PWRDM_STATE_NOW);
-	return 0;
-}
-
-static int _pwrdm_post_transition_cb(struct powerdomain *pwrdm, void *unused)
-{
-	_pwrdm_state_switch(pwrdm, PWRDM_STATE_PREV);
 	return 0;
 }
 
@@ -1460,17 +1445,6 @@ int pwrdm_wait_transition(struct powerdomain *pwrdm)
 	return ret;
 }
 
-int pwrdm_state_switch(struct powerdomain *pwrdm)
-{
-	int ret;
-
-	ret = pwrdm_wait_transition(pwrdm);
-	if (!ret)
-		ret = _pwrdm_state_switch(pwrdm, PWRDM_STATE_NOW);
-
-	return ret;
-}
-
 /*
  * pwrdm_state_high2low_counter_update() - handle a high to low change
  * @pwrdm:	powerdomain to change
@@ -1492,16 +1466,6 @@ void pwrdm_state_high2low_counter_update(struct powerdomain *pwrdm)
 void pwrdm_state_low2high_counter_update(struct powerdomain *pwrdm)
 {
 	_pwrdm_state_switch(pwrdm, PWRDM_STATE_LOW2HIGH);
-}
-
-int pwrdm_clkdm_state_switch(struct clockdomain *clkdm)
-{
-	if (clkdm != NULL && clkdm->pwrdm.ptr != NULL) {
-		pwrdm_wait_transition(clkdm->pwrdm.ptr);
-		return pwrdm_state_switch(clkdm->pwrdm.ptr);
-	}
-
-	return -EINVAL;
 }
 
 /**
@@ -1581,26 +1545,6 @@ int pwrdm_usecount_dec(struct powerdomain *pwrdm)
 int pwrdm_get_usecount(struct powerdomain *pwrdm)
 {
 	return atomic_read(&pwrdm->usecount);
-}
-
-int pwrdm_pre_transition(struct powerdomain *pwrdm)
-{
-	if (pwrdm)
-		_pwrdm_pre_transition_cb(pwrdm, NULL);
-	else
-		pwrdm_for_each(_pwrdm_pre_transition_cb, NULL);
-
-	return 0;
-}
-
-int pwrdm_post_transition(struct powerdomain *pwrdm)
-{
-	if (pwrdm)
-		_pwrdm_post_transition_cb(pwrdm, NULL);
-	else
-		pwrdm_for_each(_pwrdm_post_transition_cb, NULL);
-
-	return 0;
 }
 
 /**
