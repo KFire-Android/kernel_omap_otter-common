@@ -38,7 +38,9 @@
 #include <linux/regulator/fixed.h>
 
 #include <mach/hardware.h>
-
+#include <mach/omap-secure.h>
+#include "common.h"
+#include <asm/hardware/gic.h>
 #include <plat/common.h>
 #include <plat/i2c.h>
 #include <plat/gpio.h>
@@ -1033,9 +1035,8 @@ static void __init omap_5430evm_reserve(void)
 			OMAP_RAM_CONSOLE_SIZE_DEFAULT);
 
 	omap_rproc_reserve_cma(RPROC_CMA_OMAP5);
-
 	omap5_ion_init();
-
+	omap5_secure_workspace_addr_default();
 	omap_reserve();
 }
 
