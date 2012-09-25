@@ -102,7 +102,7 @@ struct omap_abe_atc_desc {
 
 u32 abe_dma_port_iter_factor(struct omap_aess_data_format *f);
 u32 abe_dma_port_iteration(struct omap_aess_data_format *f);
-u32 abe_dma_port_copy_subroutine_id(u32 port_id);
+u32 abe_dma_port_copy_subroutine_id(struct omap_aess *abe, u32 port_id);
 void omap_aess_decide_main_port(struct omap_aess *abe);
 void omap_aess_init_io_tasks(struct omap_aess *abe, u32 id, struct omap_aess_data_format *format,
 		       struct omap_aess_port_protocol *prot);
@@ -983,7 +983,7 @@ void omap_aess_init_io_tasks(struct omap_aess *abe, u32 id, struct omap_aess_dat
 		/* able  interrupt to be generated at the first frame */
 		desc_pp.split_addr1 = 1;
 
-		copy_func_index = (u8) abe_dma_port_copy_subroutine_id(id);
+		copy_func_index = (u8) abe_dma_port_copy_subroutine_id(abe, id);
 		dmareq_addr = abe_port[id].protocol.p.prot_pingpong.irq_addr;
 		dmareq_field = abe_port[id].protocol.p.prot_pingpong.irq_data;
 		datasize = abe_dma_port_iter_factor(format);
@@ -1051,7 +1051,7 @@ void omap_aess_init_io_tasks(struct omap_aess *abe, u32 id, struct omap_aess_dat
 		smem1 = abe_port[id].smem_buffer1;
 
 		smem3 = smem2 = abe_port[id].smem_buffer2;
-		copy_func_index1 = (u8) abe_dma_port_copy_subroutine_id(id);
+		copy_func_index1 = (u8) abe_dma_port_copy_subroutine_id(abe, id);
 		before_func_index = after_func_index =
 			copy_func_index2 = NULL_COPY_CFPID;
 
@@ -1508,7 +1508,7 @@ u32 omap_aess_dma_port_iter_factor(struct omap_aess *abe, struct omap_aess_data_
  *
  * returns the index of the function doing the copy in I/O tasks
  */
-u32 abe_dma_port_copy_subroutine_id(u32 port_id)
+u32 abe_dma_port_copy_subroutine_id(struct omap_aess *abe, u32 port_id)
 {
 	u32 sub_id;
 	if (abe_port[port_id].protocol.direction == ABE_ATC_DIRECTION_IN) {
@@ -1562,7 +1562,24 @@ u32 abe_dma_port_copy_subroutine_id(u32 port_id)
 			break;
 		case SIX_MSB:
 			if (port_id == OMAP_ABE_PDM_DL_PORT) {
-				sub_id = COPY_MCPDM_DL_CFPID;
+				switch (abe->mcpdm_path) {
+				case OMAP_ABE_DL1_HF:
+					/* DL1 -> Handsfree, Headset muted */
+					sub_id = COPY_MCPDM_DL_HF_PDL1_CFPID;
+					break;
+				case OMAP_ABE_DL1_HS_HF:
+					/* DL1 -> Headset and Handsfree */
+					sub_id = COPY_MCPDM_DL_HF_PDL2_CFPID;
+					break;
+				case OMAP_ABE_DL1_HS_DL2_HF:
+				default:
+					/*
+					 * Separate DL paths
+					 * DL1 -> Headset, DL2 -> Handsfree
+					 */
+					sub_id = COPY_MCPDM_DL_CFPID;
+					break;
+				}
 				break;
 			}
 			if (port_id == OMAP_ABE_MM_UL_PORT) {
@@ -1679,3 +1696,18 @@ void omap_aess_write_pdmdl_offset(struct omap_aess *abe, u32 path, u32 offset_le
 	}
 }
 EXPORT_SYMBOL(omap_aess_write_pdmdl_offset);
+
+/**
+ * abe_write_select_pdm_output - Select the path for OPP25 route input
+ *
+ * Parameters:
+ *  path: available paths are:
+ *         DL1 -> Headset, DL2 -> Handsfree
+ *         DL1 -> Headset + Handsfree
+ *         DL1 -> Handsfree, Headset muted
+ */
+void omap_aess_select_pdm_output(struct omap_aess *abe, u32 path)
+{
+	abe->mcpdm_path = path;
+}
+EXPORT_SYMBOL(omap_aess_select_pdm_output);

@@ -157,6 +157,12 @@ int abe_pm_restore_context(struct omap_abe *abe)
 
 	abe->context_loss = context_loss;
 
+#if defined(CONFIG_SND_OMAP_SOC_ABE_DL2)
+	omap_aess_select_pdm_output(abe->aess, OMAP_ABE_DL1_HS_DL2_HF);
+#else
+	omap_aess_select_pdm_output(abe->aess, OMAP_ABE_DL1_HS_HF);
+#endif
+
 	/* unmute gains not associated with FEs/BEs */
 	omap_aess_unmute_gain(abe->aess, OMAP_AESS_MIXAUDUL_MM_DL);
 	omap_aess_unmute_gain(abe->aess, OMAP_AESS_MIXAUDUL_TONES);
@@ -278,6 +284,12 @@ int abe_pm_resume(struct snd_soc_dai *dai)
 	}
 
 	omap_aess_reload_fw(abe->aess, abe->firmware);
+
+#if defined(CONFIG_SND_OMAP_SOC_ABE_DL2)
+	omap_aess_select_pdm_output(abe->aess, OMAP_ABE_DL1_HS_DL2_HF);
+#else
+	omap_aess_select_pdm_output(abe->aess, OMAP_ABE_DL1_HS_HF);
+#endif
 
 	switch (dai->id) {
 	case OMAP_ABE_DAI_PDM_UL:

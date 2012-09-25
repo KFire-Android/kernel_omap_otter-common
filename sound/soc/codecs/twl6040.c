@@ -766,6 +766,18 @@ int twl6040_get_dl1_gain(struct snd_soc_codec *codec)
 }
 EXPORT_SYMBOL_GPL(twl6040_get_dl1_gain);
 
+int twl6040_get_dl2_gain(struct snd_soc_codec *codec)
+{
+	struct snd_soc_dapm_context *dapm = &codec->dapm;
+
+	if (snd_soc_dapm_get_pin_power(dapm, "HFL") ||
+	    snd_soc_dapm_get_pin_power(dapm, "HFR"))
+		return -7; /* -7db */
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(twl6040_get_dl2_gain);
+
 int twl6040_get_clk_id(struct snd_soc_codec *codec)
 {
 	struct twl6040_data *priv = snd_soc_codec_get_drvdata(codec);
