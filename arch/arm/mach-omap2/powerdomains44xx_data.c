@@ -291,7 +291,7 @@ static struct powerdomain mpu_443x_pwrdm = {
 	}
 };
 
-static struct powerdomain mpu_446x_pwrdm = {
+static struct powerdomain mpu_446x_447x_pwrdm = {
 	.name		  = "mpu_pwrdm",
 	.voltdm		  = { .name = "mpu" },
 	.prcm_offs	  = OMAP4430_PRM_MPU_INST,
@@ -485,8 +485,8 @@ static struct powerdomain *powerdomains_omap443x[] __initdata = {
 	NULL
 };
 
-static struct powerdomain *powerdomains_omap446x[] __initdata = {
-	&mpu_446x_pwrdm,
+static struct powerdomain *powerdomains_omap446x_447x[] __initdata = {
+	&mpu_446x_447x_pwrdm,
 	NULL
 };
 
@@ -497,8 +497,8 @@ void __init omap44xx_powerdomains_init(void)
 
 	if (cpu_is_omap443x())
 		pwrdm_register_pwrdms(powerdomains_omap443x);
-	else if (cpu_is_omap446x())
-		pwrdm_register_pwrdms(powerdomains_omap446x);
+	else if (cpu_is_omap446x() || cpu_is_omap447x())
+		pwrdm_register_pwrdms(powerdomains_omap446x_447x);
 	else
 		WARN(true, "omap4: powerdomains data not defined\n");
 
