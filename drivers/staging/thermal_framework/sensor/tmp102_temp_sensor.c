@@ -160,8 +160,8 @@ static int tmp102_read_current_temp(struct device *dev)
 
 static int tmp102_get_temp(struct thermal_dev *tdev)
 {
-	struct platform_device *pdev = to_platform_device(tdev->dev);
-	struct tmp102_temp_sensor *tmp102 = platform_get_drvdata(pdev);
+	struct i2c_client *client = to_i2c_client(tdev->dev);
+	struct tmp102_temp_sensor *tmp102 = i2c_get_clientdata(client);
 
 	tmp102->therm_fw->current_temp =
 			tmp102_read_current_temp(tdev->dev);
@@ -171,8 +171,8 @@ static int tmp102_get_temp(struct thermal_dev *tdev)
 
 static int tmp102_report_slope(struct thermal_dev *tdev, const char *dom_name)
 {
-	struct platform_device *pdev = to_platform_device(tdev->dev);
-	struct tmp102_temp_sensor *tmp102 = platform_get_drvdata(pdev);
+	struct i2c_client *client = to_i2c_client(tdev->dev);
+	struct tmp102_temp_sensor *tmp102 = i2c_get_clientdata(client);
 
 	if (!strcmp(dom_name, "cpu"))
 		return tmp102->slope;
@@ -182,8 +182,8 @@ static int tmp102_report_slope(struct thermal_dev *tdev, const char *dom_name)
 
 static int tmp102_report_offset(struct thermal_dev *tdev, const char *dom_name)
 {
-	struct platform_device *pdev = to_platform_device(tdev->dev);
-	struct tmp102_temp_sensor *tmp102 = platform_get_drvdata(pdev);
+	struct i2c_client *client = to_i2c_client(tdev->dev);
+	struct tmp102_temp_sensor *tmp102 = i2c_get_clientdata(client);
 
 	if (!strcmp(dom_name, "cpu"))
 		return tmp102->offset;
