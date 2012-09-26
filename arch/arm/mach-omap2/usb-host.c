@@ -22,6 +22,7 @@
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 #include <linux/dma-mapping.h>
+#include <linux/pm_runtime.h>
 
 #include <asm/io.h>
 
@@ -631,6 +632,28 @@ static void __init setup_ehci_io_mux(const enum usbhs_omap_port_mode *port_mode)
 	return;
 }
 
+static struct platform_device *pdev_usbhs;
+static void usbhs_wakeup_work(struct work_struct *unused);
+static DECLARE_DELAYED_WORK(usbhs_wakeup, usbhs_wakeup_work);
+
+static int usbhs_wakeup_handler(struct omap_hwmod_mux_info *unused)
+{
+	int queued;
+
+	queued = queue_delayed_work(pm_wq, &usbhs_wakeup,
+			msecs_to_jiffies(20));
+
+	if (queued)
+		pm_runtime_get(&pdev_usbhs->dev);
+
+	return 0;
+}
+
+static void usbhs_wakeup_work(struct work_struct *unused)
+{
+	pm_runtime_put_sync(&pdev_usbhs->dev);
+}
+
 
 static struct omap_hwmod_mux_info * __init
 omap_hwmod_mux_array_init(struct platform_device	*pdev,
@@ -678,7 +701,8 @@ omap_hwmod_mux_array_init(struct platform_device	*pdev,
 		case OMAP_EHCI_PORT_MODE_TLL:
 		case OMAP_EHCI_PORT_MODE_HSIC:
 			for (j = 0; j < nr_pads[i]; j++)
-				omap_hwmod_pad_route_irq(uhh_hwm, k + j, 1);
+				omap_hwmod_pad_wakeup_handler(uhh_hwm, k + j,
+							usbhs_wakeup_handler);
 			break;
 		case OMAP_OHCI_PORT_MODE_PHY_6PIN_DATSE0:
 		case OMAP_OHCI_PORT_MODE_PHY_6PIN_DPDM:
@@ -691,7 +715,8 @@ omap_hwmod_mux_array_init(struct platform_device	*pdev,
 		case OMAP_OHCI_PORT_MODE_TLL_2PIN_DATSE0:
 		case OMAP_OHCI_PORT_MODE_TLL_2PIN_DPDM:
 			for (j = 0; j < nr_pads[i]; j++)
-				omap_hwmod_pad_route_irq(uhh_hwm, k + j, 0);
+				omap_hwmod_pad_wakeup_handler(uhh_hwm, k + j,
+							usbhs_wakeup_handler);
 			break;
 
 		case OMAP_USBHS_PORT_MODE_UNUSED:
@@ -955,6 +980,8 @@ void __init usbhs_init(const struct usbhs_omap_board_data *pdata)
 			USBHS_UHH_HWMODNAME);
 		return;
 	}
+
+	pdev_usbhs = pdev;
 
 	if (cpu_is_omap34xx()) {
 		setup_ehci_io_mux(pdata->port_mode);
