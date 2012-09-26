@@ -44,17 +44,27 @@ struct rproc_user_device {
 
 static struct rproc_user_device *ipu_device;
 static char *rproc_user_name = RPROC_USER_NAME;
-static bool secure_mode;
-
+static unsigned secure_cnt; /* cnt of secure service users */
 
 static int rproc_user_open(struct inode *inode, struct file *filp)
 {
+	filp->private_data = NULL;
 	return 0;
 }
 
 static int rproc_user_release(struct inode *inode, struct file *filp)
 {
-	return 0;
+	int ret = 0;
+
+	if (filp->private_data) {
+		mutex_lock(&rproc_user_mutex);
+		if (!--secure_cnt)
+			ret = rproc_set_secure("ipu_c0", false);
+		mutex_unlock(&rproc_user_mutex);
+		if (ret)
+			pr_err("rproc normal start failed 0x%x, urghh!!", ret);
+	}
+	return ret;
 }
 
 static ssize_t rproc_user_read(struct file *filp, char __user *ubuf,
@@ -68,7 +78,7 @@ static ssize_t rproc_user_read(struct file *filp, char __user *ubuf,
 
 	if (mutex_lock_interruptible(&rproc_user_mutex))
 		return -EINTR;
-	enable = secure_mode ? 1 : 0;
+	enable = secure_cnt ? 1 : 0;
 	if (copy_to_user((void *)ubuf, &enable, sizeof(enable)))
 		ret = -EFAULT;
 	mutex_unlock(&rproc_user_mutex);
@@ -79,10 +89,47 @@ static ssize_t rproc_user_read(struct file *filp, char __user *ubuf,
 static ssize_t rproc_user_write(struct file *filp, const char __user *ubuf,
 						size_t len, loff_t *offp)
 {
-	pr_err("%s: secure playback state switch not supported currently.\n",
-			__func__);
+	int ret = 0;
+	u8 enable;
 
-	return -EINVAL;
+	if (len != 1)
+		return -EINVAL;
+
+	if (copy_from_user(&enable, (char __user *) ubuf, sizeof(enable)))
+		return -EFAULT;
+
+	if (mutex_lock_interruptible(&rproc_user_mutex))
+		return -EINTR;
+
+	enable = enable ? 1 : 0;
+	if (enable == (int)filp->private_data) {
+		ret = -EINVAL;
+		goto out;
+	}
+
+	switch (enable) {
+	case 1:
+		if (!secure_cnt++) /* +1 secure service user */
+			ret = rproc_set_secure("ipu_c0", true);
+		if (!ret) {
+			filp->private_data = (void *)1;
+			goto out;
+		}
+		/* fall through in case of failure */
+		pr_err("rproc secure start failed, 0x%x\n", ret);
+	case 0:
+		if (!--secure_cnt)
+			ret = rproc_set_secure("ipu_c0", false);
+		if (ret)
+			pr_err("rproc normal start failed 0x%x, urghh!!", ret);
+		filp->private_data = (void *)0;
+	}
+	if (enable != (int)filp->private_data)
+		ret = -EACCES;
+out:
+	mutex_unlock(&rproc_user_mutex);
+
+	return ret ? ret : 1;
 }
 
 static const struct file_operations rproc_user_fops = {
