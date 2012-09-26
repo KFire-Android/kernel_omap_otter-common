@@ -511,12 +511,13 @@ static int __init omap_timer_init(struct omap_hwmod *oh, void *unused)
 	timer_dev_attr = oh->dev_attr;
 	if (omap_type() != OMAP2_DEVICE_TYPE_GP && timer_dev_attr)
 		if (timer_dev_attr->timer_capability == OMAP_TIMER_SECURE)
-			return ret;
+			goto end;
 
 	pdata = kzalloc(sizeof(*pdata), GFP_KERNEL);
 	if (!pdata) {
 		pr_err("%s: No memory for [%s]\n", __func__, oh->name);
-		return -ENOMEM;
+		ret = -ENOMEM;
+		goto end;
 	}
 
 	/*
@@ -539,6 +540,12 @@ static int __init omap_timer_init(struct omap_hwmod *oh, void *unused)
 		pdata->reserved = 1;
 
 	pwrdm = omap_hwmod_get_pwrdm(oh);
+	if (!pwrdm) {
+		pr_debug("%s: could not find pwrdm for (%s) in omap hwmod!\n",
+			__func__, oh->name);
+		ret = -EINVAL;
+		goto err_free_mem;
+	}
 	pdata->loses_context = pwrdm_can_ever_lose_context(pwrdm);
 #ifdef CONFIG_PM
 	pdata->get_context_loss_count = omap_pm_get_dev_context_loss_count;
@@ -552,8 +559,9 @@ static int __init omap_timer_init(struct omap_hwmod *oh, void *unused)
 		ret = -EINVAL;
 	}
 
+err_free_mem:
 	kfree(pdata);
-
+end:
 	return ret;
 }
 
