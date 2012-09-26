@@ -722,10 +722,14 @@ static u32 get_pwr_mgmt_ctrl(u32 freq, struct emif_data *emif, u32 ip_rev)
 	struct emif_custom_configs *cust_cfgs = emif->plat_data->custom_configs;
 
 	if (cust_cfgs && (cust_cfgs->mask & EMIF_CUSTOM_CONFIG_LPMODE)) {
-		lpmode		= cust_cfgs->lpmode;
-		timeout_perf	= cust_cfgs->lpmode_timeout_performance;
-		timeout_pwr	= cust_cfgs->lpmode_timeout_power;
-		freq_threshold  = cust_cfgs->lpmode_freq_threshold;
+		lpmode	= cust_cfgs->lpmode;
+
+		if (cust_cfgs->lpmode_timeout_performance)
+			timeout_perf = cust_cfgs->lpmode_timeout_performance;
+		if (cust_cfgs->lpmode_timeout_power)
+			timeout_pwr = cust_cfgs->lpmode_timeout_power;
+		if (cust_cfgs->lpmode_freq_threshold)
+			freq_threshold  = cust_cfgs->lpmode_freq_threshold;
 	}
 
 	/* Timeout based on DDR frequency */
