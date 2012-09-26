@@ -522,6 +522,8 @@ int omapdss_hdmi_set_deepcolor(struct omap_dss_device *dssdev, int val,
 		bool hdmi_restart);
 int omapdss_hdmi_display_set_mode(struct omap_dss_device *dssdev,
 					struct fb_videomode *mode);
+int omapdss_hdmi_3d_enable(struct omap_dss_device *dssdev,
+				bool enable);
 int omapdss_hdmi_display_set_mode2(struct omap_dss_device *dssdev,
 					struct fb_videomode *vm,
 					int code, int mode);

@@ -671,6 +671,37 @@ int omapdss_hdmi_display_set_mode(struct omap_dss_device *dssdev,
 	return r1 ? : r2;
 }
 
+int omapdss_hdmi_3d_enable(struct omap_dss_device *dssdev,
+				bool enable)
+{
+	int r;
+
+	if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE) {
+		r = -EINVAL;
+		DSSERR("%s incorrect state\n", __func__);
+		goto err;
+	}
+
+	hdmi.ip_data.set_mode = true;
+	dssdev->driver->disable(dssdev);
+	hdmi.ip_data.set_mode = false;
+
+	r = omapdss_hdmi_display_3d_enable(dssdev, enable);
+	if (r)
+		DSSERR("failed to enable 3d\n");
+
+	r += dssdev->driver->enable(dssdev);
+
+	if (r) {
+		DSSERR("Err in 3d configure\n");
+		goto err;
+	}
+
+	return 0;
+err:
+	return r;
+}
+
 int hdmi_notify_hpd(struct omap_dss_device *dssdev, bool hpd)
 {
 	if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE)

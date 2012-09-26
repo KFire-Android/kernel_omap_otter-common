@@ -274,12 +274,9 @@ static ssize_t display_s3d_enabled_store(struct device *dev,
 
 	enable = !!enable;
 
-	dssdev->driver->disable(dssdev);
-
 	if (dssdev->driver->s3d_enable_set)
-		err += dssdev->driver->s3d_enable_set(dssdev, enable);
+		err = dssdev->driver->s3d_enable_set(dssdev, enable);
 
-	err += dssdev->driver->enable(dssdev);
 	if (err)
 		return err;
 
