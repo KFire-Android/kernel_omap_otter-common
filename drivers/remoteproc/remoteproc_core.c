@@ -1279,6 +1279,58 @@ rproc_handle_fw_version(struct rproc *rproc, const char *version, int versz)
 }
 
 /**
+ * rproc_find_fw_section() - find the section named in fw
+ * @rproc: the rproc handle
+ * @elf_data: the content of the ELF firmware image
+ * @len: firmware size (in bytes)
+ * @sect: name of fw section
+ * @sectsz: size of the fw section
+ *
+ * This function finds the given section inside the remote processor's
+ * firmware.
+ *
+ * Returns the pointer to the section if it is found, and write its
+ * size into @sectsz. If a valid section isn't found, NULL is returned
+ * (and @sectsz isn't set).
+ */
+static const u8 *
+rproc_find_fw_section(struct rproc *rproc, const u8 *elf_data, size_t len,
+						const char *sect, int *sectsz)
+{
+	struct elf32_hdr *ehdr;
+	struct elf32_shdr *shdr;
+	const char *name_sect;
+	struct device *dev = &rproc->dev;
+	const u8 *sectaddr = NULL;
+	int i;
+
+	ehdr = (struct elf32_hdr *)elf_data;
+	shdr = (struct elf32_shdr *)(elf_data + ehdr->e_shoff);
+	name_sect = elf_data + shdr[ehdr->e_shstrndx].sh_offset;
+
+	/* look for the section */
+	for (i = 0; i < ehdr->e_shnum; i++, shdr++) {
+		int size = shdr->sh_size;
+		int offset = shdr->sh_offset;
+
+		if (strcmp(name_sect + shdr->sh_name, sect))
+			continue;
+
+		/* make sure we have the entire table */
+		if (offset + size > len) {
+			dev_err(dev, "%s truncated\n", sect);
+			return NULL;
+		}
+		sectaddr = elf_data + offset;
+		*sectsz = shdr->sh_size;
+
+		break;
+	}
+
+	return sectaddr;
+}
+
+/**
  * rproc_find_rsc_table() - find the resource table
  * @rproc: the rproc handle
  * @elf_data: the content of the ELF firmware image
@@ -1298,116 +1350,43 @@ static struct resource_table *
 rproc_find_rsc_table(struct rproc *rproc, const u8 *elf_data, size_t len,
 							int *tablesz)
 {
-	struct elf32_hdr *ehdr;
-	struct elf32_shdr *shdr;
-	const char *name_table;
 	struct device *dev = &rproc->dev;
 	struct resource_table *table = NULL;
-	int i;
+	int size;
 
-	ehdr = (struct elf32_hdr *)elf_data;
-	shdr = (struct elf32_shdr *)(elf_data + ehdr->e_shoff);
-	name_table = elf_data + shdr[ehdr->e_shstrndx].sh_offset;
+	table = (struct resource_table *) rproc_find_fw_section(rproc, elf_data,
+		len, ".resource_table", &size);
 
-	/* look for the resource table and handle it */
-	for (i = 0; i < ehdr->e_shnum; i++, shdr++) {
-		int size = shdr->sh_size;
-		int offset = shdr->sh_offset;
+	if (!table)
+		return NULL;
 
-		if (strcmp(name_table + shdr->sh_name, ".resource_table"))
-			continue;
-
-		table = (struct resource_table *)(elf_data + offset);
-
-		/* make sure we have the entire table */
-		if (offset + size > len) {
-			dev_err(dev, "resource table truncated\n");
-			return NULL;
-		}
-
-		/* make sure table has at least the header */
-		if (sizeof(struct resource_table) > size) {
-			dev_err(dev, "header-less resource table\n");
-			return NULL;
-		}
-
-		/* we don't support any version beyond the first */
-		if (table->ver != 1) {
-			dev_err(dev, "unsupported fw ver: %d\n", table->ver);
-			return NULL;
-		}
-
-		/* make sure reserved bytes are zeroes */
-		if (table->reserved[0] || table->reserved[1]) {
-			dev_err(dev, "non zero reserved bytes\n");
-			return NULL;
-		}
-
-		/* make sure the offsets array isn't truncated */
-		if (table->num * sizeof(table->offset[0]) +
-				sizeof(struct resource_table) > size) {
-			dev_err(dev, "resource table incomplete\n");
-			return NULL;
-		}
-
-		*tablesz = shdr->sh_size;
-		break;
+	/* make sure table has at least the header */
+	if (sizeof(struct resource_table) > size) {
+		dev_err(dev, "header-less resource table\n");
+		return NULL;
 	}
 
+	/* we don't support any version beyond the first */
+	if (table->ver != 1) {
+		dev_err(dev, "unsupported fw ver: %d\n", table->ver);
+		return NULL;
+	}
+
+	/* make sure reserved bytes are zeroes */
+	if (table->reserved[0] || table->reserved[1]) {
+		dev_err(dev, "non zero reserved bytes\n");
+		return NULL;
+	}
+
+	/* make sure the offsets array isn't truncated */
+	if (table->num * sizeof(table->offset[0]) +
+			sizeof(struct resource_table) > size) {
+		dev_err(dev, "resource table incomplete\n");
+		return NULL;
+	}
+
+	*tablesz = size;
 	return table;
-}
-
-/**
- * rproc_find_version_section() - find the .version section
- * @rproc: the rproc handle
- * @elf_data: the content of the ELF firmware image
- * @len: firmware size (in bytes)
- * @versz: place holder for providing back the version size
- *
- * This function finds the .version section inside the remote processor's
- * firmware. It is used to provide any version information for the
- * firmware.
- *
- * Returns the pointer to the .version section if it is found, and write its
- * size into @versz. If a valid version isn't found, NULL is returned
- * (and @versz isn't set).
- */
-static const char *
-rproc_find_fw_version_section(struct rproc *rproc, const u8 *elf_data,
-						size_t len, int *versz)
-{
-	struct elf32_hdr *ehdr;
-	struct elf32_shdr *shdr;
-	const char *name_table;
-	struct device *dev = &rproc->dev;
-	const char *vdata = NULL;
-	int i;
-
-	ehdr = (struct elf32_hdr *)elf_data;
-	shdr = (struct elf32_shdr *)(elf_data + ehdr->e_shoff);
-	name_table = elf_data + shdr[ehdr->e_shstrndx].sh_offset;
-
-	/* look for the version section */
-	for (i = 0; i < ehdr->e_shnum; i++, shdr++) {
-		int size = shdr->sh_size;
-		int offset = shdr->sh_offset;
-
-		if (strcmp(name_table + shdr->sh_name, ".version"))
-			continue;
-
-		vdata = (char *)(elf_data + offset);
-
-		/* make sure we have the entire section */
-		if (offset + size > len) {
-			dev_err(dev, "version info truncated\n");
-			return NULL;
-		}
-
-		*versz = shdr->sh_size;
-		break;
-	}
-
-	return vdata;
 }
 
 /**
@@ -1554,7 +1533,7 @@ static int rproc_fw_boot(struct rproc *rproc, const struct firmware *fw)
 	struct elf32_hdr *ehdr;
 	struct resource_table *table;
 	int ret, tablesz, versz;
-	const char *version;
+	const u8 *version;
 
 	ret = rproc_fw_sanity_check(rproc, fw);
 	if (ret)
@@ -1596,13 +1575,13 @@ static int rproc_fw_boot(struct rproc *rproc, const struct firmware *fw)
 	}
 
 	/* look for the firmware version, and store if present */
-	version = rproc_find_fw_version_section(rproc, fw->data,
-							fw->size, &versz);
+	version = rproc_find_fw_section(rproc, fw->data, fw->size,
+				".version", &versz);
 	if (version) {
 		ret = rproc_handle_fw_version(rproc, version, versz);
 		if (ret) {
 			dev_err(dev, "Failed to process version info: %d\n",
-									ret);
+					ret);
 			goto clean_up;
 		}
 	}
