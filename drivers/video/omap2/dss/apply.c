@@ -1250,16 +1250,15 @@ int omap_dss_mgr_apply(struct omap_overlay_manager *mgr)
 	DSSDBG("omap_dss_mgr_apply(%s)\n", mgr->name);
 
 	spin_lock_irqsave(&data_lock, flags);
-#if 0
-	/* TODO: FIXME: Check why this causes spin lock crash */
-	if (!mgr->device || mgr->device->state != OMAP_DSS_DISPLAY_ACTIVE) {
-		pr_info_ratelimited("cannot apply mgr(%s) on inactive device\n",
+
+	if (!mgr->device) {
+		pr_info_ratelimited("cannot aply mgr(%s)--invalid device\n",
 				mgr->name);
 		r = -ENODEV;
 		spin_unlock_irqrestore(&data_lock, flags);
 		return r;
 	}
-#endif
+
 	r = dss_check_settings_apply(mgr, mgr->device);
 	if (r) {
 		spin_unlock_irqrestore(&data_lock, flags);
@@ -1271,6 +1270,13 @@ int omap_dss_mgr_apply(struct omap_overlay_manager *mgr)
 	list_for_each_entry(ovl, &mgr->overlays, list)
 		omap_dss_mgr_apply_ovl(ovl);
 
+	if (mgr->device->state != OMAP_DSS_DISPLAY_ACTIVE) {
+		pr_info_ratelimited("cannot apply mgr(%s) on inactive device\n",
+				mgr->name);
+		r = -ENODEV;
+		spin_unlock_irqrestore(&data_lock, flags);
+		return r;
+	}
 	/* Configure manager */
 	omap_dss_mgr_apply_mgr(mgr);
 
