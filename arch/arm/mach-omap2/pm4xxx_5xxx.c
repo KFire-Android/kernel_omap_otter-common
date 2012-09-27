@@ -611,7 +611,7 @@ static void __init prcm_setup_regs(void)
 	}
 
 	/* Allow SRAM LDO to enter RET during  low power state*/
-	if (cpu_is_omap446x()) {
+	if (cpu_is_omap446x() || cpu_is_omap447x()) {
 		omap4_prminst_rmw_inst_reg_bits(OMAP4430_RETMODE_ENABLE_MASK,
 			0x1 << OMAP4430_RETMODE_ENABLE_SHIFT,
 			OMAP4430_PRM_PARTITION,
