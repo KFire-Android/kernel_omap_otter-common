@@ -332,7 +332,7 @@ static int omap_hdmi_remove(struct platform_device *pdev)
 	snd_soc_unregister_dai(&pdev->dev);
 
 	if (hdmi_data == NULL) {
-		dev_err(&pdev->dev, "cannot obtain HDMi data\n");
+		dev_err(&pdev->dev, "cannot obtain HDMI data\n");
 		return -ENODEV;
 	}
 
