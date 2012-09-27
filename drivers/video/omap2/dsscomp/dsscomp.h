@@ -194,10 +194,10 @@ extern struct dbg_event_t {
 	const char *fmt;
 } dbg_events[128];
 extern u32 dbg_event_ix;
-extern bool alpha_only;
 
 void dsscomp_dbg_events(struct seq_file *s);
 #endif
+extern bool alpha_only;
 
 static inline
 void __log_event(u32 ix, u32 ms, void *data, const char *fmt, u32 a1, u32 a2)
