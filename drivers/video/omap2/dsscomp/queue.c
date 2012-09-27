@@ -650,11 +650,13 @@ skip_ovl_set:
 			mgr->ovls[oix] = cdev->ovls[oi->cfg.ix];
 			mgr->ovls[oix]->enabled = oi->cfg.enabled;
 		}
-		r = mgr->set_ovl(mgr);
-		if (r) {
-			dev_err(DEV(cdev), "[%p] "
-				"set_ovl failed\n", comp);
-			goto err;
+		if (!r) {
+			r = mgr->set_ovl(mgr);
+			if (r) {
+				dev_err(DEV(cdev), "[%p] "
+					"set_ovl failed\n", comp);
+				goto err;
+			}
 		}
 	}
 	mutex_unlock(&mtx);
