@@ -460,4 +460,7 @@
 #define FIQ_START		1024
 #endif
 
+/* OMAP5XXX specific irq numbers */
+#define OMAP54XX_IRQ_AXI                       (3 + OMAP44XX_IRQ_GIC_START)
+
 #endif

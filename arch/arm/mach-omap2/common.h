@@ -302,6 +302,10 @@ static inline u32 omap_usec_to_32k(u32 usec)
 {
 	return DIV_ROUND_UP_ULL(32768ULL * (u64)usec, 1000000ULL);
 }
+/* AXI ERROR DEFINES */
+#define AXI_L2_ERROR (1 << 30)
+#define AXI_ASYNC_ERROR (1 << 29)
+#define AXI_ERROR (AXI_L2_ERROR | AXI_ASYNC_ERROR)
 
 #endif /* __ASSEMBLER__ */
 #endif /* __ARCH_ARM_MACH_OMAP2PLUS_COMMON_H */
