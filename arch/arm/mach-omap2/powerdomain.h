@@ -145,6 +145,7 @@ struct powerdomain {
 	/* Lock to secure accesses around pwrdm data structure updates */
 	spinlock_t lock;
 	int state;
+	bool high2low_transition_enable;
 	unsigned state_counter[PWRDM_MAX_PWRSTS];
 	unsigned ret_logic_off_counter;
 	unsigned ret_mem_off_counter[PWRDM_MAX_MEM_BANKS];
@@ -258,10 +259,8 @@ bool pwrdm_has_hdwr_sar(struct powerdomain *pwrdm);
 
 int pwrdm_wait_transition(struct powerdomain *pwrdm);
 
-int pwrdm_state_switch(struct powerdomain *pwrdm);
-int pwrdm_clkdm_state_switch(struct clockdomain *clkdm);
-int pwrdm_pre_transition(struct powerdomain *pwrdm);
-int pwrdm_post_transition(struct powerdomain *pwrdm);
+void pwrdm_state_high2low_counter_update(struct powerdomain *pwrdm);
+void pwrdm_state_low2high_counter_update(struct powerdomain *pwrdm);
 int pwrdm_usecount_inc(struct powerdomain *pwrdm);
 int pwrdm_usecount_dec(struct powerdomain *pwrdm);
 int pwrdm_get_usecount(struct powerdomain *pwrdm);

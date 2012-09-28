@@ -338,30 +338,7 @@ ENDPROC(omap4_cpu_resume)
 ENTRY(omap5_finish_suspend)
 	stmfd	sp!, {r4-r12, lr}
 	cmp	r0, #0x0
-	beq	do_wfi				@ No lowpower state, jump to WFI
-
-	mov	r7, r0
-	/*
-	 * Clear the SCTLR.C bit to prevent further data cache
-	 * allocation.
-	 */
-	mrc	p15, 0, r0, c1, c0, 0
-	bic	r0, r0, #(1 << 2)		@ Disable the C bit
-	mcr	p15, 0, r0, c1, c0, 0
-	isb
-	/*
-	 * HACK: COBRA-1.0BUG00167:  Disable L1 cache and execute WFI
-	 *
-	 * When data caching is disabled, no new cache lines are allocated
-	 * to the L1 data cache and L2 cache because of requests from that
-	 * processor. Other L1 caches will not allocate lines from caches
-	 * with C-bit disabled. L1 memory is now in Write-Back No-Allocate mode.
-	 *
-	 * When CPU comes out of WFI, L1 data cache is re-enabled
-	 */
-
-	cmp	r7, #0x1
-	beq	do_wfi				@ INA/CSWR, jump to WFI
+	beq	o5_c_bit_hack
 
 	/*
 	 * Flush all data from the L1 data cache before disabling
@@ -379,6 +356,16 @@ ENTRY(omap5_finish_suspend)
 skip_secure_l1_clean_op:
 	mov	r0, #1
 	bl	v7_flush_dcache_by_level
+
+	/*
+	 * Clear the SCTLR.C bit to prevent further data cache
+	 * allocation. Clearing SCTLR.C would make all the data accesses
+	 * strongly ordered and would not hit the cache.
+	 */
+	mrc	p15, 0, r0, c1, c0, 0
+	bic	r0, r0, #(1 << 2)		@ Disable the C bit
+	mcr	p15, 0, r0, c1, c0, 0
+	isb
 
 	/*
 	 * Invalidate L1 data cache. Even though only invalidate is
@@ -443,6 +430,35 @@ do_wfi:
 	isb
 	dsb
 	ldmfd	sp!, {r4-r12, pc}
+	/*
+	 * HACK: COBRA-1.0BUG00167: Disable L1 cache before WFI
+	 * When data caching is disabled, no new cache lines are allocated to
+	 * the L1 data cache and L2 cache because of requests from that
+	 * processor. Other L1 caches will not allocate lines from caches
+	 * with C-bit disabled L1 memory is now Write-Back No-Allocate mode.
+	 * When CPU comes out of WFI, L1 data cache is re-enabled
+	 * when save_state is 0, check the SAR memory for HACK flag
+	 */
+o5_c_bit_hack:
+
+	bl	omap4_get_sar_ram_base
+	mov	r8, r0
+	mrc	p15, 0, r5, c0, c0, 5		@ Read MPIDR
+	ands	r5, r5, #0x0f
+	ldreq	r0, [r8, #OMAP5_C_BIT_HACK_CPU0] @ Retrieve HACK CPU0 state
+	ldrne	r0, [r8, #OMAP5_C_BIT_HACK_CPU1] @ Retrieve HACK CPU1 state
+	cmp	r0, #0
+	beq	do_wfi
+	/*
+	 * Clear the SCTLR.C bit to prevent further data cache
+	 * allocation. Clearing SCTLR.C would make all the data accesses
+	 * strongly ordered and would not hit the cache.
+	 */
+	mrc	p15, 0, r0, c1, c0, 0
+	bic	r0, r0, #(1 << 2)		@ Disable the C bit
+	mcr	p15, 0, r0, c1, c0, 0
+	isb
+	b do_wfi
 ENDPROC(omap5_finish_suspend)
 
 ENTRY(omap5_cpu_resume)

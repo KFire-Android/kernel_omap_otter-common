@@ -89,6 +89,9 @@
 #define OMAP4460_ADC_START_VALUE	530
 #define OMAP4460_ADC_END_VALUE		932
 
+/* COBRA-BUG-175: set T_HOT to 0x3FF */
+#define OMAP54XX_ES1_0_TSHUT_HOT	1023
+
 #define OMAP5430_MPU_TSHUT_HOT		915
 #define OMAP5430_MPU_TSHUT_COLD		900
 #define OMAP5430_MPU_T_HOT		800
@@ -1332,6 +1335,16 @@ int __devinit omap_bandgap_probe(struct platform_device *pdev)
 		if (ret || !val)
 			dev_info(&pdev->dev,
 				 "Non-trimmed BGAP, Temp not accurate\n");
+
+		/*
+		 * COBRA-BUG-175: Workaround for spurious TSHUT. Set hot
+		 * threshold to 0x3FF, which disables H/W TSHUT mechanism.
+		 */
+		if (cpu_is_omap54xx() &&
+			(omap_rev() == OMAP5430_REV_ES1_0 ||
+			 omap_rev() == OMAP5432_REV_ES1_0))
+			bg_ptr->pdata->sensors[i].ts_data->tshut_hot =
+						OMAP54XX_ES1_0_TSHUT_HOT;
 	}
 
 	clk_rate = clk_round_rate(bg_ptr->div_clk,

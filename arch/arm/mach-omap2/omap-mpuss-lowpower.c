@@ -197,19 +197,6 @@ static inline void set_cpu_force_off(unsigned int cpu_id, bool on)
 		pwrdm_disable_force_off(pm_info->pwrdm);
 }
 
- /*
- * CPU powerdomain pre/post transition.
- */
-static inline void cpu_pwrdm_pre_post_transition(unsigned int cpu_id,
-				bool pre_transition)
-{
-	struct omap4_cpu_pm_info *pm_info = &per_cpu(omap4_pm_info, cpu_id);
-
-	if (pre_transition)
-		pwrdm_pre_transition(pm_info->pwrdm);
-	else
-		pwrdm_post_transition(pm_info->pwrdm);
-}
 /*
  * Store the SCU power status value to scratchpad memory
  */
@@ -480,25 +467,7 @@ int omap_enter_lowpower(unsigned int cpu, unsigned int power_state)
 
 	switch (power_state) {
 	case PWRDM_POWER_ON:
-		save_state = 0;
-		break;
 	case PWRDM_POWER_INACTIVE:
-		if (cpu_is_omap54xx()) {
-			/*
-			 * HACK: COBRA-1.0BUG00167: Disable L1 cache before WFI
-			 *
-			 * When data caching is disabled, no new cache lines are
-			 * allocated to the L1 data cache and L2 cache because
-			 * of requests from that processor. Other L1 caches will
-			 * not allocate lines from caches with C-bit disabled
-			 * L1 memory is now Write-Back No-Allocate mode.
-			 *
-			 * When CPU comes out of WFI, L1 data cache is
-			 * re-enabled
-			 */
-			save_state = 1;
-			break;
-		}
 		save_state = 0;
 		break;
 	case PWRDM_POWER_OFF:
@@ -506,19 +475,7 @@ int omap_enter_lowpower(unsigned int cpu, unsigned int power_state)
 		break;
 	case PWRDM_POWER_CSWR:
 		if (cpu_is_omap54xx()) {
-			/*
-			 * HACK: COBRA-1.0BUG00167: Disable L1 cache before WFI
-			 *
-			 * When data caching is disabled, no new cache lines are
-			 * allocated to the L1 data cache and L2 cache because
-			 * of requests from that processor. Other L1 caches will
-			 * not allocate lines from caches with C-bit disabled
-			 * L1 memory is now Write-Back No-Allocate mode.
-			 *
-			 * When CPU comes out of WFI, L1 data cache is
-			 * re-enabled
-			 */
-			save_state = 1;
+			save_state = 0;
 			break;
 		}
 	default:
@@ -532,7 +489,26 @@ int omap_enter_lowpower(unsigned int cpu, unsigned int power_state)
 		return -ENXIO;
 	}
 
-	pwrdm_pre_transition(NULL);
+	/*
+	 * HACK: COBRA-1.0BUG00167: Disable L1 cache before WFI
+	 * When data caching is disabled, no new cache lines are allocated to
+	 * the L1 data cache and L2 cache because of requests from that
+	 * processor. Other L1 caches will not allocate lines from caches
+	 * with C-bit disabled L1 memory is now Write-Back No-Allocate mode.
+	 * When CPU comes out of WFI, L1 data cache is re-enabled
+	 */
+	if (cpu_is_omap54xx()) {
+		void __iomem *base = sar_base;
+
+		base += cpu ? OMAP5_C_BIT_HACK_CPU1 : OMAP5_C_BIT_HACK_CPU0;
+
+		/* Enable HACK logic only for INA/RET */
+		if (power_state == PWRDM_POWER_CSWR ||
+		    power_state == PWRDM_POWER_INACTIVE)
+			__raw_writel(0x1, base);
+		else
+			__raw_writel(0x0, base);
+	}
 
 	/* Decrease mpu / core usecounts to indicate we are entering idle */
 	omap_dec_mpu_core_pwrdm_usecount();
@@ -592,7 +568,10 @@ int omap_enter_lowpower(unsigned int cpu, unsigned int power_state)
 	/*
 	 * Call low level function  with targeted low power state.
 	 */
-	cpu_suspend(save_state, omap_pm_ops.finish_suspend);
+	if (save_state)
+		cpu_suspend(save_state, omap_pm_ops.finish_suspend);
+	else
+		omap_pm_ops.finish_suspend(save_state);
 
 	/*
 	 * Restore the CPUx power state to ON otherwise CPUx
@@ -625,7 +604,6 @@ abort_suspend:
 sar_save_failed:
 	/* Increase mpu / core usecounts to indicate we are leaving idle */
 	omap_inc_mpu_core_pwrdm_usecount();
-
 	/*
 	 * Disable the extension of Non-EMIF I/O isolation *AFTER* usecounts
 	 * and callbacks. This is important to have the right sequence.
@@ -637,8 +615,6 @@ sar_save_failed:
 						OMAP4430_PRM_DEVICE_INST,
 						OMAP4_PRM_IO_PMCTRL_OFFSET);
 	}
-
-	pwrdm_post_transition(NULL);
 
 	return 0;
 }
@@ -658,7 +634,6 @@ int __cpuinit omap_hotplug_cpu(unsigned int cpu, unsigned int power_state)
 	if (power_state == PWRDM_POWER_OFF)
 		cpu_state = 1;
 
-	cpu_pwrdm_pre_post_transition(cpu, 1);
 	clear_cpu_prev_pwrst(cpu);
 	set_cpu_next_pwrst(cpu, power_state);
 	set_cpu_wakeup_addr(cpu, virt_to_phys(omap_pm_ops.hotplug_restart));
@@ -690,7 +665,6 @@ int __cpuinit omap_hotplug_cpu(unsigned int cpu, unsigned int power_state)
 	set_cpu_force_off(cpu, 0);
 #endif
 
-	cpu_pwrdm_pre_post_transition(cpu, 0);
 	set_cpu_next_pwrst(cpu, PWRDM_POWER_ON);
 	return 0;
 }
