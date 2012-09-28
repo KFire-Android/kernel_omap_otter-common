@@ -461,6 +461,7 @@ static const enum dss_feat_id omap4430_es1_0_dss_feat_list[] = {
 	FEAT_FIR_COEF_V,
 	FEAT_ALPHA_FREE_ZORDER,
 	FEAT_FIFO_MERGE,
+	FEAT_WB,
 };
 
 static const enum dss_feat_id omap4430_es2_0_1_2_dss_feat_list[] = {
@@ -478,6 +479,7 @@ static const enum dss_feat_id omap4430_es2_0_1_2_dss_feat_list[] = {
 	FEAT_FIR_COEF_V,
 	FEAT_ALPHA_FREE_ZORDER,
 	FEAT_FIFO_MERGE,
+	FEAT_WB,
 };
 
 static const enum dss_feat_id omap4_dss_feat_list[] = {
@@ -496,6 +498,7 @@ static const enum dss_feat_id omap4_dss_feat_list[] = {
 	FEAT_FIR_COEF_V,
 	FEAT_ALPHA_FREE_ZORDER,
 	FEAT_FIFO_MERGE,
+	FEAT_WB,
 };
 
 static const enum dss_feat_id omap5_dss_feat_list[] = {
