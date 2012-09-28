@@ -139,6 +139,7 @@ static struct platform_device sevm_leds_gpio = {
 
 #ifdef CONFIG_OMAP_MUX
 static struct omap_board_mux board_mux[] __initdata = {
+	OMAP5_MUX(ABESLIMBUS1_DATA, OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE1),
 	{ .reg_offset = OMAP_MUX_TERMINATOR },
 };
 #else

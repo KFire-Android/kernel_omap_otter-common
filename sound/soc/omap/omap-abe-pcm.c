@@ -319,7 +319,7 @@ static void enable_be_port(struct snd_soc_pcm_runtime *be,
 				return;
 
 			/* BT_DL connection to McBSP 1 ports */
-			format.f = 8000;
+			format.f = 16000;
 			format.samp_format = STEREO_RSHIFTED_16;
 			omap_aess_connect_serial_port(abe->aess, OMAP_ABE_BT_VX_DL_PORT, &format, MCBSP1_TX);
 			omap_abe_port_enable(abe->aess,
@@ -332,7 +332,7 @@ static void enable_be_port(struct snd_soc_pcm_runtime *be,
 				return;
 
 			/* BT_UL connection to McBSP 1 ports */
-			format.f = 8000;
+			format.f = 16000;
 			format.samp_format = STEREO_RSHIFTED_16;
 			omap_aess_connect_serial_port(abe->aess, OMAP_ABE_BT_VX_UL_PORT, &format, MCBSP1_RX);
 			omap_abe_port_enable(abe->aess,

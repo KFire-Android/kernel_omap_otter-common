@@ -419,6 +419,8 @@ struct omap_hwmod_omap4_prcm {
  *     in order to complete the reset. Optional clocks will be disabled
  *     again after the reset.
  * HWMOD_16BIT_REG: Module has 16bit registers
+ * HWMOD_ACCESS_DISABLED: this module cannot be accessed and must remain
+ *      disabled.
  */
 #define HWMOD_SWSUP_SIDLE			(1 << 0)
 #define HWMOD_SWSUP_MSTANDBY			(1 << 1)
@@ -429,6 +431,7 @@ struct omap_hwmod_omap4_prcm {
 #define HWMOD_NO_IDLEST				(1 << 6)
 #define HWMOD_CONTROL_OPT_CLKS_IN_RESET		(1 << 7)
 #define HWMOD_16BIT_REG				(1 << 8)
+#define HWMOD_ACCESS_DISABLED			(1 << 9)
 
 /*
  * omap_hwmod._int_flags definitions
@@ -570,6 +573,8 @@ struct omap_hwmod {
 };
 
 int omap_hwmod_register(struct omap_hwmod **ohs);
+int omap_hwmod_register_flags(struct omap_hwmod **ohs,
+			u32 set_flags, u32 clear_flags);
 struct omap_hwmod *omap_hwmod_lookup(const char *name);
 int omap_hwmod_for_each(int (*fn)(struct omap_hwmod *oh, void *data),
 			void *data);
