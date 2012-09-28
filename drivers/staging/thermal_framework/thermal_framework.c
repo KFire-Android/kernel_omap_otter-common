@@ -159,7 +159,7 @@ static int thermal_add_action_debug(struct thermal_cooling_action *action,
 	return PTR_ERR(action->d);
 }
 
-static int thermal_insert_cooling_action(struct thermal_dev *tdev,
+static int __thermal_insert_cooling_action(struct thermal_dev *tdev,
 						unsigned int priority,
 						unsigned int reduction,
 						struct dentry *d)
@@ -207,7 +207,7 @@ static ssize_t thermal_debug_inject_action_write(struct file *file,
 	if (reduction < 0)
 		thermal_remove_cooling_action(tdev, priority);
 	else
-		thermal_insert_cooling_action(tdev, priority, reduction,
+		__thermal_insert_cooling_action(tdev, priority, reduction,
 						file->f_path.dentry->d_parent);
 	mutex_unlock(&thermal_domain_list_lock);
 
@@ -256,6 +256,8 @@ static void thermal_debug_register_device(struct thermal_dev *tdev)
 	if (IS_ERR(d))
 		return;
 
+	tdev->debug_dentry = d;
+
 	/* Am I a cooling device ? */
 	if (tdev->dev_ops && tdev->dev_ops->cool_device) {
 		struct thermal_cooling_action *cact;
@@ -296,6 +298,13 @@ static void __exit thermal_debug_exit(void)
 	debugfs_remove_recursive(thermal_dbg);
 }
 #else
+static int __thermal_insert_cooling_action(struct thermal_dev *tdev,
+						unsigned int priority,
+						unsigned int reduction,
+						struct dentry *d)
+{
+	return 0;
+}
 static int __init thermal_debug_init(void)
 {
 	return 0;
@@ -311,6 +320,26 @@ static void thermal_debug_register_device(struct thermal_dev *tdev)
 {
 }
 #endif
+
+/**
+ * thermal_insert_cooling_action() - External API to allow cooling devices
+ *				to insert their expected cooling actions.
+ *                              Action list will be exposed via debugfs.
+ * @tdev: The thermal device setting the temperature
+ * @priority: The cooling level in which the action will be performed
+ * @reduction: The level of expected performance after this action is taken.
+ *
+ * Returns 0 for a successfull call. Proper error code in case of failure.
+ */
+int thermal_insert_cooling_action(struct thermal_dev *tdev,
+				  unsigned int priority,
+				  unsigned int reduction)
+{
+	return __thermal_insert_cooling_action(tdev, priority, reduction,
+					       tdev->debug_dentry);
+}
+EXPORT_SYMBOL_GPL(thermal_insert_cooling_action);
+
 /**
  * thermal_sensor_set_temp() - External API to allow a sensor driver to set
  *				the current temperature for a domain

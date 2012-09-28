@@ -34,6 +34,7 @@
 #include <linux/regulator/consumer.h>
 #include <linux/mutex.h>
 #include <linux/i2c.h>
+#include <linux/thermal_framework.h>
 
 #include <video/omapdss.h>
 #include <video/mipi_display.h>
@@ -321,7 +322,7 @@ static const struct backlight_ops lg4591_backlight_ops  = {
 
 static int lg4591_probe(struct omap_dss_device *dssdev)
 {
-	int ret = 0;
+	int ret = 0, i;
 	struct backlight_properties props = {
 		.brightness = 255,
 		.max_brightness = 255,
@@ -367,6 +368,10 @@ static int lg4591_probe(struct omap_dss_device *dssdev)
 		ret = PTR_ERR(lg_d->bldev);
 		goto err_backlight_device_register;
 	}
+	for (i = 0; i < lg_d->pdata->number_actions; i++)
+		thermal_insert_cooling_action(lg_d->bldev->tdev,
+				lg_d->pdata->cooling_actions[i].priority,
+				lg_d->pdata->cooling_actions[i].percentage);
 
 	lg_d->debug_dir = debugfs_create_dir("lg4591", NULL);
 	if (!lg_d->debug_dir) {

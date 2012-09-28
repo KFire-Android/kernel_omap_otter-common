@@ -62,6 +62,9 @@ static unsigned int max_thermal;
 static unsigned int max_freq;
 static unsigned int current_target_freq;
 static unsigned int current_cooling_level;
+static unsigned int cpu_cooling_level;
+static unsigned int case_cooling_level;
+static unsigned int new_cooling_level;
 static bool omap_cpufreq_ready;
 
 static unsigned int en_therm_freq_print;
@@ -279,17 +282,35 @@ static int cpufreq_apply_cooling(struct thermal_dev *dev, int cooling_level)
 
 	mutex_lock(&omap_cpufreq_lock);
 
-	if (cooling_level < current_cooling_level) {
+	if (!strcmp(dev->domain_name, "case")) {
+		if (cooling_level > case_subzone_number)
+			case_cooling_level++;
+		if (cooling_level == 0)
+			case_cooling_level = 0;
+	} else {
+		cpu_cooling_level = cooling_level;
+	}
+
+	if (case_cooling_level > cpu_cooling_level)
+		new_cooling_level = case_cooling_level;
+	else
+		new_cooling_level = cpu_cooling_level;
+
+	pr_debug("%s: cooling_level %d case %d cpu %d new %d curr %d\n",
+		__func__, cooling_level, case_cooling_level,
+		cpu_cooling_level, new_cooling_level, current_cooling_level);
+
+	if (new_cooling_level < current_cooling_level) {
 		pr_debug("%s: Unthrottle cool level %i curr cool %i\n",
-			__func__, cooling_level, current_cooling_level);
+			__func__, new_cooling_level, current_cooling_level);
 		omap_thermal_step_freq_up(&policy);
-	} else if (cooling_level > current_cooling_level) {
+	} else if (new_cooling_level > current_cooling_level) {
 		pr_debug("%s: Throttle cool level %i curr cool %i\n",
-			__func__, cooling_level, current_cooling_level);
+			__func__, new_cooling_level, current_cooling_level);
 		omap_thermal_step_freq_down(&policy);
 	}
 
-	current_cooling_level = cooling_level;
+	current_cooling_level = new_cooling_level;
 
 	mutex_unlock(&omap_cpufreq_lock);
 
@@ -301,19 +322,32 @@ static struct thermal_dev_ops cpufreq_cooling_ops = {
 };
 
 static struct thermal_dev thermal_dev = {
-	.name = "cpufreq_cooling",
-	.domain_name = "cpu",
-	.dev_ops = &cpufreq_cooling_ops,
+	.name		= "cpufreq_cooling.0",
+	.domain_name	= "cpu",
+	.dev_ops	= &cpufreq_cooling_ops,
+};
+
+static struct thermal_dev case_thermal_dev = {
+	.name		= "cpufreq_cooling.1",
+	.domain_name	= "case",
+	.dev_ops	= &cpufreq_cooling_ops,
 };
 
 static int __init omap_cpufreq_cooling_init(void)
 {
-	return thermal_cooling_dev_register(&thermal_dev);
+	int ret;
+
+	ret = thermal_cooling_dev_register(&thermal_dev);
+	if (ret)
+		return ret;
+
+	return thermal_cooling_dev_register(&case_thermal_dev);
 }
 
 static void __exit omap_cpufreq_cooling_exit(void)
 {
 	thermal_cooling_dev_unregister(&thermal_dev);
+	thermal_cooling_dev_unregister(&case_thermal_dev);
 }
 #else
 static int __init omap_cpufreq_cooling_init(void)
@@ -441,6 +475,8 @@ static int __init omap_cpufreq_init(void)
 	max_thermal = max_freq;
 	current_cooling_level = 0;
 	en_therm_freq_print = 0;
+	cpu_cooling_level = 0;
+	case_cooling_level = 0;
 
 	if (!ret)
 		ret = omap_cpufreq_cooling_init();

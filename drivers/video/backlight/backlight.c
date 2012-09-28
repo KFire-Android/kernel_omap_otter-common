@@ -14,12 +14,14 @@
 #include <linux/err.h>
 #include <linux/fb.h>
 #include <linux/slab.h>
+#include <linux/thermal_framework.h>
 
 #ifdef CONFIG_PMAC_BACKLIGHT
 #include <asm/backlight.h>
 #endif
 
-static const char *const backlight_types[] = {
+#define COOLING_STEP		10
+static const char const *backlight_types[] = {
 	[BACKLIGHT_RAW] = "raw",
 	[BACKLIGHT_PLATFORM] = "platform",
 	[BACKLIGHT_FIRMWARE] = "firmware",
@@ -158,7 +160,9 @@ static ssize_t backlight_store_brightness(struct device *dev,
 
 	mutex_lock(&bd->ops_lock);
 	if (bd->ops) {
-		if (brightness > bd->props.max_brightness)
+		if (brightness > bd->props.max_brightness ||
+				/* account for thermal limits */
+				brightness > bd->props.max_thermal_brightness)
 			rc = -EINVAL;
 		else {
 			pr_debug("backlight: set brightness to %lu\n",
@@ -271,6 +275,44 @@ void backlight_force_update(struct backlight_device *bd,
 }
 EXPORT_SYMBOL(backlight_force_update);
 
+static int backlight_apply_cooling(struct thermal_dev *dev,
+				int level)
+{
+	struct backlight_device *bd = to_backlight_device(dev->dev);
+	unsigned long brightness;
+	int percent;
+
+	/* transform into percentage */
+	percent = thermal_cooling_device_reduction_get(dev, level);
+	if (percent < 0 || percent > 100)
+		return -EINVAL;
+	brightness = (bd->props.max_brightness * percent) / 100;
+
+	mutex_lock(&bd->ops_lock);
+	if (bd->ops) {
+		pr_debug("backlight: set brightness to %lu due to thermal\n",
+				 brightness);
+		bd->props.max_thermal_brightness = brightness;
+		if (bd->props.brightness > brightness)
+			bd->props.brightness = brightness;
+		backlight_update_status(bd);
+		backlight_generate_event(bd, BACKLIGHT_UPDATE_SYSFS);
+	}
+	mutex_unlock(&bd->ops_lock);
+
+	return 0;
+}
+
+static struct thermal_dev_ops backlight_cooling_ops = {
+	.cool_device = backlight_apply_cooling,
+};
+
+static struct thermal_dev case_thermal_dev = {
+	.name		= "backlight_cooling",
+	.domain_name	= "case",
+	.dev_ops	= &backlight_cooling_ops,
+};
+
 /**
  * backlight_device_register - create and register a new object of
  *   backlight_device class.
@@ -289,6 +331,7 @@ struct backlight_device *backlight_device_register(const char *name,
 	const struct backlight_properties *props)
 {
 	struct backlight_device *new_bd;
+	struct thermal_dev *tdev;
 	int rc;
 
 	pr_debug("backlight_device_register: name=%s\n", name);
@@ -296,6 +339,12 @@ struct backlight_device *backlight_device_register(const char *name,
 	new_bd = kzalloc(sizeof(struct backlight_device), GFP_KERNEL);
 	if (!new_bd)
 		return ERR_PTR(-ENOMEM);
+
+	tdev = kzalloc(sizeof(struct thermal_dev), GFP_KERNEL);
+	if (!tdev) {
+		kfree(new_bd);
+		return ERR_PTR(-ENOMEM);
+	}
 
 	mutex_init(&new_bd->update_lock);
 	mutex_init(&new_bd->ops_lock);
@@ -318,14 +367,18 @@ struct backlight_device *backlight_device_register(const char *name,
 		new_bd->props.type = BACKLIGHT_RAW;
 	}
 
+	new_bd->props.max_thermal_brightness = new_bd->props.max_brightness;
+
 	rc = device_register(&new_bd->dev);
 	if (rc) {
 		kfree(new_bd);
+		kfree(tdev);
 		return ERR_PTR(rc);
 	}
 
 	rc = backlight_register_fb(new_bd);
 	if (rc) {
+		kfree(tdev);
 		device_unregister(&new_bd->dev);
 		return ERR_PTR(rc);
 	}
@@ -338,6 +391,17 @@ struct backlight_device *backlight_device_register(const char *name,
 		pmac_backlight = new_bd;
 	mutex_unlock(&pmac_backlight_mutex);
 #endif
+
+	memcpy(tdev, &case_thermal_dev, sizeof(struct thermal_dev));
+	tdev->dev = &new_bd->dev;
+	rc = thermal_cooling_dev_register(tdev);
+	if (rc < 0) {
+		device_unregister(&new_bd->dev);
+		kfree(tdev);
+		kfree(new_bd);
+		return ERR_PTR(rc);
+	}
+	new_bd->tdev = tdev;
 
 	return new_bd;
 }
@@ -366,6 +430,7 @@ void backlight_device_unregister(struct backlight_device *bd)
 
 	backlight_unregister_fb(bd);
 	device_unregister(&bd->dev);
+	thermal_cooling_dev_unregister(bd->tdev);
 }
 EXPORT_SYMBOL(backlight_device_unregister);
 

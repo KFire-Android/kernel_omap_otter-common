@@ -38,11 +38,11 @@
 #include <linux/err.h>
 #include <linux/types.h>
 #include <linux/mutex.h>
+#include <linux/i2c.h>
+#include <linux/i2c/tmp006.h>
 #include <linux/thermal_framework.h>
 
 #include <plat/common.h>
-
-#define REPORT_DELAY_MS 1000
 
 #define TMP006_VOLT_REG 0x00
 #define TMP006_TEMP_REG 0x01
@@ -71,6 +71,8 @@
  * @dev - device pointer
  * @sensor_mutex - Mutex for for reading current temp
  * @therm_fw - thermal device
+ * @tmp006_sensor_work - delayed periodic work function to report temperature
+ * @work_time_period - time period between two temperature updates
  * @last_update - time stamp in jiffies when the last temp was read
  * @current_temp - current sensor temp
  */
@@ -79,6 +81,8 @@ struct tmp006_temp_sensor {
 	struct device *dev;
 	struct mutex sensor_mutex;
 	struct thermal_dev *therm_fw;
+	struct delayed_work tmp006_sensor_work;
+	int work_time_period;
 	unsigned long last_update;
 	int current_temp;
 };
@@ -135,11 +139,27 @@ static int tmp006_read_current_temp(struct device *dev)
 
 static int tmp006_get_temp(struct thermal_dev *tdev)
 {
-	struct platform_device *pdev = to_platform_device(tdev->dev);
-	struct tmp006_temp_sensor *tmp006 = platform_get_drvdata(pdev);
+	struct i2c_client *client = to_i2c_client(tdev->dev);
+	struct tmp006_temp_sensor *tmp006 = i2c_get_clientdata(client);
 
 	tmp006->therm_fw->current_temp =
 			tmp006_read_current_temp(tdev->dev);
+
+	return tmp006->therm_fw->current_temp;
+}
+
+static int tmp006_report_temp(struct thermal_dev *tdev)
+{
+	struct i2c_client *client = to_i2c_client(tdev->dev);
+	struct tmp006_temp_sensor *tmp006 = i2c_get_clientdata(client);
+
+	tmp006->therm_fw->current_temp =
+			tmp006_read_current_temp(tdev->dev);
+
+	pr_debug("%s: tmp006 temp %d\n", __func__,
+		tmp006->therm_fw->current_temp);
+
+	thermal_sensor_set_temp(tmp006->therm_fw);
 
 	return tmp006->therm_fw->current_temp;
 }
@@ -153,6 +173,32 @@ static int get_current_temp(void *data, u64 *val)
 }
 DEFINE_SIMPLE_ATTRIBUTE(tmp006_fops, get_current_temp, NULL, "%llu\n");
 
+static int report_period_get(void *data, u64 *val)
+{
+	struct thermal_dev *tdev = data;
+	struct i2c_client *client = to_i2c_client(tdev->dev);
+	struct tmp006_temp_sensor *tmp006 = i2c_get_clientdata(client);
+
+	*val = tmp006->work_time_period;
+
+	return 0;
+}
+
+static int report_period_set(void *data, u64 val)
+{
+	struct thermal_dev *tdev = data;
+	struct i2c_client *client = to_i2c_client(tdev->dev);
+	struct tmp006_temp_sensor *tmp006 = i2c_get_clientdata(client);
+
+	mutex_lock(&tmp006->sensor_mutex);
+	tmp006->work_time_period = (int)val;
+	mutex_unlock(&tmp006->sensor_mutex);
+
+	return 0;
+}
+DEFINE_SIMPLE_ATTRIBUTE(report_period_fops, report_period_get,
+						report_period_set, "%llu\n");
+
 #ifdef CONFIG_THERMAL_FRAMEWORK_DEBUG
 static int tmp006_sensor_register_debug_entries(struct thermal_dev *tdev,
 					struct dentry *d)
@@ -161,6 +207,11 @@ static int tmp006_sensor_register_debug_entries(struct thermal_dev *tdev,
 	(void) debugfs_create_file("current_temp",
 			S_IRUGO, d, tdev,
 			&tmp006_fops);
+
+	/* Read/Write - Debug properties of tmp006 sensor */
+	(void) debugfs_create_file("report_period_ms",
+			S_IRUGO | S_IWUSR, d, tdev,
+			&report_period_fops);
 	return 0;
 }
 #endif
@@ -172,17 +223,34 @@ static struct thermal_dev_ops tmp006_temp_sensor_ops = {
 #endif
 };
 
+static void tmp006_sensor_delayed_work_fn(struct work_struct *work)
+{
+	struct tmp006_temp_sensor *temp_sensor =
+				container_of(work, struct tmp006_temp_sensor,
+					     tmp006_sensor_work.work);
+
+	tmp006_report_temp(temp_sensor->therm_fw);
+	schedule_delayed_work(&temp_sensor->tmp006_sensor_work,
+			msecs_to_jiffies(temp_sensor->work_time_period));
+}
 
 static int __devinit tmp006_temp_sensor_probe(
 		struct i2c_client *client, const struct i2c_device_id *id)
 {
 	struct tmp006_temp_sensor *tmp006;
+	struct tmp006_platform_data *tmp006_pd;
 	int ret = 0;
 
 	if (!i2c_check_functionality(client->adapter,
 					I2C_FUNC_SMBUS_WORD_DATA)) {
 		dev_err(&client->dev, "adapter doesn't support SMBus word transactions\n");
 		return -ENODEV;
+	}
+
+	tmp006_pd = dev_get_platdata(&client->dev);
+	if (!tmp006_pd) {
+		dev_err(&client->dev, "%s: Invalid platform data\n", __func__);
+		return -EINVAL;
 	}
 
 	tmp006 = kzalloc(sizeof(struct tmp006_temp_sensor), GFP_KERNEL);
@@ -220,6 +288,13 @@ static int __devinit tmp006_temp_sensor_probe(
 
 	i2c_set_clientdata(client, tmp006);
 
+	/* Init delayed work for Case sensor temperature */
+	INIT_DELAYED_WORK(&tmp006->tmp006_sensor_work,
+			  tmp006_sensor_delayed_work_fn);
+
+	tmp006->work_time_period = tmp006_pd->update_period;
+	schedule_work(&tmp006->tmp006_sensor_work.work);
+
 	dev_info(&client->dev, "initialized\n");
 
 	return 0;
@@ -238,6 +313,8 @@ static int __devexit tmp006_temp_sensor_remove(struct i2c_client *client)
 	struct tmp006_temp_sensor *tmp006 = i2c_get_clientdata(client);
 	u16 config;
 	int ret = 0;
+
+	cancel_delayed_work_sync(&tmp006->tmp006_sensor_work);
 
 	thermal_sensor_dev_unregister(tmp006->therm_fw);
 
@@ -263,6 +340,9 @@ static int tmp006_temp_sensor_suspend(struct device *dev)
 	struct i2c_client *client = to_i2c_client(dev);
 	int ret;
 	u16 config;
+	struct tmp006_temp_sensor *tmp006 = i2c_get_clientdata(client);
+
+	cancel_delayed_work_sync(&tmp006->tmp006_sensor_work);
 
 	ret = tmp006_read_reg(client, TMP006_CONF_REG, &config);
 	if (ret < 0) {
@@ -285,6 +365,7 @@ static int tmp006_temp_sensor_resume(struct device *dev)
 	struct i2c_client *client = to_i2c_client(dev);
 	int ret;
 	u16 config;
+	struct tmp006_temp_sensor *tmp006 = i2c_get_clientdata(client);
 
 	ret = tmp006_read_reg(client, TMP006_CONF_REG, &config);
 	if (ret < 0) {
@@ -299,6 +380,7 @@ static int tmp006_temp_sensor_resume(struct device *dev)
 	if (ret < 0)
 		dev_err(&client->dev, "%s: tmp006 write error\n", __func__);
 
+	schedule_work(&tmp006->tmp006_sensor_work.work);
 	return ret;
 }
 static const struct dev_pm_ops tmp006_dev_pm_ops = {

@@ -28,6 +28,7 @@
 #include <linux/platform_device.h>
 #include <linux/i2c/pca953x.h>
 #include <linux/i2c/tmp102.h>
+#include <linux/i2c/tmp006.h>
 #include <linux/i2c/twl.h>
 #include <linux/input/matrix_keypad.h>
 #include <linux/platform_data/omap-abe-twl6040.h>
@@ -134,6 +135,14 @@ static struct platform_device sevm_leds_gpio = {
 	.id	= -1,
 	.dev	= {
 		.platform_data = &sevm_led_data,
+	},
+};
+
+static struct platform_device evm_user_cooling_device = {
+	.name	= "user_cooling_device",
+	.id	= -1,
+	.dev	= {
+		.platform_data = "case",
 	},
 };
 
@@ -778,6 +787,7 @@ static struct platform_device *omap5evm_devices[] __initdata = {
 	&omap5evm_hdmi_audio_codec,
 	&omap5evm_abe_audio,
 	&sevm_leds_gpio,
+	&evm_user_cooling_device,
 };
 
 static struct regulator_consumer_supply omap5_evm_vmmc1_supply[] = {
@@ -842,6 +852,12 @@ static struct tmp102_platform_data tmp102_slope_offset_info = {
 	.offset_cpu = -154,
 };
 
+/* TMP006 IR Case Temperature sensor */
+static struct tmp006_platform_data tmp006_update_rate = {
+/* Period in milliseconds, temperature report sent to TI-TFW */
+	.update_period = 5000,
+};
+
 static struct i2c_board_info __initdata omap5evm_i2c_4_boardinfo[] = {
 	{
 		I2C_BOARD_INFO("tmp102_temp_sensor", 0x48),
@@ -849,6 +865,7 @@ static struct i2c_board_info __initdata omap5evm_i2c_4_boardinfo[] = {
 	},
 	{
 		I2C_BOARD_INFO("tmp006_temp_sensor", 0x40),
+		.platform_data = &tmp006_update_rate,
 	},
 };
 
