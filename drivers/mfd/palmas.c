@@ -206,6 +206,7 @@ static int __devinit palmas_i2c_probe(struct i2c_client *i2c,
 	int ret = 0, i;
 	unsigned int reg, addr;
 	int slave;
+	char *rname;
 
 	mfd_platform_data = dev_get_platdata(&i2c->dev);
 	if (!mfd_platform_data)
@@ -256,6 +257,35 @@ static int __devinit palmas_i2c_probe(struct i2c_client *i2c,
 	ret = palmas_irq_init(palmas);
 	if (ret < 0)
 		goto err;
+
+	slave = PALMAS_BASE_TO_SLAVE(PALMAS_DESIGNREV_BASE);
+	addr = PALMAS_BASE_TO_REG(PALMAS_DESIGNREV_BASE, 0);
+	/*
+	 * Revision either
+	 * PALMAS_REV_ES1_0 or
+	 * PALMAS_REV_ES2_0 or
+	 * PALMAS_REV_ES2_1
+	 */
+	ret = regmap_read(palmas->regmap[slave], addr, &reg);
+	if (ret)
+		goto err;
+
+	palmas->revision = reg;
+	switch (palmas->revision) {
+	case PALMAS_REV_ES1_0:
+		rname = "ES 1.0";
+		break;
+	case PALMAS_REV_ES2_0:
+		rname = "ES 2.0";
+		break;
+	case PALMAS_REV_ES2_1:
+		rname = "ES 2.1";
+		break;
+	default:
+		rname = "unknown";
+		break;
+	}
+	dev_info(palmas->dev, "%s %s detected\n", id->name, rname);
 
 	slave = PALMAS_BASE_TO_SLAVE(PALMAS_PU_PD_OD_BASE);
 	addr = PALMAS_BASE_TO_REG(PALMAS_PU_PD_OD_BASE,
