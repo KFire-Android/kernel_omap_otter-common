@@ -443,7 +443,7 @@ struct omap_volt_data omap447x_vdd_iva_volt_data[] = {
 	VOLT_DATA_DEFINE(0, 0, 0, 0, 0),
 };
 
-#define OMAP4470_VDD_CORE_OPP50_UV		 925000
+#define OMAP4470_VDD_CORE_OPP50_UV		 980000
 #define OMAP4470_VDD_CORE_OPP100_UV		1126000
 #define OMAP4470_VDD_CORE_OPP100_OV_UV		1190000
 
