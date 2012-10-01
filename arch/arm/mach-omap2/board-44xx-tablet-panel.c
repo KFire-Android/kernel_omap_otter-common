@@ -41,6 +41,11 @@
 #define PWM2R			BIT(3)
 #define PWM2CTL_MASK		(PWM2EN | PWM2S | PWM2R)
 
+/* HDMI GPIOs */
+#define HDMI_GPIO_CT_CP_HPD			60 /* HPD mode enable/disable */
+#define HDMI_GPIO_HPD				63 /* Hot plug pin for HDMI */
+#define HDMI_GPIO_LS_OE				41 /* Level shifter for HDMI */
+
 static void omap4_tablet_init_display_led(void)
 {
 	/* Set maximum brightness on init */
@@ -217,9 +222,34 @@ static struct omap_dss_device tablet_lcd_device = {
 	.platform_disable = NULL,
 };
 
+static int tablet_panel_enable_hdmi(struct omap_dss_device *dssdev)
+{
+	return 0;
+}
+
+static void tablet_panel_disable_hdmi(struct omap_dss_device *dssdev)
+{
+}
+
+static struct omap_dss_hdmi_data tablet_hdmi_data = {
+	.hpd_gpio = HDMI_GPIO_HPD,
+	.ls_oe_gpio = HDMI_GPIO_LS_OE,
+	.ct_cp_hpd_gpio = HDMI_GPIO_CT_CP_HPD,
+};
+
+static struct omap_dss_device tablet_hdmi_device = {
+	.name = "hdmi",
+	.driver_name = "hdmi_panel",
+	.type = OMAP_DISPLAY_TYPE_HDMI,
+	.platform_enable = tablet_panel_enable_hdmi,
+	.platform_disable = tablet_panel_disable_hdmi,
+	.channel = OMAP_DSS_CHANNEL_DIGIT,
+	.data = &tablet_hdmi_data,
+};
 
 static struct omap_dss_device *tablet_dss_devices[] = {
 	&tablet_lcd_device,
+	&tablet_hdmi_device,
 };
 
 static struct omap_dss_board_info tablet_dss_data = {
@@ -227,6 +257,22 @@ static struct omap_dss_board_info tablet_dss_data = {
 	.devices	= tablet_dss_devices,
 	.default_device	= &tablet_lcd_device,
 };
+
+static void tablet_hdmi_init(void)
+{
+	/*
+	 * OMAP4460SDP/Blaze and OMAP4430 ES2.3 SDP/Blaze boards and
+	 * later have external pull up on the HDMI I2C lines
+	 */
+	if (cpu_is_omap446x() || omap_rev() > OMAP4430_REV_ES2_2)
+		omap_hdmi_init(OMAP_HDMI_SDA_SCL_EXTERNAL_PULLUP);
+	else
+		omap_hdmi_init(0);
+
+	omap_mux_init_gpio(HDMI_GPIO_LS_OE, OMAP_PIN_OUTPUT);
+	omap_mux_init_gpio(HDMI_GPIO_CT_CP_HPD, OMAP_PIN_OUTPUT);
+	omap_mux_init_gpio(HDMI_GPIO_HPD, OMAP_PIN_INPUT_PULLDOWN);
+}
 
 static void __init tablet_lcd_init(void)
 {
@@ -264,6 +310,8 @@ int __init tablet_display_init(void)
 
 	omap_vram_set_sdram_vram(TABLET_FB_RAM_SIZE, 0);
 	omap_display_init(&tablet_dss_data);
+
+	tablet_hdmi_init();
 
 	i2c_register_board_info(2, omap4xx_i2c_bus2_d2l_info,
 		ARRAY_SIZE(omap4xx_i2c_bus2_d2l_info));
