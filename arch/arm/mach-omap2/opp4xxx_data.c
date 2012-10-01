@@ -241,7 +241,7 @@ static struct omap_opp_def omap443x_opp_def_list[] = {
 	/* IVA OPP2 - OPP100 */
 	OPP_INITIALIZER(&iva_dev_info, true, 266100000, OMAP4430_VDD_IVA_OPP100_UV),
 	/* IVA OPP3 - OPP-Turbo */
-	OPP_INITIALIZER(&iva_dev_info, false, 332000000, OMAP4430_VDD_IVA_OPPTURBO_UV),
+	OPP_INITIALIZER(&iva_dev_info, true, 332000000, OMAP4430_VDD_IVA_OPPTURBO_UV),
 	/* ABE OPP1 - OPP50 */
 	OPP_INITIALIZER(&abe_dev_info, true, 98304000, OMAP4430_VDD_IVA_OPP50_UV),
 	/* ABE OPP2 - OPP100 */
