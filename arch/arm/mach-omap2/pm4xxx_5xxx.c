@@ -140,7 +140,6 @@ static int omap4_5_pm_suspend(void)
 	 * More details can be found in OMAP4430 TRM section 4.3.4.2.
 	 */
 	omap_enter_lowpower(cpu_id, PWRDM_POWER_OFF);
-	prcmdebug_dump(PRCMDEBUG_LASTSLEEP);
 
 	/* Restore next powerdomain state */
 	list_for_each_entry(pwrst, &pwrst_list, node) {
