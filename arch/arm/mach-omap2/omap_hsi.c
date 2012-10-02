@@ -273,7 +273,7 @@ static struct omap_device_pad __initdata
 		{
 			.name = "hsi2_cadata",
 			.enable = OMAP_MUX_MODE0 | \
-				  OMAP_PIN_INPUT_PULLDOWN | \
+				  OMAP_PIN_INPUT | \
 				  OMAP_PIN_OFF_NONE,
 		},
 
