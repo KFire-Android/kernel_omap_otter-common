@@ -141,3 +141,24 @@ struct omap_vc_param omap446x_core_vc_data = {
 	 */
 	.off			= 750000,
 };
+
+struct omap_vc_param omap447x_mpu_vc_data = {
+	.on			= 1387000,
+	.onlp			= 1387000,
+	.ret			= 750000,
+	.off			= 0,
+};
+
+struct omap_vc_param omap447x_iva_vc_data = {
+	.on			= 1380000,
+	.onlp			= 1380000,
+	.ret			= 750000,
+	.off			= 0,
+};
+
+struct omap_vc_param omap447x_core_vc_data = {
+	.on			= 1190000,
+	.onlp			= 1190000,
+	.ret			= 750000,
+	.off			= 0,
+};

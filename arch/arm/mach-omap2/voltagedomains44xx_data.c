@@ -128,6 +128,10 @@ void __init omap44xx_voltagedomains_init(void)
 		omap4_voltdm_mpu.vc_param = &omap446x_mpu_vc_data;
 		omap4_voltdm_iva.vc_param = &omap446x_iva_vc_data;
 		omap4_voltdm_core.vc_param = &omap446x_core_vc_data;
+	} else if (cpu_is_omap447x()) {
+		omap4_voltdm_mpu.vc_param = &omap447x_mpu_vc_data;
+		omap4_voltdm_iva.vc_param = &omap447x_iva_vc_data;
+		omap4_voltdm_core.vc_param = &omap447x_core_vc_data;
 	}
 #endif
 	omap4_voltdm_mpu.vp_param = &omap4_mpu_vp_data;
