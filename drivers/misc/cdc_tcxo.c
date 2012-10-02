@@ -12,6 +12,7 @@
 #include <linux/platform_device.h>
 #include <linux/cdc_tcxo.h>
 #include <linux/i2c.h>
+#include <linux/export.h>
 
 #define DRIVER_DESC       "CDC TCXO driver"
 #define DRIVER_NAME       "cdc_tcxo_driver"

@@ -355,6 +355,7 @@ config MACH_OMAP_4430SDP
 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
 	select OMAP_TPS6236X
 	select TWL6030_GPADC
+	select CDC_TCXO
 
 config MACH_OMAP_BLAZE
 	bool "OMAP 44XX Tablet board"
