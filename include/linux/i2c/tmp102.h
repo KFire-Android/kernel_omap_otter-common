@@ -31,6 +31,7 @@ struct tmp102_platform_data {
 	int slope_cpu;
 	int offset;
 	int offset_cpu;
+	const char *domain;
 };
 
 #endif /* End of __TMP102_H */
