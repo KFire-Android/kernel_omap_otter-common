@@ -60,6 +60,7 @@
 #include "prcm_mpu44xx.h"
 #include "prminst44xx.h"
 #include "prcm44xx.h"
+#include "prcm-debug.h"
 #include "prm44xx.h"
 #include "prm-regbits-44xx.h"
 
@@ -600,6 +601,9 @@ abort_suspend:
 		omap4_device_off_counter++;
 #endif
 	}
+
+	if (pwrdm_read_device_off_state())
+		prcmdebug_dump(PRCMDEBUG_LASTSLEEP);
 
 sar_save_failed:
 	/* Increase mpu / core usecounts to indicate we are leaving idle */

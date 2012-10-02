@@ -50,6 +50,7 @@ struct power_state {
 #ifdef CONFIG_SUSPEND
 	u32 saved_state;
 	u32 saved_logic_state;
+	u32 context_loss_count;
 #endif
 	struct list_head node;
 };
@@ -123,8 +124,11 @@ static int omap4_5_pm_suspend(void)
 	}
 
 	/* Set targeted power domain states by suspend */
-	list_for_each_entry(pwrst, &pwrst_list, node)
+	list_for_each_entry(pwrst, &pwrst_list, node) {
+		pwrst->context_loss_count =
+			pwrdm_get_context_loss_count(pwrst->pwrdm);
 		omap_set_pwrdm_state(pwrst->pwrdm, pwrst->next_state);
+	}
 
 	/*
 	 * For MPUSS to hit power domain retention(CSWR or OSWR),
@@ -136,13 +140,24 @@ static int omap4_5_pm_suspend(void)
 	 * More details can be found in OMAP4430 TRM section 4.3.4.2.
 	 */
 	omap_enter_lowpower(cpu_id, PWRDM_POWER_OFF);
-	prcmdebug_dump(PRCMDEBUG_LASTSLEEP);
 
 	/* Restore next powerdomain state */
 	list_for_each_entry(pwrst, &pwrst_list, node) {
+		int context_loss_count =
+			pwrdm_get_context_loss_count(pwrst->pwrdm);
+
 		prev_state = pwrdm_read_prev_pwrst(pwrst->pwrdm);
 		curr_state = pwrdm_read_pwrst(pwrst->pwrdm);
-		if (pwrdm_power_state_gt(prev_state, pwrst->next_state)) {
+
+		/*
+		 * Contextloss count difference is enough to identify
+		 * powerdomains that blocked suspend, except incase of
+		 * always-on powerdomains
+		 * Compare prev_state and next_state to avoid reporting
+		 * always-on powerdomains as those blocking suspend
+		 */
+		if (pwrdm_power_state_gt(prev_state, pwrst->next_state) &&
+		    context_loss_count == pwrst->context_loss_count) {
 			pr_info("Powerdomain (%s) didn't enter target state %s "
 				"(achieved=%s current=%s saved=%s)\n",
 				pwrst->pwrdm->name,
