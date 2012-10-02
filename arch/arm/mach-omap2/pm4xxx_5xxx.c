@@ -465,7 +465,7 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
 	 * What state to program every Power domain can enter deepest to when
 	 * not in suspend state?
 	 */
-	program_state = pwrdm_get_achievable_pwrst(pwrdm, PWRDM_POWER_OSWR);
+	program_state = pwrdm_get_achievable_pwrst(pwrdm, PWRDM_POWER_OFF);
 
 do_program_state:
 	return omap_set_pwrdm_state(pwrdm, program_state);
