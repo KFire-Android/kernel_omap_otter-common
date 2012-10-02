@@ -95,28 +95,24 @@ struct omap_vc_channel omap4_vc_core = {
 /*
  * Voltage levels for different operating modes: on, sleep, retention and off
  */
-#define OMAP4_ON_VOLTAGE_UV			1375000
-#define OMAP4_ONLP_VOLTAGE_UV			1375000
-#define OMAP4_RET_VOLTAGE_UV			837500
-#define OMAP4_OFF_VOLTAGE_UV			0
 
 struct omap_vc_param omap4_mpu_vc_data = {
-	.on			= OMAP4_ON_VOLTAGE_UV,
-	.onlp			= OMAP4_ONLP_VOLTAGE_UV,
-	.ret			= OMAP4_RET_VOLTAGE_UV,
-	.off			= OMAP4_OFF_VOLTAGE_UV,
+	.on			= 1388000,
+	.onlp			= 1388000,
+	.ret			= 750000,
+	.off			= 0,
 };
 
 struct omap_vc_param omap4_iva_vc_data = {
-	.on			= OMAP4_ON_VOLTAGE_UV,
-	.onlp			= OMAP4_ONLP_VOLTAGE_UV,
-	.ret			= OMAP4_RET_VOLTAGE_UV,
-	.off			= OMAP4_OFF_VOLTAGE_UV,
+	.on			= 1291000,
+	.onlp			= 1291000,
+	.ret			= 750000,
+	.off			= 0,
 };
 
 struct omap_vc_param omap4_core_vc_data = {
-	.on			= OMAP4_ON_VOLTAGE_UV,
-	.onlp			= OMAP4_ONLP_VOLTAGE_UV,
-	.ret			= OMAP4_RET_VOLTAGE_UV,
-	.off			= OMAP4_OFF_VOLTAGE_UV,
+	.on			= 1127000,
+	.onlp			= 1127000,
+	.ret			= 750000,
+	.off			= 0,
 };
