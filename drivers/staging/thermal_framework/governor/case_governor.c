@@ -48,7 +48,7 @@ static struct case_governor *case_gov;
 static void case_reached_max_state(void)
 {
 	/* we have done everything that could be done so far, giving up */
-	orderly_poweroff(true);
+	kernel_restart(NULL);
 }
 
 /**
