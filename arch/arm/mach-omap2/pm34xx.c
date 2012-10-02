@@ -280,8 +280,6 @@ void omap_sram_idle(void)
 					   WKUP_MOD, PM_WKEN);
 	}
 
-	pwrdm_pre_transition(NULL);
-
 	/* PER */
 	if (per_next_state != PWRDM_POWER_ON) {
 		per_going_off = (per_next_state == PWRDM_POWER_OFF) ? 1 : 0;
@@ -344,8 +342,6 @@ void omap_sram_idle(void)
 					       OMAP3_PRM_VOLTCTRL_OFFSET);
 	}
 	omap3_intc_resume_idle();
-
-	pwrdm_post_transition(NULL);
 
 	/* PER */
 	if (per_next_state != PWRDM_POWER_ON) {

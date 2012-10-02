@@ -50,6 +50,7 @@
  */
 #define DEFAULT_AUTOSUSPEND_DELAY	-1
 
+#define MAX_UART_NUM			16	/* max num of UARTS to check */
 #define MAX_UART_HWMOD_NAME_LEN		16
 
 struct omap_uart_state {
@@ -61,7 +62,6 @@ struct omap_uart_state {
 };
 
 static LIST_HEAD(uart_list);
-static u8 num_uarts;
 static u8 console_uart_id = -1;
 static u8 no_console_suspend;
 static u8 uart_debug;
@@ -227,7 +227,7 @@ static void omap_rts_mux_write(u16 val, int num)
 	int i;
 
 	oh = omap_uart_hwmod_lookup(num);
-	if (!oh)
+	if ((!oh) || (!oh->mux))
 		return;
 
 	for (i = 0; i < oh->mux->nr_pads ; i++) {
@@ -242,24 +242,25 @@ static void omap_rts_mux_write(u16 val, int num)
 
 static int __init omap_serial_early_init(void)
 {
+	int i = 0; /* start from UART1 */
+
 	do {
 		char oh_name[MAX_UART_HWMOD_NAME_LEN];
 		struct omap_hwmod *oh;
 		struct omap_uart_state *uart;
 		char uart_name[MAX_UART_HWMOD_NAME_LEN];
 
-		snprintf(oh_name, MAX_UART_HWMOD_NAME_LEN,
-			 "uart%d", num_uarts + 1);
+		snprintf(oh_name, MAX_UART_HWMOD_NAME_LEN, "uart%d", i + 1);
 		oh = omap_hwmod_lookup(oh_name);
 		if (!oh)
-			break;
+			continue;
 
 		uart = kzalloc(sizeof(struct omap_uart_state), GFP_KERNEL);
 		if (WARN_ON(!uart))
 			return -ENODEV;
 
 		uart->oh = oh;
-		uart->num = num_uarts++;
+		uart->num = i;
 		list_add_tail(&uart->node, &uart_list);
 		snprintf(uart_name, MAX_UART_HWMOD_NAME_LEN,
 				"%s%d", OMAP_SERIAL_NAME, uart->num);
@@ -288,7 +289,7 @@ static int __init omap_serial_early_init(void)
 			 */
 			oh->flags |= HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET;
 		}
-	} while (1);
+	} while (++i < MAX_UART_NUM);
 
 	return 0;
 }
@@ -309,7 +310,8 @@ core_initcall(omap_serial_early_init);
 void __init omap_serial_init_port(struct omap_board_data *bdata,
 			struct omap_uart_port_info *info)
 {
-	struct omap_uart_state *uart;
+	struct omap_uart_state *uart = NULL;
+	struct omap_uart_state *temp_uart;
 	struct omap_hwmod *oh;
 	struct platform_device *pdev;
 	void *pdata = NULL;
@@ -321,12 +323,17 @@ void __init omap_serial_init_port(struct omap_board_data *bdata,
 		return;
 	if (WARN_ON(bdata->id < 0))
 		return;
-	if (WARN_ON(bdata->id >= num_uarts))
+
+	list_for_each_entry(temp_uart, &uart_list, node) {
+		if (bdata->id == temp_uart->num) {
+			uart = temp_uart;
+			break;
+		}
+	}
+
+	if (WARN_ON(!uart))
 		return;
 
-	list_for_each_entry(uart, &uart_list, node)
-		if (bdata->id == uart->num)
-			break;
 	if (!info)
 		info = omap_serial_default_info;
 

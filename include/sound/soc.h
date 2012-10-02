@@ -868,6 +868,7 @@ struct snd_soc_card {
 	struct list_head list;
 	struct mutex mutex;
 	struct mutex dapm_mutex;
+	struct mutex power_mutex;
 
 	bool instantiated;
 

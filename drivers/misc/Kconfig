@@ -552,6 +552,13 @@ config OMAP_SEVM_DOCK
 	help
 	  Enable the docking station support for the sEVM platform
 
+config CDC_TCXO
+	tristate "Texas Instruments CDC TCXO"
+	depends on I2C
+	default n
+	help
+	  Enable support for Texas Instruments CDC TCXO CDC3S04
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
