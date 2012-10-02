@@ -953,12 +953,18 @@ static struct i2c_board_info __initdata omap5evm_i2c_1_boardinfo[] = {
 	},
 };
 
-/* TMP102 PCB Temperature sensor */
-static struct tmp102_platform_data tmp102_slope_offset_info = {
+/* TMP102 PCB Temperature sensor close to OMAP */
+static struct tmp102_platform_data tmp102_omap_info = {
 	.slope = 470,
 	.slope_cpu = 378,
 	.offset = -1272,
 	.offset_cpu = -154,
+	.domain = "pcb", /* for hotspot extrapolation */
+};
+
+/* TMP102 PCB Temperature sensor close to Battery */
+static struct tmp102_platform_data tmp102_battery_info = {
+	.domain = "pcb_battery",
 };
 
 /* TMP006 IR Case Temperature sensor */
@@ -970,7 +976,11 @@ static struct tmp006_platform_data tmp006_update_rate = {
 static struct i2c_board_info __initdata omap5evm_i2c_4_boardinfo[] = {
 	{
 		I2C_BOARD_INFO("tmp102_temp_sensor", 0x48),
-		.platform_data = &tmp102_slope_offset_info,
+		.platform_data = &tmp102_omap_info,
+	},
+	{
+		I2C_BOARD_INFO("tmp102_temp_sensor", 0x49),
+		.platform_data = &tmp102_battery_info,
 	},
 	{
 		I2C_BOARD_INFO("tmp006_temp_sensor", 0x40),
