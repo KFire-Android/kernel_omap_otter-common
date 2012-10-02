@@ -454,10 +454,28 @@ static int __init omap5_opp_init(void)
 		r = omap_init_opp_table(omap5430_es1_opp_def_list,
 			ARRAY_SIZE(omap5430_es1_opp_def_list));
 	} else if (omap_rev() == OMAP5432_REV_ES1_0) {
-		/**
-		 * No 5432 ES1.0 samples are rated above OPP NOM so we will
-		 * keep the default opp table as-is.
-		 */
+		if (omap5_has_opp_high()) {
+			opp_def_list_enable_opp(omap5432_es1_opp_def_list,
+						ARRAY_SIZE(omap5432_es1_opp_def_list),
+						&mpu_dev_info,
+						1100000000, true);
+
+			opp_def_list_enable_opp(omap5432_es1_opp_def_list,
+						ARRAY_SIZE(omap5432_es1_opp_def_list),
+						&iva_dev_info,
+						532000000, true);
+
+			opp_def_list_enable_opp(omap5432_es1_opp_def_list,
+						ARRAY_SIZE(omap5432_es1_opp_def_list),
+						&dsp_dev_info,
+						532000000, true);
+
+			opp_def_list_enable_opp(omap5432_es1_opp_def_list,
+						ARRAY_SIZE(omap5432_es1_opp_def_list),
+						&gpu_dev_info,
+						532000000, true);
+		}
+
 		r = omap_init_opp_table(omap5432_es1_opp_def_list,
 			ARRAY_SIZE(omap5432_es1_opp_def_list));
 	} else {
