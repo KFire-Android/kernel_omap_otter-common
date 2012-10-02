@@ -24,6 +24,7 @@
 #include <linux/spi/spi.h>
 #include <linux/i2c/twl.h>
 #include <linux/mfd/twl6040.h>
+#include <linux/cdc_tcxo.h>
 #include <linux/regulator/machine.h>
 #include <linux/regulator/fixed.h>
 #include <linux/leds_pwm.h>
@@ -470,6 +471,33 @@ static struct twl4030_platform_data tablet_twldata = {
 	.madc		= &twl6030_gpadc,
 };
 
+/*
+ * The Clock Driver Chip (TCXO) on OMAP4 based SDP needs to
+ * be programmed to output CLK1 based on REQ1 from OMAP.
+ * By default CLK1 is driven based on an internal REQ1INT signal
+ * which is always set to 1.
+ * Doing this helps gate sysclk (from CLK1) to OMAP while OMAP
+ * is in sleep states.
+ */
+static struct cdc_tcxo_platform_data tablet_cdc_data = {
+	.buf = {
+		CDC_TCXO_REQ4INT | CDC_TCXO_REQ1INT |
+		CDC_TCXO_REQ4POL | CDC_TCXO_REQ3POL |
+		CDC_TCXO_REQ2POL | CDC_TCXO_REQ1POL,
+		CDC_TCXO_MREQ4 | CDC_TCXO_MREQ3 |
+		CDC_TCXO_MREQ2 | CDC_TCXO_MREQ1,
+		CDC_TCXO_LDOEN1,
+		0,
+	},
+};
+
+static struct i2c_board_info __initdata tablet_i2c_boardinfo[] = {
+	{
+		I2C_BOARD_INFO("cdc_tcxo_driver", 0x6c),
+		.platform_data = &tablet_cdc_data,
+	},
+};
+
 static struct i2c_board_info __initdata tablet_i2c_3_boardinfo[] = {
 	{
 		I2C_BOARD_INFO("tmp105", 0x48),
@@ -498,6 +526,8 @@ static int __init omap4_i2c_init(void)
 			TWL_COMMON_REGULATOR_V2V1);
 	omap4_pmic_init("twl6030", &tablet_twldata,
 			&twl6040_data, OMAP44XX_IRQ_SYS_2N);
+	i2c_register_board_info(1, tablet_i2c_boardinfo,
+				ARRAY_SIZE(tablet_i2c_boardinfo));
 	omap_register_i2c_bus(2, 400, NULL, 0);
 	omap_register_i2c_bus(3, 400, tablet_i2c_3_boardinfo,
 				ARRAY_SIZE(tablet_i2c_3_boardinfo));
