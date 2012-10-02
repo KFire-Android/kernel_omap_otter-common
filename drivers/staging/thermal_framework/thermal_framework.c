@@ -270,7 +270,7 @@ static void thermal_debug_register_device(struct thermal_dev *tdev)
 
 	/* Am I a sensor device ? */
 	if (tdev->dev_ops && tdev->dev_ops->report_temp)
-		(void) debugfs_create_file("temperature", S_IRUSR, d,
+		(void) debugfs_create_file("temperature", S_IRUGO, d,
 					(void *)tdev, &sensor_temp_fops);
 
 	thermal_device_call(tdev, register_debug_entries, d);
