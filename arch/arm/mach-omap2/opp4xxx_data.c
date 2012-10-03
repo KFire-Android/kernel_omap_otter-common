@@ -120,7 +120,7 @@ static struct device_info l3_dev_info = {
 
 static struct device_info iva_dev_info = {
 	.hwmod_name	= "iva",
-	.clk_name	= "dpll_iva_m5x2_ck",
+	.clk_name	= "virt_dpll_iva_ck",
 	.voltdm_name	= "iva",
 };
 

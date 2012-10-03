@@ -24,5 +24,9 @@ int omap4xxx_custom_clk_init(void);
 int omap_virt_l3_set_rate(struct clk *clk, unsigned long rate);
 long omap_virt_l3_round_rate(struct clk *clk, unsigned long rate);
 unsigned long omap_virt_l3_recalc(struct clk *clk);
+int omap_virt_iva_set_rate(struct clk *clk, unsigned long rate);
+long omap_virt_iva_round_rate(struct clk *clk, unsigned long rate);
+int omap_virt_dsp_set_rate(struct clk *clk, unsigned long rate);
+long omap_virt_dsp_round_rate(struct clk *clk, unsigned long rate);
 
 #endif

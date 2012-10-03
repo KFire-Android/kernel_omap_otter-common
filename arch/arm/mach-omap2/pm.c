@@ -479,7 +479,7 @@ static void __init omap4_init_voltages(void)
 		omap_set_init_opp("mpu", "virt_dpll_mpu_ck", "mpu");
 
 	omap_set_init_opp("core", "virt_l3_ck", "l3_main_1");
-	omap_set_init_opp("iva", "dpll_iva_m5x2_ck", "iva");
+	omap_set_init_opp("iva", "virt_dpll_iva_ck", "iva");
 }
 
 static void __init omap5_init_voltages(void)
