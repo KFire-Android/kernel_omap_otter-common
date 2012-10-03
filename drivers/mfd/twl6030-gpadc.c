@@ -589,7 +589,7 @@ static void twl6030_gpadc_work(struct work_struct *ws)
 
 		/* Return results to caller */
 		if (r->func_cb != NULL) {
-			r->func_cb(len, r->channels, r->rbuf);
+			r->func_cb(r);
 			r->func_cb = NULL;
 		}
 
