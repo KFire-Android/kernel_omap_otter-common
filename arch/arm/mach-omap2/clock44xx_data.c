@@ -204,14 +204,14 @@ static struct clk utmi_phy_clkout_ck = {
 	.ops		= &clkops_null,
 };
 
-static struct clk xclk60mhsp1_ck = {
-	.name		= "xclk60mhsp1_ck",
+static struct clk xclk60mhsp1 = {
+	.name		= "xclk60mhsp1",
 	.rate		= 60000000,
 	.ops		= &clkops_null,
 };
 
-static struct clk xclk60mhsp2_ck = {
-	.name		= "xclk60mhsp2_ck",
+static struct clk xclk60mhsp2 = {
+	.name		= "xclk60mhsp2",
 	.rate		= 60000000,
 	.ops		= &clkops_null,
 };
@@ -2534,7 +2534,7 @@ static struct clk usb_host_fs_fck = {
 
 static const struct clksel utmi_p1_gfclk_sel[] = {
 	{ .parent = &init_60m_fclk, .rates = div_1_0_rates },
-	{ .parent = &xclk60mhsp1_ck, .rates = div_1_1_rates },
+	{ .parent = &xclk60mhsp1, .rates = div_1_1_rates },
 	{ .parent = NULL },
 };
 
@@ -2561,7 +2561,7 @@ static struct clk usb_host_hs_utmi_p1_clk = {
 
 static const struct clksel utmi_p2_gfclk_sel[] = {
 	{ .parent = &init_60m_fclk, .rates = div_1_0_rates },
-	{ .parent = &xclk60mhsp2_ck, .rates = div_1_1_rates },
+	{ .parent = &xclk60mhsp2, .rates = div_1_1_rates },
 	{ .parent = NULL },
 };
 
@@ -3151,8 +3151,8 @@ static struct omap_clk omap44xx_clks[] = {
 	CLK(NULL,	"sys_clkin_ck",			&sys_clkin_ck,	CK_443X),
 	CLK(NULL,	"tie_low_clock_ck",		&tie_low_clock_ck,	CK_443X),
 	CLK(NULL,	"utmi_phy_clkout_ck",		&utmi_phy_clkout_ck,	CK_443X),
-	CLK(NULL,	"xclk60mhsp1_ck",		&xclk60mhsp1_ck,	CK_443X),
-	CLK(NULL,	"xclk60mhsp2_ck",		&xclk60mhsp2_ck,	CK_443X),
+	CLK(NULL,	"xclk60mhsp1",		&xclk60mhsp1,	CK_443X),
+	CLK(NULL,	"xclk60mhsp2",		&xclk60mhsp2,	CK_443X),
 	CLK(NULL,	"xclk60motg_ck",		&xclk60motg_ck,	CK_443X),
 	CLK(NULL,	"abe_dpll_bypass_clk_mux_ck",	&abe_dpll_bypass_clk_mux_ck,	CK_443X),
 	CLK(NULL,	"abe_dpll_refclk_mux_ck",	&abe_dpll_refclk_mux_ck,	CK_443X),
