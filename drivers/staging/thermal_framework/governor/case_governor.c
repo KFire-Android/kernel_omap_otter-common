@@ -45,9 +45,10 @@ struct case_governor {
 static struct thermal_dev *therm_fw;
 static struct case_governor *case_gov;
 
-static void case_reached_max_state(void)
+static void case_reached_max_state(int temp)
 {
-	/* we have done everything that could be done so far, giving up */
+	pr_emerg("%s: restart due to thermal case policy (temp == %d)\n",
+		 __func__, temp);
 	kernel_restart(NULL);
 }
 
@@ -76,27 +77,46 @@ static void case_reached_max_state(void)
 
 static int case_thermal_manager(struct list_head *cooling_list, int temp)
 {
-	if (temp >= sys_threshold_hot) {
-		case_gov->cooling_level++;
-		thot += SYS_THRESHOLD_HOT_INC;
-		pr_info("%s:syst temp >= thot thot set to %d", __func__, thot);
-		if (case_gov->cooling_level >= CASE_MAX_COOLING_ACTION)
-			case_reached_max_state();
-	} else if (temp < sys_threshold_cold) {
+	pr_debug("%s: temp: %d thot: %d level: %d sys_thot: %d sys_tcold: %d",
+		 __func__, temp, thot, case_gov->cooling_level,
+		 sys_threshold_hot, sys_threshold_cold);
+
+	if (temp < sys_threshold_cold) {
 		case_gov->cooling_level = INIT_COOLING_LEVEL;
 		/* We want to be notified on the first subzone */
 		thot = sys_threshold_cold;
-		pr_info("%s: syst temp =< tcold thot set to %d", __func__,
-									thot);
-	} else {
+
+		pr_debug("%s: temp: %d < sys_threshold_cold, thot: %d (%d)",
+			 __func__, temp, thot, case_gov->cooling_level);
+
+		goto update;
+	}
+
+	/* no need to update here */
+	if (temp < thot)
+		return 0;
+
+	if (temp >= sys_threshold_hot) {
+		case_gov->cooling_level++;
+		thot += SYS_THRESHOLD_HOT_INC;
+
+		pr_debug("%s: temp: %d >= sys_threshold_hot, thot: %d (%d)",
+			 __func__, temp, thot, case_gov->cooling_level);
+
+		if (case_gov->cooling_level >= CASE_MAX_COOLING_ACTION)
+			case_reached_max_state(temp);
+	} else { /* sys_thot > temp > sys_tcold, temp > thot */
 		case_gov->cooling_level++;
 		thot = sys_threshold_cold +
 			((sys_threshold_hot - sys_threshold_cold) /
 			 case_subzone_number) *
 			case_gov->cooling_level;
-		pr_info("%s: sys_threshold_hot >= syst temp>= tcold thot set to %d",
-			__func__, thot);
+
+		pr_debug("%s: sys_thot >= temp: %d >= sys_tcold, thot: %d (%d)",
+			 __func__, temp, thot, case_gov->cooling_level);
 	}
+
+update:
 	thermal_device_call_all(cooling_list, cool_device,
 						case_gov->cooling_level);
 	thermal_device_call(case_gov->temp_sensor, set_temp_thresh,
