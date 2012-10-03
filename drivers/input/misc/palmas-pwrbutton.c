@@ -157,6 +157,8 @@ static int __devinit palmas_pwron_probe(struct platform_device *pdev)
 		goto free_input_dev;
 	}
 
+	enable_irq_wake(irq);
+
 	err = input_register_device(input_dev);
 	if (err) {
 		dev_dbg(&pdev->dev, "Can't register power button: %d\n", err);
@@ -182,6 +184,7 @@ static int __devexit palmas_pwron_remove(struct platform_device *pdev)
 	struct input_dev *input_dev = pwron->input_dev;
 	int irq = platform_get_irq(pdev, 0);
 
+	disable_irq_wake(irq);
 	free_irq(irq, input_dev);
 	input_unregister_device(input_dev);
 
