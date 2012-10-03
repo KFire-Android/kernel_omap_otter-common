@@ -404,7 +404,7 @@ static int _dep_scan_table(struct device *dev,
 	struct device *target_dev;
 	struct omap_vdd_dvfs_info *tdvfs_info;
 	struct opp *opp;
-	unsigned long dep_volt = 0, new_dep_volt = 0, new_freq = 0;
+	unsigned long dep_volt = 0, new_dep_volt = 0;
 
 	if (!dep_table) {
 		dev_err(dev, "%s: deptable not present for vdd%s\n",
@@ -448,24 +448,26 @@ static int _dep_scan_table(struct device *dev,
 
 	rcu_read_lock();
 	opp = _volt_to_opp(target_dev, dep_volt);
-	if (!IS_ERR(opp)) {
+	if (!IS_ERR(opp))
 		new_dep_volt = opp_get_voltage(opp);
-		new_freq = opp_get_freq(opp);
-	}
 	rcu_read_unlock();
 
-	if (!new_dep_volt || !new_freq) {
+	if (!new_dep_volt) {
 		dev_err(target_dev, "%s: no valid OPP for voltage %lu\n",
 			__func__, dep_volt);
 		return -ENODATA;
 	}
 
+	if (dep_volt != new_dep_volt)
+		dev_warn(dev, "%s: no exact OPP for %lu voltage, %lu will be used instead\n",
+			 __func__, dep_volt, new_dep_volt);
+
 	/* See if dep_volt is possible for the vdd*/
 	i = _add_vdd_user(_voltdm_to_dvfs_info(dep_info->_dep_voltdm),
-			dev, dep_volt);
+			dev, new_dep_volt);
 	if (i)
 		dev_err(dev, "%s: Failed to add dep to domain %s volt=%ld\n",
-			__func__, dep_info->name, dep_volt);
+			__func__, dep_info->name, new_dep_volt);
 	return i;
 }
 
