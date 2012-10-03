@@ -25,8 +25,8 @@
 #include <linux/thermal_framework.h>
 
 /* System/Case Thermal thresholds */
-#define SYS_THRESHOLD_HOT		65000
-#define SYS_THRESHOLD_COLD		64000
+#define SYS_THRESHOLD_HOT		62000
+#define SYS_THRESHOLD_COLD		57000
 #define SYS_THRESHOLD_HOT_INC		500
 #define INIT_COOLING_LEVEL		0
 #define CASE_SUBZONES_NUMBER		4
