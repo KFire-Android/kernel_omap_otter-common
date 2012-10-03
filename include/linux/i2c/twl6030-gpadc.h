@@ -34,6 +34,7 @@ struct twl6030_gpadc_conversion_method {
 	u8 rbase;
 	u8 ctrl;
 	u8 enable;
+	u8 mask;
 };
 
 #define TWL6030_GPADC_MAX_CHANNELS 17
@@ -67,7 +68,6 @@ struct twl6030_gpadc_request {
 enum conversion_methods {
 	TWL6030_GPADC_RT,
 	TWL6030_GPADC_SW2,
-	TWL6032_GPADC_SW2,
 	TWL6030_GPADC_NUM_METHODS
 };
 
@@ -131,6 +131,11 @@ enum sample_type {
 #define TWL6030_GPADC_CTRL2_SCALER_EN_CH18	(1 << 2)
 #define TWL6030_GPADC_CTRL2_VBAT_SCALER_DIV4	(1 << 3)
 
+#define TWL6030_GPADC_RT_SW1_EOC_MASK		(1 << 5)
+#define TWL6030_GPADC_SW2_EOC_MASK		(1 << 6)
+
+#define TWL6032_GPADC_RT_EOC_MASK		(1 << 4)
+#define TWL6032_GPADC_SW_EOC_MASK		(1 << 5)
 
 #define TWL6030_GPADC_IOC_MAGIC '`'
 #define TWL6030_GPADC_IOCX_ADC_RAW_READ	_IO(TWL6030_GPADC_IOC_MAGIC, 0)
