@@ -25,10 +25,16 @@
 #include <linux/skbuff.h>
 #include <linux/ti_wilink_st.h>
 #include <plat/omap-serial.h>
+#include <plat/omap_apps_brd_id.h>
 #include <linux/wakelock.h>
 
 #include "mux.h"
 #include "board-54xx-sevm.h"
+
+#define OMAP4_WILINK_UART_DEV_NAME	"/dev/ttyO1"
+#define OMAP4_GPIO_WIFI_IRQ		53
+#define OMAP4_GPIO_WIFI_PMENA		54
+#define OMAP4_BT_NSHUTDOWN_GPIO		55
 
 #define OMAP5_WILINK_UART_DEV_NAME	"/dev/ttyO4"
 #define OMAP5_BT_NSHUTDOWN_GPIO		142
@@ -51,6 +57,11 @@ struct wilink_board_init_data {
 	const char	*muxname;
 	int		val;
 	}				mux_signals[];
+};
+
+static struct regulator_consumer_supply omap4_vmmc5_supply = {
+	.supply         = "vmmc",
+	.dev_name       = "omap_hsmmc.4",
 };
 
 static struct regulator_consumer_supply omap5_evm_vmmc3_supply = {
@@ -262,6 +273,51 @@ __init omap4plus_ti_st_init(const struct wilink_board_init_data *data)
 				--i, ret);
 }
 
+static struct wilink_board_init_data __initdata omap4_wilink_init_data = {
+	.wifi_gpio_irq = OMAP4_GPIO_WIFI_IRQ,
+	.wifi_irq_mux_flags = OMAP_PIN_INPUT | OMAP_PIN_OFF_WAKEUPENABLE,
+	.wifi_gpio_pmena = OMAP4_GPIO_WIFI_PMENA,
+	.wifi_pmena_mux_flags = OMAP_PIN_OUTPUT,
+	.bt_gpio_shutdown = OMAP4_BT_NSHUTDOWN_GPIO,
+	.bt_shutdown_mux_flags = OMAP_PIN_OUTPUT,
+	.wlan_data = &omap4plus_wlan_data,
+	.vwlan_device = &omap4plus_vwlan_device,
+	.st_devs = {
+		&wl18xx_device,
+		&btwilink_device,
+		NULL, /* Terminator */
+	},
+	.mux_signals = {
+		{
+			"sdmmc5_cmd.sdmmc5_cmd",
+			OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP
+		},
+		{
+			"sdmmc5_clk.sdmmc5_clk",
+			OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP
+		},
+		{
+			"sdmmc5_dat0.sdmmc5_dat0",
+			OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP
+		},
+		{
+			"sdmmc5_dat1.sdmmc5_dat1",
+			OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP
+		},
+		{
+			"sdmmc5_dat2.sdmmc5_dat2",
+			OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP
+		},
+		{
+			"sdmmc5_dat3.sdmmc5_dat3",
+			OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP
+		},
+		{
+			NULL, /* Terminator */
+		},
+	}
+};
+
 static struct wilink_board_init_data __initdata omap5_wilink_init_data = {
 	.wifi_gpio_irq = OMAP5_GPIO_WIFI_SEVM_IRQ,
 	.wifi_irq_mux_flags = OMAP_PIN_INPUT_PULLDOWN,
@@ -318,6 +374,13 @@ int __init omap4plus_connectivity_init(int board_type)
 	case OMAP5_PANDA5_BOARD_ID:
 		idata = &omap5_wilink_init_data;
 		idata->wifi_gpio_irq = OMAP5_GPIO_WIFI_PANDA5_IRQ;
+		break;
+	case OMAP4_TABLET_2_0_ID:
+		idata = &omap4_wilink_init_data;
+		omap4plus_wilink_pdata.nshutdown_gpio = OMAP4_BT_NSHUTDOWN_GPIO;
+		omap4plus_vmmc_regulator.consumer_supplies = &omap4_vmmc5_supply;
+		strcpy(&omap4plus_wilink_pdata.dev_name[0],
+				OMAP4_WILINK_UART_DEV_NAME);
 		break;
 	default:
 		pr_err("%s: Error: Unsupported board type: 0x%04x\n",

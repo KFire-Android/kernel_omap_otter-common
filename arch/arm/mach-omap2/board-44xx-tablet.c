@@ -408,7 +408,7 @@ static void __init omap_tablet_init(void)
 	tablet_touch_init();
 	tablet_sensor_init();
 	tablet_button_init();
-
+	omap4plus_connectivity_init(OMAP4_TABLET_2_0_ID);
 	status = omap_ethernet_init();
 	if (status) {
 		pr_err("Ethernet initialization failed: %d\n", status);

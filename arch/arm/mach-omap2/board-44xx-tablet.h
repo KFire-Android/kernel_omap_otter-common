@@ -17,6 +17,8 @@
 #ifndef _MACH_OMAP_BOARD_44XX_TABLET_H
 #define _MACH_OMAP_BOARD_44XX_TABLET_H
 
+#include "board-omap4plus-common.h"
+
 int __init tablet_display_init(void);
 int __init tablet_touch_init(void);
 int __init tablet_sensor_init(void);
