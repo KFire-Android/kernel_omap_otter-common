@@ -459,10 +459,16 @@ static struct twl6040_platform_data twl6040_data = {
 	.irq_base	= TWL6040_CODEC_IRQ_BASE,
 };
 
+static struct twl4030_madc_platform_data twl6030_gpadc = {
+	.irq_line = -1,
+};
+
 static struct twl4030_platform_data tablet_twldata = {
 	/* Regulators */
 	.vusim		= &tablet_vusim,
 	.vaux1		= &tablet_vaux1,
+
+	.madc		= &twl6030_gpadc,
 };
 
 static struct i2c_board_info __initdata tablet_i2c_3_boardinfo[] = {
