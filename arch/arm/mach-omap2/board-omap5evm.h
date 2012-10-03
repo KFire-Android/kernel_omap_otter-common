@@ -17,6 +17,8 @@
 #ifndef _MACH_OMAP_BOARD_OMAP5EVM_H
 #define _MACH_OMAP_BOARD_OMAP5EVM_H
 
+#include "board-omap4plus-common.h"
+
 #ifdef CONFIG_OMAP_HSI
 extern void __init omap5evm_modem_init(bool force_mux);
 #else

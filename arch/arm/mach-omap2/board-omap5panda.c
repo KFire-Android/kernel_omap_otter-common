@@ -1008,7 +1008,7 @@ static void __init omap_5_panda_init(void)
 	/* TODO: Once the board identification is passed in from the
 	 * bootloader pass in the HACK board ID to the conn board file
 	*/
-	omap5_connectivity_init(OMAP5_PANDA5_BOARD_ID);
+	omap4plus_connectivity_init(OMAP5_PANDA5_BOARD_ID);
 
 	omap_hsmmc_init(mmc);
 	usb_dwc3_init();

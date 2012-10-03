@@ -1,5 +1,5 @@
 /*
- * arch/arm/mach-omap2/board-54xx-sevm.h
+ * arch/arm/mach-omap2/board-omap4plus-common.h
  *
  * Copyright (C) 2012 Texas Instruments
  *
@@ -14,17 +14,9 @@
  *
  */
 
-#ifndef _MACH_OMAP_BOARD_54XX_SEVM_H
-#define _MACH_OMAP_BOARD_54XX_SEVM_H
+#ifndef _MACH_OMAP_BOARD_OMAP4PLUS_H
+#define _MACH_OMAP_BOARD_OMAP4PLUS_H
 
-#include "board-omap5evm.h"
-
-#define OMAP5_SEVM_BOARD_ID	0
-#define OMAP5_PANDA5_BOARD_ID	1
-
-int __init sevm_dock_init(void);
-int __init sevm_touch_init(void);
-int __init sevm_sensor_init(void);
-int __init sevm_panel_init(void);
+extern int __init omap4plus_connectivity_init(int board_type);
 
 #endif
