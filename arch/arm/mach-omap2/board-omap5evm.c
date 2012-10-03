@@ -845,10 +845,14 @@ static void lg_panel_set_power(bool enable)
 static struct panel_lg4591_data dsi_panel = {
 	.reset_gpio = 183,
 	.set_power = lg_panel_set_power,
-	.number_actions = 2,
+	.number_actions = 6,
 	.cooling_actions = {
-		{ .priority = 0, .percentage = 100 },
-		{ .priority = 1, .percentage = 75 },
+		{ .priority = 0, .percentage = 100, },
+		{ .priority = 1, .percentage = 100, },
+		{ .priority = 2, .percentage = 80, },
+		{ .priority = 3, .percentage = 70, },
+		{ .priority = 4, .percentage = 60, },
+		{ .priority = 5, .percentage = 50, },
 	},
 };
 
