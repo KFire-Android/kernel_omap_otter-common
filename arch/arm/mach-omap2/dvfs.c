@@ -259,20 +259,19 @@ struct omap_vdd_dvfs_info *_voltdm_to_dvfs_info(struct voltagedomain *voltdm)
 }
 
 /**
- * _volt_to_opp() - Find OPP corresponding to a given voltage
- * @dev:	device pointer associated with the OPP list
- * @volt:	voltage to search for in uV
+ * _volt_to_opp_ceil() - Find ceil OPP corresponding to a given voltage
+ * @dev:        device pointer associated with the OPP list
+ * @volt:       voltage to search for in uV
  *
- * Searches for exact match in the OPP list and returns handle to the matching
- * OPP if found, else returns ERR_PTR in case of error and should be handled
- * using IS_ERR. If there are multiple opps with same voltage, it will return
- * the first available entry. Return pointer should be checked against IS_ERR.
+ * Searches for OPP with equal or higher voltage in the OPP list and returns
+ * handle to the matching OPP if found, else returns ERR_PTR in case of error
+ * and should be handled using IS_ERR.
+ * If there are multiple OPPs with same voltage, it will return the first
+ * available entry. Return pointer should be checked against IS_ERR.
  *
- * NOTE: since this uses OPP functions, use under rcu_lock. This function also
- * assumes that the cpufreq table and OPP table are in sync - any modifications
- * to either should be synchronized.
+ * NOTE: since this uses OPP functions, use under rcu_lock.
  */
-static struct opp *_volt_to_opp(struct device *dev, unsigned long volt)
+static struct opp *_volt_to_opp_ceil(struct device *dev, unsigned long volt)
 {
 	struct opp *opp = ERR_PTR(-ENODEV);
 	unsigned long f = 0;
@@ -284,6 +283,36 @@ static struct opp *_volt_to_opp(struct device *dev, unsigned long volt)
 		if (opp_get_voltage(opp) >= volt)
 			break;
 		f++;
+	} while (1);
+
+	return opp;
+}
+
+/**
+ * _volt_to_opp_floor() - Find floor OPP corresponding to a given voltage
+ * @dev:	device pointer associated with the OPP list
+ * @volt:	voltage to search for in uV
+ *
+ * Searches for OPP with equal or lower voltage in the OPP list and returns
+ * handle to the matching OPP if found, else returns ERR_PTR in case of error
+ * and should be handled using IS_ERR.
+ * If there are multiple OPPs with same voltage, it will return the first
+ * available entry. Return pointer should be checked against IS_ERR.
+ *
+ * NOTE: since this uses OPP functions, use under rcu_lock.
+ */
+static struct opp *_volt_to_opp_floor(struct device *dev, unsigned long volt)
+{
+	struct opp *opp = ERR_PTR(-ENODEV);
+	unsigned long f = ULONG_MAX;
+
+	do {
+		opp = opp_find_freq_floor(dev, &f);
+		if (IS_ERR(opp))
+			break;
+		if (opp_get_voltage(opp) <= volt)
+			break;
+		f--;
 	} while (1);
 
 	return opp;
@@ -447,7 +476,7 @@ static int _dep_scan_table(struct device *dev,
 	}
 
 	rcu_read_lock();
-	opp = _volt_to_opp(target_dev, dep_volt);
+	opp = _volt_to_opp_ceil(target_dev, dep_volt);
 	if (!IS_ERR(opp))
 		new_dep_volt = opp_get_voltage(opp);
 	rcu_read_unlock();
@@ -670,12 +699,16 @@ static int _dvfs_scale(struct device *req_dev, struct device *target_dev,
 		temp_dev = list_entry(dev_list, struct omap_vdd_dev_list, node);
 		dev = temp_dev->dev;
 		rcu_read_lock();
-		opp = _volt_to_opp(dev, omap_get_nominal_voltage(new_vdata));
+		opp = _volt_to_opp_floor(dev,
+					 omap_get_nominal_voltage(new_vdata));
 		if (!IS_ERR(opp))
 			freq = opp_get_freq(opp);
 		rcu_read_unlock();
-		if (!freq)
+		if (!freq) {
+			dev_err(dev, "%s: can't find freq for voltage %lu\n",
+				__func__, omap_get_nominal_voltage(new_vdata));
 			goto next;
+		}
 
 		if (freq == clk_get_rate(temp_dev->clk)) {
 			dev_dbg(dev, "%s: Already at the requested rate %ld\n",
@@ -873,7 +906,7 @@ static int dvfs_dump_vdd(struct seq_file *sf, void *unused)
 	anyreq = 0;
 	plist_for_each_entry(vuser, &dvfs_info->vdd_user_list, node) {
 		rcu_read_lock();
-		opp = _volt_to_opp(vuser->dev, vuser->node.prio);
+		opp = _volt_to_opp_floor(vuser->dev, vuser->node.prio);
 		if (!IS_ERR(opp))
 			freq = opp_get_freq(opp);
 		rcu_read_unlock();
