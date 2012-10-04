@@ -88,4 +88,12 @@ extern struct omap_abb_instance omap4_abb_iva;
 extern struct omap_abb_instance omap5_abb_mpu;
 extern struct omap_abb_instance omap5_abb_mm;
 
+void omap_abb_init(struct voltagedomain *voltdm);
+void omap_abb_enable(struct voltagedomain *voltdm);
+void omap_abb_disable(struct voltagedomain *voltdm);
+int omap_abb_pre_scale(struct voltagedomain *voltdm,
+		struct omap_volt_data *target_volt_data);
+int omap_abb_post_scale(struct voltagedomain *voltdm,
+		struct omap_volt_data *target_volt_data);
+
 #endif
