@@ -85,35 +85,60 @@ static int case_thermal_manager(struct list_head *cooling_list, int temp)
 		case_gov->cooling_level = INIT_COOLING_LEVEL;
 		/* We want to be notified on the first subzone */
 		thot = sys_threshold_cold;
+		tcold = sys_threshold_cold;
 
-		pr_debug("%s: temp: %d < sys_threshold_cold, thot: %d (%d)",
-			 __func__, temp, thot, case_gov->cooling_level);
+		pr_debug("%s: temp: %d < sys_threshold_cold, thot: %d:%d (%d)",
+			 __func__, temp, thot, tcold, case_gov->cooling_level);
 
 		goto update;
 	}
 
 	/* no need to update here */
-	if (temp < thot)
+	if (tcold <= temp && temp <= thot)
 		return 0;
 
 	if (temp >= sys_threshold_hot) {
-		case_gov->cooling_level++;
-		thot += SYS_THRESHOLD_HOT_INC;
+		if (temp < tcold) {
+			case_gov->cooling_level--;
+			thot = tcold;
+			tcold -= SYS_THRESHOLD_HOT_INC;
+		} else { /* temp > thot */
+			case_gov->cooling_level++;
+			tcold = thot;
+			thot += SYS_THRESHOLD_HOT_INC;
+		}
 
-		pr_debug("%s: temp: %d >= sys_threshold_hot, thot: %d (%d)",
-			 __func__, temp, thot, case_gov->cooling_level);
+		pr_debug("%s: temp: %d >= sys_threshold_hot, thot: %d:%d (%d)",
+			 __func__, temp, thot, tcold, case_gov->cooling_level);
 
 		if (case_gov->cooling_level >= CASE_MAX_COOLING_ACTION)
 			case_reached_max_state(temp);
-	} else { /* sys_thot > temp > sys_tcold, temp > thot */
+	} else if (temp > thot) { /* sys_thot > temp > sys_tcold */
 		case_gov->cooling_level++;
+		tcold = thot;
 		thot = sys_threshold_cold +
 			((sys_threshold_hot - sys_threshold_cold) /
 			 case_subzone_number) *
 			case_gov->cooling_level;
 
-		pr_debug("%s: sys_thot >= temp: %d >= sys_tcold, thot: %d (%d)",
-			 __func__, temp, thot, case_gov->cooling_level);
+		pr_debug("%s: sys_thot >= temp: %d >= sys_tcold, %d:%d (%d)",
+			 __func__, temp, thot, tcold, case_gov->cooling_level);
+	} else if (temp < tcold) {
+		/* coming from Tj > sys_threshold_hot */
+		if (case_gov->cooling_level > case_subzone_number) {
+			case_gov->cooling_level = case_subzone_number;
+			/*
+			 * simplifying computation. from here we won't
+			 * change tcold or thot, unless we cross again
+			 * sys_threshold_hot.
+			 */
+			thot = sys_threshold_hot;
+			tcold = sys_threshold_cold;
+
+			pr_debug("%s: sys_thot >= temp: %d reseting %d:%d (%d)",
+				 __func__, temp, thot, tcold,
+				 case_gov->cooling_level);
+		}
 	}
 
 update:
