@@ -711,6 +711,18 @@ static int __devinit twl6040_probe(struct i2c_client *client,
 
 	twl6040->rev = twl6040_reg_read(twl6040, TWL6040_REG_ASICREV);
 
+	/*
+	 * ERRATA: Reset value of PDM_UL buffer logic is 1 (VDDVIO)
+	 * when AUDPWRON = 0, which causes current drain on this pin's
+	 * pull-down on OMAP side. The workaround consists of disabling
+	 * pull-down resistor of ABE_PDM_UL_DATA pin.
+	 * Since workaround is not in twl6040 but in McPDM pin mux, the
+	 * actual implementation isn't done here
+	 */
+	if ((twl6040_get_revid(twl6040) <= TWL6041_REV_ES2_2) &&
+	    pdata->pdm_ul_errata)
+		pdata->pdm_ul_errata();
+
 	/* ERRATA: Automatic power-up is not possible in ES1.0 */
 	if (twl6040_get_revid(twl6040) > TWL6040_REV_ES1_0)
 		twl6040->audpwron = pdata->audpwron_gpio;
