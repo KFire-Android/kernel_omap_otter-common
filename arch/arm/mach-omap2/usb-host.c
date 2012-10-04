@@ -31,6 +31,7 @@
 #include <plat/usb.h>
 #include <plat/omap_device.h>
 
+#include "control.h"
 #include "mux.h"
 
 #ifdef CONFIG_MFD_OMAP_USB_HOST
@@ -746,6 +747,14 @@ setup_4430_usbhs_io_mux(struct platform_device	*pdev,
 	case OMAP_EHCI_PORT_MODE_TLL:
 		pads[0] = port1_tll_pads;
 		pads_cnt[0] = ARRAY_SIZE(port1_tll_pads);
+
+		/* Errata i687: set I/O drive strength to 1 */
+		if (cpu_is_omap443x()) {
+			u32 val;
+			val = omap4_ctrl_pad_readl(OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_SMART2IO_PADCONF_2);
+			val |= OMAP4_USBB1_DR0_DS_MASK;
+			omap4_ctrl_pad_writel(val, OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_SMART2IO_PADCONF_2);
+		}
 			break;
 	case OMAP_EHCI_PORT_MODE_HSIC:
 		pads[0] = port1_hsic_pads;
@@ -786,6 +795,14 @@ setup_4430_usbhs_io_mux(struct platform_device	*pdev,
 	case OMAP_EHCI_PORT_MODE_TLL:
 		pads[1] = port2_tll_pads;
 		pads_cnt[1] = ARRAY_SIZE(port2_tll_pads);
+
+		/* Errata i687: set I/O drive strength to 1 */
+		if (cpu_is_omap443x()) {
+			u32 val;
+			val = omap4_ctrl_pad_readl(OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_SMART2IO_PADCONF_2);
+			val |= OMAP4_USBB2_DR0_DS_MASK;
+			omap4_ctrl_pad_writel(val, OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_SMART2IO_PADCONF_2);
+		}
 			break;
 	case OMAP_EHCI_PORT_MODE_HSIC:
 		pads[1] = port2_hsic_pads;
