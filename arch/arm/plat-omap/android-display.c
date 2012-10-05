@@ -74,28 +74,11 @@ static int __init get_hdmi_options(char *str)
 }
 early_param("omapdss.hdmi_options", get_hdmi_options);
 
-static void get_display_size(struct omap_dss_board_info *info,
-			     struct omap_android_display_data *mem)
+static void get_display_size(struct omap_dss_device *device,
+				struct omap_android_display_data *mem)
 {
-	struct omap_dss_device *device = NULL;
-	int i;
-
-	if (!info)
+	if (!device)
 		goto done;
-
-	device = info->default_device;
-	for (i = 0; i < info->num_devices; i++) {
-		if (!strcmp(default_display, info->devices[i]->name)) {
-			device = info->devices[i];
-			break;
-		}
-	}
-
-	if (!device) {
-		pr_warn("android_display: invalid dss device");
-		goto done;
-	}
-
 	if (device->type == OMAP_DISPLAY_TYPE_HDMI &&
 	    hdmi_width && hdmi_height) {
 		mem->width = hdmi_width;
@@ -107,8 +90,8 @@ static void get_display_size(struct omap_dss_board_info *info,
 	if (device->ctrl.pixel_size)
 		mem->bpp = ALIGN(device->ctrl.pixel_size, 16) >> 3;
 
-	pr_info("android_display: setting default resolution %u*%u, bpp=%u\n",
-					mem->width, mem->height, mem->bpp);
+	pr_info("android_display: setting %s resolution to %u*%u, bpp=%u\n",
+		device->name, mem->width, mem->height, mem->bpp);
 done:
 	return;
 }
@@ -202,6 +185,7 @@ int __init omap_android_display_setup(struct omap_dss_board_info *dss,
 			       struct omapfb_platform_data *fb)
 {
 	struct sgx_omaplfb_config *p_sgx_config = NULL;
+	int i;
 
 	struct omap_android_display_data mem = {
 		.bpp = 4,
@@ -209,17 +193,19 @@ int __init omap_android_display_setup(struct omap_dss_board_info *dss,
 		.height = 1080,
 	};
 
-	if (!sgx || !sgx->configs)
-		p_sgx_config = sgx_omaplfb_get(0);
-	else
-		p_sgx_config = &(sgx->configs[0]);
+	if (!sgx || !sgx->num_configs)
+		return -ENODEV;
 
-	get_display_size(dss, &mem);
+	for (i = 0; i < sgx->num_configs; ++i) {
+		p_sgx_config = &(sgx->configs[i]);
 
-	if (dsscomp)
+		if (i < dss->num_devices)
+			get_display_size(dss->devices[i], &mem);
+
 		set_tiler1d_slot_size(dsscomp, &mem);
+		set_vram_sizes(p_sgx_config, fb, &mem);
+		sgx_omaplfb_set(i, p_sgx_config);
+	}
 
-	set_vram_sizes(p_sgx_config, fb, &mem);
-
-	return sgx_omaplfb_set(0, p_sgx_config);
+	return 0;
 }
