@@ -196,7 +196,7 @@ static void set_vram_sizes(struct sgx_omaplfb_config *sgx_config,
 }
 
 /* coordinate between sgx, omapdss, dsscomp and ion needs */
-void __init omap_android_display_setup(struct omap_dss_board_info *dss,
+int __init omap_android_display_setup(struct omap_dss_board_info *dss,
 			       struct dsscomp_platform_data *dsscomp,
 			       struct sgx_omaplfb_platform_data *sgx,
 			       struct omapfb_platform_data *fb)
@@ -221,5 +221,5 @@ void __init omap_android_display_setup(struct omap_dss_board_info *dss,
 
 	set_vram_sizes(p_sgx_config, fb, &mem);
 
-	sgx_omaplfb_set(0, p_sgx_config);
+	return sgx_omaplfb_set(0, p_sgx_config);
 }
