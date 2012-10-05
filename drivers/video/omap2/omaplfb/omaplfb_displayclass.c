@@ -1430,6 +1430,16 @@ static OMAPLFB_ERROR OMAPLFBInitFBDev(OMAPLFB_DEVINFO *psDevInfo)
 		goto ErrorModPut;
 	}
 
+	/* skip framebuffer in case of zero width or height */
+	if (psDevInfo->psLINFBInfo->var.xres == 0 ||
+		psDevInfo->psLINFBInfo->var.yres == 0) {
+		printk(KERN_WARNING DRIVER_PREFIX
+		": %s: Device %u: invalid framebuffer size\n",
+		__func__, uiFBDevID);
+		eError = OMAPLFB_ERROR_INVALID_PARAMS;
+		goto ErrorModPut;
+	}
+
 #if defined(CONFIG_DSSCOMP)
 	if (psFBPlatConfig->tiler2d_buffers)
 	{
