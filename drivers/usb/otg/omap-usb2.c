@@ -52,6 +52,22 @@ void omap_usb2_set_comparator(struct phy_companion *comparator)
 }
 EXPORT_SYMBOL_GPL(omap_usb2_set_comparator);
 
+static int omap_usb2_suspend(struct usb_phy *, int);
+
+int omap_usb2_charger_detect(struct phy_companion *comparator)
+{
+	struct usb_phy  *x = usb_get_phy(USB_PHY_TYPE_USB2);
+	struct omap_usb *phy = phy_to_omapusb(x);
+	int charger = 0;
+
+	omap_usb2_suspend(x, 0);
+	charger = omap_usb_charger_detect(phy->control_dev);
+	omap_usb2_suspend(x, 1);
+
+	return charger;
+}
+EXPORT_SYMBOL_GPL(omap_usb2_charger_detect);
+
 static int omap_usb_set_vbus(struct usb_otg *otg, bool enabled)
 {
 	struct omap_usb *phy = phy_to_omapusb(otg->phy);
@@ -191,6 +207,9 @@ static int __devinit omap_usb2_probe(struct platform_device *pdev)
 	usb_add_phy(&phy->phy, USB_PHY_TYPE_USB2);
 
 	platform_set_drvdata(pdev, phy);
+
+	/* Start with disabled charger detection */
+	omap_usb_charger_enable(phy->control_dev, 0);
 
 	pm_runtime_enable(phy->dev);
 

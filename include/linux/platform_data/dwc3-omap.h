@@ -52,6 +52,7 @@ enum omap_dwc3_vbus_id_status {
 	OMAP_DWC3_ID_FLOAT,
 	OMAP_DWC3_VBUS_VALID,
 	OMAP_DWC3_VBUS_OFF,
+	OMAP_DWC3_DCP_CHARGER,
 };
 
 #if (defined(CONFIG_USB_DWC3) || defined(CONFIG_USB_DWC3_MODULE))
