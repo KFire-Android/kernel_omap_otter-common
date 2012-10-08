@@ -140,42 +140,24 @@ static u32 vram_size(struct omap_android_display_data *mem)
 }
 
 static void set_vram_sizes(struct sgx_omaplfb_config *sgx_config,
-			   struct omapfb_platform_data *fb,
-			   struct omap_android_display_data *mem)
+			   struct omapfb_mem_region *region,
+			   struct omap_android_display_data *mem,
+			   unsigned fbnum)
 {
-	u32 num_vram_buffers = 0;
+	u32 num_vram_buffers;
 	u32 vram = 0;
-	int i;
 
-	if (fb && fb->mem_desc.region_cnt >= 1) {
-		/* Need at least 1 VRAM buffer for fb0 */
-		num_vram_buffers = 1;
-	}
+	if (!sgx_config || !region || !mem)
+		return;
 
-	if (sgx_config) {
-		vram += sgx_config->vram_reserve;
-		num_vram_buffers = max(sgx_config->vram_buffers,
-				       num_vram_buffers);
-	}
-
+	/* Need at least 1 VRAM buffer for fb0 */
+	num_vram_buffers = max(sgx_config->vram_buffers, 1u);
+	vram += sgx_config->vram_reserve;
 	vram += num_vram_buffers * vram_size(mem);
 
-	if (fb) {
-		/* set fb0 vram needs */
-		if (fb->mem_desc.region_cnt >= 1) {
-			fb->mem_desc.region[0].size = vram;
-			pr_info("android_display: setting fb0.vram to %u\n",
-									vram);
-		}
-
-		/* set global vram needs incl. additional regions specified */
-		for (i = 1; i < fb->mem_desc.region_cnt; i++)
-			if (!fb->mem_desc.region[i].paddr)
-				vram += fb->mem_desc.region[i].size;
-	}
-
-	pr_info("android_display: setting vram to %u\n", vram);
-	omap_vram_set_sdram_vram(vram, 0);
+	/* set fb vram needs */
+	region->size = vram;
+	pr_info("android_display: setting fb%u.vram to %u\n", fbnum, vram);
 }
 
 /* coordinate between sgx, omapdss, dsscomp and ion needs */
@@ -186,6 +168,7 @@ int __init omap_android_display_setup(struct omap_dss_board_info *dss,
 {
 	struct sgx_omaplfb_config *p_sgx_config = NULL;
 	int i;
+	u32 omapfb_vram = 0;
 
 	struct omap_android_display_data mem = {
 		.bpp = 4,
@@ -203,9 +186,24 @@ int __init omap_android_display_setup(struct omap_dss_board_info *dss,
 			get_display_size(dss->devices[i], &mem);
 
 		set_tiler1d_slot_size(dsscomp, &mem);
-		set_vram_sizes(p_sgx_config, fb, &mem);
+
+		/* skip region if no sgx_config associated with it
+		 * or it has size pre-set by board configuration
+		*/
+		if (i < fb->mem_desc.region_cnt &&
+				!fb->mem_desc.region[i].size)
+			set_vram_sizes(p_sgx_config, &fb->mem_desc.region[i],
+								&mem, i);
 		sgx_omaplfb_set(i, p_sgx_config);
 	}
+
+	/* set global vram needs incl. additional regions specified */
+	for (i = 0; i < fb->mem_desc.region_cnt; i++)
+		if (!fb->mem_desc.region[i].paddr)
+			omapfb_vram += fb->mem_desc.region[i].size;
+
+	pr_info("android_display: setting vram to %u\n", omapfb_vram);
+	omap_vram_set_sdram_vram(omapfb_vram, 0);
 
 	return 0;
 }
