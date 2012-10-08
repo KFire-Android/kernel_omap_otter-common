@@ -1,6 +1,6 @@
 /*
- * tsl2771.h
- * TSL2771 ALS and Proximity driver
+ * drv2667.h
+ * DRV2667 Piezo-haptic driver
  *
  * Copyright (C) 2011 Texas Instruments
  * Author: Dan Murphy <DMurphy@ti.com>
