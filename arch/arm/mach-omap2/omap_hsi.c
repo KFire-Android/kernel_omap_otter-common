@@ -465,6 +465,10 @@ static int __init omap_hsi_register(struct omap_hwmod *oh, void *user)
 				__func__, oh->mpu_irqs[i].irq, port + 1, err);
 			return err;
 		}
+		err = enable_irq_wake(port);
+		if (err)
+			pr_err("%s: Could not enable wakeupfor the port %d, error = %d\n",
+			       __func__, port + 1, err);
 	}
 
 	od = omap_device_build(OMAP_HSI_PLATFORM_DEVICE_DRIVER_NAME, 0, oh,
