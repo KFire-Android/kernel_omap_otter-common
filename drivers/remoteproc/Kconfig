@@ -5,6 +5,7 @@ config REMOTEPROC
 	tristate
 	depends on EXPERIMENTAL
 	select FW_CONFIG
+	select VIRTIO
 
 # OMAP_REMOTEPROC depends on selection of IPU or DSP instances
 config OMAP_REMOTEPROC
