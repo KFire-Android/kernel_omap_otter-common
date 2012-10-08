@@ -88,6 +88,7 @@ struct omap_usb {
 
 #if defined(CONFIG_OMAP_USB2) || defined(CONFIG_OMAP_USB2_MODULE)
 void omap_usb2_set_comparator(struct phy_companion *comparator);
+int omap_usb2_charger_detect(struct phy_companion *comparator);
 #else
 static inline void omap_usb2_set_comparator(struct phy_companion *comparator)
 {

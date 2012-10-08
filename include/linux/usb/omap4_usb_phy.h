@@ -46,12 +46,38 @@
 
 #define	USB3_PHY_PARTIAL_RX_POWERON	(0x1 << 6)
 
+#define CONTROL_USB2PHYCORE		0x00000E1C
+#define CHARGER_TYPE_WAIT		0x0
+#define CHARGER_TYPE_NO_CONTACT		0x1
+#define CHARGER_TYPE_PS2		0x2
+#define CHARGER_TYPE_UNKOWN_ERR		0x3
+#define CHARGER_TYPE_DEDICATED		0x4
+#define CHARGER_TYPE_HOST		0x5
+#define CHARGER_TYPE_PC			0x6
+#define CHARGER_TYPE_INTERRUPT		0x7
+#define USB2PHY_CHGDETECTED		BIT(13)
+#define USB2PHY_CHGDETDONE		BIT(14)
+#define USB2PHY_RESTARTCHGDET		BIT(15)
+#define USB2PHY_DISCHGDET		BIT(30)
+#define USB2PHY_CHG_DET_STATUS_SHIFT	21
+#define USB2PHY_CHG_DET_STATUS_MASK	0x7
+
+/*
+ * As per TRM, The hardware charger detection mechanism
+ * should end up within the 500-ms time-out
+ */
+
+#define CHARGER_DET_TIMEOUT		500
+
+
 /* USB-PHY helpers */
 #if (defined(CONFIG_OMAP4_USB_PHY)) || (defined(CONFIG_OMAP4_USB_PHY_MODULE))
 extern int omap4_usb_phy_mailbox(struct device *dev, u32 val);
 extern int omap4_usb_phy_power(struct device *dev, bool on);
 extern int omap5_usb_phy_power(struct device *dev, bool on);
 extern int omap5_usb_phy_partial_powerup(struct device *dev);
+extern int omap_usb_charger_detect(struct device *dev);
+extern void omap_usb_charger_enable(struct device *dev, bool on);
 #else
 static int omap4_usb_phy_mailbox(struct device *dev, u32 val)
 {

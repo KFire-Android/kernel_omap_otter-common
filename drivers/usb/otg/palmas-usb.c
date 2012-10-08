@@ -36,6 +36,7 @@
 #include <linux/notifier.h>
 #include <linux/slab.h>
 #include <linux/delay.h>
+#include <linux/power_supply.h>
 
 #include <linux/mfd/palmas.h>
 
@@ -119,7 +120,7 @@ static irqreturn_t palmas_vbus_wakeup_irq(int irq, void *_palmas_usb)
 {
 	enum omap_dwc3_vbus_id_status status = OMAP_DWC3_UNKNOWN;
 	unsigned int vbus_line_state;
-	int slave;
+	int slave, charger_type;
 	unsigned int addr;
 	int timeout = PALMAS_INT3_LINE_STATE_TIME;
 	struct palmas_usb *palmas_usb = _palmas_usb;
@@ -135,7 +136,13 @@ static irqreturn_t palmas_vbus_wakeup_irq(int irq, void *_palmas_usb)
 		regmap_read(palmas_usb->palmas->regmap[slave], addr, &vbus_line_state);
 
 		if (vbus_line_state == INT3_LINE_STATE_VBUS) {
-			if (palmas_usb->linkstat != OMAP_DWC3_VBUS_VALID) {
+			if (palmas_usb->linkstat != OMAP_DWC3_VBUS_VALID && palmas_usb->linkstat != OMAP_DWC3_DCP_CHARGER) {
+				charger_type = omap_usb2_charger_detect(&palmas_usb->comparator);
+				if (charger_type == POWER_SUPPLY_TYPE_USB_DCP) {
+					status = OMAP_DWC3_DCP_CHARGER;
+					palmas_usb->linkstat = status;
+					return IRQ_HANDLED;
+				}
 				regulator_enable(palmas_usb->vbus_reg);
 				status = OMAP_DWC3_VBUS_VALID;
 				palmas_usb->linkstat = status;
@@ -145,7 +152,11 @@ static irqreturn_t palmas_vbus_wakeup_irq(int irq, void *_palmas_usb)
 			}
 			break;
 		} else if (vbus_line_state == INT3_LINE_STATE_NONE) {
-			if (palmas_usb->linkstat == OMAP_DWC3_VBUS_VALID) {
+			if (palmas_usb->linkstat == OMAP_DWC3_DCP_CHARGER) {
+				status = OMAP_DWC3_VBUS_OFF;
+				palmas_usb->linkstat = status;
+				return IRQ_HANDLED;
+			} else if (palmas_usb->linkstat == OMAP_DWC3_VBUS_VALID) {
 				regulator_disable(palmas_usb->vbus_reg);
 				status = OMAP_DWC3_VBUS_OFF;
 				palmas_usb->linkstat = status;

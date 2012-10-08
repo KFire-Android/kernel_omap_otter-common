@@ -31,6 +31,7 @@
 #include <linux/platform_device.h>
 #include <linux/mfd/omap_control.h>
 #include <linux/usb/omap4_usb_phy.h>
+#include <linux/power_supply.h>
 
 /**
  * omap4_usb_phy_power - power on/off the phy using control module reg
@@ -165,6 +166,93 @@ int omap5_usb_phy_power(struct device *dev, bool on)
 	return ret;
 }
 EXPORT_SYMBOL_GPL(omap5_usb_phy_power);
+
+int omap_usb_charger_detect(struct device *dev)
+{
+	unsigned long timeout;
+	int charger = POWER_SUPPLY_TYPE_USB;
+	u32 usb2phycore = 0, chargertype = 0;
+
+	/* enable charger detection and restart it */
+	omap_control_readl(dev, CONTROL_USB2PHYCORE, &usb2phycore);
+	usb2phycore &= ~USB2PHY_DISCHGDET;
+	usb2phycore |= USB2PHY_RESTARTCHGDET;
+	omap_control_writel(dev, usb2phycore, CONTROL_USB2PHYCORE);
+	mdelay(2);
+	omap_control_readl(dev, CONTROL_USB2PHYCORE, &usb2phycore);
+	usb2phycore &= ~USB2PHY_RESTARTCHGDET;
+	omap_control_writel(dev, usb2phycore, CONTROL_USB2PHYCORE);
+
+	timeout = jiffies + msecs_to_jiffies(CHARGER_DET_TIMEOUT);
+	do {
+		omap_control_readl(dev, CONTROL_USB2PHYCORE, &usb2phycore);
+		if (usb2phycore & (USB2PHY_CHGDETECTED|USB2PHY_CHGDETDONE)) {
+			pr_info("usb charger type detection protocol completed");
+			break;
+		}
+	msleep_interruptible(10);
+	} while (!time_after(jiffies, timeout));
+
+	chargertype = ((usb2phycore >> USB2PHY_CHG_DET_STATUS_SHIFT)
+						& USB2PHY_CHG_DET_STATUS_MASK);
+
+	switch (chargertype) {
+	case CHARGER_TYPE_WAIT:
+		pr_info("Wait state\n");
+		break;
+	case CHARGER_TYPE_NO_CONTACT:
+		pr_info("No contact\n");
+		charger = -ENODEV;
+		break;
+	case CHARGER_TYPE_PS2:
+		pr_info("PS/2 detected!\n");
+		break;
+	case CHARGER_TYPE_UNKOWN_ERR:
+		pr_info("Unknown error!\n");
+		break;
+	case CHARGER_TYPE_DEDICATED:
+		charger = POWER_SUPPLY_TYPE_USB_DCP;
+		pr_info("DCP detected\n");
+		break;
+	case CHARGER_TYPE_HOST:
+		charger = POWER_SUPPLY_TYPE_USB_CDP;
+		pr_info("CDP detected\n");
+		break;
+	case CHARGER_TYPE_PC:
+		charger = POWER_SUPPLY_TYPE_USB;
+		pr_info("PC detected\n");
+		break;
+	case CHARGER_TYPE_INTERRUPT:
+		pr_info("Interrupt\n");
+		break;
+	default:
+		pr_err("Unknown charger detected! %d\n", chargertype);
+	}
+
+	/* After detection process disable charger detection */
+	omap_control_readl(dev, CONTROL_USB2PHYCORE, &usb2phycore);
+	usb2phycore |= USB2PHY_DISCHGDET;
+	omap_control_writel(dev, usb2phycore, CONTROL_USB2PHYCORE);
+
+	return charger;
+}
+EXPORT_SYMBOL_GPL(omap_usb_charger_detect);
+
+void omap_usb_charger_enable(struct device *dev, bool on)
+{
+	u32 usb2phycore = 0;
+
+	if (on) {
+		omap_control_readl(dev, CONTROL_USB2PHYCORE, &usb2phycore);
+		usb2phycore &= ~USB2PHY_DISCHGDET;
+		omap_control_writel(dev, usb2phycore, CONTROL_USB2PHYCORE);
+	} else {
+		omap_control_readl(dev, CONTROL_USB2PHYCORE, &usb2phycore);
+		usb2phycore |= USB2PHY_DISCHGDET;
+		omap_control_writel(dev, usb2phycore, CONTROL_USB2PHYCORE);
+	}
+}
+EXPORT_SYMBOL_GPL(omap_usb_charger_enable);
 
 static int __devexit omap_usb_phy_remove(struct platform_device *pdev)
 {
