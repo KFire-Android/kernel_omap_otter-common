@@ -923,6 +923,9 @@ void musb_start(struct musb *musb)
 	musb_writeb(regs, MUSB_POWER, temp);
 
 	musb->is_active = 0;
+
+	musb_platform_enable(musb);
+
 	devctl = musb_readb(regs, MUSB_DEVCTL);
 	devctl &= ~MUSB_DEVCTL_SESSION;
 
@@ -945,7 +948,7 @@ void musb_start(struct musb *musb)
 		if ((devctl & MUSB_DEVCTL_VBUS) == MUSB_DEVCTL_VBUS)
 			musb->is_active = 1;
 	}
-	musb_platform_enable(musb);
+
 	musb_writeb(regs, MUSB_DEVCTL, devctl);
 }
 
