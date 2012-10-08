@@ -1734,6 +1734,7 @@ static int musb_gadget_pullup(struct usb_gadget *gadget, int is_on)
 {
 	struct musb	*musb = gadget_to_musb(gadget);
 	unsigned long	flags;
+	int		ret = 0;
 
 	is_on = !!is_on;
 
@@ -1743,14 +1744,37 @@ static int musb_gadget_pullup(struct usb_gadget *gadget, int is_on)
 	 * not pullup unless the B-session is active.
 	 */
 	spin_lock_irqsave(&musb->lock, flags);
+	if (!musb->allow_pullup) {
+		ret = -ECANCELED;
+		goto err;
+	}
+
 	if (is_on != musb->softconnect) {
 		musb->softconnect = is_on;
 		musb_pullup(musb, is_on);
 	}
+
+err:
 	spin_unlock_irqrestore(&musb->lock, flags);
 
 	pm_runtime_put(musb->controller);
 
+	return ret;
+}
+
+static int musb_gadget_allow_pullup(struct usb_gadget *gadget, int allow)
+{
+	struct musb	*musb = gadget_to_musb(gadget);
+	unsigned long	flags;
+
+	spin_lock_irqsave(&musb->lock, flags);
+
+	if (allow)
+		musb->allow_pullup = 1;
+	else
+		musb->allow_pullup = 0;
+
+	spin_unlock_irqrestore(&musb->lock, flags);
 	return 0;
 }
 
@@ -1766,6 +1790,7 @@ static const struct usb_gadget_ops musb_gadget_operations = {
 	/* .vbus_session		= musb_gadget_vbus_session, */
 	.vbus_draw		= musb_gadget_vbus_draw,
 	.pullup			= musb_gadget_pullup,
+	.allow_pullup		= musb_gadget_allow_pullup,
 	.udc_start		= musb_gadget_start,
 	.udc_stop		= musb_gadget_stop,
 };
@@ -1868,6 +1893,8 @@ int __devinit musb_gadget_setup(struct musb *musb)
 	musb->g.ops = &musb_gadget_operations;
 	musb->g.max_speed = USB_SPEED_HIGH;
 	musb->g.speed = USB_SPEED_UNKNOWN;
+
+	musb->allow_pullup = 1;
 
 	/* this "gadget" abstracts/virtualizes the controller */
 	dev_set_name(&musb->g.dev, "gadget");

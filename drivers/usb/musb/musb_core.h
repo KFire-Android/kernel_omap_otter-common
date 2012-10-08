@@ -432,6 +432,8 @@ struct musb {
 	unsigned		test_mode:1;
 	unsigned		softconnect:1;
 
+	unsigned		allow_pullup:1;
+
 	u8			address;
 	u8			test_mode_nr;
 	u16			ackpend;		/* ep0 */
