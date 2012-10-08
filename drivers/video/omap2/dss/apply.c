@@ -648,17 +648,47 @@ static void dss_ovl_write_regs_extra(struct omap_overlay *ovl)
 {
 	struct ovl_priv_data *op = get_ovl_priv(ovl);
 	struct mgr_priv_data *mp;
+	struct writeback_cache_data *wbc;
+	bool m2m_with_ovl = false;
+	bool m2m_with_mgr = false;
 
 	DSSDBGF("%d", ovl->id);
 
 	if (!op->extra_info_dirty)
 		return;
 
+	if (dss_has_feature(FEAT_WB)) {
+		/*
+		 * Check, if this overlay is source for wb, then ignore mgr
+		 * sources here.
+		 */
+		wbc = &dss_data.writeback_cache;
+		if (wbc->enabled && omap_dss_check_wb(wbc, ovl->id, -1)) {
+			DSSDBG("wb->enabled=%d for plane:%d\n",
+						wbc->enabled, ovl->id);
+			m2m_with_ovl = true;
+		}
+		/*
+		 * Check, if this overlay is source for manager, which is
+		 * source for wb, then ignore ovl sources.
+		 */
+		if (wbc->enabled && omap_dss_check_wb(wbc, -1, op->channel)) {
+			DSSDBG("check wb mgr wb->enabled=%d for plane:%d\n",
+							wbc->enabled, ovl->id);
+			m2m_with_mgr = true;
+		}
+	}
+
 	/* note: write also when op->enabled == false, so that the ovl gets
 	 * disabled */
 
 	dispc_ovl_enable(ovl->id, op->enabled);
-	dispc_ovl_set_channel_out(ovl->id, op->channel);
+
+	if (!m2m_with_ovl)
+		dispc_ovl_set_channel_out(ovl->id, op->channel);
+	else
+		dispc_set_wb_channel_out(ovl->id);
+
 	dispc_ovl_set_fifo_threshold(ovl->id, op->fifo_low, op->fifo_high);
 
 	mp = get_mgr_priv(ovl->manager);
@@ -822,7 +852,6 @@ static void dss_wb_ovl_enable(void)
 			case OMAP_WB_VID1:
 			case OMAP_WB_VID2:
 			case OMAP_WB_VID3:
-				dispc_ovl_enable(wbc->source - 3, true);
 				wbc->shadow_dirty = false;
 				dispc_ovl_enable(OMAP_DSS_WB, true);
 				break;
@@ -1321,9 +1350,6 @@ int omap_dss_wb_mgr_apply(struct omap_overlay_manager *mgr,
 	wbc = &dss_data.writeback_cache;
 
 	if (wb && wb->info.enabled) {
-		/* mem2mem mode not supported as of now */
-		if (wb->info.source >= OMAP_WB_GFX)
-			return -EINVAL;
 		/* if source is an overlay, mode cannot be capture */
 		if ((wb->info.source >= OMAP_WB_GFX) &&
 			(wb->info.mode != OMAP_WB_MEM2MEM_MODE))

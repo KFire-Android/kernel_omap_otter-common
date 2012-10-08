@@ -473,6 +473,7 @@ int dispc_ovl_setup(enum omap_plane plane, struct omap_overlay_info *oi,
 int dispc_ovl_enable(enum omap_plane plane, bool enable);
 void dispc_ovl_set_channel_out(enum omap_plane plane,
 		enum omap_channel channel);
+void dispc_set_wb_channel_out(enum omap_plane plane);
 
 void dispc_mgr_enable_fifohandcheck(enum omap_channel channel, bool enable);
 void dispc_mgr_set_lcd_size(enum omap_channel channel, u16 width, u16 height);
