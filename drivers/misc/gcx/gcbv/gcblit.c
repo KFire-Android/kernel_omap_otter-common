@@ -197,6 +197,17 @@ enum bverror do_blit(struct bvbltparams *bvbltparams,
 
 	GCENTER(GCZONE_BLIT);
 
+	/* 3-plane source not supported. */
+	if ((srcinfo->format.type == BVFMT_YUV) &&
+	    (srcinfo->format.cs.yuv.planecount == 3)) {
+		BVSETBLTERROR((srcinfo->index == 0)
+					? BVERR_SRC1GEOM_FORMAT
+					: BVERR_SRC2GEOM_FORMAT,
+			      "unsupported source%d format.",
+			      srcinfo->index + 1);
+		goto exit;
+	}
+
 	/* Get a shortcut to the destination surface. */
 	dstinfo = &batch->dstinfo;
 

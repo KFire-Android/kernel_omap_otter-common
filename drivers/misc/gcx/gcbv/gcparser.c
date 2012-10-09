@@ -1401,23 +1401,6 @@ enum bverror parse_destination(struct bvbltparams *bvbltparams,
 			goto exit;
 		}
 
-		/* Check for unsupported dest formats. */
-		if ((dstinfo->format.type == BVFMT_YUV) &&
-		    (dstinfo->format.cs.yuv.planecount > 1)) {
-			BVSETBLTERROR(BVERR_DSTGEOM_FORMAT,
-				      "destination format unsupported");
-			goto exit;
-		}
-
-		/* Destination stride must be 8 pixel aligned. */
-		if ((dstinfo->geom->virtstride
-				& (dstinfo->format.bitspp - 1)) != 0) {
-			BVSETBLTERROR(BVERR_DSTGEOM_STRIDE,
-				      "destination stride must be 8 pixel "
-				      "aligned.");
-			goto exit;
-		}
-
 		/* Parse orientation. */
 		dstinfo->angle = get_angle(dstinfo->geom->orientation);
 		if (dstinfo->angle == ROT_ANGLE_INVALID) {
@@ -1457,6 +1440,23 @@ enum bverror parse_destination(struct bvbltparams *bvbltparams,
 		      dstinfo->pixalign);
 		GCDBG(GCZONE_DEST, "  surface offset (bytes) = %d\n",
 		      dstinfo->bytealign);
+
+		/* Check for unsupported dest formats. */
+		if ((dstinfo->format.type == BVFMT_YUV) &&
+		    (dstinfo->format.cs.yuv.planecount > 1)) {
+			BVSETBLTERROR(BVERR_DSTGEOM_FORMAT,
+				      "destination format unsupported");
+			goto exit;
+		}
+
+		/* Destination stride must be 8 pixel aligned. */
+		if ((dstinfo->geom->virtstride
+				& (dstinfo->format.bitspp - 1)) != 0) {
+			BVSETBLTERROR(BVERR_DSTGEOM_STRIDE,
+				      "destination stride must be 8 pixel "
+				      "aligned.");
+			goto exit;
+		}
 
 		/* Validate geometry. */
 		if (!valid_geom(dstinfo)) {
@@ -1763,31 +1763,6 @@ enum bverror parse_source(struct bvbltparams *bvbltparams,
 		goto exit;
 	}
 
-	/* Source must be 8 pixel aligned. */
-	if ((srcinfo->geom->virtstride
-			& (srcinfo->format.bitspp - 1)) != 0) {
-		BVSETBLTERROR((srcinfo->index == 0)
-					? BVERR_SRC1GEOM_STRIDE
-					: BVERR_SRC2GEOM_STRIDE,
-			      "source stride must be 8 pixel aligned.");
-		goto exit;
-	}
-
-	/* Check base address alignment for planar YUV. */
-	if ((srcinfo->format.type == BVFMT_YUV) &&
-	    (srcinfo->format.cs.yuv.planecount > 1)) {
-		int pixalign;
-		pixalign = get_pixel_offset(srcinfo, 0);
-		if (pixalign != 0) {
-			BVSETBLTERROR((srcinfo->index == 0)
-					? BVERR_SRC1DESC_ALIGNMENT
-					: BVERR_SRC2DESC_ALIGNMENT,
-				      "planar YUV base address must be "
-				      "64 byte aligned.");
-			goto exit;
-		}
-	}
-
 	/* Parse orientation. */
 	srcinfo->angle = get_angle(srcinfo->geom->orientation);
 	if (srcinfo->angle == ROT_ANGLE_INVALID) {
@@ -1797,16 +1772,6 @@ enum bverror parse_source(struct bvbltparams *bvbltparams,
 			      "unsupported source%d orientation %d.",
 			      srcinfo->index + 1,
 			      srcinfo->geom->orientation);
-		goto exit;
-	}
-
-	/* Rotated YUV (packed and planar) source is not supported. */
-	if ((srcinfo->angle != ROT_ANGLE_0) &&
-	    (srcinfo->format.type == BVFMT_YUV)) {
-		BVSETBLTERROR((srcinfo->index == 0)
-					? BVERR_SRC1_ROT
-					: BVERR_SRC2_ROT,
-			      "rotation of YUV is not supported");
 		goto exit;
 	}
 
@@ -1839,6 +1804,43 @@ enum bverror parse_source(struct bvbltparams *bvbltparams,
 	/* Convert the rectangle. */
 	GCCONVERT_RECT(GCZONE_SRC,
 		       "  rect", srcrect, &srcinfo->rect);
+
+	/* Source must be 8 pixel aligned. */
+	if ((srcinfo->geom->virtstride
+			& (srcinfo->format.bitspp - 1)) != 0) {
+		BVSETBLTERROR((srcinfo->index == 0)
+					? BVERR_SRC1GEOM_STRIDE
+					: BVERR_SRC2GEOM_STRIDE,
+			      "source stride must be 8 pixel aligned.");
+		goto exit;
+	}
+
+	/* Planar YUV? */
+	if ((srcinfo->format.type == BVFMT_YUV) &&
+	    (srcinfo->format.cs.yuv.planecount > 1)) {
+		int pixalign;
+
+		/* Source rotation is not supported. */
+		if (srcinfo->angle != ROT_ANGLE_0) {
+			BVSETBLTERROR((srcinfo->index == 0)
+						? BVERR_SRC1_ROT
+						: BVERR_SRC2_ROT,
+				      "rotation of planar YUV is "
+				      "not supported");
+			goto exit;
+		}
+
+		/* Check base address alignment. */
+		pixalign = get_pixel_offset(srcinfo, 0);
+		if (pixalign != 0) {
+			BVSETBLTERROR((srcinfo->index == 0)
+						? BVERR_SRC1DESC_ALIGNMENT
+						: BVERR_SRC2DESC_ALIGNMENT,
+					"planar YUV base address must be "
+					"64 byte aligned.");
+			goto exit;
+		}
+	}
 
 	/* Validate source geometry. */
 	if (!valid_geom(srcinfo)) {
