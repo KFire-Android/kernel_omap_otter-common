@@ -769,18 +769,20 @@ int dss_ovl_check(struct omap_overlay *ovl,
 			outh = info->out_height;
 	}
 
-	if (dw < info->pos_x + outw) {
-		DSSERR("overlay %d horizontally not inside the display area "
-				"(%d + %d >= %d)\n",
-				ovl->id, info->pos_x, outw, dw);
-		return -EINVAL;
-	}
+	if (!info->wb_source) {
+		if (dw < info->pos_x + outw) {
+			DSSERR("%s: overlay %d horizontally not inside the "
+					"display area (%d + %d >= %d)\n",
+				__func__, ovl->id, info->pos_x, outw, dw);
+			return -EINVAL;
+		}
 
-	if (dh < info->pos_y + outh) {
-		DSSERR("overlay %d vertically not inside the display area "
-				"(%d + %d >= %d)\n",
-				ovl->id, info->pos_y, outh, dh);
-		return -EINVAL;
+		if (dh < info->pos_y + outh) {
+			DSSERR("%s: overlay %d vertically not inside the "
+					"display area (%d + %d >= %d)\n",
+				__func__, ovl->id, info->pos_y, outh, dh);
+			return -EINVAL;
+		}
 	}
 
 	if (dssdev->type == OMAP_DISPLAY_TYPE_DSI) {
