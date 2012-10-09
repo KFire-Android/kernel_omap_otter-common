@@ -17,6 +17,7 @@
 #define __ARCH_ARM_MACH_OMAP2_CLOCK_H
 
 #include <linux/kernel.h>
+#include <linux/clkdev.h>
 
 #include <plat/clock.h>
 
@@ -139,6 +140,8 @@ unsigned long omap4460_mpu_dpll_recalc(struct clk *clk);
 int omap5_mpu_dpll_set_rate(struct clk *clk, unsigned long rate);
 long omap5_mpu_dpll_round_rate(struct clk *clk, unsigned long rate);
 unsigned long omap5_mpu_dpll_recalc(struct clk *clk);
+
+int omap2_clks_register(struct clk_lookup *clks);
 
 extern u16 cpu_mask;
 
