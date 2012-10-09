@@ -93,15 +93,13 @@ static irqreturn_t pwron_irq(int irq, void *palmas_pwron)
 	struct input_dev *input_dev = pwron->input_dev;
 
 	cancel_delayed_work_sync(&pwron->input_work);
-	pwron->current_state = palmas_get_pwr_state(pwron);
-	if (pwron->current_state < 0)
-		return IRQ_HANDLED;
+
+	pwron->current_state = PALMAS_PWR_KEY_PRESS;
 
 	input_report_key(input_dev, KEY_POWER, pwron->current_state);
 	input_sync(input_dev);
 
-	if (pwron->current_state == PALMAS_PWR_KEY_PRESS)
-		schedule_delayed_work(&pwron->input_work, 0);
+	schedule_delayed_work(&pwron->input_work, 0);
 
 	return IRQ_HANDLED;
 }
@@ -141,7 +139,7 @@ static int __devinit palmas_pwron_probe(struct platform_device *pdev)
 
 	slave = PALMAS_BASE_TO_SLAVE(PALMAS_PMU_CONTROL_BASE);
 	addr = PALMAS_BASE_TO_REG(PALMAS_PMU_CONTROL_BASE,
-			PALMAS_PMU_CONTROL_BASE);
+				  PALMAS_LONG_PRESS_KEY);
 
 	/* 6 Seconds as the LPK_TIME Long Press Key Time */
 	regmap_update_bits(palmas->regmap[slave], addr,
@@ -156,6 +154,8 @@ static int __devinit palmas_pwron_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "Can't get IRQ for pwron: %d\n", err);
 		goto free_input_dev;
 	}
+
+	enable_irq_wake(irq);
 
 	err = input_register_device(input_dev);
 	if (err) {
@@ -182,6 +182,7 @@ static int __devexit palmas_pwron_remove(struct platform_device *pdev)
 	struct input_dev *input_dev = pwron->input_dev;
 	int irq = platform_get_irq(pdev, 0);
 
+	disable_irq_wake(irq);
 	free_irq(irq, input_dev);
 	input_unregister_device(input_dev);
 

@@ -207,6 +207,9 @@ struct omap_i2c_dev {
 	u16			westate;
 	u16			errata;
 	int			dev_lost_count;
+	bool			suspended;	/* if true - I2C device
+						   suspended and can't be
+						   accessible*/
 };
 
 static const u8 reg_map_ip_v1[] = {
@@ -643,6 +646,12 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 		return -EINVAL;
 	}
 
+	if (dev->suspended) {
+		WARN(true, "%s: Access denied - device already suspended\n",
+		     dev_name(dev->dev));
+		return -EACCES;
+	}
+
 	r = omap_i2c_hwspinlock_lock(dev);
 	/* To-Do: if we are unable to acquire the lock, we must
 	try to recover somehow */
@@ -651,7 +660,6 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 
 	r = pm_runtime_get_sync(dev->dev);
 	if (r < 0) {
-		pm_runtime_put_noidle(dev->dev);
 		goto err_pm;
 	}
 
@@ -690,8 +698,8 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 	omap_i2c_wait_for_bb(dev);
 out:
 	disable_irq(dev->irq);
-	pm_runtime_put_sync(dev->dev);
 err_pm:
+	pm_runtime_put_sync(dev->dev);
 	omap_i2c_hwspinlock_unlock(dev);
 	return r;
 }
@@ -1270,7 +1278,79 @@ static int omap_i2c_runtime_resume(struct device *dev)
 }
 #endif /* CONFIG_PM_RUNTIME */
 
+static int omap_i2c_suspend(struct device *dev)
+{
+	int ret;
+
+	/*
+	 *  Enable I2C device, so it will be accessible during
+	 * later stages of suspending when device Runtime PM is disabled.
+	 * I2C device will be turned off at "noirq" suspend stage.
+	 */
+	ret = pm_runtime_resume(dev);
+	if (ret < 0)
+		return ret;
+	return 0;
+}
+
+static int omap_i2c_suspend_noirq(struct device *dev)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct omap_i2c_dev *_dev = platform_get_drvdata(pdev);
+
+	/*
+	 * Below code is needed only to ensure that there are no
+	 * activities on I2C bus. if at this moment any driver
+	 * is trying to use I2C bus - this is the BUG and this
+	 * may cause system crash.
+	 *
+	 * So forbid access to I2C device using _dev->suspended flag.
+	 */
+
+	i2c_lock_adapter(&_dev->adapter);
+
+	/* Check for active I2C transaction */
+	if (atomic_read(&dev->power.usage_count) > 1) {
+		dev_info(dev,
+			 "active I2C transaction detected - suspend aborted\n");
+		return -EBUSY;
+	}
+
+	_dev->suspended = true;
+
+	i2c_unlock_adapter(&_dev->adapter);
+
+	/*
+	 * I2C device will be turned off by omap_device framework
+	 * on exit from .suspend_noirq() callback.
+	 * So, it will not be accessible any more.
+	 */
+	return 0;
+}
+
+static int omap_i2c_resume_noirq(struct device *dev)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct omap_i2c_dev *_dev = platform_get_drvdata(pdev);
+
+	/*
+	 * I2C device  has been turned on already by omap_device framework
+	 * unconditionally. So, it will be accessible during earlier
+	 * stages of resuming when device Runtime PM is disabled
+	 */
+
+	/* Allow access to I2C bus*/
+	i2c_lock_adapter(&_dev->adapter);
+	_dev->suspended = false;
+	i2c_unlock_adapter(&_dev->adapter);
+
+	return 0;
+}
+
 static struct dev_pm_ops omap_i2c_pm_ops = {
+	.suspend_noirq = omap_i2c_suspend_noirq,
+	.resume_noirq = omap_i2c_resume_noirq,
+	SET_SYSTEM_SLEEP_PM_OPS(omap_i2c_suspend, NULL)
 	SET_RUNTIME_PM_OPS(omap_i2c_runtime_suspend,
 			   omap_i2c_runtime_resume, NULL)
 };
