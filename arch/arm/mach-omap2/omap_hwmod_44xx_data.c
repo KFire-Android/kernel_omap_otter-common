@@ -49,6 +49,7 @@
 
 /* Backward references (IPs with Bus Master capability) */
 static struct omap_hwmod omap44xx_aess_hwmod;
+static struct omap_hwmod omap44xx_bb2d_hwmod;
 static struct omap_hwmod omap44xx_dma_system_hwmod;
 static struct omap_hwmod omap44xx_dmm_hwmod;
 static struct omap_hwmod omap44xx_dsp_hwmod;
@@ -352,6 +353,14 @@ static struct omap_hwmod_ocp_if omap44xx_dma_system__l3_main_2 = {
 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
 };
 
+/* bb2d -> l3_main_2 */
+static struct omap_hwmod_ocp_if omap44xx_bb2d__l3_main_2 = {
+	.master		= &omap44xx_bb2d_hwmod,
+	.slave		= &omap44xx_l3_main_2_hwmod,
+	.clk		= "l3_div_ck",
+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+};
+
 /* gpu -> l3_main_2 */
 static struct omap_hwmod_ocp_if omap44xx_gpu__l3_main_2 = {
 	.master		= &omap44xx_gpu_hwmod,
@@ -436,6 +445,7 @@ static struct omap_hwmod_ocp_if omap44xx_usb_otg_hs__l3_main_2 = {
 
 /* l3_main_2 slave ports */
 static struct omap_hwmod_ocp_if *omap44xx_l3_main_2_slaves[] = {
+	&omap44xx_bb2d__l3_main_2,
 	&omap44xx_dma_system__l3_main_2,
 	&omap44xx_gpu__l3_main_2,
 	&omap44xx_hsi__l3_main_2,
@@ -908,6 +918,68 @@ static struct omap_hwmod omap44xx_bandgap_hwmod = {
 	},
 	.opt_clks	= bandgap_opt_clks,
 	.opt_clks_cnt	= ARRAY_SIZE(bandgap_opt_clks),
+};
+
+/*
+ * 'bb2d' class
+ * 2d bit-blitter accelerator
+ */
+
+static struct omap_hwmod_class omap44xx_bb2d_hwmod_class = {
+	.name	= "bb2d",
+};
+
+/* bb2d */
+static struct omap_hwmod_irq_info omap44xx_bb2d_irqs[] = {
+	{ .irq = 125 + OMAP44XX_IRQ_GIC_START },
+	{ .irq = -1 }
+};
+
+static struct omap_hwmod_addr_space omap44xx_bb2d_addrs[] = {
+	{
+		.pa_start	= 0x59000000,
+		.pa_end		= 0x590007ff,
+		.flags		= ADDR_TYPE_RT
+	},
+	{ }
+};
+
+/* l3_main_2 -> bb2d */
+static struct omap_hwmod_ocp_if omap44xx_l3_main_2__bb2d = {
+	.master		= &omap44xx_l3_main_2_hwmod,
+	.slave		= &omap44xx_bb2d_hwmod,
+	.clk		= "l3_div_ck",
+	.addr		= omap44xx_bb2d_addrs,
+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+};
+
+/* bb2d master ports */
+static struct omap_hwmod_ocp_if *omap44xx_bb2d_masters[] = {
+	&omap44xx_bb2d__l3_main_2,
+};
+
+/* bb2d slave ports */
+static struct omap_hwmod_ocp_if *omap44xx_bb2d_slaves[] = {
+	&omap44xx_l3_main_2__bb2d,
+};
+
+static struct omap_hwmod omap44xx_bb2d_hwmod = {
+	.name		= "bb2d",
+	.class		= &omap44xx_bb2d_hwmod_class,
+	.mpu_irqs	= omap44xx_bb2d_irqs,
+	.main_clk	= "bb2d_fck",
+	.clkdm_name	= "l3_dss_clkdm",
+	.prcm = {
+		.omap4 = {
+			.clkctrl_offs = OMAP4_CM_DSS_BB2D_CLKCTRL_OFFSET,
+			.context_offs = OMAP4_RM_DSS_DEISS_CONTEXT_OFFSET,
+			.modulemode   = MODULEMODE_SWCTRL,
+		},
+	},
+	.slaves		= omap44xx_bb2d_slaves,
+	.slaves_cnt	= ARRAY_SIZE(omap44xx_bb2d_slaves),
+	.masters	= omap44xx_bb2d_masters,
+	.masters_cnt	= ARRAY_SIZE(omap44xx_bb2d_masters),
 };
 
 /*
@@ -6388,8 +6460,25 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
 	NULL,
 };
 
+/* OMAP447X specific h/wmods */
+static __initdata struct omap_hwmod *omap447x_hwmods[] = {
+
+	/* bb2d class */
+	&omap44xx_bb2d_hwmod,
+	/* Terminator */
+	NULL,
+};
+
 int __init omap44xx_hwmod_init(void)
 {
-	return omap_hwmod_register(omap44xx_hwmods);
+	int r;
+
+	r = omap_hwmod_register(omap44xx_hwmods);
+	WARN(r, "Failed to register 44xx common hwmods with %d\n", r);
+
+	if (cpu_is_omap447x())
+		r |=  omap_hwmod_register(omap447x_hwmods);
+
+	return r;
 }
 
