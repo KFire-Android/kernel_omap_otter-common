@@ -64,7 +64,7 @@
 #define GCZONE_DEST		(1 << 5)
 #define GCZONE_SURF		(1 << 6)
 
-GCDBG_FILTERDEF(gcfilter, GCZONE_NONE,
+GCDBG_FILTERDEF(filter, GCZONE_NONE,
 		"kernel",
 		"filter",
 		"blend",
@@ -211,11 +211,13 @@ static GC_COORD_TYPE sine(GC_COORD_TYPE x)
 		0x0FFEEBC0, 0x0FFE0FC0, 0x0FFCF3D0, 0x0FFB97E0
 	};
 
-	static const unsigned int indexwidth = 8;
-	static const unsigned int intwidth = 1;
-	static const unsigned int indexshift = intwidth
-					     + GC_COORD_FRACTION
-					     - indexwidth;
+	enum {
+		indexwidth = 8,
+		intwidth = 1,
+		indexshift = intwidth
+			   + GC_COORD_FRACTION
+			   - indexwidth
+	};
 
 	unsigned int p1, p2;
 	GC_COORD_TYPE p1x, p2x;
@@ -318,8 +320,8 @@ static GC_COORD_TYPE sinc_filter(GC_COORD_TYPE x, int radius)
 	if ((quadpitd == 1) || (quadpitd == 3))
 		normpitd = GC_COORD_PIOVER2 - normpitd;
 
-	sinpit = sine(normpit);
-	sinpitd = sine(normpitd);
+	sinpit = sine((GC_COORD_TYPE) normpit);
+	sinpitd = sine((GC_COORD_TYPE) normpitd);
 
 	/* Negate depending on the quadrant. */
 	if (negpit) {

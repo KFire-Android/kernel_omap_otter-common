@@ -60,7 +60,7 @@
 #define GCZONE_SURF		(1 << 1)
 #define GCZONE_BLIT		(1 << 3)
 
-GCDBG_FILTERDEF(gcblit, GCZONE_NONE,
+GCDBG_FILTERDEF(blit, GCZONE_NONE,
 		"blend",
 		"surf",
 		"blit")

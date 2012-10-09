@@ -64,7 +64,7 @@
 #define GCZONE_SRC		(1 << 5)
 #define GCZONE_SCALING		(1 << 6)
 
-GCDBG_FILTERDEF(gcparser, GCZONE_NONE,
+GCDBG_FILTERDEF(parser, GCZONE_NONE,
 		"format",
 		"formatverbose",
 		"blend",

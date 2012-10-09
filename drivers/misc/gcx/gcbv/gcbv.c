@@ -67,7 +67,7 @@
 #define GCZONE_CALLBACK		(1 << 8)
 #define GCZONE_TEMP		(1 << 9)
 
-GCDBG_FILTERDEF(gcbv, GCZONE_NONE,
+GCDBG_FILTERDEF(bv, GCZONE_NONE,
 		"mapping",
 		"buffer",
 		"dest",
@@ -655,13 +655,13 @@ void bv_init(void)
 	struct gcicaps gcicaps;
 	unsigned i, j;
 
-	GCDBG_REGISTER(gcbv);
-	GCDBG_REGISTER(gcparser);
-	GCDBG_REGISTER(gcmap);
-	GCDBG_REGISTER(gcbuffer);
-	GCDBG_REGISTER(gcfill);
-	GCDBG_REGISTER(gcblit);
-	GCDBG_REGISTER(gcfilter);
+	GCDBG_REGISTER(bv);
+	GCDBG_REGISTER(parser);
+	GCDBG_REGISTER(map);
+	GCDBG_REGISTER(buffer);
+	GCDBG_REGISTER(fill);
+	GCDBG_REGISTER(blit);
+	GCDBG_REGISTER(filter);
 
 	GCLOCK_INIT(&gccontext->batchlock);
 	GCLOCK_INIT(&gccontext->bufferlock);
