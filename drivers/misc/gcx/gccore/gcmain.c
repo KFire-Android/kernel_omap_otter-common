@@ -644,7 +644,7 @@ void gc_commit(struct gcicommit *gcicommit, bool fromuser)
 
 	/* Execute the buffer. */
 	gcicommit->gcerror = gcqueue_execute(gccorecontext, false,
-					    gcicommit->asynchronous);
+					     gcicommit->asynchronous);
 
 exit:
 	GCUNLOCK(&gccorecontext->mmucontextlock);

@@ -696,6 +696,7 @@ static int gccmdthread(void *_gccorecontext)
 		/* MMU error? */
 		if (try_wait_for_completion(&gcqueue->mmuerror)) {
 			static char *mmuerror[] = {
+				"  no error",
 				"  slave not present",
 				"  page not present",
 				"  write violation"
@@ -718,7 +719,7 @@ static int gccmdthread(void *_gccorecontext)
 
 				GCERR("MMU%d is at fault:\n", i);
 				if (mmucode >= countof(mmuerror))
-					GCERR("  unknown state.\n", mmucode);
+					GCERR("  unknown state %d.\n", mmucode);
 				else
 					GCERR("%s.\n", mmuerror[mmucode]);
 
