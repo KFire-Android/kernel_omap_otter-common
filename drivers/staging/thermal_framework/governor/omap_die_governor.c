@@ -49,6 +49,11 @@
 #define OMAP_MONITOR_TEMP		85000
 #define OMAP_SAFE_TEMP			25000
 
+#define OMAP_SAFE_ZONE_MAX_TREND	400
+#define OMAP_MONITOR_ZONE_MAX_TREND	250
+#define OMAP_ALERT_ZONE_MAX_TREND	150
+#define OMAP_PANIC_ZONE_MAX_TREND	50
+
 /* TODO: Define this via a configurable file */
 #define HYSTERESIS_VALUE		5000
 #define NORMAL_TEMP_MONITORING_RATE	1000
@@ -71,8 +76,9 @@ struct omap_thermal_zone {
 	int temp_upper;
 	int update_rate;
 	int average_rate;
+	int max_trend;
 };
-#define OMAP_THERMAL_ZONE(n, i, l, u, r, a)		\
+#define OMAP_THERMAL_ZONE(n, i, l, u, r, a, t)		\
 {							\
 	.name				= n,		\
 	.cooling_increment		= (i),		\
@@ -80,6 +86,7 @@ struct omap_thermal_zone {
 	.temp_upper			= (u),		\
 	.update_rate			= (r),		\
 	.average_rate			= (a),		\
+	.max_trend			= (t),		\
 }
 
 struct omap_governor {
@@ -95,11 +102,14 @@ struct omap_governor {
 	int hotspot_temp;
 	int pcb_temp;
 	bool pcb_sensor_available;
+	bool bursting;
+	bool throttle_on_burst;
 	int sensor_temp;
 	int absolute_delta;
 	int omap_gradient_slope;
 	int omap_gradient_const;
 	int prev_zone;
+	int trend;
 	int steps;
 	bool enable_debug_print;
 	/* for synchronizing actions */
@@ -110,42 +120,48 @@ struct omap_governor {
 static struct omap_thermal_zone zones_es1_0[] __initdata = {
 	OMAP_THERMAL_ZONE("safe", 0, OMAP_SAFE_TEMP, OMAP_MONITOR_TEMP,
 			FAST_TEMP_MONITORING_RATE_ES1_0,
-			NORMAL_TEMP_MONITORING_RATE),
+			NORMAL_TEMP_MONITORING_RATE, OMAP_SAFE_ZONE_MAX_TREND),
 	OMAP_THERMAL_ZONE("monitor", 0,
 			OMAP_MONITOR_TEMP - HYSTERESIS_VALUE, OMAP_ALERT_TEMP,
 			FAST_TEMP_MONITORING_RATE_ES1_0,
-			FAST_TEMP_MONITORING_RATE_ES1_0),
+			FAST_TEMP_MONITORING_RATE_ES1_0,
+			OMAP_MONITOR_ZONE_MAX_TREND),
 	OMAP_THERMAL_ZONE("alert", 0,
 			OMAP_ALERT_TEMP - HYSTERESIS_VALUE,
 			OMAP_CRITICAL_TEMP_ES1_0,
 			FAST_TEMP_MONITORING_RATE_ES1_0,
-			FAST_TEMP_MONITORING_RATE_ES1_0),
+			FAST_TEMP_MONITORING_RATE_ES1_0,
+			OMAP_ALERT_ZONE_MAX_TREND),
 	OMAP_THERMAL_ZONE("critical", 1,
 			OMAP_CRITICAL_TEMP_ES1_0 - HYSTERESIS_VALUE,
 			OMAP_SHUTDOWN_TEMP_ES1_0,
 			FAST_TEMP_MONITORING_RATE_ES1_0,
-			FAST_TEMP_MONITORING_RATE_ES1_0),
+			FAST_TEMP_MONITORING_RATE_ES1_0,
+			OMAP_PANIC_ZONE_MAX_TREND),
 };
 
 /* Initial set of thersholds for different thermal zones starting from ES2.0 */
 static struct omap_thermal_zone zones_es2_0[] __initdata = {
 	OMAP_THERMAL_ZONE("safe", 0, OMAP_SAFE_TEMP, OMAP_MONITOR_TEMP,
 			FAST_TEMP_MONITORING_RATE,
-			NORMAL_TEMP_MONITORING_RATE),
+			NORMAL_TEMP_MONITORING_RATE, OMAP_SAFE_ZONE_MAX_TREND),
 	OMAP_THERMAL_ZONE("monitor", 0,
 			OMAP_MONITOR_TEMP - HYSTERESIS_VALUE, OMAP_ALERT_TEMP,
 			FAST_TEMP_MONITORING_RATE,
-			FAST_TEMP_MONITORING_RATE),
+			FAST_TEMP_MONITORING_RATE,
+			OMAP_MONITOR_ZONE_MAX_TREND),
 	OMAP_THERMAL_ZONE("alert", 0,
 			OMAP_ALERT_TEMP - HYSTERESIS_VALUE,
 			OMAP_CRITICAL_TEMP,
 			FAST_TEMP_MONITORING_RATE,
-			FAST_TEMP_MONITORING_RATE),
+			FAST_TEMP_MONITORING_RATE,
+			OMAP_ALERT_ZONE_MAX_TREND),
 	OMAP_THERMAL_ZONE("critical", 1,
 			OMAP_CRITICAL_TEMP - HYSTERESIS_VALUE,
 			OMAP_SHUTDOWN_TEMP,
 			FAST_TEMP_MONITORING_RATE,
-			FAST_TEMP_MONITORING_RATE),
+			FAST_TEMP_MONITORING_RATE,
+			OMAP_PANIC_ZONE_MAX_TREND),
 };
 
 static struct omap_governor *omap_gov_instance[OMAP_GOV_MAX_INSTANCE];
@@ -305,8 +321,13 @@ static int omap_enter_zone(struct omap_governor *omap_gov,
 	int temp_upper;
 	int temp_lower;
 
+	omap_gov->trend =
+		thermal_lookup_trend(omap_gov->temp_sensor->domain_name);
+	omap_gov->bursting = omap_gov->trend > zone->max_trend;
+	omap_gov->throttle_on_burst = false;
+
 	/* TODO: check for stabilization */
-	if (!in_new_zone)
+	if (!in_new_zone && !omap_gov->bursting)
 		return 0;
 
 	if (list_empty(cooling_list)) {
@@ -315,11 +336,25 @@ static int omap_enter_zone(struct omap_governor *omap_gov,
 		return -ENODEV;
 	}
 
+	if (omap_gov->bursting) {
+		set_cooling_level = true;
+		omap_gov->throttle_on_burst = true;
+		pr_debug("%s(%s): throttling due to fast temp rise:\n",
+			__func__, omap_gov->thermal_fw.domain_name);
+		pr_debug("%d mC, %d mC, %d mC/ms, %d mC/ms\n",
+			cpu_temp, omap_gov->hotspot_temp, omap_gov->trend,
+			zone->max_trend);
+	}
+
 	if (set_cooling_level) {
 		if (zone->cooling_increment)
 			omap_gov->cooling_level += zone->cooling_increment;
 		else
 			omap_gov->cooling_level = 0;
+
+		if (omap_gov->throttle_on_burst)
+			omap_gov->cooling_level++;
+
 		thermal_device_call_all(cooling_list, cool_device,
 						omap_gov->cooling_level);
 	}
