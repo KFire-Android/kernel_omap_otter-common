@@ -2475,6 +2475,21 @@ static void _enable_lcd_out(enum omap_channel channel, bool enable)
 	}
 }
 
+void enable_disable_dss_mgr(enum omap_channel channel, bool enable)
+{
+	if (channel == OMAP_DSS_CHANNEL_LCD2) {
+		REG_FLD_MOD(DISPC_CONTROL2, enable ? 1 : 0, 0, 0);
+		/* flush posted write */
+		dispc_read_reg(DISPC_CONTROL2);
+	} else if (channel == OMAP_DSS_CHANNEL_LCD) {
+		REG_FLD_MOD(DISPC_CONTROL, enable ? 1 : 0, 0, 0);
+		dispc_read_reg(DISPC_CONTROL);
+	} else if (channel == OMAP_DSS_CHANNEL_DIGIT) {
+		REG_FLD_MOD(DISPC_CONTROL, enable ? 1 : 0, 1, 1);
+		dispc_read_reg(DISPC_CONTROL);
+	}
+}
+
 static void dispc_mgr_enable_lcd_out(enum omap_channel channel, bool enable)
 {
 	struct completion frame_done_completion;
