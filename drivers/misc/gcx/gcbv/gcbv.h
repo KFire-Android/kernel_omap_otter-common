@@ -380,9 +380,6 @@ struct gcblit {
 	/* Multi source enable flag. */
 	unsigned int multisrc;
 
-	/* ROP code. */
-	unsigned short rop;
-
 	/* Computed destination rectangle coordinates; in multi-source
 	 * setup can be modified to match new destination and source
 	 * geometry. */
@@ -572,6 +569,26 @@ enum bverror free_temp(bool schedule);
 enum bverror set_dst(struct bvbltparams *bltparams,
 		     struct gcbatch *batch,
 		     struct bvbuffmap *dstmap);
+
+/* Program blending. */
+enum bverror set_blending(struct bvbltparams *bvbltparams,
+			  struct gcbatch *batch,
+			  struct surfaceinfo *srcinfo);
+enum bverror set_blending_index(struct bvbltparams *bvbltparams,
+				struct gcbatch *batch,
+				struct surfaceinfo *srcinfo,
+				unsigned int index);
+
+/* Program YUV source. */
+enum bverror set_yuvsrc(struct bvbltparams *bvbltparams,
+			struct gcbatch *batch,
+			struct surfaceinfo *srcinfo,
+			struct bvbuffmap *srcmap);
+enum bverror set_yuvsrc_index(struct bvbltparams *bvbltparams,
+			      struct gcbatch *batch,
+			      struct surfaceinfo *srcinfo,
+			      struct bvbuffmap *srcmap,
+			      unsigned int index);
 
 /* Rendering entry points. */
 enum bverror do_fill(struct bvbltparams *bltparams,

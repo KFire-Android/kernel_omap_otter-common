@@ -66,6 +66,7 @@
 #define GCZONE_CACHE		(1 << 7)
 #define GCZONE_CALLBACK		(1 << 8)
 #define GCZONE_TEMP		(1 << 9)
+#define GCZONE_BLEND		(1 << 10)
 
 GCDBG_FILTERDEF(bv, GCZONE_NONE,
 		"mapping",
@@ -77,7 +78,8 @@ GCDBG_FILTERDEF(bv, GCZONE_NONE,
 		"blit",
 		"cache",
 		"callback",
-		"tempbuffer")
+		"tempbuffer",
+		"blending")
 
 
 /*******************************************************************************
@@ -542,6 +544,453 @@ exit:
 	return bverror;
 }
 
+/*******************************************************************************
+ * Program blending.
+ */
+
+enum bverror set_blending(struct bvbltparams *bvbltparams,
+			  struct gcbatch *batch,
+			  struct surfaceinfo *srcinfo)
+{
+	enum bverror bverror = BVERR_NONE;
+	struct gcmoalphaoff *gcmoalphaoff;
+	struct gcmoalpha *gcmoalpha;
+	struct gcmoglobal *gcmoglobal;
+	struct gcalpha *gca;
+
+	GCENTER(GCZONE_BLEND);
+
+	gca = srcinfo->gca;
+	if (gca == NULL) {
+		bverror = claim_buffer(bvbltparams, batch,
+				       sizeof(struct gcmoalphaoff),
+				       (void **) &gcmoalphaoff);
+		if (bverror != BVERR_NONE)
+			goto exit;
+
+		gcmoalphaoff->control_ldst = gcmoalphaoff_control_ldst[0];
+		gcmoalphaoff->control.reg = gcregalpha_off;
+
+		GCDBG(GCZONE_BLEND, "blending disabled.\n");
+	} else {
+		bverror = claim_buffer(bvbltparams, batch,
+				       sizeof(struct gcmoalpha),
+				       (void **) &gcmoalpha);
+		if (bverror != BVERR_NONE)
+			goto exit;
+
+		gcmoalpha->config_ldst = gcmoalpha_config_ldst;
+		gcmoalpha->control.reg = gcregalpha_on;
+
+		gcmoalpha->mode.raw = 0;
+		gcmoalpha->mode.reg.src_global_alpha_mode
+			= gca->src_global_alpha_mode;
+		gcmoalpha->mode.reg.dst_global_alpha_mode
+			= gca->dst_global_alpha_mode;
+
+		gcmoalpha->mode.reg.src_blend
+			= gca->srcconfig->factor_mode;
+		gcmoalpha->mode.reg.src_color_reverse
+			= gca->srcconfig->color_reverse;
+
+		gcmoalpha->mode.reg.dst_blend
+			= gca->dstconfig->factor_mode;
+		gcmoalpha->mode.reg.dst_color_reverse
+			= gca->dstconfig->color_reverse;
+
+		GCDBG(GCZONE_BLEND, "dst blend:\n");
+		GCDBG(GCZONE_BLEND, "  factor = %d\n",
+			gcmoalpha->mode.reg.dst_blend);
+		GCDBG(GCZONE_BLEND, "  inverse = %d\n",
+			gcmoalpha->mode.reg.dst_color_reverse);
+
+		GCDBG(GCZONE_BLEND, "src blend:\n");
+		GCDBG(GCZONE_BLEND, "  factor = %d\n",
+			gcmoalpha->mode.reg.src_blend);
+		GCDBG(GCZONE_BLEND, "  inverse = %d\n",
+			gcmoalpha->mode.reg.src_color_reverse);
+
+		if ((gca->src_global_alpha_mode
+			!= GCREG_GLOBAL_ALPHA_MODE_NORMAL) ||
+		    (gca->dst_global_alpha_mode
+			!= GCREG_GLOBAL_ALPHA_MODE_NORMAL)) {
+			bverror = claim_buffer(bvbltparams, batch,
+					       sizeof(struct gcmoglobal),
+					       (void **) &gcmoglobal);
+			if (bverror != BVERR_NONE)
+				goto exit;
+
+			gcmoglobal->color_ldst = gcmoglobal_color_ldst;
+			gcmoglobal->srcglobal.raw = gca->src_global_color;
+			gcmoglobal->dstglobal.raw = gca->dst_global_color;
+		}
+	}
+
+exit:
+	GCEXITARG(GCZONE_BLEND, "bv%s = %d\n",
+		  (bverror == BVERR_NONE) ? "result" : "error", bverror);
+	return bverror;
+}
+
+enum bverror set_blending_index(struct bvbltparams *bvbltparams,
+				struct gcbatch *batch,
+				struct surfaceinfo *srcinfo,
+				unsigned int index)
+{
+	enum bverror bverror = BVERR_NONE;
+	struct gcmoalphaoff *gcmoalphaoff;
+	struct gcmoxsrcalpha *gcmoxsrcalpha;
+	struct gcmoxsrcglobal *gcmoxsrcglobal;
+	struct gcalpha *gca;
+
+	GCENTER(GCZONE_BLEND);
+
+	gca = srcinfo->gca;
+	if (gca == NULL) {
+		bverror = claim_buffer(bvbltparams, batch,
+				       sizeof(struct gcmoalphaoff),
+				       (void **) &gcmoalphaoff);
+		if (bverror != BVERR_NONE)
+			goto exit;
+
+		gcmoalphaoff->control_ldst = gcmoalphaoff_control_ldst[index];
+		gcmoalphaoff->control.reg = gcregalpha_off;
+
+		GCDBG(GCZONE_BLEND, "blending disabled.\n");
+	} else {
+		bverror = claim_buffer(bvbltparams, batch,
+				       sizeof(struct gcmoxsrcalpha),
+				       (void **) &gcmoxsrcalpha);
+		if (bverror != BVERR_NONE)
+			goto exit;
+
+		gcmoxsrcalpha->control_ldst = gcmoxsrcalpha_control_ldst[index];
+		gcmoxsrcalpha->control.reg = gcregalpha_on;
+
+		gcmoxsrcalpha->mode_ldst = gcmoxsrcalpha_mode_ldst[index];
+		gcmoxsrcalpha->mode.raw = 0;
+		gcmoxsrcalpha->mode.reg.src_global_alpha_mode
+			= gca->src_global_alpha_mode;
+		gcmoxsrcalpha->mode.reg.dst_global_alpha_mode
+			= gca->dst_global_alpha_mode;
+
+		gcmoxsrcalpha->mode.reg.src_blend
+			= gca->srcconfig->factor_mode;
+		gcmoxsrcalpha->mode.reg.src_color_reverse
+			= gca->srcconfig->color_reverse;
+
+		gcmoxsrcalpha->mode.reg.dst_blend
+			= gca->dstconfig->factor_mode;
+		gcmoxsrcalpha->mode.reg.dst_color_reverse
+			= gca->dstconfig->color_reverse;
+
+		GCDBG(GCZONE_BLEND, "dst blend:\n");
+		GCDBG(GCZONE_BLEND, "  factor = %d\n",
+			gcmoxsrcalpha->mode.reg.dst_blend);
+		GCDBG(GCZONE_BLEND, "  inverse = %d\n",
+			gcmoxsrcalpha->mode.reg.dst_color_reverse);
+
+		GCDBG(GCZONE_BLEND, "src blend:\n");
+		GCDBG(GCZONE_BLEND, "  factor = %d\n",
+			gcmoxsrcalpha->mode.reg.src_blend);
+		GCDBG(GCZONE_BLEND, "  inverse = %d\n",
+			gcmoxsrcalpha->mode.reg.src_color_reverse);
+
+		if ((gca->src_global_alpha_mode
+			!= GCREG_GLOBAL_ALPHA_MODE_NORMAL) ||
+		    (gca->dst_global_alpha_mode
+			!= GCREG_GLOBAL_ALPHA_MODE_NORMAL)) {
+			bverror = claim_buffer(bvbltparams, batch,
+					       sizeof(struct gcmoxsrcglobal),
+					       (void **) &gcmoxsrcglobal);
+			if (bverror != BVERR_NONE)
+				goto exit;
+
+			gcmoxsrcglobal->srcglobal_ldst
+				= gcmoxsrcglobal_srcglobal_ldst[index];
+			gcmoxsrcglobal->srcglobal.raw = gca->src_global_color;
+
+			gcmoxsrcglobal->dstglobal_ldst
+				= gcmoxsrcglobal_dstglobal_ldst[index];
+			gcmoxsrcglobal->dstglobal.raw = gca->dst_global_color;
+		}
+	}
+
+exit:
+	GCEXITARG(GCZONE_BLEND, "bv%s = %d\n",
+		  (bverror == BVERR_NONE) ? "result" : "error", bverror);
+	return bverror;
+}
+
+/*******************************************************************************
+ * Program YUV source.
+ */
+
+enum bverror set_yuvsrc(struct bvbltparams *bvbltparams,
+			struct gcbatch *batch,
+			struct surfaceinfo *srcinfo,
+			struct bvbuffmap *srcmap)
+{
+	enum bverror bverror = BVERR_NONE;
+	struct gcmoyuv1 *gcmoyuv1;
+	struct gcmoyuv2 *gcmoyuv2;
+	struct gcmoyuv3 *gcmoyuv3;
+	int ushift, vshift;
+	unsigned int srcheight;
+
+	GCENTER(GCZONE_SRC);
+
+	GCDBG(GCZONE_SRC, "plane count %d.\n",
+	      srcinfo->format.cs.yuv.planecount);
+
+	switch (srcinfo->format.cs.yuv.planecount) {
+	case 1:
+		bverror = claim_buffer(bvbltparams, batch,
+				       sizeof(struct gcmoyuv1),
+				       (void **) &gcmoyuv1);
+		if (bverror != BVERR_NONE)
+			goto exit;
+
+		gcmoyuv1->pectrl_ldst = gcmoyuv_pectrl_ldst;
+		gcmoyuv1->pectrl.raw = 0;
+		gcmoyuv1->pectrl.reg.standard
+			= srcinfo->format.cs.yuv.std;
+		gcmoyuv1->pectrl.reg.swizzle
+			= srcinfo->format.swizzle;
+		gcmoyuv1->pectrl.reg.convert
+			= GCREG_PE_CONTROL_YUVRGB_DISABLED;
+		break;
+
+	case 2:
+		bverror = claim_buffer(bvbltparams, batch,
+					sizeof(struct gcmoyuv2),
+					(void **) &gcmoyuv2);
+		if (bverror != BVERR_NONE)
+			goto exit;
+
+		gcmoyuv2->pectrl_ldst = gcmoyuv_pectrl_ldst;
+		gcmoyuv2->pectrl.raw = 0;
+		gcmoyuv2->pectrl.reg.standard
+			= srcinfo->format.cs.yuv.std;
+		gcmoyuv2->pectrl.reg.swizzle
+			= srcinfo->format.swizzle;
+		gcmoyuv2->pectrl.reg.convert
+			= GCREG_PE_CONTROL_YUVRGB_DISABLED;
+
+		srcheight = ((srcinfo->angle % 2) == 0)
+			  ? srcinfo->geom->height
+			  : srcinfo->geom->width;
+
+		ushift = srcinfo->bytealign
+		       + srcinfo->geom->virtstride
+		       * srcheight;
+		GCDBG(GCZONE_SRC, "ushift = 0x%08X (%d)\n",
+		      ushift, ushift);
+
+		add_fixup(bvbltparams, batch, &gcmoyuv2->uplaneaddress,
+			  ushift);
+
+		gcmoyuv2->plane_ldst = gcmoyuv2_plane_ldst;
+		gcmoyuv2->uplaneaddress = GET_MAP_HANDLE(srcmap);
+		gcmoyuv2->uplanestride  = srcinfo->geom->virtstride;
+		break;
+
+	case 3:
+		bverror = claim_buffer(bvbltparams, batch,
+					sizeof(struct gcmoyuv3),
+					(void **) &gcmoyuv3);
+		if (bverror != BVERR_NONE)
+			goto exit;
+
+		gcmoyuv3->pectrl_ldst = gcmoyuv_pectrl_ldst;
+		gcmoyuv3->pectrl.raw = 0;
+		gcmoyuv3->pectrl.reg.standard
+			= srcinfo->format.cs.yuv.std;
+		gcmoyuv3->pectrl.reg.swizzle
+			= srcinfo->format.swizzle;
+		gcmoyuv3->pectrl.reg.convert
+			= GCREG_PE_CONTROL_YUVRGB_DISABLED;
+
+		srcheight = ((srcinfo->angle % 2) == 0)
+			  ? srcinfo->geom->height
+			  : srcinfo->geom->width;
+
+		ushift = srcinfo->bytealign
+		       + srcinfo->geom->virtstride
+		       * srcheight;
+		vshift = ushift
+		       + srcinfo->geom->virtstride
+		       * srcheight / 4;
+
+		GCDBG(GCZONE_SRC, "ushift = 0x%08X (%d)\n",
+		      ushift, ushift);
+		GCDBG(GCZONE_SRC, "vshift = 0x%08X (%d)\n",
+		      vshift, vshift);
+
+		add_fixup(bvbltparams, batch, &gcmoyuv3->uplaneaddress,
+			  ushift);
+		add_fixup(bvbltparams, batch, &gcmoyuv3->vplaneaddress,
+			  vshift);
+
+		gcmoyuv3->plane_ldst = gcmoyuv3_plane_ldst;
+		gcmoyuv3->uplaneaddress = GET_MAP_HANDLE(srcmap);
+		gcmoyuv3->uplanestride  = srcinfo->geom->virtstride / 2;
+		gcmoyuv3->vplaneaddress = GET_MAP_HANDLE(srcmap);
+		gcmoyuv3->vplanestride  = srcinfo->geom->virtstride / 2;
+		break;
+
+	default:
+		GCERR("invlaid plane count %d.\n",
+		      srcinfo->format.cs.yuv.planecount);
+	}
+
+exit:
+	GCEXITARG(GCZONE_SRC, "bv%s = %d\n",
+		  (bverror == BVERR_NONE) ? "result" : "error", bverror);
+	return bverror;
+}
+
+enum bverror set_yuvsrc_index(struct bvbltparams *bvbltparams,
+			      struct gcbatch *batch,
+			      struct surfaceinfo *srcinfo,
+			      struct bvbuffmap *srcmap,
+			      unsigned int index)
+{
+	enum bverror bverror = BVERR_NONE;
+	struct gcmoxsrcyuv1 *gcmoxsrcyuv1;
+	struct gcmoxsrcyuv2 *gcmoxsrcyuv2;
+	struct gcmoxsrcyuv3 *gcmoxsrcyuv3;
+	int ushift, vshift;
+	unsigned int srcheight;
+
+	GCENTER(GCZONE_SRC);
+
+	GCDBG(GCZONE_SRC, "plane count %d.\n",
+	      srcinfo->format.cs.yuv.planecount);
+
+	switch (srcinfo->format.cs.yuv.planecount) {
+	case 1:
+		bverror = claim_buffer(bvbltparams, batch,
+				       sizeof(struct gcmoxsrcyuv1),
+				       (void **) &gcmoxsrcyuv1);
+		if (bverror != BVERR_NONE)
+			goto exit;
+
+		gcmoxsrcyuv1->pectrl_ldst
+			= gcmoxsrcyuv_pectrl_ldst[index];
+		gcmoxsrcyuv1->pectrl.raw = 0;
+		gcmoxsrcyuv1->pectrl.reg.standard
+			= srcinfo->format.cs.yuv.std;
+		gcmoxsrcyuv1->pectrl.reg.swizzle
+			= srcinfo->format.swizzle;
+		gcmoxsrcyuv1->pectrl.reg.convert
+			= GCREG_PE_CONTROL_YUVRGB_DISABLED;
+		break;
+
+	case 2:
+		bverror = claim_buffer(bvbltparams, batch,
+					sizeof(struct gcmoxsrcyuv2),
+					(void **) &gcmoxsrcyuv2);
+		if (bverror != BVERR_NONE)
+			goto exit;
+
+		gcmoxsrcyuv2->pectrl_ldst
+			= gcmoxsrcyuv_pectrl_ldst[index];
+		gcmoxsrcyuv2->pectrl.raw = 0;
+		gcmoxsrcyuv2->pectrl.reg.standard
+			= srcinfo->format.cs.yuv.std;
+		gcmoxsrcyuv2->pectrl.reg.swizzle
+			= srcinfo->format.swizzle;
+		gcmoxsrcyuv2->pectrl.reg.convert
+			= GCREG_PE_CONTROL_YUVRGB_DISABLED;
+
+		srcheight = ((srcinfo->angle % 2) == 0)
+			  ? srcinfo->geom->height
+			  : srcinfo->geom->width;
+
+		ushift = srcinfo->bytealign
+		       + srcinfo->geom->virtstride
+		       * srcheight;
+		GCDBG(GCZONE_SRC, "ushift = 0x%08X (%d)\n",
+		      ushift, ushift);
+
+		add_fixup(bvbltparams, batch, &gcmoxsrcyuv2->uplaneaddress,
+			  ushift);
+
+		gcmoxsrcyuv2->uplaneaddress_ldst
+			= gcmoxsrcyuv_uplaneaddress_ldst[index];
+		gcmoxsrcyuv2->uplaneaddress = GET_MAP_HANDLE(srcmap);
+
+		gcmoxsrcyuv2->uplanestride_ldst
+			= gcmoxsrcyuv_uplanestride_ldst[index];
+		gcmoxsrcyuv2->uplanestride = srcinfo->geom->virtstride;
+		break;
+
+	case 3:
+		bverror = claim_buffer(bvbltparams, batch,
+					sizeof(struct gcmoxsrcyuv3),
+					(void **) &gcmoxsrcyuv3);
+		if (bverror != BVERR_NONE)
+			goto exit;
+
+		gcmoxsrcyuv3->pectrl_ldst
+			= gcmoxsrcyuv_pectrl_ldst[index];
+		gcmoxsrcyuv3->pectrl.raw = 0;
+		gcmoxsrcyuv3->pectrl.reg.standard
+			= srcinfo->format.cs.yuv.std;
+		gcmoxsrcyuv3->pectrl.reg.swizzle
+			= srcinfo->format.swizzle;
+		gcmoxsrcyuv3->pectrl.reg.convert
+			= GCREG_PE_CONTROL_YUVRGB_DISABLED;
+
+		srcheight = ((srcinfo->angle % 2) == 0)
+			  ? srcinfo->geom->height
+			  : srcinfo->geom->width;
+
+		ushift = srcinfo->bytealign
+		       + srcinfo->geom->virtstride
+		       * srcheight;
+		vshift = ushift
+		       + srcinfo->geom->virtstride
+		       * srcheight / 4;
+
+		GCDBG(GCZONE_SRC, "ushift = 0x%08X (%d)\n",
+		      ushift, ushift);
+		GCDBG(GCZONE_SRC, "vshift = 0x%08X (%d)\n",
+		      vshift, vshift);
+
+		add_fixup(bvbltparams, batch, &gcmoxsrcyuv3->uplaneaddress,
+			  ushift);
+		add_fixup(bvbltparams, batch, &gcmoxsrcyuv3->vplaneaddress,
+			  vshift);
+
+		gcmoxsrcyuv3->uplaneaddress_ldst
+			= gcmoxsrcyuv_uplaneaddress_ldst[index];
+		gcmoxsrcyuv3->uplaneaddress = GET_MAP_HANDLE(srcmap);
+
+		gcmoxsrcyuv3->uplanestride_ldst
+			= gcmoxsrcyuv_uplanestride_ldst[index];
+		gcmoxsrcyuv3->uplanestride  = srcinfo->geom->virtstride / 2;
+
+		gcmoxsrcyuv3->vplaneaddress_ldst
+			= gcmoxsrcyuv_vplaneaddress_ldst[index];
+		gcmoxsrcyuv3->vplaneaddress = GET_MAP_HANDLE(srcmap);
+
+		gcmoxsrcyuv3->vplanestride_ldst
+			= gcmoxsrcyuv_vplanestride_ldst[index];
+		gcmoxsrcyuv3->vplanestride  = srcinfo->geom->virtstride / 2;
+		break;
+
+	default:
+		GCERR("invlaid plane count %d.\n",
+		      srcinfo->format.cs.yuv.planecount);
+	}
+
+exit:
+	GCEXITARG(GCZONE_SRC, "bv%s = %d\n",
+		  (bverror == BVERR_NONE) ? "result" : "error", bverror);
+	return bverror;
+}
 
 /*******************************************************************************
  * Surface compare and validation.
