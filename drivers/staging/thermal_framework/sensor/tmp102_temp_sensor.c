@@ -263,8 +263,14 @@ static int __devinit tmp102_temp_sensor_probe(
 
 	tmp102->therm_fw = kzalloc(sizeof(struct thermal_dev), GFP_KERNEL);
 	if (tmp102->therm_fw) {
-		tmp102->therm_fw->name = "tmp102_sensor";
-		tmp102->therm_fw->domain_name = "pcb";
+		char tmp[30];
+
+		snprintf(tmp, sizeof(tmp), "%s.%d", client->name,
+			 client->addr);
+		tmp102->therm_fw->name = kstrdup(tmp, GFP_KERNEL);
+		tmp102->therm_fw->domain_name =
+				kstrdup(tmp102_platform_data->domain,
+					GFP_KERNEL);
 
 		tmp102->therm_fw->dev = tmp102->dev;
 		tmp102->therm_fw->dev_ops = &tmp102_temp_sensor_ops;
@@ -315,6 +321,8 @@ static int __devexit tmp102_temp_sensor_remove(struct i2c_client *client)
 	}
 
 free_drv:
+	kfree(tmp102->therm_fw->name);
+	kfree(tmp102->therm_fw->domain);
 	kfree(tmp102->therm_fw);
 	kfree(tmp102);
 

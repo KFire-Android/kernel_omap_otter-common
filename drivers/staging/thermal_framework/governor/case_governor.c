@@ -25,8 +25,8 @@
 #include <linux/thermal_framework.h>
 
 /* System/Case Thermal thresholds */
-#define SYS_THRESHOLD_HOT		65000
-#define SYS_THRESHOLD_COLD		64000
+#define SYS_THRESHOLD_HOT		62000
+#define SYS_THRESHOLD_COLD		57000
 #define SYS_THRESHOLD_HOT_INC		500
 #define INIT_COOLING_LEVEL		0
 #define CASE_SUBZONES_NUMBER		4
@@ -45,10 +45,11 @@ struct case_governor {
 static struct thermal_dev *therm_fw;
 static struct case_governor *case_gov;
 
-static void case_reached_max_state(void)
+static void case_reached_max_state(int temp)
 {
-	/* we have done everything that could be done so far, giving up */
-	orderly_poweroff(true);
+	pr_emerg("%s: restart due to thermal case policy (temp == %d)\n",
+		 __func__, temp);
+	kernel_restart(NULL);
 }
 
 /**
@@ -76,27 +77,71 @@ static void case_reached_max_state(void)
 
 static int case_thermal_manager(struct list_head *cooling_list, int temp)
 {
-	if (temp >= sys_threshold_hot) {
-		case_gov->cooling_level++;
-		thot += SYS_THRESHOLD_HOT_INC;
-		pr_info("%s:syst temp >= thot thot set to %d", __func__, thot);
-		if (case_gov->cooling_level >= CASE_MAX_COOLING_ACTION)
-			case_reached_max_state();
-	} else if (temp < sys_threshold_cold) {
+	pr_debug("%s: temp: %d thot: %d level: %d sys_thot: %d sys_tcold: %d",
+		 __func__, temp, thot, case_gov->cooling_level,
+		 sys_threshold_hot, sys_threshold_cold);
+
+	if (temp < sys_threshold_cold) {
 		case_gov->cooling_level = INIT_COOLING_LEVEL;
 		/* We want to be notified on the first subzone */
 		thot = sys_threshold_cold;
-		pr_info("%s: syst temp =< tcold thot set to %d", __func__,
-									thot);
-	} else {
+		tcold = sys_threshold_cold;
+
+		pr_debug("%s: temp: %d < sys_threshold_cold, thot: %d:%d (%d)",
+			 __func__, temp, thot, tcold, case_gov->cooling_level);
+
+		goto update;
+	}
+
+	/* no need to update here */
+	if (tcold <= temp && temp <= thot)
+		return 0;
+
+	if (temp >= sys_threshold_hot) {
+		if (temp < tcold) {
+			case_gov->cooling_level--;
+			thot = tcold;
+			tcold -= SYS_THRESHOLD_HOT_INC;
+		} else { /* temp > thot */
+			case_gov->cooling_level++;
+			tcold = thot;
+			thot += SYS_THRESHOLD_HOT_INC;
+		}
+
+		pr_debug("%s: temp: %d >= sys_threshold_hot, thot: %d:%d (%d)",
+			 __func__, temp, thot, tcold, case_gov->cooling_level);
+
+		if (case_gov->cooling_level >= CASE_MAX_COOLING_ACTION)
+			case_reached_max_state(temp);
+	} else if (temp > thot) { /* sys_thot > temp > sys_tcold */
 		case_gov->cooling_level++;
+		tcold = thot;
 		thot = sys_threshold_cold +
 			((sys_threshold_hot - sys_threshold_cold) /
 			 case_subzone_number) *
 			case_gov->cooling_level;
-		pr_info("%s: sys_threshold_hot >= syst temp>= tcold thot set to %d",
-			__func__, thot);
+
+		pr_debug("%s: sys_thot >= temp: %d >= sys_tcold, %d:%d (%d)",
+			 __func__, temp, thot, tcold, case_gov->cooling_level);
+	} else if (temp < tcold) {
+		/* coming from Tj > sys_threshold_hot */
+		if (case_gov->cooling_level > case_subzone_number) {
+			case_gov->cooling_level = case_subzone_number;
+			/*
+			 * simplifying computation. from here we won't
+			 * change tcold or thot, unless we cross again
+			 * sys_threshold_hot.
+			 */
+			thot = sys_threshold_hot;
+			tcold = sys_threshold_cold;
+
+			pr_debug("%s: sys_thot >= temp: %d reseting %d:%d (%d)",
+				 __func__, temp, thot, tcold,
+				 case_gov->cooling_level);
+		}
 	}
+
+update:
 	thermal_device_call_all(cooling_list, cool_device,
 						case_gov->cooling_level);
 	thermal_device_call(case_gov->temp_sensor, set_temp_thresh,

@@ -283,10 +283,12 @@ static int cpufreq_apply_cooling(struct thermal_dev *dev, int cooling_level)
 	mutex_lock(&omap_cpufreq_lock);
 
 	if (!strcmp(dev->domain_name, "case")) {
-		if (cooling_level > case_subzone_number)
-			case_cooling_level++;
-		if (cooling_level == 0)
-			case_cooling_level = 0;
+		int tmp;
+
+		tmp = cooling_level - case_subzone_number;
+		if (tmp < 0)
+			tmp = 0;
+		case_cooling_level = tmp;
 	} else {
 		cpu_cooling_level = cooling_level;
 	}
