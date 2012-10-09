@@ -538,7 +538,9 @@ void dsscomp_dbg_gralloc(struct seq_file *s)
 	struct dsscomp_gralloc_t *g;
 	struct tiler1d_slot *t;
 	struct dsscomp *c;
-
+#ifdef CONFIG_DSSCOMP_DEBUG_LOG
+		int i;
+#endif
 
 	mutex_lock(&dbg_mtx);
 	seq_printf(s, "ACTIVE GRALLOC FLIPS\n\n");
@@ -568,7 +570,6 @@ void dsscomp_dbg_gralloc(struct seq_file *s)
 					   log_state_str(c->state));
 		}
 #ifdef CONFIG_DSSCOMP_DEBUG_LOG
-		int i;
 		for (i = 0; i < ARRAY_SIZE(c->dbg_log); i++) {
 			int go = false;
 			seq_printf(s, "\n  ");
