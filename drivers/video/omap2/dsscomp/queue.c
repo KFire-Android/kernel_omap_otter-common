@@ -255,11 +255,7 @@ int dsscomp_set_ovl(struct dsscomp *comp, struct dss2_ovl_info *ovl)
 
 		/* and disabled (unless forced) if on another manager */
 		o = cdev->ovls[ovl->cfg.ix];
-		if (ovl->cfg.ix == OMAP_DSS_WB) {
-			struct omap_writeback *wb = cdev->wb_ovl;
-			if (wb && wb->info.enabled && wb->info.source != ix)
-				goto done;
-		} else {
+		if (ovl->cfg.ix != OMAP_DSS_WB) {
 			if (o->is_enabled(o) &&
 			   (!o->manager || o->manager->id != ix))
 				goto done;
@@ -470,7 +466,6 @@ static int dsscomp_apply(struct dsscomp *comp)
 	struct dsscomp_setup_mgr_data *d;
 	u32 oix;
 	bool cb_programmed = false;
-	struct omap_writeback *wb = cdev->wb_ovl;
 	bool wb_apply = false;
 
 	struct omapdss_ovl_cb cb = {
@@ -519,17 +514,10 @@ static int dsscomp_apply(struct dsscomp *comp)
 		}
 
 		if (oi->cfg.ix == OMAP_DSS_WB) {
-			enum omap_writeback_source src;
-			if (wb->info.enabled &&
-				wb->info.source != (int)mgr->id) {
-				dmask |= 1 << oi->cfg.ix;
-				continue;
-			}
 			/* update status of WB */
 			wb_apply = true;
-			src = mgr->id;
 
-			r = set_dss_wb_info(oi, src);
+			r = set_dss_wb_info(oi);
 		} else {
 			ovl = cdev->ovls[oi->cfg.ix];
 
