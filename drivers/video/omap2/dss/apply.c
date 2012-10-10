@@ -709,7 +709,7 @@ static void dss_mgr_write_regs(struct omap_overlay_manager *mgr)
 
 	DSSDBGF("%d", mgr->id);
 
-	if (!mp->enabled)
+	if (!mp->enabled && !mp->info.wb_only)
 		return;
 
 	WARN_ON(mp->busy);
@@ -776,7 +776,8 @@ static void dss_write_regs(void)
 		mp = get_mgr_priv(mgr);
 
 		if (!mp->enabled || mgr_manual_update(mgr) || mp->busy)
-			continue;
+			if (!mp->info.wb_only)
+				continue;
 
 		r = dss_check_settings(mgr, mgr->device);
 		if (r) {
@@ -1304,9 +1305,12 @@ int omap_dss_mgr_apply(struct omap_overlay_manager *mgr)
 {
 	unsigned long flags;
 	struct omap_overlay *ovl;
+	struct omap_overlay_manager_info info;
 	int r;
 
 	DSSDBG("omap_dss_mgr_apply(%s)\n", mgr->name);
+
+	mgr->get_manager_info(mgr, &info);
 
 	spin_lock_irqsave(&data_lock, flags);
 
@@ -1314,34 +1318,52 @@ int omap_dss_mgr_apply(struct omap_overlay_manager *mgr)
 		pr_info_ratelimited("cannot aply mgr(%s)--invalid device\n",
 				mgr->name);
 		r = -ENODEV;
-		spin_unlock_irqrestore(&data_lock, flags);
-		return r;
+		goto done;
 	}
 
 	r = dss_check_settings_apply(mgr, mgr->device);
 	if (r) {
-		spin_unlock_irqrestore(&data_lock, flags);
 		DSSERR("failed to apply settings: illegal configuration.\n");
-		return r;
+		goto done;
 	}
 
 	/* Configure overlays */
 	list_for_each_entry(ovl, &mgr->overlays, list)
 		omap_dss_mgr_apply_ovl(ovl);
 
-	if (mgr->device->state != OMAP_DSS_DISPLAY_ACTIVE) {
+	if (mgr->device->state != OMAP_DSS_DISPLAY_ACTIVE && !info.wb_only) {
+		struct writeback_cache_data *wbc;
+
+		if (dss_has_feature(FEAT_WB))
+			wbc = &dss_data.writeback_cache;
+		else
+			wbc = NULL;
+
+		/* in case, if WB was configured with MEM2MEM with manager
+		 * mode, but manager, which is source for WB, is not marked as
+		 * wb_only, then skip apply operation. We have such case, when
+		 * composition was sent to disable pipes, which are sources for
+		 * WB.
+		 */
+		if (wbc && wbc->mode == OMAP_WB_MEM2MEM_MODE &&
+			(int)wbc->source == (int)mgr->id && mgr->device &&
+			mgr->device->state != OMAP_DSS_DISPLAY_ACTIVE) {
+			r = 0;
+			goto done;
+		}
+
 		pr_info_ratelimited("cannot apply mgr(%s) on inactive device\n",
 				mgr->name);
 		r = -ENODEV;
-		spin_unlock_irqrestore(&data_lock, flags);
-		return r;
+		goto done;
 	}
+
 	/* Configure manager */
 	omap_dss_mgr_apply_mgr(mgr);
-
+done:
 	spin_unlock_irqrestore(&data_lock, flags);
 
-	return 0;
+	return r;
 }
 
 int omap_dss_wb_mgr_apply(struct omap_overlay_manager *mgr,
@@ -1354,6 +1376,17 @@ int omap_dss_wb_mgr_apply(struct omap_overlay_manager *mgr,
 	if (!wb) {
 		printk(KERN_ERR "[%s][%d] No WB!\n", __FILE__, __LINE__);
 		return -EINVAL;
+	}
+
+	/* skip composition, if manager is enabled. It happens when HDMI/TV
+	 * physical layer is activated in the time, when MEM2MEM with manager
+	 * mode is used.
+	 */
+	if (wb->info.source == OMAP_WB_TV &&
+			dispc_mgr_is_enabled(OMAP_DSS_CHANNEL_DIGIT) &&
+				wb->info.mode == OMAP_WB_MEM2MEM_MODE) {
+		DSSERR("manager %d busy, dropping\n", mgr->id);
+		return -EBUSY;
 	}
 
 	spin_lock_irqsave(&data_lock, flags);

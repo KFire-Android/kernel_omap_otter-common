@@ -748,11 +748,26 @@ int dss_ovl_check(struct omap_overlay *ovl,
 {
 	u16 outw, outh;
 	u16 dw, dh;
+	struct omap_writeback_info wb_info;
+	struct omap_writeback *wb;
+
 
 	if (dssdev == NULL)
 		return 0;
 
-	dssdev->driver->get_resolution(dssdev, &dw, &dh);
+	wb = omap_dss_get_wb(0);
+	if (wb) {
+		wb->get_wb_info(wb, &wb_info);
+
+		if (wb_info.enabled && wb_info.mode == OMAP_WB_MEM2MEM_MODE &&
+				(int)ovl->manager->id == (int)wb_info.source) {
+			dw = wb_info.width;
+			dh = wb_info.height;
+		} else
+			dssdev->driver->get_resolution(dssdev, &dw, &dh);
+	} else
+		dssdev->driver->get_resolution(dssdev, &dw, &dh);
+
 
 	if ((ovl->caps & OMAP_DSS_OVL_CAP_SCALE) == 0) {
 		outw = info->width;

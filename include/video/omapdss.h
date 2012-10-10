@@ -575,6 +575,9 @@ struct omap_overlay_manager_info {
 
 	bool partial_alpha_enabled;
 
+	/* if true, manager is used in MEM2MEM mode */
+	bool wb_only;
+
 	bool cpr_enable;
 	struct omap_dss_cpr_coefs cpr_coefs;
 
