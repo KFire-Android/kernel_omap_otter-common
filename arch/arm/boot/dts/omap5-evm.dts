@@ -136,11 +136,13 @@
 
 &mmc1 {
 	vmmc-supply = <&vmmcsd_fixed>;
+	vmmc-aux-supply = <&ldo9_reg>;
 	bus-width = <4>;
 };
 
 &mmc2 {
 	vmmc-supply = <&vmmcsd_fixed>;
+	vmmc-aux-supply = <&ldo9_reg>;
 	bus-width = <8>;
 	ti,non-removable;
 };
