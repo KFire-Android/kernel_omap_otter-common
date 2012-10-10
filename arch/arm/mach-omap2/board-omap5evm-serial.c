@@ -127,7 +127,9 @@ static struct omap_uart_port_info uart5_info __initdata = {
 
 void __init omap5_board_serial_init(void)
 {
-	omap_serial_init_port(&uart1_board_data, &uart1_info);
+	if (omap_rev() < OMAP5432_REV_ES1_0)
+		omap_serial_init_port(&uart1_board_data, &uart1_info);
+
 	omap_serial_init_port(&uart3_board_data, &uart3_info);
 	omap_serial_init_port(&uart5_board_data, &uart5_info);
 }
