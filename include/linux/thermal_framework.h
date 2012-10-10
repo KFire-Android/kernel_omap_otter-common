@@ -170,9 +170,12 @@ extern int thermal_governor_dev_register(struct thermal_dev *tdev);
 extern void thermal_governor_dev_unregister(struct thermal_dev *tdev);
 extern int thermal_check_domain(const char *domain_name);
 #else
-static int thermal_insert_cooling_action(struct thermal_dev *tdev,
+static inline int thermal_insert_cooling_action(struct thermal_dev *tdev,
 					 unsigned int priority,
-					 unsigned int reduction);
+					 unsigned int reduction)
+{
+	return 0;
+}
 static inline int thermal_request_temp(struct thermal_dev *tdev)
 {
 	return 0;
