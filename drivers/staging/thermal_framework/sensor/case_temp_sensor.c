@@ -299,7 +299,7 @@ static int __devinit case_temp_sensor_probe(struct platform_device *pdev)
 	temp_sensor->therm_fw = kzalloc(sizeof(struct thermal_dev), GFP_KERNEL);
 	if (temp_sensor->therm_fw) {
 		temp_sensor->therm_fw->name = "case_sensor";
-		temp_sensor->therm_fw->domain_name = pdata->source_domain;
+		temp_sensor->therm_fw->domain_name = "case";
 		temp_sensor->therm_fw->dev = temp_sensor->dev;
 		temp_sensor->therm_fw->dev_ops = &case_sensor_ops;
 		thermal_sensor_dev_register(temp_sensor->therm_fw);
@@ -319,7 +319,7 @@ static int __devinit case_temp_sensor_probe(struct platform_device *pdev)
 	else
 		temp_sensor->average_number = pdata->average_number;
 
-	temp_sensor->work_delay = pdata->average_number;
+	temp_sensor->work_delay = pdata->report_delay_ms;
 	schedule_work(&temp_sensor->case_sensor_work.work);
 
 	dev_info(&pdev->dev, "%s: Initialised\n", temp_sensor->therm_fw->name);
