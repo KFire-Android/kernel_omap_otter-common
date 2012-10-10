@@ -26,5 +26,5 @@ static inline void __init omap5evm_modem_init(bool force_mux) { }
 #endif
 
 extern void omap5_board_serial_init(void);
-
+void sevm_android_display_setup(void);
 #endif
