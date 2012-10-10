@@ -24,8 +24,10 @@
 #include "clock44xx.h"
 #include "clock54xx.h"
 
-#define OMAP4_L3_OPP50_RATE 100000000
-#define OMAP5_L3_OPP50_RATE 133000000
+#define OMAP4_L3_OPP50_RATE	100000000
+#define OMAP4470_L3_OPP50_RATE	116666666
+#define OMAP4470_LP_OPP_SET_CORE_DPLL_FREQ	1600000000
+#define OMAP5_L3_OPP50_RATE	133000000
 
 #define CLK_SCALE_DOWN					0
 #define CLK_SCALE_NONE					1
@@ -156,6 +158,52 @@ static struct virt_l3_clk_data omap4_virt_l3_clk_data[] = {
 	},
 	{	.opp50_rate = 400000000,
 		.opp100_rate = 800000000,
+		.clk_name	=  "dpll_core_m2_ck"
+	},
+	{	.opp50_rate = 0,
+		.opp100_rate = 0,
+		.clk_name	=  NULL
+	},
+};
+
+static struct virt_l3_clk_data omap4470_low_virt_l3_clk_data[] = {
+	{	.opp50_rate = 200000000,
+		.opp100_rate = 320000000,
+		.clk_name	=  "dpll_core_m3x2_ck"
+	},
+	{	.opp50_rate = 200000000,
+		.opp100_rate = 266600000,
+		.clk_name	=  "dpll_core_m6x2_ck"
+	},
+	{	.opp50_rate = 192000000,
+		.opp100_rate = 256000000,
+		.clk_name	=  "dpll_per_m3x2_ck"
+	},
+	{	.opp50_rate = 400000000,
+		.opp100_rate = 800000000,
+		.clk_name	=  "dpll_core_m2_ck"
+	},
+	{	.opp50_rate = 0,
+		.opp100_rate = 0,
+		.clk_name	=  NULL
+	},
+};
+
+static struct virt_l3_clk_data omap4470_high_virt_l3_clk_data[] = {
+	{	.opp50_rate = 200000000,
+		.opp100_rate = 320000000,
+		.clk_name	=  "dpll_core_m3x2_ck"
+	},
+	{	.opp50_rate = 200000000,
+		.opp100_rate = 266600000,
+		.clk_name	=  "dpll_core_m6x2_ck"
+	},
+	{	.opp50_rate = 192000000,
+		.opp100_rate = 256000000,
+		.clk_name	=  "dpll_per_m3x2_ck"
+	},
+	{	.opp50_rate = 466000000,
+		.opp100_rate = 932000000,
 		.clk_name	=  "dpll_core_m2_ck"
 	},
 	{	.opp50_rate = 0,
@@ -426,13 +474,34 @@ int omap4xxx_custom_clk_init(void)
 		return 0;
 	}
 
-	omap_virt_l3_clk_data = omap4_virt_l3_clk_data;
 	main_l3_clk = clk_get(NULL, "dpll_core_m5x2_ck");
 	if (!main_l3_clk) {
 		pr_err("%s: Unable to get clock dpll_core_m5x2_ck\n", __func__);
 		return -EINVAL;
 	}
-	l3_opp50_rate = OMAP4_L3_OPP50_RATE;
+
+	if (cpu_is_omap447x()) {
+		struct clk *dpll_core_ck;
+		unsigned long rate = 0;
+
+		dpll_core_ck = clk_get(NULL, "dpll_core_ck");
+		if (dpll_core_ck) {
+			rate = clk_get_rate(dpll_core_ck);
+			clk_put(dpll_core_ck);
+		}
+
+		if (rate > OMAP4470_LP_OPP_SET_CORE_DPLL_FREQ / 2)
+			omap_virt_l3_clk_data = omap4470_high_virt_l3_clk_data;
+		else
+			omap_virt_l3_clk_data = omap4470_low_virt_l3_clk_data;
+
+		l3_opp50_rate = main_l3_clk->round_rate(main_l3_clk,
+							OMAP4470_L3_OPP50_RATE);
+	} else {
+		omap_virt_l3_clk_data = omap4_virt_l3_clk_data;
+		l3_opp50_rate = main_l3_clk->round_rate(main_l3_clk,
+							OMAP4_L3_OPP50_RATE);
+	}
 
 	for (i = 0; ; i++) {
 		char *clk_name = omap_virt_l3_clk_data[i].clk_name;
