@@ -863,6 +863,16 @@ static void dss_wb_ovl_enable(void)
 				break;
 			}
 		} else if (wbc->dirty && !wbc->enabled) {
+			if (wbc->mode == OMAP_WB_MEM2MEM_MODE &&
+				wbc->source >= OMAP_WB_GFX) {
+				/* This is a workaround. According to TRM
+				 * we should disable the manager but it will
+				 * cause blinking of panel. WA is to disable
+				 * pipe which was used as source of WB and do
+				 * dummy enable and disable of WB.
+				 */
+				dispc_ovl_enable(OMAP_DSS_WB, true);
+			}
 			dispc_ovl_enable(OMAP_DSS_WB, false);
 			wbc->dirty = false;
 		}
