@@ -736,18 +736,20 @@ void process_rotation(struct bvbltparams *bvbltparams,
 		switch (gcfilter->dstangle) {
 		case ROT_ANGLE_0:
 			/* Determine the origin offset. */
-			dstoffsetX = dstinfo->pixalign;
-			dstoffsetY = 0;
+			dstoffsetX = dstinfo->xpixalign;
+			dstoffsetY = dstinfo->ypixalign;
 
 			/* Determine geometry size. */
 			if (orthogonal) {
 				batch->dstwidth  = dstinfo->geom->height
-						 - dstinfo->pixalign;
-				batch->dstheight = dstinfo->geom->width;
+						 - dstinfo->xpixalign;
+				batch->dstheight = dstinfo->geom->width
+						 - dstinfo->ypixalign;
 			} else {
 				batch->dstwidth  = dstinfo->geom->width
-						 - dstinfo->pixalign;
-				batch->dstheight = dstinfo->geom->height;
+						 - dstinfo->xpixalign;
+				batch->dstheight = dstinfo->geom->height
+						 - dstinfo->ypixalign;
 			}
 
 			/* Determine the physical size. */
@@ -757,29 +759,33 @@ void process_rotation(struct bvbltparams *bvbltparams,
 
 		case ROT_ANGLE_90:
 			/* Determine the origin offset. */
-			dstoffsetX = 0;
-			dstoffsetY = dstinfo->pixalign;
+			dstoffsetX = dstinfo->ypixalign;
+			dstoffsetY = dstinfo->xpixalign;
 
 			if (orthogonal) {
 				/* Determine geometry size. */
-				batch->dstwidth  = dstinfo->geom->height;
+				batch->dstwidth  = dstinfo->geom->height
+						 - dstinfo->ypixalign;
 				batch->dstheight = dstinfo->geom->width
-						 - dstinfo->pixalign;
+						 - dstinfo->xpixalign;
 
 				/* Determine the physical size. */
-				dstinfo->physwidth = dstinfo->geom->width
-						   - dstinfo->pixalign;
-				dstinfo->physheight = dstinfo->geom->height;
+				dstinfo->physwidth  = dstinfo->geom->width
+						    - dstinfo->xpixalign;
+				dstinfo->physheight = dstinfo->geom->height
+						    - dstinfo->ypixalign;
 			} else {
 				/* Determine geometry size. */
-				batch->dstwidth  = dstinfo->geom->width;
+				batch->dstwidth  = dstinfo->geom->width
+						 - dstinfo->ypixalign;
 				batch->dstheight = dstinfo->geom->height
-						 - dstinfo->pixalign;
+						 - dstinfo->xpixalign;
 
 				/* Determine the physical size. */
 				dstinfo->physwidth  = dstinfo->geom->height
-						    - dstinfo->pixalign;
-				dstinfo->physheight = dstinfo->geom->width;
+						    - dstinfo->xpixalign;
+				dstinfo->physheight = dstinfo->geom->width
+						    - dstinfo->ypixalign;
 			}
 			break;
 
@@ -791,12 +797,14 @@ void process_rotation(struct bvbltparams *bvbltparams,
 			/* Determine geometry size. */
 			if (orthogonal) {
 				batch->dstwidth  = dstinfo->geom->height
-						 - dstinfo->pixalign;
-				batch->dstheight = dstinfo->geom->width;
+						 - dstinfo->xpixalign;
+				batch->dstheight = dstinfo->geom->width
+						 - dstinfo->ypixalign;
 			} else {
 				batch->dstwidth  = dstinfo->geom->width
-						 - dstinfo->pixalign;
-				batch->dstheight = dstinfo->geom->height;
+						 - dstinfo->xpixalign;
+				batch->dstheight = dstinfo->geom->height
+						 - dstinfo->ypixalign;
 			}
 
 			/* Determine the physical size. */
@@ -811,24 +819,28 @@ void process_rotation(struct bvbltparams *bvbltparams,
 
 			if (orthogonal) {
 				/* Determine geometry size. */
-				batch->dstwidth  = dstinfo->geom->height;
+				batch->dstwidth  = dstinfo->geom->height
+						 = dstinfo->ypixalign;
 				batch->dstheight = dstinfo->geom->width
-						 - dstinfo->pixalign;
+						 - dstinfo->xpixalign;
 
 				/* Determine the physical size. */
 				dstinfo->physwidth  = dstinfo->geom->width
-						    - dstinfo->pixalign;
-				dstinfo->physheight = dstinfo->geom->height;
+						    - dstinfo->xpixalign;
+				dstinfo->physheight = dstinfo->geom->height
+						    - dstinfo->ypixalign;
 			} else {
 				/* Determine geometry size. */
-				batch->dstwidth  = dstinfo->geom->width;
+				batch->dstwidth  = dstinfo->geom->width
+						 - dstinfo->ypixalign;
 				batch->dstheight = dstinfo->geom->height
-						 - dstinfo->pixalign;
+						 - dstinfo->xpixalign;
 
 				/* Determine the physical size. */
 				dstinfo->physwidth  = dstinfo->geom->height
-						    - dstinfo->pixalign;
-				dstinfo->physheight = dstinfo->geom->width;
+						    - dstinfo->xpixalign;
+				dstinfo->physheight = dstinfo->geom->width
+						    - dstinfo->ypixalign;
 			}
 			break;
 
@@ -945,7 +957,8 @@ static enum bverror startvr(struct bvbltparams *bvbltparams,
 
 	GCDBG(GCZONE_FILTER, "destination:\n");
 	GCDBG(GCZONE_FILTER, "  angle = %d\n", dstangle);
-	GCDBG(GCZONE_FILTER, "  pixalign = %d\n", dstinfo->pixalign);
+	GCDBG(GCZONE_FILTER, "  pixalign = %d,%d\n",
+	      dstinfo->xpixalign, dstinfo->ypixalign);
 	GCDBG(GCZONE_FILTER, "  bytealign = %d\n", dstinfo->bytealign);
 	GCDBG(GCZONE_FILTER, "  virtstride = %d\n", dstinfo->geom->virtstride);
 	GCDBG(GCZONE_FILTER, "  format = %d\n", dstinfo->format.format);
@@ -986,13 +999,14 @@ static enum bverror startvr(struct bvbltparams *bvbltparams,
 
 	/* Determine adjusted source bounding rectangle and origin. */
 	srcrect = srcinfo->rect;
-	srcrect.left  -=  srcinfo->pixalign;
-	srcrect.right -=  srcinfo->pixalign;
-	srcx          -= (srcinfo->pixalign << 16);
+	srcrect.left  -=  srcinfo->xpixalign;
+	srcrect.right -=  srcinfo->xpixalign;
+	srcx          -= (srcinfo->xpixalign << 16);
 
 	GCDBG(GCZONE_FILTER, "source:\n");
 	GCDBG(GCZONE_FILTER, "  angle = %d\n", srcangle);
-	GCDBG(GCZONE_FILTER, "  pixalign = %d\n", srcinfo->pixalign);
+	GCDBG(GCZONE_FILTER, "  pixalign = %d,%d\n",
+	      srcinfo->xpixalign, srcinfo->ypixalign);
 	GCDBG(GCZONE_FILTER, "  bytealign = %d\n", srcinfo->bytealign);
 	GCDBG(GCZONE_FILTER, "  virtstride = %d\n", srcinfo->geom->virtstride);
 	GCDBG(GCZONE_FILTER, "  format = %d\n", srcinfo->format.format);
@@ -1230,23 +1244,30 @@ enum bverror do_filter(struct bvbltparams *bvbltparams,
 
 	/* Compute the source alignments needed to compensate
 	 * for the surface base address misalignment if any. */
-	srcinfo->pixalign  = get_pixel_offset(srcinfo, 0);
-	srcinfo->bytealign = (srcinfo->pixalign
+	srcinfo->xpixalign = get_pixel_offset(srcinfo, 0);
+	srcinfo->ypixalign = 0;
+	srcinfo->bytealign = (srcinfo->xpixalign
 			   * (int) srcinfo->format.bitspp) / 8;
-	GCDBG(GCZONE_SRC, "source surface offset (pixels) = %d,0\n",
-		srcinfo->pixalign);
+	GCDBG(GCZONE_SRC, "source surface offset (pixels) = %d,%d\n",
+		srcinfo->xpixalign, srcinfo->ypixalign);
 	GCDBG(GCZONE_SRC, "source surface offset (bytes) = %d\n",
 		srcinfo->bytealign);
+
+	/* Compute U/V plane offsets. */
+	if (srcinfo->format.type == BVFMT_YUV)
+		set_computeyuv(srcinfo, 0, 0);
 
 	/* Determine physical size. */
 	if ((srcinfo->angle % 2) == 0) {
 		srcinfo->physwidth  = srcinfo->geom->width
-				    - srcinfo->pixalign;
-		srcinfo->physheight = srcinfo->geom->height;
+				    - srcinfo->xpixalign;
+		srcinfo->physheight = srcinfo->geom->height
+				    - srcinfo->ypixalign;
 	} else {
 		srcinfo->physwidth  = srcinfo->geom->height
-				    - srcinfo->pixalign;
-		srcinfo->physheight = srcinfo->geom->width;
+				    - srcinfo->xpixalign;
+		srcinfo->physheight = srcinfo->geom->width
+				    - srcinfo->ypixalign;
 	}
 	GCDBG(GCZONE_SRC, "source physical size = %dx%d\n",
 		srcinfo->physwidth, srcinfo->physheight);
@@ -1587,16 +1608,17 @@ enum bverror do_filter(struct bvbltparams *bvbltparams,
 
 		/* Compute the temp alignments needed to compensate
 		 * for the surface base address misalignment if any. */
-		tmpinfo.pixalign  = get_pixel_offset(&tmpinfo, 0);
-		tmpinfo.bytealign = (tmpinfo.pixalign
+		tmpinfo.xpixalign = get_pixel_offset(&tmpinfo, 0);
+		tmpinfo.ypixalign = 0;
+		tmpinfo.bytealign = (tmpinfo.xpixalign
 					* (int) tmpinfo.format.bitspp) / 8;
-		GCDBG(GCZONE_SRC, "tmp offset (pixels) = %d,0\n",
-			tmpinfo.pixalign);
+		GCDBG(GCZONE_SRC, "tmp offset (pixels) = %d,%d\n",
+			tmpinfo.xpixalign, tmpinfo.ypixalign);
 		GCDBG(GCZONE_SRC, "tmp offset (bytes) = %d\n",
 			tmpinfo.bytealign);
 
 		/* Adjust physical size. */
-		tmpinfo.physwidth -= tmpinfo.pixalign;
+		tmpinfo.physwidth -= tmpinfo.xpixalign;
 		GCDBG(GCZONE_FILTER, "tmp adjusted physical dims: %dx%d\n",
 		      tmpinfo.physwidth, tmpinfo.physheight);
 
@@ -1637,8 +1659,8 @@ enum bverror do_filter(struct bvbltparams *bvbltparams,
 		GCPRINT_RECT(GCZONE_DEST, "dest", &dstrotated0);
 
 		/* Apply adjustment. */
-		dstrotated0.left  -= dstinfo->pixalign;
-		dstrotated0.right -= dstinfo->pixalign;
+		dstrotated0.left  -= dstinfo->xpixalign;
+		dstrotated0.right -= dstinfo->xpixalign;
 
 		/* Determine the source origin. */
 		srcx = ((leftextra + tmpinfo.rect.left) << 16)

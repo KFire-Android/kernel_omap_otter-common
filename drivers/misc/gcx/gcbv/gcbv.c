@@ -726,6 +726,91 @@ exit:
  * Program YUV source.
  */
 
+void set_computeyuv(struct surfaceinfo *srcinfo, int x, int y)
+{
+	int pixalign, bytealign;
+	unsigned int height1, size1;
+	unsigned int height2, size2;
+	unsigned int origin;
+	int ssX, ssY;
+
+	GCENTER(GCZONE_SRC);
+
+	switch (srcinfo->format.cs.yuv.planecount) {
+	case 2:
+		/* Compute base address alignment. */
+		pixalign = get_pixel_offset(srcinfo, 0);
+		bytealign = (pixalign * (int) srcinfo->format.bitspp) / 8;
+
+		/* Determine physical height. */
+		height1 = ((srcinfo->angle % 2) == 0)
+			? srcinfo->geom->height
+			: srcinfo->geom->width;
+
+		/* Determine the second plane stride. */
+		srcinfo->stride2 = srcinfo->geom->virtstride
+				 / srcinfo->format.cs.yuv.xsample;
+
+		/* Determine subsample pixel position. */
+		ssX = x / srcinfo->format.cs.yuv.xsample;
+		ssY = y / srcinfo->format.cs.yuv.ysample;
+
+		/* U and V are interleaved in one plane. */
+		ssX *= 2;
+		srcinfo->stride2 *= 2;
+
+		/* Determine the size of the first plane. */
+		size1 = srcinfo->geom->virtstride * height1;
+
+		/* Determnine the origin offset. */
+		origin = ssY * srcinfo->stride2 + ssX;
+
+		/* Compute the second plane alignment. */
+		srcinfo->bytealign2 = bytealign + size1 + origin;
+		GCDBG(GCZONE_SRC, "plane2 offset (bytes) = 0x%08X\n",
+			srcinfo->bytealign2);
+		break;
+
+	case 3:
+		/* Compute base address alignment. */
+		pixalign = get_pixel_offset(srcinfo, 0);
+		bytealign = (pixalign * (int) srcinfo->format.bitspp) / 8;
+
+		/* Determine physical height. */
+		height1 = ((srcinfo->angle % 2) == 0)
+			? srcinfo->geom->height
+			: srcinfo->geom->width;
+		height2 = height1 / srcinfo->format.cs.yuv.ysample;
+
+		/* Determine the U and V stride. */
+		srcinfo->stride2 =
+		srcinfo->stride3 = srcinfo->geom->virtstride
+				 / srcinfo->format.cs.yuv.xsample;
+
+		/* Determine subsample pixel position. */
+		ssX = x / srcinfo->format.cs.yuv.xsample;
+		ssY = y / srcinfo->format.cs.yuv.ysample;
+
+		/* Determine the size of the planes. */
+		size1 = srcinfo->geom->virtstride * height1;
+		size2 = srcinfo->stride2 * height2;
+
+		/* Determnine the origin offset. */
+		origin = ssY * srcinfo->stride2 + ssX;
+
+		/* Compute the second plane alignment. */
+		srcinfo->bytealign2 = bytealign + size1 + origin;
+		srcinfo->bytealign3 = bytealign + size1 + size2 + origin;
+		GCDBG(GCZONE_SRC, "  plane2 offset (bytes) = 0x%08X\n",
+		      srcinfo->bytealign2);
+		GCDBG(GCZONE_SRC, "  plane3 offset (bytes) = 0x%08X\n",
+		      srcinfo->bytealign3);
+		break;
+	}
+
+	GCEXIT(GCZONE_SRC);
+}
+
 enum bverror set_yuvsrc(struct bvbltparams *bvbltparams,
 			struct gcbatch *batch,
 			struct surfaceinfo *srcinfo,
@@ -735,8 +820,6 @@ enum bverror set_yuvsrc(struct bvbltparams *bvbltparams,
 	struct gcmoyuv1 *gcmoyuv1;
 	struct gcmoyuv2 *gcmoyuv2;
 	struct gcmoyuv3 *gcmoyuv3;
-	int ushift, vshift;
-	unsigned int srcheight;
 
 	GCENTER(GCZONE_SRC);
 
@@ -751,6 +834,7 @@ enum bverror set_yuvsrc(struct bvbltparams *bvbltparams,
 		if (bverror != BVERR_NONE)
 			goto exit;
 
+		/* Set YUV parameters. */
 		gcmoyuv1->pectrl_ldst = gcmoyuv_pectrl_ldst;
 		gcmoyuv1->pectrl.raw = 0;
 		gcmoyuv1->pectrl.reg.standard
@@ -768,6 +852,7 @@ enum bverror set_yuvsrc(struct bvbltparams *bvbltparams,
 		if (bverror != BVERR_NONE)
 			goto exit;
 
+		/* Set YUV parameters. */
 		gcmoyuv2->pectrl_ldst = gcmoyuv_pectrl_ldst;
 		gcmoyuv2->pectrl.raw = 0;
 		gcmoyuv2->pectrl.reg.standard
@@ -777,22 +862,12 @@ enum bverror set_yuvsrc(struct bvbltparams *bvbltparams,
 		gcmoyuv2->pectrl.reg.convert
 			= GCREG_PE_CONTROL_YUVRGB_DISABLED;
 
-		srcheight = ((srcinfo->angle % 2) == 0)
-			  ? srcinfo->geom->height
-			  : srcinfo->geom->width;
-
-		ushift = srcinfo->bytealign
-		       + srcinfo->geom->virtstride
-		       * srcheight;
-		GCDBG(GCZONE_SRC, "ushift = 0x%08X (%d)\n",
-		      ushift, ushift);
-
+		/* Program U/V plane. */
 		add_fixup(bvbltparams, batch, &gcmoyuv2->uplaneaddress,
-			  ushift);
-
+			  srcinfo->bytealign2);
 		gcmoyuv2->plane_ldst = gcmoyuv2_plane_ldst;
 		gcmoyuv2->uplaneaddress = GET_MAP_HANDLE(srcmap);
-		gcmoyuv2->uplanestride  = srcinfo->geom->virtstride;
+		gcmoyuv2->uplanestride = srcinfo->stride2;
 		break;
 
 	case 3:
@@ -802,6 +877,7 @@ enum bverror set_yuvsrc(struct bvbltparams *bvbltparams,
 		if (bverror != BVERR_NONE)
 			goto exit;
 
+		/* Set YUV parameters. */
 		gcmoyuv3->pectrl_ldst = gcmoyuv_pectrl_ldst;
 		gcmoyuv3->pectrl.raw = 0;
 		gcmoyuv3->pectrl.reg.standard
@@ -811,32 +887,16 @@ enum bverror set_yuvsrc(struct bvbltparams *bvbltparams,
 		gcmoyuv3->pectrl.reg.convert
 			= GCREG_PE_CONTROL_YUVRGB_DISABLED;
 
-		srcheight = ((srcinfo->angle % 2) == 0)
-			  ? srcinfo->geom->height
-			  : srcinfo->geom->width;
-
-		ushift = srcinfo->bytealign
-		       + srcinfo->geom->virtstride
-		       * srcheight;
-		vshift = ushift
-		       + srcinfo->geom->virtstride
-		       * srcheight / 4;
-
-		GCDBG(GCZONE_SRC, "ushift = 0x%08X (%d)\n",
-		      ushift, ushift);
-		GCDBG(GCZONE_SRC, "vshift = 0x%08X (%d)\n",
-		      vshift, vshift);
-
+		/* Program U/V planes. */
 		add_fixup(bvbltparams, batch, &gcmoyuv3->uplaneaddress,
-			  ushift);
+			  srcinfo->bytealign2);
 		add_fixup(bvbltparams, batch, &gcmoyuv3->vplaneaddress,
-			  vshift);
-
+			  srcinfo->bytealign3);
 		gcmoyuv3->plane_ldst = gcmoyuv3_plane_ldst;
 		gcmoyuv3->uplaneaddress = GET_MAP_HANDLE(srcmap);
-		gcmoyuv3->uplanestride  = srcinfo->geom->virtstride / 2;
+		gcmoyuv3->uplanestride  = srcinfo->stride2;
 		gcmoyuv3->vplaneaddress = GET_MAP_HANDLE(srcmap);
-		gcmoyuv3->vplanestride  = srcinfo->geom->virtstride / 2;
+		gcmoyuv3->vplanestride  = srcinfo->stride2;
 		break;
 
 	default:
@@ -860,8 +920,6 @@ enum bverror set_yuvsrc_index(struct bvbltparams *bvbltparams,
 	struct gcmoxsrcyuv1 *gcmoxsrcyuv1;
 	struct gcmoxsrcyuv2 *gcmoxsrcyuv2;
 	struct gcmoxsrcyuv3 *gcmoxsrcyuv3;
-	int ushift, vshift;
-	unsigned int srcheight;
 
 	GCENTER(GCZONE_SRC);
 
@@ -876,6 +934,7 @@ enum bverror set_yuvsrc_index(struct bvbltparams *bvbltparams,
 		if (bverror != BVERR_NONE)
 			goto exit;
 
+		/* Set YUV parameters. */
 		gcmoxsrcyuv1->pectrl_ldst
 			= gcmoxsrcyuv_pectrl_ldst[index];
 		gcmoxsrcyuv1->pectrl.raw = 0;
@@ -894,6 +953,7 @@ enum bverror set_yuvsrc_index(struct bvbltparams *bvbltparams,
 		if (bverror != BVERR_NONE)
 			goto exit;
 
+		/* Set YUV parameters. */
 		gcmoxsrcyuv2->pectrl_ldst
 			= gcmoxsrcyuv_pectrl_ldst[index];
 		gcmoxsrcyuv2->pectrl.raw = 0;
@@ -904,26 +964,15 @@ enum bverror set_yuvsrc_index(struct bvbltparams *bvbltparams,
 		gcmoxsrcyuv2->pectrl.reg.convert
 			= GCREG_PE_CONTROL_YUVRGB_DISABLED;
 
-		srcheight = ((srcinfo->angle % 2) == 0)
-			  ? srcinfo->geom->height
-			  : srcinfo->geom->width;
-
-		ushift = srcinfo->bytealign
-		       + srcinfo->geom->virtstride
-		       * srcheight;
-		GCDBG(GCZONE_SRC, "ushift = 0x%08X (%d)\n",
-		      ushift, ushift);
-
+		/* Program U/V plane. */
 		add_fixup(bvbltparams, batch, &gcmoxsrcyuv2->uplaneaddress,
-			  ushift);
-
+			  srcinfo->bytealign2);
 		gcmoxsrcyuv2->uplaneaddress_ldst
 			= gcmoxsrcyuv_uplaneaddress_ldst[index];
 		gcmoxsrcyuv2->uplaneaddress = GET_MAP_HANDLE(srcmap);
-
 		gcmoxsrcyuv2->uplanestride_ldst
 			= gcmoxsrcyuv_uplanestride_ldst[index];
-		gcmoxsrcyuv2->uplanestride = srcinfo->geom->virtstride;
+		gcmoxsrcyuv2->uplanestride = srcinfo->stride2;
 		break;
 
 	case 3:
@@ -933,6 +982,7 @@ enum bverror set_yuvsrc_index(struct bvbltparams *bvbltparams,
 		if (bverror != BVERR_NONE)
 			goto exit;
 
+		/* Set YUV parameters. */
 		gcmoxsrcyuv3->pectrl_ldst
 			= gcmoxsrcyuv_pectrl_ldst[index];
 		gcmoxsrcyuv3->pectrl.raw = 0;
@@ -943,42 +993,23 @@ enum bverror set_yuvsrc_index(struct bvbltparams *bvbltparams,
 		gcmoxsrcyuv3->pectrl.reg.convert
 			= GCREG_PE_CONTROL_YUVRGB_DISABLED;
 
-		srcheight = ((srcinfo->angle % 2) == 0)
-			  ? srcinfo->geom->height
-			  : srcinfo->geom->width;
-
-		ushift = srcinfo->bytealign
-		       + srcinfo->geom->virtstride
-		       * srcheight;
-		vshift = ushift
-		       + srcinfo->geom->virtstride
-		       * srcheight / 4;
-
-		GCDBG(GCZONE_SRC, "ushift = 0x%08X (%d)\n",
-		      ushift, ushift);
-		GCDBG(GCZONE_SRC, "vshift = 0x%08X (%d)\n",
-		      vshift, vshift);
-
+		/* Program U/V planes. */
 		add_fixup(bvbltparams, batch, &gcmoxsrcyuv3->uplaneaddress,
-			  ushift);
+			  srcinfo->bytealign2);
 		add_fixup(bvbltparams, batch, &gcmoxsrcyuv3->vplaneaddress,
-			  vshift);
-
+			  srcinfo->bytealign3);
 		gcmoxsrcyuv3->uplaneaddress_ldst
 			= gcmoxsrcyuv_uplaneaddress_ldst[index];
 		gcmoxsrcyuv3->uplaneaddress = GET_MAP_HANDLE(srcmap);
-
 		gcmoxsrcyuv3->uplanestride_ldst
 			= gcmoxsrcyuv_uplanestride_ldst[index];
-		gcmoxsrcyuv3->uplanestride  = srcinfo->geom->virtstride / 2;
-
+		gcmoxsrcyuv3->uplanestride  = srcinfo->stride2;
 		gcmoxsrcyuv3->vplaneaddress_ldst
 			= gcmoxsrcyuv_vplaneaddress_ldst[index];
 		gcmoxsrcyuv3->vplaneaddress = GET_MAP_HANDLE(srcmap);
-
 		gcmoxsrcyuv3->vplanestride_ldst
 			= gcmoxsrcyuv_vplanestride_ldst[index];
-		gcmoxsrcyuv3->vplanestride  = srcinfo->geom->virtstride / 2;
+		gcmoxsrcyuv3->vplanestride  = srcinfo->stride2;
 		break;
 
 	default:
@@ -1416,6 +1447,8 @@ enum bverror bv_blt(struct bvbltparams *bvbltparams)
 	/* Extract the operation flags. */
 	op = (bvbltparams->flags & BVFLAG_OP_MASK) >> BVFLAG_OP_SHIFT;
 	type = (bvbltparams->flags & BVFLAG_BATCH_MASK) >> BVFLAG_BATCH_SHIFT;
+	GCDBG(GCZONE_BLIT, "op = %d\n", op);
+	GCDBG(GCZONE_BLIT, "type = %d\n", type);
 
 	switch (type) {
 	case (BVFLAG_BATCH_NONE >> BVFLAG_BATCH_SHIFT):
