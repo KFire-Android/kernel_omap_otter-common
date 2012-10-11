@@ -604,11 +604,32 @@ static void dss_ovl_write_regs(struct omap_overlay *ovl)
 	u16 x_decim, y_decim;
 	bool five_taps = true;
 	int r;
+	struct writeback_cache_data *wbc;
+	bool m2m_with_ovl = false;
+	bool m2m_with_mgr = false;
 
 	DSSDBGF("%d", ovl->id);
 
 	if (!op->enabled || !op->info_dirty)
 		return;
+
+	if (dss_has_feature(FEAT_WB)) {
+		/* check if this overlay is source for wb, ignore mgr sources
+		 * here */
+		wbc = &dss_data.writeback_cache;
+		if (wbc->enabled && omap_dss_check_wb(wbc, ovl->id, -1)) {
+			DSSDBG("wb->enabled=%d for plane:%d\n",
+						wbc->enabled, ovl->id);
+			m2m_with_ovl = true;
+		}
+		/* check if this overlay is source for manager, which is source
+		 * for wb, ignore ovl sources */
+		if (wbc->enabled && omap_dss_check_wb(wbc, -1, op->channel)) {
+			DSSDBG("check wb mgr wb->enabled=%d for plane:%d\n",
+							wbc->enabled, ovl->id);
+			m2m_with_mgr = true;
+		}
+	}
 
 	oi = &op->info;
 
@@ -620,7 +641,8 @@ static void dss_ovl_write_regs(struct omap_overlay *ovl)
 						&x_decim, &y_decim, &five_taps);
 
 	r = r ? : dispc_ovl_setup(ovl->id, oi, ilace,
-			replication, x_decim, y_decim, five_taps);
+			replication, x_decim, y_decim, five_taps,
+						m2m_with_ovl || m2m_with_mgr);
 	if (r) {
 		/*
 		 * We can't do much here, as this function can be called from

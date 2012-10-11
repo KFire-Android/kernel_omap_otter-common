@@ -469,7 +469,7 @@ void dispc_ovl_compute_fifo_thresholds(enum omap_plane plane,
 		bool manual_update);
 int dispc_ovl_setup(enum omap_plane plane, struct omap_overlay_info *oi,
 		bool ilace, bool replication, int x_decim, int y_decim,
-		bool five_taps);
+		bool five_taps, bool source_of_wb);
 int dispc_ovl_enable(enum omap_plane plane, bool enable);
 void dispc_ovl_set_channel_out(enum omap_plane plane,
 		enum omap_channel channel);

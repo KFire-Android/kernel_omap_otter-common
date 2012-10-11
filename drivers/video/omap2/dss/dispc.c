@@ -2035,7 +2035,7 @@ static void dispc_enable_arbitration(enum omap_plane plane, bool enable)
 
 int dispc_ovl_setup(enum omap_plane plane, struct omap_overlay_info *oi,
 		bool ilace, bool replication, int x_decim, int y_decim,
-		bool five_taps)
+		bool five_taps, bool source_of_wb)
 {
 	struct omap_overlay *ovl = omap_dss_get_overlay(plane);
 	bool fieldmode = 0;
@@ -2050,6 +2050,8 @@ int dispc_ovl_setup(enum omap_plane plane, struct omap_overlay_info *oi,
 	u8 global_alpha;
 	u16 outw, outh;
 	enum omap_channel channel;
+	unsigned long flags;
+	u32 udf_mask;
 
 	channel = dispc_ovl_get_channel_out(plane);
 
@@ -2069,6 +2071,58 @@ int dispc_ovl_setup(enum omap_plane plane, struct omap_overlay_info *oi,
 	outh = oi->out_height == 0 ? oi->height : oi->out_height;
 	if (outw == 0 || outh == 0)
 		return -EINVAL;
+
+	/*
+	 * Make sure UDF is disabled for ovls that are source for WB -
+	 * Errata i642 for OMAP4.
+	 */
+
+	if (!cpu_is_omap44xx())
+		goto skip_errata;
+
+	switch (plane) {
+	case OMAP_DSS_GFX:
+		udf_mask = DISPC_IRQ_GFX_FIFO_UNDERFLOW;
+		break;
+	case OMAP_DSS_VIDEO1:
+		udf_mask = DISPC_IRQ_VID1_FIFO_UNDERFLOW;
+		break;
+	case OMAP_DSS_VIDEO2:
+		udf_mask = DISPC_IRQ_VID2_FIFO_UNDERFLOW;
+		break;
+	case OMAP_DSS_VIDEO3:
+		udf_mask = DISPC_IRQ_VID3_FIFO_UNDERFLOW;
+		break;
+	default:
+		udf_mask = 0;
+	}
+
+	if (source_of_wb) {
+		/* if the ovl UDF is enabled, disable it */
+		if (dispc.irq_error_mask & udf_mask) {
+			DSSDBG("%s: disable irq irq_error_mask:0x%x \
+				mask:0x%x\n", __func__, dispc.irq_error_mask,
+								udf_mask);
+			spin_lock_irqsave(&dispc.irq_lock, flags);
+			dispc.irq_error_mask &= ~udf_mask;
+			_omap_dispc_set_irqs();
+			spin_unlock_irqrestore(&dispc.irq_lock, flags);
+		}
+	} else {
+		/* enable UDF if irq_error_mask needs it and its currently
+		 * disabled */
+		if (!(dispc.irq_error_mask & udf_mask)) {
+			DSSDBG("%s: enable irq irq_error_mask:0x%x \
+				mask:0x%x\n", __func__, dispc.irq_error_mask,
+								udf_mask);
+			spin_lock_irqsave(&dispc.irq_lock, flags);
+			dispc.irq_error_mask |= udf_mask;
+			_omap_dispc_set_irqs();
+			spin_unlock_irqrestore(&dispc.irq_lock, flags);
+		}
+	}
+
+skip_errata:
 
 	if (ilace && oi->height == outh)
 		fieldmode = 1;

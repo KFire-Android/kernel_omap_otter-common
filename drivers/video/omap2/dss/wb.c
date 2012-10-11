@@ -74,7 +74,11 @@ bool omap_dss_check_wb(struct writeback_cache_data *wb, int overlayId,
 	if ((wb->mode == OMAP_WB_MEM2MEM_MODE) &&
 				((wb->source - 3) == overlayId))
 		result = true;
-	else if (wb->mode == OMAP_WB_CAPTURE_MODE) {
+	else if (wb->mode == OMAP_WB_MEM2MEM_MODE &&
+						wb->source < OMAP_WB_GFX &&
+						managerId == wb->source) {
+		result = true;
+	} else if (wb->mode == OMAP_WB_CAPTURE_MODE) {
 		switch (wb->source) {
 		case OMAP_WB_LCD1:
 			if (managerId == OMAP_DSS_CHANNEL_LCD)
