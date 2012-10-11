@@ -736,75 +736,69 @@ void set_computeyuv(struct surfaceinfo *srcinfo, int x, int y)
 
 	GCENTER(GCZONE_SRC);
 
+	/* Compute base address alignment. */
+	pixalign = get_pixel_offset(srcinfo, 0);
+	bytealign = (pixalign * (int) srcinfo->format.bitspp) / 8;
+
+	/* Determine the physical height of the first plane. */
+	height1 = ((srcinfo->angle % 2) == 0)
+		? srcinfo->geom->height
+		: srcinfo->geom->width;
+
+	/* Determine the size of the first plane. */
+	size1 = srcinfo->geom->virtstride * height1;
+
+	/* Determine the stride of the second plane. */
+	srcinfo->stride2 = srcinfo->geom->virtstride
+			 / srcinfo->format.cs.yuv.xsample;
+
+	/* Determine subsample pixel position. */
+	ssX = x / srcinfo->format.cs.yuv.xsample;
+	ssY = y / srcinfo->format.cs.yuv.ysample;
+
 	switch (srcinfo->format.cs.yuv.planecount) {
 	case 2:
-		/* Compute base address alignment. */
-		pixalign = get_pixel_offset(srcinfo, 0);
-		bytealign = (pixalign * (int) srcinfo->format.bitspp) / 8;
-
-		/* Determine physical height. */
-		height1 = ((srcinfo->angle % 2) == 0)
-			? srcinfo->geom->height
-			: srcinfo->geom->width;
-
-		/* Determine the second plane stride. */
-		srcinfo->stride2 = srcinfo->geom->virtstride
-				 / srcinfo->format.cs.yuv.xsample;
-
-		/* Determine subsample pixel position. */
-		ssX = x / srcinfo->format.cs.yuv.xsample;
-		ssY = y / srcinfo->format.cs.yuv.ysample;
-
 		/* U and V are interleaved in one plane. */
 		ssX *= 2;
 		srcinfo->stride2 *= 2;
 
-		/* Determine the size of the first plane. */
-		size1 = srcinfo->geom->virtstride * height1;
-
 		/* Determnine the origin offset. */
 		origin = ssY * srcinfo->stride2 + ssX;
 
-		/* Compute the second plane alignment. */
+		/* Compute the alignment of the second plane. */
 		srcinfo->bytealign2 = bytealign + size1 + origin;
+
 		GCDBG(GCZONE_SRC, "plane2 offset (bytes) = 0x%08X\n",
 			srcinfo->bytealign2);
+		GCDBG(GCZONE_SRC, "plane2 stride = %d\n",
+			srcinfo->stride2);
 		break;
 
 	case 3:
-		/* Compute base address alignment. */
-		pixalign = get_pixel_offset(srcinfo, 0);
-		bytealign = (pixalign * (int) srcinfo->format.bitspp) / 8;
-
-		/* Determine physical height. */
-		height1 = ((srcinfo->angle % 2) == 0)
-			? srcinfo->geom->height
-			: srcinfo->geom->width;
+		/* Determine the physical height of the U/V planes. */
 		height2 = height1 / srcinfo->format.cs.yuv.ysample;
 
-		/* Determine the U and V stride. */
-		srcinfo->stride2 =
-		srcinfo->stride3 = srcinfo->geom->virtstride
-				 / srcinfo->format.cs.yuv.xsample;
-
-		/* Determine subsample pixel position. */
-		ssX = x / srcinfo->format.cs.yuv.xsample;
-		ssY = y / srcinfo->format.cs.yuv.ysample;
-
-		/* Determine the size of the planes. */
-		size1 = srcinfo->geom->virtstride * height1;
+		/* Determine the size of the U/V planes. */
 		size2 = srcinfo->stride2 * height2;
 
 		/* Determnine the origin offset. */
 		origin = ssY * srcinfo->stride2 + ssX;
 
-		/* Compute the second plane alignment. */
+		/* Compute the alignment of the U/V planes. */
 		srcinfo->bytealign2 = bytealign + size1 + origin;
 		srcinfo->bytealign3 = bytealign + size1 + size2 + origin;
-		GCDBG(GCZONE_SRC, "  plane2 offset (bytes) = 0x%08X\n",
+
+		/* Determine the stride of the U/V planes. */
+		srcinfo->stride3 = srcinfo->stride2;
+
+		GCDBG(GCZONE_SRC, "plane2 offset (bytes) = 0x%08X\n",
 		      srcinfo->bytealign2);
-		GCDBG(GCZONE_SRC, "  plane3 offset (bytes) = 0x%08X\n",
+		GCDBG(GCZONE_SRC, "plane2 stride = %d\n",
+			srcinfo->stride2);
+		GCDBG(GCZONE_SRC, "plane3 offset (bytes) = 0x%08X\n",
 		      srcinfo->bytealign3);
+		GCDBG(GCZONE_SRC, "plane3 stride = %d\n",
+			srcinfo->stride3);
 		break;
 	}
 
@@ -896,7 +890,7 @@ enum bverror set_yuvsrc(struct bvbltparams *bvbltparams,
 		gcmoyuv3->uplaneaddress = GET_MAP_HANDLE(srcmap);
 		gcmoyuv3->uplanestride  = srcinfo->stride2;
 		gcmoyuv3->vplaneaddress = GET_MAP_HANDLE(srcmap);
-		gcmoyuv3->vplanestride  = srcinfo->stride2;
+		gcmoyuv3->vplanestride  = srcinfo->stride3;
 		break;
 
 	default:
@@ -1009,7 +1003,7 @@ enum bverror set_yuvsrc_index(struct bvbltparams *bvbltparams,
 		gcmoxsrcyuv3->vplaneaddress = GET_MAP_HANDLE(srcmap);
 		gcmoxsrcyuv3->vplanestride_ldst
 			= gcmoxsrcyuv_vplanestride_ldst[index];
-		gcmoxsrcyuv3->vplanestride  = srcinfo->stride2;
+		gcmoxsrcyuv3->vplanestride  = srcinfo->stride3;
 		break;
 
 	default:

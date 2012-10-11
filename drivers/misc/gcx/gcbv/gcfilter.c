@@ -1254,7 +1254,8 @@ enum bverror do_filter(struct bvbltparams *bvbltparams,
 		srcinfo->bytealign);
 
 	/* Compute U/V plane offsets. */
-	if (srcinfo->format.type == BVFMT_YUV)
+	if ((srcinfo->format.type == BVFMT_YUV) &&
+	    (srcinfo->format.cs.yuv.planecount > 1))
 		set_computeyuv(srcinfo, 0, 0);
 
 	/* Determine physical size. */
@@ -1513,11 +1514,20 @@ enum bverror do_filter(struct bvbltparams *bvbltparams,
 
 		/* Determine temporary surface format. */
 		if (srcinfo->format.type == BVFMT_YUV) {
-			GCDBG(GCZONE_FILTER, "tmp format = 4:2:2\n");
-			tmpgeom.format = OCDFMT_YUYV;
-			parse_format(bvbltparams, &tmpinfo);
+			if (tmpinfo.angle == ROT_ANGLE_0) {
+				GCDBG(GCZONE_FILTER,
+				      "tmp format = 4:2:2\n");
+				tmpgeom.format = OCDFMT_YUYV;
+				parse_format(bvbltparams, &tmpinfo);
+			} else {
+				GCDBG(GCZONE_FILTER,
+				      "tmp format = dst format\n");
+				tmpgeom.format = dstinfo->geom->format;
+				tmpinfo.format = dstinfo->format;
+			}
 		} else {
-			GCDBG(GCZONE_FILTER, "tmp format = src format\n");
+			GCDBG(GCZONE_FILTER,
+			      "tmp format = src format\n");
 			tmpgeom.format = srcinfo->geom->format;
 			tmpinfo.format = srcinfo->format;
 		}
@@ -1575,14 +1585,18 @@ enum bverror do_filter(struct bvbltparams *bvbltparams,
 
 		/* Determine the physical size of the surface. */
 		if ((tmpinfo.angle % 2) == 0) {
+			tmpgeom.width = (tmpgeom.width + tmpalignmask)
+				      & ~tmpalignmask;
 			tmpinfo.physwidth  = tmpgeom.width;
 			tmpinfo.physheight = tmpgeom.height;
 		} else {
+			tmpgeom.height = (tmpgeom.height + tmpalignmask)
+				       & ~tmpalignmask;
 			tmpinfo.physwidth  = tmpgeom.height;
 			tmpinfo.physheight = tmpgeom.width;
 		}
-		tmpinfo.physwidth = (tmpinfo.physwidth + tmpalignmask)
-				  & ~tmpalignmask;
+		GCDBG(GCZONE_FILTER, "tmp aligned dims: %dx%d\n",
+		      tmpgeom.width, tmpgeom.height);
 		GCDBG(GCZONE_FILTER, "tmp physical dims: %dx%d\n",
 		      tmpinfo.physwidth, tmpinfo.physheight);
 

@@ -311,7 +311,8 @@ enum bverror do_blit(struct bvbltparams *bvbltparams,
 	      srcinfo->bytealign);
 
 	/* Compute U/V plane offsets. */
-	if (srcinfo->format.type == BVFMT_YUV)
+	if ((srcinfo->format.type == BVFMT_YUV) &&
+	    (srcinfo->format.cs.yuv.planecount > 1))
 		set_computeyuv(srcinfo, srcshiftX, srcshiftY);
 
 	/* Determine the destination surface shift. */
@@ -366,7 +367,8 @@ enum bverror do_blit(struct bvbltparams *bvbltparams,
 		      dstinfo->bytealign);
 
 		/* Compute U/V plane offsets. */
-		if (srcinfo->format.type == BVFMT_YUV)
+		if ((srcinfo->format.type == BVFMT_YUV) &&
+		    (srcinfo->format.cs.yuv.planecount > 1))
 			set_computeyuv(srcinfo, 0, 0);
 
 		switch (srcinfo->angle) {
