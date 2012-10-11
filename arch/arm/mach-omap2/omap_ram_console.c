@@ -16,6 +16,7 @@
 
 #include <linux/platform_device.h>
 #include <linux/memblock.h>
+#include <linux/persistent_ram.h>
 
 #include <plat/cpu.h>
 
@@ -28,6 +29,11 @@ static struct resource ram_console_resources[] = {
 		.end    = OMAP_RAM_CONSOLE_START_DEFAULT +
 			  OMAP_RAM_CONSOLE_SIZE_DEFAULT - 1,
 	},
+};
+
+static struct persistent_ram persistent_ram;
+static struct persistent_ram_descriptor ram_descriptor = {
+	.name = "ram_console",
 };
 
 static struct platform_device ram_console_device = {
@@ -84,20 +90,16 @@ int __init omap_ram_console_init(phys_addr_t phy_addr, size_t size)
 {
 	int ret;
 
-	/* Remove the ram console region from kernel's map */
-	ret = memblock_remove(phy_addr, size);
-	if (ret) {
-		pr_err("%s: unable to remove memory for ram console:"
-			"start=0x%08x, size=0x%08x, ret=%d\n",
-			__func__, (u32)phy_addr, (u32)size, ret);
-		return ret;
-	}
-
-	ram_console_resources[0].start = phy_addr;
-	ram_console_resources[0].end = phy_addr + size - 1;
-
-	/* flag for registration */
-	omap_ramconsole_inited = true;
+	ram_descriptor.size = size;
+	persistent_ram.descs = &ram_descriptor;
+	persistent_ram.start = phy_addr;
+	persistent_ram.size = size;
+	persistent_ram.num_descs = 1;
+	ret = persistent_ram_early_init(&persistent_ram);
+	if (ret)
+		pr_err("%s: failed to init persistent ram\n", __func__);
+	else
+		omap_ramconsole_inited = true;
 
 	return ret;
 }
