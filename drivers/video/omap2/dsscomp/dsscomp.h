@@ -145,7 +145,8 @@ int dsscomp_state_notifier(struct notifier_block *nb,
 /* basic operation - if not using queues */
 int set_dss_ovl_info(struct dss2_ovl_info *oi);
 int set_dss_wb_info(struct dss2_ovl_info *oi);
-int set_dss_mgr_info(struct dss2_mgr_info *mi, struct omapdss_ovl_cb *cb);
+int set_dss_mgr_info(struct dss2_mgr_info *mi, struct omapdss_ovl_cb *cb,
+								bool m2m_mode);
 struct omap_overlay_manager *find_dss_mgr(int display_ix);
 void swap_rb_in_ovl_info(struct dss2_ovl_info *oi);
 void swap_rb_in_mgr_info(struct dss2_mgr_info *mi);
