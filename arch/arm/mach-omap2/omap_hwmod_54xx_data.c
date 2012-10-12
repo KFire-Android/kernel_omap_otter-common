@@ -2021,7 +2021,7 @@ static struct omap_hwmod_ocp_if *omap54xx_fdif_masters[] = {
 static struct omap_hwmod_addr_space omap54xx_fdif_addrs[] = {
 	{
 		.pa_start	= 0x4a10a000,
-		.pa_end		= 0x4a10a1ff,
+		.pa_end		= 0x4a10a3ff,
 		.flags		= ADDR_TYPE_RT
 	},
 	{ }
