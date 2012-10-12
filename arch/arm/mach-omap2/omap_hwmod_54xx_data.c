@@ -2010,7 +2010,7 @@ static struct omap_hwmod_class omap54xx_fdif_hwmod_class = {
 /* fdif */
 static struct omap_hwmod_irq_info omap54xx_fdif_irqs[] = {
 	{ .irq = 69 + OMAP54XX_IRQ_GIC_START },
-	{}
+	{ .irq = -1 }
 };
 
 /* fdif master ports */
@@ -3525,10 +3525,12 @@ static struct omap_hwmod_class omap54xx_mcasp_hwmod_class = {
 static struct omap_hwmod omap54xx_mcasp_hwmod;
 static struct omap_hwmod_irq_info omap54xx_mcasp_irqs[] = {
 	{ .irq = 109 + OMAP54XX_IRQ_GIC_START },
+	{ .irq = -1 }
 };
 
 static struct omap_hwmod_dma_info omap54xx_mcasp_sdma_reqs[] = {
 	{ .name = "tx", .dma_req = 7 + OMAP54XX_DMA_REQ_START },
+	{ .dma_req = -1 }
 };
 
 static struct omap_hwmod_addr_space omap54xx_mcasp_addrs[] = {
