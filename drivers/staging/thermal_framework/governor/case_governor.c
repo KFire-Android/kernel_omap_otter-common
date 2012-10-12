@@ -21,6 +21,7 @@
 #include <linux/slab.h>
 #include <linux/types.h>
 #include <linux/debugfs.h>
+#include <linux/syscalls.h>
 
 #include <linux/thermal_framework.h>
 
@@ -54,6 +55,7 @@ static void case_reached_max_state(int temp)
 {
 	pr_emerg("%s: restart due to thermal case policy (temp == %d)\n",
 		 __func__, temp);
+	sys_sync();
 	kernel_restart(NULL);
 }
 
