@@ -861,6 +861,11 @@ static void dss_wb_write_regs(void)
 static void dss_wb_ovl_enable(void)
 {
 	struct writeback_cache_data *wbc;
+	struct ovl_priv_data *op = NULL;
+	struct omap_overlay *ovl;
+	const int num_ovls = dss_feat_get_num_ovls();
+	int i;
+
 	if (dss_has_feature(FEAT_WB))
 		wbc = &dss_data.writeback_cache;
 	else
@@ -895,8 +900,39 @@ static void dss_wb_ovl_enable(void)
 				 * dummy enable and disable of WB.
 				 */
 				dispc_ovl_enable(OMAP_DSS_WB, true);
-			}
-			dispc_ovl_enable(OMAP_DSS_WB, false);
+				dispc_ovl_enable(OMAP_DSS_WB, false);
+			} else if (wbc->mode == OMAP_WB_MEM2MEM_MODE &&
+					wbc->source < OMAP_WB_GFX) {
+				/* This is a workaround that prevents SYNC_LOST
+				 * on changing pipe channelout from manager
+				 * which was used as a source of wb to another
+				 * manager. Manager could free pipes after wb
+				 * will send SYNC message but that will start
+				 * wb capture. To prevent that we reconnect the
+				 * pipe from the manager to wb and do a dummy
+				 * enabling and disabling of wb - the pipe will
+				 * be freed and capture won't start because
+				 * source pipe is switched off. */
+				for (i = 0; i < num_ovls; ++i) {
+					ovl = omap_dss_get_overlay(i);
+					if (ovl)
+						op = get_ovl_priv(ovl);
+					if (op && (int)op->channel ==
+						(int)wbc->source &&
+						!op->enabled) {
+						dispc_setup_wb_source(
+							OMAP_DSS_GFX + i);
+						dispc_set_wb_channel_out(i);
+						dispc_ovl_enable(
+							OMAP_DSS_WB, true);
+						dispc_ovl_enable(
+							OMAP_DSS_WB, false);
+					}
+				}
+			} else
+				/* capture mode case */
+				dispc_ovl_enable(OMAP_DSS_WB, false);
+
 			wbc->dirty = false;
 		}
 	}

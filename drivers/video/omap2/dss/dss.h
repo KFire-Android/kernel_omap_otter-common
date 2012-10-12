@@ -505,6 +505,7 @@ void dispc_mgr_setup(enum omap_channel channel,
 		struct omap_overlay_manager_info *info);
 /* DISPC WRITEBACK */
 int dispc_setup_wb(struct writeback_cache_data *wb);
+void dispc_setup_wb_source(enum omap_writeback_source source);
 void dispc_go_wb(void);
 
 /* VENC */
