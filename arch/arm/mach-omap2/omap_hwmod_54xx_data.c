@@ -6242,15 +6242,15 @@ static struct omap_hwmod_ocp_if *omap54xx_usb_otg_ss_masters[] = {
 
 static struct omap_hwmod_addr_space omap54xx_usb_otg_ss_addrs[] = {
 	{
-		.name           = "wrapper",
-		.pa_start       = 0x4a020000,
-		.pa_end         = 0x4a02ffff,
-		.flags          = ADDR_TYPE_RT
-	}, {
-		.name           = "dwc_usb3",
-		.pa_start       = 0x4a030000,
-		.pa_end         = 0x4a03ffff,
-		.flags          = ADDR_TYPE_RT
+		.name		= "wrapper",
+		.pa_start	= 0x4a020000,
+		.pa_end		= 0x4a0201ff,
+		.flags		= ADDR_TYPE_RT
+	},
+	{
+		.name		= "dwc_usb3",
+		.pa_start	= 0x4a030000,
+		.pa_end		= 0x4a03cfff,
 	},
 	{ }
 };
