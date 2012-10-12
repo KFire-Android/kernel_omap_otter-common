@@ -78,7 +78,10 @@ GCDBG_FILTERDEF(filter, GCZONE_NONE,
  * Miscellaneous defines.
  */
 
-#define GC_BITS_PER_CACHELINE	(64 * 8)
+#define GC_BYTES_PER_CACHELINE	(64)
+#define GC_BITS_PER_CACHELINE	(GC_BYTES_PER_CACHELINE * 8)
+#define GC_CACHELINE_ALIGN_16	(GC_BITS_PER_CACHELINE / 16 - 1)
+#define GC_CACHELINE_ALIGN_32	(GC_BITS_PER_CACHELINE / 32 - 1)
 
 enum gcscaletype {
 	GC_SCALE_OPF,
@@ -1356,22 +1359,14 @@ enum bverror do_filter(struct bvbltparams *bvbltparams,
 	dstdelta.top    = dstclipped->top    - dstrect->top;
 	dstdelta.right  = dstclipped->right  - dstrect->left;
 	dstdelta.bottom = dstclipped->bottom - dstrect->top;
+	GCDBG(GCZONE_FILTER, "dst deltas = (%d,%d)-(%d,%d)\n",
+	      dstdelta.left, dstdelta.top, dstdelta.right, dstdelta.bottom);
 
 	/* Compute the source offsets. */
 	srcdelta.left   =  dstdelta.left        * horscalefactor;
 	srcdelta.top    =  dstdelta.top         * verscalefactor;
 	srcdelta.right  = (dstdelta.right  - 1) * horscalefactor + (1 << 16);
 	srcdelta.bottom = (dstdelta.bottom - 1) * verscalefactor + (1 << 16);
-
-	GCDBG(GCZONE_FILTER, "offsets (dst, src):\n");
-	GCDBG(GCZONE_FILTER, "  left   = %d, 0x%08X\n",
-	      dstdelta.left, srcdelta.left);
-	GCDBG(GCZONE_FILTER, "  top    = %d, 0x%08X\n",
-	      dstdelta.top, srcdelta.top);
-	GCDBG(GCZONE_FILTER, "  right  = %d, 0x%08X\n",
-	      dstdelta.right, srcdelta.right);
-	GCDBG(GCZONE_FILTER, "  bottom = %d, 0x%08X\n",
-	      dstdelta.bottom, srcdelta.bottom);
 
 	/* Before rendering each destination pixel, the HW will select the
 	 * corresponding source center pixel to apply the kernel around.
@@ -1382,13 +1377,34 @@ enum bverror do_filter(struct bvbltparams *bvbltparams,
 	srcdelta.top    += 0x00008000;
 	srcdelta.right  += 0x00008000;
 	srcdelta.bottom += 0x00008000;
+	GCDBG(GCZONE_FILTER, "src deltas = "
+	      "(0x%08X,0x%08X)-(0x%08X,0x%08X)\n",
+	      srcdelta.left, srcdelta.top, srcdelta.right, srcdelta.bottom);
+	GCDBG(GCZONE_FILTER, "src deltas (int) = (%d,%d)-(%d,%d)\n",
+	      srcdelta.left >> 16, srcdelta.top >> 16,
+	      srcdelta.right >> 16, srcdelta.bottom >> 16);
 
 	/* Determine clipped source rectangle. */
 	srcclipped.left   = srcrect->left   + (srcdelta.left   >> 16);
 	srcclipped.top    = srcrect->top    + (srcdelta.top    >> 16);
 	srcclipped.right  = srcrect->left   + (srcdelta.right  >> 16);
 	srcclipped.bottom = srcrect->top    + (srcdelta.bottom >> 16);
-	GCPRINT_RECT(GCZONE_FILTER, "  clipped source", &srcclipped);
+
+	GCDBG(GCZONE_FILTER, "source:\n");
+	GCDBG(GCZONE_FILTER, "  stride = %d, geom = %dx%d\n",
+	      srcinfo->geom->virtstride,
+	      srcinfo->geom->width, srcinfo->geom->height);
+	GCDBG(GCZONE_FILTER, "  rotation = %d\n",
+	      srcinfo->angle);
+	GCPRINT_RECT(GCZONE_FILTER, "  clipped rect", &srcclipped);
+
+	GCDBG(GCZONE_FILTER, "destination:\n");
+	GCDBG(GCZONE_FILTER, "  stride = %d, geom size = %dx%d\n",
+	      dstinfo->geom->virtstride,
+	      dstinfo->geom->width, dstinfo->geom->height);
+	GCDBG(GCZONE_FILTER, "  rotation = %d\n",
+	      dstinfo->angle);
+	GCPRINT_RECT(GCZONE_FILTER, "  clipped rect", dstclipped);
 
 	/* Validate the source rectangle. */
 	if (!valid_rect(srcinfo->geom, &srcclipped)) {
@@ -1398,22 +1414,6 @@ enum bverror do_filter(struct bvbltparams *bvbltparams,
 			      "invalid source rectangle.");
 		goto exit;
 	}
-
-	GCDBG(GCZONE_FILTER, "source:\n");
-	GCDBG(GCZONE_FILTER, "  stride = %d, geom = %dx%d\n",
-	      srcinfo->geom->virtstride,
-	      srcinfo->geom->width, srcinfo->geom->height);
-	GCDBG(GCZONE_FILTER, "  rotation = %d\n",
-	      srcinfo->angle);
-	GCDBG(GCZONE_FILTER, "  rect offsets = "
-	      "(0x%08X,0x%08X)-(0x%08X,0x%08X)\n",
-	      srcdelta.left, srcdelta.top, srcdelta.right, srcdelta.bottom);
-
-	GCDBG(GCZONE_FILTER, "destination:\n");
-	GCDBG(GCZONE_FILTER, "  stride = %d, geom size = %dx%d\n",
-	      bvbltparams->dstgeom->virtstride,
-	      bvbltparams->dstgeom->width, bvbltparams->dstgeom->height);
-	GCPRINT_RECT(GCZONE_FILTER, "  rect", dstclipped);
 
 	/* Map the source. */
 	bverror = do_map(srcinfo->buf.desc, batch, &srcmap);
@@ -1560,8 +1560,10 @@ enum bverror do_filter(struct bvbltparams *bvbltparams,
 		srcx = ((srcrect->left - leftextra) << 16) + srcdelta.left;
 		srcy =  (srcrect->top << 16) + srcdelta.top;
 		GCDBG(GCZONE_SRC, "src origin: 0x%08X,0x%08X\n", srcx, srcy);
+		GCDBG(GCZONE_SRC, "src origin (int): %d,%d\n",
+		      srcx >> 16, srcy >> 16);
 
-		/* Determine the size of the temporary image. */
+		/* Determine the size of the temporary rectangle. */
 		tmprectwidth = leftextra + rightextra
 			     + ((srcdelta.right >> 16) - (srcdelta.left >> 16));
 		tmprectheight = dstadjusted->bottom - dstadjusted->top;
@@ -1569,41 +1571,67 @@ enum bverror do_filter(struct bvbltparams *bvbltparams,
 		      tmprectwidth, tmprectheight);
 
 		/* Determine the temporary destination coordinates. */
-		tmpinfo.rect.left = ((tmpinfo.angle % 2) == 0)
-			? (srcx >> 16) & tmpalignmask
-			: dstadjusted->left & dstalignmask;
-		tmpinfo.rect.top  = 0;
-		tmpinfo.rect.right = tmpinfo.rect.left + tmprectwidth;
-		tmpinfo.rect.bottom = tmpinfo.rect.top + tmprectheight;
-		GCPRINT_RECT(GCZONE_DEST, "tmp dest", &tmpinfo.rect);
+		switch (tmpinfo.angle) {
+		case ROT_ANGLE_0:
+		case ROT_ANGLE_180:
+			tmpinfo.rect.left   = (srcx >> 16) & tmpalignmask;
+			tmpinfo.rect.top    = 0;
+			tmpinfo.rect.right  = tmpinfo.rect.left + tmprectwidth;
+			tmpinfo.rect.bottom = tmprectheight;
 
-		/* Determine the temporaty surface dimensions. */
-		tmpgeom.width = tmpinfo.rect.right;
-		tmpgeom.height = tmpinfo.rect.bottom;
-		GCDBG(GCZONE_FILTER, "tmp dims: %dx%d\n",
-		      tmpgeom.width, tmpgeom.height);
+			tmpgeom.width  = (tmpinfo.rect.right + tmpalignmask)
+				       & ~tmpalignmask;
+			tmpgeom.height = tmprectheight;
 
-		/* Determine the physical size of the surface. */
-		if ((tmpinfo.angle % 2) == 0) {
-			tmpgeom.width = (tmpgeom.width + tmpalignmask)
-				      & ~tmpalignmask;
 			tmpinfo.physwidth  = tmpgeom.width;
 			tmpinfo.physheight = tmpgeom.height;
-		} else {
-			tmpgeom.height = (tmpgeom.height + tmpalignmask)
+			break;
+
+		case ROT_ANGLE_90:
+			tmpinfo.rect.left   = 0;
+			tmpinfo.rect.top    = dstadjusted->left & dstalignmask;
+			tmpinfo.rect.right  = tmprectwidth;
+			tmpinfo.rect.bottom = tmpinfo.rect.top  + tmprectheight;
+
+			tmpgeom.width  = tmprectwidth;
+			tmpgeom.height = (tmpinfo.rect.bottom + tmpalignmask)
 				       & ~tmpalignmask;
+
 			tmpinfo.physwidth  = tmpgeom.height;
 			tmpinfo.physheight = tmpgeom.width;
+			break;
+
+		case ROT_ANGLE_270:
+			tmpinfo.rect.left   = 0;
+			tmpinfo.rect.right  = tmprectwidth;
+			tmpinfo.rect.bottom = dstadjusted->left & dstalignmask;
+
+			tmpgeom.width  = tmprectwidth;
+			tmpgeom.height = (tmpinfo.rect.bottom + tmprectheight
+				       + tmpalignmask) & ~tmpalignmask;
+
+			tmpinfo.rect.bottom = tmpgeom.height
+					    - tmpinfo.rect.bottom;
+			tmpinfo.rect.top    = tmpinfo.rect.bottom
+					    - tmprectheight;
+
+			tmpinfo.physwidth  = tmpgeom.height;
+			tmpinfo.physheight = tmpgeom.width;
+			break;
 		}
-		GCDBG(GCZONE_FILTER, "tmp aligned dims: %dx%d\n",
+
+		GCPRINT_RECT(GCZONE_DEST, "tmp dest", &tmpinfo.rect);
+		GCDBG(GCZONE_FILTER, "tmp geometry size = %dx%d\n",
 		      tmpgeom.width, tmpgeom.height);
-		GCDBG(GCZONE_FILTER, "tmp physical dims: %dx%d\n",
+		GCDBG(GCZONE_FILTER, "tmp physical size = %dx%d\n",
 		      tmpinfo.physwidth, tmpinfo.physheight);
 
 		/* Determine the size of the temporaty surface. */
 		tmpgeom.virtstride = (tmpinfo.physwidth
 				   *  tmpinfo.format.bitspp) / 8;
 		tmpsize = tmpgeom.virtstride * tmpinfo.physheight;
+		tmpsize += GC_BYTES_PER_CACHELINE;
+		tmpsize = (tmpsize + ~PAGE_MASK) & PAGE_MASK;
 		GCDBG(GCZONE_FILTER, "tmp stride = %d\n", tmpgeom.virtstride);
 		GCDBG(GCZONE_FILTER, "tmp size (bytes) = %d\n", tmpsize);
 
@@ -1620,21 +1648,16 @@ enum bverror do_filter(struct bvbltparams *bvbltparams,
 			goto exit;
 		}
 
-		/* Compute the temp alignments needed to compensate
+		/* Compute the temp buffer alignments needed to compensate
 		 * for the surface base address misalignment if any. */
-		tmpinfo.xpixalign = get_pixel_offset(&tmpinfo, 0);
+		tmpinfo.xpixalign = 0;
 		tmpinfo.ypixalign = 0;
-		tmpinfo.bytealign = (tmpinfo.xpixalign
-					* (int) tmpinfo.format.bitspp) / 8;
+		tmpinfo.bytealign = (get_pixel_offset(&tmpinfo, 0)
+				  * (int) tmpinfo.format.bitspp) / 8;
 		GCDBG(GCZONE_SRC, "tmp offset (pixels) = %d,%d\n",
 			tmpinfo.xpixalign, tmpinfo.ypixalign);
 		GCDBG(GCZONE_SRC, "tmp offset (bytes) = %d\n",
 			tmpinfo.bytealign);
-
-		/* Adjust physical size. */
-		tmpinfo.physwidth -= tmpinfo.xpixalign;
-		GCDBG(GCZONE_FILTER, "tmp adjusted physical dims: %dx%d\n",
-		      tmpinfo.physwidth, tmpinfo.physheight);
 
 		/* Load the vertical filter. */
 		bverror = load_filter(bvbltparams, batch,
@@ -1677,12 +1700,37 @@ enum bverror do_filter(struct bvbltparams *bvbltparams,
 		dstrotated0.right -= dstinfo->xpixalign;
 
 		/* Determine the source origin. */
-		srcx = ((leftextra + tmpinfo.rect.left) << 16)
-			+ (srcdelta.left & 0xFFFF);
-		srcy = (tmpinfo.rect.top << 16)
-			+ (srcdelta.top & 0xFFFF);
-		GCDBG(GCZONE_SRC, "src origin: 0x%08X,0x%08X\n",
-		      srcx, srcy);
+		switch (tmpinfo.angle) {
+		case ROT_ANGLE_0:
+			srcx = ((tmpinfo.rect.left + leftextra) << 16)
+			     + (srcdelta.left & 0xFFFF);
+			srcy = (tmpinfo.rect.top << 16)
+			     + (srcdelta.top & 0xFFFF);
+			break;
+
+		case ROT_ANGLE_90:
+			srcx = (tmpinfo.rect.left << 16)
+			     + (srcdelta.top & 0xFFFF);
+			srcy = ((tmpinfo.rect.top + rightextra) << 16)
+			     + (srcdelta.left & 0xFFFF);
+			break;
+
+		case ROT_ANGLE_180:
+			srcx = ((tmpinfo.rect.left + rightextra) << 16)
+			     + (srcdelta.left & 0xFFFF);
+			srcy = (tmpinfo.rect.top << 16)
+			     + (srcdelta.top & 0xFFFF);
+			break;
+
+		case ROT_ANGLE_270:
+			srcx = (tmpinfo.rect.left << 16)
+			     + (srcdelta.top & 0xFFFF);
+			srcy = ((tmpinfo.rect.top + leftextra) << 16)
+			     + (srcdelta.left & 0xFFFF);
+			break;
+		}
+
+		GCDBG(GCZONE_SRC, "src origin: 0x%08X,0x%08X\n", srcx, srcy);
 
 		/* Load the horizontal filter. */
 		bverror = load_filter(bvbltparams, batch,
