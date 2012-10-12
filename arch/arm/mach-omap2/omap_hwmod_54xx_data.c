@@ -1722,7 +1722,7 @@ static struct omap_hwmod_class_sysconfig omap54xx_hdmi_sysc = {
 };
 
 static struct omap_hwmod_class omap54xx_hdmi_hwmod_class = {
-	.name	= "dss_hdmi",
+	.name	= "hdmi",
 	.sysc	= &omap54xx_hdmi_sysc,
 };
 
