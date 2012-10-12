@@ -159,7 +159,8 @@ phys_addr_t omaprpc_buffer_lookup(struct omaprpc_instance_t *rpc,
 				ion_free(rpc->ion_client, handle);
 		}
 	}
-
+	/* As a last resort ask tiler if it knows about this virtual address */
+	lpa = (phys_addr_t)tiler_virt2phys(uva);
 to_va:
 	/* convert the local physical address to remote physical address */
 	rpa = rpmsg_local_to_remote_pa(rpc, lpa);
