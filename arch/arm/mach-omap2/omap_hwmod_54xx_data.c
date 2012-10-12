@@ -3904,6 +3904,7 @@ static struct omap_hwmod_dma_info omap54xx_mcpdm_sdma_reqs[] = {
 
 static struct omap_hwmod_addr_space omap54xx_mcpdm_addrs[] = {
 	{
+		.name		= "mpu",
 		.pa_start	= 0x40132000,
 		.pa_end		= 0x4013207f,
 		.flags		= ADDR_TYPE_RT
@@ -3922,6 +3923,7 @@ static struct omap_hwmod_ocp_if omap54xx_l4_abe__mcpdm = {
 
 static struct omap_hwmod_addr_space omap54xx_mcpdm_dma_addrs[] = {
 	{
+		.name		= "dma",
 		.pa_start	= 0x49032000,
 		.pa_end		= 0x4903207f,
 	},
@@ -5323,6 +5325,7 @@ static struct omap_hwmod_irq_info omap54xx_timer5_irqs[] = {
 
 static struct omap_hwmod_addr_space omap54xx_timer5_addrs[] = {
 	{
+		.name		= "mpu",
 		.pa_start	= 0x40138000,
 		.pa_end		= 0x4013807f,
 		.flags		= ADDR_TYPE_RT
@@ -5341,6 +5344,7 @@ static struct omap_hwmod_ocp_if omap54xx_l4_abe__timer5 = {
 
 static struct omap_hwmod_addr_space omap54xx_timer5_dma_addrs[] = {
 	{
+		.name		= "dma",
 		.pa_start	= 0x49038000,
 		.pa_end		= 0x4903807f,
 	},
@@ -5388,6 +5392,7 @@ static struct omap_hwmod_irq_info omap54xx_timer6_irqs[] = {
 
 static struct omap_hwmod_addr_space omap54xx_timer6_addrs[] = {
 	{
+		.name		= "mpu",
 		.pa_start	= 0x4013a000,
 		.pa_end		= 0x4013a07f,
 		.flags		= ADDR_TYPE_RT
@@ -5406,6 +5411,7 @@ static struct omap_hwmod_ocp_if omap54xx_l4_abe__timer6 = {
 
 static struct omap_hwmod_addr_space omap54xx_timer6_dma_addrs[] = {
 	{
+		.name		= "dma",
 		.pa_start	= 0x4903a000,
 		.pa_end		= 0x4903a07f,
 	},
@@ -5453,6 +5459,7 @@ static struct omap_hwmod_irq_info omap54xx_timer7_irqs[] = {
 
 static struct omap_hwmod_addr_space omap54xx_timer7_addrs[] = {
 	{
+		.name		= "mpu",
 		.pa_start	= 0x4013c000,
 		.pa_end		= 0x4013c07f,
 		.flags		= ADDR_TYPE_RT
@@ -5471,6 +5478,7 @@ static struct omap_hwmod_ocp_if omap54xx_l4_abe__timer7 = {
 
 static struct omap_hwmod_addr_space omap54xx_timer7_dma_addrs[] = {
 	{
+		.name		= "dma",
 		.pa_start	= 0x4903c000,
 		.pa_end		= 0x4903c07f,
 	},
@@ -5518,6 +5526,7 @@ static struct omap_hwmod_irq_info omap54xx_timer8_irqs[] = {
 
 static struct omap_hwmod_addr_space omap54xx_timer8_addrs[] = {
 	{
+		.name		= "mpu",
 		.pa_start	= 0x4013e000,
 		.pa_end		= 0x4013e07f,
 		.flags		= ADDR_TYPE_RT
@@ -5536,6 +5545,7 @@ static struct omap_hwmod_ocp_if omap54xx_l4_abe__timer8 = {
 
 static struct omap_hwmod_addr_space omap54xx_timer8_dma_addrs[] = {
 	{
+		.name		= "dma",
 		.pa_start	= 0x4903e000,
 		.pa_end		= 0x4903e07f,
 	},
@@ -6450,6 +6460,7 @@ static struct omap_hwmod_irq_info omap54xx_wd_timer3_irqs[] = {
 
 static struct omap_hwmod_addr_space omap54xx_wd_timer3_addrs[] = {
 	{
+		.name		= "mpu",
 		.pa_start	= 0x40130000,
 		.pa_end		= 0x4013007f,
 		.flags		= ADDR_TYPE_RT
@@ -6468,6 +6479,7 @@ static struct omap_hwmod_ocp_if omap54xx_l4_abe__wd_timer3 = {
 
 static struct omap_hwmod_addr_space omap54xx_wd_timer3_dma_addrs[] = {
 	{
+		.name		= "dma",
 		.pa_start	= 0x49030000,
 		.pa_end		= 0x4903007f,
 	},
