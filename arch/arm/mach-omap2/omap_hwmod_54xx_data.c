@@ -776,7 +776,7 @@ static struct omap_hwmod_addr_space omap54xx_aess_addrs[] = {
 		.pa_end		= 0x401e1fff,
 	},
 	{
-		.name		= "mpu",
+		.name		= "aess",
 		.pa_start	= 0x401f1000,
 		.pa_end		= 0x401f13ff,
 		.flags		= ADDR_TYPE_RT
@@ -815,7 +815,7 @@ static struct omap_hwmod_addr_space omap54xx_aess_dma_addrs[] = {
 		.pa_end		= 0x490e1fff,
 	},
 	{
-		.name		= "dma",
+		.name		= "aess_dma",
 		.pa_start	= 0x490f1000,
 		.pa_end		= 0x490f13ff,
 	},
