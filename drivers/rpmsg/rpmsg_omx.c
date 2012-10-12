@@ -546,10 +546,10 @@ static int rpmsg_omx_release(struct inode *inode, struct file *filp)
 	mutex_lock(&omxserv->lock);
 	list_del(&omx->next);
 	/*
-	 * only destroy ept if there is a valid rpdev. Otherwise, it is not
+	 * only destroy ept if omx state != OMX_FAIL. Otherwise, it is not
 	 * needed because it was already destroyed by rpmsg_omx_remove function
 	 */
-	if (omxserv->rpdev)
+	if (omx->state != OMX_FAIL)
 		rpmsg_destroy_ept(omx->ept);
 	mutex_unlock(&omxserv->lock);
 	kfree(omx);
