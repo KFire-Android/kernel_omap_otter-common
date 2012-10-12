@@ -770,14 +770,15 @@ int omapdss_hdmi_display_check_timing(struct omap_dss_device *dssdev,
 int omapdss_hdmi_display_3d_enable(struct omap_dss_device *dssdev,
 					struct s3d_disp_info *info, int code)
 {
+	struct omap_dss_output *out = dssdev->output;
 	int r = 0;
 
 	DSSDBG("ENTER hdmi_display_3d_enable\n");
 
 	mutex_lock(&hdmi.lock);
 
-	if (dssdev->manager == NULL) {
-		DSSERR("failed to enable display: no manager\n");
+	if (out == NULL || out->manager == NULL) {
+		DSSERR("failed to enable display: no output/manager\n");
 		r = -ENODEV;
 		goto err0;
 	}
