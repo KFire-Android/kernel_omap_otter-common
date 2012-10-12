@@ -543,42 +543,12 @@ static struct omap_hwmod_class omap54xx_l4_hwmod_class = {
 };
 
 /* l4_abe */
-static struct omap_hwmod_addr_space omap54xx_l4_abe_addrs[] = {
-	{
-		.name		= "mpu",
-		.pa_start	= 0x401f1000,
-		.pa_end		= 0x401f13ff,
-		.flags		= ADDR_TYPE_RT
-	},
-	{ }
-};
-
 /* aess -> l4_abe */
 static struct omap_hwmod_ocp_if omap54xx_aess__l4_abe = {
 	.master		= &omap54xx_aess_hwmod,
 	.slave		= &omap54xx_l4_abe_hwmod,
 	.clk		= "abe_iclk",
-	.addr		= omap54xx_l4_abe_addrs,
-	.user		= OCP_USER_MPU,
-};
-
-static struct omap_hwmod_addr_space omap54xx_l4_abe_dma_addrs[] = {
-	{
-		.name		= "dma",
-		.pa_start	= 0x490f1000,
-		.pa_end		= 0x490f13ff,
-		.flags		= ADDR_TYPE_RT
-	},
-	{ }
-};
-
-/* aess -> l4_abe (dma) */
-static struct omap_hwmod_ocp_if omap54xx_aess__l4_abe_dma = {
-	.master		= &omap54xx_aess_hwmod,
-	.slave		= &omap54xx_l4_abe_hwmod,
-	.clk		= "abe_iclk",
-	.addr		= omap54xx_l4_abe_dma_addrs,
-	.user		= OCP_USER_SDMA,
+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
 };
 
 /* dsp -> l4_abe */
