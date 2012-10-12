@@ -295,11 +295,103 @@ static void unmute_be(struct snd_soc_pcm_runtime *be,
 	}
 }
 
+/* Connect BE to serial port (McBSP) */
+static int be_connect_serial_port(struct snd_soc_pcm_runtime *be,
+				  struct snd_soc_dai *dai, int stream)
+{
+	struct snd_soc_dpcm_runtime *dpcm = &be->dpcm[stream];
+	struct snd_pcm_hw_params *params = &dpcm->hw_params;
+	struct snd_soc_dai *cpu_dai = be->cpu_dai;
+	struct omap_abe *abe = snd_soc_dai_get_drvdata(dai);
+	struct omap_aess_data_format format;
+	u32 port, mcbsp_id;
+
+	format.f = params_rate(params);
+
+	switch (params_channels(params)) {
+	case 1:
+		if (params_format(params) == SNDRV_PCM_FORMAT_S16_LE)
+			format.samp_format = MONO_RSHIFTED_16;
+		else
+			format.samp_format = MONO_MSB;
+		break;
+	case 2:
+		if (params_format(params) == SNDRV_PCM_FORMAT_S16_LE)
+			format.samp_format = STEREO_RSHIFTED_16;
+		else
+			format.samp_format = STEREO_MSB;
+		break;
+	default:
+		dev_err(dai->dev, "%d channels not supported\n",
+			params_channels(params));
+		return -EINVAL;
+	}
+
+	switch (be->dai_link->be_id) {
+	case OMAP_ABE_DAI_BT_VX:
+		if (stream == SNDRV_PCM_STREAM_PLAYBACK)
+			port = OMAP_ABE_BT_VX_DL_PORT;
+		else
+			port = OMAP_ABE_BT_VX_UL_PORT;
+		break;
+	case OMAP_ABE_DAI_MM_FM:
+		if (stream == SNDRV_PCM_STREAM_PLAYBACK)
+			port = OMAP_ABE_MM_EXT_OUT_PORT;
+		else
+			port = OMAP_ABE_MM_EXT_IN_PORT;
+		break;
+	case OMAP_ABE_DAI_MODEM:
+		if (stream == SNDRV_PCM_STREAM_PLAYBACK)
+			port = OMAP_ABE_VX_DL_PORT;
+		else
+			port = OMAP_ABE_VX_UL_PORT;
+		/*
+		 * Invert stream direction:
+		 * - McBSP RX is used for voice call playback direction
+		 * - McBSP TX is used for voice call capture direction
+		 */
+		stream = !stream;
+		break;
+	default:
+		dev_err(dai->dev, "serial port cannot be connected to BE %d\n",
+			be->dai_link->be_id);
+		return -EINVAL;
+	}
+
+	switch (cpu_dai->id) {
+	case 1:
+		if (stream == SNDRV_PCM_STREAM_PLAYBACK)
+			mcbsp_id = MCBSP1_TX;
+		else
+			mcbsp_id = MCBSP1_RX;
+		break;
+	case 2:
+		if (stream == SNDRV_PCM_STREAM_PLAYBACK)
+			mcbsp_id = MCBSP2_TX;
+		else
+			mcbsp_id = MCBSP2_RX;
+		break;
+	case 3:
+		if (stream == SNDRV_PCM_STREAM_PLAYBACK)
+			mcbsp_id = MCBSP3_TX;
+		else
+			mcbsp_id = MCBSP3_RX;
+		break;
+	default:
+		dev_err(dai->dev, "invalid DAI id %d\n",
+			dai->id);
+		return -EINVAL;
+	}
+
+	omap_aess_connect_serial_port(abe->aess, port, &format, mcbsp_id);
+
+	return 0;
+}
+
 static void enable_be_port(struct snd_soc_pcm_runtime *be,
 		struct snd_soc_dai *dai, int stream)
 {
 	struct omap_abe *abe = snd_soc_dai_get_drvdata(dai);
-	struct omap_aess_data_format format;
 
 	dev_dbg(be->dev, "%s: %s %d\n", __func__, be->cpu_dai->name, stream);
 
@@ -318,10 +410,7 @@ static void enable_be_port(struct snd_soc_pcm_runtime *be,
 					abe->dai.port[OMAP_ABE_BE_PORT_BT_VX_DL]))
 				return;
 
-			/* BT_DL connection to McBSP 1 ports */
-			format.f = 16000;
-			format.samp_format = STEREO_RSHIFTED_16;
-			omap_aess_connect_serial_port(abe->aess, OMAP_ABE_BT_VX_DL_PORT, &format, MCBSP1_TX);
+			be_connect_serial_port(be, dai, stream);
 			omap_abe_port_enable(abe->aess,
 				abe->dai.port[OMAP_ABE_BE_PORT_BT_VX_DL]);
 		} else {
@@ -331,10 +420,7 @@ static void enable_be_port(struct snd_soc_pcm_runtime *be,
 					abe->dai.port[OMAP_ABE_BE_PORT_BT_VX_UL]))
 				return;
 
-			/* BT_UL connection to McBSP 1 ports */
-			format.f = 16000;
-			format.samp_format = STEREO_RSHIFTED_16;
-			omap_aess_connect_serial_port(abe->aess, OMAP_ABE_BT_VX_UL_PORT, &format, MCBSP1_RX);
+			be_connect_serial_port(be, dai, stream);
 			omap_abe_port_enable(abe->aess,
 				abe->dai.port[OMAP_ABE_BE_PORT_BT_VX_UL]);
 		}
@@ -347,10 +433,7 @@ static void enable_be_port(struct snd_soc_pcm_runtime *be,
 					abe->dai.port[OMAP_ABE_BE_PORT_MM_EXT_DL]))
 				return;
 
-			/* MM_EXT connection to McBSP 2 ports */
-			format.f = 48000;
-			format.samp_format = STEREO_RSHIFTED_16;
-			omap_aess_connect_serial_port(abe->aess, OMAP_ABE_MM_EXT_OUT_PORT, &format, MCBSP2_TX);
+			be_connect_serial_port(be, dai, stream);
 			omap_abe_port_enable(abe->aess,
 				abe->dai.port[OMAP_ABE_BE_PORT_MM_EXT_DL]);
 		} else {
@@ -360,10 +443,7 @@ static void enable_be_port(struct snd_soc_pcm_runtime *be,
 					abe->dai.port[OMAP_ABE_BE_PORT_MM_EXT_UL]))
 				return;
 
-			/* MM_EXT connection to McBSP 2 ports */
-			format.f = 48000;
-			format.samp_format = STEREO_RSHIFTED_16;
-			omap_aess_connect_serial_port(abe->aess, OMAP_ABE_MM_EXT_IN_PORT, &format, MCBSP2_RX);
+			be_connect_serial_port(be, dai, stream);
 			omap_abe_port_enable(abe->aess,
 				abe->dai.port[OMAP_ABE_BE_PORT_MM_EXT_UL]);
 		}
@@ -935,6 +1015,9 @@ static int omap_abe_dai_hw_params(struct snd_pcm_substream *substream,
 	struct omap_aess_data_format format;
 	struct omap_aess_dma dma_sink;
 	struct omap_aess_dma dma_params;
+	struct snd_pcm_substream *modem_substream;
+	struct snd_soc_pcm_runtime *modem_rtd;
+	struct snd_pcm_hw_params *modem_params;
 	int ret;
 
 	dev_dbg(dai->dev, "%s: %s\n", __func__, dai->name);
@@ -1031,20 +1114,23 @@ static int omap_abe_dai_hw_params(struct snd_pcm_substream *substream,
 			return -EINVAL;
 		break;
 	case OMAP_ABE_FRONTEND_DAI_MODEM:
-		/* MODEM is special case where data IO is performed by McBSP2
+		modem_substream = abe->modem.substream[substream->stream];
+		modem_rtd = modem_substream->private_data;
+		modem_params = &modem_rtd->dpcm[substream->stream].hw_params;
+
+		/*
+		 * MODEM is special case where data IO is performed by McBSP2
 		 * directly onto VX_DL and VX_UL (instead of SDMA).
+		 * It's assumed that the FE port is open with the params the
+		 * McBSP port will actually use
 		 */
-		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
-			/* Vx_DL connection to McBSP 2 ports */
-			format.samp_format = STEREO_RSHIFTED_16;
-			omap_aess_connect_serial_port(abe->aess, OMAP_ABE_VX_DL_PORT, &format, MCBSP2_RX);
+		memcpy(modem_params, params, sizeof(struct snd_pcm_hw_params));
+		be_connect_serial_port(modem_rtd, dai, substream->stream);
+
+		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
 			omap_aess_read_port_address(abe->aess, OMAP_ABE_VX_DL_PORT, &dma_params);
-		} else {
-			/* Vx_UL connection to McBSP 2 ports */
-			format.samp_format = STEREO_RSHIFTED_16;
-			omap_aess_connect_serial_port(abe->aess, OMAP_ABE_VX_UL_PORT, &format, MCBSP2_TX);
+		else
 			omap_aess_read_port_address(abe->aess, OMAP_ABE_VX_UL_PORT, &dma_params);
-		}
 		break;
 	default:
 		dev_err(dai->dev, "port %d not supported\n", dai->id);

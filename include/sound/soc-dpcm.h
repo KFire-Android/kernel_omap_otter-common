@@ -45,9 +45,6 @@ struct snd_soc_dpcm_params {
 	struct list_head list_be;
 	struct list_head list_fe;
 
-	/* hw params for this link - may be different for each link */
-	struct snd_pcm_hw_params hw_params;
-
 #ifdef CONFIG_DEBUG_FS
 	struct dentry *debugfs_state;
 #endif

@@ -388,9 +388,9 @@ MODULE_DEVICE_TABLE(i2c, tmp102_id);
 static struct i2c_driver tmp102_driver = {
 	.probe = tmp102_temp_sensor_probe,
 	.remove = tmp102_temp_sensor_remove,
-	.driver.pm = TMP102_DEV_PM_OPS,
 	.driver = {
 		.name = "tmp102_temp_sensor",
+		.pm = TMP102_DEV_PM_OPS,
 	},
 	.id_table = tmp102_id,
 };

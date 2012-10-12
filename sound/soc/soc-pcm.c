@@ -1333,14 +1333,14 @@ static int soc_dpcm_be_dai_hw_params(struct snd_soc_pcm_runtime *fe, int stream)
 		dev_dbg(be->dev, "dpcm: hw_params BE %s\n",
 			dpcm_params->fe->dai_link->name);
 
-		/* copy params for each dpcm_params */
-		memcpy(&dpcm_params->hw_params, &fe->dpcm[stream].hw_params,
+		/* copy params for the BE */
+		memcpy(&be->dpcm[stream].hw_params, &fe->dpcm[stream].hw_params,
 				sizeof(struct snd_pcm_hw_params));
 
 		/* perform any hw_params fixups */
 		if (be->dai_link->be_hw_params_fixup) {
 			ret = be->dai_link->be_hw_params_fixup(be,
-					&dpcm_params->hw_params);
+					&be->dpcm[stream].hw_params);
 			if (ret < 0) {
 				dev_err(be->dev,
 					"dpcm: hw_params BE fixup failed %d\n",
@@ -1349,7 +1349,7 @@ static int soc_dpcm_be_dai_hw_params(struct snd_soc_pcm_runtime *fe, int stream)
 			}
 		}
 
-		ret = soc_pcm_hw_params(be_substream, &dpcm_params->hw_params);
+		ret = soc_pcm_hw_params(be_substream, &be->dpcm[stream].hw_params);
 		if (ret < 0) {
 			dev_err(dpcm_params->be->dev, "dpcm: hw_params BE failed %d\n", ret);
 			goto unwind;
@@ -2594,7 +2594,7 @@ static ssize_t soc_dpcm_show_state(struct snd_soc_pcm_runtime *fe,
 
 	list_for_each_entry(dpcm_params, &fe->dpcm[stream].be_clients, list_be) {
 		struct snd_soc_pcm_runtime *be = dpcm_params->be;
-		params = &dpcm_params->hw_params;
+		params = &be->dpcm[stream].hw_params;
 
 		offset += snprintf(buf + offset, size - offset,
 				"- %s\n", be->dai_link->name);

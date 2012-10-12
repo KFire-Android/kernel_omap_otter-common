@@ -318,10 +318,24 @@ static int mcbsp_be_hw_params_fixup(struct snd_soc_pcm_runtime *rtd,
 {
 	struct snd_interval *channels = hw_param_interval(params,
 						SNDRV_PCM_HW_PARAM_CHANNELS);
+	struct snd_interval *rate = hw_param_interval(params,
+						SNDRV_PCM_HW_PARAM_RATE);
 	unsigned int be_id = rtd->dai_link->be_id;
 
-	if (be_id == OMAP_ABE_DAI_MM_FM || be_id == OMAP_ABE_DAI_BT_VX)
+	switch (be_id) {
+	case OMAP_ABE_DAI_BT_VX:
 		channels->min = 2;
+		rate->min = rate->max = 16000;
+		break;
+	case OMAP_ABE_DAI_MM_FM:
+		channels->min = 2;
+		rate->min = rate->max = 48000;
+		break;
+	case OMAP_ABE_DAI_MODEM:
+		break;
+	default:
+		return -EINVAL;
+	}
 
 	snd_mask_set(&params->masks[SNDRV_PCM_HW_PARAM_FORMAT -
 				SNDRV_PCM_HW_PARAM_FIRST_MASK],
