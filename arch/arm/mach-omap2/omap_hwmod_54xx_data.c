@@ -985,11 +985,6 @@ static struct omap_hwmod omap54xx_counter_32k_hwmod = {
 
 static struct omap_hwmod_class_sysconfig omap54xx_ctrl_module_sysc = {
 	.rev_offs	= 0x0000,
-	.sysc_offs	= 0x0010,
-	.sysc_flags	= SYSC_HAS_SIDLEMODE,
-	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
-			SIDLE_SMART_WKUP),
-	.sysc_fields	= &omap_hwmod_sysc_type2,
 };
 
 static struct omap_hwmod_class omap54xx_ctrl_module_hwmod_class = {
@@ -1007,10 +1002,18 @@ static struct omap_hwmod_irq_info omap54xx_ctrl_module_core_irqs[] = {
 
 static struct omap_hwmod_addr_space omap54xx_ctrl_module_core_addrs[] = {
 	{
+		.name		= "omap_control_core_core",
 		.pa_start	= 0x4a002000,
 		.pa_end		= 0x4a0027ff,
 		.flags		= ADDR_TYPE_RT
 	},
+	{
+		.name		= "omap_control_core_pad",
+		.pa_start	= 0x4a002800,
+		.pa_end		= 0x4a002fff,
+		.flags		= ADDR_TYPE_RT
+	},
+	{ }
 };
 
 /* l4_cfg -> ctrl_module_core */
@@ -1034,6 +1037,46 @@ static struct omap_hwmod omap54xx_ctrl_module_core_hwmod = {
 	.mpu_irqs	= omap54xx_ctrl_module_core_irqs,
 	.slaves		= omap54xx_ctrl_module_core_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap54xx_ctrl_module_core_slaves),
+};
+
+/* ctrl_module_wkup */
+static struct omap_hwmod omap54xx_ctrl_module_wkup_hwmod;
+static struct omap_hwmod_addr_space omap54xx_ctrl_module_wkup_addrs[] = {
+	{
+		.name		= "omap_control_wkup_core",
+		.pa_start	= 0x4ae0c000,
+		.pa_end		= 0x4ae0c7ff,
+		.flags		= ADDR_TYPE_RT
+	},
+	{
+		.name		= "omap_control_wkup_pad",
+		.pa_start	= 0x4ae0c800,
+		.pa_end		= 0x4ae0cfff,
+		.flags		= ADDR_TYPE_RT
+	},
+	{ }
+};
+
+/* l4_wkup -> ctrl_module_wkup */
+static struct omap_hwmod_ocp_if omap54xx_l4_wkup__ctrl_module_wkup = {
+	.master		= &omap54xx_l4_wkup_hwmod,
+	.slave		= &omap54xx_ctrl_module_wkup_hwmod,
+	.clk		= "wkupaon_clk_mux",
+	.addr		= omap54xx_ctrl_module_wkup_addrs,
+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+};
+
+/* ctrl_module_wkup slave ports */
+static struct omap_hwmod_ocp_if *omap54xx_ctrl_module_wkup_slaves[] = {
+	&omap54xx_l4_wkup__ctrl_module_wkup,
+};
+
+static struct omap_hwmod omap54xx_ctrl_module_wkup_hwmod = {
+	.name		= "ctrl_module_wkup",
+	.class		= &omap54xx_ctrl_module_hwmod_class,
+	.clkdm_name	= "wkupaon_clkdm",
+	.slaves		= omap54xx_ctrl_module_wkup_slaves,
+	.slaves_cnt	= ARRAY_SIZE(omap54xx_ctrl_module_wkup_slaves),
 };
 
 /*
@@ -6493,8 +6536,9 @@ static __initdata struct omap_hwmod *omap54xx_hwmods_common[] = {
 	/* counter class */
 	&omap54xx_counter_32k_hwmod,
 
-	/* ctrl module class */
+	/* ctrl_module class */
 	&omap54xx_ctrl_module_core_hwmod,
+	&omap54xx_ctrl_module_wkup_hwmod,
 
 	/* dma class */
 	&omap54xx_dma_system_hwmod,
