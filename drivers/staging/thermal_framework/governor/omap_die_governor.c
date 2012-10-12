@@ -30,6 +30,8 @@
 #include <linux/thermal_framework.h>
 
 #include <plat/cpu.h>
+#include <linux/opp.h>
+#include <plat/omap_device.h>
 
 /* Zone information */
 #define FATAL_ZONE	5
@@ -101,6 +103,7 @@ struct omap_governor {
 	int omap_gradient_slope;
 	int omap_gradient_const;
 	int prev_zone;
+	int steps;
 	bool enable_debug_print;
 	int sensor_temp_table[AVERAGE_NUMBER];
 	struct delayed_work average_gov_sensor_work;
@@ -381,13 +384,13 @@ static int omap_thermal_manager(struct omap_governor *omap_gov,
 	case PANIC_ZONE:
 		alert = omap_gov->zones[ALERT_ZONE - 1].temp_upper;
 		fatal = omap_gov->zones[PANIC_ZONE - 1].temp_upper;
-		temp_upper = (((fatal - alert) / 4) *
+		temp_upper = (((fatal - alert) / omap_gov->steps) *
 				omap_gov->panic_zone_reached) + alert;
 		if (temp_upper < cpu_temp)
 			omap_gov->panic_zone_reached++;
 		else
 			set_cooling_level = false; /* no need for update */
-		temp_upper = (((fatal - alert) / 4) *
+		temp_upper = (((fatal - alert) / omap_gov->steps) *
 				omap_gov->panic_zone_reached) + alert;
 		if (temp_upper >= fatal)
 			temp_upper = fatal;
@@ -663,6 +666,10 @@ static int omap_gov_register_debug_entries(struct thermal_dev *gov,
 	(void) debugfs_create_file("avg_cpu_sensor_temp",
 			S_IRUGO, d, &(omap_gov->avg_gov_sensor_temp),
 			&omap_die_gov_fops);
+	(void) debugfs_create_file("panic_sub_zones",
+			S_IRUGO, d, &(omap_gov->steps),
+			&omap_die_gov_fops);
+
 
 	/* Read  and Write properties of die gov */
 	/* ALERT zone threshold */
@@ -698,6 +705,7 @@ static struct notifier_block omap_die_pm_notifier = {
 static int __init omap_governor_init(void)
 {
 	int i;
+	struct device *mpu, *gpu;
 
 	for (i = 0; i < OMAP_GOV_MAX_INSTANCE; i++) {
 		omap_gov_instance[i] = kzalloc(sizeof(struct omap_governor),
@@ -739,6 +747,14 @@ static int __init omap_governor_init(void)
 		       zones_es2_0, sizeof(zones_es2_0));
 	}
 
+	mpu = omap_device_get_by_hwmod_name("mpu");
+	if (!mpu) {
+		pr_err("%s: mpu domain does not know the amount of throttling",
+			__func__);
+		goto error;
+	}
+	omap_gov_instance[OMAP_GOV_CPU_INSTANCE]->steps =
+						opp_get_opp_count(mpu) - 1;
 	omap_gov_instance[OMAP_GOV_CPU_INSTANCE]->thermal_fw.name =
 							"omap_cpu_governor";
 	omap_gov_instance[OMAP_GOV_CPU_INSTANCE]->thermal_fw.domain_name =
@@ -770,6 +786,14 @@ static int __init omap_governor_init(void)
 		       zones_es2_0, sizeof(zones_es2_0));
 	}
 
+	gpu = omap_device_get_by_hwmod_name("gpu");
+	if (!gpu) {
+		pr_err("%s: gpu domain does not know the amount of throttling",
+			__func__);
+		goto mpu_free;
+	}
+	omap_gov_instance[OMAP_GOV_GPU_INSTANCE]->steps =
+						opp_get_opp_count(gpu) - 1;
 	omap_gov_instance[OMAP_GOV_GPU_INSTANCE]->thermal_fw.name =
 							"omap_gpu_governor";
 	omap_gov_instance[OMAP_GOV_GPU_INSTANCE]->thermal_fw.domain_name =
@@ -793,6 +817,11 @@ static int __init omap_governor_init(void)
 
 	return 0;
 
+mpu_free:
+	cancel_delayed_work_sync(
+	&omap_gov_instance[OMAP_GOV_CPU_INSTANCE]->average_gov_sensor_work);
+	thermal_governor_dev_unregister(
+		&omap_gov_instance[OMAP_GOV_CPU_INSTANCE]->thermal_fw);
 error:
 	for (i = 0; i < OMAP_GOV_MAX_INSTANCE; i++)
 		kfree(omap_gov_instance[i]);
