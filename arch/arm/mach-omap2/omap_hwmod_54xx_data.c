@@ -3535,14 +3535,16 @@ static struct omap_hwmod_dma_info omap54xx_mcasp_sdma_reqs[] = {
 
 static struct omap_hwmod_addr_space omap54xx_mcasp_addrs[] = {
 	{
+		.name		= "cfg",
 		.pa_start	= 0x40128000,
-		.pa_end         = 0x40128000 + SZ_4K - 1, /* McASP CFG Port */
-		.flags          = ADDR_TYPE_RT
+		.pa_end		= 0x401283ff,
+		.flags		= ADDR_TYPE_RT
 	},
 	{
-		.pa_start       = 0x4012A000,
-		.pa_end         = 0x4012A000 + SZ_4K - 1, /* McASP Data Port */
-		.flags          = ADDR_TYPE_RT
+		.name		= "dat",
+		.pa_start	= 0x4012a000,
+		.pa_end		= 0x4012a3ff,
+		.flags		= ADDR_TYPE_RT
 	},
 	{ }
 };
@@ -3558,14 +3560,14 @@ static struct omap_hwmod_ocp_if omap54xx_l4_abe__mcasp = {
 
 static struct omap_hwmod_addr_space omap54xx_mcasp_dma_addrs[] = {
 	{
+		.name		= "cfg_dma",
 		.pa_start	= 0x49028000,
-		.pa_end         = 0x49028000 + SZ_4K - 1, /* McASP CFG Port */
-		.flags          = ADDR_TYPE_RT
+		.pa_end		= 0x490283ff,
 	},
 	{
-		.pa_start       = 0x4902A000,
-		.pa_end         = 0x4902A000 + SZ_4K - 1, /* McASP Data Port */
-		.flags          = ADDR_TYPE_RT
+		.name		= "dat_dma",
+		.pa_start	= 0x4902a000,
+		.pa_end		= 0x4902a3ff,
 	},
 	{ }
 };
@@ -4748,12 +4750,12 @@ static struct omap_hwmod_addr_space omap54xx_sata_addrs[] = {
 	{
 		.name		= "ahci",
 		.pa_start	= 0x4a140000,
-		.pa_end		= 0x4a1410ff,
+		.pa_end		= 0x4a1401ff,
 	},
 	{
 		.name		= "sysc",
-		.pa_start	= 0x4A141100,
-		.pa_end		= 0x4A141104,
+		.pa_start	= 0x4a141100,
+		.pa_end		= 0x4a141103,
 		.flags		= ADDR_TYPE_RT
 	},
 	{ }
