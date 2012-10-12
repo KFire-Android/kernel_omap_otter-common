@@ -3242,8 +3242,8 @@ static struct omap_hwmod_class_sysconfig omap54xx_iva_sysc = {
 	.rev_offs	= 0x0000,
 	.sysc_offs	= 0x0010,
 	.sysc_flags	= (SYSC_HAS_MIDLEMODE | SYSC_HAS_SIDLEMODE),
-	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
-			   SIDLE_SMART_WKUP),
+	.idlemodes	= (SIDLE_NO | SIDLE_SMART | MSTANDBY_NO |
+			   MSTANDBY_SMART),
 	.sysc_fields	= &omap_hwmod_sysc_type2,
 };
 
