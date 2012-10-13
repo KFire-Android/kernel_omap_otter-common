@@ -128,11 +128,6 @@
 
 #define TSCADC_CELLS		2
 
-enum tscadc_cells {
-	TSC_CELL,
-	ADC_CELL,
-};
-
 struct mfd_tscadc_board {
 	struct tsc_data *tsc_init;
 	struct adc_data *adc_init;
@@ -143,6 +138,9 @@ struct ti_tscadc_dev {
 	struct regmap *regmap_tscadc;
 	void __iomem *tscadc_base;
 	int irq;
+	int used_cells;	/* 0-2 */
+	int tsc_cell;	/* -1 if not used */
+	int adc_cell;	/* -1 if not used */
 	struct mfd_cell cells[TSCADC_CELLS];
 
 	/* tsc device */

@@ -20,10 +20,11 @@
 #include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/platform_device.h>
-#include <linux/io.h>
 #include <linux/iio/iio.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
+#include <linux/iio/machine.h>
+#include <linux/iio/driver.h>
 
 #include <linux/mfd/ti_am335x_tscadc.h>
 #include <linux/platform_data/ti_am335x_adc.h>
@@ -31,6 +32,8 @@
 struct tiadc_device {
 	struct ti_tscadc_dev *mfd_tscadc;
 	int channels;
+	char *buf;
+	struct iio_map *map;
 };
 
 static unsigned int tiadc_readl(struct tiadc_device *adc, unsigned int reg)
@@ -77,24 +80,56 @@ static void tiadc_step_config(struct tiadc_device *adc_dev)
 static int tiadc_channel_init(struct iio_dev *indio_dev, int channels)
 {
 	struct iio_chan_spec *chan_array;
-	int i;
+	struct iio_chan_spec *chan;
+	char *s;
+	int i, len, size, ret;
 
-	indio_dev->num_channels = channels;
-	chan_array = kcalloc(indio_dev->num_channels,
-			sizeof(struct iio_chan_spec), GFP_KERNEL);
-
+	size = indio_dev->num_channels * (sizeof(struct iio_chan_spec) + 6);
+	chan_array = kzalloc(size, GFP_KERNEL);
 	if (chan_array == NULL)
 		return -ENOMEM;
 
-	for (i = 0; i < (indio_dev->num_channels); i++) {
-		struct iio_chan_spec *chan = chan_array + i;
+	/* buffer space is after the array */
+	s = (char *)(chan_array + indio_dev->num_channels);
+	chan = chan_array;
+	for (i = 0; i < indio_dev->num_channels; i++, chan++, s += len + 1) {
+
+		len = sprintf(s, "AIN%d", i);
+
 		chan->type = IIO_VOLTAGE;
 		chan->indexed = 1;
 		chan->channel = i;
-		chan->info_mask = IIO_CHAN_INFO_RAW_SEPARATE_BIT;
+		chan->datasheet_name = s;
+		chan->scan_type.sign = 'u';
+		chan->scan_type.realbits = 12;
+		chan->scan_type.storagebits = 32;
+		chan->scan_type.shift = 0;
 	}
 
 	indio_dev->channels = chan_array;
+
+	size = (indio_dev->num_channels + 1) * sizeof(struct iio_map);
+	adc_dev->map = kzalloc(size, GFP_KERNEL);
+	if (adc_dev->map == NULL) {
+		kfree(chan_array);
+		return -ENOMEM;
+	}
+
+	for (i = 0; i < indio_dev->num_channels; i++) {
+		adc_dev->map[i].adc_channel_label = chan_array[i].datasheet_name;
+		adc_dev->map[i].consumer_dev_name = "any";
+		adc_dev->map[i].consumer_channel = chan_array[i].datasheet_name;
+	}
+	adc_dev->map[i].adc_channel_label = NULL;
+	adc_dev->map[i].consumer_dev_name = NULL;
+	adc_dev->map[i].consumer_channel = NULL;
+
+	ret = iio_map_array_register(indio_dev, adc_dev->map);
+	if (ret != 0) {
+		kfree(adc_dev->map);
+		kfree(chan_array);
+		return -ENOMEM;
+	}
 
 	return indio_dev->num_channels;
 }

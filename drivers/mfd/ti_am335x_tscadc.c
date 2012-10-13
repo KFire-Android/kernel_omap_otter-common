@@ -186,25 +186,37 @@ static	int ti_tscadc_probe(struct platform_device *pdev)
 	ctrl |= CNTRLREG_TSCSSENB;
 	tscadc_writel(tscadc, REG_CTRL, ctrl);
 
+	tscadc->used_cells = 0;
+	tscadc->tsc_cell = -1;
+	tscadc->adc_cell = -1;
+
 	/* TSC Cell */
-	cell = &tscadc->cells[TSC_CELL];
-	cell->name = "tsc";
-	cell->platform_data = tscadc;
-	cell->pdata_size = sizeof(*tscadc);
+	if (tsc_wires > 0) {
+		tscadc->tsc_cell = tscadc->used_cells;
+		cell = &tscadc->cells[tscadc->used_cells++];
+		cell->name = "tsc";
+		cell->platform_data = tscadc;
+		cell->pdata_size = sizeof(*tscadc);
+	}
 
 	/* ADC Cell */
-	cell = &tscadc->cells[ADC_CELL];
-	cell->name = "tiadc";
-	cell->platform_data = tscadc;
-	cell->pdata_size = sizeof(*tscadc);
+	if (adc_channels > 0) {
+		tscadc->adc_cell = tscadc->used_cells;
+		cell = &tscadc->cells[tscadc->used_cells++];
+		cell->name = "tiadc";
+		cell->platform_data = tscadc;
+		cell->pdata_size = sizeof(*tscadc);
+	}
 
 	err = mfd_add_devices(&pdev->dev, pdev->id, tscadc->cells,
-			TSCADC_CELLS, NULL, 0, NULL);
+			tscadc->used_cells, NULL, 0, NULL);
 	if (err < 0)
 		goto err_disable_clk;
 
 	device_init_wakeup(&pdev->dev, true);
 	platform_set_drvdata(pdev, tscadc);
+
+	dev_info(&pdev->dev, "Initialized OK.\n");
 
 	return 0;
 
