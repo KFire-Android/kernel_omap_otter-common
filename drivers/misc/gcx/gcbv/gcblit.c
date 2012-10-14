@@ -180,7 +180,7 @@ enum bverror do_blit(struct bvbltparams *bvbltparams,
 	int dstpixalign, dstbyteshift;
 	int dstoffsetX, dstoffsetY;
 
-	int srcshiftX, srcshiftY;
+	int srcshiftX, srcshiftY, srctopedge;
 	struct gcrect srcclipped;
 	int srcsurfwidth, srcsurfheight;
 	unsigned int physwidth, physheight;
@@ -239,30 +239,37 @@ enum bverror do_blit(struct bvbltparams *bvbltparams,
 	/* Compute the source surface shift. */
 	switch (srcinfo->angle) {
 	case ROT_ANGLE_0:
+		srctopedge = srcclipped.top;
 		srcshiftX = srcclipped.left - batch->dstadjusted.left;
-		srcshiftY = srcclipped.top  - batch->dstadjusted.top;
+		srcshiftY = srctopedge - batch->dstadjusted.top;
 		break;
 
 	case ROT_ANGLE_90:
+		srctopedge = srcinfo->geom->width - srcclipped.left;
 		srcshiftX = srcclipped.top - batch->dstadjusted.top;
-		srcshiftY = (srcinfo->geom->width - srcclipped.left)
+		srcshiftY = srctopedge
 			  - (batch->dstwidth - batch->dstadjusted.left);
+		srctopedge += 1;
 		break;
 
 	case ROT_ANGLE_180:
+		srctopedge = srcinfo->geom->height - srcclipped.top;
 		srcshiftX = (srcinfo->geom->width - srcclipped.left)
 			  - (batch->dstwidth - batch->dstadjusted.left);
-		srcshiftY = (srcinfo->geom->height - srcclipped.top)
+		srcshiftY = srctopedge
 			  - (batch->dstheight - batch->dstadjusted.top);
+		srctopedge += 1;
 		break;
 
 	case ROT_ANGLE_270:
+		srctopedge = srcclipped.left;
 		srcshiftX = (srcinfo->geom->height - srcclipped.top)
 			  - (batch->dstheight - batch->dstadjusted.top);
-		srcshiftY = srcclipped.left - batch->dstadjusted.left;
+		srcshiftY = srctopedge - batch->dstadjusted.left;
 		break;
 
 	default:
+		srctopedge = 0;
 		srcshiftX = 0;
 		srcshiftY = 0;
 	}
@@ -274,7 +281,9 @@ enum bverror do_blit(struct bvbltparams *bvbltparams,
 	 * aligned on the base address, then we are also aligned at the
 	 * beginning of a sample. */
 	if (srcinfo->format.type == BVFMT_YUV) {
-		int mody = srcshiftY % srcinfo->format.cs.yuv.ysample;
+		int mody = (srctopedge + srcshiftY)
+			 % srcinfo->format.cs.yuv.ysample;
+
 		if (mody < 0)
 			mody = srcinfo->format.cs.yuv.ysample + mody;
 
@@ -305,6 +314,10 @@ enum bverror do_blit(struct bvbltparams *bvbltparams,
 			   * (int) srcinfo->format.bitspp / 8;
 	srcshiftX += srcinfo->xpixalign;
 
+	/* NOTE: at this point the source is ready to be presented,
+	 * srcinfo->xpixalign and srcinfo->ypixalign represent additional
+	 * adjustments for the DESTINATION. */
+
 	GCDBG(GCZONE_SURF, "  adjusted surface offset (pixels) = %d,%d\n",
 	      srcshiftX, srcshiftY);
 	GCDBG(GCZONE_SURF, "  adjusted surface offset (bytes) = 0x%08X\n",
@@ -315,10 +328,12 @@ enum bverror do_blit(struct bvbltparams *bvbltparams,
 	    (srcinfo->format.cs.yuv.planecount > 1))
 		set_computeyuv(srcinfo, srcshiftX, srcshiftY);
 
-	/* Determine the destination surface shift. */
+	/* Set precomputed destination adjustments based on the destination
+	 * base address misalignment only. */
 	dstshiftX = dstinfo->xpixalign;
 	dstshiftY = dstinfo->ypixalign;
 
+	/* Apply source adjustemnts. */
 	if (srcinfo->angle == dstinfo->angle) {
 		dstshiftX += srcinfo->xpixalign;
 		dstshiftY += srcinfo->ypixalign;
@@ -333,7 +348,9 @@ enum bverror do_blit(struct bvbltparams *bvbltparams,
 		     + dstshiftX * (int) dstinfo->format.bitspp / 8;
 
 	/* Compute the destination offset in pixels needed to compensate
-	 * for the surface base address misalignment if any. */
+	 * for the surface base address misalignment if any. If dstpixalign
+	 * comes out anything other than zero, multisource blit cannot be
+	 * performed. */
 	dstpixalign = get_pixel_offset(dstinfo, dstbyteshift);
 
 	GCDBG(GCZONE_SURF, "destination surface:\n");
@@ -346,35 +363,12 @@ enum bverror do_blit(struct bvbltparams *bvbltparams,
 
 	if ((dstpixalign != 0) ||
 	    ((srcinfo->xpixalign != 0) && (srcinfo->angle == dstinfo->angle))) {
-		/* Compute the source offset in pixels needed to compensate
-		 * for the surface base address misalignment if any. */
-		srcinfo->xpixalign = get_pixel_offset(srcinfo, 0);
-		srcinfo->ypixalign = 0;
-
-		/* Compute the surface offsets in bytes. */
-		srcinfo->bytealign = srcinfo->xpixalign
-				   * (int) srcinfo->format.bitspp / 8;
-
-		/* Overwrite destination byte offset. */
-		dstbyteshift = dstinfo->bytealign;
-
-		GCDBG(GCZONE_SURF, "recomputed for single-source setup:\n");
-		GCDBG(GCZONE_SURF, "  srcpixalign = %d,%d\n",
-		      srcinfo->xpixalign, srcinfo->ypixalign);
-		GCDBG(GCZONE_SURF, "  srcsurf offset (bytes) = 0x%08X\n",
-		      srcinfo->bytealign);
-		GCDBG(GCZONE_SURF, "  dstsurf offset (bytes) = 0x%08X\n",
-		      dstinfo->bytealign);
-
-		/* Compute U/V plane offsets. */
-		if ((srcinfo->format.type == BVFMT_YUV) &&
-		    (srcinfo->format.cs.yuv.planecount > 1))
-			set_computeyuv(srcinfo, 0, 0);
-
+		/* Adjust the destination to match the source geometry. */
 		switch (srcinfo->angle) {
 		case ROT_ANGLE_0:
-			/* Adjust left coordinate. */
-			srcclipped.left -= srcinfo->xpixalign;
+			/* Adjust coordinates. */
+			srcclipped.left -= srcshiftX;
+			srcclipped.top  -= srcshiftY;
 
 			/* Determine source size. */
 			srcsurfwidth = srcinfo->geom->width
@@ -384,7 +378,7 @@ enum bverror do_blit(struct bvbltparams *bvbltparams,
 
 		case ROT_ANGLE_90:
 			/* Adjust top coordinate. */
-			srcclipped.top -= srcinfo->xpixalign;
+			srcclipped.top -= srcshiftX;
 
 			/* Determine source size. */
 			srcsurfwidth = srcinfo->geom->height
@@ -400,6 +394,9 @@ enum bverror do_blit(struct bvbltparams *bvbltparams,
 			break;
 
 		case ROT_ANGLE_270:
+			/* Adjust coordinates. */
+			srcclipped.left -= srcshiftY;
+
 			/* Determine source size. */
 			srcsurfwidth = srcinfo->geom->height
 				     - srcinfo->xpixalign;
@@ -415,6 +412,9 @@ enum bverror do_blit(struct bvbltparams *bvbltparams,
 		      srcclipped.left, srcclipped.top);
 		GCDBG(GCZONE_SURF, "source physical size = %dx%d\n",
 		      srcsurfwidth, srcsurfheight);
+
+		/* Overwrite destination byte offset. */
+		dstbyteshift = dstinfo->bytealign;
 
 		/* No adjustment necessary for single-source. */
 		dstoffsetX = 0;
@@ -441,8 +441,7 @@ enum bverror do_blit(struct bvbltparams *bvbltparams,
 			dstoffsetY = srcinfo->ypixalign;
 
 			/* Apply the source alignment. */
-			if ((dstinfo->angle == ROT_ANGLE_0) ||
-			    (dstinfo->angle == ROT_ANGLE_180)) {
+			if ((dstinfo->angle % 2) == 0) {
 				physwidth  = dstinfo->physwidth
 					   - srcinfo->xpixalign;
 				physheight = dstinfo->physheight
@@ -461,8 +460,7 @@ enum bverror do_blit(struct bvbltparams *bvbltparams,
 			dstoffsetY = srcinfo->xpixalign;
 
 			/* Apply the source alignment. */
-			if ((dstinfo->angle == ROT_ANGLE_0) ||
-			    (dstinfo->angle == ROT_ANGLE_180)) {
+			if ((dstinfo->angle % 2) == 0) {
 				physwidth  = dstinfo->physwidth
 					   - srcinfo->ypixalign;
 				physheight = dstinfo->physheight
@@ -481,8 +479,7 @@ enum bverror do_blit(struct bvbltparams *bvbltparams,
 			dstoffsetY = 0;
 
 			/* Apply the source alignment. */
-			if ((dstinfo->angle == ROT_ANGLE_0) ||
-			    (dstinfo->angle == ROT_ANGLE_180)) {
+			if ((dstinfo->angle % 2) == 0) {
 				physwidth  = dstinfo->physwidth
 					   - srcinfo->xpixalign;
 				physheight = dstinfo->physheight
@@ -501,8 +498,7 @@ enum bverror do_blit(struct bvbltparams *bvbltparams,
 			dstoffsetY = 0;
 
 			/* Apply the source alignment. */
-			if ((dstinfo->angle == ROT_ANGLE_0) ||
-			    (dstinfo->angle == ROT_ANGLE_180)) {
+			if ((dstinfo->angle % 2) == 0) {
 				physwidth  = dstinfo->physwidth
 					   - srcinfo->ypixalign;
 				physheight = dstinfo->physheight

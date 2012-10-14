@@ -1309,7 +1309,7 @@ static bool valid_geom(struct surfaceinfo *surfaceinfo)
 	/* Compute the size of the surface. */
 	size = (surfaceinfo->geom->width *
 		surfaceinfo->geom->height *
-		surfaceinfo->format.bitspp) / 8;
+		surfaceinfo->format.allocbitspp) / 8;
 
 	/* Make sure the size is not greater then the surface. */
 	if (size > surfaceinfo->buf.desc->length) {
