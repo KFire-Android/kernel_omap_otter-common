@@ -21,4 +21,13 @@ config ST_GPS
 	  This enables the GPS driver for TI BT/FM/GPS combo devices.
 	  It will provide a character device for the TI GPS host software to
 	  access the GPS core.
+
+config ST_HCI
+	tristate "HCI TTY emulation driver for Bluetooth"
+	depends on TI_ST
+	help
+	  This enables the TTY device like emulation for HCI used by
+	  user-space Bluetooth stacks.
+	  It will provide a character device for user space Bluetooth stack to
+	  send/receive data over shared transport.
 endmenu
