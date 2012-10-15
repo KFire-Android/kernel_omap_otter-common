@@ -340,7 +340,7 @@ static struct omap_opp_def __initdata omap5430_es1_opp_def_list[] = {
 	OPP_INITIALIZER(&gpu_dev_info, false, 532000000, OMAP5430_VDD_MM_OPP_OD),
 };
 
-/**
+/*
  * OMAP5432 devices will use DDR3 memory which requires the CORE voltage
  * domain to stay at OPP NOM. Anything sourced from VDD_CORE must stay
  * at OPP NOM as well.
