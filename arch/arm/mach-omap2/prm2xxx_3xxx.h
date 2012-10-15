@@ -327,6 +327,10 @@ extern int omap2_prm_deassert_hardreset(s16 prm_mod, u8 rst_shift, u8 st_shift);
 u32 omap3_prm_vp_check_txdone(u8 vp_id);
 void omap3_prm_vp_clear_txdone(u8 vp_id);
 
+/* OMAP36xx-specific ABB functions */
+u32 omap3_prm_abb_check_txdone(u8 vp_id);
+void omap3_prm_abb_clear_txdone(u8 vp_id);
+
 /*
  * OMAP3 access functions for voltage controller (VC) and
  * voltage proccessor (VP) in the PRM.

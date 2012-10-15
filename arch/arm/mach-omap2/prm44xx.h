@@ -755,6 +755,10 @@ extern u32 omap4_prm_rmw_inst_reg_bits(u32 mask, u32 bits, s16 inst, s16 idx);
 u32 omap4_prm_vp_check_txdone(u8 vp_id);
 void omap4_prm_vp_clear_txdone(u8 vp_id);
 
+/* OMAP4-specific ABB functions */
+u32 omap4_prm_abb_check_txdone(u8 abb_id);
+void omap4_prm_abb_clear_txdone(u8 abb_id);
+
 /*
  * OMAP4 access functions for voltage controller (VC) and
  * voltage proccessor (VP) in the PRM.
