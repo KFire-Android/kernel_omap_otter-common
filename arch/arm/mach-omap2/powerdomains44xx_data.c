@@ -38,7 +38,7 @@ static struct powerdomain core_44xx_pwrdm = {
 	.prcm_offs	  = OMAP4430_PRM_CORE_INST,
 	.prcm_partition	  = OMAP4430_PRM_PARTITION,
 	.context_offs	  = OMAP4_RM_L3_1_L3_1_CONTEXT_OFFSET,
-	.pwrsts		  = PWRSTS_RET_ON,
+	.pwrsts		  = PWRSTS_RET_INA_ON,
 	.pwrsts_logic_ret = PWRSTS_OFF_RET,
 	.banks		  = 5,
 	.pwrsts_mem_ret	= {
@@ -73,7 +73,7 @@ static struct powerdomain gfx_44xx_pwrdm = {
 	.voltdm		  = { .name = "core" },
 	.prcm_offs	  = OMAP4430_PRM_GFX_INST,
 	.prcm_partition	  = OMAP4430_PRM_PARTITION,
-	.pwrsts		  = PWRSTS_OFF_ON,
+	.pwrsts		  = PWRSTS_OFF_INA_ON,
 	.banks		  = 1,
 	.pwrsts_mem_ret	= {
 		[0] = PWRSTS_OFF,	/* gfx_mem */
@@ -98,7 +98,7 @@ static struct powerdomain abe_44xx_pwrdm = {
 	.voltdm		  = { .name = "iva" },
 	.prcm_offs	  = OMAP4430_PRM_ABE_INST,
 	.prcm_partition	  = OMAP4430_PRM_PARTITION,
-	.pwrsts		  = PWRSTS_OFF_RET_ON,
+	.pwrsts		  = PWRSTS_OFF_RET_INA_ON,
 	.pwrsts_logic_ret = PWRSTS_OFF,
 	.banks		  = 2,
 	.pwrsts_mem_ret	= {
@@ -126,7 +126,7 @@ static struct powerdomain dss_44xx_pwrdm = {
 	.voltdm		  = { .name = "core" },
 	.prcm_offs	  = OMAP4430_PRM_DSS_INST,
 	.prcm_partition	  = OMAP4430_PRM_PARTITION,
-	.pwrsts		  = PWRSTS_OFF_RET_ON,
+	.pwrsts		  = PWRSTS_OFF_RET_INA_ON,
 	.pwrsts_logic_ret = PWRSTS_OFF,
 	.banks		  = 1,
 	.pwrsts_mem_ret	= {
@@ -152,7 +152,7 @@ static struct powerdomain tesla_44xx_pwrdm = {
 	.voltdm		  = { .name = "iva" },
 	.prcm_offs	  = OMAP4430_PRM_TESLA_INST,
 	.prcm_partition	  = OMAP4430_PRM_PARTITION,
-	.pwrsts		  = PWRSTS_OFF_RET_ON,
+	.pwrsts		  = PWRSTS_OFF_RET_INA_ON,
 	.pwrsts_logic_ret = PWRSTS_OFF_RET,
 	.banks		  = 3,
 	.pwrsts_mem_ret	= {
@@ -198,7 +198,7 @@ static struct powerdomain cpu0_44xx_pwrdm = {
 	.voltdm		  = { .name = "mpu" },
 	.prcm_offs	  = OMAP4430_PRCM_MPU_CPU0_INST,
 	.prcm_partition	  = OMAP4430_PRCM_MPU_PARTITION,
-	.pwrsts		  = PWRSTS_OFF_RET_ON,
+	.pwrsts		  = PWRSTS_OFF_RET_INA_ON,
 	.pwrsts_logic_ret = PWRSTS_OFF_RET,
 	.banks		  = 1,
 	.pwrsts_mem_ret	= {
@@ -224,7 +224,7 @@ static struct powerdomain cpu1_44xx_pwrdm = {
 	.voltdm		  = { .name = "mpu" },
 	.prcm_offs	  = OMAP4430_PRCM_MPU_CPU1_INST,
 	.prcm_partition	  = OMAP4430_PRCM_MPU_PARTITION,
-	.pwrsts		  = PWRSTS_OFF_RET_ON,
+	.pwrsts		  = PWRSTS_OFF_RET_INA_ON,
 	.pwrsts_logic_ret = PWRSTS_OFF_RET,
 	.banks		  = 1,
 	.pwrsts_mem_ret	= {
@@ -261,13 +261,13 @@ static struct powerdomain emu_44xx_pwrdm = {
 };
 
 /* mpu_44xx_pwrdm: Modena processor and the Neon coprocessor power domain */
-static struct powerdomain mpu_44xx_pwrdm = {
+static struct powerdomain mpu_443x_pwrdm = {
 	.name		  = "mpu_pwrdm",
 	.voltdm		  = { .name = "mpu" },
 	.prcm_offs	  = OMAP4430_PRM_MPU_INST,
 	.prcm_partition	  = OMAP4430_PRM_PARTITION,
 	.context_offs	  = OMAP4_RM_MPU_MPU_CONTEXT_OFFSET,
-	.pwrsts		  = PWRSTS_RET_ON,
+	.pwrsts		  = PWRSTS_OFF_RET_INA_ON,
 	.pwrsts_logic_ret = PWRSTS_OFF_RET,
 	.banks		  = 3,
 	.pwrsts_mem_ret	= {
@@ -291,13 +291,41 @@ static struct powerdomain mpu_44xx_pwrdm = {
 	}
 };
 
+static struct powerdomain mpu_446x_447x_pwrdm = {
+	.name		  = "mpu_pwrdm",
+	.voltdm		  = { .name = "mpu" },
+	.prcm_offs	  = OMAP4430_PRM_MPU_INST,
+	.prcm_partition	  = OMAP4430_PRM_PARTITION,
+	.context_offs	  = OMAP4_RM_MPU_MPU_CONTEXT_OFFSET,
+	.pwrsts		  = PWRSTS_RET_INA_ON,
+	.pwrsts_logic_ret = PWRSTS_OFF_RET,
+	.banks		  = 2,
+	.pwrsts_mem_ret	= {
+		[0] = PWRSTS_OFF_RET,	/* mpu_l2 */
+		[1] = PWRSTS_RET,	/* mpu_ram */
+	},
+	.pwrsts_mem_on	= {
+		[0] = PWRSTS_ON,	/* mpu_l2 */
+		[1] = PWRSTS_ON,	/* mpu_ram */
+	},
+	.wakeup_lat = {
+		/* CPUIdle and suspend controls this explicitly */
+		[PWRDM_POWER_OFF] = UNSUP_STATE,
+		[PWRDM_POWER_OSWR] = UNSUP_STATE,
+		[PWRDM_POWER_CSWR] = UNSUP_STATE,
+		[PWRDM_POWER_RET] = UNSUP_STATE,
+		[PWRDM_POWER_INACTIVE] = UNSUP_STATE,
+		[PWRDM_POWER_ON] = UNSUP_STATE,
+	}
+};
+
 /* ivahd_44xx_pwrdm: IVA-HD power domain */
 static struct powerdomain ivahd_44xx_pwrdm = {
 	.name		  = "ivahd_pwrdm",
 	.voltdm		  = { .name = "iva" },
 	.prcm_offs	  = OMAP4430_PRM_IVAHD_INST,
 	.prcm_partition	  = OMAP4430_PRM_PARTITION,
-	.pwrsts		  = PWRSTS_OFF_RET_ON,
+	.pwrsts		  = PWRSTS_OFF_RET_INA_ON,
 	.pwrsts_logic_ret = PWRSTS_OFF,
 	.banks		  = 4,
 	.pwrsts_mem_ret	= {
@@ -329,7 +357,7 @@ static struct powerdomain cam_44xx_pwrdm = {
 	.voltdm		  = { .name = "core" },
 	.prcm_offs	  = OMAP4430_PRM_CAM_INST,
 	.prcm_partition	  = OMAP4430_PRM_PARTITION,
-	.pwrsts		  = PWRSTS_OFF_ON,
+	.pwrsts		  = PWRSTS_OFF_INA_ON,
 	.banks		  = 1,
 	.pwrsts_mem_ret	= {
 		[0] = PWRSTS_OFF,	/* cam_mem */
@@ -354,7 +382,7 @@ static struct powerdomain l3init_44xx_pwrdm = {
 	.voltdm		  = { .name = "core" },
 	.prcm_offs	  = OMAP4430_PRM_L3INIT_INST,
 	.prcm_partition	  = OMAP4430_PRM_PARTITION,
-	.pwrsts		  = PWRSTS_RET_ON,
+	.pwrsts		  = PWRSTS_RET_INA_ON,
 	.pwrsts_logic_ret = PWRSTS_OFF_RET,
 	.banks		  = 1,
 	.pwrsts_mem_ret	= {
@@ -380,7 +408,7 @@ static struct powerdomain l4per_44xx_pwrdm = {
 	.voltdm		  = { .name = "core" },
 	.prcm_offs	  = OMAP4430_PRM_L4PER_INST,
 	.prcm_partition	  = OMAP4430_PRM_PARTITION,
-	.pwrsts		  = PWRSTS_RET_ON,
+	.pwrsts		  = PWRSTS_RET_INA_ON,
 	.pwrsts_logic_ret = PWRSTS_OFF_RET,
 	.banks		  = 2,
 	.pwrsts_mem_ret	= {
@@ -420,7 +448,7 @@ static struct powerdomain cefuse_44xx_pwrdm = {
 	.voltdm		  = { .name = "core" },
 	.prcm_offs	  = OMAP4430_PRM_CEFUSE_INST,
 	.prcm_partition	  = OMAP4430_PRM_PARTITION,
-	.pwrsts		  = PWRSTS_OFF_ON,
+	.pwrsts		  = PWRSTS_OFF_INA_ON,
 	.flags		  = PWRDM_HAS_LOWPOWERSTATECHANGE,
 };
 
@@ -443,7 +471,6 @@ static struct powerdomain *powerdomains_omap44xx[] __initdata = {
 	&cpu0_44xx_pwrdm,
 	&cpu1_44xx_pwrdm,
 	&emu_44xx_pwrdm,
-	&mpu_44xx_pwrdm,
 	&ivahd_44xx_pwrdm,
 	&cam_44xx_pwrdm,
 	&l3init_44xx_pwrdm,
@@ -453,9 +480,27 @@ static struct powerdomain *powerdomains_omap44xx[] __initdata = {
 	NULL
 };
 
+static struct powerdomain *powerdomains_omap443x[] __initdata = {
+	&mpu_443x_pwrdm,
+	NULL
+};
+
+static struct powerdomain *powerdomains_omap446x_447x[] __initdata = {
+	&mpu_446x_447x_pwrdm,
+	NULL
+};
+
 void __init omap44xx_powerdomains_init(void)
 {
 	pwrdm_register_platform_funcs(&omap4_pwrdm_operations);
 	pwrdm_register_pwrdms(powerdomains_omap44xx);
+
+	if (cpu_is_omap443x())
+		pwrdm_register_pwrdms(powerdomains_omap443x);
+	else if (cpu_is_omap446x() || cpu_is_omap447x())
+		pwrdm_register_pwrdms(powerdomains_omap446x_447x);
+	else
+		WARN(true, "omap4: powerdomains data not defined\n");
+
 	pwrdm_complete_init();
 }

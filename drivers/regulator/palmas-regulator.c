@@ -618,12 +618,31 @@ static int palmas_set_voltage_ldo_sel(struct regulator_dev *dev,
 	int id = rdev_get_id(dev);
 	unsigned int reg = 0;
 	unsigned int addr;
+	bool enable_ldo9 = 0;
+
+	/*
+	 * Workaround for palmas bug when voltage transition
+	 * from 3.3V to 1.8V takes ~50-60 ms.
+	 * Disable voltage before switching to 1.8V and then enbable again
+	 * COBRA-1.0BUG00154: Palmas PMIC: LDO9 Ramp Time Issue.
+	 */
+	if (id == PALMAS_REG_LDO9) {
+		int voltage = palmas_list_voltage_ldo(dev, selector);
+
+		if (voltage == 1800000) {
+			palmas_disable_ldo(dev);
+			enable_ldo9 = 1;
+		}
+	}
 
 	addr = palmas_regs_info[id].vsel_addr;
 
 	reg = selector;
 
 	palmas_ldo_write(pmic->palmas, addr, reg);
+
+	if (enable_ldo9)
+		palmas_enable_ldo(dev);
 
 	return 0;
 }

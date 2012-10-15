@@ -2094,25 +2094,27 @@ static int rproc_loader_thread(struct rproc *rproc)
 	unsigned long to;
 	int ret;
 
-	/* wait until 120 secs waiting for the firmware */
+	/* wait until 120 secs for the firmware */
 	to = jiffies + msecs_to_jiffies(120000);
 
 	/* wait until uevent can be sent */
-	do {
-		ret = kobject_uevent(&dev->kobj, KOBJ_CHANGE);
-	} while (ret && time_after(to, jiffies));
+	while (kobject_uevent(&dev->kobj, KOBJ_CHANGE) &&
+				time_after(to, jiffies))
+		msleep(1000);
 
-	if (ret) {
+	if (time_before(to, jiffies)) {
+		ret = -ETIME;
 		dev_err(dev, "failed waiting for udev %d\n", ret);
 		return ret;
 	}
 
 	/* make some retries in case FS is not up yet */
-	do {
-		ret = request_firmware(&fw, rproc->firmware, dev);
-	} while (ret && time_after(to, jiffies));
+	while (request_firmware(&fw, rproc->firmware, dev) &&
+				time_after(to, jiffies))
+		msleep(1000);
 
-	if (ret || !fw) {
+	if (!fw) {
+		ret = -ETIME;
 		dev_err(dev, "error %d requesting firmware %s\n",
 							ret, rproc->firmware);
 		return ret;
