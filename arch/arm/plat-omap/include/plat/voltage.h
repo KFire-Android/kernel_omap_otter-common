@@ -38,6 +38,7 @@ struct omap_volt_data {
 	u32	lvt_sr_efuse_offs;
 	u8	sr_errminlimit;
 	u8	vp_errgain;
+	u8	opp_sel;
 };
 struct voltagedomain;
 
