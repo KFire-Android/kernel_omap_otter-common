@@ -1036,6 +1036,7 @@ static void __init omap_5430evm_init(void)
 #endif
 	omap5_mux_init(board_mux, NULL, OMAP_PACKAGE_CBL);
 	omap_sdrc_init(NULL, NULL);
+	omap_init_board_version(BOARD_MAKE_VERSION(BOARD_OMAP5_SEVM, 0));
 	omap_create_board_props();
 	omap_5430evm_i2c_init();
 	omap_msecure_init();
@@ -1063,7 +1064,7 @@ static void __init omap_5430evm_init(void)
 	/* TODO: Once the board identification is passed in from the
 	 * bootloader pass in the HACK board ID to the conn board file
 	*/
-	omap4plus_connectivity_init(OMAP5_SEVM_BOARD_ID);
+	omap4plus_connectivity_init();
 	omap_hsmmc_init(mmc);
 	usb_dwc3_init();
 	platform_add_devices(omap5evm_devices, ARRAY_SIZE(omap5evm_devices));

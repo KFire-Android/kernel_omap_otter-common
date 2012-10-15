@@ -985,6 +985,7 @@ static void __init omap_5_panda_init(void)
 {
 	omap5_mux_init(board_mux, NULL, OMAP_PACKAGE_CBL);
 	omap_sdrc_init(NULL, NULL);
+	omap_init_board_version(BOARD_MAKE_VERSION(BOARD_OMAP5_UEVM, 0));
 	omap_create_board_props();
 	omap5pandai2c_init();
 	omap5_pmic_init(1, PALMAS_NAME, OMAP44XX_IRQ_SYS_1N, PALMAS_DATA,
@@ -998,7 +999,7 @@ static void __init omap_5_panda_init(void)
 	/* TODO: Once the board identification is passed in from the
 	 * bootloader pass in the HACK board ID to the conn board file
 	*/
-	omap4plus_connectivity_init(OMAP5_PANDA5_BOARD_ID);
+	omap4plus_connectivity_init();
 
 	omap_hsmmc_init(mmc);
 	usb_dwc3_init();

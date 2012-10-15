@@ -22,6 +22,7 @@
 #include <asm/system_info.h>
 #include <mach/id.h>
 #include <linux/platform_device.h>
+#include <linux/string.h>
 
 #include <mach/hardware.h>
 
@@ -138,4 +139,160 @@ err_soc_obj:
 err_board_obj:
 	if (!board_props_kobj || !soc_kobj || ret)
 		pr_err("failed to create board_properties\n");
+}
+
+static struct {
+	u32 class;
+	char *name;
+} boards_info[] __initdata = {
+	{
+		.class = BOARD_OMAP4_PANDA,
+		.name = "Panda",
+	},
+	{
+		.class = BOARD_OMAP4_BLAZE,
+		.name = "Blaze/SDP",
+	},
+	{
+		.class = BOARD_OMAP4_TABLET1,
+		.name = "Tablet 1",
+	},
+	{
+		.class = BOARD_OMAP4_TABLET2,
+		.name = "Tablet 2",
+	},
+	{
+		.class = BOARD_OMAP5_SEVM,
+		.name = "sEVM",
+	},
+	{
+		.class = BOARD_OMAP5_SEVM2,
+		.name = "sEVM",
+	},
+	{
+		.class = BOARD_OMAP5_SEVM3,
+		.name = "sEVM",
+	},
+	{
+		.class = BOARD_OMAP5_UEVM,
+		.name = "uEVM",
+	},
+	{
+		.class = BOARD_OMAP5_UEVM2,
+		.name = "uEVM",
+	},
+	{
+		.class = BOARD_OMAP5_TEVM,
+		.name = "tEVM",
+	},
+};
+
+/**
+ * struct board_revision -The board revision info
+ *
+ * @class:	board class
+ * @rev_mod:	board version (includes board class and revision)
+ * @rev:	revision of specific board
+ * @name:	board name
+ *
+ * The board revision is string which stored in the board EEPROM.
+ * The string format is xxx -BBBB-CCC(x). Here is:
+ * - BBBB - value reflects major changes in board,
+ * - CCC  - minor changes.
+ * Boot-loader converts this string into decimal value and passes it to
+ * the kernel.
+ * struct board_revision stores hex-converted data.
+ * Example: 2170001 in decimal will be converted into 0x2170001
+ */
+struct board_revision {
+	int class;
+	int rev_mod;
+	int rev;
+	char name[BOARD_NAME_MAX_SIZE];
+};
+
+static struct board_revision omap_board;
+
+int __init omap_init_board_version(int forced_rev)
+{
+	int i = 0, hex = 0, dec = system_rev;
+
+	if (forced_rev)
+		dec = forced_rev;
+
+	switch (dec) {
+	/*
+	 * U-BOOT passing fake board identifiers for Blaze(4430SDP) and
+	 * Panda boards. We have to have separate checks for them.
+	 */
+	case OMAP4_PANDA:
+		omap_board.class = BOARD_OMAP4_PANDA;
+		omap_board.rev_mod = (BOARD_OMAP4_PANDA << BOARD_CLASS_OFF);
+		break;
+	case OMAP4_BLAZE:
+		omap_board.class = BOARD_OMAP4_BLAZE;
+		omap_board.rev_mod = (BOARD_OMAP4_BLAZE << BOARD_CLASS_OFF);
+		break;
+	default:
+		/*
+		 * Converting to heximal value,
+		 * e.g. dec:2170003 became a 0x2170003,
+		 * this make check process more easy and quick
+		 */
+		do {
+			hex |= dec%10 << i*4;
+			i++;
+		} while (dec /= 10);
+
+		i = 0;
+		omap_board.class = hex >> BOARD_CLASS_OFF;
+		omap_board.rev_mod = hex;
+		omap_board.rev = BOARD_GET_REV(hex);
+	}
+
+	for (i = 0; i < ARRAY_SIZE(boards_info); i++) {
+		if (omap_board.class == boards_info[i].class) {
+			strlcpy(omap_board.name, boards_info[i].name,
+						 BOARD_NAME_MAX_SIZE);
+			return omap_board.rev_mod;
+		}
+	}
+
+	strcpy(omap_board.name, "UNKNOWN");
+	return omap_board.rev_mod;
+}
+
+bool omap_is_board_version(int req_board_version)
+{
+	return req_board_version == omap_board.rev_mod;
+}
+
+int omap_get_board_version(void)
+{
+	return omap_board.rev_mod;
+}
+
+bool omap_is_board_class(int req_class)
+{
+	return req_class == omap_board.class;
+}
+
+int omap_get_board_class(void)
+{
+	return omap_board.class;
+}
+
+bool omap_is_board_revision(int req_rev)
+{
+	return req_rev == omap_board.rev;
+}
+
+int omap_get_board_revision(void)
+{
+	return omap_board.rev;
+}
+
+const char *omap_get_board_name()
+{
+	return (const char *)omap_board.name;
 }

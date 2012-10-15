@@ -580,6 +580,7 @@ static void __init omap_tablet_init(void)
 #endif
 
 	omap4_mux_init(board_mux, NULL, package);
+	omap_init_board_version(0);
 	omap_create_board_props();
 	omap4_i2c_init();
 	platform_add_devices(tablet_devices, ARRAY_SIZE(tablet_devices));
@@ -597,7 +598,7 @@ static void __init omap_tablet_init(void)
 	tablet_camera_mux_init();
 	tablet_sensor_init();
 	tablet_button_init();
-	omap4plus_connectivity_init(OMAP4_TABLET_2_0_ID);
+	omap4plus_connectivity_init();
 	status = omap_ethernet_init();
 	if (status) {
 		pr_err("Ethernet initialization failed: %d\n", status);

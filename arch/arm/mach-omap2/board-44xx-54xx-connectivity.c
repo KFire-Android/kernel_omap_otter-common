@@ -365,18 +365,24 @@ static struct wilink_board_init_data __initdata omap5_wilink_init_data = {
 	}
 };
 
-int __init omap4plus_connectivity_init(int board_type)
+int __init omap4plus_connectivity_init(void)
 {
 	struct wilink_board_init_data *idata;
-	switch (board_type) {
-	case OMAP5_SEVM_BOARD_ID:
+	int board_class = omap_get_board_class();
+
+	switch (board_class) {
+	case BOARD_OMAP5_SEVM:
+	case BOARD_OMAP5_SEVM2:
+	case BOARD_OMAP5_SEVM3:
 		idata = &omap5_wilink_init_data;
 		break;
-	case OMAP5_PANDA5_BOARD_ID:
+	case BOARD_OMAP5_UEVM:
+	case BOARD_OMAP5_UEVM2:
 		idata = &omap5_wilink_init_data;
 		idata->wifi_gpio_irq = OMAP5_GPIO_WIFI_PANDA5_IRQ;
 		break;
-	case OMAP4_TABLET_2_0_ID:
+	case BOARD_OMAP4_TABLET1:
+	case BOARD_OMAP4_TABLET2:
 		idata = &omap4_wilink_init_data;
 		omap4plus_wilink_pdata.nshutdown_gpio = OMAP4_BT_NSHUTDOWN_GPIO;
 		omap4plus_vmmc_regulator.consumer_supplies = &omap4_vmmc5_supply;
@@ -384,8 +390,8 @@ int __init omap4plus_connectivity_init(int board_type)
 				OMAP4_WILINK_UART_DEV_NAME);
 		break;
 	default:
-		pr_err("%s: Error: Unsupported board type: 0x%04x\n",
-				__func__, board_type);
+		pr_err("%s: Error: Unsupported board class: 0x%04x\n",
+				__func__, board_class);
 		return -EINVAL;
 	}
 

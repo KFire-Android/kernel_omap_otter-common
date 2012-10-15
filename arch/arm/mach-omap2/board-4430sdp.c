@@ -1227,7 +1227,7 @@ static void __init omap_4430sdp_init(void)
 #endif
 
 	omap4_mux_init(board_mux, NULL, package);
-	omap_create_board_props();
+	omap_init_board_version(0);
 
 	omap4_i2c_init();
 	blaze_sensor_init();
