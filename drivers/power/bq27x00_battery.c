@@ -75,6 +75,7 @@
 struct bq27x00_device_info;
 struct bq27x00_access_methods {
 	int (*read)(struct bq27x00_device_info *di, u8 reg, bool single);
+	int (*write)(struct bq27x00_device_info *di, u8 reg, u8 val);
 };
 
 enum bq27x00_chip { BQ27000, BQ27500, BQ27530 };
@@ -152,6 +153,12 @@ static inline int bq27x00_read(struct bq27x00_device_info *di, u8 reg,
 		bool single)
 {
 	return di->bus.read(di, reg, single);
+}
+
+static inline int bq27x00_write(struct bq27x00_device_info *di, u8 reg,
+				u8 val)
+{
+	return di->bus.write(di, reg, val);
 }
 
 /*
@@ -796,6 +803,13 @@ static int bq27x00_read_i2c(struct bq27x00_device_info *di, u8 reg, bool single)
 	return ret;
 }
 
+static int bq27x00_write_i2c(struct bq27x00_device_info *di, u8 reg, u8 val)
+{
+	struct i2c_client *client = to_i2c_client(di->dev);
+
+	return i2c_smbus_write_byte_data(client, reg, val);
+}
+
 static int bq27x00_battery_probe(struct i2c_client *client,
 				 const struct i2c_device_id *id)
 {
@@ -833,6 +847,7 @@ static int bq27x00_battery_probe(struct i2c_client *client,
 	di->chip = id->driver_data;
 	di->bat.name = name;
 	di->bus.read = &bq27x00_read_i2c;
+	di->bus.write = &bq27x00_write_i2c;
 	di->gpio = client->irq;
 	retval = gpio_request_one(di->gpio, GPIOF_IN, "bq_gpio");
 	if (retval < 0) {
