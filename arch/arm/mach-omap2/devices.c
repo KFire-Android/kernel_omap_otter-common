@@ -422,6 +422,42 @@ static void __init omap_init_mcpdm(void)
 	struct platform_device *pdev;
 	struct omap_mcpdm_pdata *pdata;
 
+	/*
+	* Init McPDM pins to prevent the occurrence of
+	* noise at the output of the Audio IC
+	*/
+	if (cpu_is_omap44xx()) {
+		omap_mux_init_signal("abe_pdm_ul_data.abe_pdm_ul_data",
+				OMAP_PIN_INPUT_PULLDOWN);
+
+		omap_mux_init_signal("abe_pdm_dl_data.abe_pdm_dl_data",
+				OMAP_PIN_INPUT_PULLDOWN);
+
+		omap_mux_init_signal("abe_pdm_frame.abe_pdm_frame",
+				OMAP_PIN_INPUT_PULLUP);
+
+		omap_mux_init_signal("abe_pdm_lb_clk.abe_pdm_lb_clk",
+				OMAP_PIN_INPUT_PULLDOWN);
+
+		omap_mux_init_signal("abe_clks.abe_clks",
+				OMAP_PIN_INPUT_PULLDOWN);
+	} else if (cpu_is_omap54xx()) {
+		omap_mux_init_signal("abemcpdm_ul_data.abe_pdm_ul_data",
+				OMAP_PIN_INPUT_PULLDOWN);
+
+		omap_mux_init_signal("abemcpdm_dl_data.abe_pdm_dl_data",
+				OMAP_PIN_INPUT_PULLDOWN);
+
+		omap_mux_init_signal("abemcpdm_frame.abe_pdm_frame",
+				OMAP_PIN_INPUT_PULLUP);
+
+		omap_mux_init_signal("abemcpdm_lb_clk.abe_pdm_lb_clk",
+				OMAP_PIN_INPUT_PULLDOWN);
+
+		omap_mux_init_signal("abe_clks.abe_clks",
+				OMAP_PIN_INPUT_PULLDOWN);
+	}
+
 	oh = omap_hwmod_lookup("mcpdm");
 	if (!oh) {
 		printk(KERN_ERR "Could not look up mcpdm hw_mod\n");
