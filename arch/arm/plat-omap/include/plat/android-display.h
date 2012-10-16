@@ -28,4 +28,6 @@ void omap_android_display_setup(struct omap_dss_board_info *dss,
 				struct sgx_omaplfb_platform_data *sgx,
 				struct omapfb_platform_data *fb);
 
+bool omap_android_display_is_default(struct omap_dss_device *device);
+
 #endif
