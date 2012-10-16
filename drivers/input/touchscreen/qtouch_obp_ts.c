@@ -873,7 +873,7 @@ static int qtouch_process_info_block(struct qtouch_ts_data *ts)
 		entry.size++;
 		entry.num_inst++;
 
-		pr_info("%s: Object %d @ 0x%04x (%d) insts %d rep_ids %d\n",
+		pr_debug("%s: Object %d @ 0x%04x (%d) insts %d rep_ids %d\n",
 			__func__, entry.type, entry.addr, entry.size,
 			entry.num_inst, entry.num_rids);
 
