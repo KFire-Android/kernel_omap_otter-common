@@ -312,12 +312,18 @@ static struct twl6040_platform_data twl6040_data = {
 	.irq_base	= TWL6040_CODEC_IRQ_BASE,
 };
 
+static struct twl4030_madc_platform_data twl6030_gpadc = {
+	.irq_line = -1,
+};
+
 static struct twl4030_platform_data tablet_twldata = {
 	/* Regulators */
 	.vusim		= &tablet_vusim,
 	.vaux1		= &tablet_vaux1,
 	.clk32kg	= &clk32kg,
+	.madc		= &twl6030_gpadc,
 };
+
 
 static int __init omap4_i2c_init(void)
 {

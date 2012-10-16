@@ -428,6 +428,10 @@ static struct platform_device sdp4430_abe_audio = {
 	},
 };
 
+static struct twl4030_madc_platform_data twl6030_gpadc = {
+	.irq_line = -1,
+};
+
 static struct platform_device *sdp4430_devices[] __initdata = {
 	&sdp4430_gpio_keys_device,
 	&sdp4430_leds_gpio,
@@ -608,6 +612,8 @@ static struct twl4030_platform_data sdp4430_twldata = {
 	/* Regulators */
 	.vusim		= &sdp4430_vusim,
 	.vaux1		= &sdp4430_vaux1,
+
+	.madc		= &twl6030_gpadc,
 };
 
 static struct i2c_board_info __initdata sdp4430_i2c_3_boardinfo[] = {
