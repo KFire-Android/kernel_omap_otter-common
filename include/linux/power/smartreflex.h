@@ -159,9 +159,13 @@
 #define OMAP54XX_SR2_SENPAVGWEIGHT	0x04
 #define OMAP54XX_SR2_SENNAVGWEIGHT	0x04
 
-struct voltagedomain;
-struct omap_volt_data;
+/* Smart reflex notifiers for class drivers to use */
+#define SR_NOTIFY_MCUDISACK		BIT(3)
+#define SR_NOTIFY_MCUBOUND		BIT(2)
+#define SR_NOTIFY_MCUVALID		BIT(1)
+#define SR_NOTIFY_MCUACCUM		BIT(0)
 
+struct voltagedomain;
 struct omap_sr_ops;
 
 struct omap_sr {
@@ -173,6 +177,7 @@ struct omap_sr {
 	struct voltagedomain		*voltdm;
 	struct dentry			*dbg_dir;
 	unsigned int			irq;
+	bool				irq_enabled;
 	int				srid;
 	int				ip_type;
 	int				nvalue_count;
@@ -260,6 +265,8 @@ struct omap_smartreflex_dev_attr {
  *
  * @enable:		API to enable a particular class smaartreflex.
  * @disable:		API to disable a particular class smartreflex.
+ * @init:		API to do class specific initialization (optional)
+ * @deinit:		API to do class specific deinitialization (optional)
  * @configure:		API to configure a particular class smartreflex.
  * @notify:		API to notify the class driver about an event in SR.
  *			Not needed for class3.
@@ -267,14 +274,20 @@ struct omap_smartreflex_dev_attr {
  * @class_type:		specify which smartreflex class.
  *			Can be used by the SR driver to take any class
  *			based decisions.
+ * @class_priv_data	Class specific private data (optional)
  */
 struct omap_sr_class_data {
 	int (*enable)(struct omap_sr *sr);
 	int (*disable)(struct omap_sr *sr, int is_volt_reset);
+	int (*init)(struct omap_sr *sr, void *class_priv_data);
+	int (*deinit)(struct omap_sr *sr, void *class_priv_data);
+	int (*suspend)(struct omap_sr *sr);
+	int (*resume)(struct omap_sr *sr);
 	int (*configure)(struct omap_sr *sr);
 	int (*notify)(struct omap_sr *sr, u32 status);
 	u8 notify_flags;
 	u8 class_type;
+	void *class_priv_data;
 };
 
 /**
@@ -330,16 +343,18 @@ struct omap_sr_data {
 void omap_sr_enable(struct voltagedomain *voltdm);
 void omap_sr_disable(struct voltagedomain *voltdm);
 void omap_sr_disable_reset_volt(struct voltagedomain *voltdm);
+bool omap_sr_is_enabled(struct voltagedomain *voltdm);
 
 /* API to register the pmic specific data with the smartreflex driver. */
 void omap_sr_register_pmic(struct omap_sr_pmic_data *pmic_data);
 
 /* Smartreflex driver hooks to be called from Smartreflex class driver */
-int sr_enable(struct voltagedomain *voltdm, unsigned long volt);
-void sr_disable(struct voltagedomain *voltdm);
-int sr_configure_errgen(struct voltagedomain *voltdm);
-int sr_disable_errgen(struct voltagedomain *voltdm);
-int sr_configure_minmax(struct voltagedomain *voltdm);
+int sr_enable(struct omap_sr *sr);
+void sr_disable(struct omap_sr *sr);
+int sr_configure_errgen(struct omap_sr *sr);
+int sr_disable_errgen(struct omap_sr *sr);
+int sr_configure_minmax(struct omap_sr *sr);
+int sr_notifier_control(struct omap_sr *sr, bool enable);
 
 /* API to register the smartreflex class driver with the smartreflex driver */
 int sr_register_class(struct omap_sr_class_data *class_data);
@@ -348,6 +363,10 @@ static inline void omap_sr_enable(struct voltagedomain *voltdm) {}
 static inline void omap_sr_disable(struct voltagedomain *voltdm) {}
 static inline void omap_sr_disable_reset_volt(
 		struct voltagedomain *voltdm) {}
+static inline bool omap_sr_is_enabled(struct voltagedomain *voltdm)
+{
+	return false;
+}
 static inline void omap_sr_register_pmic(
 		struct omap_sr_pmic_data *pmic_data) {}
 #endif

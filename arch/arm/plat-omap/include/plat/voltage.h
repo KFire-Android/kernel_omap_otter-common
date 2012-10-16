@@ -14,6 +14,8 @@
 /**
  * struct omap_volt_data - Omap voltage specific data.
  * @volt_nominal:	The possible voltage value in uV
+ * @volt_margin:	Additional sofware margin to add to OPP calibrated
+ *			voltage
  * @sr_efuse_offs:	The offset of the efuse register(from system
  *			control module base address) from where to read
  *			the n-target value for the smartreflex module.
@@ -25,6 +27,7 @@
  */
 struct omap_volt_data {
 	u32	volt_nominal;
+	u32	volt_margin;
 	u32	sr_efuse_offs;
 	u32	lvt_sr_efuse_offs;
 	u8	sr_errminlimit;

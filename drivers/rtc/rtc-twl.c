@@ -566,6 +566,9 @@ static int __devinit twl_rtc_probe(struct platform_device *pdev)
 	if (ret < 0)
 		goto out3;
 
+	/* Set device as wakeup capable */
+	device_init_wakeup(&pdev->dev, 1);
+
 	rtc = rtc_device_register(pdev->name,
 				  &pdev->dev, &twl_rtc_ops, THIS_MODULE);
 	if (IS_ERR(rtc)) {
