@@ -197,14 +197,6 @@ static struct omap_hwmod_class omap54xx_l3_hwmod_class = {
 };
 
 /* l3_instr */
-/* iva -> l3_instr */
-static struct omap_hwmod_ocp_if omap54xx_iva__l3_instr = {
-	.master		= &omap54xx_iva_hwmod,
-	.slave		= &omap54xx_l3_instr_hwmod,
-	.clk		= "l3_div_ck",
-	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-};
-
 /* l3_main_3 -> l3_instr */
 static struct omap_hwmod_ocp_if omap54xx_l3_main_3__l3_instr = {
 	.master		= &omap54xx_l3_main_3_hwmod,
@@ -215,7 +207,6 @@ static struct omap_hwmod_ocp_if omap54xx_l3_main_3__l3_instr = {
 
 /* l3_instr slave ports */
 static struct omap_hwmod_ocp_if *omap54xx_l3_instr_slaves[] = {
-	&omap54xx_iva__l3_instr,
 	&omap54xx_l3_main_3__l3_instr,
 };
 
@@ -242,22 +233,6 @@ static struct omap_hwmod_irq_info omap54xx_l3_main_1_irqs[] = {
 	{ .irq = -1 }
 };
 
-/* dsp -> l3_main_1 */
-static struct omap_hwmod_ocp_if omap54xx_dsp__l3_main_1 = {
-	.master		= &omap54xx_dsp_hwmod,
-	.slave		= &omap54xx_l3_main_1_hwmod,
-	.clk		= "l3_div_ck",
-	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-};
-
-/* dss -> l3_main_1 */
-static struct omap_hwmod_ocp_if omap54xx_dss__l3_main_1 = {
-	.master		= &omap54xx_dss_hwmod,
-	.slave		= &omap54xx_l3_main_1_hwmod,
-	.clk		= "l3_div_ck",
-	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-};
-
 /* l3_main_2 -> l3_main_1 */
 static struct omap_hwmod_ocp_if omap54xx_l3_main_2__l3_main_1 = {
 	.master		= &omap54xx_l3_main_2_hwmod,
@@ -271,22 +246,6 @@ static struct omap_hwmod_ocp_if omap54xx_l4_cfg__l3_main_1 = {
 	.master		= &omap54xx_l4_cfg_hwmod,
 	.slave		= &omap54xx_l3_main_1_hwmod,
 	.clk		= "l4_div_ck",
-	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-};
-
-/* mmc1 -> l3_main_1 */
-static struct omap_hwmod_ocp_if omap54xx_mmc1__l3_main_1 = {
-	.master		= &omap54xx_mmc1_hwmod,
-	.slave		= &omap54xx_l3_main_1_hwmod,
-	.clk		= "l3_div_ck",
-	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-};
-
-/* mmc2 -> l3_main_1 */
-static struct omap_hwmod_ocp_if omap54xx_mmc2__l3_main_1 = {
-	.master		= &omap54xx_mmc2_hwmod,
-	.slave		= &omap54xx_l3_main_1_hwmod,
-	.clk		= "l3_div_ck",
 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
 };
 
@@ -309,12 +268,8 @@ static struct omap_hwmod_ocp_if omap54xx_mpu__l3_main_1 = {
 
 /* l3_main_1 slave ports */
 static struct omap_hwmod_ocp_if *omap54xx_l3_main_1_slaves[] = {
-	&omap54xx_dsp__l3_main_1,
-	&omap54xx_dss__l3_main_1,
 	&omap54xx_l3_main_2__l3_main_1,
 	&omap54xx_l4_cfg__l3_main_1,
-	&omap54xx_mmc1__l3_main_1,
-	&omap54xx_mmc2__l3_main_1,
 	&omap54xx_mpu__l3_main_1,
 };
 
@@ -334,70 +289,6 @@ static struct omap_hwmod omap54xx_l3_main_1_hwmod = {
 };
 
 /* l3_main_2 */
-/* bb2d -> l3_main_2 */
-static struct omap_hwmod_ocp_if omap54xx_bb2d__l3_main_2 = {
-	.master		= &omap54xx_bb2d_hwmod,
-	.slave		= &omap54xx_l3_main_2_hwmod,
-	.clk		= "l3_div_ck",
-	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-};
-
-/* dma_system -> l3_main_2 */
-static struct omap_hwmod_ocp_if omap54xx_dma_system__l3_main_2 = {
-	.master		= &omap54xx_dma_system_hwmod,
-	.slave		= &omap54xx_l3_main_2_hwmod,
-	.clk		= "l3_div_ck",
-	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-};
-
-/* fdif -> l3_main_2 */
-static struct omap_hwmod_ocp_if omap54xx_fdif__l3_main_2 = {
-	.master		= &omap54xx_fdif_hwmod,
-	.slave		= &omap54xx_l3_main_2_hwmod,
-	.clk		= "l3_div_ck",
-	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-};
-
-/* gpu -> l3_main_2 */
-static struct omap_hwmod_ocp_if omap54xx_gpu__l3_main_2 = {
-	.master		= &omap54xx_gpu_hwmod,
-	.slave		= &omap54xx_l3_main_2_hwmod,
-	.clk		= "l3_div_ck",
-	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-};
-
-/* hsi -> l3_main_2 */
-static struct omap_hwmod_ocp_if omap54xx_hsi__l3_main_2 = {
-	.master		= &omap54xx_hsi_hwmod,
-	.slave		= &omap54xx_l3_main_2_hwmod,
-	.clk		= "l3_div_ck",
-	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-};
-
-/* ipu -> l3_main_2 */
-static struct omap_hwmod_ocp_if omap54xx_ipu__l3_main_2 = {
-	.master		= &omap54xx_ipu_hwmod,
-	.slave		= &omap54xx_l3_main_2_hwmod,
-	.clk		= "l3_div_ck",
-	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-};
-
-/* iss -> l3_main_2 */
-static struct omap_hwmod_ocp_if omap54xx_iss__l3_main_2 = {
-	.master		= &omap54xx_iss_hwmod,
-	.slave		= &omap54xx_l3_main_2_hwmod,
-	.clk		= "dpll_core_h23x2_ck",
-	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-};
-
-/* iva -> l3_main_2 */
-static struct omap_hwmod_ocp_if omap54xx_iva__l3_main_2 = {
-	.master		= &omap54xx_iva_hwmod,
-	.slave		= &omap54xx_l3_main_2_hwmod,
-	.clk		= "l3_div_ck",
-	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-};
-
 static struct omap_hwmod_addr_space omap54xx_l3_main_2_addrs[] = {
 	{
 		.pa_start	= 0x44800000,
@@ -423,45 +314,10 @@ static struct omap_hwmod_ocp_if omap54xx_l4_cfg__l3_main_2 = {
 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
 };
 
-/* sata -> l3_main_2 */
-static struct omap_hwmod_ocp_if omap54xx_sata__l3_main_2 = {
-	.master		= &omap54xx_sata_hwmod,
-	.slave		= &omap54xx_l3_main_2_hwmod,
-	.clk		= "l3_div_ck",
-	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-};
-
-/* usb_host_hs -> l3_main_2 */
-static struct omap_hwmod_ocp_if omap54xx_usb_host_hs__l3_main_2 = {
-	.master		= &omap54xx_usb_host_hs_hwmod,
-	.slave		= &omap54xx_l3_main_2_hwmod,
-	.clk		= "l3_div_ck",
-	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-};
-
-/* usb_otg_ss -> l3_main_2 */
-static struct omap_hwmod_ocp_if omap54xx_usb_otg_ss__l3_main_2 = {
-	.master		= &omap54xx_usb_otg_ss_hwmod,
-	.slave		= &omap54xx_l3_main_2_hwmod,
-	.clk		= "dpll_core_h13x2_ck",
-	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-};
-
 /* l3_main_2 slave ports */
 static struct omap_hwmod_ocp_if *omap54xx_l3_main_2_slaves[] = {
-	&omap54xx_bb2d__l3_main_2,
-	&omap54xx_dma_system__l3_main_2,
-	&omap54xx_fdif__l3_main_2,
-	&omap54xx_gpu__l3_main_2,
-	&omap54xx_hsi__l3_main_2,
-	&omap54xx_ipu__l3_main_2,
-	&omap54xx_iss__l3_main_2,
-	&omap54xx_iva__l3_main_2,
 	&omap54xx_l3_main_1__l3_main_2,
 	&omap54xx_l4_cfg__l3_main_2,
-	&omap54xx_sata__l3_main_2,
-	&omap54xx_usb_host_hs__l3_main_2,
-	&omap54xx_usb_otg_ss__l3_main_2,
 };
 
 static struct omap_hwmod omap54xx_l3_main_2_hwmod = {
@@ -543,22 +399,6 @@ static struct omap_hwmod_class omap54xx_l4_hwmod_class = {
 };
 
 /* l4_abe */
-/* aess -> l4_abe */
-static struct omap_hwmod_ocp_if omap54xx_aess__l4_abe = {
-	.master		= &omap54xx_aess_hwmod,
-	.slave		= &omap54xx_l4_abe_hwmod,
-	.clk		= "abe_iclk",
-	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-};
-
-/* dsp -> l4_abe */
-static struct omap_hwmod_ocp_if omap54xx_dsp__l4_abe = {
-	.master		= &omap54xx_dsp_hwmod,
-	.slave		= &omap54xx_l4_abe_hwmod,
-	.clk		= "abe_iclk",
-	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-};
-
 /* l3_main_1 -> l4_abe */
 static struct omap_hwmod_ocp_if omap54xx_l3_main_1__l4_abe = {
 	.master		= &omap54xx_l3_main_1_hwmod,
@@ -577,8 +417,6 @@ static struct omap_hwmod_ocp_if omap54xx_mpu__l4_abe = {
 
 /* l4_abe slave ports */
 static struct omap_hwmod_ocp_if *omap54xx_l4_abe_slaves[] = {
-	&omap54xx_aess__l4_abe,
-	&omap54xx_dsp__l4_abe,
 	&omap54xx_l3_main_1__l4_abe,
 	&omap54xx_mpu__l4_abe,
 };
@@ -749,11 +587,6 @@ static struct omap_hwmod_dma_info omap54xx_aess_sdma_reqs[] = {
 	{ .dma_req = -1 }
 };
 
-/* aess master ports */
-static struct omap_hwmod_ocp_if *omap54xx_aess_masters[] = {
-	&omap54xx_aess__l4_abe,
-};
-
 static struct omap_hwmod_addr_space omap54xx_aess_addrs[] = {
 	{
 		.name		= "dmem",
@@ -853,8 +686,6 @@ static struct omap_hwmod omap54xx_aess_hwmod = {
 	},
 	.slaves		= omap54xx_aess_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap54xx_aess_slaves),
-	.masters	= omap54xx_aess_masters,
-	.masters_cnt	= ARRAY_SIZE(omap54xx_aess_masters),
 };
 
 /*
@@ -870,11 +701,6 @@ static struct omap_hwmod_class omap54xx_bb2d_hwmod_class = {
 static struct omap_hwmod_irq_info omap54xx_bb2d_irqs[] = {
 	{ .irq = 125 + OMAP54XX_IRQ_GIC_START },
 	{ .irq = -1 }
-};
-
-/* bb2d master ports */
-static struct omap_hwmod_ocp_if *omap54xx_bb2d_masters[] = {
-	&omap54xx_bb2d__l3_main_2,
 };
 
 static struct omap_hwmod_addr_space omap54xx_bb2d_addrs[] = {
@@ -915,8 +741,6 @@ static struct omap_hwmod omap54xx_bb2d_hwmod = {
 	},
 	.slaves		= omap54xx_bb2d_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap54xx_bb2d_slaves),
-	.masters	= omap54xx_bb2d_masters,
-	.masters_cnt	= ARRAY_SIZE(omap54xx_bb2d_masters),
 };
 
 /*
@@ -1119,11 +943,6 @@ static struct omap_hwmod_irq_info omap54xx_dma_system_irqs[] = {
 	{ .irq = -1 }
 };
 
-/* dma_system master ports */
-static struct omap_hwmod_ocp_if *omap54xx_dma_system_masters[] = {
-	&omap54xx_dma_system__l3_main_2,
-};
-
 static struct omap_hwmod_addr_space omap54xx_dma_system_addrs[] = {
 	{
 		.pa_start	= 0x4a056000,
@@ -1162,8 +981,6 @@ static struct omap_hwmod omap54xx_dma_system_hwmod = {
 	.dev_attr	= &dma_dev_attr,
 	.slaves		= omap54xx_dma_system_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap54xx_dma_system_slaves),
-	.masters	= omap54xx_dma_system_masters,
-	.masters_cnt	= ARRAY_SIZE(omap54xx_dma_system_masters),
 };
 
 /*
@@ -1330,28 +1147,6 @@ static struct omap_hwmod_addr_space omap54xx_dsp_addrs[] = {
 	{}
 };
 
-/* dsp -> sl2if */
-static struct omap_hwmod_ocp_if omap54xx_dsp__sl2if = {
-	.master		= &omap54xx_dsp_hwmod,
-	.slave		= &omap54xx_sl2if_hwmod,
-	.clk		= "dpll_iva_h12x2_ck",
-};
-
-/* dsp -> iva */
-static struct omap_hwmod_ocp_if omap54xx_dsp__iva = {
-	.master		= &omap54xx_dsp_hwmod,
-	.slave		= &omap54xx_iva_hwmod,
-	.clk		= "dpll_iva_h12x2_ck",
-};
-
-/* dsp master ports */
-static struct omap_hwmod_ocp_if *omap54xx_dsp_masters[] = {
-	&omap54xx_dsp__l3_main_1,
-	&omap54xx_dsp__sl2if,
-	&omap54xx_dsp__iva,
-	&omap54xx_dsp__l4_abe,
-};
-
 /* l4_cfg -> dsp */
 static struct omap_hwmod_ocp_if omap54xx_l4_cfg__dsp = {
 	.master		= &omap54xx_l4_cfg_hwmod,
@@ -1404,8 +1199,6 @@ static struct omap_hwmod omap54xx_dsp_hwmod = {
 	.dev_attr	= &omap54xx_dsp_mmu_dev_attr,
 	.slaves		= omap54xx_dsp_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap54xx_dsp_slaves),
-	.masters	= omap54xx_dsp_masters,
-	.masters_cnt	= ARRAY_SIZE(omap54xx_dsp_masters),
 };
 
 /*
@@ -1426,11 +1219,6 @@ static struct omap_hwmod_class omap54xx_dss_hwmod_class = {
 };
 
 /* dss */
-/* dss master ports */
-static struct omap_hwmod_ocp_if *omap54xx_dss_masters[] = {
-	&omap54xx_dss__l3_main_1,
-};
-
 static struct omap_hwmod_addr_space omap54xx_dss_addrs[] = {
 	{
 		.pa_start	= 0x58000000,
@@ -1477,8 +1265,6 @@ static struct omap_hwmod omap54xx_dss_hwmod = {
 	.opt_clks_cnt	= ARRAY_SIZE(dss_opt_clks),
 	.slaves		= omap54xx_dss_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap54xx_dss_slaves),
-	.masters	= omap54xx_dss_masters,
-	.masters_cnt	= ARRAY_SIZE(omap54xx_dss_masters),
 };
 
 /*
@@ -2013,11 +1799,6 @@ static struct omap_hwmod_irq_info omap54xx_fdif_irqs[] = {
 	{ .irq = -1 }
 };
 
-/* fdif master ports */
-static struct omap_hwmod_ocp_if *omap54xx_fdif_masters[] = {
-	&omap54xx_fdif__l3_main_2,
-};
-
 static struct omap_hwmod_addr_space omap54xx_fdif_addrs[] = {
 	{
 		.pa_start	= 0x4a10a000,
@@ -2055,8 +1836,6 @@ static struct omap_hwmod omap54xx_fdif_hwmod = {
 	},
 	.slaves		= omap54xx_fdif_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap54xx_fdif_slaves),
-	.masters	= omap54xx_fdif_masters,
-	.masters_cnt	= ARRAY_SIZE(omap54xx_fdif_masters),
 };
 
 /*
@@ -2553,11 +2332,6 @@ static struct omap_hwmod_irq_info omap54xx_gpu_irqs[] = {
 	{ .irq = -1 }
 };
 
-/* gpu master ports */
-static struct omap_hwmod_ocp_if *omap54xx_gpu_masters[] = {
-	&omap54xx_gpu__l3_main_2,
-};
-
 static struct omap_hwmod_addr_space omap54xx_gpu_addrs[] = {
 	{
 		.name		= "klio",
@@ -2617,8 +2391,6 @@ static struct omap_hwmod omap54xx_gpu_hwmod = {
 	},
 	.slaves		= omap54xx_gpu_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap54xx_gpu_slaves),
-	.masters	= omap54xx_gpu_masters,
-	.masters_cnt	= ARRAY_SIZE(omap54xx_gpu_masters),
 };
 
 /*
@@ -2651,11 +2423,6 @@ static struct omap_hwmod_irq_info omap54xx_hsi_irqs[] = {
 	{ .name = "hsi_p2_mpu", .irq = 68 + OMAP54XX_IRQ_GIC_START },
 	{ .name = "hsi_dma_mpu", .irq = 71 + OMAP54XX_IRQ_GIC_START },
 	{ .irq = -1 }
-};
-
-/* hsi master ports */
-static struct omap_hwmod_ocp_if *omap54xx_hsi_masters[] = {
-	&omap54xx_hsi__l3_main_2,
 };
 
 static struct omap_hwmod_addr_space omap54xx_hsi_addrs[] = {
@@ -2697,8 +2464,6 @@ static struct omap_hwmod omap54xx_hsi_hwmod = {
 	},
 	.slaves		= omap54xx_hsi_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap54xx_hsi_slaves),
-	.masters	= omap54xx_hsi_masters,
-	.masters_cnt	= ARRAY_SIZE(omap54xx_hsi_masters),
 };
 
 /*
@@ -3047,11 +2812,6 @@ static struct omap_hwmod_rst_info omap54xx_ipu_resets[] = {
 	{ .name = "mmu_cache", .rst_shift = 2 },
 };
 
-/* ipu master ports */
-static struct omap_hwmod_ocp_if *omap54xx_ipu_masters[] = {
-	&omap54xx_ipu__l3_main_2,
-};
-
 static struct omap_hwmod_addr_space omap54xx_ipu_addrs[] = {
 	{
 		.pa_start	= 0x55082000,
@@ -3126,8 +2886,6 @@ static struct omap_hwmod omap54xx_ipu_hwmod = {
 	.dev_attr	= &omap54xx_ipu_mmu_dev_attr,
 	.slaves		= omap54xx_ipu_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap54xx_ipu_slaves),
-	.masters	= omap54xx_ipu_masters,
-	.masters_cnt	= ARRAY_SIZE(omap54xx_ipu_masters),
 };
 
 /*
@@ -3178,11 +2936,6 @@ static struct omap_hwmod_dma_info omap54xx_iss_sdma_reqs[] = {
 	{ .dma_req = -1 }
 };
 
-/* iss master ports */
-static struct omap_hwmod_ocp_if *omap54xx_iss_masters[] = {
-	&omap54xx_iss__l3_main_2,
-};
-
 static struct omap_hwmod_addr_space omap54xx_iss_addrs[] = {
 	{
 		.pa_start	= 0x52000000,
@@ -3229,8 +2982,6 @@ static struct omap_hwmod omap54xx_iss_hwmod = {
 	.opt_clks_cnt	= ARRAY_SIZE(iss_opt_clks),
 	.slaves		= omap54xx_iss_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap54xx_iss_slaves),
-	.masters	= omap54xx_iss_masters,
-	.masters_cnt	= ARRAY_SIZE(omap54xx_iss_masters),
 };
 
 /*
@@ -3276,20 +3027,6 @@ static struct omap_hwmod_rst_info omap54xx_iva_seq1_resets[] = {
 	{ .name = "seq1", .rst_shift = 1 },
 };
 
-/* iva -> sl2if */
-static struct omap_hwmod_ocp_if omap54xx_iva__sl2if = {
-	.master		= &omap54xx_iva_hwmod,
-	.slave		= &omap54xx_sl2if_hwmod,
-	.clk		= "dpll_iva_h12x2_ck",
-};
-
-/* iva master ports */
-static struct omap_hwmod_ocp_if *omap54xx_iva_masters[] = {
-	&omap54xx_iva__sl2if,
-	&omap54xx_iva__l3_main_2,
-	&omap54xx_iva__l3_instr,
-};
-
 static struct omap_hwmod_addr_space omap54xx_iva_addrs[] = {
 	{
 		.pa_start	= 0x5a000000,
@@ -3305,12 +3042,11 @@ static struct omap_hwmod_ocp_if omap54xx_l3_main_2__iva = {
 	.slave		= &omap54xx_iva_hwmod,
 	.clk		= "l3_div_ck",
 	.addr		= omap54xx_iva_addrs,
-	.user		= OCP_USER_MPU,
+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
 };
 
 /* iva slave ports */
 static struct omap_hwmod_ocp_if *omap54xx_iva_slaves[] = {
-	&omap54xx_dsp__iva,
 	&omap54xx_l3_main_2__iva,
 };
 
@@ -3368,8 +3104,6 @@ static struct omap_hwmod omap54xx_iva_hwmod = {
 	},
 	.slaves		= omap54xx_iva_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap54xx_iva_slaves),
-	.masters	= omap54xx_iva_masters,
-	.masters_cnt	= ARRAY_SIZE(omap54xx_iva_masters),
 };
 
 /*
@@ -4269,11 +4003,6 @@ static struct omap_hwmod_dma_info omap54xx_mmc1_sdma_reqs[] = {
 	{ .dma_req = -1 }
 };
 
-/* mmc1 master ports */
-static struct omap_hwmod_ocp_if *omap54xx_mmc1_masters[] = {
-	&omap54xx_mmc1__l3_main_1,
-};
-
 static struct omap_hwmod_addr_space omap54xx_mmc1_addrs[] = {
 	{
 		.pa_start	= 0x4809c000,
@@ -4319,8 +4048,6 @@ static struct omap_hwmod omap54xx_mmc1_hwmod = {
 	.dev_attr	= &mmc1_dev_attr,
 	.slaves		= omap54xx_mmc1_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap54xx_mmc1_slaves),
-	.masters	= omap54xx_mmc1_masters,
-	.masters_cnt	= ARRAY_SIZE(omap54xx_mmc1_masters),
 };
 
 /* mmc2 */
@@ -4333,11 +4060,6 @@ static struct omap_hwmod_dma_info omap54xx_mmc2_sdma_reqs[] = {
 	{ .name = "tx", .dma_req = 46 + OMAP54XX_DMA_REQ_START },
 	{ .name = "rx", .dma_req = 47 + OMAP54XX_DMA_REQ_START },
 	{ .dma_req = -1 }
-};
-
-/* mmc2 master ports */
-static struct omap_hwmod_ocp_if *omap54xx_mmc2_masters[] = {
-	&omap54xx_mmc2__l3_main_1,
 };
 
 static struct omap_hwmod_addr_space omap54xx_mmc2_addrs[] = {
@@ -4379,8 +4101,6 @@ static struct omap_hwmod omap54xx_mmc2_hwmod = {
 	},
 	.slaves		= omap54xx_mmc2_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap54xx_mmc2_slaves),
-	.masters	= omap54xx_mmc2_masters,
-	.masters_cnt	= ARRAY_SIZE(omap54xx_mmc2_masters),
 };
 
 /* mmc3 */
@@ -4561,14 +4281,6 @@ static struct omap_hwmod_irq_info omap54xx_mpu_irqs[] = {
 	{ .irq = -1 }
 };
 
-/* mpu master ports */
-static struct omap_hwmod_ocp_if *omap54xx_mpu_masters[] = {
-	&omap54xx_mpu__l3_main_1,
-	&omap54xx_mpu__l4_abe,
-	&omap54xx_mpu__emif1,
-	&omap54xx_mpu__emif2,
-};
-
 static struct omap_hwmod_addr_space omap54xx_mpu_addrs[] = {
 	{
 		.pa_start	= 0x48211000,
@@ -4607,8 +4319,6 @@ static struct omap_hwmod omap54xx_mpu_hwmod = {
 	},
 	.slaves		= omap54xx_mpu_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap54xx_mpu_slaves),
-	.masters	= omap54xx_mpu_masters,
-	.masters_cnt	= ARRAY_SIZE(omap54xx_mpu_masters),
 };
 
 /*
@@ -4743,11 +4453,6 @@ static struct omap_hwmod_irq_info omap54xx_sata_irqs[] = {
 	{ .irq = -1 }
 };
 
-/* sata master ports */
-static struct omap_hwmod_ocp_if *omap54xx_sata_masters[] = {
-	&omap54xx_sata__l3_main_2,
-};
-
 static struct omap_hwmod_addr_space omap54xx_sata_addrs[] = {
 	{
 		.name		= "ahci",
@@ -4799,8 +4504,6 @@ static struct omap_hwmod omap54xx_sata_hwmod = {
 	.opt_clks_cnt	= ARRAY_SIZE(sata_opt_clks),
 	.slaves		= omap54xx_sata_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap54xx_sata_slaves),
-	.masters	= omap54xx_sata_masters,
-	.masters_cnt	= ARRAY_SIZE(omap54xx_sata_masters),
 };
 
 /*
@@ -4823,8 +4526,6 @@ static struct omap_hwmod_ocp_if omap54xx_l3_main_2__sl2if = {
 
 /* sl2if slave ports */
 static struct omap_hwmod_ocp_if *omap54xx_sl2if_slaves[] = {
-	&omap54xx_dsp__sl2if,
-	&omap54xx_iva__sl2if,
 	&omap54xx_l3_main_2__sl2if,
 };
 
@@ -6100,11 +5801,6 @@ static struct omap_hwmod_irq_info omap54xx_usb_host_hs_irqs[] = {
 	{ .irq = -1 }
 };
 
-/* usb_host_hs master ports */
-static struct omap_hwmod_ocp_if *omap54xx_usb_host_hs_masters[] = {
-	&omap54xx_usb_host_hs__l3_main_2,
-};
-
 static struct omap_hwmod_addr_space omap54xx_usb_host_hs_addrs[] = {
 	{
 		.name		= "uhh",
@@ -6245,11 +5941,6 @@ static struct omap_hwmod_irq_info omap54xx_usb_otg_ss_irqs[] = {
 	{ .irq = -1 }
 };
 
-/* usb_otg_ss master ports */
-static struct omap_hwmod_ocp_if *omap54xx_usb_otg_ss_masters[] = {
-	&omap54xx_usb_otg_ss__l3_main_2,
-};
-
 static struct omap_hwmod_addr_space omap54xx_usb_otg_ss_addrs[] = {
 	{
 		.name		= "wrapper",
@@ -6301,8 +5992,6 @@ static struct omap_hwmod omap54xx_usb_otg_ss_hwmod = {
 	.opt_clks_cnt	= ARRAY_SIZE(usb_otg_ss_opt_clks),
 	.slaves		= omap54xx_usb_otg_ss_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap54xx_usb_otg_ss_slaves),
-	.masters	= omap54xx_usb_otg_ss_masters,
-	.masters_cnt	= ARRAY_SIZE(omap54xx_usb_otg_ss_masters),
 };
 
 /*
