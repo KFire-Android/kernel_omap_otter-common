@@ -575,7 +575,7 @@ static int omaprpc_release(struct inode *inode, struct file *filp)
 			 * TODO: Should we wait for a message to come back?
 			 * For now, no.
 			 */
-			wait_for_completion(&rpc->reply_arrived);
+			wait_for_completion_interruptible(&rpc->reply_arrived);
 
 		}
 
