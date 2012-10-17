@@ -38,6 +38,7 @@
 #include <linux/gpio.h>
 #include <linux/slab.h>
 #include <asm/unaligned.h>
+#include <linux/mfd/palmas.h>
 
 #include <linux/power/bq27x00_battery.h>
 
@@ -71,6 +72,19 @@
 #define BQ27500_FLAG_FC			BIT(9)
 
 #define BQ27000_RS			20 /* Resistor sense */
+
+/*
+ * bq27530 controls bq24160 charger by its own dedicated i2c bus
+ * The charger registers are mapped to a series of single byte
+ * Charger Data Commands to enable system reading and writing of
+ * battery charger registers.
+ */
+#define BQ24160_CHRGR_CONTROL_REG	0x78
+
+#define IUSB_LIMIT_2			BIT(6)
+#define IUSB_LIMIT_1			BIT(5)
+#define IUSB_LIMIT_0			BIT(4)
+#define IUSB_LIMIT_MASK			(IUSB_LIMIT_2 | IUSB_LIMIT_1 | IUSB_LIMIT_0)
 
 struct bq27x00_device_info;
 struct bq27x00_access_methods {
@@ -107,10 +121,13 @@ struct bq27x00_device_info {
 
 	struct power_supply	bat;
 	struct power_supply	ac;
+	struct power_supply	usb;
 	struct power_supply	bat_sim;
 
 	struct bq27x00_access_methods bus;
 	bool battery_present;
+	int			charger_type;
+	struct notifier_block   nb;
 
 	struct mutex lock;
 };
@@ -139,6 +156,10 @@ static unsigned int poll_interval = 1;
 static enum power_supply_property bq27x00_ac_props[] = {
 	POWER_SUPPLY_PROP_ONLINE,
 	POWER_SUPPLY_PROP_VOLTAGE_NOW,
+};
+
+static enum power_supply_property bq27x00_usb_props[] = {
+	POWER_SUPPLY_PROP_ONLINE,
 };
 
 module_param(poll_interval, uint, 0644);
@@ -625,6 +646,25 @@ static int bq27x00_ac_get_property(struct power_supply *psy,
 	return ret;
 }
 
+static int bq27x00_usb_get_property(struct power_supply *psy,
+					enum power_supply_property psp,
+					union power_supply_propval *val)
+{
+	int ret = 0;
+	struct bq27x00_device_info *di =
+		container_of(psy, struct bq27x00_device_info, usb);
+
+	switch (psp) {
+	case POWER_SUPPLY_PROP_ONLINE:
+		val->intval = di->charger_type;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	return ret;
+}
+
 static void bq27x00_external_power_changed(struct power_supply *psy)
 {
 	struct bq27x00_device_info *di = to_bq27x00_device_info(psy);
@@ -706,6 +746,20 @@ static int bq27x00_powersupply_init(struct bq27x00_device_info *di)
 		ret = power_supply_register(di->dev, &di->ac);
 		if (ret) {
 			dev_err(di->dev, "fail to register AC: %d\n", ret);
+			power_supply_unregister(&di->bat);
+			return ret;
+		}
+
+		di->usb.name = "usb-supply";
+		di->usb.type = POWER_SUPPLY_TYPE_USB;
+		di->usb.properties = bq27x00_usb_props;
+		di->usb.num_properties = ARRAY_SIZE(bq27x00_usb_props);
+		di->usb.get_property = bq27x00_usb_get_property;
+
+		ret = power_supply_register(di->dev, &di->usb);
+		if (ret) {
+			dev_err(di->dev,
+				"fail to register USB power supply: %d\n", ret);
 			power_supply_unregister(&di->bat);
 			return ret;
 		}
@@ -810,6 +864,41 @@ static int bq27x00_write_i2c(struct bq27x00_device_info *di, u8 reg, u8 val)
 	return i2c_smbus_write_byte_data(client, reg, val);
 }
 
+static int bq27x00_usb_notifier_call(struct notifier_block *nb,
+		unsigned long event, void *data)
+{
+	struct bq27x00_device_info *di =
+		container_of(nb, struct bq27x00_device_info, nb);
+	u8 val;
+
+	di->charger_type = event;
+	val = bq27x00_read_i2c(di, BQ24160_CHRGR_CONTROL_REG, false);
+	val &= ~IUSB_LIMIT_MASK;
+
+	switch (event) {
+	case POWER_SUPPLY_TYPE_UNKNOWN:
+	case POWER_SUPPLY_TYPE_BATTERY:
+		/* on disconnect set safe minimal current - 100 mA */
+		bq27x00_write_i2c(di, BQ24160_CHRGR_CONTROL_REG, val);
+		break;
+	case POWER_SUPPLY_TYPE_USB:
+		/* USB2.0 host with 500 mA current limit */
+		val |= IUSB_LIMIT_1;
+		bq27x00_write_i2c(di, BQ24160_CHRGR_CONTROL_REG, val);
+		break;
+	case POWER_SUPPLY_TYPE_USB_DCP:
+	case POWER_SUPPLY_TYPE_USB_CDP:
+	case POWER_SUPPLY_TYPE_USB_ACA:
+		/* USB host/charger with 1500 mA current limit */
+		val |= IUSB_LIMIT_2 | IUSB_LIMIT_0;
+		bq27x00_write_i2c(di, BQ24160_CHRGR_CONTROL_REG, val);
+	default:
+		return NOTIFY_OK;
+	}
+
+	return NOTIFY_OK;
+}
+
 static int bq27x00_battery_probe(struct i2c_client *client,
 				 const struct i2c_device_id *id)
 {
@@ -862,6 +951,9 @@ static int bq27x00_battery_probe(struct i2c_client *client,
 		goto batt_failed_4;
 
 	i2c_set_clientdata(client, di);
+
+	di->nb.notifier_call = bq27x00_usb_notifier_call;
+	palmas_usb_register_notifier(&di->nb);
 
 	return 0;
 
