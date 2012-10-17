@@ -79,12 +79,20 @@
  * Charger Data Commands to enable system reading and writing of
  * battery charger registers.
  */
+#define BQ24160_CHRGR_CTL_STAT_REG      0x76
 #define BQ24160_CHRGR_CONTROL_REG	0x78
 
 #define IUSB_LIMIT_2			BIT(6)
 #define IUSB_LIMIT_1			BIT(5)
 #define IUSB_LIMIT_0			BIT(4)
 #define IUSB_LIMIT_MASK			(IUSB_LIMIT_2 | IUSB_LIMIT_1 | IUSB_LIMIT_0)
+
+#define STAT_2				BIT(6)
+#define STAT_1				BIT(5)
+#define STAT_0				BIT(4)
+#define STAT_MASK			(STAT_2 | STAT_1 | STAT_0)
+#define AC_CHARGING			(STAT_1 | STAT_0)
+#define AC_CHARGING_READY		STAT_0
 
 struct bq27x00_device_info;
 struct bq27x00_access_methods {
@@ -626,6 +634,10 @@ static int bq27x00_ac_get_property(struct power_supply *psy,
 	int ret = 0;
 	struct bq27x00_device_info *di =
 		container_of(psy, struct bq27x00_device_info, ac);
+	u8 value;
+
+	value = bq27x00_read(di, BQ24160_CHRGR_CTL_STAT_REG, false);
+	value &= STAT_MASK;
 
 	switch (psp) {
 	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
@@ -633,7 +645,8 @@ static int bq27x00_ac_get_property(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_ONLINE:
 		ret = bq27x00_battery_status(di, val);
-		if (val->intval == POWER_SUPPLY_STATUS_CHARGING)
+		if (val->intval == POWER_SUPPLY_STATUS_CHARGING &&
+		    (value == AC_CHARGING || value == AC_CHARGING_READY))
 			val->intval = POWER_SUPPLY_TYPE_MAINS;
 		else
 			val->intval = POWER_SUPPLY_TYPE_UNKNOWN;
