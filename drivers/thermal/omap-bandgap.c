@@ -1531,46 +1531,28 @@ static int omap_bandgap_restore_ctxt(struct omap_bandgap *bg_ptr)
 {
 	struct device *cdev = bg_ptr->dev->parent;
 	int i, err = 0;
-	u32 temp = 0;
 
 	for (i = 0; i < bg_ptr->pdata->sensor_count; i++) {
 		struct temp_sensor_registers *tsr;
 		struct temp_sensor_regval *rval;
-		u32 val;
 
 		rval = &bg_ptr->pdata->sensors[i].regval;
 		tsr = bg_ptr->pdata->sensors[i].registers;
 
-		err = omap_control_readl(cdev, tsr->bgap_counter, &val);
-		if (val == 0) {
-			err |= omap_control_writel(cdev, rval->bg_threshold,
-						   tsr->bgap_threshold);
-			err |= omap_control_writel(cdev, rval->tshut_threshold,
-						   tsr->tshut_threshold);
-			/* Force immediate temperature measurement and update
-			 * of the DTEMP field
-			 */
-			omap_bandgap_force_single_read(bg_ptr, i);
-			err |= omap_control_writel(cdev, rval->bg_counter,
-						   tsr->bgap_counter);
-			err |= omap_control_writel(cdev, rval->bg_mode_ctrl,
-						   tsr->bgap_mode_ctrl);
-			err |= omap_control_writel(cdev, rval->bg_ctrl,
-						   tsr->bgap_mask_ctrl);
-		} else {
-			err |= omap_control_readl(cdev, tsr->temp_sensor_ctrl,
-						 &temp);
-			temp &= (tsr->bgap_dtemp_mask);
-			if (temp == 0) {
-				omap_bandgap_force_single_read(bg_ptr, i);
-				err |= omap_control_readl(cdev,
-							  tsr->bgap_mask_ctrl,
-							  &temp);
-				temp |= 1 << __ffs(tsr->mode_ctrl_mask);
-				err |= omap_control_writel(cdev, temp,
-							   tsr->bgap_mask_ctrl);
-			}
-		}
+		err = omap_control_writel(cdev, rval->bg_threshold,
+						tsr->bgap_threshold);
+		err |= omap_control_writel(cdev, rval->tshut_threshold,
+						tsr->tshut_threshold);
+		/* Force immediate temperature measurement and update
+		 * of the DTEMP field
+		 */
+		omap_bandgap_force_single_read(bg_ptr, i);
+		err |= omap_control_writel(cdev, rval->bg_counter,
+						tsr->bgap_counter);
+		err |= omap_control_writel(cdev, rval->bg_mode_ctrl,
+						tsr->bgap_mode_ctrl);
+		err |= omap_control_writel(cdev, rval->bg_ctrl,
+						tsr->bgap_mask_ctrl);
 		if (err)
 			dev_err(bg_ptr->dev, "could not save sensor %d\n", i);
 	}
