@@ -181,6 +181,7 @@ int omap_aess_load_fw_param(struct omap_aess *abe, u32 *data)
 {
 	u32 pmem_size, dmem_size, smem_size, cmem_size;
 	u32 *pmem_ptr, *dmem_ptr, *smem_ptr, *cmem_ptr, *fw_ptr;
+	u32 idlest;
 
 	fw_ptr = data;
 	abe->firmware_version_number = *fw_ptr++;
@@ -208,6 +209,18 @@ int omap_aess_load_fw_param(struct omap_aess *abe, u32 *data)
 		/* Restore the event Generator status */
 		omap_aess_start_event_generator(abe);
 	} else {
+		/*
+		 * idlest = 0 means AE is idled
+		 * idlest = USHRT_MAX means AE is processing/running
+		 */
+		omap_abe_mem_read(abe, OMAP_ABE_DMEM,
+				  OMAP_ABE_D_IDLE_STATE_ADDR,
+				  &idlest, sizeof(idlest));
+		if (idlest == USHRT_MAX) {
+			pr_err("trying to load PMEM when AESS is running\n");
+			return -EBUSY;
+		}
+
 		omap_abe_mem_write(abe, OMAP_ABE_PMEM, 0, pmem_ptr,
 			       pmem_size);
 		omap_abe_mem_write(abe, OMAP_ABE_CMEM, 0, cmem_ptr,
