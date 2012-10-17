@@ -345,7 +345,14 @@ static int omap_thermal_manager(struct omap_governor *omap_gov,
 	} else if (cpu_temp >= omap_gov->panic_threshold) {
 		int temp_upper;
 
-		omap_gov->panic_zone_reached++;
+		temp_upper = (((OMAP_FATAL_TEMP -
+				omap_gov->panic_threshold) / 4) *
+					omap_gov->panic_zone_reached) +
+				omap_gov->panic_threshold;
+		if (temp_upper < cpu_temp)
+			omap_gov->panic_zone_reached++;
+		else
+			set_cooling_level = false; /* no need for update */
 		temp_upper = (((OMAP_FATAL_TEMP -
 				omap_gov->panic_threshold) / 4) *
 					omap_gov->panic_zone_reached) +
