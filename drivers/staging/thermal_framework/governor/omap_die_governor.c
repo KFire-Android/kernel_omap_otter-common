@@ -39,24 +39,20 @@
 #define SAFE_ZONE	1
 #define NO_ACTION	0
 #define MAX_NO_MON_ZONES PANIC_ZONE
-#define OMAP_FATAL_DEFAULT_TEMP 125000
-#define OMAP_PANIC_DEFAULT_TEMP 110000
-#define OMAP_FATAL_TEMP ((omap_rev() == OMAP5430_REV_ES1_0) || \
-			 (omap_rev() == OMAP5432_REV_ES1_0) ? 120000 : 125000)
-#define OMAP_PANIC_TEMP ((omap_rev() == OMAP5430_REV_ES1_0) || \
-			 (omap_rev() == OMAP5432_REV_ES1_0) ? 105000 : 110000)
-#define OMAP_ALERT_TEMP 100000
-#define OMAP_MONITOR_TEMP 85000
-#define OMAP_SAFE_TEMP  25000
+#define OMAP_FATAL_TEMP			125000
+#define OMAP_FATAL_TEMP_ES1_0		120000
+#define OMAP_PANIC_TEMP			110000
+#define OMAP_PANIC_TEMP_ES1_0		105000
+#define OMAP_ALERT_TEMP			100000
+#define OMAP_MONITOR_TEMP		85000
+#define OMAP_SAFE_TEMP			25000
 
 /* TODO: Define this via a configurable file */
-#define HYSTERESIS_VALUE 5000
-#define NORMAL_TEMP_MONITORING_RATE 1000
-#define FAST_TEMP_DEFAULT_MONITORING_RATE 250
-#define FAST_TEMP_MONITORING_RATE ((omap_rev() == OMAP5430_REV_ES1_0) || \
-				   (omap_rev() == OMAP5432_REV_ES1_0)	 \
-				   ? 125 : 250)
-#define AVERAGE_NUMBER 20
+#define HYSTERESIS_VALUE		5000
+#define NORMAL_TEMP_MONITORING_RATE	1000
+#define FAST_TEMP_MONITORING_RATE	250
+#define FAST_TEMP_MONITORING_RATE_ES1_0	125
+#define AVERAGE_NUMBER			20
 
 
 enum governor_instances {
@@ -87,7 +83,7 @@ struct omap_thermal_zone {
 struct omap_governor {
 	struct thermal_dev *temp_sensor;
 	struct thermal_dev thermal_fw;
-	struct omap_thermal_zone omap_thermal_zones[MAX_NO_MON_ZONES];
+	struct omap_thermal_zone zones[MAX_NO_MON_ZONES];
 	void (*update_temp_thresh) (struct thermal_dev *, int min, int max);
 	int report_rate;
 	int panic_zone_reached;
@@ -114,24 +110,45 @@ struct omap_governor {
 };
 
 /* Initial set of thersholds for different thermal zones */
-static struct omap_thermal_zone omap_thermal_init_zones[] __initdata = {
+static struct omap_thermal_zone zones_es1_0[] __initdata = {
 	OMAP_THERMAL_ZONE("safe", 0, OMAP_SAFE_TEMP, OMAP_MONITOR_TEMP,
-			FAST_TEMP_DEFAULT_MONITORING_RATE,
+			FAST_TEMP_MONITORING_RATE_ES1_0,
 			NORMAL_TEMP_MONITORING_RATE),
 	OMAP_THERMAL_ZONE("monitor", 0,
 			OMAP_MONITOR_TEMP - HYSTERESIS_VALUE, OMAP_ALERT_TEMP,
-			FAST_TEMP_DEFAULT_MONITORING_RATE,
-			FAST_TEMP_DEFAULT_MONITORING_RATE),
+			FAST_TEMP_MONITORING_RATE_ES1_0,
+			FAST_TEMP_MONITORING_RATE_ES1_0),
 	OMAP_THERMAL_ZONE("alert", 0,
 			OMAP_ALERT_TEMP - HYSTERESIS_VALUE,
-			OMAP_PANIC_DEFAULT_TEMP,
-			FAST_TEMP_DEFAULT_MONITORING_RATE,
-			FAST_TEMP_DEFAULT_MONITORING_RATE),
+			OMAP_PANIC_TEMP_ES1_0,
+			FAST_TEMP_MONITORING_RATE_ES1_0,
+			FAST_TEMP_MONITORING_RATE_ES1_0),
 	OMAP_THERMAL_ZONE("panic", 1,
-			OMAP_PANIC_DEFAULT_TEMP - HYSTERESIS_VALUE,
-			OMAP_FATAL_DEFAULT_TEMP,
-			FAST_TEMP_DEFAULT_MONITORING_RATE,
-			FAST_TEMP_DEFAULT_MONITORING_RATE),
+			OMAP_PANIC_TEMP_ES1_0 - HYSTERESIS_VALUE,
+			OMAP_FATAL_TEMP_ES1_0,
+			FAST_TEMP_MONITORING_RATE_ES1_0,
+			FAST_TEMP_MONITORING_RATE_ES1_0),
+};
+
+/* Initial set of thersholds for different thermal zones starting from ES2.0 */
+static struct omap_thermal_zone zones_es2_0[] __initdata = {
+	OMAP_THERMAL_ZONE("safe", 0, OMAP_SAFE_TEMP, OMAP_MONITOR_TEMP,
+			FAST_TEMP_MONITORING_RATE,
+			NORMAL_TEMP_MONITORING_RATE),
+	OMAP_THERMAL_ZONE("monitor", 0,
+			OMAP_MONITOR_TEMP - HYSTERESIS_VALUE, OMAP_ALERT_TEMP,
+			FAST_TEMP_MONITORING_RATE,
+			FAST_TEMP_MONITORING_RATE),
+	OMAP_THERMAL_ZONE("alert", 0,
+			OMAP_ALERT_TEMP - HYSTERESIS_VALUE,
+			OMAP_PANIC_TEMP,
+			FAST_TEMP_MONITORING_RATE,
+			FAST_TEMP_MONITORING_RATE),
+	OMAP_THERMAL_ZONE("panic", 1,
+			OMAP_PANIC_TEMP - HYSTERESIS_VALUE,
+			OMAP_FATAL_TEMP,
+			FAST_TEMP_MONITORING_RATE,
+			FAST_TEMP_MONITORING_RATE),
 };
 
 static struct omap_governor *omap_gov_instance[OMAP_GOV_MAX_INSTANCE];
@@ -332,19 +349,32 @@ static void omap_fatal_zone(int cpu_temp)
 	kernel_restart(NULL);
 }
 
+static int omap_thermal_match_zone(struct omap_thermal_zone *zone_set, int temp)
+{
+	int i;
+
+	for (i = MAX_NO_MON_ZONES - 1; i >= 0; i--)
+		if (zone_set[i].temp_upper < temp)
+			return i + 2; /* no action and index 0*/
+
+	return temp > OMAP_SAFE_TEMP ? SAFE_ZONE : NO_ACTION;
+}
+
 static int omap_thermal_manager(struct omap_governor *omap_gov,
 				struct list_head *cooling_list, int temp)
 {
 	int cpu_temp, zone = NO_ACTION;
 	bool set_cooling_level = true;
+	int temp_upper;
 
 	cpu_temp = convert_omap_sensor_temp_to_hotspot_temp(omap_gov, temp);
-	if (cpu_temp >= OMAP_FATAL_TEMP) {
+	zone = omap_thermal_match_zone(omap_gov->zones, cpu_temp);
+
+	switch (zone) {
+	case FATAL_ZONE:
 		omap_fatal_zone(cpu_temp);
 		return FATAL_ZONE;
-	} else if (cpu_temp >= omap_gov->panic_threshold) {
-		int temp_upper;
-
+	case PANIC_ZONE:
 		temp_upper = (((OMAP_FATAL_TEMP -
 				omap_gov->panic_threshold) / 4) *
 					omap_gov->panic_zone_reached) +
@@ -359,49 +389,28 @@ static int omap_thermal_manager(struct omap_governor *omap_gov,
 				omap_gov->panic_threshold;
 		if (temp_upper >= OMAP_FATAL_TEMP)
 			temp_upper = OMAP_FATAL_TEMP;
-		omap_gov->omap_thermal_zones[PANIC_ZONE - 1].temp_upper =
+
+		/* Need to update this so that sensor thresholds get updated */
+		omap_gov->zones[PANIC_ZONE - 1].temp_upper =
 								temp_upper;
-		zone = PANIC_ZONE;
-	} else if (cpu_temp < (omap_gov->panic_threshold - HYSTERESIS_VALUE)) {
-		if (cpu_temp >= omap_gov->alert_threshold) {
-			set_cooling_level = omap_gov->panic_zone_reached == 0;
-			zone = ALERT_ZONE;
-		} else if (cpu_temp < (omap_gov->alert_threshold -
-						HYSTERESIS_VALUE)) {
-			if (cpu_temp >= OMAP_MONITOR_TEMP) {
-				omap_gov->panic_zone_reached = 0;
-				zone = MONITOR_ZONE;
-			} else {
-				/*
-				 * this includes the case where :
-				 * (OMAP_MONITOR_TEMP - HYSTERESIS_VALUE) <= T
-				 * && T < OMAP_MONITOR_TEMP
-				 */
-				omap_gov->panic_zone_reached = 0;
-				zone = SAFE_ZONE;
-			}
-		} else {
-			/*
-			 * this includes the case where :
-			 * (OMAP_ALERT_TEMP - HYSTERESIS_VALUE) <=
-			 * T < OMAP_ALERT_TEMP
-			 */
-			omap_gov->panic_zone_reached = 0;
-			zone = MONITOR_ZONE;
-		}
-	} else {
-		/*
-		 * this includes the case where :
-		 * (OMAP_PANIC_TEMP - HYSTERESIS_VALUE) <= T < OMAP_PANIC_TEMP
-		 */
+		break;
+	case ALERT_ZONE:
 		set_cooling_level = omap_gov->panic_zone_reached == 0;
-		zone = ALERT_ZONE;
-	}
+		break;
+	case MONITOR_ZONE:
+	case SAFE_ZONE:
+		omap_gov->panic_zone_reached = 0;
+		break;
+	case NO_ACTION:
+		break;
+	default:
+		break;
+	};
 
 	if (zone != NO_ACTION) {
 		struct omap_thermal_zone *therm_zone;
 
-		therm_zone = &omap_gov->omap_thermal_zones[zone - 1];
+		therm_zone = &omap_gov->zones[zone - 1];
 		if ((omap_gov->enable_debug_print) &&
 		((omap_gov->prev_zone != zone) || (zone == PANIC_ZONE))) {
 			pr_info("%s:sensor %d avg sensor %d pcb ",
@@ -582,9 +591,9 @@ static int option_alert_set(void *data, u64 val)
 	/* Change the ALERT Threshold value */
 	omap_gov->alert_threshold = val;
 	/* Also update the governor zone array */
-	omap_gov->omap_thermal_zones[MONITOR_ZONE - 1].temp_upper =
+	omap_gov->zones[MONITOR_ZONE - 1].temp_upper =
 						omap_gov->alert_threshold;
-	omap_gov->omap_thermal_zones[ALERT_ZONE - 1].temp_lower =
+	omap_gov->zones[ALERT_ZONE - 1].temp_lower =
 				omap_gov->alert_threshold - HYSTERESIS_VALUE;
 
 	/* Skip sensor update if no sensor is present */
@@ -621,9 +630,9 @@ static int option_panic_set(void *data, u64 val)
 	/* Change the PANIC Threshold value */
 	omap_gov->panic_threshold = val;
 	/* Also update the governor zone array */
-	omap_gov->omap_thermal_zones[ALERT_ZONE - 1].temp_upper =
+	omap_gov->zones[ALERT_ZONE - 1].temp_upper =
 						omap_gov->panic_threshold;
-	omap_gov->omap_thermal_zones[PANIC_ZONE - 1].temp_lower =
+	omap_gov->zones[PANIC_ZONE - 1].temp_lower =
 				omap_gov->panic_threshold - HYSTERESIS_VALUE;
 
 	/* Skip sensor update if no sensor is present */
@@ -692,8 +701,7 @@ static struct notifier_block omap_die_pm_notifier = {
 
 static int __init omap_governor_init(void)
 {
-	int i, zone;
-	struct omap_thermal_zone *t_zone;
+	int i;
 
 	for (i = 0; i < OMAP_GOV_MAX_INSTANCE; i++) {
 		omap_gov_instance[i] = kzalloc(sizeof(struct omap_governor),
@@ -728,8 +736,14 @@ static int __init omap_governor_init(void)
 	}
 
 	/* Initializing CPU governor */
-	memcpy(omap_gov_instance[OMAP_GOV_CPU_INSTANCE]->omap_thermal_zones,
-		omap_thermal_init_zones, sizeof(omap_thermal_init_zones));
+	if (omap_rev() == OMAP5430_REV_ES1_0 ||
+	    omap_rev() == OMAP5432_REV_ES1_0) {
+		memcpy(omap_gov_instance[OMAP_GOV_CPU_INSTANCE]->zones,
+		       zones_es1_0, sizeof(zones_es1_0));
+	} else {
+		memcpy(omap_gov_instance[OMAP_GOV_CPU_INSTANCE]->zones,
+		       zones_es2_0, sizeof(zones_es2_0));
+	}
 
 	omap_gov_instance[OMAP_GOV_CPU_INSTANCE]->thermal_fw.name =
 							"omap_cpu_governor";
@@ -753,8 +767,14 @@ static int __init omap_governor_init(void)
 	omap_gov_instance[OMAP_GOV_CPU_INSTANCE]->omap_gradient_const);
 
 	/* Initializing GPU governor */
-	memcpy(omap_gov_instance[OMAP_GOV_GPU_INSTANCE]->omap_thermal_zones,
-		omap_thermal_init_zones, sizeof(omap_thermal_init_zones));
+	if (omap_rev() == OMAP5430_REV_ES1_0 ||
+	    omap_rev() == OMAP5432_REV_ES1_0) {
+		memcpy(omap_gov_instance[OMAP_GOV_GPU_INSTANCE]->zones,
+		       zones_es1_0, sizeof(zones_es1_0));
+	} else {
+		memcpy(omap_gov_instance[OMAP_GOV_GPU_INSTANCE]->zones,
+		       zones_es2_0, sizeof(zones_es2_0));
+	}
 
 	omap_gov_instance[OMAP_GOV_GPU_INSTANCE]->thermal_fw.name =
 							"omap_gpu_governor";
@@ -776,22 +796,6 @@ static int __init omap_governor_init(void)
 	omap_gov_instance[OMAP_GOV_GPU_INSTANCE]->thermal_fw.domain_name,
 	omap_gov_instance[OMAP_GOV_GPU_INSTANCE]->omap_gradient_slope,
 	omap_gov_instance[OMAP_GOV_GPU_INSTANCE]->omap_gradient_const);
-
-	for (i = 0; i < OMAP_GOV_MAX_INSTANCE; i++) {
-		t_zone = omap_gov_instance[i]->omap_thermal_zones;
-
-		t_zone[ALERT_ZONE].temp_upper = OMAP_PANIC_TEMP;
-		t_zone[PANIC_ZONE].temp_lower = OMAP_FATAL_TEMP -
-							HYSTERESIS_VALUE;
-		t_zone[PANIC_ZONE].temp_upper = OMAP_FATAL_TEMP;
-
-		for (zone = 0; zone <= MAX_NO_MON_ZONES; zone++) {
-			t_zone[zone].update_rate = FAST_TEMP_MONITORING_RATE;
-			if (zone != SAFE_ZONE)
-				t_zone[zone].average_rate =
-						FAST_TEMP_MONITORING_RATE;
-		}
-	}
 
 	return 0;
 
