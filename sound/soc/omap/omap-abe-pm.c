@@ -152,8 +152,13 @@ int abe_pm_restore_context(struct omap_abe *abe)
 	dev_dbg(abe->dev, "%s: context is %slost\n", __func__,
 		(context_loss != abe->context_loss) ? "" : "not ");
 
-	if (context_loss != abe->context_loss)
-		omap_aess_reload_fw(abe->aess, abe->firmware);
+	if (context_loss != abe->context_loss) {
+		ret = omap_aess_reload_fw(abe->aess, abe->firmware);
+		if (ret) {
+			dev_dbg(abe->dev, "failed to reload firmware\n");
+			return ret;
+		}
+	}
 
 	abe->context_loss = context_loss;
 
@@ -269,7 +274,6 @@ int abe_pm_resume(struct snd_soc_dai *dai)
 	if (context_loss == abe->context_loss)
 		return 0;
 
-	omap_aess_reload_fw(abe->aess, abe->firmware);
 	abe->context_loss = context_loss;
 
 	omap_abe_pm_runtime_get_sync(abe);
@@ -283,7 +287,11 @@ int abe_pm_resume(struct snd_soc_dai *dai)
 		}
 	}
 
-	omap_aess_reload_fw(abe->aess, abe->firmware);
+	ret = omap_aess_reload_fw(abe->aess, abe->firmware);
+	if (ret) {
+		dev_dbg(abe->dev, "failed to reload firmware\n");
+		goto out;
+	}
 
 #if defined(CONFIG_SND_OMAP_SOC_ABE_DL2)
 	omap_aess_select_pdm_output(abe->aess, OMAP_ABE_DL1_HS_DL2_HF);
