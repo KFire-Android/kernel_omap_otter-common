@@ -243,7 +243,7 @@ static struct omap_sevm_panel_data *get_panel_data(void)
 		return &panel_data_lg_panel;
 }
 
-void sevm_android_display_setup(void)
+void __init sevm_android_display_setup(void)
 {
 	struct omap_sevm_panel_data *panel_data = get_panel_data();
 	omap_android_display_setup(panel_data->board_info,
