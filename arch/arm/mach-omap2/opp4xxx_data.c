@@ -215,8 +215,8 @@ static struct omap_opp_def __initdata omap443x_opp_def_list[] = {
 	OPP_INITIALIZER(&mpu_dev_info, true, 600000000, OMAP4430_VDD_MPU_OPP100_UV),
 	/* MPU OPP3 - OPP-Turbo */
 	OPP_INITIALIZER(&mpu_dev_info, true, 800000000, OMAP4430_VDD_MPU_OPPTURBO_UV),
-	/* MPU OPP4 - OPP-NT. False while ABB is not added */
-	OPP_INITIALIZER(&mpu_dev_info, false, 1008000000, OMAP4430_VDD_MPU_OPPNITRO_UV),
+	/* MPU OPP4 - OPP-NT */
+	OPP_INITIALIZER(&mpu_dev_info, true, 1008000000, OMAP4430_VDD_MPU_OPPNITRO_UV),
 	/* L3 OPP1 - OPP50 */
 	OPP_INITIALIZER(&l3_dev_info, true, 100000000, OMAP4430_VDD_CORE_OPP50_UV),
 	/* L3 OPP2 - OPP100, OPP-Turbo, OPP-SB */
@@ -344,7 +344,7 @@ static struct omap_opp_def __initdata omap446x_opp_def_list[] = {
 	/* MPU OPP3 - OPP-Turbo */
 	OPP_INITIALIZER(&omap4460_mpu_dev_info, true, 920000000, OMAP4460_VDD_MPU_OPPTURBO_UV),
 	/* MPU OPP4 - OPP-Nitro */
-	OPP_INITIALIZER(&omap4460_mpu_dev_info, false, 1200000000, OMAP4460_VDD_MPU_OPPNITRO_UV),
+	OPP_INITIALIZER(&omap4460_mpu_dev_info, true, 1200000000, OMAP4460_VDD_MPU_OPPNITRO_UV),
 	/* MPU OPP4 - OPP-Nitro SpeedBin */
 	OPP_INITIALIZER(&omap4460_mpu_dev_info, false, 1500000000, OMAP4460_VDD_MPU_OPPNITROSB_UV),
 	/* L3 OPP1 - OPP50 */
@@ -502,11 +502,11 @@ static struct omap_opp_def __initdata omap447x_opp_low_def_list[] = {
 	OPP_INITIALIZER(&omap4460_mpu_dev_info, true, 396800000, OMAP4470_VDD_MPU_OPP50_UV),
 	/* MPU OPP2 - OPP100 */
 	OPP_INITIALIZER(&omap4460_mpu_dev_info, true, 800000000, OMAP4470_VDD_MPU_OPP100_UV),
-	/* MPU OPP3 - OPP-Turbo. False while ABB and DCC are not supported */
-	OPP_INITIALIZER(&omap4460_mpu_dev_info, false, 1100000000, OMAP4470_VDD_MPU_OPPTURBO_UV),
-	/* MPU OPP4 - OPP-Nitro. False while ABB and DCC are not supported */
-	OPP_INITIALIZER(&omap4460_mpu_dev_info, false, 1300000000, OMAP4470_VDD_MPU_OPPNITRO_UV),
-	/* MPU OPP4 - OPP-Nitro SpeedBin */
+	/* MPU OPP3 - OPP-Turbo */
+	OPP_INITIALIZER(&omap4460_mpu_dev_info, true, 1100000000, OMAP4470_VDD_MPU_OPPTURBO_UV),
+	/* MPU OPP4 - OPP-Nitro */
+	OPP_INITIALIZER(&omap4460_mpu_dev_info, true, 1300000000, OMAP4470_VDD_MPU_OPPNITRO_UV),
+	/* MPU OPP5 - OPP-Nitro SpeedBin */
 	OPP_INITIALIZER(&omap4460_mpu_dev_info, false, 1500000000, OMAP4470_VDD_MPU_OPPNITROSB_UV),
 	/* L3 OPP1 - OPP50 */
 	OPP_INITIALIZER(&l3_dev_info, true, 100000000, OMAP4470_VDD_CORE_OPP50_UV),
@@ -556,11 +556,11 @@ static struct omap_opp_def __initdata omap447x_opp_high_def_list[] = {
 	OPP_INITIALIZER(&omap4460_mpu_dev_info, true, 396800000, OMAP4470_VDD_MPU_OPP50_UV),
 	/* MPU OPP2 - OPP100 */
 	OPP_INITIALIZER(&omap4460_mpu_dev_info, true, 800000000, OMAP4470_VDD_MPU_OPP100_UV),
-	/* MPU OPP3 - OPP-Turbo. False while ABB and DCC are not supported */
-	OPP_INITIALIZER(&omap4460_mpu_dev_info, false, 1100000000, OMAP4470_VDD_MPU_OPPTURBO_UV),
-	/* MPU OPP4 - OPP-Nitro. False while ABB and DCC are not supported */
-	OPP_INITIALIZER(&omap4460_mpu_dev_info, false, 1300000000, OMAP4470_VDD_MPU_OPPNITRO_UV),
-	/* MPU OPP4 - OPP-Nitro SpeedBin */
+	/* MPU OPP3 - OPP-Turbo */
+	OPP_INITIALIZER(&omap4460_mpu_dev_info, true, 1100000000, OMAP4470_VDD_MPU_OPPTURBO_UV),
+	/* MPU OPP4 - OPP-Nitro */
+	OPP_INITIALIZER(&omap4460_mpu_dev_info, true, 1300000000, OMAP4470_VDD_MPU_OPPNITRO_UV),
+	/* MPU OPP5 - OPP-Nitro SpeedBin */
 	OPP_INITIALIZER(&omap4460_mpu_dev_info, false, 1500000000, OMAP4470_VDD_MPU_OPPNITROSB_UV),
 	/* L3 OPP1 - OPP50 */
 	OPP_INITIALIZER(&l3_dev_info, true, 116000000, OMAP4470_VDD_CORE_OPP50_UV),
@@ -602,6 +602,27 @@ static struct omap_opp_def __initdata omap447x_opp_high_def_list[] = {
 	OPP_INITIALIZER(&abe_dev_info, true, 196608000, OMAP4470_VDD_IVA_OPP100_UV),
 	/* TODO: add DSP */
 };
+
+/*
+ * opp_def_list_enable_opp() - enable opp by dev_info and frequency
+ */
+static int __init opp_def_list_enable_opp(struct omap_opp_def *list,
+					  unsigned int size,
+					  struct device_info *dev_info,
+					  unsigned long opp_freq, bool state)
+{
+	int i;
+	for (i = 0; i < size; i++) {
+		struct omap_opp_def *entry = &list[i];
+		if (entry->dev_info == dev_info && entry->freq == opp_freq) {
+			entry->default_available = state;
+			return 0;
+		}
+	}
+	WARN(1, "Unable to find opp for %s, frequency %ld\n",
+	    dev_info->hwmod_name, opp_freq);
+	return -EINVAL;
+}
 
 /*
  * omap4_replace_dep_table() - replace the dep_table for dep_info by vdd name
@@ -685,16 +706,27 @@ int __init omap4_opp_init(void)
 	if (!cpu_is_omap44xx())
 		return r;
 
-	if (cpu_is_omap443x())
+	if (cpu_is_omap443x()) {
+		if (omap4_has_perf_silicon()) {
+			opp_def_list_enable_opp(omap443x_opp_def_list,
+					ARRAY_SIZE(omap443x_opp_def_list),
+					&mpu_dev_info,
+					1200000000, true);
+		}
+
 		r = omap_init_opp_table(omap443x_opp_def_list,
 			ARRAY_SIZE(omap443x_opp_def_list));
-	else if (cpu_is_omap446x()) {
+	} else if (cpu_is_omap446x()) {
 		omap4_abb_trim_update(omap446x_ldo_abb_trim_data);
-
+		if (omap4_has_perf_silicon()) {
+			opp_def_list_enable_opp(omap446x_opp_def_list,
+					ARRAY_SIZE(omap446x_opp_def_list),
+					&omap4460_mpu_dev_info,
+					1500000000, true);
+		}
 		r = omap_init_opp_table(omap446x_opp_def_list,
 			ARRAY_SIZE(omap446x_opp_def_list));
-	}
-	else if (cpu_is_omap447x()) {
+	} else if (cpu_is_omap447x()) {
 		struct clk *dpll_core_ck;
 		unsigned long rate = 0;
 
@@ -706,10 +738,25 @@ int __init omap4_opp_init(void)
 		rate = clk_get_rate(dpll_core_ck);
 		clk_put(dpll_core_ck);
 
-		if (rate > OMAP4470_LP_OPP_SET_CORE_DPLL_FREQ / 2)
+		if (rate > OMAP4470_LP_OPP_SET_CORE_DPLL_FREQ / 2) {
+			if (omap4_has_perf_silicon()) {
+				opp_def_list_enable_opp(
+					omap447x_opp_high_def_list,
+					ARRAY_SIZE(omap447x_opp_high_def_list),
+					&omap4460_mpu_dev_info,
+					1500000000, true);
+			}
 			r = omap_init_opp_table(omap447x_opp_high_def_list,
 					ARRAY_SIZE(omap447x_opp_high_def_list));
-		else {
+		} else {
+			if (omap4_has_perf_silicon()) {
+				opp_def_list_enable_opp(
+					omap447x_opp_low_def_list,
+					ARRAY_SIZE(omap447x_opp_low_def_list),
+					&omap4460_mpu_dev_info,
+					1500000000, true);
+			}
+
 			omap4_replace_dep_table("core",
 					omap447x_vddmpu_dep_info,
 					omap447x_vdd_mpu_core_low_dep_data);
