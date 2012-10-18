@@ -267,6 +267,10 @@ void __init omap3_pmic_get_config(struct twl4030_platform_data *pmic_data,
 static struct twl4030_usb_data omap4_usb_pdata = {
 };
 
+static struct twl4030_madc_platform_data omap4_madc_pdata = {
+	.irq_line = -1,
+};
+
 static struct regulator_init_data omap4_vdac_idata = {
 	.constraints = {
 		.min_uV			= 1800000,
@@ -277,6 +281,25 @@ static struct regulator_init_data omap4_vdac_idata = {
 					| REGULATOR_CHANGE_STATUS,
 	},
 	.supply_regulator	= "V2V1",
+};
+
+static struct regulator_consumer_supply omap4_vaux_supply[] = {
+	REGULATOR_SUPPLY("vmmc", "omap_hsmmc.1"),
+};
+
+static struct regulator_init_data omap4_vaux1_idata = {
+	.constraints = {
+		.min_uV			= 1000000,
+		.max_uV			= 3000000,
+		.apply_uV		= true,
+		.valid_modes_mask	= REGULATOR_MODE_NORMAL
+					| REGULATOR_MODE_STANDBY,
+		.valid_ops_mask	 = REGULATOR_CHANGE_VOLTAGE
+					| REGULATOR_CHANGE_MODE
+					| REGULATOR_CHANGE_STATUS,
+	},
+	.num_consumer_supplies  = ARRAY_SIZE(omap4_vaux_supply),
+	.consumer_supplies      = omap4_vaux_supply,
 };
 
 static struct regulator_init_data omap4_vaux2_idata = {
@@ -333,6 +356,19 @@ static struct regulator_init_data omap4_vpp_idata = {
 		.valid_modes_mask	= REGULATOR_MODE_NORMAL
 					| REGULATOR_MODE_STANDBY,
 		.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE
+					| REGULATOR_CHANGE_MODE
+					| REGULATOR_CHANGE_STATUS,
+	},
+};
+
+static struct regulator_init_data omap4_vusim_idata = {
+	.constraints = {
+		.min_uV			= 1200000,
+		.max_uV			= 2900000,
+		.apply_uV		= true,
+		.valid_modes_mask	= REGULATOR_MODE_NORMAL
+					| REGULATOR_MODE_STANDBY,
+		.valid_ops_mask	 = REGULATOR_CHANGE_VOLTAGE
 					| REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
 	},
@@ -434,9 +470,15 @@ void __init omap4_pmic_get_config(struct twl4030_platform_data *pmic_data,
 	if (pdata_flags & TWL_COMMON_PDATA_USB && !pmic_data->usb)
 		pmic_data->usb = &omap4_usb_pdata;
 
+	if (pdata_flags & TWL_COMMON_PDATA_MADC && !pmic_data->madc)
+		pmic_data->madc = &omap4_madc_pdata;
+
 	/* Common regulator configurations */
 	if (regulators_flags & TWL_COMMON_REGULATOR_VDAC && !pmic_data->vdac)
 		pmic_data->vdac = &omap4_vdac_idata;
+
+	if (regulators_flags & TWL_COMMON_REGULATOR_VAUX1 && !pmic_data->vaux1)
+		pmic_data->vaux1 = &omap4_vaux1_idata;
 
 	if (regulators_flags & TWL_COMMON_REGULATOR_VAUX2 && !pmic_data->vaux2)
 		pmic_data->vaux2 = &omap4_vaux2_idata;
@@ -449,6 +491,9 @@ void __init omap4_pmic_get_config(struct twl4030_platform_data *pmic_data,
 
 	if (regulators_flags & TWL_COMMON_REGULATOR_VPP && !pmic_data->vpp)
 		pmic_data->vpp = &omap4_vpp_idata;
+
+	if (regulators_flags & TWL_COMMON_REGULATOR_VUSIM && !pmic_data->vusim)
+		pmic_data->vusim = &omap4_vusim_idata;
 
 	if (regulators_flags & TWL_COMMON_REGULATOR_VANA && !pmic_data->vana)
 		pmic_data->vana = &omap4_vana_idata;
