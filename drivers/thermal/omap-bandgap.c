@@ -757,6 +757,10 @@ static int temp_sensor_configure_tshut_hot(struct omap_bandgap *bg_ptr,
 	u32 reg_val;
 	int err;
 
+	/* If not using the HW TSHUT feature, just return success */
+	if (!bg_ptr->pdata->has_tshut_config)
+		return 0;
+
 	tsr = bg_ptr->pdata->sensors[id].registers;
 	err = omap_control_readl(cdev, tsr->tshut_threshold, &reg_val);
 	reg_val &= ~tsr->tshut_hot_mask;
@@ -777,6 +781,10 @@ static int temp_sensor_configure_tshut_cold(struct omap_bandgap *bg_ptr,
 	struct temp_sensor_registers *tsr;
 	u32 reg_val;
 	int err;
+
+	/* If not using the HW TSHUT feature, just return success */
+	if (!bg_ptr->pdata->has_tshut_config)
+		return 0;
 
 	tsr = bg_ptr->pdata->sensors[id].registers;
 	err = omap_control_readl(cdev, tsr->tshut_threshold, &reg_val);
@@ -1158,6 +1166,7 @@ static int omap_bandgap_talert_init(struct omap_bandgap *bg_ptr,
 static struct omap_bandgap_data omap4460_data = {
 	.has_talert = true,
 	.has_tshut = true,
+	.has_tshut_config = true,
 	.fclock_name = "bandgap_ts_fclk",
 	.div_ck_name = "div_ts_ck",
 	.conv_table = omap4460_adc_to_temp,
@@ -1176,6 +1185,7 @@ static struct omap_bandgap_data omap4460_data = {
 static struct omap_bandgap_data omap5430_data = {
 	.has_talert = true,
 	.has_tshut = false,
+	.has_tshut_config = true,
 	.fclock_name = "ts_clk_div_ck",
 	.div_ck_name = "ts_clk_div_ck",
 	.conv_table = omap5430_adc_to_temp,
@@ -1402,10 +1412,12 @@ int __devinit omap_bandgap_probe(struct platform_device *pdev)
 			temp_sensor_init_talert_thresholds(bg_ptr, i,
 							   ts_data->t_hot,
 							   ts_data->t_cold);
-		temp_sensor_configure_tshut_hot(bg_ptr, i,
-						ts_data->tshut_hot);
-		temp_sensor_configure_tshut_cold(bg_ptr, i,
-						 ts_data->tshut_cold);
+		if (bg_ptr->pdata->has_tshut_config) {
+			temp_sensor_configure_tshut_hot(bg_ptr, i,
+							ts_data->tshut_hot);
+			temp_sensor_configure_tshut_cold(bg_ptr, i,
+							 ts_data->tshut_cold);
+		}
 	}
 
 	enable_continuous_mode(bg_ptr);
@@ -1501,9 +1513,10 @@ static int omap_bandgap_save_ctxt(struct omap_bandgap *bg_ptr)
 					&rval->bg_counter);
 		if (bg_ptr->pdata->has_talert)
 			err |= omap_control_readl(cdev, tsr->bgap_threshold,
-					  &rval->bg_threshold);
-		err |= omap_control_readl(cdev, tsr->tshut_threshold,
-					  &rval->tshut_threshold);
+						  &rval->bg_threshold);
+		if (bg_ptr->pdata->has_tshut_config)
+			err |= omap_control_readl(cdev, tsr->tshut_threshold,
+						  &rval->tshut_threshold);
 
 		if (err)
 			dev_err(bg_ptr->dev, "could not save sensor %d\n", i);
@@ -1560,8 +1573,9 @@ static int omap_bandgap_restore_ctxt(struct omap_bandgap *bg_ptr)
 		if (bg_ptr->pdata->has_talert)
 			err = omap_control_writel(cdev, rval->bg_threshold,
 							tsr->bgap_threshold);
-		err |= omap_control_writel(cdev, rval->tshut_threshold,
-						tsr->tshut_threshold);
+		if (bg_ptr->pdata->has_tshut_config)
+			err |= omap_control_writel(cdev, rval->tshut_threshold,
+							tsr->tshut_threshold);
 		/* Force immediate temperature measurement and update
 		 * of the DTEMP field
 		 */
