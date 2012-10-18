@@ -6068,8 +6068,8 @@ static struct omap_hwmod_addr_space omap44xx_usb_host_hs_addrs[] = {
 };
 
 static struct omap_hwmod_irq_info omap44xx_usb_host_hs_irqs[] = {
-	{ .name = "ohci-irq", .irq = 76 + OMAP44XX_IRQ_GIC_START },
-	{ .name = "ehci-irq", .irq = 77 + OMAP44XX_IRQ_GIC_START },
+	{ .name = "ohci", .irq = 76 + OMAP44XX_IRQ_GIC_START },
+	{ .name = "ehci", .irq = 77 + OMAP44XX_IRQ_GIC_START },
 	{ .irq = -1 }
 };
 

@@ -4284,8 +4284,7 @@ static struct omap_hwmod_irq_info omap54xx_mpu_irqs[] = {
 static struct omap_hwmod_addr_space omap54xx_mpu_addrs[] = {
 	{
 		.pa_start	= 0x48211000,
-		.pa_end		= 0x48310fff,
-		.flags		= ADDR_TYPE_RT
+		.pa_end		= 0x482af27f,
 	},
 	{ }
 };
@@ -5796,8 +5795,8 @@ static struct omap_hwmod_class omap54xx_usb_host_hs_hwmod_class = {
 
 /* usb_host_hs */
 static struct omap_hwmod_irq_info omap54xx_usb_host_hs_irqs[] = {
-	{ .name = "ohci-irq", .irq = 76 + OMAP54XX_IRQ_GIC_START },
-	{ .name = "ehci-irq", .irq = 77 + OMAP54XX_IRQ_GIC_START },
+	{ .name = "ohci", .irq = 76 + OMAP54XX_IRQ_GIC_START },
+	{ .name = "ehci", .irq = 77 + OMAP54XX_IRQ_GIC_START },
 	{ .irq = -1 }
 };
 
@@ -5811,12 +5810,12 @@ static struct omap_hwmod_addr_space omap54xx_usb_host_hs_addrs[] = {
 	{
 		.name		= "ohci",
 		.pa_start	= 0x4a064800,
-		.pa_end		= 0x4a064bff,
+		.pa_end		= 0x4a06487f,
 	},
 	{
 		.name		= "ehci",
 		.pa_start	= 0x4a064c00,
-		.pa_end		= 0x4a064fff,
+		.pa_end		= 0x4a064cff,
 	},
 	{ }
 };
