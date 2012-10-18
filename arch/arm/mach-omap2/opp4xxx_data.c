@@ -358,7 +358,7 @@ static struct omap_opp_def __initdata omap446x_opp_def_list[] = {
 	/* IVA OPP3 - OPP-Turbo */
 	OPP_INITIALIZER(&iva_dev_info, true, 332000000, OMAP4460_VDD_IVA_OPPTURBO_UV),
 	/* IVA OPP4 - OPP-Nitro */
-	OPP_INITIALIZER(&iva_dev_info, false, 430000000, OMAP4460_VDD_IVA_OPPNITRO_UV),
+	OPP_INITIALIZER(&iva_dev_info, true, 430000000, OMAP4460_VDD_IVA_OPPNITRO_UV),
 	/* IVA OPP5 - OPP-Nitro SpeedBin*/
 	OPP_INITIALIZER(&iva_dev_info, false, 500000000, OMAP4460_VDD_IVA_OPPNITROSB_UV),
 	/* FDIF OPP1 - OPP50 */
@@ -519,7 +519,7 @@ static struct omap_opp_def __initdata omap447x_opp_low_def_list[] = {
 	/* IVA OPP3 - OPP-Turbo */
 	OPP_INITIALIZER(&iva_dev_info, true, 332000000, OMAP4470_VDD_IVA_OPPTURBO_UV),
 	/* IVA OPP4 - OPP-Nitro */
-	OPP_INITIALIZER(&iva_dev_info, false, 430000000, OMAP4470_VDD_IVA_OPPNITRO_UV),
+	OPP_INITIALIZER(&iva_dev_info, true, 430000000, OMAP4470_VDD_IVA_OPPNITRO_UV),
 	/* IVA OPP5 - OPP-Nitro SpeedBin */
 	OPP_INITIALIZER(&iva_dev_info, false, 500000000, OMAP4470_VDD_IVA_OPPNITROSB_UV),
 	/* SGX OPP1 - OPP50 */
@@ -573,7 +573,7 @@ static struct omap_opp_def __initdata omap447x_opp_high_def_list[] = {
 	/* IVA OPP3 - OPP-Turbo */
 	OPP_INITIALIZER(&iva_dev_info, true, 332000000, OMAP4470_VDD_IVA_OPPTURBO_UV),
 	/* IVA OPP4 - OPP-Nitro */
-	OPP_INITIALIZER(&iva_dev_info, false, 430000000, OMAP4470_VDD_IVA_OPPNITRO_UV),
+	OPP_INITIALIZER(&iva_dev_info, true, 430000000, OMAP4470_VDD_IVA_OPPNITRO_UV),
 	/* IVA OPP5 - OPP-Nitro SpeedBin */
 	OPP_INITIALIZER(&iva_dev_info, false, 500000000, OMAP4470_VDD_IVA_OPPNITROSB_UV),
 	/* SGX OPP1 - OPP50 */
@@ -723,6 +723,10 @@ int __init omap4_opp_init(void)
 					ARRAY_SIZE(omap446x_opp_def_list),
 					&omap4460_mpu_dev_info,
 					1500000000, true);
+			opp_def_list_enable_opp(omap446x_opp_def_list,
+					ARRAY_SIZE(omap446x_opp_def_list),
+					&iva_dev_info,
+					500000000, true);
 		}
 		r = omap_init_opp_table(omap446x_opp_def_list,
 			ARRAY_SIZE(omap446x_opp_def_list));
@@ -745,6 +749,11 @@ int __init omap4_opp_init(void)
 					ARRAY_SIZE(omap447x_opp_high_def_list),
 					&omap4460_mpu_dev_info,
 					1500000000, true);
+				opp_def_list_enable_opp(
+					omap447x_opp_high_def_list,
+					ARRAY_SIZE(omap447x_opp_high_def_list),
+					&iva_dev_info,
+					500000000, true);
 			}
 			r = omap_init_opp_table(omap447x_opp_high_def_list,
 					ARRAY_SIZE(omap447x_opp_high_def_list));
@@ -755,6 +764,11 @@ int __init omap4_opp_init(void)
 					ARRAY_SIZE(omap447x_opp_low_def_list),
 					&omap4460_mpu_dev_info,
 					1500000000, true);
+				opp_def_list_enable_opp(
+					omap447x_opp_low_def_list,
+					ARRAY_SIZE(omap447x_opp_low_def_list),
+					&iva_dev_info,
+					500000000, true);
 			}
 
 			omap4_replace_dep_table("core",
