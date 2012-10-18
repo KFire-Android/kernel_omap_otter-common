@@ -34,17 +34,17 @@
 #include <plat/omap_device.h>
 
 /* Zone information */
-#define FATAL_ZONE	5
-#define PANIC_ZONE	4
+#define SHUTDOWN_ZONE	5
+#define CRITICAL_ZONE	4
 #define ALERT_ZONE	3
 #define MONITOR_ZONE	2
 #define SAFE_ZONE	1
 #define NO_ACTION	0
-#define MAX_NO_MON_ZONES PANIC_ZONE
-#define OMAP_FATAL_TEMP			125000
-#define OMAP_FATAL_TEMP_ES1_0		120000
-#define OMAP_PANIC_TEMP			110000
-#define OMAP_PANIC_TEMP_ES1_0		105000
+#define MAX_NO_MON_ZONES CRITICAL_ZONE
+#define OMAP_SHUTDOWN_TEMP			125000
+#define OMAP_SHUTDOWN_TEMP_ES1_0		120000
+#define OMAP_CRITICAL_TEMP			110000
+#define OMAP_CRITICAL_TEMP_ES1_0		105000
 #define OMAP_ALERT_TEMP			100000
 #define OMAP_MONITOR_TEMP		85000
 #define OMAP_SAFE_TEMP			25000
@@ -88,7 +88,7 @@ struct omap_governor {
 	struct omap_thermal_zone zones[MAX_NO_MON_ZONES];
 	void (*update_temp_thresh) (struct thermal_dev *, int min, int max);
 	int report_rate;
-	int panic_zone_reached;
+	int critical_zone_reached;
 	int cooling_level;
 	int hotspot_temp_upper;
 	int hotspot_temp_lower;
@@ -121,12 +121,12 @@ static struct omap_thermal_zone zones_es1_0[] __initdata = {
 			FAST_TEMP_MONITORING_RATE_ES1_0),
 	OMAP_THERMAL_ZONE("alert", 0,
 			OMAP_ALERT_TEMP - HYSTERESIS_VALUE,
-			OMAP_PANIC_TEMP_ES1_0,
+			OMAP_CRITICAL_TEMP_ES1_0,
 			FAST_TEMP_MONITORING_RATE_ES1_0,
 			FAST_TEMP_MONITORING_RATE_ES1_0),
-	OMAP_THERMAL_ZONE("panic", 1,
-			OMAP_PANIC_TEMP_ES1_0 - HYSTERESIS_VALUE,
-			OMAP_FATAL_TEMP_ES1_0,
+	OMAP_THERMAL_ZONE("critical", 1,
+			OMAP_CRITICAL_TEMP_ES1_0 - HYSTERESIS_VALUE,
+			OMAP_SHUTDOWN_TEMP_ES1_0,
 			FAST_TEMP_MONITORING_RATE_ES1_0,
 			FAST_TEMP_MONITORING_RATE_ES1_0),
 };
@@ -142,12 +142,12 @@ static struct omap_thermal_zone zones_es2_0[] __initdata = {
 			FAST_TEMP_MONITORING_RATE),
 	OMAP_THERMAL_ZONE("alert", 0,
 			OMAP_ALERT_TEMP - HYSTERESIS_VALUE,
-			OMAP_PANIC_TEMP,
+			OMAP_CRITICAL_TEMP,
 			FAST_TEMP_MONITORING_RATE,
 			FAST_TEMP_MONITORING_RATE),
-	OMAP_THERMAL_ZONE("panic", 1,
-			OMAP_PANIC_TEMP - HYSTERESIS_VALUE,
-			OMAP_FATAL_TEMP,
+	OMAP_THERMAL_ZONE("critical", 1,
+			OMAP_CRITICAL_TEMP - HYSTERESIS_VALUE,
+			OMAP_SHUTDOWN_TEMP,
 			FAST_TEMP_MONITORING_RATE,
 			FAST_TEMP_MONITORING_RATE),
 };
@@ -177,11 +177,11 @@ static struct omap_governor *omap_gov_instance[OMAP_GOV_MAX_INSTANCE];
  *
  * There are 5 zones identified:
  *
- * FATAL_ZONE: This zone indicates that the on-die temperature has reached
+ * SHUTDOWN_ZONE: This zone indicates that the on-die temperature has reached
  * a point where the device needs to be rebooted and allow ROM or the bootloader
  * to run to allow the device to cool.
  *
- * PANIC_ZONE: This zone indicates a near fatal temperature is approaching
+ * CRITICAL_ZONE: This zone indicates a near shutdown temperature is approaching
  * and should impart all neccessary cooling agent to bring the temperature
  * down to an acceptable level.
  *
@@ -341,16 +341,16 @@ static int omap_enter_zone(struct omap_governor *omap_gov,
 }
 
 /**
- * omap_fatal_zone() - Shut-down the system to ensure OMAP Junction
+ * omap_shutdown_zone() - Shut-down the system to ensure OMAP Junction
  *			temperature decreases enough
  *
  * @cpu_temp:	The current adjusted CPU temperature
  *
  * No return forces a restart of the system
  */
-static void omap_fatal_zone(int cpu_temp)
+static void omap_shutdown_zone(int cpu_temp)
 {
-	pr_emerg("%s:FATAL ZONE (hot spot temp: %i)\n", __func__, cpu_temp);
+	pr_emerg("%s:SHUTDOWN ZONE (hot spot temp: %i)\n", __func__, cpu_temp);
 
 	kernel_restart(NULL);
 }
@@ -372,38 +372,38 @@ static int omap_thermal_manager(struct omap_governor *omap_gov,
 	int cpu_temp, zone = NO_ACTION;
 	bool set_cooling_level = true;
 	int temp_upper, inter_zone_thot = 0;
-	int fatal, alert;
+	int shutdown, alert;
 
 	cpu_temp = convert_omap_sensor_temp_to_hotspot_temp(omap_gov, temp);
 	zone = omap_thermal_match_zone(omap_gov->zones, cpu_temp);
 
 	switch (zone) {
-	case FATAL_ZONE:
-		omap_fatal_zone(cpu_temp);
-		return FATAL_ZONE;
-	case PANIC_ZONE:
+	case SHUTDOWN_ZONE:
+		omap_shutdown_zone(cpu_temp);
+		return SHUTDOWN_ZONE;
+	case CRITICAL_ZONE:
 		alert = omap_gov->zones[ALERT_ZONE - 1].temp_upper;
-		fatal = omap_gov->zones[PANIC_ZONE - 1].temp_upper;
-		temp_upper = (((fatal - alert) / omap_gov->steps) *
-				omap_gov->panic_zone_reached) + alert;
+		shutdown = omap_gov->zones[CRITICAL_ZONE - 1].temp_upper;
+		temp_upper = (((shutdown - alert) / omap_gov->steps) *
+				omap_gov->critical_zone_reached) + alert;
 		if (temp_upper < cpu_temp)
-			omap_gov->panic_zone_reached++;
+			omap_gov->critical_zone_reached++;
 		else
 			set_cooling_level = false; /* no need for update */
-		temp_upper = (((fatal - alert) / omap_gov->steps) *
-				omap_gov->panic_zone_reached) + alert;
-		if (temp_upper >= fatal)
-			temp_upper = fatal;
+		temp_upper = (((shutdown - alert) / omap_gov->steps) *
+				omap_gov->critical_zone_reached) + alert;
+		if (temp_upper >= shutdown)
+			temp_upper = shutdown;
 
 		inter_zone_thot = temp_upper;
 
 		break;
 	case ALERT_ZONE:
-		set_cooling_level = omap_gov->panic_zone_reached == 0;
+		set_cooling_level = omap_gov->critical_zone_reached == 0;
 		break;
 	case MONITOR_ZONE:
 	case SAFE_ZONE:
-		omap_gov->panic_zone_reached = 0;
+		omap_gov->critical_zone_reached = 0;
 		break;
 	case NO_ACTION:
 		break;
@@ -416,7 +416,7 @@ static int omap_thermal_manager(struct omap_governor *omap_gov,
 
 		therm_zone = &omap_gov->zones[zone - 1];
 		if ((omap_gov->enable_debug_print) &&
-		((omap_gov->prev_zone != zone) || (zone == PANIC_ZONE))) {
+		((omap_gov->prev_zone != zone) || (zone == CRITICAL_ZONE))) {
 			pr_info("%s:sensor %d avg sensor %d pcb ",
 				 __func__, temp,
 				 omap_gov->avg_gov_sensor_temp);
@@ -590,7 +590,7 @@ static int option_alert_set(void *data, u64 val)
 			(int)val, OMAP_MONITOR_TEMP);
 		return -EINVAL;
 	} else if (val >= thres) {
-		pr_err("Invalid threshold: ALERT:%d is >= PANIC:%d\n",
+		pr_err("Invalid threshold: ALERT:%d is >= CRITICAL:%d\n",
 			(int)val, thres);
 		return -EINVAL;
 	}
@@ -607,7 +607,7 @@ static int option_alert_set(void *data, u64 val)
 DEFINE_SIMPLE_ATTRIBUTE(omap_die_gov_alert_fops, option_alert_get,
 			option_alert_set, "%llu\n");
 
-static int option_panic_get(void *data, u64 *val)
+static int option_critical_get(void *data, u64 *val)
 {
 	struct omap_governor *omap_gov = (struct omap_governor *) data;
 
@@ -616,23 +616,23 @@ static int option_panic_get(void *data, u64 *val)
 	return 0;
 }
 
-static int option_panic_set(void *data, u64 val)
+static int option_critical_set(void *data, u64 val)
 {
 	struct omap_governor *omap_gov = (struct omap_governor *) data;
 	int thres = omap_gov->zones[MONITOR_ZONE - 1].temp_upper;
 
 	if (val <= thres) {
-		pr_err("Invalid threshold: PANIC:%d is <= ALERT:%d\n",
+		pr_err("Invalid threshold: CRITICAL:%d is <= ALERT:%d\n",
 			(int)val, thres);
 		return -EINVAL;
-	} else if (val >= OMAP_FATAL_TEMP) {
-		pr_err("Invalid threshold: PANIC:%d is >= FATAL:%d\n",
-			(int)val, OMAP_FATAL_TEMP);
+	} else if (val >= OMAP_SHUTDOWN_TEMP) {
+		pr_err("Invalid threshold: CRITICAL:%d is >= SHUTDOWN:%d\n",
+			(int)val, OMAP_SHUTDOWN_TEMP);
 		return -EINVAL;
 	}
 	/* Also update the governor zone array */
 	omap_gov->zones[ALERT_ZONE - 1].temp_upper = val;
-	omap_gov->zones[PANIC_ZONE - 1].temp_lower = val - HYSTERESIS_VALUE;
+	omap_gov->zones[CRITICAL_ZONE - 1].temp_lower = val - HYSTERESIS_VALUE;
 
 	/* Skip sensor update if no sensor is present */
 	if (!IS_ERR_OR_NULL(omap_gov->temp_sensor))
@@ -640,8 +640,8 @@ static int option_panic_set(void *data, u64 val)
 
 	return 0;
 }
-DEFINE_SIMPLE_ATTRIBUTE(omap_die_gov_panic_fops, option_panic_get,
-			option_panic_set, "%llu\n");
+DEFINE_SIMPLE_ATTRIBUTE(omap_die_gov_critical_fops, option_critical_get,
+			option_critical_set, "%llu\n");
 
 #ifdef CONFIG_THERMAL_FRAMEWORK_DEBUG
 static int omap_gov_register_debug_entries(struct thermal_dev *gov,
@@ -666,7 +666,7 @@ static int omap_gov_register_debug_entries(struct thermal_dev *gov,
 	(void) debugfs_create_file("avg_cpu_sensor_temp",
 			S_IRUGO, d, &(omap_gov->avg_gov_sensor_temp),
 			&omap_die_gov_fops);
-	(void) debugfs_create_file("panic_sub_zones",
+	(void) debugfs_create_file("critical_sub_zones",
 			S_IRUGO, d, &(omap_gov->steps),
 			&omap_die_gov_fops);
 
@@ -677,10 +677,10 @@ static int omap_gov_register_debug_entries(struct thermal_dev *gov,
 			S_IRUGO | S_IWUSR, d, omap_gov,
 			&omap_die_gov_alert_fops);
 
-	/* PANIC zone threshold */
-	(void) debugfs_create_file("panic_threshold",
+	/* CRITICAL zone threshold */
+	(void) debugfs_create_file("critical_threshold",
 			S_IRUGO | S_IWUSR, d, omap_gov,
-			&omap_die_gov_panic_fops);
+			&omap_die_gov_critical_fops);
 
 	/* Flag to enable the Debug Zone Prints */
 	(void) debugfs_create_file("enable_debug_print",
@@ -721,7 +721,7 @@ static int __init omap_governor_init(void)
 						NORMAL_TEMP_MONITORING_RATE;
 		omap_gov_instance[i]->avg_is_valid = 0;
 		omap_gov_instance[i]->hotspot_temp = 0;
-		omap_gov_instance[i]->panic_zone_reached = 0;
+		omap_gov_instance[i]->critical_zone_reached = 0;
 		omap_gov_instance[i]->pcb_sensor_available = false;
 		omap_gov_instance[i]->enable_debug_print = false;
 
