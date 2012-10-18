@@ -476,6 +476,11 @@ static void average_on_die_temperature(struct omap_governor *omap_gov)
 	omap_gov->avg_gov_sensor_temp =
 		(omap_gov->avg_gov_sensor_temp / AVERAGE_NUMBER);
 
+	pr_debug("%s: averaging %s temp %d. avg %d\n", __func__,
+				omap_gov->thermal_fw.domain_name,
+				omap_gov->sensor_temp,
+				omap_gov->avg_gov_sensor_temp);
+
 	/*
 	 * Reconfigure the current temperature thresholds according
 	 * to the current PCB temperature
