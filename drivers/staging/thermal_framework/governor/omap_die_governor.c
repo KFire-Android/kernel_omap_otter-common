@@ -100,8 +100,6 @@ struct omap_governor {
 	int avg_is_valid;
 	int omap_gradient_slope;
 	int omap_gradient_const;
-	int alert_threshold;
-	int panic_threshold;
 	int prev_zone;
 	bool enable_debug_print;
 	int sensor_temp_table[AVERAGE_NUMBER];
@@ -297,7 +295,8 @@ static signed hotspot_temp_to_sensor_temp(struct omap_governor *omap_gov,
 static int omap_enter_zone(struct omap_governor *omap_gov,
 				struct omap_thermal_zone *zone,
 				bool set_cooling_level,
-				struct list_head *cooling_list, int cpu_temp)
+				struct list_head *cooling_list, int cpu_temp,
+				int inter_zone_thot)
 {
 	int temp_upper;
 	int temp_lower;
@@ -316,8 +315,12 @@ static int omap_enter_zone(struct omap_governor *omap_gov,
 		thermal_device_call_all(cooling_list, cool_device,
 						omap_gov->cooling_level);
 	}
+
+	if (inter_zone_thot == 0)
+		inter_zone_thot = zone->temp_upper;
+
 	temp_lower = hotspot_temp_to_sensor_temp(omap_gov, zone->temp_lower);
-	temp_upper = hotspot_temp_to_sensor_temp(omap_gov, zone->temp_upper);
+	temp_upper = hotspot_temp_to_sensor_temp(omap_gov, inter_zone_thot);
 	thermal_device_call(omap_gov->temp_sensor, set_temp_thresh, temp_lower,
 								temp_upper);
 	omap_update_report_rate(omap_gov, omap_gov->temp_sensor,
@@ -365,7 +368,8 @@ static int omap_thermal_manager(struct omap_governor *omap_gov,
 {
 	int cpu_temp, zone = NO_ACTION;
 	bool set_cooling_level = true;
-	int temp_upper;
+	int temp_upper, inter_zone_thot = 0;
+	int fatal, alert;
 
 	cpu_temp = convert_omap_sensor_temp_to_hotspot_temp(omap_gov, temp);
 	zone = omap_thermal_match_zone(omap_gov->zones, cpu_temp);
@@ -375,24 +379,21 @@ static int omap_thermal_manager(struct omap_governor *omap_gov,
 		omap_fatal_zone(cpu_temp);
 		return FATAL_ZONE;
 	case PANIC_ZONE:
-		temp_upper = (((OMAP_FATAL_TEMP -
-				omap_gov->panic_threshold) / 4) *
-					omap_gov->panic_zone_reached) +
-				omap_gov->panic_threshold;
+		alert = omap_gov->zones[ALERT_ZONE - 1].temp_upper;
+		fatal = omap_gov->zones[PANIC_ZONE - 1].temp_upper;
+		temp_upper = (((fatal - alert) / 4) *
+				omap_gov->panic_zone_reached) + alert;
 		if (temp_upper < cpu_temp)
 			omap_gov->panic_zone_reached++;
 		else
 			set_cooling_level = false; /* no need for update */
-		temp_upper = (((OMAP_FATAL_TEMP -
-				omap_gov->panic_threshold) / 4) *
-					omap_gov->panic_zone_reached) +
-				omap_gov->panic_threshold;
-		if (temp_upper >= OMAP_FATAL_TEMP)
-			temp_upper = OMAP_FATAL_TEMP;
+		temp_upper = (((fatal - alert) / 4) *
+				omap_gov->panic_zone_reached) + alert;
+		if (temp_upper >= fatal)
+			temp_upper = fatal;
 
-		/* Need to update this so that sensor thresholds get updated */
-		omap_gov->zones[PANIC_ZONE - 1].temp_upper =
-								temp_upper;
+		inter_zone_thot = temp_upper;
+
 		break;
 	case ALERT_ZONE:
 		set_cooling_level = omap_gov->panic_zone_reached == 0;
@@ -424,8 +425,8 @@ static int omap_thermal_manager(struct omap_governor *omap_gov,
 			omap_gov->prev_zone = zone;
 		}
 
-		omap_enter_zone(omap_gov, therm_zone,
-				set_cooling_level, cooling_list, cpu_temp);
+		omap_enter_zone(omap_gov, therm_zone, set_cooling_level,
+				cooling_list, cpu_temp, inter_zone_thot);
 	}
 
 	return zone;
@@ -570,7 +571,7 @@ static int option_alert_get(void *data, u64 *val)
 {
 	struct omap_governor *omap_gov = (struct omap_governor *) data;
 
-	*val = omap_gov->alert_threshold;
+	*val = omap_gov->zones[MONITOR_ZONE - 1].temp_upper;
 
 	return 0;
 }
@@ -578,23 +579,20 @@ static int option_alert_get(void *data, u64 *val)
 static int option_alert_set(void *data, u64 val)
 {
 	struct omap_governor *omap_gov = (struct omap_governor *) data;
+	int thres = omap_gov->zones[ALERT_ZONE - 1].temp_upper;
 
 	if (val <= OMAP_MONITOR_TEMP) {
 		pr_err("Invalid threshold: ALERT:%d is <= MONITOR:%d\n",
 			(int)val, OMAP_MONITOR_TEMP);
 		return -EINVAL;
-	} else if (val >= omap_gov->panic_threshold) {
+	} else if (val >= thres) {
 		pr_err("Invalid threshold: ALERT:%d is >= PANIC:%d\n",
-			(int)val, omap_gov->panic_threshold);
+			(int)val, thres);
 		return -EINVAL;
 	}
-	/* Change the ALERT Threshold value */
-	omap_gov->alert_threshold = val;
 	/* Also update the governor zone array */
-	omap_gov->zones[MONITOR_ZONE - 1].temp_upper =
-						omap_gov->alert_threshold;
-	omap_gov->zones[ALERT_ZONE - 1].temp_lower =
-				omap_gov->alert_threshold - HYSTERESIS_VALUE;
+	omap_gov->zones[MONITOR_ZONE - 1].temp_upper = val;
+	omap_gov->zones[ALERT_ZONE - 1].temp_lower = val - HYSTERESIS_VALUE;
 
 	/* Skip sensor update if no sensor is present */
 	if (!IS_ERR_OR_NULL(omap_gov->temp_sensor))
@@ -609,7 +607,7 @@ static int option_panic_get(void *data, u64 *val)
 {
 	struct omap_governor *omap_gov = (struct omap_governor *) data;
 
-	*val = omap_gov->panic_threshold;
+	*val = omap_gov->zones[ALERT_ZONE - 1].temp_upper;
 
 	return 0;
 }
@@ -617,23 +615,20 @@ static int option_panic_get(void *data, u64 *val)
 static int option_panic_set(void *data, u64 val)
 {
 	struct omap_governor *omap_gov = (struct omap_governor *) data;
+	int thres = omap_gov->zones[MONITOR_ZONE - 1].temp_upper;
 
-	if (val <= omap_gov->alert_threshold) {
+	if (val <= thres) {
 		pr_err("Invalid threshold: PANIC:%d is <= ALERT:%d\n",
-			(int)val, omap_gov->alert_threshold);
+			(int)val, thres);
 		return -EINVAL;
 	} else if (val >= OMAP_FATAL_TEMP) {
 		pr_err("Invalid threshold: PANIC:%d is >= FATAL:%d\n",
 			(int)val, OMAP_FATAL_TEMP);
 		return -EINVAL;
 	}
-	/* Change the PANIC Threshold value */
-	omap_gov->panic_threshold = val;
 	/* Also update the governor zone array */
-	omap_gov->zones[ALERT_ZONE - 1].temp_upper =
-						omap_gov->panic_threshold;
-	omap_gov->zones[PANIC_ZONE - 1].temp_lower =
-				omap_gov->panic_threshold - HYSTERESIS_VALUE;
+	omap_gov->zones[ALERT_ZONE - 1].temp_upper = val;
+	omap_gov->zones[PANIC_ZONE - 1].temp_lower = val - HYSTERESIS_VALUE;
 
 	/* Skip sensor update if no sensor is present */
 	if (!IS_ERR_OR_NULL(omap_gov->temp_sensor))
@@ -720,8 +715,6 @@ static int __init omap_governor_init(void)
 		omap_gov_instance[i]->panic_zone_reached = 0;
 		omap_gov_instance[i]->pcb_sensor_available = false;
 		omap_gov_instance[i]->enable_debug_print = false;
-		omap_gov_instance[i]->alert_threshold = OMAP_ALERT_TEMP;
-		omap_gov_instance[i]->panic_threshold = OMAP_PANIC_TEMP;
 
 		INIT_DELAYED_WORK(&omap_gov_instance[i]->
 					average_gov_sensor_work,
