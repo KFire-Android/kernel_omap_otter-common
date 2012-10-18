@@ -69,6 +69,9 @@ static int staticdep_wa_i745_applied;
 static struct powerdomain *gpu_pd;
 static struct voltagedomain *mpu_vdd, *core_vdd, *mm_vdd;
 
+static void omap4_syscontrol_lpddr_clk_io_errata_i736(bool enable);
+
+
 /*
 * HSI - OMAP4430-2.2BUG00055:
 * HSI: DSP Swakeup generated is the same than MPU Swakeup.
@@ -96,6 +99,29 @@ static struct voltagedomain *mpu_vdd, *core_vdd, *mm_vdd;
  * in all active use cases and get all the power savings accordingly.
  */
 #define OMAP44xx_54xx_PM_ERRATUM_MPU_EMIF_NO_DYNDEP_IDLE_i745	BIT(3)
+
+/* Errata ID: i736: All OMAP4
+ * There is a HW bug in CMD PHY which gives ISO signals as same for both
+ * PADn and PADp on differential IO pad, because of which IO leaks higher
+ * as pull controls are differential internally and pull value does not
+ * match A value.
+ * Though there is no functionality impact due to this bug, it is seen
+ * that by disabling the pulls there is a savings ~500uA in OSWR, but draws
+ * ~300uA more during OFF mode.
+ * Workaround:
+ * To prevent an increase in leakage, it is recommended to disable the pull
+ * logic for these I/Os except during off mode.
+ * So the default state of the I/Os (to program at boot) will have pull
+ * logic disable:
+ * CONTROL_LPDDR2IO1_2[18:17]LPDDR2IO1_GR10_WD = 00
+ * CONTROL_LPDDR2IO2_2[18:17]LPDDR2IO2_GR10_WD = 00
+ * When entering off mode, these I/Os must be configured with pulldown enable:
+ * CONTROL_LPDDR2IO1_2[18:17]LPDDR2IO1_GR10_WD = 10
+ * CONTROL_LPDDR2IO2_2[18:17]LPDDR2IO2_GR10_WD = 10
+ * When resuming from off mode, pull logic must be disabled.
+ */
+#define OMAP44xx_54xx_PM_ERRATUM_LPDDR_CLK_IO_i736		BIT(4)
+#define LPDDR_WD_PULL_DOWN		0x02
 
 static u8 pm44xx_54xx_errata;
 #define is_pm44xx_54xx_erratum(erratum) (pm44xx_54xx_errata & \
@@ -402,6 +428,9 @@ void omap_idle_core_notifier(int mpu_next_state, int core_next_state)
 			clkdm_allow_idle(emif_clkdm);
 		}
 	}
+
+	if (is_suspend)
+		omap4_syscontrol_lpddr_clk_io_errata_i736(false);
 }
 
 /**
@@ -429,6 +458,9 @@ void omap_enable_core_notifier(int mpu_next_state, int core_next_state)
 			smp_processor_id());
 		return;
 	}
+
+	if (is_suspend)
+		omap4_syscontrol_lpddr_clk_io_errata_i736(true);
 
 	if (core_next_state != PWRDM_POWER_ON)
 		omap2_gpio_resume_after_idle();
@@ -681,7 +713,33 @@ static void __init omap_pm_setup_errata(void)
 	if (cpu_is_omap44xx()) {
 		pm44xx_54xx_errata |= OMAP44xx_54xx_PM_ERRATUM_HSI_SWAKEUP_i702;
 		pm44xx_54xx_errata |= OMAP44xx_54xx_PM_ERRATUM_RTA_i608;
+		pm44xx_54xx_errata |=
+			OMAP44xx_54xx_PM_ERRATUM_LPDDR_CLK_IO_i736;
 	}
+}
+
+static void omap4_syscontrol_lpddr_clk_io_errata_i736(bool enable)
+{
+	u32 v = 0;
+
+	if (!is_pm44xx_54xx_erratum(LPDDR_CLK_IO_i736))
+		return;
+
+	v =
+	   omap4_ctrl_pad_readl(OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_LPDDR2IO1_2);
+	v &= ~OMAP4_LPDDR2IO1_GR10_WD_MASK;
+	if (!enable)
+		v |= LPDDR_WD_PULL_DOWN << OMAP4_LPDDR2IO1_GR10_WD_SHIFT;
+	omap4_ctrl_pad_writel(v,
+			      OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_LPDDR2IO1_2);
+
+	v =
+	   omap4_ctrl_pad_readl(OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_LPDDR2IO2_2);
+	v &= ~OMAP4_LPDDR2IO2_GR10_WD_MASK;
+	if (!enable)
+		v |= LPDDR_WD_PULL_DOWN << OMAP4_LPDDR2IO1_GR10_WD_SHIFT;
+	omap4_ctrl_pad_writel(v,
+			      OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_LPDDR2IO2_2);
 }
 
 static void __init omap4_syscontrol_setup_regs(void)
@@ -712,6 +770,8 @@ static void __init omap4_syscontrol_setup_regs(void)
 	     OMAP4_LPDDR21_VREF_AUTO_EN_DQ_MASK;
 	omap4_ctrl_pad_writel(
 		v, OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_LPDDR2IO2_3);
+
+	omap4_syscontrol_lpddr_clk_io_errata_i736(true);
 }
 
 static void __init prcm_setup_regs(void)
