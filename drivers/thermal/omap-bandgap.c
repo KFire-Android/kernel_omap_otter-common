@@ -1261,6 +1261,30 @@ struct omap_bandgap *omap_bandgap_platform_build(struct platform_device *pdev)
 		}
 	}
 
+	/*
+	 * On OMAP5 ES1.0, due to TSHUT HW errata, the TALERT feature
+	 * will be used by PPA to mointor the temperature and does
+	 * HW reset if the junction temperature crosses 118degC. Due to
+	 * this, driver SW will not use this feature on Non-GP devices,
+	 * but will use on GP device (since PPA will not be running on
+	 * GP devices).
+	 */
+	if (((omap_rev() == OMAP5430_REV_ES1_0) ||
+		(omap_rev() == OMAP5432_REV_ES1_0)) &&
+		(omap_type() != OMAP2_DEVICE_TYPE_GP))
+			bg_ptr->pdata->has_talert = false;
+
+	/*
+	 * On OMAP5 ES1.0, due to TSHUT HW errata, thresholds for TSHUT
+	 * are set by PPA. Due to this, driver SW will not set these
+	 * tshut thershold on Non-GP devices, but will set it on GP device
+	 * (since PPA will not be running on GP devices).
+	 */
+	if (((omap_rev() == OMAP5430_REV_ES1_0) ||
+		(omap_rev() == OMAP5432_REV_ES1_0)) &&
+		(omap_type() != OMAP2_DEVICE_TYPE_GP))
+			bg_ptr->pdata->has_tshut_config = false;
+
 	return bg_ptr;
 }
 
