@@ -271,8 +271,10 @@ void *omap_bandgap_get_sensor_data(struct omap_bandgap *bg_ptr, int id);
 
 #ifdef CONFIG_OMAP4_BG_TEMP_SENSOR_DATA
 extern struct omap_bandgap_data omap4460_data;
+extern struct omap_bandgap_data omap4470_data;
 #else
 #define omap4460_data					NULL
+#define omap4470_data					NULL
 #endif
 
 #ifdef CONFIG_OMAP5_BG_TEMP_SENSOR_DATA
