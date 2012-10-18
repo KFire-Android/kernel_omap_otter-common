@@ -42,6 +42,7 @@
 #include "pm.h"
 #include "voltage.h"
 #include "prcm-debug.h"
+#include "control.h"
 
 #define EMIF_SDRAM_CONFIG2_OFFSET	0xc
 
@@ -683,6 +684,36 @@ static void __init omap_pm_setup_errata(void)
 	}
 }
 
+static void __init omap4_syscontrol_setup_regs(void)
+{
+	u32 v;
+
+	/* Disable LPDDR VREF manual control and enable Auto control */
+	v =
+	   omap4_ctrl_pad_readl(OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_LPDDR2IO1_3);
+	if (v & (OMAP4_LPDDR21_VREF_EN_CA_MASK | OMAP4_LPDDR21_VREF_EN_DQ_MASK))
+		pr_warn("OMAP4: PM: LPDDR2IO1_3 VREF CA and DQ Manual control"
+			" is wrongly set by bootloader\n");
+
+	v &= ~(OMAP4_LPDDR21_VREF_EN_CA_MASK | OMAP4_LPDDR21_VREF_EN_DQ_MASK);
+	v |= OMAP4_LPDDR21_VREF_AUTO_EN_CA_MASK |
+	     OMAP4_LPDDR21_VREF_AUTO_EN_DQ_MASK;
+	omap4_ctrl_pad_writel(
+		v, OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_LPDDR2IO1_3);
+
+	v =
+	   omap4_ctrl_pad_readl(OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_LPDDR2IO2_3);
+	if (v & (OMAP4_LPDDR21_VREF_EN_CA_MASK | OMAP4_LPDDR21_VREF_EN_DQ_MASK))
+		pr_warn("OMAP4: PM: LPDDR2IO2_3 VREF CA and DQ Manual control"
+			" is wrongly set by bootloader\n");
+
+	v &= ~(OMAP4_LPDDR21_VREF_EN_CA_MASK | OMAP4_LPDDR21_VREF_EN_DQ_MASK);
+	v |= OMAP4_LPDDR21_VREF_AUTO_EN_CA_MASK |
+	     OMAP4_LPDDR21_VREF_AUTO_EN_DQ_MASK;
+	omap4_ctrl_pad_writel(
+		v, OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_LPDDR2IO2_3);
+}
+
 static void __init prcm_setup_regs(void)
 {
 	s16 dev_inst = cpu_is_omap44xx() ? OMAP4430_PRM_DEVICE_INST :
@@ -881,6 +912,9 @@ static int __init omap_pm_init(void)
 	omap_pm_setup_errata();
 
 	prcm_setup_regs();
+
+	if (cpu_is_omap44xx())
+		omap4_syscontrol_setup_regs();
 
 	/*
 	 * Work around for OMAP443x Errata i632: "LPDDR2 Corruption After OFF
