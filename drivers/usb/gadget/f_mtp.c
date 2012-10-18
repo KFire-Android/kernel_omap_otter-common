@@ -1038,7 +1038,9 @@ static int mtp_open(struct inode *ip, struct file *fp)
 	if (_mtp_dev->state != STATE_OFFLINE)
 		_mtp_dev->state = STATE_READY;
 
-	if (_mtp_dev->cdev->gadget->speed == USB_SPEED_HIGH)
+	if (_mtp_dev->cdev->gadget->speed == USB_SPEED_SUPER)
+		descriptors = _mtp_dev->function.ss_descriptors;
+	else if (_mtp_dev->cdev->gadget->speed == USB_SPEED_HIGH)
 		descriptors = _mtp_dev->function.hs_descriptors;
 	else
 		descriptors = _mtp_dev->function.descriptors;
