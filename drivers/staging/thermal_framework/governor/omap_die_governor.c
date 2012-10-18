@@ -482,6 +482,7 @@ static void average_on_die_temperature(struct omap_governor *omap_gov)
 	thermal_device_call(omap_gov->temp_sensor, set_temp_thresh,
 				omap_gov->hotspot_temp_lower,
 				omap_gov->hotspot_temp_upper);
+	thermal_sensor_set_temp(omap_gov->temp_sensor);
 }
 
 static void average_sensor_delayed_work_fn(struct work_struct *work)
