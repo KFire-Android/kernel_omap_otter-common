@@ -830,15 +830,16 @@ static int __init omap_pm_init(void)
 	 * Power states for samples which do not support it.
 	 */
 	if (!omap5_has_auto_ret()) {
+		u32 mask = OMAP4430_VDD_MPU_I2C_DISABLE_MASK |
+				OMAP4430_VDD_CORE_I2C_DISABLE_MASK |
+				OMAP4430_VDD_IVA_I2C_DISABLE_MASK;
+
 		mpu_voltdm = voltdm_lookup("mpu");
 		if (!mpu_voltdm) {
 			pr_err("Failed to get MPU voltdm\n");
 			goto err2;
 		}
-		mpu_voltdm->write(OMAP4430_VDD_MPU_I2C_DISABLE_MASK |
-				  OMAP4430_VDD_CORE_I2C_DISABLE_MASK |
-				  OMAP4430_VDD_IVA_I2C_DISABLE_MASK,
-				  OMAP4_PRM_VOLTCTRL_OFFSET);
+		mpu_voltdm->rmw(mask, mask, OMAP4_PRM_VOLTCTRL_OFFSET);
 	}
 
 	ret = omap_mpuss_init();
