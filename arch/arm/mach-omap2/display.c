@@ -598,6 +598,32 @@ int omap_dss_reset(struct omap_hwmod *oh)
 	return r;
 }
 
+static int __init hdmi_init_of(void)
+{
+	if (cpu_is_omap44xx()) {
+		enum omap_hdmi_flags flags;
+
+		/*
+		 * OMAP4460SDP/Blaze and OMAP4430 ES2.3 SDP/Blaze boards and
+		 * later have external pull up on the HDMI I2C lines.
+		 */
+		/* FIXME: Ideally we should know from the DT whether if there is a
+		 * resistor. This could work with PandaES, as it is the only Panda
+		 * with 4460. For SDP, however, there are no dedicated DT files for
+		 * each processor board to know whether the pull-up resistor is
+		 * present.
+		 */
+		if (cpu_is_omap446x() || omap_rev() > OMAP4430_REV_ES2_2)
+			flags = OMAP_HDMI_SDA_SCL_EXTERNAL_PULLUP;
+		else
+			flags = 0;
+
+		omap4_hdmi_mux_pads(flags);
+	}
+
+	return 0;
+}
+
 int __init omapdss_init_of(void)
 {
 	int r;
@@ -626,6 +652,8 @@ int __init omapdss_init_of(void)
 		pr_err("Unable to register omapdss device\n");
 		return r;
 	}
+
+	hdmi_init_of();
 
 	return 0;
 }
