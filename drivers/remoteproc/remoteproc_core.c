@@ -44,6 +44,8 @@
 #include <linux/kthread.h>
 #include <linux/delay.h>
 #include <linux/vmalloc.h>
+#include <linux/rproc_drm.h>
+#include <linux/rproc_secure.h>
 
 #include "remoteproc_internal.h"
 
@@ -1583,6 +1585,9 @@ static int rproc_fw_boot(struct rproc *rproc, const struct firmware *fw)
 		goto free_version;
 	}
 
+	/* check and validate secure certificate */
+	rproc_secure_boot(rproc, fw);
+
 	/* power up the remote processor */
 	ret = rproc->ops->start(rproc);
 	if (ret) {
@@ -1880,6 +1885,10 @@ static int _reset_all_vdev(struct rproc *rproc)
 	struct rproc_vdev *rvdev, *rvtmp;
 
 	dev_dbg(&rproc->dev, "reseting virtio devices for %s\n", rproc->name);
+
+	/* reset firewalls */
+	rproc_secure_reset(rproc);
+
 	/* clean up remote vdev entries */
 	list_for_each_entry_safe(rvdev, rvtmp, &rproc->rvdevs, node)
 		rproc_remove_virtio_dev(rvdev);
@@ -1936,6 +1945,37 @@ void rproc_recover(struct rproc *rproc)
 		dev_info(&rproc->dev, "rproc recovering....\n");
 		_reset_all_vdev(rproc);
 	}
+}
+
+/**
+ * rproc_reload() - trigger reload for a rproc
+ *
+ * This function is used to trigger a rproc reload explicitly.
+ */
+int rproc_reload(const char *name)
+{
+	struct rproc *rproc;
+	struct klist_iter i;
+	int ret = 0;
+
+	/* find the remote processor, and upref its refcount */
+	klist_iter_init(&rprocs, &i);
+	while ((rproc = next_rproc(&i)) != NULL)
+		if (!strcmp(rproc->name, name)) {
+			kref_get(&rproc->refcount);
+			break;
+		}
+	klist_iter_exit(&i);
+
+	/* can't find this rproc ? */
+	if (!rproc) {
+		pr_err("can't find remote processor %s\n", name);
+		return -ENODEV;
+	}
+
+	dev_info(&rproc->dev, "rproc reloading....\n");
+	_reset_all_vdev(rproc);
+	return ret;
 }
 
 /**
@@ -2137,6 +2177,9 @@ int rproc_register(struct rproc *rproc)
 	/* rproc_unregister() calls must wait until async loader completes */
 	init_completion(&rproc->firmware_loading_complete);
 
+	/* initialize secure service */
+	rproc_secure_reset(rproc);
+
 	/*
 	 * We must retrieve early virtio configuration info from
 	 * the firmware (e.g. whether to register a virtio device,
@@ -2236,6 +2279,8 @@ struct rproc *rproc_alloc(struct device *dev, const char *name,
 	INIT_LIST_HEAD(&rproc->rvdevs);
 
 	INIT_WORK(&rproc->error_handler, rproc_error_handler_work);
+
+	rproc_secure_init(rproc);
 
 	rproc->state = RPROC_OFFLINE;
 
