@@ -948,12 +948,6 @@ static int rproc_handle_devmem(struct rproc *rproc, struct fw_rsc_devmem *rsc,
 		return -EINVAL;
 	}
 
-	/* make sure reserved bytes are zeroes */
-	if (rsc->reserved) {
-		dev_err(dev, "devmem rsc has non zero reserved bytes\n");
-		return -EINVAL;
-	}
-
 	mapping = kzalloc(sizeof(*mapping), GFP_KERNEL);
 	if (!mapping) {
 		dev_err(dev, "kzalloc mapping failed\n");
@@ -976,6 +970,7 @@ static int rproc_handle_devmem(struct rproc *rproc, struct fw_rsc_devmem *rsc,
 	mapping->dma = rsc->pa;
 	mapping->da = rsc->da;
 	mapping->len = rsc->len;
+	mapping->memregion = rsc->memregion;
 	list_add_tail(&mapping->node, &rproc->mappings);
 
 	dev_dbg(dev, "mapped devmem pa 0x%x, da 0x%x, len 0x%x\n",
@@ -1017,12 +1012,6 @@ static int rproc_handle_carveout(struct rproc *rproc,
 
 	if (sizeof(*rsc) > avail) {
 		dev_err(dev, "carveout rsc is truncated\n");
-		return -EINVAL;
-	}
-
-	/* make sure reserved bytes are zeroes */
-	if (rsc->reserved) {
-		dev_err(dev, "carveout rsc has non zero reserved bytes\n");
 		return -EINVAL;
 	}
 
@@ -1109,6 +1098,7 @@ static int rproc_handle_carveout(struct rproc *rproc,
 	carveout->len = rsc->len;
 	carveout->dma = dma;
 	carveout->da = rsc->da;
+	carveout->memregion = rsc->memregion;
 
 	list_add_tail(&carveout->node, &rproc->carveouts);
 
