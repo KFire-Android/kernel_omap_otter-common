@@ -169,6 +169,8 @@
 #define TWL6040_REV_ES1_0		0x00
 #define TWL6040_REV_ES1_1		0x01
 #define TWL6040_REV_ES1_2		0x02
+#define TWL6041_REV_ES2_0		0x10
+#define TWL6041_REV_ES2_2		0x12
 
 #define TWL6040_IRQ_TH			0
 #define TWL6040_IRQ_PLUG		1
@@ -202,6 +204,7 @@ struct twl6040_platform_data {
 	int audpwron_gpio;	/* audio power-on gpio */
 	unsigned int irq_base;
 	int (*set_pll_input)(int pll_id, int enable);
+	int (*pdm_ul_errata)(void);
 
 	struct twl6040_codec_data *codec;
 	struct twl6040_vibra_data *vibra;

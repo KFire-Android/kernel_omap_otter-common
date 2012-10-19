@@ -25,12 +25,14 @@
 #include <linux/gpio.h>
 #include <linux/regulator/machine.h>
 #include <linux/regulator/fixed.h>
+#include <linux/mfd/twl6040.h>
 
 #include <plat/i2c.h>
 #include <plat/usb.h>
 
 #include "twl-common.h"
 #include "pm.h"
+#include "mux.h"
 
 static struct i2c_board_info __initdata pmic_i2c_board_info = {
 	.addr		= 0x48,
@@ -57,6 +59,36 @@ static struct i2c_board_info __initdata omap5_i2c1_generic_info[] = {
 	},
 };
 
+static int twl6040_pdm_ul_errata(void)
+{
+	struct omap_mux_partition *part;
+	u16 reg_offset, pdm_ul;
+
+	if (cpu_is_omap44xx())
+		reg_offset = OMAP4_CTRL_MODULE_PAD_ABE_PDM_UL_DATA_OFFSET;
+	else if (cpu_is_omap54xx())
+		reg_offset = OMAP5_CTRL_MODULE_PAD_ABEMCPDM_UL_DATA_OFFSET;
+	else
+		return 0;
+
+	part = omap_mux_get("core");
+	if (!part) {
+		pr_err("failed to apply PDM_UL errata\n");
+		return -EINVAL;
+	}
+
+	/*
+	 * ERRATA: Reset value of PDM_UL buffer logic is 1 (VDDVIO)
+	 * when AUDPWRON = 0, which causes current drain on this pin's
+	 * pull-down on OMAP side. The workaround consists of disabling
+	 * pull-down resistor of ABE_PDM_UL_DATA pin
+	 */
+	pdm_ul = omap_mux_read(part, reg_offset);
+	omap_mux_write(part, pdm_ul & ~OMAP_PULL_ENA, reg_offset);
+
+	return 0;
+}
+
 void __init omap_pmic_init(int bus, u32 clkrate,
 			   const char *pmic_type, int pmic_irq,
 			   struct twl4030_platform_data *pmic_data)
@@ -80,6 +112,7 @@ void __init omap4_pmic_init(const char *pmic_type,
 	omap4_i2c1_board_info[0].platform_data = pmic_data;
 
 	/* TWL6040 audio IC part */
+	twl6040_data->pdm_ul_errata = twl6040_pdm_ul_errata;
 	omap4_i2c1_board_info[1].irq = twl6040_irq;
 	omap4_i2c1_board_info[1].platform_data = twl6040_data;
 
@@ -114,6 +147,7 @@ void __init omap5_pmic_init(int bus_id, const char *pmic_type, int pmic_irq,
 	/* TWL6040 audio IC part */
 	strncpy(omap5_i2c1_generic_info[1].type, audio_type,
 		sizeof(omap5_i2c1_generic_info[1].type));
+	audio_data->pdm_ul_errata = twl6040_pdm_ul_errata;
 	omap5_i2c1_generic_info[1].irq = audio_irq;
 	omap5_i2c1_generic_info[1].platform_data = audio_data;
 
