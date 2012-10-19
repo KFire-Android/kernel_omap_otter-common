@@ -537,6 +537,7 @@ struct rproc_vdev {
 	unsigned long gfeatures;
 };
 
+int rproc_reload(const char *name);
 struct rproc *rproc_get_by_name(const char *name);
 void rproc_put(struct rproc *rproc);
 
