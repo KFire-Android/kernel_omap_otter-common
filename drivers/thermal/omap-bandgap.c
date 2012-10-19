@@ -519,6 +519,11 @@ static irqreturn_t talert_irq_handler(int irq, void *data)
 			return IRQ_NONE;
 		}
 
+		dev_dbg(bg_ptr->dev,
+			"%s: IRQ from %s sensor: hotevent %d coldevent %d\n",
+			__func__, bg_ptr->pdata->sensors[i].domain,
+			t_hot, t_cold);
+
 		/* read temperature */
 		r = omap_control_readl(cdev, tsr->temp_sensor_ctrl, &temp);
 		temp &= tsr->bgap_dtemp_mask;
