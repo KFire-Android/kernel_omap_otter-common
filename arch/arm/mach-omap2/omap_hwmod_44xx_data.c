@@ -894,33 +894,6 @@ static struct omap_hwmod omap44xx_aess_hwmod = {
 };
 
 /*
- * 'bandgap' class
- * bangap reference for ldo regulators
- */
-
-static struct omap_hwmod_class omap44xx_bandgap_hwmod_class = {
-	.name	= "bandgap",
-};
-
-/* bandgap */
-static struct omap_hwmod_opt_clk bandgap_opt_clks[] = {
-	{ .role = "fclk", .clk = "bandgap_fclk" },
-};
-
-static struct omap_hwmod omap44xx_bandgap_hwmod = {
-	.name		= "bandgap",
-	.class		= &omap44xx_bandgap_hwmod_class,
-	.clkdm_name	= "l4_wkup_clkdm",
-	.prcm = {
-		.omap4 = {
-			.clkctrl_offs = OMAP4_CM_WKUP_BANDGAP_CLKCTRL_OFFSET,
-		},
-	},
-	.opt_clks	= bandgap_opt_clks,
-	.opt_clks_cnt	= ARRAY_SIZE(bandgap_opt_clks),
-};
-
-/*
  * 'bb2d' class
  * 2d bit-blitter accelerator
  */
@@ -6315,9 +6288,6 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
 
 	/* aess class */
 	&omap44xx_aess_hwmod,
-
-	/* bandgap class */
-	&omap44xx_bandgap_hwmod,
 
 	/* counter class */
 /*	&omap44xx_counter_32k_hwmod, */
