@@ -45,6 +45,10 @@ static struct mutex secure_lock;
 static enum rproc_secure_st secure_state;
 static int secure_reload;
 static struct rproc_sec_params *secure_params;
+static rproc_drm_invoke_service_t rproc_secure_drm_service_alternate;
+static int rproc_secure_drm_service(
+	enum rproc_service_enum service,
+	struct rproc_sec_params *rproc_sec_params);
 
 #define dev_to_rproc(dev) container_of(dev, struct rproc, dev)
 
@@ -62,7 +66,7 @@ static void rproc_secure_work(struct work_struct *work)
 	enum rproc_secure_st state = secure_state;
 
 	/* call the secure mode API to validate code */
-	ret = rproc_drm_invoke_service(AUTHENTICATION_A2, secure_params);
+	ret = rproc_secure_drm_service(AUTHENTICATION_A2, secure_params);
 	if (ret)
 		pr_debug("%s: error failed to validate code\n", __func__);
 
@@ -103,7 +107,7 @@ void rproc_secure_reset(struct rproc *rproc)
 {
 	dev_dbg(&rproc->dev, "reseting secure service\n");
 
-	rproc_drm_invoke_service(AUTHENTICATION_A0, NULL);
+	rproc_secure_drm_service(AUTHENTICATION_A0, NULL);
 
 	return;
 }
@@ -231,7 +235,7 @@ int rproc_secure_boot(struct rproc *rproc, const struct firmware *fw)
 	secure_params->decoded_buffer_size = (uint32_t) 0x5100000;
 
 	/* validate boot section */
-	ret = rproc_drm_invoke_service(AUTHENTICATION_A1, secure_params);
+	ret = rproc_secure_drm_service(AUTHENTICATION_A1, secure_params);
 	if (ret) {
 		dev_err(dev, "error failed to validate boot code\n");
 		goto out;
@@ -271,7 +275,7 @@ int rproc_set_secure(const char *name, bool enable)
 
 	if (enable) { /* entering secure mode */
 		/* enter secure mode, reload once if fails */
-		ret = rproc_drm_invoke_service(
+		ret = rproc_secure_drm_service(
 				ENTER_SECURE_PLAYBACK_AFTER_AUTHENTICATION,
 				secure_params);
 
@@ -294,12 +298,12 @@ int rproc_set_secure(const char *name, bool enable)
 		}
 
 		/* invoke secure service for secure mode */
-		ret = rproc_drm_invoke_service(
+		ret = rproc_secure_drm_service(
 			ENTER_SECURE_PLAYBACK_AFTER_AUTHENTICATION,
 			secure_params);
 	} else { /* disable secure mode */
 		/* invoke service to exit secure mode */
-		ret = rproc_drm_invoke_service(EXIT_SECURE_PLAYBACK,
+		ret = rproc_secure_drm_service(EXIT_SECURE_PLAYBACK,
 			secure_params);
 		if (ret)
 			pr_err("%s: error disabling secure mode %d\n",
@@ -309,3 +313,43 @@ out:
 	return ret;
 }
 EXPORT_SYMBOL(rproc_set_secure);
+
+/**
+ * rproc_secure_drm_service() - invoke the specified rproc_drm service
+ * @service: the secure service that is being invoked
+ * @rproc_sec_params: secure params needed by the service
+ *
+ * returns 0 on success
+ */
+static int rproc_secure_drm_service(enum rproc_service_enum service,
+				    struct rproc_sec_params
+				    *rproc_sec_params)
+{
+	int ret = 0;
+	if (rproc_secure_drm_service_alternate)
+		ret = rproc_secure_drm_service_alternate(service,
+							 rproc_sec_params);
+	return ret;
+}
+
+/**
+ * rproc_register_drm_service() - called by the rproc_drm module
+ * to register the service.
+ * @rproc_drm_service: the rproc_drm service that is being registered
+ *
+ * remoteproc calls this rproc_drm.rproc_drm_invoke_service upon calls
+ *  to rproc_drm_invoke_service
+ *
+ * returns 0 on success
+ */
+int rproc_register_drm_service(rproc_drm_invoke_service_t
+			       rproc_drm_service)
+{
+	if (rproc_drm_service == NULL)
+		return -ENODEV;
+
+	rproc_secure_drm_service_alternate = rproc_drm_service ;
+	return 0;
+
+}
+EXPORT_SYMBOL(rproc_register_drm_service);
