@@ -1124,6 +1124,11 @@ add_children(struct twl4030_platform_data *pdata, unsigned irq_base,
 	/* twl6032 regulators */
 	if (twl_has_regulator() && twl_class_is_6030() &&
 			(features & TWL6032_SUBCLASS)) {
+		child = add_regulator(TWL6032_REG_EXT_V2V1, pdata->ext_v2v1,
+					features);
+		if (IS_ERR(child))
+			return PTR_ERR(child);
+
 		child = add_regulator(TWL6032_REG_LDO5, pdata->ldo5,
 					features);
 		if (IS_ERR(child))

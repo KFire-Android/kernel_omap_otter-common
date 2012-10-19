@@ -930,6 +930,11 @@ static struct regulator_ops twl6030_external_control_pin_ops = {
 
 	.get_status		= twl6030reg_get_status,
 };
+
+static struct regulator_ops twl6032_ext_ops = {
+	.list_voltage   = twlfixed_list_voltage,
+	.get_voltage	= twlfixed_get_voltage,
+};
 /*----------------------------------------------------------------------*/
 
 #define TWL4030_FIXED_LDO(label, offset, mVolts, num, turnon_delay, \
@@ -1073,6 +1078,18 @@ static struct twlreg_info TWLRES_INFO_##label = { \
 		}, \
 	}
 
+#define TWL6032_EXT_SMPS(label, mVolts) \
+static struct twlreg_info TWL6032_EXT_INFO_##label = { \
+	.min_mV = mVolts, \
+	.desc = { \
+		.name = #label, \
+		.id = TWL6032_REG_EXT_##label, \
+		.n_voltages = 1, \
+		.ops = &twl6032_ext_ops, \
+		.type = REGULATOR_VOLTAGE, \
+		.owner = THIS_MODULE, \
+		}, \
+	}
 /*
  * We list regulators here if systems need some level of
  * software control over them after boot.
@@ -1136,6 +1153,8 @@ TWL6032_ADJUSTABLE_SMPS(VIO, 0x16);
 TWL6030_EXTERNAL_CONTROL_PIN(SYSEN, 0x83, 0);
 TWL6030_EXTERNAL_CONTROL_PIN(REGEN1, 0x7d, 0);
 
+TWL6032_EXT_SMPS(V2V1, 2100);
+
 static u8 twl_get_smps_offset(void)
 {
 	u8 value;
@@ -1166,6 +1185,8 @@ static u8 twl_get_smps_mult(void)
 #define TWLFIXED_OF_MATCH(comp, label) TWL_OF_MATCH(comp, TWLFIXED, label)
 #define TWLRES_OF_MATCH(comp, label) TWL_OF_MATCH(comp, TWLRES, label)
 #define TWLSMPS_OF_MATCH(comp, label) TWL_OF_MATCH(comp, TWLSMPS, label)
+#define TWL6032_EXT_OF_MATCH(comp, label) \
+	TWL_OF_MATCH(comp, TWL6032_EXT, label)
 
 static const struct of_device_id twl_of_match[] __devinitconst = {
 	TWL4030_OF_MATCH("ti,twl4030-vaux1", VAUX1),
@@ -1219,6 +1240,7 @@ static const struct of_device_id twl_of_match[] __devinitconst = {
 	TWLSMPS_OF_MATCH("ti,twl6032-smps3", SMPS3),
 	TWLSMPS_OF_MATCH("ti,twl6032-smps4", SMPS4),
 	TWLSMPS_OF_MATCH("ti,twl6032-vio", VIO),
+	TWL6032_EXT_OF_MATCH("ti,twl6032-ext_v2v1", V2V1),
 	{},
 };
 MODULE_DEVICE_TABLE(of, twl_of_match);
