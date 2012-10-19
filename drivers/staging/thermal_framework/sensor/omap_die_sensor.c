@@ -29,7 +29,7 @@
 
 #define MAX_SENSOR_NAME 50
 
-struct omap5_thermal_data {
+struct omap_thermal_data {
 	struct thermal_dev therm_fw;
 	struct omap_bandgap *bg_ptr;
 	struct work_struct report_temperature_work;
@@ -38,9 +38,9 @@ struct omap5_thermal_data {
 static void report_temperature_delayed_work_fn(struct work_struct *work)
 {
 	int ret, temp;
-	struct omap5_thermal_data *therm_data;
+	struct omap_thermal_data *therm_data;
 
-	therm_data = container_of(work, struct omap5_thermal_data,
+	therm_data = container_of(work, struct omap_thermal_data,
 						report_temperature_work);
 
 	ret = omap_bandgap_read_temperature(therm_data->bg_ptr,
@@ -66,14 +66,14 @@ static void report_temperature_delayed_work_fn(struct work_struct *work)
 static int omap_bandgap_report_temp(struct thermal_dev *tdev)
 {
 	int temp, ret;
-	struct omap5_thermal_data *therm_data;
+	struct omap_thermal_data *therm_data;
 
 	if (tdev == NULL) {
 		pr_err("%s:Not a valid device\n", __func__);
 		return -ENODEV;
 	}
 
-	therm_data = container_of(tdev, struct omap5_thermal_data, therm_fw);
+	therm_data = container_of(tdev, struct omap_thermal_data, therm_fw);
 
 	ret = omap_bandgap_read_temperature(therm_data->bg_ptr, tdev->sen_id,
 								&temp);
@@ -93,14 +93,14 @@ int omap_bandgap_set_temp_thresh(struct thermal_dev *tdev,
 				int new_tcold, int new_thot)
 {
 	int ret, t_cold, t_hot;
-	struct omap5_thermal_data *therm_data;
+	struct omap_thermal_data *therm_data;
 
 	if (tdev == NULL) {
 		pr_err("%s:Not a valid device\n", __func__);
 		return -ENODEV;
 	}
 
-	therm_data = container_of(tdev, struct omap5_thermal_data, therm_fw);
+	therm_data = container_of(tdev, struct omap_thermal_data, therm_fw);
 
 	if (new_tcold >= new_thot) {
 		dev_err(therm_data->bg_ptr->dev,
@@ -155,17 +155,17 @@ int omap_bandgap_set_temp_thresh(struct thermal_dev *tdev,
 
 static int omap_bandgap_set_measuring_rate(struct thermal_dev *tdev, int rate)
 {
-	struct omap5_thermal_data *therm_data;
+	struct omap_thermal_data *therm_data;
 
 	if (tdev == NULL) {
 		pr_err("%s:Not a valid device\n", __func__);
 		return -ENODEV;
 	}
 
-	therm_data = container_of(tdev, struct omap5_thermal_data, therm_fw);
+	therm_data = container_of(tdev, struct omap_thermal_data, therm_fw);
 
 	omap_bandgap_write_update_interval(therm_data->bg_ptr, tdev->sen_id,
-								rate);
+					   rate);
 
 	return rate;
 }
@@ -173,14 +173,14 @@ static int omap_bandgap_set_measuring_rate(struct thermal_dev *tdev, int rate)
 static
 int omap_bandgap_report_slope(struct thermal_dev *tdev, const char *rel_name)
 {
-	struct omap5_thermal_data *therm_data;
+	struct omap_thermal_data *therm_data;
 
 	if (tdev == NULL) {
 		pr_err("%s:Not a valid device\n", __func__);
 		return -ENODEV;
 	}
 
-	therm_data = container_of(tdev, struct omap5_thermal_data, therm_fw);
+	therm_data = container_of(tdev, struct omap_thermal_data, therm_fw);
 
 	return therm_data->therm_fw.slope;
 }
@@ -188,14 +188,14 @@ int omap_bandgap_report_slope(struct thermal_dev *tdev, const char *rel_name)
 static
 int omap_bandgap_report_offset(struct thermal_dev *tdev, const char *rel_name)
 {
-	struct omap5_thermal_data *therm_data;
+	struct omap_thermal_data *therm_data;
 
 	if (tdev == NULL) {
 		pr_err("%s:Not a valid device\n", __func__);
 		return -ENODEV;
 	}
 
-	therm_data = container_of(tdev, struct omap5_thermal_data, therm_fw);
+	therm_data = container_of(tdev, struct omap_thermal_data, therm_fw);
 
 	return therm_data->therm_fw.constant;
 }
@@ -208,9 +208,9 @@ static struct thermal_dev_ops omap_sensor_ops = {
 	.init_offset = omap_bandgap_report_offset
 };
 
-int omap5_thermal_report_temperature(struct omap_bandgap *bg_ptr, int id)
+int omap_thermal_report_temperature(struct omap_bandgap *bg_ptr, int id)
 {
-	struct omap5_thermal_data *therm_data;
+	struct omap_thermal_data *therm_data;
 
 	if (bg_ptr == NULL) {
 		pr_err("%s:Not a valid device\n", __func__);
@@ -233,9 +233,9 @@ int omap5_thermal_report_temperature(struct omap_bandgap *bg_ptr, int id)
 	return 0;
 }
 
-int omap5_thermal_remove_sensor(struct omap_bandgap *bg_ptr, int id)
+int omap_thermal_remove_sensor(struct omap_bandgap *bg_ptr, int id)
 {
-	struct omap5_thermal_data *therm_data;
+	struct omap_thermal_data *therm_data;
 
 	if (bg_ptr == NULL) {
 		pr_err("%s:Not a valid device\n", __func__);
@@ -254,11 +254,11 @@ int omap5_thermal_remove_sensor(struct omap_bandgap *bg_ptr, int id)
 	return 0;
 }
 
-int omap5_thermal_expose_sensor(struct omap_bandgap *bg_ptr, int id,
+int omap_thermal_expose_sensor(struct omap_bandgap *bg_ptr, int id,
 				char *domain)
 {
 	int ret = 0;
-	struct omap5_thermal_data *data;
+	struct omap_thermal_data *data;
 	char *sensor_name;
 
 	if ((bg_ptr == NULL) || (domain == NULL)) {
@@ -282,7 +282,7 @@ int omap5_thermal_expose_sensor(struct omap_bandgap *bg_ptr, int id,
 
 	/* Init deferred work to report temperature */
 	INIT_WORK(&data->report_temperature_work,
-		report_temperature_delayed_work_fn);
+		  report_temperature_delayed_work_fn);
 
 	data->therm_fw.dev_ops = devm_kzalloc(bg_ptr->dev,
 					sizeof(*data->therm_fw.dev_ops),

@@ -57,4 +57,4 @@ obj-$(CONFIG_ANDROID)		+= android/
 obj-$(CONFIG_PHONE)		+= telephony/
 obj-$(CONFIG_RAMSTER)		+= ramster/
 obj-$(CONFIG_USB_WPAN_HCD)	+= ozwpan/
-obj-$(CONFIG_OMAP_THERMAL)	+= thermal_framework/
+obj-$(CONFIG_THERMAL_FRAMEWORK)	+= thermal_framework/

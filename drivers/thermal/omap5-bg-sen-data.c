@@ -337,9 +337,9 @@ struct omap_bandgap_data omap5430_data = {
 	.fclock_name = "l3instr_ts_gclk_div",
 	.div_ck_name = "l3instr_ts_gclk_div",
 	.conv_table = omap5430_adc_to_temp,
-	.report_temperature = omap5_thermal_report_temperature,
-	.expose_sensor = omap5_thermal_expose_sensor,
-	.remove_sensor = omap5_thermal_remove_sensor,
+	.report_temperature = omap_thermal_report_temperature,
+	.expose_sensor = omap_thermal_expose_sensor,
+	.remove_sensor = omap_thermal_remove_sensor,
 	.sensors = {
 		{
 			.registers = &omap5430_mpu_temp_sensor_registers,
