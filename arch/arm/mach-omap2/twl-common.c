@@ -458,6 +458,17 @@ static struct regulator_init_data omap4_v2v1_idata = {
 	.consumer_supplies	= omap4_v2v1_supply,
 };
 
+static struct regulator_init_data omap4_ext_v2v1_idata = {
+	.constraints = {
+		.min_uV			= 2100000,
+		.max_uV			= 2100000,
+		.valid_modes_mask	= REGULATOR_MODE_NORMAL,
+	},
+	.num_consumer_supplies	= ARRAY_SIZE(omap4_v2v1_supply),
+	.consumer_supplies	= omap4_v2v1_supply,
+	.supply_regulator	= "SYSEN",
+};
+
 static struct regulator_init_data omap4_sysen_idata = {
 	.constraints = {
 		.valid_ops_mask		= REGULATOR_CHANGE_STATUS,
@@ -572,8 +583,12 @@ void __init omap4_pmic_get_config(struct twl4030_platform_data *pmic_data,
 			pmic_data->smps4 = &omap4_v1v8_idata;
 	}
 
-	if (regulators_flags & TWL_COMMON_REGULATOR_V2V1 && !pmic_data->v2v1)
-		pmic_data->v2v1 = &omap4_v2v1_idata;
+	if (regulators_flags & TWL_COMMON_REGULATOR_V2V1) {
+		if (!pmic_data->v2v1)
+			pmic_data->v2v1 = &omap4_v2v1_idata;
+		if (!pmic_data->ext_v2v1)
+			pmic_data->ext_v2v1 = &omap4_ext_v2v1_idata;
+	}
 
 	if (regulators_flags & TWL_COMMON_REGULATOR_SYSEN &&
 	    !pmic_data->sysen)
