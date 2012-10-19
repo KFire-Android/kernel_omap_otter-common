@@ -3395,10 +3395,12 @@ static struct omap_hwmod_class omap44xx_mcasp_hwmod_class = {
 static struct omap_hwmod omap44xx_mcasp_hwmod;
 static struct omap_hwmod_irq_info omap44xx_mcasp_irqs[] = {
 	{ .irq = 109 + OMAP44XX_IRQ_GIC_START },
+	{ .irq = -1 }
 };
 
 static struct omap_hwmod_dma_info omap44xx_mcasp_sdma_reqs[] = {
 	{ .name = "tx", .dma_req = 7 + OMAP44XX_DMA_REQ_START },
+	{ .dma_req = -1 }
 };
 
 static struct omap_hwmod_addr_space omap44xx_mcasp_addrs[] = {
@@ -3412,6 +3414,7 @@ static struct omap_hwmod_addr_space omap44xx_mcasp_addrs[] = {
 		.pa_end         = 0x4012A000 + SZ_4K - 1, /* McASP Data Port */
 		.flags          = ADDR_TYPE_RT
 	},
+	{ }
 };
 
 /* l4_abe -> mcasp */
@@ -3434,6 +3437,7 @@ static struct omap_hwmod_addr_space omap44xx_mcasp_dma_addrs[] = {
 		.pa_end         = 0x4902A000 + SZ_4K - 1, /* McASP Data Port */
 		.flags          = ADDR_TYPE_RT
 	},
+	{ }
 };
 
 /* l4_abe -> mcasp (dma) */
