@@ -1526,7 +1526,7 @@ static struct omap_hwmod_dma_info omap54xx_dss_hdmi_sdma_reqs[] = {
 static struct omap_hwmod_addr_space omap54xx_dss_hdmi_addrs[] = {
 	{
 		.pa_start	= 0x58040000,
-		.pa_end		= 0x5807ffff,
+		.pa_end		= 0x58078fff,
 		.flags		= ADDR_TYPE_RT
 	},
 	{ }
