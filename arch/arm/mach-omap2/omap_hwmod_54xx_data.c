@@ -6019,7 +6019,7 @@ static struct omap_hwmod_irq_info omap54xx_usb_tll_hs_irqs[] = {
 static struct omap_hwmod_addr_space omap54xx_usb_tll_hs_addrs[] = {
 	{
 		.pa_start	= 0x4a062000,
-		.pa_end		= 0x4a062fff,
+		.pa_end		= 0x4a062bff,
 		.flags		= ADDR_TYPE_RT
 	},
 	{ }
