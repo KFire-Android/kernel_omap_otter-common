@@ -133,7 +133,7 @@ enum fw_resource_type {
  * @pa: physical address
  * @len: length (in bytes)
  * @flags: iommu protection flags
- * @reserved: reserved (must be zero)
+ * @memregion: mem region
  * @name: human-readable name of the requested memory region
  *
  * This resource entry requests the host to allocate a physically contiguous
@@ -175,7 +175,7 @@ struct fw_rsc_carveout {
 	u32 pa;
 	u32 len;
 	u32 flags;
-	u32 reserved;
+	u32 memregion;
 	u8 name[32];
 } __packed;
 
@@ -185,7 +185,7 @@ struct fw_rsc_carveout {
  * @pa: physical address
  * @len: length (in bytes)
  * @flags: iommu protection flags
- * @reserved: reserved (must be zero)
+ * @memregion: mem region
  * @name: human-readable name of the requested region to be mapped
  *
  * This resource entry requests the host to iommu map a physically contiguous
@@ -213,7 +213,7 @@ struct fw_rsc_devmem {
 	u32 pa;
 	u32 len;
 	u32 flags;
-	u32 reserved;
+	u32 memregion;
 	u8 name[32];
 } __packed;
 
@@ -338,6 +338,7 @@ struct fw_rsc_custom {
  * @dma: dma address
  * @len: length, in bytes
  * @da: device address
+ * @memregion: type of memory
  * @priv: associated data
  * @node: list node
  */
@@ -346,6 +347,7 @@ struct rproc_mem_entry {
 	dma_addr_t dma;
 	int len;
 	u32 da;
+	u32 memregion;
 	void *priv;
 	struct list_head node;
 };
