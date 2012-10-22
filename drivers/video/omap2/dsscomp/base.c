@@ -42,7 +42,7 @@ static const struct color_info {
 	int x_bt;
 	enum omap_color_mode mode;
 	const char *name;
-} fmts[2][16] = { {
+} fmts[2][17] = { {
 	{ 0,  0, 0,  0, 0,  0, 0, 0, 1, OMAP_DSS_COLOR_CLUT1, "BITMAP1" },
 	{ 0,  0, 0,  0, 0,  0, 0, 0, 2, OMAP_DSS_COLOR_CLUT2, "BITMAP2" },
 	{ 0,  0, 0,  0, 0,  0, 0, 0, 4, OMAP_DSS_COLOR_CLUT4, "BITMAP4" },
@@ -59,6 +59,7 @@ static const struct color_info {
 	{ 24, 8, 16, 8, 8,  8, 0, 8, 0, OMAP_DSS_COLOR_ARGB32, "ARGB32-8888" },
 	{ 0,  8, 24, 8, 16, 8, 8, 8, 0, OMAP_DSS_COLOR_RGBA32, "RGBA32-8888" },
 	{ 0,  0, 24, 8, 16, 8, 8, 8, 8, OMAP_DSS_COLOR_RGBX32, "RGBx24-8888" },
+	{ 0,  8, 8,  8, 16, 8, 24, 8, 0, OMAP_DSS_COLOR_BGRA32, "BGRA32-8888" },
 	{ 0,  0, 10, 5, 5,  5, 0, 5, 1, OMAP_DSS_COLOR_XRGB16_1555,
 								"xRGB15-1555" },
 }, {
@@ -77,6 +78,7 @@ static const struct color_info {
 	{ 0,  0, 0,  0, 0,  0, 0, 0, 16, OMAP_DSS_COLOR_UYVY, "UYVY" },
 	{ 24, 8, 16, 8, 8,  8, 0, 8, 0, OMAP_DSS_COLOR_ARGB32, "ARGB32-8888" },
 	{ 0,  8, 24, 8, 16, 8, 8, 8, 0, OMAP_DSS_COLOR_RGBA32, "RGBA32-8888" },
+	{ 0,  8, 8,  8, 16, 8, 24, 8, 0, OMAP_DSS_COLOR_BGRA32, "BGRA32-8888" },
 	{ 0,  0, 24, 8, 16, 8, 8, 8, 8, OMAP_DSS_COLOR_RGBX32, "RGBx24-8888" },
 	{ 0,  0, 10, 5, 5,  5, 0, 5, 1, OMAP_DSS_COLOR_XRGB16_1555,
 								"xRGB15-1555" },
