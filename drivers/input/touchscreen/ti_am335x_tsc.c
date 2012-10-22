@@ -35,6 +35,8 @@
 #define ADCFSM_STEPID		0x10
 #define SEQ_SETTLE		275
 #define MAX_12BIT		((1 << 12) - 1)
+#define TSCADC_DELTA_X		15
+#define TSCADC_DELTA_Y		15
 
 /*
  * Refer to function regbit_map() to
@@ -54,6 +56,8 @@ struct titsc {
 	unsigned int		wires;
 	unsigned int		x_plate_resistance;
 	unsigned int		enable_bits;
+	unsigned int		bckup_x;
+	unsigned int		bckup_y;
 	bool			pen_down;
 	int			steps_to_configure;
 	int			config_inp[20];
@@ -315,10 +319,17 @@ static irqreturn_t titsc_irq(int irq, void *dev)
 	unsigned int x = 0, y = 0;
 	unsigned int z1, z2, z;
 	unsigned int fsm;
+	unsigned int diffx = 0, diffy = 0;
+	int i;
 
 	status = titsc_readl(ts_dev, REG_IRQSTATUS);
 	if (status & IRQENB_FIFO0THRES) {
 		titsc_read_coordinates(ts_dev, &x, &y);
+
+		diffx = abs(x - (ts_dev->bckup_x));
+		diffy = abs(y - (ts_dev->bckup_y));
+		ts_dev->bckup_x = x;
+		ts_dev->bckup_y = y;
 
 		z1 = titsc_readl(ts_dev, REG_FIFO0) & 0xfff;
 		z2 = titsc_readl(ts_dev, REG_FIFO1) & 0xfff;
@@ -335,7 +346,8 @@ static irqreturn_t titsc_irq(int irq, void *dev)
 			z /= z1;
 			z = (z + 2047) >> 12;
 
-			if (z <= MAX_12BIT) {
+			if ((diffx < TSCADC_DELTA_X) &&
+			(diffy < TSCADC_DELTA_Y) && (z <= MAX_12BIT)) {
 				input_report_abs(input_dev, ABS_X, x);
 				input_report_abs(input_dev, ABS_Y, y);
 				input_report_abs(input_dev, ABS_PRESSURE, z);
@@ -358,6 +370,8 @@ static irqreturn_t titsc_irq(int irq, void *dev)
 		fsm = titsc_readl(ts_dev, REG_ADCFSM);
 		if (fsm == ADCFSM_STEPID) {
 			ts_dev->pen_down = false;
+			ts_dev->bckup_x = 0;
+			ts_dev->bckup_y = 0;
 			input_report_key(input_dev, BTN_TOUCH, 0);
 			input_report_abs(input_dev, ABS_PRESSURE, 0);
 			input_sync(input_dev);
