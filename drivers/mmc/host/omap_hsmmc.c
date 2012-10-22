@@ -165,6 +165,7 @@
 
 /* Errata definitions */
 #define OMAP_HSMMC_ERRATA_I761	BIT(0)
+#define OMAP_HSMMC_ERRATA_FSMR	BIT(1)
 
 /*
  * One controller can have multiple slots, like on some omap boards using
@@ -1105,16 +1106,17 @@ static inline void omap_hsmmc_reset_controller_fsm(struct omap_hsmmc_host *host,
 	 * OMAP4 ES2 and greater has an updated reset logic.
 	 * Monitor a 0->1 transition first
 	 */
-	if (mmc_slot(host).features & HSMMC_HAS_UPDATED_RESET) {
+	if (host->errata & OMAP_HSMMC_ERRATA_FSMR) {
 		while ((!(OMAP_HSMMC_READ(host->base, SYSCTL) & bit))
 					&& (i++ < limit))
-			cpu_relax();
+			udelay(10);
 	}
 	i = 0;
 
 	while ((OMAP_HSMMC_READ(host->base, SYSCTL) & bit) &&
-		(i++ < limit))
-		cpu_relax();
+		(i++ < limit)) {
+		udelay(10);
+	}
 
 	if (OMAP_HSMMC_READ(host->base, SYSCTL) & bit)
 		dev_err(mmc_dev(host->mmc),
@@ -2167,9 +2169,6 @@ static struct omap_mmc_platform_data *of_get_hsmmc_pdata(struct device *dev)
 	else if (bus_width == 8)
 		pdata->slots[0].caps |= MMC_CAP_8_BIT_DATA;
 
-	if (of_find_property(np, "ti,needs-special-reset", NULL))
-		pdata->slots[0].features |= HSMMC_HAS_UPDATED_RESET;
-
 	return pdata;
 }
 #else
@@ -2248,6 +2247,8 @@ static int __devinit omap_hsmmc_probe(struct platform_device *pdev)
 	host->errata = 0;
 	if (cpu_is_omap44xx())
 		host->errata |= OMAP_HSMMC_ERRATA_I761;
+	if (cpu_is_omap44xx() && (omap_rev() > OMAP4430_REV_ES1_0))
+		host->errata |= OMAP_HSMMC_ERRATA_FSMR;
 
 	host->next_data.cookie = 1;
 	host->regulator_enabled = 0;
