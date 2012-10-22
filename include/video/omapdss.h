@@ -96,6 +96,7 @@ enum omap_color_mode {
 	OMAP_DSS_COLOR_RGBX16		= 1 << 16, /* RGBx16 - 4444 */
 	OMAP_DSS_COLOR_ARGB16_1555	= 1 << 17, /* ARGB16 - 1555 */
 	OMAP_DSS_COLOR_XRGB16_1555	= 1 << 18, /* xRGB16 - 1555 */
+	OMAP_DSS_COLOR_BGRA32	= 1 << 19,  /* BGRA32 */
 };
 
 enum omap_lcd_display_type {
@@ -184,6 +185,7 @@ enum omap_overlay_caps {
 	OMAP_DSS_OVL_CAP_GLOBAL_ALPHA = 1 << 1,
 	OMAP_DSS_OVL_CAP_PRE_MULT_ALPHA = 1 << 2,
 	OMAP_DSS_OVL_CAP_ZORDER = 1 << 3,
+	OMAP_DSS_OVL_CAP_FORCE_1D = 1 << 4,
 };
 
 enum omap_overlay_manager_caps {

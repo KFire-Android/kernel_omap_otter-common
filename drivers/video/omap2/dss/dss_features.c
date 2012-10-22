@@ -262,6 +262,47 @@ static const enum omap_color_mode omap4_dss_supported_color_modes[] = {
 	OMAP_DSS_COLOR_RGBX32,
 };
 
+static const enum omap_color_mode omap5_es_2_0_dss_supported_color_modes[] = {
+	/* OMAP_DSS_GFX */
+	OMAP_DSS_COLOR_RGB12U | OMAP_DSS_COLOR_ARGB16 |
+	OMAP_DSS_COLOR_RGB16 | OMAP_DSS_COLOR_RGB24U |
+	OMAP_DSS_COLOR_RGB24P | OMAP_DSS_COLOR_ARGB32 |
+	OMAP_DSS_COLOR_RGBA32 | OMAP_DSS_COLOR_RGBX32 |
+	OMAP_DSS_COLOR_ARGB16_1555 | OMAP_DSS_COLOR_RGBX16 |
+	OMAP_DSS_COLOR_RGBA16 | OMAP_DSS_COLOR_XRGB16_1555,
+	OMAP_DSS_COLOR_BGRA32,
+
+	/* OMAP_DSS_VIDEO1 */
+	OMAP_DSS_COLOR_RGB16 | OMAP_DSS_COLOR_RGB12U |
+	OMAP_DSS_COLOR_YUV2 | OMAP_DSS_COLOR_ARGB16_1555 |
+	OMAP_DSS_COLOR_RGBA32 | OMAP_DSS_COLOR_NV12 |
+	OMAP_DSS_COLOR_RGBA16 | OMAP_DSS_COLOR_RGB24U |
+	OMAP_DSS_COLOR_RGB24P | OMAP_DSS_COLOR_UYVY |
+	OMAP_DSS_COLOR_ARGB16 | OMAP_DSS_COLOR_XRGB16_1555 |
+	OMAP_DSS_COLOR_ARGB32 | OMAP_DSS_COLOR_RGBX16 |
+	OMAP_DSS_COLOR_RGBX32 | OMAP_DSS_COLOR_BGRA32,
+
+       /* OMAP_DSS_VIDEO2 */
+	OMAP_DSS_COLOR_RGB16 | OMAP_DSS_COLOR_RGB12U |
+	OMAP_DSS_COLOR_YUV2 | OMAP_DSS_COLOR_ARGB16_1555 |
+	OMAP_DSS_COLOR_RGBA32 | OMAP_DSS_COLOR_NV12 |
+	OMAP_DSS_COLOR_RGBA16 | OMAP_DSS_COLOR_RGB24U |
+	OMAP_DSS_COLOR_RGB24P | OMAP_DSS_COLOR_UYVY |
+	OMAP_DSS_COLOR_ARGB16 | OMAP_DSS_COLOR_XRGB16_1555 |
+	OMAP_DSS_COLOR_ARGB32 | OMAP_DSS_COLOR_RGBX16 |
+	OMAP_DSS_COLOR_RGBX32 | OMAP_DSS_COLOR_BGRA32,
+
+	/* OMAP_DSS_VIDEO3 */
+	OMAP_DSS_COLOR_RGB16 | OMAP_DSS_COLOR_RGB12U |
+	OMAP_DSS_COLOR_YUV2 | OMAP_DSS_COLOR_ARGB16_1555 |
+	OMAP_DSS_COLOR_RGBA32 | OMAP_DSS_COLOR_NV12 |
+	OMAP_DSS_COLOR_RGBA16 | OMAP_DSS_COLOR_RGB24U |
+	OMAP_DSS_COLOR_RGB24P | OMAP_DSS_COLOR_UYVY |
+	OMAP_DSS_COLOR_ARGB16 | OMAP_DSS_COLOR_XRGB16_1555 |
+	OMAP_DSS_COLOR_ARGB32 | OMAP_DSS_COLOR_RGBX16 |
+	OMAP_DSS_COLOR_RGBX32 | OMAP_DSS_COLOR_BGRA32,
+};
+
 static const enum omap_overlay_caps omap2_dss_overlay_caps[] = {
 	/* OMAP_DSS_GFX */
 	0,
@@ -312,6 +353,27 @@ static const enum omap_overlay_caps omap4_dss_overlay_caps[] = {
 	/* OMAP_DSS_VIDEO3 */
 	OMAP_DSS_OVL_CAP_SCALE | OMAP_DSS_OVL_CAP_GLOBAL_ALPHA |
 		OMAP_DSS_OVL_CAP_PRE_MULT_ALPHA | OMAP_DSS_OVL_CAP_ZORDER,
+};
+
+static const enum omap_overlay_caps omap5_es_2_0_dss_overlay_caps[] = {
+	/* OMAP_DSS_GFX */
+	OMAP_DSS_OVL_CAP_GLOBAL_ALPHA | OMAP_DSS_OVL_CAP_PRE_MULT_ALPHA |
+		OMAP_DSS_OVL_CAP_ZORDER | OMAP_DSS_OVL_CAP_FORCE_1D,
+
+	/* OMAP_DSS_VIDEO1 */
+	OMAP_DSS_OVL_CAP_SCALE | OMAP_DSS_OVL_CAP_GLOBAL_ALPHA |
+		OMAP_DSS_OVL_CAP_PRE_MULT_ALPHA | OMAP_DSS_OVL_CAP_ZORDER |
+		OMAP_DSS_OVL_CAP_FORCE_1D,
+
+	/* OMAP_DSS_VIDEO2 */
+	OMAP_DSS_OVL_CAP_SCALE | OMAP_DSS_OVL_CAP_GLOBAL_ALPHA |
+		OMAP_DSS_OVL_CAP_PRE_MULT_ALPHA | OMAP_DSS_OVL_CAP_ZORDER |
+		OMAP_DSS_OVL_CAP_FORCE_1D,
+
+	/* OMAP_DSS_VIDEO3 */
+	OMAP_DSS_OVL_CAP_SCALE | OMAP_DSS_OVL_CAP_GLOBAL_ALPHA |
+		OMAP_DSS_OVL_CAP_PRE_MULT_ALPHA | OMAP_DSS_OVL_CAP_ZORDER |
+		OMAP_DSS_OVL_CAP_FORCE_1D,
 };
 
 static const char * const omap2_dss_clk_source_names[] = {
@@ -399,6 +461,21 @@ static const struct dss_param_range omap5_dss_param_range[] = {
 	[FEAT_PARAM_DSIPLL_REGM_DISPC]		= { 0, (1 << 5) - 1 },
 	[FEAT_PARAM_DSIPLL_REGM_DSI]		= { 0, (1 << 5) - 1 },
 	[FEAT_PARAM_DSIPLL_FINT]		= { 500000, 2500000 },
+	[FEAT_PARAM_DSIPLL_LPDIV]		= { 0, (1 << 13) - 1 },
+	[FEAT_PARAM_DOWNSCALE]			= { 1, 4 },
+	[FEAT_PARAM_LINEWIDTH]			= { 1, 2048 },
+	[FEAT_PARAM_MGR_WIDTH]			= { 1, 4096 },
+	[FEAT_PARAM_MGR_HEIGHT]			= { 1, 4096 },
+};
+
+static const struct dss_param_range omap5_es_2_0_dss_param_range[] = {
+	[FEAT_PARAM_DSS_FCK]			= { 0, 209250000 },
+	[FEAT_PARAM_DSS_PCD]			= { 1, 255 },
+	[FEAT_PARAM_DSIPLL_REGN]		= { 0, (1 << 8) - 1 },
+	[FEAT_PARAM_DSIPLL_REGM]		= { 0, (1 << 12) - 1 },
+	[FEAT_PARAM_DSIPLL_REGM_DISPC]		= { 0, (1 << 5) - 1 },
+	[FEAT_PARAM_DSIPLL_REGM_DSI]		= { 0, (1 << 5) - 1 },
+	[FEAT_PARAM_DSIPLL_FINT]		= { 150000, 52000000 },
 	[FEAT_PARAM_DSIPLL_LPDIV]		= { 0, (1 << 13) - 1 },
 	[FEAT_PARAM_DOWNSCALE]			= { 1, 4 },
 	[FEAT_PARAM_LINEWIDTH]			= { 1, 2048 },
@@ -521,6 +598,30 @@ static const enum dss_feat_id omap5_dss_feat_list[] = {
 	FEAT_FIFO_MERGE,
 	FEAT_DSI_PLL_SELFREQDCO,
 	FEAT_DSI_PLL_REFSEL,
+};
+
+static const enum dss_feat_id omap5_es_2_0_dss_feat_list[] = {
+	FEAT_MGR_LCD2,
+	FEAT_CORE_CLK_DIV,
+	FEAT_LCD_CLK_SRC,
+	FEAT_DSI_DCS_CMD_CONFIG_VC,
+	FEAT_DSI_VC_OCP_WIDTH,
+	FEAT_DSI_GNQ,
+	FEAT_HDMI_CTS_SWMODE,
+	FEAT_HDMI_AUDIO_USE_MCLK,
+	FEAT_HANDLE_UV_SEPARATE,
+	FEAT_ATTR2,
+	FEAT_CPR,
+	FEAT_PRELOAD,
+	FEAT_FIR_COEF_V,
+	FEAT_ALPHA_FREE_ZORDER,
+	FEAT_FIFO_MERGE,
+	FEAT_DSI_PLL_SELFREQDCO,
+	FEAT_DSI_PLL_REFSEL,
+	FEAT_WB,
+	FEAT_FLIP_IMMEDIATE,
+	FEAT_MFLAG,
+	FEAT_3D,
 };
 
 /* OMAP2 DSS Features */
@@ -666,6 +767,28 @@ static const struct omap_dss_features omap5_dss_features = {
 	.hdmi_core_sys_offset = OMAP5_HDMI_CORE_OFFSET,
 	.hdmi_cec_offset = OMAP5_ES_1_0_HDMI_CEC_OFFSET,
 	.hdmi_core_i2cm_offset = OMAP5_ES_1_0_HDMI_I2CM_OFFSET,
+};
+
+/* OMAP5 ES2.0 DSS Features */
+static const struct omap_dss_features omap5_es2_0_dss_features = {
+	.reg_fields = omap5_dss_reg_fields,
+	.num_reg_fields = ARRAY_SIZE(omap5_dss_reg_fields),
+
+	.features = omap5_es_2_0_dss_feat_list,
+	.num_features = ARRAY_SIZE(omap5_es_2_0_dss_feat_list),
+
+	.num_mgrs = 3,
+	.num_ovls = 4,
+	.supported_displays = omap5_dss_supported_displays,
+	.supported_color_modes = omap5_es_2_0_dss_supported_color_modes,
+	.overlay_caps = omap5_es_2_0_dss_overlay_caps,
+	.clksrc_names = omap5_dss_clk_source_names,
+	.dss_params = omap5_es_2_0_dss_param_range,
+	.buffer_size_unit = 16,
+	.burst_size_unit = 16,
+	.dsi_ddr_div = 2,
+	.hdmi_core_sys_offset = 0x20000,
+	.hdmi_cec_offset = 0x20000,
 };
 
 #if defined(CONFIG_OMAP4_DSS_HDMI) || defined(CONFIG_OMAP5_DSS_HDMI)
@@ -841,8 +964,10 @@ void dss_features_init(void)
 		omap_current_dss_features = &omap4430_es2_0_1_2_dss_features;
 	else if (cpu_is_omap44xx())
 		omap_current_dss_features = &omap4_dss_features;
-	else if (cpu_is_omap54xx())
+	else if (cpu_is_omap54xx() && (omap_rev() <= OMAP5430_REV_ES1_0))
 		omap_current_dss_features = &omap5_dss_features;
+	else if (cpu_is_omap54xx() && (omap_rev() == OMAP5430_REV_ES2_0))
+		omap_current_dss_features = &omap5_es2_0_dss_features;
 	else
 		DSSWARN("Unsupported OMAP version");
 }
