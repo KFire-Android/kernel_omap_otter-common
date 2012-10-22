@@ -108,6 +108,8 @@ struct omap_governor {
 	int sensor_temp_table[AVERAGE_NUMBER];
 	struct delayed_work average_gov_sensor_work;
 	struct notifier_block pm_notifier;
+	/* for synchronizing actions */
+	struct mutex mutex;
 };
 
 /* Initial set of thersholds for different thermal zones */
@@ -297,12 +299,17 @@ static signed hotspot_temp_to_sensor_temp(struct omap_governor *omap_gov,
 
 static int omap_enter_zone(struct omap_governor *omap_gov,
 				struct omap_thermal_zone *zone,
+				bool in_new_zone,
 				bool set_cooling_level,
 				struct list_head *cooling_list, int cpu_temp,
 				int inter_zone_thot)
 {
 	int temp_upper;
 	int temp_lower;
+
+	/* TODO: check for stabilization */
+	if (!in_new_zone)
+		return 0;
 
 	if (list_empty(cooling_list)) {
 		pr_err("%s: No Cooling devices registered\n",
@@ -373,6 +380,8 @@ static int omap_thermal_manager(struct omap_governor *omap_gov,
 	bool set_cooling_level = true;
 	int temp_upper, inter_zone_thot = 0;
 	int shutdown, alert;
+	bool in_new_zone = false;
+
 
 	cpu_temp = convert_omap_sensor_temp_to_hotspot_temp(omap_gov, temp);
 	zone = omap_thermal_match_zone(omap_gov->zones, cpu_temp);
@@ -386,10 +395,13 @@ static int omap_thermal_manager(struct omap_governor *omap_gov,
 		shutdown = omap_gov->zones[CRITICAL_ZONE - 1].temp_upper;
 		temp_upper = (((shutdown - alert) / omap_gov->steps) *
 				omap_gov->critical_zone_reached) + alert;
-		if (temp_upper < cpu_temp)
+		if (temp_upper < cpu_temp) {
 			omap_gov->critical_zone_reached++;
-		else
+			in_new_zone = true;
+		} else {
 			set_cooling_level = false; /* no need for update */
+			in_new_zone = false;
+		}
 		temp_upper = (((shutdown - alert) / omap_gov->steps) *
 				omap_gov->critical_zone_reached) + alert;
 		if (temp_upper >= shutdown)
@@ -414,7 +426,15 @@ static int omap_thermal_manager(struct omap_governor *omap_gov,
 	if (zone != NO_ACTION) {
 		struct omap_thermal_zone *therm_zone;
 
+		if (zone != omap_gov->prev_zone)
+			in_new_zone = true;
+
+
 		therm_zone = &omap_gov->zones[zone - 1];
+		pr_debug("%s: %s in new zone %d %s: %d (%d %d)\n",
+			__func__, omap_gov->thermal_fw.domain_name,
+			in_new_zone, therm_zone->name, cpu_temp, zone,
+			omap_gov->prev_zone);
 		if ((omap_gov->enable_debug_print) &&
 		((omap_gov->prev_zone != zone) || (zone == CRITICAL_ZONE))) {
 			pr_info("%s:sensor %d avg sensor %d pcb ",
@@ -425,11 +445,12 @@ static int omap_thermal_manager(struct omap_governor *omap_gov,
 				 cpu_temp);
 			pr_info("%s: hot spot temp %d - going into %s zone\n",
 				__func__, cpu_temp, therm_zone->name);
-			omap_gov->prev_zone = zone;
 		}
+		omap_gov->prev_zone = zone;
 
-		omap_enter_zone(omap_gov, therm_zone, set_cooling_level,
-				cooling_list, cpu_temp, inter_zone_thot);
+		omap_enter_zone(omap_gov, therm_zone, in_new_zone,
+				set_cooling_level, cooling_list, cpu_temp,
+				inter_zone_thot);
 	}
 
 	return zone;
@@ -512,14 +533,25 @@ static int omap_process_temp(struct thermal_dev *gov,
 {
 	struct omap_governor *omap_gov = container_of(gov, struct
 					omap_governor, thermal_fw);
+	int ret;
 
-	pr_debug("%s: Received temp %i\n", __func__, temp);
+	mutex_lock(&omap_gov->mutex);
 	omap_gov->temp_sensor = temp_sensor;
 	if (!omap_gov->pcb_sensor_available &&
 		(thermal_check_domain("pcb") == 0))
 		omap_gov->pcb_sensor_available = true;
 
-	return omap_thermal_manager(omap_gov, cooling_list, temp);
+	/* because here we are safe, we do an extra read */
+	temp = thermal_request_temp(omap_gov->temp_sensor);
+	omap_gov->sensor_temp = temp;
+
+	pr_debug("%s: received temp %i on %s\n", __func__, temp,
+				omap_gov->thermal_fw.domain_name);
+
+	ret = omap_thermal_manager(omap_gov, cooling_list, temp);
+	mutex_unlock(&omap_gov->mutex);
+
+	return ret;
 }
 
 static int omap_die_pm_notifier_cb(struct notifier_block *notifier,
@@ -722,6 +754,7 @@ static int __init omap_governor_init(void)
 	}
 
 	for (i = 0; i < OMAP_GOV_MAX_INSTANCE; i++) {
+		mutex_init(&omap_gov_instance[i]->mutex);
 		omap_gov_instance[i]->average_period =
 						NORMAL_TEMP_MONITORING_RATE;
 		omap_gov_instance[i]->avg_is_valid = 0;
