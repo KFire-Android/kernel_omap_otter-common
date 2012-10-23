@@ -140,7 +140,7 @@ static __init int omap4_ldo_trim_init(void)
 	 * high enough voltage on SLDO output.
 	 * 2. trim VDAC value for TV output as per recomendation
 	 */
-	if (omap_rev() >= CHIP_IS_OMAP4430ES2_2)
+	if (omap_rev() >= OMAP4430_REV_ES2_2)
 		bgap_trimmed = omap_ctrl_readl(
 			OMAP4_CTRL_MODULE_CORE_STD_FUSE_OPP_BGAP);
 
