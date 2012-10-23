@@ -465,6 +465,21 @@ omap_hsmmc_max_min(u8 slot, unsigned long *max, unsigned long *min)
 	return 0;
 }
 
+/* Set Silicon specific capabilities */
+static u32 __init omap_hsmmc_si_spec_caps(struct omap2_hsmmc_info *c)
+{
+	u32 caps = 0;
+	if (cpu_is_omap54xx()) {
+		if (c->mmc == 1) {
+			caps |= (MMC_CAP_UHS_SDR12 | MMC_CAP_UHS_SDR25 |
+				MMC_CAP_UHS_DDR50);
+			if (omap_rev() == OMAP5430_REV_ES2_0)
+				caps |= MMC_CAP_UHS_SDR104;
+		}
+	}
+	return caps;
+}
+
 static int __init omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
 					struct omap_mmc_platform_data *mmc)
 {
@@ -486,6 +501,7 @@ static int __init omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
 	mmc->slots[0].name = hc_name;
 	mmc->nr_slots = 1;
 	mmc->slots[0].caps = c->caps;
+	mmc->slots[0].caps |= omap_hsmmc_si_spec_caps(c);
 	mmc->slots[0].pm_caps = c->pm_caps;
 	mmc->slots[0].internal_clock = !c->ext_clock;
 	mmc->dma_mask = 0xffffffff;
