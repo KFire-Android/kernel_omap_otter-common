@@ -283,7 +283,7 @@ u8 *hdmi_read_valid_edid(void)
 						  HDMI_EDID_MAX_LENGTH);
 
 	for (i = 0; i < HDMI_EDID_MAX_LENGTH; i += 16)
-		pr_info("edid[%03x] = %02x %02x %02x %02x %02x %02x %02x %02x "\
+		DSSDBG("edid[%03x] = %02x %02x %02x %02x %02x %02x %02x %02x "\
 			"%02x %02x %02x %02x %02x %02x %02x %02x\n", i,
 			hdmi.edid[i], hdmi.edid[i + 1], hdmi.edid[i + 2],
 			hdmi.edid[i + 3], hdmi.edid[i + 4], hdmi.edid[i + 5],
