@@ -50,6 +50,9 @@
 	.balls		= { bb, bt },					\
 }
 
+#define _OMAP5_MUXENTRY_SAFE(M0, g) \
+	_OMAP5_MUXENTRY(M0, g, NULL, NULL, NULL, NULL, NULL, NULL, NULL,\
+		"safe_mode")
 /*
  * Superset of all mux modes for omap5
  */
@@ -924,18 +927,63 @@ static struct omap_ball __initdata omap5_wkup_cbl_ball[] = {
 #define omap5_wkup_cbl_ball  NULL
 #endif
 
+/*
+ * Core subset for OMAP5432 ES1.0
+ */
+static struct omap_mux __initdata omap5_5432es1_core_subset[] = {
+	_OMAP5_MUXENTRY_SAFE(HSI1_ACREADY,	64),
+	_OMAP5_MUXENTRY_SAFE(HSI1_CAREADY,	65),
+	_OMAP5_MUXENTRY_SAFE(HSI1_ACWAKE,	66),
+	_OMAP5_MUXENTRY_SAFE(HSI1_CAWAKE,	67),
+	_OMAP5_MUXENTRY_SAFE(HSI1_ACFLAG,	68),
+	_OMAP5_MUXENTRY_SAFE(HSI1_ACDATA,	69),
+	_OMAP5_MUXENTRY_SAFE(HSI1_CAFLAG,	70),
+	_OMAP5_MUXENTRY_SAFE(HSI1_CADATA,	71),
+	_OMAP5_MUXENTRY_SAFE(UART1_TX,		72),
+	_OMAP5_MUXENTRY_SAFE(UART1_CTS,		73),
+	_OMAP5_MUXENTRY_SAFE(UART1_RX,		74),
+	_OMAP5_MUXENTRY_SAFE(UART1_RTS,		75),
+	_OMAP5_MUXENTRY_SAFE(USBB1_HSIC_STROBE,	92),
+	_OMAP5_MUXENTRY_SAFE(USBB1_HSIC_DATA,	93),
+	_OMAP5_MUXENTRY_SAFE(PERSLIMBUS2_CLOCK,	145),
+	_OMAP5_MUXENTRY_SAFE(PERSLIMBUS2_DATA,	146),
+	_OMAP5_MUXENTRY_SAFE(UART6_TX,		149),
+	_OMAP5_MUXENTRY_SAFE(UART6_RX,		150),
+	_OMAP5_MUXENTRY_SAFE(UART6_CTS,		151),
+	{ .reg_offset = OMAP_MUX_TERMINATOR },
+};
+
+/*
+ * Wake-up subset for OMAP5432 ES1.0
+ */
+static struct omap_mux __initdata omap5_5432_wkup_subset[] = {
+	_OMAP5_MUXENTRY_SAFE(FREF_CLK1_REQ, 8),
+	_OMAP5_MUXENTRY_SAFE(FREF_CLK2_REQ, 9),
+	_OMAP5_MUXENTRY_SAFE(FREF_CLK2_OUT, 10),
+	{ .reg_offset = OMAP_MUX_TERMINATOR },
+};
+
+
+
 
 int __init omap5_mux_init(struct omap_board_mux *board_subset,
 	struct omap_board_mux *board_wkup_subset, int flags)
 {
-	struct omap_ball *package_balls_core, *package_balls_wkup;
+	struct omap_mux *core_subset = NULL;
+	struct omap_mux *wkup_subset = NULL;
 	int ret;
 	u8 val;
+	unsigned int rev = omap_rev();
 
-	switch (flags & OMAP_PACKAGE_MASK) {
-	case OMAP_PACKAGE_CBL:
-		package_balls_core = omap5_core_cbl_ball;
-		package_balls_wkup = omap5_wkup_cbl_ball;
+	switch (rev) {
+	case OMAP5430_REV_ES1_0:
+	case OMAP5430_REV_ES2_0:
+		pr_debug("%s: OMAP5430 ES1.0/ES2.0 mux\n", __func__);
+		break;
+	case OMAP5432_REV_ES1_0:
+		pr_debug("%s: OMAP5432 ES1.0 mux\n", __func__);
+		core_subset = omap5_5432es1_core_subset;
+		wkup_subset = omap5_5432_wkup_subset;
 		break;
 	default:
 		pr_err("mux: Unknown omap package, mux disabled\n");
@@ -945,14 +993,14 @@ int __init omap5_mux_init(struct omap_board_mux *board_subset,
 	ret = omap_mux_init("core", OMAP_MUX_GPIO_IN_MODE6,
 			    OMAP5_CTRL_MODULE_PAD_CORE_MUX_PBASE,
 			    OMAP5_CTRL_MODULE_PAD_CORE_MUX_SIZE,
-			    omap5_core_muxmodes, NULL, board_subset,
-			    package_balls_core);
+			    omap5_core_muxmodes, core_subset, board_subset,
+			    omap5_core_cbl_ball);
 
 	ret = omap_mux_init("wkup", OMAP_MUX_GPIO_IN_MODE6,
 			    OMAP5_CTRL_MODULE_PAD_WKUP_MUX_PBASE,
 			    OMAP5_CTRL_MODULE_PAD_WKUP_MUX_SIZE,
-			    omap5_wkup_muxmodes, NULL, board_subset,
-			    package_balls_wkup);
+			    omap5_wkup_muxmodes, wkup_subset, board_subset,
+			    omap5_wkup_cbl_ball);
 
 	/*
 	 * if sysboot bits 4,5 both are 0, then the ioreq pin is INPUT.

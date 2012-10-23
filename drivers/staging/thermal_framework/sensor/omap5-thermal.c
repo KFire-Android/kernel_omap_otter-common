@@ -84,7 +84,6 @@ static int omap_bandgap_report_temp(struct thermal_dev *tdev)
 	}
 
 	therm_data->therm_fw.current_temp = temp;
-	thermal_sensor_set_temp(&therm_data->therm_fw);
 
 	return therm_data->therm_fw.current_temp;
 }

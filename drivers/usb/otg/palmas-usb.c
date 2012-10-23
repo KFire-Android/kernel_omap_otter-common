@@ -47,6 +47,20 @@
 
 #define PALMAS_INT3_LINE_STATE_TIME	20000
 
+static BLOCKING_NOTIFIER_HEAD(notifier_list);
+
+int palmas_usb_register_notifier(struct notifier_block *nb)
+{
+	return blocking_notifier_chain_register(&notifier_list, nb);
+}
+EXPORT_SYMBOL_GPL(palmas_usb_register_notifier);
+
+int palmas_usb_unregister_notifier(struct notifier_block *nb)
+{
+	return blocking_notifier_chain_unregister(&notifier_list, nb);
+}
+EXPORT_SYMBOL_GPL(palmas_usb_unregister_notifier);
+
 static int palmas_usb_read(struct palmas *palmas, unsigned int reg,
 		unsigned int *dest)
 {
@@ -120,7 +134,7 @@ static irqreturn_t palmas_vbus_wakeup_irq(int irq, void *_palmas_usb)
 {
 	enum omap_dwc3_vbus_id_status status = OMAP_DWC3_UNKNOWN;
 	unsigned int vbus_line_state;
-	int slave, charger_type;
+	int slave, charger_type = POWER_SUPPLY_TYPE_BATTERY;
 	unsigned int addr;
 	int timeout = PALMAS_INT3_LINE_STATE_TIME;
 	struct palmas_usb *palmas_usb = _palmas_usb;
@@ -141,7 +155,7 @@ static irqreturn_t palmas_vbus_wakeup_irq(int irq, void *_palmas_usb)
 				if (charger_type == POWER_SUPPLY_TYPE_USB_DCP) {
 					status = OMAP_DWC3_DCP_CHARGER;
 					palmas_usb->linkstat = status;
-					return IRQ_HANDLED;
+					goto ret;
 				}
 				regulator_enable(palmas_usb->vbus_reg);
 				status = OMAP_DWC3_VBUS_VALID;
@@ -155,7 +169,7 @@ static irqreturn_t palmas_vbus_wakeup_irq(int irq, void *_palmas_usb)
 			if (palmas_usb->linkstat == OMAP_DWC3_DCP_CHARGER) {
 				status = OMAP_DWC3_VBUS_OFF;
 				palmas_usb->linkstat = status;
-				return IRQ_HANDLED;
+				goto ret;
 			} else if (palmas_usb->linkstat == OMAP_DWC3_VBUS_VALID) {
 				regulator_disable(palmas_usb->vbus_reg);
 				status = OMAP_DWC3_VBUS_OFF;
@@ -173,10 +187,14 @@ static irqreturn_t palmas_vbus_wakeup_irq(int irq, void *_palmas_usb)
 
 	if (status != OMAP_DWC3_UNKNOWN) {
 		omap_dwc3_mailbox(status);
-		return IRQ_HANDLED;
+		goto ret;
 	}
 
 	return IRQ_NONE;
+ret:
+	blocking_notifier_call_chain(&notifier_list, charger_type, NULL);
+
+	return IRQ_HANDLED;
 }
 
 static irqreturn_t palmas_id_irq(int irq, void *_palmas_usb)

@@ -2899,4 +2899,5 @@ enum usb_irq_events {
 #define PALMAS_GPADC_TRIM15					0xE
 #define PALMAS_GPADC_TRIM16					0xF
 
+int palmas_usb_register_notifier(struct notifier_block *nb);
 #endif /*  __LINUX_MFD_PALMAS_H */

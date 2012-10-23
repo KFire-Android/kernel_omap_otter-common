@@ -30,33 +30,31 @@
 #include <linux/thermal_framework.h>
 
 #include <plat/cpu.h>
+#include <linux/opp.h>
+#include <plat/omap_device.h>
 
 /* Zone information */
-#define FATAL_ZONE	5
-#define PANIC_ZONE	4
+#define SHUTDOWN_ZONE	5
+#define CRITICAL_ZONE	4
 #define ALERT_ZONE	3
 #define MONITOR_ZONE	2
 #define SAFE_ZONE	1
 #define NO_ACTION	0
-#define MAX_NO_MON_ZONES PANIC_ZONE
-#define OMAP_FATAL_DEFAULT_TEMP 125000
-#define OMAP_PANIC_DEFAULT_TEMP 110000
-#define OMAP_FATAL_TEMP ((omap_rev() == OMAP5430_REV_ES1_0) || \
-			 (omap_rev() == OMAP5432_REV_ES1_0) ? 120000 : 125000)
-#define OMAP_PANIC_TEMP ((omap_rev() == OMAP5430_REV_ES1_0) || \
-			 (omap_rev() == OMAP5432_REV_ES1_0) ? 105000 : 110000)
-#define OMAP_ALERT_TEMP 100000
-#define OMAP_MONITOR_TEMP 85000
-#define OMAP_SAFE_TEMP  25000
+#define MAX_NO_MON_ZONES CRITICAL_ZONE
+#define OMAP_SHUTDOWN_TEMP			125000
+#define OMAP_SHUTDOWN_TEMP_ES1_0		120000
+#define OMAP_CRITICAL_TEMP			110000
+#define OMAP_CRITICAL_TEMP_ES1_0		105000
+#define OMAP_ALERT_TEMP			100000
+#define OMAP_MONITOR_TEMP		85000
+#define OMAP_SAFE_TEMP			25000
 
 /* TODO: Define this via a configurable file */
-#define HYSTERESIS_VALUE 5000
-#define NORMAL_TEMP_MONITORING_RATE 1000
-#define FAST_TEMP_DEFAULT_MONITORING_RATE 250
-#define FAST_TEMP_MONITORING_RATE ((omap_rev() == OMAP5430_REV_ES1_0) || \
-				   (omap_rev() == OMAP5432_REV_ES1_0)	 \
-				   ? 125 : 250)
-#define AVERAGE_NUMBER 20
+#define HYSTERESIS_VALUE		5000
+#define NORMAL_TEMP_MONITORING_RATE	1000
+#define FAST_TEMP_MONITORING_RATE	250
+#define FAST_TEMP_MONITORING_RATE_ES1_0	125
+#define AVERAGE_NUMBER			20
 
 
 enum governor_instances {
@@ -87,10 +85,10 @@ struct omap_thermal_zone {
 struct omap_governor {
 	struct thermal_dev *temp_sensor;
 	struct thermal_dev thermal_fw;
-	struct omap_thermal_zone omap_thermal_zones[MAX_NO_MON_ZONES];
+	struct omap_thermal_zone zones[MAX_NO_MON_ZONES];
 	void (*update_temp_thresh) (struct thermal_dev *, int min, int max);
 	int report_rate;
-	int panic_zone_reached;
+	int critical_zone_reached;
 	int cooling_level;
 	int hotspot_temp_upper;
 	int hotspot_temp_lower;
@@ -104,34 +102,56 @@ struct omap_governor {
 	int avg_is_valid;
 	int omap_gradient_slope;
 	int omap_gradient_const;
-	int alert_threshold;
-	int panic_threshold;
 	int prev_zone;
+	int steps;
 	bool enable_debug_print;
 	int sensor_temp_table[AVERAGE_NUMBER];
 	struct delayed_work average_gov_sensor_work;
 	struct notifier_block pm_notifier;
+	/* for synchronizing actions */
+	struct mutex mutex;
 };
 
 /* Initial set of thersholds for different thermal zones */
-static struct omap_thermal_zone omap_thermal_init_zones[] __initdata = {
+static struct omap_thermal_zone zones_es1_0[] __initdata = {
 	OMAP_THERMAL_ZONE("safe", 0, OMAP_SAFE_TEMP, OMAP_MONITOR_TEMP,
-			FAST_TEMP_DEFAULT_MONITORING_RATE,
+			FAST_TEMP_MONITORING_RATE_ES1_0,
 			NORMAL_TEMP_MONITORING_RATE),
 	OMAP_THERMAL_ZONE("monitor", 0,
 			OMAP_MONITOR_TEMP - HYSTERESIS_VALUE, OMAP_ALERT_TEMP,
-			FAST_TEMP_DEFAULT_MONITORING_RATE,
-			FAST_TEMP_DEFAULT_MONITORING_RATE),
+			FAST_TEMP_MONITORING_RATE_ES1_0,
+			FAST_TEMP_MONITORING_RATE_ES1_0),
 	OMAP_THERMAL_ZONE("alert", 0,
 			OMAP_ALERT_TEMP - HYSTERESIS_VALUE,
-			OMAP_PANIC_DEFAULT_TEMP,
-			FAST_TEMP_DEFAULT_MONITORING_RATE,
-			FAST_TEMP_DEFAULT_MONITORING_RATE),
-	OMAP_THERMAL_ZONE("panic", 1,
-			OMAP_PANIC_DEFAULT_TEMP - HYSTERESIS_VALUE,
-			OMAP_FATAL_DEFAULT_TEMP,
-			FAST_TEMP_DEFAULT_MONITORING_RATE,
-			FAST_TEMP_DEFAULT_MONITORING_RATE),
+			OMAP_CRITICAL_TEMP_ES1_0,
+			FAST_TEMP_MONITORING_RATE_ES1_0,
+			FAST_TEMP_MONITORING_RATE_ES1_0),
+	OMAP_THERMAL_ZONE("critical", 1,
+			OMAP_CRITICAL_TEMP_ES1_0 - HYSTERESIS_VALUE,
+			OMAP_SHUTDOWN_TEMP_ES1_0,
+			FAST_TEMP_MONITORING_RATE_ES1_0,
+			FAST_TEMP_MONITORING_RATE_ES1_0),
+};
+
+/* Initial set of thersholds for different thermal zones starting from ES2.0 */
+static struct omap_thermal_zone zones_es2_0[] __initdata = {
+	OMAP_THERMAL_ZONE("safe", 0, OMAP_SAFE_TEMP, OMAP_MONITOR_TEMP,
+			FAST_TEMP_MONITORING_RATE,
+			NORMAL_TEMP_MONITORING_RATE),
+	OMAP_THERMAL_ZONE("monitor", 0,
+			OMAP_MONITOR_TEMP - HYSTERESIS_VALUE, OMAP_ALERT_TEMP,
+			FAST_TEMP_MONITORING_RATE,
+			FAST_TEMP_MONITORING_RATE),
+	OMAP_THERMAL_ZONE("alert", 0,
+			OMAP_ALERT_TEMP - HYSTERESIS_VALUE,
+			OMAP_CRITICAL_TEMP,
+			FAST_TEMP_MONITORING_RATE,
+			FAST_TEMP_MONITORING_RATE),
+	OMAP_THERMAL_ZONE("critical", 1,
+			OMAP_CRITICAL_TEMP - HYSTERESIS_VALUE,
+			OMAP_SHUTDOWN_TEMP,
+			FAST_TEMP_MONITORING_RATE,
+			FAST_TEMP_MONITORING_RATE),
 };
 
 static struct omap_governor *omap_gov_instance[OMAP_GOV_MAX_INSTANCE];
@@ -159,11 +179,11 @@ static struct omap_governor *omap_gov_instance[OMAP_GOV_MAX_INSTANCE];
  *
  * There are 5 zones identified:
  *
- * FATAL_ZONE: This zone indicates that the on-die temperature has reached
+ * SHUTDOWN_ZONE: This zone indicates that the on-die temperature has reached
  * a point where the device needs to be rebooted and allow ROM or the bootloader
  * to run to allow the device to cool.
  *
- * PANIC_ZONE: This zone indicates a near fatal temperature is approaching
+ * CRITICAL_ZONE: This zone indicates a near shutdown temperature is approaching
  * and should impart all neccessary cooling agent to bring the temperature
  * down to an acceptable level.
  *
@@ -279,11 +299,17 @@ static signed hotspot_temp_to_sensor_temp(struct omap_governor *omap_gov,
 
 static int omap_enter_zone(struct omap_governor *omap_gov,
 				struct omap_thermal_zone *zone,
+				bool in_new_zone,
 				bool set_cooling_level,
-				struct list_head *cooling_list, int cpu_temp)
+				struct list_head *cooling_list, int cpu_temp,
+				int inter_zone_thot)
 {
 	int temp_upper;
 	int temp_lower;
+
+	/* TODO: check for stabilization */
+	if (!in_new_zone)
+		return 0;
 
 	if (list_empty(cooling_list)) {
 		pr_err("%s: No Cooling devices registered\n",
@@ -299,8 +325,12 @@ static int omap_enter_zone(struct omap_governor *omap_gov,
 		thermal_device_call_all(cooling_list, cool_device,
 						omap_gov->cooling_level);
 	}
+
+	if (inter_zone_thot == 0)
+		inter_zone_thot = zone->temp_upper;
+
 	temp_lower = hotspot_temp_to_sensor_temp(omap_gov, zone->temp_lower);
-	temp_upper = hotspot_temp_to_sensor_temp(omap_gov, zone->temp_upper);
+	temp_upper = hotspot_temp_to_sensor_temp(omap_gov, inter_zone_thot);
 	thermal_device_call(omap_gov->temp_sensor, set_temp_thresh, temp_lower,
 								temp_upper);
 	omap_update_report_rate(omap_gov, omap_gov->temp_sensor,
@@ -318,18 +348,29 @@ static int omap_enter_zone(struct omap_governor *omap_gov,
 }
 
 /**
- * omap_fatal_zone() - Shut-down the system to ensure OMAP Junction
+ * omap_shutdown_zone() - Shut-down the system to ensure OMAP Junction
  *			temperature decreases enough
  *
  * @cpu_temp:	The current adjusted CPU temperature
  *
  * No return forces a restart of the system
  */
-static void omap_fatal_zone(int cpu_temp)
+static void omap_shutdown_zone(int cpu_temp)
 {
-	pr_emerg("%s:FATAL ZONE (hot spot temp: %i)\n", __func__, cpu_temp);
+	pr_emerg("%s:SHUTDOWN ZONE (hot spot temp: %i)\n", __func__, cpu_temp);
 
 	kernel_restart(NULL);
+}
+
+static int omap_thermal_match_zone(struct omap_thermal_zone *zone_set, int temp)
+{
+	int i;
+
+	for (i = MAX_NO_MON_ZONES - 1; i >= 0; i--)
+		if (zone_set[i].temp_upper < temp)
+			return i + 2; /* no action and index 0*/
+
+	return temp > OMAP_SAFE_TEMP ? SAFE_ZONE : NO_ACTION;
 }
 
 static int omap_thermal_manager(struct omap_governor *omap_gov,
@@ -337,66 +378,65 @@ static int omap_thermal_manager(struct omap_governor *omap_gov,
 {
 	int cpu_temp, zone = NO_ACTION;
 	bool set_cooling_level = true;
+	int temp_upper, inter_zone_thot = 0;
+	int shutdown, alert;
+	bool in_new_zone = false;
+
 
 	cpu_temp = convert_omap_sensor_temp_to_hotspot_temp(omap_gov, temp);
-	if (cpu_temp >= OMAP_FATAL_TEMP) {
-		omap_fatal_zone(cpu_temp);
-		return FATAL_ZONE;
-	} else if (cpu_temp >= omap_gov->panic_threshold) {
-		int temp_upper;
+	zone = omap_thermal_match_zone(omap_gov->zones, cpu_temp);
 
-		omap_gov->panic_zone_reached++;
-		temp_upper = (((OMAP_FATAL_TEMP -
-				omap_gov->panic_threshold) / 4) *
-					omap_gov->panic_zone_reached) +
-				omap_gov->panic_threshold;
-		if (temp_upper >= OMAP_FATAL_TEMP)
-			temp_upper = OMAP_FATAL_TEMP;
-		omap_gov->omap_thermal_zones[PANIC_ZONE - 1].temp_upper =
-								temp_upper;
-		zone = PANIC_ZONE;
-	} else if (cpu_temp < (omap_gov->panic_threshold - HYSTERESIS_VALUE)) {
-		if (cpu_temp >= omap_gov->alert_threshold) {
-			set_cooling_level = omap_gov->panic_zone_reached == 0;
-			zone = ALERT_ZONE;
-		} else if (cpu_temp < (omap_gov->alert_threshold -
-						HYSTERESIS_VALUE)) {
-			if (cpu_temp >= OMAP_MONITOR_TEMP) {
-				omap_gov->panic_zone_reached = 0;
-				zone = MONITOR_ZONE;
-			} else {
-				/*
-				 * this includes the case where :
-				 * (OMAP_MONITOR_TEMP - HYSTERESIS_VALUE) <= T
-				 * && T < OMAP_MONITOR_TEMP
-				 */
-				omap_gov->panic_zone_reached = 0;
-				zone = SAFE_ZONE;
-			}
+	switch (zone) {
+	case SHUTDOWN_ZONE:
+		omap_shutdown_zone(cpu_temp);
+		return SHUTDOWN_ZONE;
+	case CRITICAL_ZONE:
+		alert = omap_gov->zones[ALERT_ZONE - 1].temp_upper;
+		shutdown = omap_gov->zones[CRITICAL_ZONE - 1].temp_upper;
+		temp_upper = (((shutdown - alert) / omap_gov->steps) *
+				omap_gov->critical_zone_reached) + alert;
+		if (temp_upper < cpu_temp) {
+			omap_gov->critical_zone_reached++;
+			in_new_zone = true;
 		} else {
-			/*
-			 * this includes the case where :
-			 * (OMAP_ALERT_TEMP - HYSTERESIS_VALUE) <=
-			 * T < OMAP_ALERT_TEMP
-			 */
-			omap_gov->panic_zone_reached = 0;
-			zone = MONITOR_ZONE;
+			set_cooling_level = false; /* no need for update */
+			in_new_zone = false;
 		}
-	} else {
-		/*
-		 * this includes the case where :
-		 * (OMAP_PANIC_TEMP - HYSTERESIS_VALUE) <= T < OMAP_PANIC_TEMP
-		 */
-		set_cooling_level = omap_gov->panic_zone_reached == 0;
-		zone = ALERT_ZONE;
-	}
+		temp_upper = (((shutdown - alert) / omap_gov->steps) *
+				omap_gov->critical_zone_reached) + alert;
+		if (temp_upper >= shutdown)
+			temp_upper = shutdown;
+
+		inter_zone_thot = temp_upper;
+
+		break;
+	case ALERT_ZONE:
+		set_cooling_level = omap_gov->critical_zone_reached == 0;
+		break;
+	case MONITOR_ZONE:
+	case SAFE_ZONE:
+		omap_gov->critical_zone_reached = 0;
+		break;
+	case NO_ACTION:
+		break;
+	default:
+		break;
+	};
 
 	if (zone != NO_ACTION) {
 		struct omap_thermal_zone *therm_zone;
 
-		therm_zone = &omap_gov->omap_thermal_zones[zone - 1];
+		if (zone != omap_gov->prev_zone)
+			in_new_zone = true;
+
+
+		therm_zone = &omap_gov->zones[zone - 1];
+		pr_debug("%s: %s in new zone %d %s: %d (%d %d)\n",
+			__func__, omap_gov->thermal_fw.domain_name,
+			in_new_zone, therm_zone->name, cpu_temp, zone,
+			omap_gov->prev_zone);
 		if ((omap_gov->enable_debug_print) &&
-		((omap_gov->prev_zone != zone) || (zone == PANIC_ZONE))) {
+		((omap_gov->prev_zone != zone) || (zone == CRITICAL_ZONE))) {
 			pr_info("%s:sensor %d avg sensor %d pcb ",
 				 __func__, temp,
 				 omap_gov->avg_gov_sensor_temp);
@@ -405,11 +445,12 @@ static int omap_thermal_manager(struct omap_governor *omap_gov,
 				 cpu_temp);
 			pr_info("%s: hot spot temp %d - going into %s zone\n",
 				__func__, cpu_temp, therm_zone->name);
-			omap_gov->prev_zone = zone;
 		}
+		omap_gov->prev_zone = zone;
 
-		omap_enter_zone(omap_gov, therm_zone,
-				set_cooling_level, cooling_list, cpu_temp);
+		omap_enter_zone(omap_gov, therm_zone, in_new_zone,
+				set_cooling_level, cooling_list, cpu_temp,
+				inter_zone_thot);
 	}
 
 	return zone;
@@ -456,6 +497,11 @@ static void average_on_die_temperature(struct omap_governor *omap_gov)
 	omap_gov->avg_gov_sensor_temp =
 		(omap_gov->avg_gov_sensor_temp / AVERAGE_NUMBER);
 
+	pr_debug("%s: averaging %s temp %d. avg %d\n", __func__,
+				omap_gov->thermal_fw.domain_name,
+				omap_gov->sensor_temp,
+				omap_gov->avg_gov_sensor_temp);
+
 	/*
 	 * Reconfigure the current temperature thresholds according
 	 * to the current PCB temperature
@@ -465,6 +511,7 @@ static void average_on_die_temperature(struct omap_governor *omap_gov)
 	thermal_device_call(omap_gov->temp_sensor, set_temp_thresh,
 				omap_gov->hotspot_temp_lower,
 				omap_gov->hotspot_temp_upper);
+	thermal_sensor_set_temp(omap_gov->temp_sensor);
 }
 
 static void average_sensor_delayed_work_fn(struct work_struct *work)
@@ -486,14 +533,25 @@ static int omap_process_temp(struct thermal_dev *gov,
 {
 	struct omap_governor *omap_gov = container_of(gov, struct
 					omap_governor, thermal_fw);
+	int ret;
 
-	pr_debug("%s: Received temp %i\n", __func__, temp);
+	mutex_lock(&omap_gov->mutex);
 	omap_gov->temp_sensor = temp_sensor;
 	if (!omap_gov->pcb_sensor_available &&
 		(thermal_check_domain("pcb") == 0))
 		omap_gov->pcb_sensor_available = true;
 
-	return omap_thermal_manager(omap_gov, cooling_list, temp);
+	/* because here we are safe, we do an extra read */
+	temp = thermal_request_temp(omap_gov->temp_sensor);
+	omap_gov->sensor_temp = temp;
+
+	pr_debug("%s: received temp %i on %s\n", __func__, temp,
+				omap_gov->thermal_fw.domain_name);
+
+	ret = omap_thermal_manager(omap_gov, cooling_list, temp);
+	mutex_unlock(&omap_gov->mutex);
+
+	return ret;
 }
 
 static int omap_die_pm_notifier_cb(struct notifier_block *notifier,
@@ -554,7 +612,7 @@ static int option_alert_get(void *data, u64 *val)
 {
 	struct omap_governor *omap_gov = (struct omap_governor *) data;
 
-	*val = omap_gov->alert_threshold;
+	*val = omap_gov->zones[MONITOR_ZONE - 1].temp_upper;
 
 	return 0;
 }
@@ -562,23 +620,20 @@ static int option_alert_get(void *data, u64 *val)
 static int option_alert_set(void *data, u64 val)
 {
 	struct omap_governor *omap_gov = (struct omap_governor *) data;
+	int thres = omap_gov->zones[ALERT_ZONE - 1].temp_upper;
 
 	if (val <= OMAP_MONITOR_TEMP) {
 		pr_err("Invalid threshold: ALERT:%d is <= MONITOR:%d\n",
 			(int)val, OMAP_MONITOR_TEMP);
 		return -EINVAL;
-	} else if (val >= omap_gov->panic_threshold) {
-		pr_err("Invalid threshold: ALERT:%d is >= PANIC:%d\n",
-			(int)val, omap_gov->panic_threshold);
+	} else if (val >= thres) {
+		pr_err("Invalid threshold: ALERT:%d is >= CRITICAL:%d\n",
+			(int)val, thres);
 		return -EINVAL;
 	}
-	/* Change the ALERT Threshold value */
-	omap_gov->alert_threshold = val;
 	/* Also update the governor zone array */
-	omap_gov->omap_thermal_zones[MONITOR_ZONE - 1].temp_upper =
-						omap_gov->alert_threshold;
-	omap_gov->omap_thermal_zones[ALERT_ZONE - 1].temp_lower =
-				omap_gov->alert_threshold - HYSTERESIS_VALUE;
+	omap_gov->zones[MONITOR_ZONE - 1].temp_upper = val;
+	omap_gov->zones[ALERT_ZONE - 1].temp_lower = val - HYSTERESIS_VALUE;
 
 	/* Skip sensor update if no sensor is present */
 	if (!IS_ERR_OR_NULL(omap_gov->temp_sensor))
@@ -589,35 +644,32 @@ static int option_alert_set(void *data, u64 val)
 DEFINE_SIMPLE_ATTRIBUTE(omap_die_gov_alert_fops, option_alert_get,
 			option_alert_set, "%llu\n");
 
-static int option_panic_get(void *data, u64 *val)
+static int option_critical_get(void *data, u64 *val)
 {
 	struct omap_governor *omap_gov = (struct omap_governor *) data;
 
-	*val = omap_gov->panic_threshold;
+	*val = omap_gov->zones[ALERT_ZONE - 1].temp_upper;
 
 	return 0;
 }
 
-static int option_panic_set(void *data, u64 val)
+static int option_critical_set(void *data, u64 val)
 {
 	struct omap_governor *omap_gov = (struct omap_governor *) data;
+	int thres = omap_gov->zones[MONITOR_ZONE - 1].temp_upper;
 
-	if (val <= omap_gov->alert_threshold) {
-		pr_err("Invalid threshold: PANIC:%d is <= ALERT:%d\n",
-			(int)val, omap_gov->alert_threshold);
+	if (val <= thres) {
+		pr_err("Invalid threshold: CRITICAL:%d is <= ALERT:%d\n",
+			(int)val, thres);
 		return -EINVAL;
-	} else if (val >= OMAP_FATAL_TEMP) {
-		pr_err("Invalid threshold: PANIC:%d is >= FATAL:%d\n",
-			(int)val, OMAP_FATAL_TEMP);
+	} else if (val >= OMAP_SHUTDOWN_TEMP) {
+		pr_err("Invalid threshold: CRITICAL:%d is >= SHUTDOWN:%d\n",
+			(int)val, OMAP_SHUTDOWN_TEMP);
 		return -EINVAL;
 	}
-	/* Change the PANIC Threshold value */
-	omap_gov->panic_threshold = val;
 	/* Also update the governor zone array */
-	omap_gov->omap_thermal_zones[ALERT_ZONE - 1].temp_upper =
-						omap_gov->panic_threshold;
-	omap_gov->omap_thermal_zones[PANIC_ZONE - 1].temp_lower =
-				omap_gov->panic_threshold - HYSTERESIS_VALUE;
+	omap_gov->zones[ALERT_ZONE - 1].temp_upper = val;
+	omap_gov->zones[CRITICAL_ZONE - 1].temp_lower = val - HYSTERESIS_VALUE;
 
 	/* Skip sensor update if no sensor is present */
 	if (!IS_ERR_OR_NULL(omap_gov->temp_sensor))
@@ -625,8 +677,8 @@ static int option_panic_set(void *data, u64 val)
 
 	return 0;
 }
-DEFINE_SIMPLE_ATTRIBUTE(omap_die_gov_panic_fops, option_panic_get,
-			option_panic_set, "%llu\n");
+DEFINE_SIMPLE_ATTRIBUTE(omap_die_gov_critical_fops, option_critical_get,
+			option_critical_set, "%llu\n");
 
 #ifdef CONFIG_THERMAL_FRAMEWORK_DEBUG
 static int omap_gov_register_debug_entries(struct thermal_dev *gov,
@@ -651,6 +703,10 @@ static int omap_gov_register_debug_entries(struct thermal_dev *gov,
 	(void) debugfs_create_file("avg_cpu_sensor_temp",
 			S_IRUGO, d, &(omap_gov->avg_gov_sensor_temp),
 			&omap_die_gov_fops);
+	(void) debugfs_create_file("critical_sub_zones",
+			S_IRUGO, d, &(omap_gov->steps),
+			&omap_die_gov_fops);
+
 
 	/* Read  and Write properties of die gov */
 	/* ALERT zone threshold */
@@ -658,10 +714,10 @@ static int omap_gov_register_debug_entries(struct thermal_dev *gov,
 			S_IRUGO | S_IWUSR, d, omap_gov,
 			&omap_die_gov_alert_fops);
 
-	/* PANIC zone threshold */
-	(void) debugfs_create_file("panic_threshold",
+	/* CRITICAL zone threshold */
+	(void) debugfs_create_file("critical_threshold",
 			S_IRUGO | S_IWUSR, d, omap_gov,
-			&omap_die_gov_panic_fops);
+			&omap_die_gov_critical_fops);
 
 	/* Flag to enable the Debug Zone Prints */
 	(void) debugfs_create_file("enable_debug_print",
@@ -685,8 +741,8 @@ static struct notifier_block omap_die_pm_notifier = {
 
 static int __init omap_governor_init(void)
 {
-	int i, zone;
-	struct omap_thermal_zone *t_zone;
+	int i;
+	struct device *mpu, *gpu;
 
 	for (i = 0; i < OMAP_GOV_MAX_INSTANCE; i++) {
 		omap_gov_instance[i] = kzalloc(sizeof(struct omap_governor),
@@ -698,15 +754,14 @@ static int __init omap_governor_init(void)
 	}
 
 	for (i = 0; i < OMAP_GOV_MAX_INSTANCE; i++) {
+		mutex_init(&omap_gov_instance[i]->mutex);
 		omap_gov_instance[i]->average_period =
 						NORMAL_TEMP_MONITORING_RATE;
 		omap_gov_instance[i]->avg_is_valid = 0;
 		omap_gov_instance[i]->hotspot_temp = 0;
-		omap_gov_instance[i]->panic_zone_reached = 0;
+		omap_gov_instance[i]->critical_zone_reached = 0;
 		omap_gov_instance[i]->pcb_sensor_available = false;
 		omap_gov_instance[i]->enable_debug_print = false;
-		omap_gov_instance[i]->alert_threshold = OMAP_ALERT_TEMP;
-		omap_gov_instance[i]->panic_threshold = OMAP_PANIC_TEMP;
 
 		INIT_DELAYED_WORK(&omap_gov_instance[i]->
 					average_gov_sensor_work,
@@ -721,9 +776,23 @@ static int __init omap_governor_init(void)
 	}
 
 	/* Initializing CPU governor */
-	memcpy(omap_gov_instance[OMAP_GOV_CPU_INSTANCE]->omap_thermal_zones,
-		omap_thermal_init_zones, sizeof(omap_thermal_init_zones));
+	if (omap_rev() == OMAP5430_REV_ES1_0 ||
+	    omap_rev() == OMAP5432_REV_ES1_0) {
+		memcpy(omap_gov_instance[OMAP_GOV_CPU_INSTANCE]->zones,
+		       zones_es1_0, sizeof(zones_es1_0));
+	} else {
+		memcpy(omap_gov_instance[OMAP_GOV_CPU_INSTANCE]->zones,
+		       zones_es2_0, sizeof(zones_es2_0));
+	}
 
+	mpu = omap_device_get_by_hwmod_name("mpu");
+	if (!mpu) {
+		pr_err("%s: mpu domain does not know the amount of throttling",
+			__func__);
+		goto error;
+	}
+	omap_gov_instance[OMAP_GOV_CPU_INSTANCE]->steps =
+						opp_get_opp_count(mpu) - 1;
 	omap_gov_instance[OMAP_GOV_CPU_INSTANCE]->thermal_fw.name =
 							"omap_cpu_governor";
 	omap_gov_instance[OMAP_GOV_CPU_INSTANCE]->thermal_fw.domain_name =
@@ -746,9 +815,23 @@ static int __init omap_governor_init(void)
 	omap_gov_instance[OMAP_GOV_CPU_INSTANCE]->omap_gradient_const);
 
 	/* Initializing GPU governor */
-	memcpy(omap_gov_instance[OMAP_GOV_GPU_INSTANCE]->omap_thermal_zones,
-		omap_thermal_init_zones, sizeof(omap_thermal_init_zones));
+	if (omap_rev() == OMAP5430_REV_ES1_0 ||
+	    omap_rev() == OMAP5432_REV_ES1_0) {
+		memcpy(omap_gov_instance[OMAP_GOV_GPU_INSTANCE]->zones,
+		       zones_es1_0, sizeof(zones_es1_0));
+	} else {
+		memcpy(omap_gov_instance[OMAP_GOV_GPU_INSTANCE]->zones,
+		       zones_es2_0, sizeof(zones_es2_0));
+	}
 
+	gpu = omap_device_get_by_hwmod_name("gpu");
+	if (!gpu) {
+		pr_err("%s: gpu domain does not know the amount of throttling",
+			__func__);
+		goto mpu_free;
+	}
+	omap_gov_instance[OMAP_GOV_GPU_INSTANCE]->steps =
+						opp_get_opp_count(gpu) - 1;
 	omap_gov_instance[OMAP_GOV_GPU_INSTANCE]->thermal_fw.name =
 							"omap_gpu_governor";
 	omap_gov_instance[OMAP_GOV_GPU_INSTANCE]->thermal_fw.domain_name =
@@ -770,24 +853,13 @@ static int __init omap_governor_init(void)
 	omap_gov_instance[OMAP_GOV_GPU_INSTANCE]->omap_gradient_slope,
 	omap_gov_instance[OMAP_GOV_GPU_INSTANCE]->omap_gradient_const);
 
-	for (i = 0; i < OMAP_GOV_MAX_INSTANCE; i++) {
-		t_zone = omap_gov_instance[i]->omap_thermal_zones;
-
-		t_zone[ALERT_ZONE].temp_upper = OMAP_PANIC_TEMP;
-		t_zone[PANIC_ZONE].temp_lower = OMAP_FATAL_TEMP -
-							HYSTERESIS_VALUE;
-		t_zone[PANIC_ZONE].temp_upper = OMAP_FATAL_TEMP;
-
-		for (zone = 0; zone <= MAX_NO_MON_ZONES; zone++) {
-			t_zone[zone].update_rate = FAST_TEMP_MONITORING_RATE;
-			if (zone != SAFE_ZONE)
-				t_zone[zone].average_rate =
-						FAST_TEMP_MONITORING_RATE;
-		}
-	}
-
 	return 0;
 
+mpu_free:
+	cancel_delayed_work_sync(
+	&omap_gov_instance[OMAP_GOV_CPU_INSTANCE]->average_gov_sensor_work);
+	thermal_governor_dev_unregister(
+		&omap_gov_instance[OMAP_GOV_CPU_INSTANCE]->thermal_fw);
 error:
 	for (i = 0; i < OMAP_GOV_MAX_INSTANCE; i++)
 		kfree(omap_gov_instance[i]);
