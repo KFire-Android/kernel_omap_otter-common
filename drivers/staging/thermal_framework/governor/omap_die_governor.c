@@ -60,7 +60,7 @@
 #define FAST_TEMP_MONITORING_RATE	250
 #define FAST_TEMP_MONITORING_RATE_ES1_0	125
 #define AVERAGE_NUMBER			20
-
+#define SAME_ZONE_CNT			600
 
 enum governor_instances {
 	OMAP_GOV_CPU_INSTANCE,
@@ -103,14 +103,16 @@ struct omap_governor {
 	int pcb_temp;
 	bool pcb_sensor_available;
 	bool bursting;
-	bool throttle_on_burst;
 	int sensor_temp;
 	int absolute_delta;
 	int omap_gradient_slope;
 	int omap_gradient_const;
 	int prev_zone;
+	int prev_cool_level;
 	int trend;
 	int steps;
+	int same_zone_cnt;
+	int is_stable;
 	bool enable_debug_print;
 	/* for synchronizing actions */
 	struct mutex mutex;
@@ -320,15 +322,31 @@ static int omap_enter_zone(struct omap_governor *omap_gov,
 {
 	int temp_upper;
 	int temp_lower;
+	int temp_cool_level;
 
 	omap_gov->trend =
 		thermal_lookup_trend(omap_gov->temp_sensor->domain_name);
 	omap_gov->bursting = omap_gov->trend > zone->max_trend;
-	omap_gov->throttle_on_burst = false;
+	omap_gov->is_stable = false;
+	omap_gov->prev_cool_level = temp_cool_level = omap_gov->cooling_level;
 
-	/* TODO: check for stabilization */
-	if (!in_new_zone && !omap_gov->bursting)
+	if (in_new_zone)
+		omap_gov->same_zone_cnt = 0;
+	else
+		omap_gov->same_zone_cnt++;
+
+	if (omap_gov->same_zone_cnt >= SAME_ZONE_CNT &&
+		(thermal_check_temp_stability(omap_gov->temp_sensor) > 0))
+		omap_gov->is_stable = true;
+
+	if (!in_new_zone && !omap_gov->bursting
+			&& !omap_gov->is_stable)
 		return 0;
+
+	if (omap_gov->is_stable) {
+		if (omap_gov->cooling_level > 0)
+			temp_cool_level--;
+	}
 
 	if (list_empty(cooling_list)) {
 		pr_err("%s: No Cooling devices registered\n",
@@ -337,27 +355,31 @@ static int omap_enter_zone(struct omap_governor *omap_gov,
 	}
 
 	if (omap_gov->bursting) {
-		set_cooling_level = true;
-		omap_gov->throttle_on_burst = true;
 		pr_debug("%s(%s): throttling due to fast temp rise:\n",
 			__func__, omap_gov->thermal_fw.domain_name);
 		pr_debug("%d mC, %d mC, %d mC/ms, %d mC/ms\n",
 			cpu_temp, omap_gov->hotspot_temp, omap_gov->trend,
 			zone->max_trend);
+			temp_cool_level++;
 	}
 
-	if (set_cooling_level) {
+	if (set_cooling_level && !omap_gov->bursting) {
 		if (zone->cooling_increment)
-			omap_gov->cooling_level += zone->cooling_increment;
+			temp_cool_level += zone->cooling_increment;
 		else
-			omap_gov->cooling_level = 0;
-
-		if (omap_gov->throttle_on_burst)
-			omap_gov->cooling_level++;
-
-		thermal_device_call_all(cooling_list, cool_device,
-						omap_gov->cooling_level);
+			temp_cool_level = 0;
 	}
+
+	if (temp_cool_level < 0)
+		omap_gov->cooling_level = 0;
+	else if (temp_cool_level > omap_gov->steps)
+		omap_gov->cooling_level = omap_gov->steps;
+	else
+		omap_gov->cooling_level = temp_cool_level;
+
+	if (omap_gov->prev_cool_level != omap_gov->cooling_level)
+		thermal_device_call_all(cooling_list, cool_device,
+				omap_gov->cooling_level);
 
 	if (inter_zone_thot == 0)
 		inter_zone_thot = zone->temp_upper;
