@@ -27,7 +27,6 @@
 struct omap4_idle_statedata {
 	u32 cpu_state;
 	u32 mpu_state;
-	u8 valid;
 };
 
 static struct omap4_idle_statedata omap4_idle_data[] = {
