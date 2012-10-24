@@ -345,8 +345,6 @@ static int __init hdmi_init_display(struct omap_dss_device *dssdev)
 
 	DSSDBG("init_display\n");
 
-	dss_init_hdmi_ip_ops(&hdmi.ip_data, omapdss_get_version());
-
 	if (hdmi.vdda_hdmi_dac_reg == NULL) {
 		struct regulator *reg;
 
@@ -1209,6 +1207,8 @@ static int __init omapdss_hdmihw_probe(struct platform_device *pdev)
 
 	mutex_init(&hdmi.lock);
 	mutex_init(&hdmi.ip_data.lock);
+
+	dss_init_hdmi_ip_ops(&hdmi.ip_data, omapdss_get_version());
 
 	res = platform_get_resource(hdmi.pdev, IORESOURCE_MEM, 0);
 	if (!res) {
