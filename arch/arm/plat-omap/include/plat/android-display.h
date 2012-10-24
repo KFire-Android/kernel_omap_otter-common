@@ -23,11 +23,25 @@
 
 #define NUM_ANDROID_TILER1D_SLOTS 2
 
+#ifdef CONFIG_ION_OMAP
 void omap_android_display_setup(struct omap_dss_board_info *dss,
 				struct dsscomp_platform_data *dsscomp,
 				struct sgx_omaplfb_platform_data *sgx,
 				struct omapfb_platform_data *fb);
 
 bool omap_android_display_is_default(struct omap_dss_device *device);
+#else
+static inline void omap_android_display_setup(struct omap_dss_board_info *dss,
+				struct dsscomp_platform_data *dsscomp,
+				struct sgx_omaplfb_platform_data *sgx,
+				struct omapfb_platform_data *fb)
+{
+}
+
+static inline bool omap_android_display_is_default(struct omap_dss_device *dev)
+{
+	return false;
+}
+#endif
 
 #endif
