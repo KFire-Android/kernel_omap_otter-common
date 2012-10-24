@@ -591,6 +591,12 @@ int omap_aess_disable_data_transfer(struct omap_aess *abe, u32 id)
 			io_task = &aess_port_mm_dl_48k;
 		omap_aess_update_io_task(abe, io_task, 0);
 		break;
+	case OMAP_ABE_TONES_DL_PORT:
+		if (abe_port[id].format.f == 44100)
+			io_task = &aess_port_tones_dl_441k;
+		else
+			io_task = &aess_port_tones_dl_48k;
+		omap_aess_update_io_task(abe, io_task, 0);
 	default:
 		break;
 	}
