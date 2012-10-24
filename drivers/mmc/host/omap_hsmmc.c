@@ -578,6 +578,27 @@ static u16 calc_divisor(struct omap_hsmmc_host *host, struct mmc_ios *ios)
 	return dsor;
 }
 
+static inline void omap_hsmmc_opp_scale(struct omap_hsmmc_host *host)
+{
+	int ret = 0;
+	if (!host->pdata->opp_scale)
+		return;
+
+	ret = host->pdata->opp_scale(host->pdata, host->mmc->ios.clock);
+	if (ret)
+		dev_err(mmc_dev(host->mmc), "%s error: %d", __func__, ret);
+}
+
+static inline void omap_hsmmc_opp_relax(struct omap_hsmmc_host *host)
+{
+	int ret = 0;
+	if (!host->pdata->opp_relax)
+		return;
+	ret = host->pdata->opp_relax(host->pdata);
+	if (ret)
+		dev_err(mmc_dev(host->mmc), "%s error: %d\n", __func__, ret);
+}
+
 static void omap_hsmmc_set_clock(struct omap_hsmmc_host *host)
 {
 	struct mmc_ios *ios = &host->mmc->ios;
@@ -587,6 +608,8 @@ static void omap_hsmmc_set_clock(struct omap_hsmmc_host *host)
 	dev_dbg(mmc_dev(host->mmc), "Set clock to %uHz\n", ios->clock);
 
 	omap_hsmmc_stop_clock(host);
+
+	omap_hsmmc_opp_scale(host);
 
 	regval = OMAP_HSMMC_READ(host->base, SYSCTL);
 	regval = regval & ~(CLKD_MASK | DTO_MASK);
@@ -657,6 +680,8 @@ static int omap_hsmmc_context_restore(struct omap_hsmmc_host *host)
 	int context_loss = 0;
 	u32 hctl, capa, value;
 	unsigned long timeout;
+
+	omap_hsmmc_opp_scale(host);
 
 	if (pdata->get_context_loss_count) {
 		context_loss = pdata->get_context_loss_count(host->dev);
@@ -746,6 +771,7 @@ static void omap_hsmmc_context_save(struct omap_hsmmc_host *host)
 			return;
 		host->context_loss = context_loss;
 	}
+	omap_hsmmc_opp_relax(host);
 }
 
 #else
@@ -2162,7 +2188,6 @@ static int __devinit omap_hsmmc_probe(struct platform_device *pdev)
 	int ret, irq;
 	int ctrlr_caps = 0;
 	const struct of_device_id *match;
-	long mmc_fclk;
 
 	match = of_match_device(of_match_ptr(omap_mmc_of_match), &pdev->dev);
 	if (match) {
@@ -2225,6 +2250,7 @@ static int __devinit omap_hsmmc_probe(struct platform_device *pdev)
 
 	host->next_data.cookie = 1;
 	host->regulator_enabled = 0;
+	pdata->dev = host->dev;
 
 	platform_set_drvdata(pdev, host);
 
@@ -2237,10 +2263,6 @@ static int __devinit omap_hsmmc_probe(struct platform_device *pdev)
 	if (mmc_slot(host).vcc_aux_disable_is_sleep)
 		mmc_slot(host).no_off = 1;
 
-	if (pdata->set_clk_src)
-		if (pdata->set_clk_src(&pdev->dev, pdev->id))
-			goto err1;
-
 	mmc->f_min = pdata->min_freq;
 	mmc->f_max = pdata->max_freq;
 
@@ -2252,14 +2274,9 @@ static int __devinit omap_hsmmc_probe(struct platform_device *pdev)
 		host->fclk = NULL;
 		goto err1;
 	}
-	if (clk_get_rate(host->fclk) != pdata->max_si_freq) {
-		mmc_fclk = clk_round_rate(host->fclk, pdata->max_si_freq);
-		if (mmc_fclk <= 0)
-			goto err_fclk;
-		ret = clk_set_rate(host->fclk, mmc_fclk);
-		if (ret)
-			goto err_fclk;
-	}
+	pdata->fclk = host->fclk;
+	if (pdata->opp_scale_init)
+		pdata->opp_scale_init(pdata);
 
 	if (host->pdata->controller_flags & OMAP_HSMMC_BROKEN_MULTIBLOCK_READ) {
 		dev_info(&pdev->dev, "multiblock reads disabled due to 35xx erratum 2.1.1.128; MMC read performance may suffer\n");
@@ -2437,7 +2454,6 @@ err_irq:
 		clk_disable(host->dbclk);
 		clk_put(host->dbclk);
 	}
-err_fclk:
 	clk_put(host->fclk);
 	host->fclk = NULL;
 err1:
