@@ -3154,7 +3154,9 @@ static struct omap_hwmod omap44xx_iva_seq0_hwmod = {
 	.name		= "iva_seq0",
 	.class		= &omap44xx_iva_hwmod_class,
 	.clkdm_name	= "ivahd_clkdm",
+#ifndef CONFIG_OMAP_PM_STANDALONE
 	.flags		= HWMOD_INIT_NO_RESET,
+#endif
 	.rst_lines	= omap44xx_iva_seq0_resets,
 	.rst_lines_cnt	= ARRAY_SIZE(omap44xx_iva_seq0_resets),
 	.prcm = {
@@ -3169,7 +3171,9 @@ static struct omap_hwmod omap44xx_iva_seq1_hwmod = {
 	.name		= "iva_seq1",
 	.class		= &omap44xx_iva_hwmod_class,
 	.clkdm_name	= "ivahd_clkdm",
+#ifndef CONFIG_OMAP_PM_STANDALONE
 	.flags		= HWMOD_INIT_NO_RESET,
+#endif
 	.rst_lines	= omap44xx_iva_seq1_resets,
 	.rst_lines_cnt	= ARRAY_SIZE(omap44xx_iva_seq1_resets),
 	.prcm = {
@@ -6291,8 +6295,9 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
 	&omap44xx_mpu_private_hwmod,
 
 	/* aess class */
+#ifndef CONFIG_OMAP_PM_STANDALONE
 	&omap44xx_aess_hwmod,
-
+#endif
 	/* counter class */
 /*	&omap44xx_counter_32k_hwmod, */
 
