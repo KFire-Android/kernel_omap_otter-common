@@ -526,6 +526,7 @@ static struct omap_dss_device tablet_hdmi_device = {
 			.max_pixclk_khz = 148500,
 		},
 	},
+	.reset_gpio = -EINVAL,
 	.hpd_gpio = HDMI_GPIO_HPD,
 	.channel = OMAP_DSS_CHANNEL_DIGIT,
 };
