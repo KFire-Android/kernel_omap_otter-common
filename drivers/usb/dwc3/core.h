@@ -883,6 +883,7 @@ extern int dwc3_get_device_id(void);
 extern void dwc3_put_device_id(int id);
 
 extern int dwc3_core_late_init(struct device *dev);
+extern int dwc3_core_host_init(struct device *dev);
 extern int dwc3_core_shutdown(struct device *dev);
 
 #endif /* __DRIVERS_USB_DWC3_CORE_H */

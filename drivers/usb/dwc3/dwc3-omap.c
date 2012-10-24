@@ -164,8 +164,7 @@ static void omap_dwc3_set_mailbox(struct dwc3_omap *omap)
 	switch (omap->status) {
 	case OMAP_DWC3_ID_GROUND:
 		dev_dbg(omap->dev, "ID GND\n");
-
-		dwc3_core_late_init(&omap->dwc3->dev);
+		dwc3_core_host_init(&omap->dwc3->dev);
 
 		ret = pm_runtime_get_sync(omap->dev);
 		if (ret < 0) {
@@ -242,6 +241,9 @@ static void omap_dwc3_set_mailbox(struct dwc3_omap *omap)
 		 * done, before shutting down the DWC core.
 		 */
 		msleep(25);
+		if (omap->status == OMAP_DWC3_ID_FLOAT)
+			dwc3_host_exit(dwc);
+
 		dwc3_core_shutdown(&omap->dwc3->dev);
 
 		wake_unlock(&omap->dwc_wakelock);

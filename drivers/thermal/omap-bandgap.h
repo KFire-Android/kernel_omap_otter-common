@@ -151,6 +151,7 @@ struct omap_temp_sensor {
  * struct omap_bandgap_data - bandgap platform data structure
  * @has_talert: indicates if the chip has talert output line
  * @has_tshut: indicates if the chip has tshut output line
+ * @has_tshut_config: indicates if the chip tshut thresholds can be configured
  * @conv_table: Pointer to adc to temperature conversion table
  * @fclock_name: clock name of the functional clock
  * @div_ck_nme: clock name of the clock divisor
@@ -163,6 +164,7 @@ struct omap_temp_sensor {
 struct omap_bandgap_data {
 	bool				has_talert;
 	bool				has_tshut;
+	bool				has_tshut_config;
 	int				*conv_table;
 	char				*fclock_name;
 	char				*div_ck_name;

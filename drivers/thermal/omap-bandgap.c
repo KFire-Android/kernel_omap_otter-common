@@ -757,6 +757,10 @@ static int temp_sensor_configure_tshut_hot(struct omap_bandgap *bg_ptr,
 	u32 reg_val;
 	int err;
 
+	/* If not using the HW TSHUT feature, just return success */
+	if (!bg_ptr->pdata->has_tshut_config)
+		return 0;
+
 	tsr = bg_ptr->pdata->sensors[id].registers;
 	err = omap_control_readl(cdev, tsr->tshut_threshold, &reg_val);
 	reg_val &= ~tsr->tshut_hot_mask;
@@ -777,6 +781,10 @@ static int temp_sensor_configure_tshut_cold(struct omap_bandgap *bg_ptr,
 	struct temp_sensor_registers *tsr;
 	u32 reg_val;
 	int err;
+
+	/* If not using the HW TSHUT feature, just return success */
+	if (!bg_ptr->pdata->has_tshut_config)
+		return 0;
 
 	tsr = bg_ptr->pdata->sensors[id].registers;
 	err = omap_control_readl(cdev, tsr->tshut_threshold, &reg_val);
@@ -829,6 +837,10 @@ int omap_bandgap_read_thot(struct omap_bandgap *bg_ptr, int id,
 	u32 temp;
 	int ret;
 
+	/* If not using the HW Alert feature, just return success */
+	if (!bg_ptr->pdata->has_talert)
+		return 0;
+
 	tsr = bg_ptr->pdata->sensors[id].registers;
 	ret = omap_control_readl(cdev, tsr->bgap_threshold, &temp);
 	temp = (temp & tsr->threshold_thot_mask) >>
@@ -861,6 +873,10 @@ int omap_bandgap_write_thot(struct omap_bandgap *bg_ptr, int id, int val)
 
 	tsr = bg_ptr->pdata->sensors[id].registers;
 
+	/* If not using the HW Alert feature, just return success */
+	if (!bg_ptr->pdata->has_talert)
+		return 0;
+
 	if (val < ts_data->min_temp + ts_data->hyst_val)
 		return -EINVAL;
 	ret = temp_to_adc_conversion(val, bg_ptr, id, &t_hot);
@@ -890,6 +906,10 @@ int omap_bandgap_read_tcold(struct omap_bandgap *bg_ptr, int id,
 	u32 temp;
 	int ret;
 
+	/* If not using the HW Alert feature, just return success */
+	if (!bg_ptr->pdata->has_talert)
+		return 0;
+
 	tsr = bg_ptr->pdata->sensors[id].registers;
 	ret = omap_control_readl(cdev, tsr->bgap_threshold, &temp);
 	temp = (temp & tsr->threshold_tcold_mask)
@@ -917,6 +937,10 @@ int omap_bandgap_write_tcold(struct omap_bandgap *bg_ptr, int id, int val)
 	struct temp_sensor_registers *tsr;
 	u32 t_cold;
 	int ret;
+
+	/* If not using the HW Alert feature, just return success */
+	if (!bg_ptr->pdata->has_talert)
+		return 0;
 
 	tsr = bg_ptr->pdata->sensors[id].registers;
 	if (val > ts_data->max_temp + ts_data->hyst_val)
@@ -1142,6 +1166,7 @@ static int omap_bandgap_talert_init(struct omap_bandgap *bg_ptr,
 static struct omap_bandgap_data omap4460_data = {
 	.has_talert = true,
 	.has_tshut = true,
+	.has_tshut_config = true,
 	.fclock_name = "bandgap_ts_fclk",
 	.div_ck_name = "div_ts_ck",
 	.conv_table = omap4460_adc_to_temp,
@@ -1160,6 +1185,7 @@ static struct omap_bandgap_data omap4460_data = {
 static struct omap_bandgap_data omap5430_data = {
 	.has_talert = true,
 	.has_tshut = false,
+	.has_tshut_config = true,
 	.fclock_name = "ts_clk_div_ck",
 	.div_ck_name = "ts_clk_div_ck",
 	.conv_table = omap5430_adc_to_temp,
@@ -1234,6 +1260,30 @@ struct omap_bandgap *omap_bandgap_platform_build(struct platform_device *pdev)
 			return ERR_PTR(-EINVAL);
 		}
 	}
+
+	/*
+	 * On OMAP5 ES1.0, due to TSHUT HW errata, the TALERT feature
+	 * will be used by PPA to mointor the temperature and does
+	 * HW reset if the junction temperature crosses 118degC. Due to
+	 * this, driver SW will not use this feature on Non-GP devices,
+	 * but will use on GP device (since PPA will not be running on
+	 * GP devices).
+	 */
+	if (((omap_rev() == OMAP5430_REV_ES1_0) ||
+		(omap_rev() == OMAP5432_REV_ES1_0)) &&
+		(omap_type() != OMAP2_DEVICE_TYPE_GP))
+			bg_ptr->pdata->has_talert = false;
+
+	/*
+	 * On OMAP5 ES1.0, due to TSHUT HW errata, thresholds for TSHUT
+	 * are set by PPA. Due to this, driver SW will not set these
+	 * tshut thershold on Non-GP devices, but will set it on GP device
+	 * (since PPA will not be running on GP devices).
+	 */
+	if (((omap_rev() == OMAP5430_REV_ES1_0) ||
+		(omap_rev() == OMAP5432_REV_ES1_0)) &&
+		(omap_type() != OMAP2_DEVICE_TYPE_GP))
+			bg_ptr->pdata->has_tshut_config = false;
 
 	return bg_ptr;
 }
@@ -1382,13 +1432,16 @@ int __devinit omap_bandgap_probe(struct platform_device *pdev)
 
 		ts_data = bg_ptr->pdata->sensors[i].ts_data;
 
-		temp_sensor_init_talert_thresholds(bg_ptr, i,
-						   ts_data->t_hot,
-						   ts_data->t_cold);
-		temp_sensor_configure_tshut_hot(bg_ptr, i,
-						ts_data->tshut_hot);
-		temp_sensor_configure_tshut_cold(bg_ptr, i,
-						 ts_data->tshut_cold);
+		if (bg_ptr->pdata->has_talert)
+			temp_sensor_init_talert_thresholds(bg_ptr, i,
+							   ts_data->t_hot,
+							   ts_data->t_cold);
+		if (bg_ptr->pdata->has_tshut_config) {
+			temp_sensor_configure_tshut_hot(bg_ptr, i,
+							ts_data->tshut_hot);
+			temp_sensor_configure_tshut_cold(bg_ptr, i,
+							 ts_data->tshut_cold);
+		}
 	}
 
 	enable_continuous_mode(bg_ptr);
@@ -1481,11 +1534,13 @@ static int omap_bandgap_save_ctxt(struct omap_bandgap *bg_ptr)
 		err |= omap_control_readl(cdev,	tsr->bgap_mask_ctrl,
 					  &rval->bg_ctrl);
 		err |= omap_control_readl(cdev,	tsr->bgap_counter,
-					  &rval->bg_counter);
-		err |= omap_control_readl(cdev, tsr->bgap_threshold,
-					  &rval->bg_threshold);
-		err |= omap_control_readl(cdev, tsr->tshut_threshold,
-					  &rval->tshut_threshold);
+					&rval->bg_counter);
+		if (bg_ptr->pdata->has_talert)
+			err |= omap_control_readl(cdev, tsr->bgap_threshold,
+						  &rval->bg_threshold);
+		if (bg_ptr->pdata->has_tshut_config)
+			err |= omap_control_readl(cdev, tsr->tshut_threshold,
+						  &rval->tshut_threshold);
 
 		if (err)
 			dev_err(bg_ptr->dev, "could not save sensor %d\n", i);
@@ -1531,46 +1586,30 @@ static int omap_bandgap_restore_ctxt(struct omap_bandgap *bg_ptr)
 {
 	struct device *cdev = bg_ptr->dev->parent;
 	int i, err = 0;
-	u32 temp = 0;
 
 	for (i = 0; i < bg_ptr->pdata->sensor_count; i++) {
 		struct temp_sensor_registers *tsr;
 		struct temp_sensor_regval *rval;
-		u32 val;
 
 		rval = &bg_ptr->pdata->sensors[i].regval;
 		tsr = bg_ptr->pdata->sensors[i].registers;
 
-		err = omap_control_readl(cdev, tsr->bgap_counter, &val);
-		if (val == 0) {
-			err |= omap_control_writel(cdev, rval->bg_threshold,
-						   tsr->bgap_threshold);
+		if (bg_ptr->pdata->has_talert)
+			err = omap_control_writel(cdev, rval->bg_threshold,
+							tsr->bgap_threshold);
+		if (bg_ptr->pdata->has_tshut_config)
 			err |= omap_control_writel(cdev, rval->tshut_threshold,
-						   tsr->tshut_threshold);
-			/* Force immediate temperature measurement and update
-			 * of the DTEMP field
-			 */
-			omap_bandgap_force_single_read(bg_ptr, i);
-			err |= omap_control_writel(cdev, rval->bg_counter,
-						   tsr->bgap_counter);
-			err |= omap_control_writel(cdev, rval->bg_mode_ctrl,
-						   tsr->bgap_mode_ctrl);
-			err |= omap_control_writel(cdev, rval->bg_ctrl,
-						   tsr->bgap_mask_ctrl);
-		} else {
-			err |= omap_control_readl(cdev, tsr->temp_sensor_ctrl,
-						 &temp);
-			temp &= (tsr->bgap_dtemp_mask);
-			if (temp == 0) {
-				omap_bandgap_force_single_read(bg_ptr, i);
-				err |= omap_control_readl(cdev,
-							  tsr->bgap_mask_ctrl,
-							  &temp);
-				temp |= 1 << __ffs(tsr->mode_ctrl_mask);
-				err |= omap_control_writel(cdev, temp,
-							   tsr->bgap_mask_ctrl);
-			}
-		}
+							tsr->tshut_threshold);
+		/* Force immediate temperature measurement and update
+		 * of the DTEMP field
+		 */
+		omap_bandgap_force_single_read(bg_ptr, i);
+		err |= omap_control_writel(cdev, rval->bg_counter,
+						tsr->bgap_counter);
+		err |= omap_control_writel(cdev, rval->bg_mode_ctrl,
+						tsr->bgap_mode_ctrl);
+		err |= omap_control_writel(cdev, rval->bg_ctrl,
+						tsr->bgap_mask_ctrl);
 		if (err)
 			dev_err(bg_ptr->dev, "could not save sensor %d\n", i);
 	}

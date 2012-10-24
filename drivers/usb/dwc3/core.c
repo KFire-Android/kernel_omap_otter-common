@@ -317,30 +317,19 @@ static void __devinit dwc3_cache_hwparams(struct dwc3 *dwc)
 }
 
 /**
- * dwc3_core_late_init - late initialization of DWC3 Core
+ * dwc3_core_common_init - common initialization of DWC3 Core
  * @dev: device pointer of dwc3 device
  *
- * Enables the dwc3 module, performs reset and starts the gadget (enables
- * the endpoint). This function should be called on demand i.e whenever dwc3
- * is going to be used.
- *
- * Called from the glue layer on cable connect and when a gadget driver is
- * inserted.
+ * This function groups the common initialization procedure required
+ * as part of the dwc3_core_host_init() and dwc3_core_late_init()
  */
-int dwc3_core_late_init(struct device *dev)
+int dwc3_core_common_init(struct device *dev)
 {
-	unsigned long		timeout;
-	u32			reg;
-	int			ret = 0;
 	struct platform_device	*pdev = to_platform_device(dev);
 	struct dwc3		*dwc = platform_get_drvdata(pdev);
-
-	/* return if a gadget driver is not found on cable connect */
-	if (!dwc->gadget_driver) {
-		dev_dbg(dev, "%s is not bound to any driver\n",
-						dwc->gadget.name);
-		return -EINVAL;
-	}
+	int			ret = 0;
+	u32			reg;
+	unsigned long		timeout;
 
 	ret = pm_runtime_get_sync(dev);
 	if (ret < 0) {
@@ -362,27 +351,88 @@ int dwc3_core_late_init(struct device *dev)
 		if (time_after(jiffies, timeout)) {
 			dev_err(dwc->dev, "Reset Timed Out\n");
 			ret = -ETIMEDOUT;
+			goto exit;
 		}
 
 		cpu_relax();
 	} while (true);
 
 	dwc3_core_soft_reset(dwc);
-
 	ret = dwc3_event_buffers_setup(dwc);
-	if (ret) {
+	if (ret)
 		dev_err(dwc->dev, "failed to setup event buffers\n");
-		return ret;
+
+exit:
+	return ret;
+}
+
+/**
+ * dwc3_core_host_init - late initialization of DWC3 Core
+ * @dev: device pointer of dwc3 device
+ *
+ * Enables the dwc3 host, performs reset and does a host_init
+ */
+int dwc3_core_host_init(struct device *dev)
+{
+	int			ret = 0;
+	struct platform_device	*pdev = to_platform_device(dev);
+	struct dwc3		*dwc = platform_get_drvdata(pdev);
+
+	ret = dwc3_core_common_init(dev);
+	if (ret) {
+		dev_err(dev, "dwc3_core_common_init failed with err %d\n", ret);
+		goto exit;
+	}
+
+	dwc3_set_mode(dwc, DWC3_GCTL_PRTCAP_HOST);
+	ret = dwc3_host_init(dwc);
+	if (ret)
+		dev_err(dev, "failed to initialize host with err %d\n", ret);
+
+exit:
+	return ret;
+}
+EXPORT_SYMBOL_GPL(dwc3_core_host_init);
+
+/**
+ * dwc3_core_late_init - late initialization of DWC3 Core
+ * @dev: device pointer of dwc3 device
+ *
+ * Enables the dwc3 module, performs reset and starts the gadget (enables
+ * the endpoint). This function should be called on demand i.e whenever dwc3
+ * is going to be used.
+ *
+ * Called from the glue layer on cable connect and when a gadget driver is
+ * inserted.
+ */
+int dwc3_core_late_init(struct device *dev)
+{
+	int			ret = 0;
+	struct platform_device	*pdev = to_platform_device(dev);
+	struct dwc3		*dwc = platform_get_drvdata(pdev);
+
+	/* return if a gadget driver is not found on cable connect */
+	if (!dwc->gadget_driver) {
+		dev_dbg(dev, "%s is not bound to any driver\n",
+						dwc->gadget.name);
+		return -EINVAL;
+	}
+
+	ret = dwc3_core_common_init(dev);
+	if (ret < 0) {
+		dev_err(dev, "dwc3_core_common_init failed with err %d\n", ret);
+		goto exit;
 	}
 
 	ret = dwc3_gadget_delayed_start(&dwc->gadget, dwc->gadget_driver);
 	if (ret) {
 		dev_err(dwc->dev, "failed to start the gadget\n");
-		return ret;
+		goto exit;
 	}
 
 	dwc3_gadget_run_stop(dwc, true);
 
+exit:
 	return ret;
 }
 EXPORT_SYMBOL_GPL(dwc3_core_late_init);
@@ -613,29 +663,8 @@ static int __devinit dwc3_probe(struct platform_device *pdev)
 
 	switch (mode) {
 	case DWC3_MODE_DEVICE:
-		dwc3_set_mode(dwc, DWC3_GCTL_PRTCAP_DEVICE);
-		ret = dwc3_gadget_init(dwc);
-		if (ret) {
-			dev_err(dev, "failed to initialize gadget\n");
-			goto err2;
-		}
-		break;
-	case DWC3_MODE_HOST:
-		dwc3_set_mode(dwc, DWC3_GCTL_PRTCAP_HOST);
-		ret = dwc3_host_init(dwc);
-		if (ret) {
-			dev_err(dev, "failed to initialize host\n");
-			goto err2;
-		}
-		break;
 	case DWC3_MODE_DRD:
-		dwc3_set_mode(dwc, DWC3_GCTL_PRTCAP_OTG);
-		ret = dwc3_host_init(dwc);
-		if (ret) {
-			dev_err(dev, "failed to initialize host\n");
-			goto err2;
-		}
-
+		dwc3_set_mode(dwc, DWC3_GCTL_PRTCAP_DEVICE);
 		ret = dwc3_gadget_init(dwc);
 		if (ret) {
 			dev_err(dev, "failed to initialize gadget\n");
