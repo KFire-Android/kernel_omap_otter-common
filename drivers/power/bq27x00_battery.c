@@ -972,7 +972,6 @@ static int bq27x00_battery_probe(struct i2c_client *client,
 
 batt_failed_4:
 	gpio_free(di->gpio);
-	free_irq(di->gpio_irq, NULL);
 batt_failed_3:
 	kfree(di);
 batt_failed_2:
