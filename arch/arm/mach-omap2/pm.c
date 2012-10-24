@@ -475,7 +475,7 @@ static void __init omap4_init_voltages(void)
 
 	if (cpu_is_omap443x())
 		omap_set_init_opp("mpu", "dpll_mpu_ck", "mpu");
-	else if (cpu_is_omap446x())
+	else if (cpu_is_omap446x() | cpu_is_omap447x())
 		omap_set_init_opp("mpu", "virt_dpll_mpu_ck", "mpu");
 
 	omap_set_init_opp("core", "virt_l3_ck", "l3_main_1");
