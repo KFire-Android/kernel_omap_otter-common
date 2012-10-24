@@ -226,11 +226,16 @@
 #define HDMI_TXPHY_POWER_CTRL			0x8
 #define HDMI_TXPHY_PAD_CFG_CTRL			0xC
 
+/* Interrupt masks */
+#define HDMI_WP_IRQSTATUS_CORE_MASK                  0x1
+
 #define REG_FLD_MOD(base, idx, val, start, end) \
 	hdmi_write_reg(base, idx, FLD_MOD(hdmi_read_reg(base, idx),\
 							val, start, end))
 #define REG_GET(base, idx, start, end) \
 	FLD_GET(hdmi_read_reg(base, idx), start, end)
+
+
 
 enum hdmi_phy_pwr {
 	HDMI_PHYPWRCMD_OFF = 0,
