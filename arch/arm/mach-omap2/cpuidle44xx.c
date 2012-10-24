@@ -30,10 +30,24 @@ struct omap4_idle_statedata {
 	u8 valid;
 };
 
+static struct omap4_idle_statedata omap4_idle_data[] = {
+	/* C1 - CPU0 ON + CPU1 ON + MPU ON */
+	{
+		.cpu_state = PWRDM_POWER_ON,
+		.mpu_state = PWRDM_POWER_ON,
+	},
+	/* C2 - CPU0 OFF + CPU1 OFF + MPU CSWR */
+	{
+		.cpu_state = PWRDM_POWER_OFF,
+		.mpu_state = PWRDM_POWER_CSWR,
+	},
+	/* C3 - CPU0 OFF + CPU1 OFF + MPU OSWR */
+	{
+		.cpu_state = PWRDM_POWER_OFF,
+		.mpu_state = PWRDM_POWER_OSWR,
+	},
+};
 
-#define OMAP4_NUM_STATES 3
-
-static struct omap4_idle_statedata omap4_idle_data[OMAP4_NUM_STATES];
 static struct powerdomain *mpu_pd, *cpu_pd[NR_CPUS];
 static struct clockdomain *cpu_clkdm[NR_CPUS];
 
@@ -65,8 +79,7 @@ static int omap4_enter_idle_coupled(struct cpuidle_device *dev,
 			struct cpuidle_driver *drv,
 			int index)
 {
-	struct omap4_idle_statedata *cx =
-			cpuidle_get_statedata(&dev->states_usage[index]);
+	struct omap4_idle_statedata *cx = &omap4_idle_data[index];
 	int cpu_id = smp_processor_id();
 
 	local_fiq_disable();
@@ -184,21 +197,9 @@ static struct cpuidle_driver omap4_idle_driver = {
 			.disable = 0,
 		},
 	},
-	.state_count = OMAP4_NUM_STATES,
+	.state_count = ARRAY_SIZE(omap4_idle_data),
 	.safe_state_index = 0,
 };
-
-static inline struct omap4_idle_statedata *_fill_cstate_usage(
-					struct cpuidle_device *dev,
-					int idx)
-{
-	struct omap4_idle_statedata *cx = &omap4_idle_data[idx];
-	struct cpuidle_state_usage *state_usage = &dev->states_usage[idx];
-
-	cpuidle_set_statedata(state_usage, cx);
-
-	return cx;
-}
 
 /**
  * omap4_idle_init - Init routine for OMAP4 idle
@@ -208,7 +209,6 @@ static inline struct omap4_idle_statedata *_fill_cstate_usage(
  */
 int __init omap4_idle_init(void)
 {
-	struct omap4_idle_statedata *cx;
 	struct cpuidle_device *dev;
 	int res;
 	unsigned int cpu_id = 0;
@@ -233,27 +233,7 @@ int __init omap4_idle_init(void)
 	for_each_cpu(cpu_id, cpu_online_mask) {
 		dev = &per_cpu(omap4_idle_dev, cpu_id);
 		dev->cpu = cpu_id;
-		dev->state_count = 0;
 		dev->coupled_cpus = *cpu_online_mask;
-
-		/* C1 - CPU0 ON + CPU1 ON + MPU ON */
-		cx = _fill_cstate_usage(dev, 0);
-		cx->valid = 1;	/* C1 is always valid */
-		cx->cpu_state = PWRDM_POWER_ON;
-		cx->mpu_state = PWRDM_POWER_ON;
-		dev->state_count++;
-
-		/* C2 - CPU0 OFF + CPU1 OFF + MPU CSWR */
-		cx = _fill_cstate_usage(dev, 1);
-		cx->cpu_state = PWRDM_POWER_OFF;
-		cx->mpu_state = PWRDM_POWER_CSWR;
-		dev->state_count++;
-
-		/* C3 - CPU0 OFF + CPU1 OFF + MPU OSWR */
-		cx = _fill_cstate_usage(dev, 2);
-		cx->cpu_state = PWRDM_POWER_OFF;
-		cx->mpu_state = PWRDM_POWER_OSWR;
-		dev->state_count++;
 
 		clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ON, &cpu_id);
 
