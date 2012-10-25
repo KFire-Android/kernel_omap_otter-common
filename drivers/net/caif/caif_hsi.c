@@ -6,10 +6,11 @@
  * License terms: GNU General Public License (GPL) version 2.
  */
 
+#define pr_fmt(fmt) KBUILD_MODNAME fmt
+
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/device.h>
-#include <linux/platform_device.h>
 #include <linux/netdevice.h>
 #include <linux/string.h>
 #include <linux/list.h>
@@ -18,7 +19,9 @@
 #include <linux/sched.h>
 #include <linux/if_arp.h>
 #include <linux/timer.h>
-#include <linux/rtnetlink.h>
+#include <net/rtnetlink.h>
+#include <asm/unaligned.h>
+#include <linux/pkt_sched.h>
 #include <net/caif/caif_layer.h>
 #include <net/caif/caif_hsi.h>
 
@@ -30,60 +33,126 @@ MODULE_DESCRIPTION("CAIF HSI driver");
 #define PAD_POW2(x, pow) ((((x)&((pow)-1)) == 0) ? 0 :\
 				(((pow)-((x)&((pow)-1)))))
 
-static int inactivity_timeout = 1000;
-module_param(inactivity_timeout, int, S_IRUGO | S_IWUSR);
-MODULE_PARM_DESC(inactivity_timeout, "Inactivity timeout on HSI, ms.");
+static const struct cfhsi_config  hsi_default_config = {
 
-/*
- * HSI padding options.
- * Warning: must be a base of 2 (& operation used) and can not be zero !
- */
-static int hsi_head_align = 4;
-module_param(hsi_head_align, int, S_IRUGO);
-MODULE_PARM_DESC(hsi_head_align, "HSI head alignment.");
+	/* Inactivity timeout on HSI, ms */
+	.inactivity_timeout = HZ,
 
-static int hsi_tail_align = 4;
-module_param(hsi_tail_align, int, S_IRUGO);
-MODULE_PARM_DESC(hsi_tail_align, "HSI tail alignment.");
+	/* Aggregation timeout (ms) of zero means no aggregation is done*/
+	.aggregation_timeout = 1,
 
-/*
- * HSI link layer flowcontrol thresholds.
- * Warning: A high threshold value migth increase throughput but it will at
- * the same time prevent channel prioritization and increase the risk of
- * flooding the modem. The high threshold should be above the low.
- */
-static int hsi_high_threshold = 100;
-module_param(hsi_high_threshold, int, S_IRUGO);
-MODULE_PARM_DESC(hsi_high_threshold, "HSI high threshold (FLOW OFF).");
+	/*
+	 * HSI link layer flow-control thresholds.
+	 * Threshold values for the HSI packet queue. Flow-control will be
+	 * asserted when the number of packets exceeds q_high_mark. It will
+	 * not be de-asserted before the number of packets drops below
+	 * q_low_mark.
+	 * Warning: A high threshold value might increase throughput but it
+	 * will at the same time prevent channel prioritization and increase
+	 * the risk of flooding the modem. The high threshold should be above
+	 * the low.
+	 */
+	.q_high_mark = 100,
+	.q_low_mark = 50,
 
-static int hsi_low_threshold = 50;
-module_param(hsi_low_threshold, int, S_IRUGO);
-MODULE_PARM_DESC(hsi_low_threshold, "HSI high threshold (FLOW ON).");
+	/*
+	 * HSI padding options.
+	 * Warning: must be a base of 2 (& operation used) and can not be zero !
+	 */
+	.head_align = 4,
+	.tail_align = 4,
+
+	/* HSI Dynamic speed change enabled for RX/TX */
+	.tx_dyn_speed_change = 0,
+	.rx_dyn_speed_change = 0,
+
+	.change_hsi_clock = 0,
+};
+
+/* Parameters which may be converted to module params */
+static int dfs_Q1 = DYN_SPEED_QUEUE_FILL_Q1;
+static int dfs_F1 = DYN_SPEED_FILL_GRADE_F1;
+static int dfs_F2 = DYN_SPEED_FILL_GRADE_F2;
+static int dfs_N = DYN_SPEED_FILL_GRADE_N;
+static int dfs_T1_fb = DYN_SPEED_T1_FB_VALUE;
+static int dfs_T1_ff = DYN_SPEED_T1_FF_VALUE;
+static int dfs_T2 = DYN_SPEED_T2_VALUE;
+static int dfs_T3 = DYN_SPEED_T3_TP_INTERVAL;
 
 #define ON 1
 #define OFF 0
 
-/*
- * Threshold values for the HSI packet queue. Flowcontrol will be asserted
- * when the number of packets exceeds HIGH_WATER_MARK. It will not be
- * de-asserted before the number of packets drops below LOW_WATER_MARK.
- */
-#define LOW_WATER_MARK   hsi_low_threshold
-#define HIGH_WATER_MARK  hsi_high_threshold
-
 static LIST_HEAD(cfhsi_list);
-static spinlock_t cfhsi_list_lock;
 
 static void cfhsi_inactivity_tout(unsigned long arg)
 {
 	struct cfhsi *cfhsi = (struct cfhsi *)arg;
 
-	dev_dbg(&cfhsi->ndev->dev, "%s.\n",
+	netdev_dbg(cfhsi->ndev, "%s.\n",
 		__func__);
 
 	/* Schedule power down work queue. */
 	if (!test_bit(CFHSI_SHUTDOWN, &cfhsi->bits))
 		queue_work(cfhsi->wq, &cfhsi->wake_down_work);
+}
+
+static void cfhsi_update_aggregation_stats(struct cfhsi *cfhsi,
+					   const struct sk_buff *skb,
+					   int direction)
+{
+	struct caif_payload_info *info;
+	int hpad, tpad, len;
+
+	info = (struct caif_payload_info *)&skb->cb;
+	hpad = 1 + PAD_POW2((info->hdr_len + 1), cfhsi->cfg.head_align);
+	tpad = PAD_POW2((skb->len + hpad), cfhsi->cfg.tail_align);
+	len = skb->len + hpad + tpad;
+
+	if (direction > 0)
+		cfhsi->aggregation_len += len;
+	else if (direction < 0)
+		cfhsi->aggregation_len -= len;
+}
+
+static bool cfhsi_can_send_aggregate(struct cfhsi *cfhsi)
+{
+	int i;
+
+	if (cfhsi->cfg.aggregation_timeout == 0)
+		return true;
+
+	for (i = 0; i < CFHSI_PRIO_BEBK; ++i) {
+		if (cfhsi->qhead[i].qlen)
+			return true;
+	}
+
+	/* TODO: Use aggregation_len instead */
+	if (cfhsi->qhead[CFHSI_PRIO_BEBK].qlen >= CFHSI_MAX_PKTS)
+		return true;
+
+	return false;
+}
+
+static struct sk_buff *cfhsi_dequeue(struct cfhsi *cfhsi)
+{
+	struct sk_buff *skb;
+	int i;
+
+	for (i = 0; i < CFHSI_PRIO_LAST; ++i) {
+		skb = skb_dequeue(&cfhsi->qhead[i]);
+		if (skb)
+			break;
+	}
+
+	return skb;
+}
+
+static int cfhsi_tx_queue_len(struct cfhsi *cfhsi)
+{
+	int i, len = 0;
+	for (i = 0; i < CFHSI_PRIO_LAST; ++i)
+		len += skb_queue_len(&cfhsi->qhead[i]);
+	return len;
 }
 
 static void cfhsi_abort_tx(struct cfhsi *cfhsi)
@@ -92,20 +161,420 @@ static void cfhsi_abort_tx(struct cfhsi *cfhsi)
 
 	for (;;) {
 		spin_lock_bh(&cfhsi->lock);
-		skb = skb_dequeue(&cfhsi->qhead);
+		skb = cfhsi_dequeue(cfhsi);
 		if (!skb)
 			break;
 
 		cfhsi->ndev->stats.tx_errors++;
 		cfhsi->ndev->stats.tx_dropped++;
+		cfhsi_update_aggregation_stats(cfhsi, skb, -1);
 		spin_unlock_bh(&cfhsi->lock);
 		kfree_skb(skb);
 	}
 	cfhsi->tx_state = CFHSI_TX_STATE_IDLE;
 	if (!test_bit(CFHSI_SHUTDOWN, &cfhsi->bits))
-		mod_timer(&cfhsi->timer,
-			jiffies + cfhsi->inactivity_timeout);
+		mod_timer(&cfhsi->inactivity_timer,
+			jiffies + cfhsi->cfg.inactivity_timeout);
 	spin_unlock_bh(&cfhsi->lock);
+}
+
+static void cfhsi_send_speed_request(struct cfhsi *cfhsi, u32 new_speed)
+{
+	struct cfhsi_desc *desc = NULL;
+	int len;
+	int i = 0;
+	int res;
+	u16 *plen = NULL;
+
+	desc = (struct cfhsi_desc *)cfhsi->dyn_speed.tx_com_buf;
+
+	dev_dbg(&cfhsi->ndev->dev, "caif_hsi: enter send_speed_request(), new speed=%d\n",
+		new_speed);
+
+	desc->header = 0;
+	desc->header = CFHSI_PROT_SPEED_CHANGE_DESC | CFHSI_COM_BIT_DESC;
+	desc->offset = 0;
+
+	plen = desc->cffrm_len;
+	for (i = 0; i < CFHSI_MAX_PKTS; i++) {
+		*plen = 0;
+		plen++;
+	}
+
+	desc->emb_frm[0] = CFHSI_COM_REQUEST_SPEED_DESC;
+
+	put_unaligned_le32(new_speed, &desc->emb_frm[1]);
+
+	for (i = 5; i < CFHSI_MAX_EMB_FRM_SZ; i++)
+		desc->emb_frm[i] = 0;
+
+	dev_dbg(&cfhsi->ndev->dev, "caif_hsi: send new speed=%x %x %x %x\n",
+		desc->emb_frm[1], desc->emb_frm[2],
+		desc->emb_frm[3], desc->emb_frm[4]);
+
+	len = CFHSI_DESC_SZ;
+
+	res = cfhsi->ops->cfhsi_tx(cfhsi->dyn_speed.tx_com_buf,
+				   len, cfhsi->ops);
+	if (WARN_ON(res < 0)) {
+		dev_err(&cfhsi->ndev->dev, "%s: TX error %d.\n",
+			__func__, res);
+		cfhsi_abort_tx(cfhsi);
+	}
+	/* DYN_SPEED_T2_VALUE in millisecond */
+	cfhsi->dyn_speed.T2_time_stamp =
+		jiffies + cfhsi->dyn_speed.T2_time_factor;
+}
+
+static void cfhsi_build_acknack(struct cfhsi *cfhsi,
+				struct cfhsi_desc *desc,
+				bool send_ack)
+{
+	int i;
+	u16 *plen = NULL;
+
+	dev_dbg(&cfhsi->ndev->dev, "caif_hsi: enter build_acknack()\n");
+
+	desc->header = 0;
+	desc->header = CFHSI_PROT_SPEED_CHANGE_DESC | CFHSI_COM_BIT_DESC;
+	desc->offset = 0;
+	plen = desc->cffrm_len;
+
+	for (i = 0; i < CFHSI_MAX_PKTS; i++) {
+		*plen = 0;
+		plen++;
+	}
+
+	if (send_ack)
+		desc->emb_frm[0] = CFHSI_COM_ACK_SPEED_DESC;
+	else
+		desc->emb_frm[0] = CFHSI_COM_NACK_SPEED_DESC;
+
+	for (i = 1; i < CFHSI_MAX_EMB_FRM_SZ; i++)
+		desc->emb_frm[i] = 0;
+}
+
+static void cfhsi_send_acknack(struct cfhsi *cfhsi, bool send_ack)
+{
+	struct cfhsi_desc *desc = NULL;
+	int len;
+	int res;
+
+	desc = (struct cfhsi_desc *)cfhsi->dyn_speed.tx_com_buf;
+
+	dev_dbg(&cfhsi->ndev->dev, "caif_hsi: enter send_acknack()\n");
+
+	cfhsi_build_acknack(cfhsi, desc, send_ack);
+
+	len = CFHSI_DESC_SZ;
+
+	res = cfhsi->ops->cfhsi_tx(cfhsi->dyn_speed.tx_com_buf,
+				   len, cfhsi->ops);
+	if (WARN_ON(res < 0)) {
+		dev_err(&cfhsi->ndev->dev, "%s: TX error %d.\n",
+			__func__, res);
+		cfhsi_abort_tx(cfhsi);
+	}
+}
+
+static void cfhsi_start_throughput_measurement(struct dynamic_speed *dfs_p)
+{
+	dfs_p->uplink_data_counter = 0;
+	dfs_p->throughput_data_valid = false;
+	dfs_p->throughput_msg_ongoing = true;
+	dfs_p->data_count_timestamp = jiffies + dfs_p->throughput_time_factor;
+	return;
+}
+
+static void cfhsi_reset_throughput_measurement(struct dynamic_speed *dfs_p)
+{
+	dfs_p->uplink_data_counter = 0;
+	dfs_p->throughput_data_valid = false;
+	dfs_p->throughput_msg_ongoing = false;
+	dfs_p->data_count_timestamp = 0;
+	return;
+}
+
+static void cfhsi_measure_throughput(struct cfhsi *cfhsi, int len)
+{
+	if (cfhsi->dyn_speed.throughput_msg_ongoing) {
+		cfhsi->dyn_speed.uplink_data_counter += len;
+		if (time_before(jiffies, cfhsi->dyn_speed.data_count_timestamp))
+			return;
+
+		cfhsi->dyn_speed.throughput_msg_ongoing = false;
+		cfhsi->dyn_speed.throughput_data_valid = true;
+	}
+}
+
+static void cfhsi_process_speed_command(struct cfhsi *cfhsi,
+					struct cfhsi_desc *desc)
+{
+	u32 requested_speed = 0;
+	struct dynamic_speed *dfs_p = &cfhsi->dyn_speed;
+	struct cfhsi_ops *dev_p = cfhsi->ops;
+	int timer_active;
+	bool send_ack;
+
+	dev_dbg(&cfhsi->ndev->dev, "caif_hsi: enter %s\n", __func__);
+
+	switch (desc->emb_frm[0]) {
+	case CFHSI_COM_ACK_SPEED_DESC:
+		if (!dfs_p->negotiation_in_progress) {
+			dev_err(&cfhsi->ndev->dev, "%s: Received ACK in wrong state\n",
+				__func__);
+			return;
+		}
+		/* Is this ACK for fallforward?*/
+
+		dev_dbg(&cfhsi->ndev->dev, "%s: Received ACK\n",
+			__func__);
+
+		if (dfs_p->tx_speed <
+		    dfs_p->tx_next_speed) {
+			dev_p->cfhsi_change_tx_speed(dev_p,
+					  CFHSI_DYN_SPEED_GO_UP,
+					  &dfs_p->tx_speed,
+					  &dfs_p->tx_speed_level);
+		}
+		cfhsi_reset_throughput_measurement(dfs_p);
+		dfs_p->fb_state = FB_CHECK_QUEUE_LEVEL;
+		dfs_p->tx_next_speed = dfs_p->tx_speed;
+		dfs_p->negotiation_in_progress = false;
+		break;
+	case CFHSI_COM_NACK_SPEED_DESC:
+		if (!dfs_p->negotiation_in_progress) {
+			dev_err(&cfhsi->ndev->dev, "%s: Received ACK in wrong state\n",
+				__func__);
+			return;
+		}
+
+		dev_dbg(&cfhsi->ndev->dev, "%s: Received NACK\n",
+			__func__);
+
+		if (dfs_p->tx_speed < dfs_p->tx_next_speed) {
+			dfs_p->T1_ff_time_stamp = jiffies +
+				DYN_SPEED_DISABLED_AFTER_NACK_VALUE*HZ;
+		} else {
+			dev_p->cfhsi_change_tx_speed(dev_p,
+				    CFHSI_DYN_SPEED_GO_UP,
+				    &dfs_p->tx_speed,
+				    &dfs_p->tx_speed_level);
+			dfs_p->T1_fb_time_stamp = jiffies +
+				DYN_SPEED_DISABLED_AFTER_NACK_VALUE*HZ;
+		}
+		dfs_p->tx_next_speed = dfs_p->tx_speed;
+		dfs_p->negotiation_in_progress = false;
+		break;
+	case CFHSI_COM_REQUEST_SPEED_DESC:
+		requested_speed = get_unaligned_le32(&desc->emb_frm[1]);
+
+		/* The receiver will change speed/frequency for 2 reasons:
+		 * 1) If the requested speed is higher than current speed
+		 * 2) For a requested lower speed,
+		 *    a lower frequency may be needed to save power.
+		 *    If an invalid speed (ex. too high) is requested,
+		 *    the function shall return error (<0)
+		 */
+
+		requested_speed = requested_speed/1000000;
+
+		dev_dbg(&cfhsi->ndev->dev, "%s: Speed change request received, Requested Speed=%d\n",
+			__func__, requested_speed);
+
+		spin_lock_bh(&cfhsi->lock);
+		/* Delete inactivity timer if started. */
+		timer_active = del_timer_sync(&cfhsi->inactivity_timer);
+
+		send_ack = true;
+		if (cfhsi->cfg.rx_dyn_speed_change &&
+		    (dev_p->cfhsi_change_rx_speed(dev_p, requested_speed) < 0))
+			send_ack = false; /* Send NACK */
+
+		if (timer_active && (cfhsi->tx_state == CFHSI_TX_STATE_IDLE)) {
+			cfhsi->tx_state = CFHSI_TX_STATE_XFER;
+			cfhsi_send_acknack(cfhsi, send_ack);
+			dev_dbg(&cfhsi->ndev->dev, "%s: Send ACK-NACK\n",
+				__func__);
+			spin_unlock_bh(&cfhsi->lock);
+			break;
+		} else {
+			/* Delay ACK-NACK response until tx is available */
+			if (send_ack)
+				dfs_p->acknack_response
+					= CFHSI_DYN_SPEED_SEND_ACK;
+			else
+				dfs_p->acknack_response
+					= CFHSI_DYN_SPEED_SEND_NACK;
+		}
+
+		if (!timer_active) {
+			dev_dbg(&cfhsi->ndev->dev,
+				"Race condition: Wake-down vs rec. of speed change\n");
+			/*
+			 * We are in wake down
+			 * ACK-NACK will be sent after wake-up
+			 * Schedule wake up work queue if the peer initiates.
+			 */
+			if (!test_and_set_bit(CFHSI_WAKE_UP, &cfhsi->bits)) {
+				cfhsi_wakelock_lock(cfhsi);
+				queue_work(cfhsi->wq, &cfhsi->wake_up_work);
+			}
+		}
+		spin_unlock_bh(&cfhsi->lock);
+		break;
+	default:
+		dev_err(&cfhsi->ndev->dev, "%s: Unknown speed command received\n",
+			__func__);
+		break;
+	}
+
+	return;
+}
+
+static bool cfhsi_check_tx_speed_change(struct cfhsi *cfhsi)
+{
+	bool retval = false;
+	struct dynamic_speed *dfs_p = &cfhsi->dyn_speed;
+	struct cfhsi_ops *dev_p = cfhsi->ops;
+	u32 qlen, qlen_limit;
+	u32 tmp_fb_level = 0;
+
+	if (!cfhsi->cfg.tx_dyn_speed_change || dfs_p->negotiation_in_progress)
+		return retval;
+
+	if (dfs_p->T2_time_stamp != 0) {
+		if (time_before(jiffies, dfs_p->T2_time_stamp))
+			return retval;
+		dfs_p->T2_time_stamp = 0;
+	}
+
+	if (dfs_p->T1_ff_time_stamp != 0 &&
+	    time_after_eq(jiffies, dfs_p->T1_ff_time_stamp))
+		/* Fallforward disabled timeout, one may try again */
+			dfs_p->T1_ff_time_stamp = 0;
+
+	qlen = cfhsi_tx_queue_len(cfhsi);
+
+	/* Check for fallforward if speed level is below HIGH */
+	if (dfs_p->tx_speed_level < CFHSI_DYN_SPEED_HIGH &&
+	    dfs_p->T1_ff_time_stamp == 0) {
+		/*
+		 * If (tx queue is higher than Q1 (ex. 20 packets)) OR
+		 * ((fill-grade is higher than F2 (ex. 5 packets) AND
+		 * (N (ex 2) times higher than at last transfer)),
+		 * go to max speed
+		 */
+
+		qlen_limit = qlen;
+		if ((qlen > 0) &&
+		    (dfs_p->prev_fill_grade > 0) &&
+		    (qlen > dfs_p->prev_fill_grade)) {
+			qlen_limit = dfs_N * dfs_p->prev_fill_grade;
+		}
+		dfs_p->prev_fill_grade = qlen;
+
+		if (qlen >= dfs_Q1 ||
+		    (qlen >= dfs_F2 && qlen > qlen_limit)) {
+
+			dev_p->cfhsi_get_next_tx_speed(dev_p,
+						       CFHSI_DYN_SPEED_GO_UP,
+						       &dfs_p->tx_next_speed);
+
+			dev_dbg(&cfhsi->ndev->dev, "%s: Try to Fallforward, to speed=%d\n",
+				__func__, dfs_p->tx_next_speed);
+
+			cfhsi->tx_state = CFHSI_TX_STATE_XFER;
+			cfhsi_send_speed_request(cfhsi,
+						 dfs_p->tx_next_speed *
+						 1000000);
+
+			dfs_p->T1_ff_time_stamp = jiffies +
+				dfs_p->T1_ff_time_factor;
+
+			dfs_p->negotiation_in_progress = true;
+			retval = true;
+
+			return retval;
+		}
+	}
+
+	if (dfs_p->T1_fb_time_stamp != 0) {
+		if (time_before(jiffies, dfs_p->T1_fb_time_stamp))
+			return retval;
+
+		/* Fallback disabled timeout, one may try again */
+		dfs_p->T1_fb_time_stamp = 0;
+	}
+
+	switch (dfs_p->fb_state) {
+	case FB_CHECK_QUEUE_LEVEL:
+		/* Check for fallback if speed level is above LOW */
+		if (dfs_p->tx_speed_level > CFHSI_DYN_SPEED_LOW &&
+		    qlen <= dfs_F1) {
+
+			cfhsi_start_throughput_measurement(dfs_p);
+			dfs_p->fb_state = FB_THROUGHPUT_MEASUREMENT;
+		}
+		break;
+	case FB_THROUGHPUT_MEASUREMENT:
+
+		/* Check for fallback if speed level is above LOW */
+
+		if (!dfs_p->throughput_data_valid)
+			return false;
+
+		tmp_fb_level = dfs_p->tx_speed * DYN_SPEED_TP_FB_FACTOR;
+
+		if ((dfs_p->uplink_data_counter < tmp_fb_level) &&
+		    (qlen <= dfs_F1)) {
+			dev_p->cfhsi_change_tx_speed(dev_p,
+						     CFHSI_DYN_SPEED_GO_DOWN,
+						     &dfs_p->tx_speed,
+						     &dfs_p->tx_speed_level);
+			dfs_p->tx_next_speed =
+				dfs_p->tx_speed;
+
+			dev_dbg(&cfhsi->ndev->dev, "%s: Try to Fallback, to speed=%d\n",
+				__func__, dfs_p->tx_speed);
+
+			cfhsi->tx_state = CFHSI_TX_STATE_XFER;
+			cfhsi_send_speed_request(cfhsi,
+						 dfs_p->tx_speed * 1000000);
+			dfs_p->negotiation_in_progress = true;
+			retval = true;
+		}
+		cfhsi_reset_throughput_measurement(dfs_p);
+		dfs_p->T1_fb_time_stamp = jiffies +
+			dfs_p->T1_fb_time_factor;
+		dfs_p->fb_state = FB_CHECK_QUEUE_LEVEL;
+		break;
+	default:
+		dev_err(&cfhsi->ndev->dev, "%s: Invalid fb_state=%d\n",
+				__func__, dfs_p->fb_state);
+		break;
+	}
+	return retval;
+}
+
+static int cfhsi_start_dyn_speed(struct cfhsi *cfhsi)
+{
+	int res = 0;
+	struct dynamic_speed *dfs_p = &cfhsi->dyn_speed;
+
+	dev_dbg(&cfhsi->ndev->dev, "caif_hsi: enter %s\n", __func__);
+
+	dfs_p->tx_com_buf = kzalloc(CFHSI_DESC_SZ, GFP_KERNEL);
+	if (!dfs_p->tx_com_buf)
+		res = -ENODEV;
+
+	dfs_p->T1_fb_time_factor = (dfs_T1_fb*HZ)/1000;
+	dfs_p->T1_ff_time_factor = (dfs_T1_ff*HZ)/1000;
+	dfs_p->T2_time_factor = (dfs_T2*HZ)/1000;
+	dfs_p->throughput_time_factor = (dfs_T3*HZ)/1000;
+	cfhsi_reset_throughput_measurement(dfs_p);
+	dfs_p->fb_state = FB_CHECK_QUEUE_LEVEL;
+	return res;
 }
 
 static int cfhsi_flush_fifo(struct cfhsi *cfhsi)
@@ -114,14 +583,14 @@ static int cfhsi_flush_fifo(struct cfhsi *cfhsi)
 	size_t fifo_occupancy;
 	int ret;
 
-	dev_dbg(&cfhsi->ndev->dev, "%s.\n",
+	netdev_dbg(cfhsi->ndev, "%s.\n",
 		__func__);
 
 	do {
-		ret = cfhsi->dev->cfhsi_fifo_occupancy(cfhsi->dev,
+		ret = cfhsi->ops->cfhsi_fifo_occupancy(cfhsi->ops,
 				&fifo_occupancy);
 		if (ret) {
-			dev_warn(&cfhsi->ndev->dev,
+			netdev_warn(cfhsi->ndev,
 				"%s: can't get FIFO occupancy: %d.\n",
 				__func__, ret);
 			break;
@@ -131,11 +600,11 @@ static int cfhsi_flush_fifo(struct cfhsi *cfhsi)
 
 		fifo_occupancy = min(sizeof(buffer), fifo_occupancy);
 		set_bit(CFHSI_FLUSH_FIFO, &cfhsi->bits);
-		ret = cfhsi->dev->cfhsi_rx(buffer, fifo_occupancy,
-				cfhsi->dev);
+		ret = cfhsi->ops->cfhsi_rx(buffer, fifo_occupancy,
+				cfhsi->ops);
 		if (ret) {
 			clear_bit(CFHSI_FLUSH_FIFO, &cfhsi->bits);
-			dev_warn(&cfhsi->ndev->dev,
+			netdev_warn(cfhsi->ndev,
 				"%s: can't read data: %d.\n",
 				__func__, ret);
 			break;
@@ -146,13 +615,13 @@ static int cfhsi_flush_fifo(struct cfhsi *cfhsi)
 			 !test_bit(CFHSI_FLUSH_FIFO, &cfhsi->bits), ret);
 
 		if (ret < 0) {
-			dev_warn(&cfhsi->ndev->dev,
+			netdev_warn(cfhsi->ndev,
 				"%s: can't wait for flush complete: %d.\n",
 				__func__, ret);
 			break;
 		} else if (!ret) {
 			ret = -ETIMEDOUT;
-			dev_warn(&cfhsi->ndev->dev,
+			netdev_warn(cfhsi->ndev,
 				"%s: timeout waiting for flush complete.\n",
 				__func__);
 			break;
@@ -169,24 +638,46 @@ static int cfhsi_tx_frm(struct cfhsi_desc *desc, struct cfhsi *cfhsi)
 	struct sk_buff *skb;
 	u8 *pfrm = desc->emb_frm + CFHSI_MAX_EMB_FRM_SZ;
 
-	skb = skb_dequeue(&cfhsi->qhead);
+	/* First check if there are any pending ACK or NACK
+	 * (after received speed change request) to be sent
+	 */
+	if (cfhsi->dyn_speed.acknack_response != CFHSI_DYN_SPEED_NO_RESPONSE) {
+		if (cfhsi->dyn_speed.acknack_response ==
+		    CFHSI_DYN_SPEED_SEND_ACK) {
+			cfhsi_build_acknack(cfhsi, desc, true);
+			dev_dbg(&cfhsi->ndev->dev, "%s: Send ACK\n",
+				__func__);
+		} else {
+			cfhsi_build_acknack(cfhsi, desc, false);
+			dev_dbg(&cfhsi->ndev->dev, "%s: Send NACK\n",
+				__func__);
+		}
+		spin_lock_bh(&cfhsi->lock);
+		cfhsi->dyn_speed.acknack_response = CFHSI_DYN_SPEED_NO_RESPONSE;
+		spin_unlock_bh(&cfhsi->lock);
+
+		return CFHSI_DESC_SZ;
+	}
+
+	skb = cfhsi_dequeue(cfhsi);
 	if (!skb)
 		return 0;
 
-	/* Clear offset. */
+	/* Clear header and offset. */
+	desc->header = 0;
 	desc->offset = 0;
 
 	/* Check if we can embed a CAIF frame. */
 	if (skb->len < CFHSI_MAX_EMB_FRM_SZ) {
 		struct caif_payload_info *info;
-		int hpad = 0;
-		int tpad = 0;
+		int hpad;
+		int tpad;
 
 		/* Calculate needed head alignment and tail alignment. */
 		info = (struct caif_payload_info *)&skb->cb;
 
-		hpad = 1 + PAD_POW2((info->hdr_len + 1), hsi_head_align);
-		tpad = PAD_POW2((skb->len + hpad), hsi_tail_align);
+		hpad = 1 + PAD_POW2((info->hdr_len + 1), cfhsi->cfg.head_align);
+		tpad = PAD_POW2((skb->len + hpad), cfhsi->cfg.tail_align);
 
 		/* Check if frame still fits with added alignment. */
 		if ((skb->len + hpad + tpad) <= CFHSI_MAX_EMB_FRM_SZ) {
@@ -196,11 +687,16 @@ static int cfhsi_tx_frm(struct cfhsi_desc *desc, struct cfhsi *cfhsi)
 			pemb += hpad;
 
 			/* Update network statistics. */
+			spin_lock_bh(&cfhsi->lock);
 			cfhsi->ndev->stats.tx_packets++;
 			cfhsi->ndev->stats.tx_bytes += skb->len;
+			cfhsi_update_aggregation_stats(cfhsi, skb, -1);
+			spin_unlock_bh(&cfhsi->lock);
 
 			/* Copy in embedded CAIF frame. */
 			skb_copy_bits(skb, 0, pemb, skb->len);
+
+			/* Consume the SKB */
 			consume_skb(skb);
 			skb = NULL;
 		}
@@ -210,11 +706,11 @@ static int cfhsi_tx_frm(struct cfhsi_desc *desc, struct cfhsi *cfhsi)
 	pfrm = desc->emb_frm + CFHSI_MAX_EMB_FRM_SZ;
 	while (nfrms < CFHSI_MAX_PKTS) {
 		struct caif_payload_info *info;
-		int hpad = 0;
-		int tpad = 0;
+		int hpad;
+		int tpad;
 
 		if (!skb)
-			skb = skb_dequeue(&cfhsi->qhead);
+			skb = cfhsi_dequeue(cfhsi);
 
 		if (!skb)
 			break;
@@ -222,8 +718,8 @@ static int cfhsi_tx_frm(struct cfhsi_desc *desc, struct cfhsi *cfhsi)
 		/* Calculate needed head alignment and tail alignment. */
 		info = (struct caif_payload_info *)&skb->cb;
 
-		hpad = 1 + PAD_POW2((info->hdr_len + 1), hsi_head_align);
-		tpad = PAD_POW2((skb->len + hpad), hsi_tail_align);
+		hpad = 1 + PAD_POW2((info->hdr_len + 1), cfhsi->cfg.head_align);
+		tpad = PAD_POW2((skb->len + hpad), cfhsi->cfg.tail_align);
 
 		/* Fill in CAIF frame length in descriptor. */
 		desc->cffrm_len[nfrms] = hpad + skb->len + tpad;
@@ -233,8 +729,11 @@ static int cfhsi_tx_frm(struct cfhsi_desc *desc, struct cfhsi *cfhsi)
 		pfrm += hpad;
 
 		/* Update network statistics. */
+		spin_lock_bh(&cfhsi->lock);
 		cfhsi->ndev->stats.tx_packets++;
 		cfhsi->ndev->stats.tx_bytes += skb->len;
+		cfhsi_update_aggregation_stats(cfhsi, skb, -1);
+		spin_unlock_bh(&cfhsi->lock);
 
 		/* Copy in CAIF frame. */
 		skb_copy_bits(skb, 0, pfrm, skb->len);
@@ -244,6 +743,8 @@ static int cfhsi_tx_frm(struct cfhsi_desc *desc, struct cfhsi *cfhsi)
 
 		/* Update frame pointer. */
 		pfrm += skb->len + tpad;
+
+		/* Consume the SKB */
 		consume_skb(skb);
 		skb = NULL;
 
@@ -258,8 +759,7 @@ static int cfhsi_tx_frm(struct cfhsi_desc *desc, struct cfhsi *cfhsi)
 	}
 
 	/* Check if we can piggy-back another descriptor. */
-	skb = skb_peek(&cfhsi->qhead);
-	if (skb)
+	if (cfhsi_can_send_aggregate(cfhsi))
 		desc->header |= CFHSI_PIGGY_DESC;
 	else
 		desc->header &= ~CFHSI_PIGGY_DESC;
@@ -267,70 +767,85 @@ static int cfhsi_tx_frm(struct cfhsi_desc *desc, struct cfhsi *cfhsi)
 	return CFHSI_DESC_SZ + pld_len;
 }
 
-static void cfhsi_tx_done(struct cfhsi *cfhsi)
+static void cfhsi_start_tx(struct cfhsi *cfhsi)
 {
-	struct cfhsi_desc *desc = NULL;
-	int len = 0;
-	int res;
+	struct cfhsi_desc *desc = (struct cfhsi_desc *)cfhsi->tx_buf;
+	int len, res;
 
-	dev_dbg(&cfhsi->ndev->dev, "%s.\n", __func__);
+	netdev_dbg(cfhsi->ndev, "%s.\n", __func__);
 
 	if (test_bit(CFHSI_SHUTDOWN, &cfhsi->bits))
 		return;
 
-	desc = (struct cfhsi_desc *)cfhsi->tx_buf;
+	if (cfhsi_check_tx_speed_change(cfhsi))
+		return;
 
 	do {
-		/*
-		 * Send flow on if flow off has been previously signalled
-		 * and number of packets is below low water mark.
-		 */
-		spin_lock_bh(&cfhsi->lock);
-		if (cfhsi->flow_off_sent &&
-				cfhsi->qhead.qlen <= cfhsi->q_low_mark &&
-				cfhsi->cfdev.flowctrl) {
-
-			cfhsi->flow_off_sent = 0;
-			cfhsi->cfdev.flowctrl(cfhsi->ndev, ON);
-		}
-		spin_unlock_bh(&cfhsi->lock);
-
 		/* Create HSI frame. */
-		do {
-			len = cfhsi_tx_frm(desc, cfhsi);
-			if (!len) {
-				spin_lock_bh(&cfhsi->lock);
-				if (unlikely(skb_peek(&cfhsi->qhead))) {
-					spin_unlock_bh(&cfhsi->lock);
-					continue;
-				}
-				cfhsi->tx_state = CFHSI_TX_STATE_IDLE;
-				/* Start inactivity timer. */
-				mod_timer(&cfhsi->timer,
-					jiffies + cfhsi->inactivity_timeout);
+		len = cfhsi_tx_frm(desc, cfhsi);
+		if (!len) {
+			spin_lock_bh(&cfhsi->lock);
+			if (unlikely(cfhsi_tx_queue_len(cfhsi))) {
 				spin_unlock_bh(&cfhsi->lock);
-				goto done;
+				res = -EAGAIN;
+				continue;
 			}
-		} while (!len);
+			cfhsi->tx_state = CFHSI_TX_STATE_IDLE;
+			/* Start inactivity timer. */
+			mod_timer(&cfhsi->inactivity_timer,
+				jiffies + cfhsi->cfg.inactivity_timeout);
+			spin_unlock_bh(&cfhsi->lock);
+			break;
+		}
 
 		/* Set up new transfer. */
-		res = cfhsi->dev->cfhsi_tx(cfhsi->tx_buf, len, cfhsi->dev);
-		if (WARN_ON(res < 0)) {
-			dev_err(&cfhsi->ndev->dev, "%s: TX error %d.\n",
-				__func__, res);
-		}
-	} while (res < 0);
+		cfhsi_measure_throughput(cfhsi, len);
 
-done:
+		res = cfhsi->ops->cfhsi_tx(cfhsi->tx_buf, len, cfhsi->ops);
+		if (WARN_ON(res < 0))
+			netdev_err(cfhsi->ndev, "%s: TX error %d.\n",
+				__func__, res);
+	} while (res < 0);
+}
+
+static void cfhsi_tx_done(struct cfhsi *cfhsi)
+{
+	netdev_dbg(cfhsi->ndev, "%s.\n", __func__);
+
+	if (test_bit(CFHSI_SHUTDOWN, &cfhsi->bits))
+		return;
+
+	/*
+	 * Send flow on if flow off has been previously signalled
+	 * and number of packets is below low water mark.
+	 */
+	spin_lock_bh(&cfhsi->lock);
+	if (cfhsi->flow_off_sent &&
+			cfhsi_tx_queue_len(cfhsi) <= cfhsi->cfg.q_low_mark &&
+			cfhsi->cfdev.flowctrl) {
+
+		cfhsi->flow_off_sent = 0;
+		cfhsi->cfdev.flowctrl(cfhsi->ndev, ON);
+	}
+
+	if (cfhsi_can_send_aggregate(cfhsi)) {
+		spin_unlock_bh(&cfhsi->lock);
+		cfhsi_start_tx(cfhsi);
+	} else {
+		mod_timer(&cfhsi->aggregation_timer,
+			jiffies + cfhsi->cfg.aggregation_timeout);
+		spin_unlock_bh(&cfhsi->lock);
+	}
+
 	return;
 }
 
-static void cfhsi_tx_done_cb(struct cfhsi_drv *drv)
+static void cfhsi_tx_done_cb(struct cfhsi_cb_ops *cb_ops)
 {
 	struct cfhsi *cfhsi;
 
-	cfhsi = container_of(drv, struct cfhsi, drv);
-	dev_dbg(&cfhsi->ndev->dev, "%s.\n",
+	cfhsi = container_of(cb_ops, struct cfhsi, cb_ops);
+	netdev_dbg(cfhsi->ndev, "%s.\n",
 		__func__);
 
 	if (test_bit(CFHSI_SHUTDOWN, &cfhsi->bits))
@@ -345,9 +860,14 @@ static int cfhsi_rx_desc(struct cfhsi_desc *desc, struct cfhsi *cfhsi)
 	u16 *plen = NULL;
 	u8 *pfrm = NULL;
 
-	if ((desc->header & ~CFHSI_PIGGY_DESC) ||
-			(desc->offset > CFHSI_MAX_EMB_FRM_SZ)) {
-		dev_err(&cfhsi->ndev->dev, "%s: Invalid descriptor.\n",
+	if (desc->header & (CFHSI_PROT_SPEED_CHANGE_DESC | CFHSI_COM_BIT_DESC))
+		return 0;
+
+	if ((desc->header &
+	     ~(CFHSI_PIGGY_DESC |
+	       CFHSI_PROT_SPEED_CHANGE_DESC | CFHSI_COM_BIT_DESC)) ||
+	    (desc->offset > CFHSI_MAX_EMB_FRM_SZ)) {
+		netdev_err(cfhsi->ndev, "%s: Invalid descriptor.\n",
 			__func__);
 		return -EPROTO;
 	}
@@ -357,10 +877,12 @@ static int cfhsi_rx_desc(struct cfhsi_desc *desc, struct cfhsi *cfhsi)
 		struct sk_buff *skb;
 		u8 *dst = NULL;
 		int len = 0;
+		int padding;
 		pfrm = ((u8 *)desc) + desc->offset;
 
 		/* Remove offset padding. */
-		pfrm += *pfrm + 1;
+		padding = *pfrm + 1;
+		pfrm += padding;
 
 		/* Read length of CAIF frame (little endian). */
 		len = *pfrm;
@@ -369,20 +891,21 @@ static int cfhsi_rx_desc(struct cfhsi_desc *desc, struct cfhsi *cfhsi)
 
 		/* Sanity check length of CAIF frame. */
 		if (unlikely(len > CFHSI_MAX_CAIF_FRAME_SZ)) {
-			dev_err(&cfhsi->ndev->dev, "%s: Invalid length.\n",
+			netdev_err(cfhsi->ndev, "%s: Invalid length.\n",
 				__func__);
 			return -EPROTO;
 		}
 
 		/* Allocate SKB (OK even in IRQ context). */
-		skb = alloc_skb(len + 1, GFP_ATOMIC);
+		skb = alloc_skb(len + padding + 1, GFP_ATOMIC);
 		if (!skb) {
-			dev_err(&cfhsi->ndev->dev, "%s: Out of memory !\n",
+			netdev_err(cfhsi->ndev, "%s: Out of memory !\n",
 				__func__);
 			return -ENOMEM;
 		}
 		caif_assert(skb != NULL);
 
+		skb_reserve(skb, padding);
 		dst = skb_put(skb, len);
 		memcpy(dst, pfrm, len);
 
@@ -391,8 +914,8 @@ static int cfhsi_rx_desc(struct cfhsi_desc *desc, struct cfhsi *cfhsi)
 		skb->dev = cfhsi->ndev;
 
 		/*
-		 * We are called from a arch specific platform device.
-		 * Unfortunately we don't know what context we're
+		 * We are in a callback handler and
+		 * unfortunately we don't know what context we're
 		 * running in.
 		 */
 		if (in_interrupt())
@@ -419,7 +942,7 @@ static int cfhsi_rx_desc(struct cfhsi_desc *desc, struct cfhsi *cfhsi)
 		xfer_sz += CFHSI_DESC_SZ;
 
 	if ((xfer_sz % 4) || (xfer_sz > (CFHSI_BUF_SZ_RX - CFHSI_DESC_SZ))) {
-		dev_err(&cfhsi->ndev->dev,
+		netdev_err(cfhsi->ndev,
 				"%s: Invalid payload len: %d, ignored.\n",
 			__func__, xfer_sz);
 		return -EPROTO;
@@ -433,9 +956,10 @@ static int cfhsi_rx_desc_len(struct cfhsi_desc *desc)
 	int nfrms = 0;
 	u16 *plen;
 
-	if ((desc->header & ~CFHSI_PIGGY_DESC) ||
-			(desc->offset > CFHSI_MAX_EMB_FRM_SZ)) {
-
+	if ((desc->header &
+	     ~(CFHSI_PIGGY_DESC |
+	       CFHSI_PROT_SPEED_CHANGE_DESC | CFHSI_COM_BIT_DESC)) ||
+	    (desc->offset > CFHSI_MAX_EMB_FRM_SZ)) {
 		pr_err("Invalid descriptor. %x %x\n", desc->header,
 				desc->offset);
 		return -EPROTO;
@@ -463,10 +987,16 @@ static int cfhsi_rx_pld(struct cfhsi_desc *desc, struct cfhsi *cfhsi)
 	u16 *plen = NULL;
 	u8 *pfrm = NULL;
 
+
+	if (desc->header & (CFHSI_PROT_SPEED_CHANGE_DESC | CFHSI_COM_BIT_DESC))
+		return 0;
+
 	/* Sanity check header and offset. */
-	if (WARN_ON((desc->header & ~CFHSI_PIGGY_DESC) ||
+	if (WARN_ON((desc->header & ~(CFHSI_PIGGY_DESC |
+				      CFHSI_PROT_SPEED_CHANGE_DESC
+				      | CFHSI_COM_BIT_DESC)) ||
 			(desc->offset > CFHSI_MAX_EMB_FRM_SZ))) {
-		dev_err(&cfhsi->ndev->dev, "%s: Invalid descriptor.\n",
+		netdev_err(cfhsi->ndev, "%s: Invalid descriptor.\n",
 			__func__);
 		return -EPROTO;
 	}
@@ -488,10 +1018,12 @@ static int cfhsi_rx_pld(struct cfhsi_desc *desc, struct cfhsi *cfhsi)
 		struct sk_buff *skb;
 		u8 *dst = NULL;
 		u8 *pcffrm = NULL;
-		int len = 0;
+		int len;
+		int padding;
 
 		/* CAIF frame starts after head padding. */
-		pcffrm = pfrm + *pfrm + 1;
+		padding = *pfrm + 1;
+		pcffrm = pfrm + padding;
 
 		/* Read length of CAIF frame (little endian). */
 		len = *pcffrm;
@@ -500,21 +1032,22 @@ static int cfhsi_rx_pld(struct cfhsi_desc *desc, struct cfhsi *cfhsi)
 
 		/* Sanity check length of CAIF frames. */
 		if (unlikely(len > CFHSI_MAX_CAIF_FRAME_SZ)) {
-			dev_err(&cfhsi->ndev->dev, "%s: Invalid length.\n",
+			netdev_err(cfhsi->ndev, "%s: Invalid length.\n",
 				__func__);
 			return -EPROTO;
 		}
 
 		/* Allocate SKB (OK even in IRQ context). */
-		skb = alloc_skb(len + 1, GFP_ATOMIC);
+		skb = alloc_skb(len + padding + 1, GFP_ATOMIC);
 		if (!skb) {
-			dev_err(&cfhsi->ndev->dev, "%s: Out of memory !\n",
+			netdev_err(cfhsi->ndev, "%s: Out of memory !\n",
 				__func__);
 			cfhsi->rx_state.nfrms = nfrms;
 			return -ENOMEM;
 		}
 		caif_assert(skb != NULL);
 
+		skb_reserve(skb, padding);
 		dst = skb_put(skb, len);
 		memcpy(dst, pcffrm, len);
 
@@ -523,7 +1056,7 @@ static int cfhsi_rx_pld(struct cfhsi_desc *desc, struct cfhsi *cfhsi)
 		skb->dev = cfhsi->ndev;
 
 		/*
-		 * We're called from a platform device,
+		 * We're called in callback from HSI
 		 * and don't know the context we're running in.
 		 */
 		if (in_interrupt())
@@ -555,15 +1088,15 @@ static void cfhsi_rx_done(struct cfhsi *cfhsi)
 
 	desc = (struct cfhsi_desc *)cfhsi->rx_buf;
 
-	dev_dbg(&cfhsi->ndev->dev, "%s\n", __func__);
+	netdev_dbg(cfhsi->ndev, "%s\n", __func__);
 
 	if (test_bit(CFHSI_SHUTDOWN, &cfhsi->bits))
 		return;
 
 	/* Update inactivity timer if pending. */
 	spin_lock_bh(&cfhsi->lock);
-	mod_timer_pending(&cfhsi->timer,
-			jiffies + cfhsi->inactivity_timeout);
+	mod_timer_pending(&cfhsi->inactivity_timer,
+			jiffies + cfhsi->cfg.inactivity_timeout);
 	spin_unlock_bh(&cfhsi->lock);
 
 	if (cfhsi->rx_state.state == CFHSI_RX_STATE_DESC) {
@@ -571,6 +1104,10 @@ static void cfhsi_rx_done(struct cfhsi *cfhsi)
 
 		if (desc_pld_len < 0)
 			goto out_of_sync;
+
+		if (desc->header &
+		      (CFHSI_PROT_SPEED_CHANGE_DESC | CFHSI_COM_BIT_DESC))
+			cfhsi_process_speed_command(cfhsi, desc);
 
 		rx_buf = cfhsi->rx_buf;
 		rx_len = desc_pld_len;
@@ -593,26 +1130,27 @@ static void cfhsi_rx_done(struct cfhsi *cfhsi)
 
 			/* Extract payload len from piggy-backed descriptor. */
 			desc_pld_len = cfhsi_rx_desc_len(piggy_desc);
-			if (desc_pld_len < 0)
-				goto out_of_sync;
 
-			if (desc_pld_len > 0)
-				rx_len = desc_pld_len;
+			if (piggy_desc->header &
+			    (CFHSI_PROT_SPEED_CHANGE_DESC | CFHSI_COM_BIT_DESC))
+				cfhsi_process_speed_command(cfhsi, piggy_desc);
+			else {
+				if (desc_pld_len < 0)
+					goto out_of_sync;
 
-			if (desc_pld_len > 0 &&
-					(piggy_desc->header & CFHSI_PIGGY_DESC))
-				rx_len += CFHSI_DESC_SZ;
+				if (desc_pld_len > 0) {
+					rx_len = desc_pld_len;
+					if (piggy_desc->header & CFHSI_PIGGY_DESC)
+						rx_len += CFHSI_DESC_SZ;
+				}
 
-			/*
-			 * Copy needed information from the piggy-backed
-			 * descriptor to the descriptor in the start.
-			 */
-			memcpy(rx_buf, (u8 *)piggy_desc,
-					CFHSI_DESC_SHORT_SZ);
-			/* Mark no embedded frame here */
-			piggy_desc->offset = 0;
-			if (desc_pld_len == -EPROTO)
-				goto out_of_sync;
+				/*
+				 * Copy needed information from the piggy-backed
+				 * descriptor to the descriptor in the start.
+				 */
+				memcpy(rx_buf, (u8 *)piggy_desc,
+				       CFHSI_DESC_SHORT_SZ);
+			}
 		}
 	}
 
@@ -628,13 +1166,13 @@ static void cfhsi_rx_done(struct cfhsi *cfhsi)
 	/* Initiate next read */
 	if (test_bit(CFHSI_AWAKE, &cfhsi->bits)) {
 		/* Set up new transfer. */
-		dev_dbg(&cfhsi->ndev->dev, "%s: Start RX.\n",
+		netdev_dbg(cfhsi->ndev, "%s: Start RX.\n",
 				__func__);
 
-		res = cfhsi->dev->cfhsi_rx(rx_ptr, rx_len,
-				cfhsi->dev);
+		res = cfhsi->ops->cfhsi_rx(rx_ptr, rx_len,
+				cfhsi->ops);
 		if (WARN_ON(res < 0)) {
-			dev_err(&cfhsi->ndev->dev, "%s: RX error %d.\n",
+			netdev_err(cfhsi->ndev, "%s: RX error %d.\n",
 				__func__, res);
 			cfhsi->ndev->stats.rx_errors++;
 			cfhsi->ndev->stats.rx_dropped++;
@@ -653,6 +1191,8 @@ static void cfhsi_rx_done(struct cfhsi *cfhsi)
 			/* Extract any payload in piggyback descriptor. */
 			if (cfhsi_rx_desc(piggy_desc, cfhsi) < 0)
 				goto out_of_sync;
+			/* Mark no embedded frame after extracting it */
+			piggy_desc->offset = 0;
 		}
 	}
 
@@ -669,7 +1209,7 @@ static void cfhsi_rx_done(struct cfhsi *cfhsi)
 	return;
 
 out_of_sync:
-	dev_err(&cfhsi->ndev->dev, "%s: Out of sync.\n", __func__);
+	netdev_err(cfhsi->ndev, "%s: Out of sync.\n", __func__);
 	print_hex_dump_bytes("--> ", DUMP_PREFIX_NONE,
 			cfhsi->rx_buf, CFHSI_DESC_SZ);
 	schedule_work(&cfhsi->out_of_sync_work);
@@ -679,18 +1219,18 @@ static void cfhsi_rx_slowpath(unsigned long arg)
 {
 	struct cfhsi *cfhsi = (struct cfhsi *)arg;
 
-	dev_dbg(&cfhsi->ndev->dev, "%s.\n",
+	netdev_dbg(cfhsi->ndev, "%s.\n",
 		__func__);
 
 	cfhsi_rx_done(cfhsi);
 }
 
-static void cfhsi_rx_done_cb(struct cfhsi_drv *drv)
+static void cfhsi_rx_done_cb(struct cfhsi_cb_ops *cb_ops)
 {
 	struct cfhsi *cfhsi;
 
-	cfhsi = container_of(drv, struct cfhsi, drv);
-	dev_dbg(&cfhsi->ndev->dev, "%s.\n",
+	cfhsi = container_of(cb_ops, struct cfhsi, cb_ops);
+	netdev_dbg(cfhsi->ndev, "%s.\n",
 		__func__);
 
 	if (test_bit(CFHSI_SHUTDOWN, &cfhsi->bits))
@@ -723,45 +1263,45 @@ static void cfhsi_wake_up(struct work_struct *work)
 	}
 
 	/* Activate wake line. */
-	cfhsi->dev->cfhsi_wake_up(cfhsi->dev);
+	cfhsi->ops->cfhsi_wake_up(cfhsi->ops);
 
-	dev_dbg(&cfhsi->ndev->dev, "%s: Start waiting.\n",
+	netdev_dbg(cfhsi->ndev, "%s: Start waiting.\n",
 		__func__);
 
 	/* Wait for acknowledge. */
-	ret = CFHSI_WAKE_TOUT;
+	ret = CFHSI_WAKE_UP_TOUT;
 	ret = wait_event_interruptible_timeout(cfhsi->wake_up_wait,
 					test_and_clear_bit(CFHSI_WAKE_UP_ACK,
 							&cfhsi->bits), ret);
 	if (unlikely(ret < 0)) {
 		/* Interrupted by signal. */
-		dev_err(&cfhsi->ndev->dev, "%s: Signalled: %ld.\n",
+		netdev_err(cfhsi->ndev, "%s: Signalled: %ld.\n",
 			__func__, ret);
 
 		clear_bit(CFHSI_WAKE_UP, &cfhsi->bits);
-		cfhsi->dev->cfhsi_wake_down(cfhsi->dev);
+		cfhsi->ops->cfhsi_wake_down(cfhsi->ops);
 		return;
 	} else if (!ret) {
 		bool ca_wake = false;
 		size_t fifo_occupancy = 0;
 
 		/* Wakeup timeout */
-		dev_dbg(&cfhsi->ndev->dev, "%s: Timeout.\n",
+		netdev_dbg(cfhsi->ndev, "%s: Timeout.\n",
 			__func__);
 
 		/* Check FIFO to check if modem has sent something. */
-		WARN_ON(cfhsi->dev->cfhsi_fifo_occupancy(cfhsi->dev,
+		WARN_ON(cfhsi->ops->cfhsi_fifo_occupancy(cfhsi->ops,
 					&fifo_occupancy));
 
-		dev_dbg(&cfhsi->ndev->dev, "%s: Bytes in FIFO: %u.\n",
+		netdev_dbg(cfhsi->ndev, "%s: Bytes in FIFO: %u.\n",
 				__func__, (unsigned) fifo_occupancy);
 
 		/* Check if we misssed the interrupt. */
-		WARN_ON(cfhsi->dev->cfhsi_get_peer_wake(cfhsi->dev,
+		WARN_ON(cfhsi->ops->cfhsi_get_peer_wake(cfhsi->ops,
 							&ca_wake));
 
 		if (ca_wake) {
-			dev_err(&cfhsi->ndev->dev, "%s: CA Wake missed !.\n",
+			netdev_err(cfhsi->ndev, "%s: CA Wake missed !.\n",
 				__func__);
 
 			/* Clear the CFHSI_WAKE_UP_ACK bit to prevent race. */
@@ -772,11 +1312,11 @@ static void cfhsi_wake_up(struct work_struct *work)
 		}
 
 		clear_bit(CFHSI_WAKE_UP, &cfhsi->bits);
-		cfhsi->dev->cfhsi_wake_down(cfhsi->dev);
+		cfhsi->ops->cfhsi_wake_down(cfhsi->ops);
 		return;
 	}
 wake_ack:
-	dev_dbg(&cfhsi->ndev->dev, "%s: Woken.\n",
+	netdev_dbg(cfhsi->ndev, "%s: Woken.\n",
 		__func__);
 
 	/* Clear power up bit. */
@@ -784,29 +1324,29 @@ wake_ack:
 	clear_bit(CFHSI_WAKE_UP, &cfhsi->bits);
 
 	/* Resume read operation. */
-	dev_dbg(&cfhsi->ndev->dev, "%s: Start RX.\n", __func__);
-	res = cfhsi->dev->cfhsi_rx(cfhsi->rx_ptr, cfhsi->rx_len, cfhsi->dev);
+	netdev_dbg(cfhsi->ndev, "%s: Start RX.\n", __func__);
+	res = cfhsi->ops->cfhsi_rx(cfhsi->rx_ptr, cfhsi->rx_len, cfhsi->ops);
 
 	if (WARN_ON(res < 0))
-		dev_err(&cfhsi->ndev->dev, "%s: RX err %d.\n", __func__, res);
+		netdev_err(cfhsi->ndev, "%s: RX err %d.\n", __func__, res);
 
 	/* Clear power up acknowledment. */
 	clear_bit(CFHSI_WAKE_UP_ACK, &cfhsi->bits);
 
 	spin_lock_bh(&cfhsi->lock);
 
-	/* Resume transmit if queue is not empty. */
-	if (!skb_peek(&cfhsi->qhead)) {
-		dev_dbg(&cfhsi->ndev->dev, "%s: Peer wake, start timer.\n",
+	/* Resume transmit if queues are not empty. */
+	if (!cfhsi_tx_queue_len(cfhsi)) {
+		netdev_dbg(cfhsi->ndev, "%s: Peer wake, start timer.\n",
 			__func__);
 		/* Start inactivity timer. */
-		mod_timer(&cfhsi->timer,
-				jiffies + cfhsi->inactivity_timeout);
+		mod_timer(&cfhsi->inactivity_timer,
+				jiffies + cfhsi->cfg.inactivity_timeout);
 		spin_unlock_bh(&cfhsi->lock);
 		return;
 	}
 
-	dev_dbg(&cfhsi->ndev->dev, "%s: Host wake.\n",
+	netdev_dbg(cfhsi->ndev, "%s: Host wake.\n",
 		__func__);
 
 	spin_unlock_bh(&cfhsi->lock);
@@ -816,14 +1356,16 @@ wake_ack:
 
 	if (likely(len > 0)) {
 		/* Set up new transfer. */
-		res = cfhsi->dev->cfhsi_tx(cfhsi->tx_buf, len, cfhsi->dev);
+		cfhsi_measure_throughput(cfhsi, len);
+
+		res = cfhsi->ops->cfhsi_tx(cfhsi->tx_buf, len, cfhsi->ops);
 		if (WARN_ON(res < 0)) {
-			dev_err(&cfhsi->ndev->dev, "%s: TX error %d.\n",
+			netdev_err(cfhsi->ndev, "%s: TX error %d.\n",
 				__func__, res);
 			cfhsi_abort_tx(cfhsi);
 		}
 	} else {
-		dev_err(&cfhsi->ndev->dev,
+		netdev_err(cfhsi->ndev,
 				"%s: Failed to create HSI frame: %d.\n",
 				__func__, len);
 	}
@@ -837,44 +1379,59 @@ static void cfhsi_wake_down(struct work_struct *work)
 	int retry = CFHSI_WAKE_TOUT;
 
 	cfhsi = container_of(work, struct cfhsi, wake_down_work);
-	dev_dbg(&cfhsi->ndev->dev, "%s.\n", __func__);
+	netdev_dbg(cfhsi->ndev, "%s. inactivity_timeout=%d\n",
+		   __func__, cfhsi->cfg.inactivity_timeout);
 
 	if (test_bit(CFHSI_SHUTDOWN, &cfhsi->bits))
 		return;
 
 	/* Clear spurious states (if any) */
-	WARN_ON(test_and_clear_bit(CFHSI_WAKE_DOWN_ACK, &cfhsi->bits));
+	if (test_and_clear_bit(CFHSI_WAKE_DOWN_ACK, &cfhsi->bits))
+		dev_err(&cfhsi->ndev->dev, "%s: Wrong CAWAKE state.\n",
+			__func__);
 
 	/* Deactivate wake line. */
-	cfhsi->dev->cfhsi_wake_down(cfhsi->dev);
+	cfhsi->ops->cfhsi_wake_down(cfhsi->ops);
 
 	/* Wait for acknowledge. */
-	ret = CFHSI_WAKE_TOUT;
+	ret = CFHSI_WAKE_DOWN_TOUT;
 	ret = wait_event_interruptible_timeout(cfhsi->wake_down_wait,
-					test_and_clear_bit(CFHSI_WAKE_DOWN_ACK,
-							&cfhsi->bits), ret);
+					       test_and_clear_bit(CFHSI_WAKE_DOWN_ACK,
+								  &cfhsi->bits), ret);
 	if (ret < 0) {
 		/* Interrupted by signal. */
-		dev_err(&cfhsi->ndev->dev, "%s: Signalled: %ld.\n",
-			__func__, ret);
+		netdev_err(cfhsi->ndev, "%s: Signalled: %ld.\n",
+			   __func__, ret);
 		return;
 	} else if (!ret) {
 		bool ca_wake = true;
 
 		/* Timeout */
-		dev_err(&cfhsi->ndev->dev, "%s: Timeout.\n", __func__);
+		netdev_err(cfhsi->ndev,
+			   "%s: Waiting for ACK Timeout\n", __func__);
 
 		/* Check if we misssed the interrupt. */
-		WARN_ON(cfhsi->dev->cfhsi_get_peer_wake(cfhsi->dev,
+		WARN_ON(cfhsi->ops->cfhsi_get_peer_wake(cfhsi->ops,
 							&ca_wake));
 		if (!ca_wake)
-			dev_err(&cfhsi->ndev->dev, "%s: CA Wake missed !.\n",
-				__func__);
+			netdev_err(cfhsi->ndev, "%s: CA Wake missed !.\n",
+				   __func__);
+		else {
+			netdev_err(cfhsi->ndev,
+				   "%s: CA Wake Down ACK missed, Taking down interface\n",
+				   __func__);
+			schedule_work(&cfhsi->out_of_sync_work);
+			return;
+		}
+
+	} else {
+		netdev_dbg(cfhsi->ndev, "%s: Wake_Down ACK received from modem\n",
+			   __func__);
 	}
 
 	/* Check FIFO occupancy. */
 	while (retry) {
-		WARN_ON(cfhsi->dev->cfhsi_fifo_occupancy(cfhsi->dev,
+		WARN_ON(cfhsi->ops->cfhsi_fifo_occupancy(cfhsi->ops,
 							&fifo_occupancy));
 
 		if (!fifo_occupancy)
@@ -886,19 +1443,23 @@ static void cfhsi_wake_down(struct work_struct *work)
 	}
 
 	if (!retry)
-		dev_err(&cfhsi->ndev->dev, "%s: FIFO Timeout.\n", __func__);
+		netdev_err(cfhsi->ndev, "%s: FIFO Timeout.\n", __func__);
 
 	/* Clear AWAKE condition. */
 	clear_bit(CFHSI_AWAKE, &cfhsi->bits);
 
 	/* Cancel pending RX requests. */
-	cfhsi->dev->cfhsi_rx_cancel(cfhsi->dev);
-
+	cfhsi->ops->cfhsi_rx_cancel(cfhsi->ops);
 	/* Release system wake lock */
 	spin_lock_bh(&cfhsi->lock);
 	if (!test_bit(CFHSI_WAKE_UP, &cfhsi->bits))
 		cfhsi_wakelock_unlock(cfhsi);
 	spin_unlock_bh(&cfhsi->lock);
+
+	if (cfhsi->cfg.change_hsi_clock) {
+		cfhsi->ops->cfhsi_set_hsi_clock(cfhsi->ops, 0);
+		cfhsi->cfg.change_hsi_clock = false;
+	}
 }
 
 static void cfhsi_out_of_sync(struct work_struct *work)
@@ -912,12 +1473,12 @@ static void cfhsi_out_of_sync(struct work_struct *work)
 	rtnl_unlock();
 }
 
-static void cfhsi_wake_up_cb(struct cfhsi_drv *drv)
+static void cfhsi_wake_up_cb(struct cfhsi_cb_ops *cb_ops)
 {
 	struct cfhsi *cfhsi = NULL;
 
-	cfhsi = container_of(drv, struct cfhsi, drv);
-	dev_dbg(&cfhsi->ndev->dev, "%s.\n",
+	cfhsi = container_of(cb_ops, struct cfhsi, cb_ops);
+	netdev_dbg(cfhsi->ndev, "%s.\n",
 		__func__);
 
 	set_bit(CFHSI_WAKE_UP_ACK, &cfhsi->bits);
@@ -935,12 +1496,12 @@ static void cfhsi_wake_up_cb(struct cfhsi_drv *drv)
 	spin_unlock_bh(&cfhsi->lock);
 }
 
-static void cfhsi_wake_down_cb(struct cfhsi_drv *drv)
+static void cfhsi_wake_down_cb(struct cfhsi_cb_ops *cb_ops)
 {
 	struct cfhsi *cfhsi = NULL;
 
-	cfhsi = container_of(drv, struct cfhsi, drv);
-	dev_dbg(&cfhsi->ndev->dev, "%s.\n",
+	cfhsi = container_of(cb_ops, struct cfhsi, cb_ops);
+	netdev_dbg(cfhsi->ndev, "%s.\n",
 		__func__);
 
 	/* Initiating low power is only permitted by the host (us). */
@@ -948,20 +1509,53 @@ static void cfhsi_wake_down_cb(struct cfhsi_drv *drv)
 	wake_up_interruptible(&cfhsi->wake_down_wait);
 }
 
+static void cfhsi_aggregation_tout(unsigned long arg)
+{
+	struct cfhsi *cfhsi = (struct cfhsi *)arg;
+
+	netdev_dbg(cfhsi->ndev, "%s.\n",
+		__func__);
+
+	cfhsi_start_tx(cfhsi);
+}
+
 static int cfhsi_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	struct cfhsi *cfhsi = NULL;
 	int start_xfer = 0;
 	int timer_active;
+	int prio;
 
 	if (!dev)
 		return -EINVAL;
 
 	cfhsi = netdev_priv(dev);
 
+	switch (skb->priority) {
+	case TC_PRIO_BESTEFFORT:
+	case TC_PRIO_FILLER:
+	case TC_PRIO_BULK:
+		prio = CFHSI_PRIO_BEBK;
+		break;
+	case TC_PRIO_INTERACTIVE_BULK:
+		prio = CFHSI_PRIO_VI;
+		break;
+	case TC_PRIO_INTERACTIVE:
+		prio = CFHSI_PRIO_VO;
+		break;
+	case TC_PRIO_CONTROL:
+	default:
+		prio = CFHSI_PRIO_CTL;
+		break;
+	}
+
 	spin_lock_bh(&cfhsi->lock);
 
-	skb_queue_tail(&cfhsi->qhead, skb);
+	/* Update aggregation statistics  */
+	cfhsi_update_aggregation_stats(cfhsi, skb, 1);
+
+	/* Queue the SKB */
+	skb_queue_tail(&cfhsi->qhead[prio], skb);
 
 	/* Sanity check; xmit should not be called after unregister_netdev */
 	if (WARN_ON(test_bit(CFHSI_SHUTDOWN, &cfhsi->bits))) {
@@ -972,7 +1566,7 @@ static int cfhsi_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	/* Send flow off if number of packets is above high water mark. */
 	if (!cfhsi->flow_off_sent &&
-		cfhsi->qhead.qlen > cfhsi->q_high_mark &&
+		cfhsi_tx_queue_len(cfhsi) > cfhsi->cfg.q_high_mark &&
 		cfhsi->cfdev.flowctrl) {
 		cfhsi->flow_off_sent = 1;
 		cfhsi->cfdev.flowctrl(cfhsi->ndev, OFF);
@@ -984,12 +1578,18 @@ static int cfhsi_xmit(struct sk_buff *skb, struct net_device *dev)
 	}
 
 	if (!start_xfer) {
+		/* Send aggregate if it is possible */
+		bool aggregate_ready =
+			cfhsi_can_send_aggregate(cfhsi) &&
+			del_timer(&cfhsi->aggregation_timer) > 0;
 		spin_unlock_bh(&cfhsi->lock);
+		if (aggregate_ready)
+			cfhsi_start_tx(cfhsi);
 		return 0;
 	}
 
 	/* Delete inactivity timer if started. */
-	timer_active = del_timer_sync(&cfhsi->timer);
+	timer_active = del_timer_sync(&cfhsi->inactivity_timer);
 
 	spin_unlock_bh(&cfhsi->lock);
 
@@ -1003,9 +1603,13 @@ static int cfhsi_xmit(struct sk_buff *skb, struct net_device *dev)
 		WARN_ON(!len);
 
 		/* Set up new transfer. */
-		res = cfhsi->dev->cfhsi_tx(cfhsi->tx_buf, len, cfhsi->dev);
+		cfhsi_measure_throughput(cfhsi, len);
+
+		res = cfhsi->ops->cfhsi_tx(cfhsi->tx_buf, len, cfhsi->ops);
+
+		/* Upon error we simply drop the frame and continue. */
 		if (WARN_ON(res < 0)) {
-			dev_err(&cfhsi->ndev->dev, "%s: TX error %d.\n",
+			netdev_err(cfhsi->ndev, "%s: TX error %d.\n",
 				__func__, res);
 			cfhsi_abort_tx(cfhsi);
 		}
@@ -1022,58 +1626,54 @@ static int cfhsi_xmit(struct sk_buff *skb, struct net_device *dev)
 	return 0;
 }
 
-static int cfhsi_open(struct net_device *dev)
-{
-	netif_wake_queue(dev);
-
-	return 0;
-}
-
-static int cfhsi_close(struct net_device *dev)
-{
-	netif_stop_queue(dev);
-
-	return 0;
-}
-
-static const struct net_device_ops cfhsi_ops = {
-	.ndo_open = cfhsi_open,
-	.ndo_stop = cfhsi_close,
-	.ndo_start_xmit = cfhsi_xmit
-};
+static const struct net_device_ops cfhsi_netdevops;
 
 static void cfhsi_setup(struct net_device *dev)
 {
+	int i;
 	struct cfhsi *cfhsi = netdev_priv(dev);
 	dev->features = 0;
-	dev->netdev_ops = &cfhsi_ops;
 	dev->type = ARPHRD_CAIF;
 	dev->flags = IFF_POINTOPOINT | IFF_NOARP;
 	dev->mtu = CFHSI_MAX_CAIF_FRAME_SZ;
 	dev->tx_queue_len = 0;
 	dev->destructor = free_netdev;
-	skb_queue_head_init(&cfhsi->qhead);
+	dev->netdev_ops = &cfhsi_netdevops;
+	for (i = 0; i < CFHSI_PRIO_LAST; ++i)
+		skb_queue_head_init(&cfhsi->qhead[i]);
 	cfhsi->cfdev.link_select = CAIF_LINK_HIGH_BANDW;
 	cfhsi->cfdev.use_frag = false;
 	cfhsi->cfdev.use_stx = false;
 	cfhsi->cfdev.use_fcs = false;
 	cfhsi->ndev = dev;
+	cfhsi->cfg = hsi_default_config;
+	/*
+	 * FIXME:For current design, knowledge of speed should be
+	 *       on lower layer.
+	 *       May be change by later hsi design
+	 */
+	cfhsi->dyn_speed.tx_speed = 196;
+	cfhsi->dyn_speed.rx_speed = 196;
+	cfhsi->dyn_speed.tx_next_speed = 0;
+	cfhsi->dyn_speed.tx_speed_level = CFHSI_DYN_SPEED_HIGH;
+	cfhsi->dyn_speed.rx_speed_level = CFHSI_DYN_SPEED_HIGH;
+
+	cfhsi->dyn_speed.negotiation_in_progress = false;
+	cfhsi->dyn_speed.T1_fb_time_stamp = 0;
+	cfhsi->dyn_speed.T1_ff_time_stamp = 0;
+	cfhsi->dyn_speed.T2_time_stamp = 0;
+	cfhsi->dyn_speed.tx_speed_change_enabled = false;
+	cfhsi->dyn_speed.prev_fill_grade = 1;
+	cfhsi->dyn_speed.acknack_response = CFHSI_DYN_SPEED_NO_RESPONSE;
+	cfhsi->cfg.change_hsi_clock = false;
 }
 
-int cfhsi_probe(struct platform_device *pdev)
+static int cfhsi_open(struct net_device *ndev)
 {
-	struct cfhsi *cfhsi = NULL;
-	struct net_device *ndev;
-	struct cfhsi_dev *dev;
+	struct cfhsi *cfhsi = netdev_priv(ndev);
 	int res;
 
-	ndev = alloc_netdev(sizeof(struct cfhsi), "cfhsi%d", cfhsi_setup);
-	if (!ndev)
-		return -ENODEV;
-
-	cfhsi = netdev_priv(ndev);
-	cfhsi->ndev = ndev;
-	cfhsi->pdev = pdev;
+	clear_bit(CFHSI_SHUTDOWN, &cfhsi->bits);
 
 	/* Initialize state vaiables. */
 	cfhsi->tx_state = CFHSI_TX_STATE_IDLE;
@@ -1081,15 +1681,6 @@ int cfhsi_probe(struct platform_device *pdev)
 
 	/* Set flow info */
 	cfhsi->flow_off_sent = 0;
-	cfhsi->q_low_mark = LOW_WATER_MARK;
-	cfhsi->q_high_mark = HIGH_WATER_MARK;
-
-	/* Assign the HSI device. */
-	dev = (struct cfhsi_dev *)pdev->dev.platform_data;
-	cfhsi->dev = dev;
-
-	/* Assign the driver to this HSI device. */
-	dev->drv = &cfhsi->drv;
 
 	/*
 	 * Allocate a TX buffer with the size of a HSI packet descriptors
@@ -1117,17 +1708,8 @@ int cfhsi_probe(struct platform_device *pdev)
 		goto err_alloc_rx_flip;
 	}
 
-	/* Pre-calculate inactivity timeout. */
-	if (inactivity_timeout != -1) {
-		cfhsi->inactivity_timeout =
-				inactivity_timeout * HZ / 1000;
-		if (!cfhsi->inactivity_timeout)
-			cfhsi->inactivity_timeout = 1;
-		else if (cfhsi->inactivity_timeout > NEXT_TIMER_MAX_DELTA)
-			cfhsi->inactivity_timeout = NEXT_TIMER_MAX_DELTA;
-	} else {
-		cfhsi->inactivity_timeout = NEXT_TIMER_MAX_DELTA;
-	}
+	/* Initialize aggregation timeout */
+	cfhsi->cfg.aggregation_timeout = hsi_default_config.aggregation_timeout;
 
 	/* Initialize recieve vaiables. */
 	cfhsi->rx_ptr = cfhsi->rx_buf;
@@ -1137,10 +1719,10 @@ int cfhsi_probe(struct platform_device *pdev)
 	spin_lock_init(&cfhsi->lock);
 
 	/* Set up the driver. */
-	cfhsi->drv.tx_done_cb = cfhsi_tx_done_cb;
-	cfhsi->drv.rx_done_cb = cfhsi_rx_done_cb;
-	cfhsi->drv.wake_up_cb = cfhsi_wake_up_cb;
-	cfhsi->drv.wake_down_cb = cfhsi_wake_down_cb;
+	cfhsi->cb_ops.tx_done_cb = cfhsi_tx_done_cb;
+	cfhsi->cb_ops.rx_done_cb = cfhsi_rx_done_cb;
+	cfhsi->cb_ops.wake_up_cb = cfhsi_wake_up_cb;
+	cfhsi->cb_ops.wake_down_cb = cfhsi_wake_down_cb;
 
 	/* Initialize the work queues. */
 	INIT_WORK(&cfhsi->wake_up_work, cfhsi_wake_up);
@@ -1154,9 +1736,9 @@ int cfhsi_probe(struct platform_device *pdev)
 	clear_bit(CFHSI_AWAKE, &cfhsi->bits);
 
 	/* Create work thread. */
-	cfhsi->wq = create_singlethread_workqueue(pdev->name);
+	cfhsi->wq = create_singlethread_workqueue(cfhsi->ndev->name);
 	if (!cfhsi->wq) {
-		dev_err(&ndev->dev, "%s: Failed to create work queue.\n",
+		netdev_err(cfhsi->ndev, "%s: Failed to create work queue.\n",
 			__func__);
 		res = -ENODEV;
 		goto err_create_wq;
@@ -1168,25 +1750,24 @@ int cfhsi_probe(struct platform_device *pdev)
 	init_waitqueue_head(&cfhsi->flush_fifo_wait);
 
 	/* Setup the inactivity timer. */
-	init_timer(&cfhsi->timer);
-	cfhsi->timer.data = (unsigned long)cfhsi;
-	cfhsi->timer.function = cfhsi_inactivity_tout;
+	init_timer(&cfhsi->inactivity_timer);
+	cfhsi->inactivity_timer.data = (unsigned long)cfhsi;
+	cfhsi->inactivity_timer.function = cfhsi_inactivity_tout;
 	/* Setup the slowpath RX timer. */
 	init_timer(&cfhsi->rx_slowpath_timer);
 	cfhsi->rx_slowpath_timer.data = (unsigned long)cfhsi;
 	cfhsi->rx_slowpath_timer.function = cfhsi_rx_slowpath;
+	/* Setup the aggregation timer. */
+	init_timer(&cfhsi->aggregation_timer);
+	cfhsi->aggregation_timer.data = (unsigned long)cfhsi;
+	cfhsi->aggregation_timer.function = cfhsi_aggregation_tout;
 
 	cfhsi_wakelock_init(cfhsi);
 
-	/* Add CAIF HSI device to list. */
-	spin_lock(&cfhsi_list_lock);
-	list_add_tail(&cfhsi->list, &cfhsi_list);
-	spin_unlock(&cfhsi_list_lock);
-
 	/* Activate HSI interface. */
-	res = cfhsi->dev->cfhsi_up(cfhsi->dev);
+	res = cfhsi->ops->cfhsi_up(cfhsi->ops);
 	if (res) {
-		dev_err(&cfhsi->ndev->dev,
+		netdev_err(cfhsi->ndev,
 			"%s: can't activate HSI interface: %d.\n",
 			__func__, res);
 		goto err_activate;
@@ -1195,25 +1776,14 @@ int cfhsi_probe(struct platform_device *pdev)
 	/* Flush FIFO */
 	res = cfhsi_flush_fifo(cfhsi);
 	if (res) {
-		dev_err(&ndev->dev, "%s: Can't flush FIFO: %d.\n",
+		netdev_err(cfhsi->ndev, "%s: Can't flush FIFO: %d.\n",
 			__func__, res);
 		goto err_net_reg;
 	}
-
-	/* Register network device. */
-	res = register_netdev(ndev);
-	if (res) {
-		dev_err(&ndev->dev, "%s: Registration error: %d.\n",
-			__func__, res);
-		goto err_net_reg;
-	}
-
-	netif_stop_queue(ndev);
-
 	return res;
 
  err_net_reg:
-	cfhsi->dev->cfhsi_down(cfhsi->dev);
+	cfhsi->ops->cfhsi_down(cfhsi->ops);
  err_activate:
 	destroy_workqueue(cfhsi->wq);
  err_create_wq:
@@ -1223,17 +1793,13 @@ int cfhsi_probe(struct platform_device *pdev)
  err_alloc_rx:
 	kfree(cfhsi->tx_buf);
  err_alloc_tx:
-	free_netdev(ndev);
-
 	return res;
 }
 
-static void cfhsi_shutdown(struct cfhsi *cfhsi)
+static int cfhsi_close(struct net_device *ndev)
 {
+	struct cfhsi *cfhsi = netdev_priv(ndev);
 	u8 *tx_buf, *rx_buf, *flip_buf;
-
-	/* Stop TXing */
-	netif_tx_stop_all_queues(cfhsi->ndev);
 
 	/* going to shutdown driver */
 	set_bit(CFHSI_SHUTDOWN, &cfhsi->bits);
@@ -1242,11 +1808,12 @@ static void cfhsi_shutdown(struct cfhsi *cfhsi)
 	flush_workqueue(cfhsi->wq);
 
 	/* Delete timers if pending */
-	del_timer_sync(&cfhsi->timer);
+	del_timer_sync(&cfhsi->inactivity_timer);
 	del_timer_sync(&cfhsi->rx_slowpath_timer);
+	del_timer_sync(&cfhsi->aggregation_timer);
 
 	/* Cancel pending RX request (if any) */
-	cfhsi->dev->cfhsi_rx_cancel(cfhsi->dev);
+	cfhsi->ops->cfhsi_rx_cancel(cfhsi->ops);
 
 	/* Destroy workqueue */
 	destroy_workqueue(cfhsi->wq);
@@ -1259,99 +1826,219 @@ static void cfhsi_shutdown(struct cfhsi *cfhsi)
 	cfhsi_abort_tx(cfhsi);
 
 	/* Deactivate interface */
-	cfhsi->dev->cfhsi_down(cfhsi->dev);
+	cfhsi->ops->cfhsi_down(cfhsi->ops);
 
 	cfhsi_wakelock_deinit(cfhsi);
-
-	/* Finally unregister the network device. */
-	unregister_netdev(cfhsi->ndev);
 
 	/* Free buffers. */
 	kfree(tx_buf);
 	kfree(rx_buf);
 	kfree(flip_buf);
+	return 0;
 }
 
-int cfhsi_remove(struct platform_device *pdev)
+static void cfhsi_uninit(struct net_device *dev)
 {
-	struct list_head *list_node;
-	struct list_head *n;
-	struct cfhsi *cfhsi = NULL;
-	struct cfhsi_dev *dev;
+	struct cfhsi *cfhsi = netdev_priv(dev);
+	ASSERT_RTNL();
+	symbol_put(cfhsi_get_ops);
+	list_del(&cfhsi->list);
+}
 
-	dev = (struct cfhsi_dev *)pdev->dev.platform_data;
-	spin_lock(&cfhsi_list_lock);
-	list_for_each_safe(list_node, n, &cfhsi_list) {
-		cfhsi = list_entry(list_node, struct cfhsi, list);
-		/* Find the corresponding device. */
-		if (cfhsi->dev == dev) {
-			/* Remove from list. */
-			list_del(list_node);
-			spin_unlock(&cfhsi_list_lock);
+static const struct net_device_ops cfhsi_netdevops = {
+	.ndo_uninit = cfhsi_uninit,
+	.ndo_open = cfhsi_open,
+	.ndo_stop = cfhsi_close,
+	.ndo_start_xmit = cfhsi_xmit
+};
 
-			/* Shutdown driver. */
-			cfhsi_shutdown(cfhsi);
+static void cfhsi_netlink_parms(struct nlattr *data[], struct cfhsi *cfhsi)
+{
+	int i;
 
-			return 0;
-		}
+	if (!data) {
+		pr_debug("no params data found\n");
+		return;
 	}
-	spin_unlock(&cfhsi_list_lock);
+
+	i = __IFLA_CAIF_HSI_INACTIVITY_TOUT;
+	/*
+	 * Inactivity timeout in millisecs. Lowest possible value is 1,
+	 * and highest possible is NEXT_TIMER_MAX_DELTA.
+	 */
+	if (data[i]) {
+		u32 inactivity_timeout = nla_get_u32(data[i]);
+		/* Pre-calculate inactivity timeout. */
+		cfhsi->cfg.inactivity_timeout =	inactivity_timeout * HZ / 1000;
+		if (cfhsi->cfg.inactivity_timeout == 0)
+			cfhsi->cfg.inactivity_timeout = 1;
+		else if (cfhsi->cfg.inactivity_timeout > NEXT_TIMER_MAX_DELTA)
+			cfhsi->cfg.inactivity_timeout = NEXT_TIMER_MAX_DELTA;
+	}
+
+	i = __IFLA_CAIF_HSI_AGGREGATION_TOUT;
+	if (data[i])
+		cfhsi->cfg.aggregation_timeout = nla_get_u32(data[i]);
+
+	i = __IFLA_CAIF_HSI_HEAD_ALIGN;
+	if (data[i])
+		cfhsi->cfg.head_align = nla_get_u32(data[i]);
+
+	i = __IFLA_CAIF_HSI_TAIL_ALIGN;
+	if (data[i])
+		cfhsi->cfg.tail_align = nla_get_u32(data[i]);
+
+	i = __IFLA_CAIF_HSI_QHIGH_WATERMARK;
+	if (data[i])
+		cfhsi->cfg.q_high_mark = nla_get_u32(data[i]);
+
+	i = __IFLA_CAIF_HSI_QLOW_WATERMARK;
+	if (data[i])
+		cfhsi->cfg.q_low_mark = nla_get_u32(data[i]);
+
+	i = __IFLA_CAIF_HSI_TX_DYN_SPEED_CHANGE;
+	if (data[i])
+		cfhsi->cfg.tx_dyn_speed_change = (bool)nla_get_u32(data[i]);
+
+	i = __IFLA_CAIF_HSI_RX_DYN_SPEED_CHANGE;
+	if (data[i])
+		cfhsi->cfg.rx_dyn_speed_change = (bool)nla_get_u32(data[i]);
+
+	i = __IFLA_CAIF_HSI_CHANGE_HSI_CLOCK;
+	if (data[i])
+		cfhsi->cfg.change_hsi_clock = (bool)nla_get_u32(data[i]);
+}
+
+static int caif_hsi_changelink(struct net_device *dev, struct nlattr *tb[],
+				struct nlattr *data[])
+{
+	cfhsi_netlink_parms(data, netdev_priv(dev));
+	netdev_state_change(dev);
+	return 0;
+}
+
+static const struct nla_policy caif_hsi_policy[__IFLA_CAIF_HSI_MAX + 1] = {
+	[__IFLA_CAIF_HSI_INACTIVITY_TOUT] = { .type = NLA_U32, .len = 4 },
+	[__IFLA_CAIF_HSI_AGGREGATION_TOUT] = { .type = NLA_U32, .len = 4 },
+	[__IFLA_CAIF_HSI_HEAD_ALIGN] = { .type = NLA_U32, .len = 4 },
+	[__IFLA_CAIF_HSI_TAIL_ALIGN] = { .type = NLA_U32, .len = 4 },
+	[__IFLA_CAIF_HSI_QHIGH_WATERMARK] = { .type = NLA_U32, .len = 4 },
+	[__IFLA_CAIF_HSI_QLOW_WATERMARK] = { .type = NLA_U32, .len = 4 },
+	[__IFLA_CAIF_HSI_TX_DYN_SPEED_CHANGE] = { .type = NLA_U32, .len = 4 },
+	[__IFLA_CAIF_HSI_RX_DYN_SPEED_CHANGE] = { .type = NLA_U32, .len = 4 },
+	[__IFLA_CAIF_HSI_CHANGE_HSI_CLOCK] = { .type = NLA_U32, .len = 4 },
+};
+
+static size_t caif_hsi_get_size(const struct net_device *dev)
+{
+	int i;
+	size_t s = 0;
+	for (i = __IFLA_CAIF_HSI_UNSPEC + 1; i < __IFLA_CAIF_HSI_MAX; i++)
+		s += nla_total_size(caif_hsi_policy[i].len);
+	return s;
+}
+
+static int caif_hsi_fill_info(struct sk_buff *skb, const struct net_device *dev)
+{
+	struct cfhsi *cfhsi = netdev_priv(dev);
+
+	if (nla_put_u32(skb, __IFLA_CAIF_HSI_INACTIVITY_TOUT,
+			cfhsi->cfg.inactivity_timeout) ||
+	    nla_put_u32(skb, __IFLA_CAIF_HSI_AGGREGATION_TOUT,
+			cfhsi->cfg.aggregation_timeout) ||
+	    nla_put_u32(skb, __IFLA_CAIF_HSI_HEAD_ALIGN,
+			cfhsi->cfg.head_align) ||
+	    nla_put_u32(skb, __IFLA_CAIF_HSI_TAIL_ALIGN,
+			cfhsi->cfg.tail_align) ||
+	    nla_put_u32(skb, __IFLA_CAIF_HSI_QHIGH_WATERMARK,
+			cfhsi->cfg.q_high_mark) ||
+	    nla_put_u32(skb, __IFLA_CAIF_HSI_QLOW_WATERMARK,
+			cfhsi->cfg.q_low_mark) ||
+	    nla_put_u32(skb, __IFLA_CAIF_HSI_TX_DYN_SPEED_CHANGE,
+			cfhsi->cfg.tx_dyn_speed_change) ||
+	    nla_put_u32(skb, __IFLA_CAIF_HSI_RX_DYN_SPEED_CHANGE,
+			cfhsi->cfg.rx_dyn_speed_change) ||
+	    nla_put_u32(skb, __IFLA_CAIF_HSI_CHANGE_HSI_CLOCK,
+			cfhsi->cfg.change_hsi_clock))
+		return -EMSGSIZE;
+
+	return 0;
+}
+
+
+static int caif_hsi_newlink(struct net *src_net, struct net_device *dev,
+			  struct nlattr *tb[], struct nlattr *data[])
+{
+	struct cfhsi *cfhsi = NULL;
+	struct cfhsi_ops *(*get_ops)(void);
+
+	ASSERT_RTNL();
+
+	cfhsi = netdev_priv(dev);
+	cfhsi_netlink_parms(data, cfhsi);
+	dev_net_set(cfhsi->ndev, src_net);
+
+	get_ops = symbol_get(cfhsi_get_ops);
+	if (!get_ops) {
+		pr_err("%s: failed to get the cfhsi_ops\n", __func__);
+		return -ENODEV;
+	}
+
+	/* Assign the HSI device. */
+	cfhsi->ops = (*get_ops)();
+	if (!cfhsi->ops) {
+		pr_err("%s: failed to get the cfhsi_ops\n", __func__);
+		goto err;
+	}
+
+	/* Assign the driver to this HSI device. */
+	cfhsi->ops->cb_ops = &cfhsi->cb_ops;
+	cfhsi_start_dyn_speed(cfhsi);
+
+	if (register_netdevice(dev)) {
+		pr_warn("%s: caif_hsi device registration failed\n", __func__);
+		goto err;
+	}
+	/* Add CAIF HSI device to list. */
+	list_add_tail(&cfhsi->list, &cfhsi_list);
+
+	return 0;
+err:
+	symbol_put(cfhsi_get_ops);
 	return -ENODEV;
 }
 
-struct platform_driver cfhsi_plat_drv = {
-	.probe = cfhsi_probe,
-	.remove = cfhsi_remove,
-	.driver = {
-		   .name = "cfhsi",
-		   .owner = THIS_MODULE,
-		   },
+static struct rtnl_link_ops caif_hsi_link_ops __read_mostly = {
+	.kind		= "cfhsi",
+	.priv_size	= sizeof(struct cfhsi),
+	.setup		= cfhsi_setup,
+	.maxtype	= __IFLA_CAIF_HSI_MAX,
+	.policy	= caif_hsi_policy,
+	.newlink	= caif_hsi_newlink,
+	.changelink	= caif_hsi_changelink,
+	.get_size	= caif_hsi_get_size,
+	.fill_info	= caif_hsi_fill_info,
 };
 
 static void __exit cfhsi_exit_module(void)
 {
 	struct list_head *list_node;
 	struct list_head *n;
-	struct cfhsi *cfhsi = NULL;
+	struct cfhsi *cfhsi;
 
-	spin_lock(&cfhsi_list_lock);
+	rtnl_link_unregister(&caif_hsi_link_ops);
+
+	rtnl_lock();
 	list_for_each_safe(list_node, n, &cfhsi_list) {
 		cfhsi = list_entry(list_node, struct cfhsi, list);
-
-		/* Remove from list. */
-		list_del(list_node);
-		spin_unlock(&cfhsi_list_lock);
-
-		/* Shutdown driver. */
-		cfhsi_shutdown(cfhsi);
-
-		spin_lock(&cfhsi_list_lock);
+		unregister_netdev(cfhsi->ndev);
 	}
-	spin_unlock(&cfhsi_list_lock);
-
-	/* Unregister platform driver. */
-	platform_driver_unregister(&cfhsi_plat_drv);
+	rtnl_unlock();
 }
 
 static int __init cfhsi_init_module(void)
 {
-	int result;
-
-	/* Initialize spin lock. */
-	spin_lock_init(&cfhsi_list_lock);
-
-	/* Register platform driver. */
-	result = platform_driver_register(&cfhsi_plat_drv);
-	if (result) {
-		printk(KERN_ERR "Could not register platform HSI driver: %d.\n",
-			result);
-		goto err_dev_register;
-	}
-
-	return result;
-
- err_dev_register:
-	return result;
+	return rtnl_link_register(&caif_hsi_link_ops);
 }
 
 module_init(cfhsi_init_module);
