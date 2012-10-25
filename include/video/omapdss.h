@@ -479,6 +479,7 @@ struct omap_writeback_info {
 	u32					p_uv_addr;
 	u8					rotation;
 	enum omap_dss_rotation_type		rotation_type;
+	bool force_1d;
 };
 
 struct omap_writeback {

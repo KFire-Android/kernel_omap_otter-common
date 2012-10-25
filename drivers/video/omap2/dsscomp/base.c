@@ -214,6 +214,8 @@ int set_dss_ovl_info(struct dss2_ovl_info *oi)
 	info.mirror = cfg->mirror;
 	info.color_mode = cfg->color_mode;
 
+	info.force_1d = cfg->force_1d;
+
 	/* crop to screen */
 	crop.r = cfg->crop;
 	win.r = cfg->win;
@@ -402,6 +404,8 @@ int set_dss_wb_info(struct dss2_ovl_info *oi)
 	info.out_width = cfg->win.w;
 	info.out_height = cfg->win.h;
 	info.dss_mode = cfg->color_mode;
+
+	info.force_1d = cfg->force_1d;
 
 	/* calculate addresses */
 	info.paddr = oi->ba;
