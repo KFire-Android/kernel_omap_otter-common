@@ -840,6 +840,14 @@ static const struct ti_hdmi_ip_ops omap5_hdmi_functions = {
 	.dump_pll		=	ti_hdmi_4xxx_pll_dump,
 	.dump_phy		=	ti_hdmi_4xxx_phy_dump,
 	.irq_handler		=	ti_hdmi_4xxx_irq_handler,
+#if defined(CONFIG_OMAP5_DSS_HDMI_AUDIO)
+	.audio_enable		=	ti_hdmi_4xxx_wp_audio_enable,
+	.audio_disable		=	ti_hdmi_4xxx_wp_audio_disable,
+	.audio_start		=	ti_hdmi_5xxx_audio_start,
+	.audio_stop		=	ti_hdmi_5xxx_audio_stop,
+	.audio_config		=	ti_hdmi_5xxx_audio_config,
+	.audio_get_dma_port	=	ti_hdmi_4xxx_audio_get_dma_port,
+#endif
 };
 
 void dss_init_hdmi_ip_ops(struct hdmi_ip_data *ip_data,
