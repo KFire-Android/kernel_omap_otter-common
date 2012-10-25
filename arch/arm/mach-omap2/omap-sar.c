@@ -426,7 +426,7 @@ static int set_sar_io_addr(struct sar_ram_entry *entry, u32 addr)
 	mod = sar_modules;
 
 	while (mod->base) {
-		if (addr >= mod->base && addr <= mod->base + mod->size) {
+		if (addr >= mod->base && addr < mod->base + mod->size) {
 			if (mod->invalid)
 				break;
 			entry->io_base = mod->io_base;
