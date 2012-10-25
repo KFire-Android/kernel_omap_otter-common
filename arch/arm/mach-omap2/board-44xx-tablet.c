@@ -798,7 +798,7 @@ static void __init omap_tablet_init(void)
 
 	omap4_i2c_init();
 	platform_add_devices(tablet_devices, ARRAY_SIZE(tablet_devices));
-	omap_serial_init();
+	omap4_board_serial_init();
 	omap_sdrc_init(NULL, NULL);
 	omap4_twl6030_hsmmc_init(mmc);
 

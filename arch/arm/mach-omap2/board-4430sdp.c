@@ -1042,7 +1042,7 @@ static void __init omap_4430sdp_init(void)
 	omap4_i2c_init();
 	omap_sfh7741prox_init();
 	platform_add_devices(sdp4430_devices, ARRAY_SIZE(sdp4430_devices));
-	omap_serial_init();
+	omap4_board_serial_init();
 	omap_sdrc_init(NULL, NULL);
 	omap4_sdp4430_wifi_init();
 	omap4_twl6030_hsmmc_init(mmc);
