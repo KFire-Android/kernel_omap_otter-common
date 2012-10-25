@@ -49,11 +49,11 @@ static struct omap4_idle_statedata omap4_idle_data[] = {
 		.mpu_state = PWRDM_POWER_CSWR,
 		.core_state = PWRDM_POWER_CSWR,
 	},
-	/* C4 - CPU0 OFF + CPU1 OFF + MPU OSWR + CORE ON*/
+	/* C4 - CPU0 OFF + CPU1 OFF + MPU OSWR + CORE OSWR */
 	{
 		.cpu_state = PWRDM_POWER_OFF,
 		.mpu_state = PWRDM_POWER_OSWR,
-		.core_state = PWRDM_POWER_ON,
+		.core_state = PWRDM_POWER_OSWR,
 	},
 };
 
@@ -249,13 +249,13 @@ static struct cpuidle_driver omap4_idle_driver = {
 			.disable = 0,
 		},
 		{
-			/* C4 - CPU0 OFF + CPU1 OFF + MPU OSWR + CORE ON*/
+			/* C4 - CPU0 OFF + CPU1 OFF + MPU OSWR + CORE OSWR*/
 			.exit_latency = 460 + 518,
 			.target_residency = 1100,
 			.flags = CPUIDLE_FLAG_TIME_VALID | CPUIDLE_FLAG_COUPLED,
 			.enter = omap4_enter_idle_coupled,
 			.name = "C4",
-			.desc = "MPUSS OSWR CORE ON",
+			.desc = "MPUSS OSWR CORE OSWR",
 			.disable = 0,
 		},
 	},
