@@ -580,8 +580,8 @@ static struct sar_module omap44xx_sar_modules[] = {
 	{ .base = L3_44XX_BASE_CLK1, .size = SZ_1M },
 	{ .base = L3_44XX_BASE_CLK2, .size = SZ_1M },
 	{ .base = L3_44XX_BASE_CLK3, .size = SZ_1M },
-	{ .base = OMAP44XX_USBTLL_BASE, .size = SZ_1M },
-	{ .base = OMAP44XX_UHH_CONFIG_BASE, .size = SZ_1M },
+	{ .base = OMAP44XX_USBTLL_BASE, .size = SZ_8K },
+	{ .base = OMAP44XX_UHH_CONFIG_BASE, .size = SZ_8K },
 	{ .base = L4_44XX_PHYS, .size = SZ_4M },
 	{ .base = L4_PER_44XX_PHYS, .size = SZ_4M },
 	{ .base = 0 },
@@ -659,11 +659,11 @@ static struct sar_module omap54xx_sar_modules[] = {
 	{ .base = L3_54XX_BASE_CLK2, .size = SZ_1M },
 	{ .base = L3_54XX_BASE_CLK3, .size = SZ_1M },
 #ifndef CONFIG_MACH_OMAP_5430ZEBU
-	{ .base = OMAP54XX_USBTLL_BASE, .size = SZ_1M },
-	{ .base = OMAP54XX_UHH_CONFIG_BASE, .size = SZ_1M },
+	{ .base = OMAP54XX_USBTLL_BASE, .size = SZ_8K },
+	{ .base = OMAP54XX_UHH_CONFIG_BASE, .size = SZ_8K },
 #else
-	{ .base = OMAP54XX_USBTLL_BASE, .size = SZ_1M, .invalid = true },
-	{ .base = OMAP54XX_UHH_CONFIG_BASE, .size = SZ_1M, .invalid = true },
+	{ .base = OMAP54XX_USBTLL_BASE, .size = SZ_8K, .invalid = true },
+	{ .base = OMAP54XX_UHH_CONFIG_BASE, .size = SZ_8K, .invalid = true },
 #endif
 	{ .base = L4_54XX_PHYS, .size = SZ_4M },
 	{ .base = L4_PER_54XX_PHYS, .size = SZ_4M },
