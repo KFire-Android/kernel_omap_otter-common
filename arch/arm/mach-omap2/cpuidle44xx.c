@@ -37,13 +37,19 @@ static struct omap4_idle_statedata omap4_idle_data[] = {
 		.mpu_state = PWRDM_POWER_ON,
 		.core_state = PWRDM_POWER_ON,
 	},
-	/* C2 - CPU0 OFF + CPU1 OFF + MPU CSWR + CORE ON */
+	/* C2 - CPU0 INA + CPU1 OFF + MPU INA + CORE INA */
+	{
+		.cpu_state = PWRDM_POWER_INACTIVE,
+		.mpu_state = PWRDM_POWER_INACTIVE,
+		.core_state = PWRDM_POWER_INACTIVE,
+	},
+	/* C3 - CPU0 OFF + CPU1 OFF + MPU CSWR + CORE ON */
 	{
 		.cpu_state = PWRDM_POWER_OFF,
 		.mpu_state = PWRDM_POWER_CSWR,
 		.core_state = PWRDM_POWER_ON,
 	},
-	/* C3 - CPU0 OFF + CPU1 OFF + MPU OSWR + CORE ON*/
+	/* C4 - CPU0 OFF + CPU1 OFF + MPU OSWR + CORE ON*/
 	{
 		.cpu_state = PWRDM_POWER_OFF,
 		.mpu_state = PWRDM_POWER_OSWR,
@@ -134,7 +140,11 @@ static int omap4_enter_idle_coupled(struct cpuidle_device *dev,
 			cpu_cluster_pm_enter();
 	}
 
-	omap_enter_lowpower(dev->cpu, cx->cpu_state);
+	if (dev->cpu == 0)
+		omap_enter_lowpower(dev->cpu, cx->cpu_state);
+	else
+		omap_enter_lowpower(dev->cpu, PWRDM_POWER_OFF);
+
 	cpu_done[dev->cpu] = true;
 
 	mpuss_context_lost = omap_mpuss_read_prev_context_state();
@@ -219,22 +229,32 @@ static struct cpuidle_driver omap4_idle_driver = {
 			.disable = 0,
 		},
 		{
-			/* C2 - CPU0 OFF + CPU1 OFF + MPU CSWR + CORE ON*/
+			/* C2 - CPU0 INA + CPU1 OFF + MPU INA + CORE INA*/
+			.exit_latency = 350,
+			.target_residency = 350,
+			.flags = CPUIDLE_FLAG_TIME_VALID | CPUIDLE_FLAG_COUPLED,
+			.enter = omap4_enter_idle_coupled,
+			.name = "C2",
+			.desc = "MPUSS INA CORE INA",
+			.disable = 0,
+		},
+		{
+			/* C3 - CPU0 OFF + CPU1 OFF + MPU CSWR + CORE ON*/
 			.exit_latency = 328 + 440,
 			.target_residency = 960,
 			.flags = CPUIDLE_FLAG_TIME_VALID | CPUIDLE_FLAG_COUPLED,
 			.enter = omap4_enter_idle_coupled,
-			.name = "C2",
+			.name = "C3",
 			.desc = "MPUSS CSWR CORE ON",
 			.disable = 0,
 		},
 		{
-			/* C3 - CPU0 OFF + CPU1 OFF + MPU OSWR + CORE ON*/
+			/* C4 - CPU0 OFF + CPU1 OFF + MPU OSWR + CORE ON*/
 			.exit_latency = 460 + 518,
 			.target_residency = 1100,
 			.flags = CPUIDLE_FLAG_TIME_VALID | CPUIDLE_FLAG_COUPLED,
 			.enter = omap4_enter_idle_coupled,
-			.name = "C3",
+			.name = "C4",
 			.desc = "MPUSS OSWR CORE ON",
 			.disable = 0,
 		},
