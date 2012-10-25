@@ -1091,11 +1091,6 @@ add_children(struct twl4030_platform_data *pdata, unsigned irq_base,
 					features);
 		if (IS_ERR(child))
 			return PTR_ERR(child);
-
-		child = add_regulator(TWL6030_REG_CLK32KG, pdata->clk32kg,
-					features);
-		if (IS_ERR(child))
-			return PTR_ERR(child);
 	}
 
 	/* 6030 and 6032 share this regulator */
@@ -1117,6 +1112,11 @@ add_children(struct twl4030_platform_data *pdata, unsigned irq_base,
 
 		child = add_regulator(TWL6030_REG_REGEN1,
 				pdata->sysen, features);
+		if (IS_ERR(child))
+			return PTR_ERR(child);
+
+		child = add_regulator(TWL6030_REG_CLK32KG, pdata->clk32kg,
+					features);
 		if (IS_ERR(child))
 			return PTR_ERR(child);
 	}
