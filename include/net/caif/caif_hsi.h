@@ -67,6 +67,12 @@ struct cfhsi_desc {
 
 /* Bitmasks for the HSI descriptor. */
 #define CFHSI_PIGGY_DESC		(0x01 << 7)
+#define CFHSI_PROT_SPEED_CHANGE_DESC    (0x01 << 4)
+#define CFHSI_COM_BIT_DESC              (0x01 << 3)
+
+#define CFHSI_COM_ACK_SPEED_DESC            0x01
+#define CFHSI_COM_NACK_SPEED_DESC           0x02
+#define CFHSI_COM_REQUEST_SPEED_DESC        0x03
 
 #define CFHSI_TX_STATE_IDLE			0
 #define CFHSI_TX_STATE_XFER			1
@@ -91,6 +97,14 @@ struct cfhsi_desc {
 #define CFHSI_WAKE_TOUT			(3 * HZ)
 #endif /* CFHSI_WAKE_TOUT */
 
+#ifndef CFHSI_WAKE_UP_TOUT
+#define CFHSI_WAKE_UP_TOUT		(3 * HZ)
+#endif /* CFHSI_WAKE_UP_TOUT */
+
+#ifndef CFHSI_WAKE_DOWN_TOUT
+#define CFHSI_WAKE_DOWN_TOUT		(30 * HZ)
+#endif /* CFHSI_WAKE_DOWN_TOUT */
+
 #ifndef CFHSI_MAX_RX_RETRIES
 #define CFHSI_MAX_RX_RETRIES		(10 * HZ)
 #endif
@@ -99,26 +113,68 @@ struct cfhsi_desc {
 #define CFHSI_RX_GRACE_PERIOD		(1 * HZ)
 #endif
 
+/* Defines for dynamic speed changes */
+
+#define DYN_SPEED_T1_FB_VALUE               5000
+#define DYN_SPEED_T1_FF_VALUE                100
+#define DYN_SPEED_T2_VALUE                   100
+#define DYN_SPEED_DISABLED_AFTER_NACK_VALUE   10
+#define DYN_SPEED_FILL_GRADE_F1                2
+#define DYN_SPEED_FILL_GRADE_F2               80
+#define DYN_SPEED_FILL_GRADE_N                 2
+#define DYN_SPEED_QUEUE_FILL_Q1               80
+#define DYN_SPEED_T3_TP_INTERVAL            1000
+#define DYN_SPEED_TP_FB_FACTOR                25
+
+enum dyn_speed_cmd {
+	CFHSI_DYN_SPEED_GO_LOWEST,
+	CFHSI_DYN_SPEED_GO_DOWN,
+	CFHSI_DYN_SPEED_GO_UP,
+	CFHSI_DYN_SPEED_GO_HIGHEST,
+};
+
+enum dyn_speed_level {
+	CFHSI_DYN_SPEED_LOW,
+	CFHSI_DYN_SPEED_MIDDLE,
+	CFHSI_DYN_SPEED_HIGH,
+};
+
+enum pending_acknack_response {
+	CFHSI_DYN_SPEED_NO_RESPONSE,
+	CFHSI_DYN_SPEED_SEND_ACK,
+	CFHSI_DYN_SPEED_SEND_NACK,
+};
+
 /* Structure implemented by the CAIF HSI driver. */
-struct cfhsi_drv {
-	void (*tx_done_cb) (struct cfhsi_drv *drv);
-	void (*rx_done_cb) (struct cfhsi_drv *drv);
-	void (*wake_up_cb) (struct cfhsi_drv *drv);
-	void (*wake_down_cb) (struct cfhsi_drv *drv);
+struct cfhsi_cb_ops {
+	void (*tx_done_cb) (struct cfhsi_cb_ops *drv);
+	void (*rx_done_cb) (struct cfhsi_cb_ops *drv);
+	void (*wake_up_cb) (struct cfhsi_cb_ops *drv);
+	void (*wake_down_cb) (struct cfhsi_cb_ops *drv);
 };
 
 /* Structure implemented by HSI device. */
-struct cfhsi_dev {
-	int (*cfhsi_up) (struct cfhsi_dev *dev);
-	int (*cfhsi_down) (struct cfhsi_dev *dev);
-	int (*cfhsi_tx) (u8 *ptr, int len, struct cfhsi_dev *dev);
-	int (*cfhsi_rx) (u8 *ptr, int len, struct cfhsi_dev *dev);
-	int (*cfhsi_wake_up) (struct cfhsi_dev *dev);
-	int (*cfhsi_wake_down) (struct cfhsi_dev *dev);
-	int (*cfhsi_get_peer_wake) (struct cfhsi_dev *dev, bool *status);
-	int (*cfhsi_fifo_occupancy)(struct cfhsi_dev *dev, size_t *occupancy);
-	int (*cfhsi_rx_cancel)(struct cfhsi_dev *dev);
-	struct cfhsi_drv *drv;
+struct cfhsi_ops {
+	int (*cfhsi_up) (struct cfhsi_ops *dev);
+	int (*cfhsi_down) (struct cfhsi_ops *dev);
+	int (*cfhsi_tx) (u8 *ptr, int len, struct cfhsi_ops *dev);
+	int (*cfhsi_rx) (u8 *ptr, int len, struct cfhsi_ops *dev);
+	int (*cfhsi_wake_up) (struct cfhsi_ops *dev);
+	int (*cfhsi_wake_down) (struct cfhsi_ops *dev);
+	int (*cfhsi_get_peer_wake) (struct cfhsi_ops *dev, bool *status);
+	int (*cfhsi_fifo_occupancy) (struct cfhsi_ops *dev, size_t *occupancy);
+	int (*cfhsi_rx_cancel)(struct cfhsi_ops *dev);
+	int (*cfhsi_set_hsi_clock) (struct cfhsi_ops *dev,
+				    unsigned int hsi_clock);
+	int (*cfhsi_change_tx_speed) (struct cfhsi_ops *dev,
+				      enum dyn_speed_cmd speed_cmd,
+				      u32 *tx_speed,
+				      enum dyn_speed_level *speed_level);
+	int (*cfhsi_get_next_tx_speed) (struct cfhsi_ops *dev,
+					enum dyn_speed_cmd speed_cmd,
+					u32 *tx_next_speed);
+	int (*cfhsi_change_rx_speed) (struct cfhsi_ops *dev, u32 rx_speed);
+	struct cfhsi_cb_ops *cb_ops;
 };
 
 /* Structure holds status of received CAIF frames processing */
@@ -130,17 +186,69 @@ struct cfhsi_rx_state {
 	bool piggy_desc;
 };
 
+/* Priority mapping */
+enum {
+	CFHSI_PRIO_CTL = 0,
+	CFHSI_PRIO_VI,
+	CFHSI_PRIO_VO,
+	CFHSI_PRIO_BEBK,
+	CFHSI_PRIO_LAST,
+};
+
+struct cfhsi_config {
+	u32 inactivity_timeout;
+	u32 aggregation_timeout;
+	u32 head_align;
+	u32 tail_align;
+	u32 q_high_mark;
+	u32 q_low_mark;
+	u32 tx_dyn_speed_change;
+	u32 rx_dyn_speed_change;
+	u32 change_hsi_clock;
+};
+
+enum fallback_state {
+	FB_CHECK_QUEUE_LEVEL = 0,
+	FB_THROUGHPUT_MEASUREMENT,
+};
+
+/* Structure holding params for dynamic speed change */
+struct dynamic_speed {
+	enum dyn_speed_level tx_speed_level;
+	enum dyn_speed_level rx_speed_level;
+	enum pending_acknack_response acknack_response;
+	enum fallback_state fb_state;
+	u32 tx_speed;
+	u32 tx_next_speed;
+	u32 rx_speed;
+	bool tx_speed_change_enabled;
+	bool negotiation_in_progress;
+	unsigned long T1_fb_time_stamp;
+	unsigned long T1_ff_time_stamp;
+	unsigned long T2_time_stamp;
+	unsigned long T1_fb_time_factor;
+	unsigned long T1_ff_time_factor;
+	unsigned long T2_time_factor;
+	unsigned long throughput_time_factor;
+	u32 prev_fill_grade;
+	u32 uplink_data_counter;
+	bool throughput_data_valid;
+	bool throughput_msg_ongoing;
+	unsigned long data_count_timestamp;
+	u8 *tx_com_buf;
+};
+
 /* Structure implemented by CAIF HSI drivers. */
 struct cfhsi {
 	struct caif_dev_common cfdev;
 	struct net_device *ndev;
 	struct platform_device *pdev;
-	struct sk_buff_head qhead;
-	struct cfhsi_drv drv;
-	struct cfhsi_dev *dev;
+	struct sk_buff_head qhead[CFHSI_PRIO_LAST];
+	struct cfhsi_cb_ops cb_ops;
+	struct cfhsi_ops *ops;
 	int tx_state;
 	struct cfhsi_rx_state rx_state;
-	unsigned long inactivity_timeout;
+	struct cfhsi_config cfg;
 	int rx_len;
 	u8 *rx_ptr;
 	u8 *tx_buf;
@@ -148,8 +256,6 @@ struct cfhsi {
 	u8 *rx_flip_buf;
 	spinlock_t lock;
 	int flow_off_sent;
-	u32 q_low_mark;
-	u32 q_high_mark;
 	struct list_head list;
 	struct work_struct wake_up_work;
 	struct work_struct wake_down_work;
@@ -158,18 +264,45 @@ struct cfhsi {
 	wait_queue_head_t wake_up_wait;
 	wait_queue_head_t wake_down_wait;
 	wait_queue_head_t flush_fifo_wait;
-	struct timer_list timer;
+	struct timer_list inactivity_timer;
 	struct timer_list rx_slowpath_timer;
+
+	/* TX aggregation */
+	int aggregation_len;
+	struct timer_list aggregation_timer;
+
 	unsigned long bits;
+	struct dynamic_speed dyn_speed;
 #ifdef CONFIG_WAKELOCK
 	struct wake_lock link_wakelock;
 	struct timer_list sys_wakelock_timer;
 	unsigned long last_rx_jiffies;
 #endif
 };
-
 extern struct platform_driver cfhsi_driver;
 
+/**
+ * enum ifla_caif_hsi - CAIF HSI NetlinkRT parameters.
+ * @IFLA_CAIF_HSI_INACTIVITY_TOUT: Inactivity timeout before
+ *			taking the HSI wakeline down, in milliseconds.
+ * When using RT Netlink to create, destroy or configure a CAIF HSI interface,
+ * enum ifla_caif_hsi is used to specify the configuration attributes.
+ */
+enum ifla_caif_hsi {
+	__IFLA_CAIF_HSI_UNSPEC,
+	__IFLA_CAIF_HSI_INACTIVITY_TOUT,
+	__IFLA_CAIF_HSI_AGGREGATION_TOUT,
+	__IFLA_CAIF_HSI_HEAD_ALIGN,
+	__IFLA_CAIF_HSI_TAIL_ALIGN,
+	__IFLA_CAIF_HSI_QHIGH_WATERMARK,
+	__IFLA_CAIF_HSI_QLOW_WATERMARK,
+	__IFLA_CAIF_HSI_TX_DYN_SPEED_CHANGE,
+	__IFLA_CAIF_HSI_RX_DYN_SPEED_CHANGE,
+	__IFLA_CAIF_HSI_CHANGE_HSI_CLOCK,
+	__IFLA_CAIF_HSI_MAX
+};
+
+extern struct cfhsi_ops *cfhsi_get_ops(void);
 #ifdef CONFIG_WAKELOCK
 static inline void cfhsi_wakelock_lock(struct cfhsi *cfhsi)
 {

@@ -40,15 +40,15 @@ MODULE_ALIAS_LDISC(N_CAIF);
 /*This list is protected by the rtnl lock. */
 static LIST_HEAD(ser_list);
 
-static int ser_loop;
+static bool ser_loop;
 module_param(ser_loop, bool, S_IRUGO);
 MODULE_PARM_DESC(ser_loop, "Run in simulated loopback mode.");
 
-static int ser_use_stx = 1;
+static bool ser_use_stx = 1;
 module_param(ser_use_stx, bool, S_IRUGO);
 MODULE_PARM_DESC(ser_use_stx, "STX enabled or not.");
 
-static int ser_use_fcs = 1;
+static bool ser_use_fcs = 1;
 
 #ifdef CONFIG_CAIF_USE_DEPRECATED_FUNC
 #ifdef CONFIG_CAIF_TTY_PM
