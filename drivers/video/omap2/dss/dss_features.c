@@ -791,7 +791,7 @@ static const struct omap_dss_features omap5_dss_features = {
 	.burst_size_unit = 16,
 };
 
-#if defined(CONFIG_OMAP4_DSS_HDMI)
+#if defined(CONFIG_OMAP4_DSS_HDMI) || defined(CONFIG_OMAP5_DSS_HDMI)
 /* HDMI OMAP4 Functions*/
 static const struct ti_hdmi_ip_ops omap4_hdmi_functions = {
 
@@ -821,6 +821,27 @@ static const struct ti_hdmi_ip_ops omap4_hdmi_functions = {
 
 };
 
+/* HDMI OMAP5 Functions*/
+static const struct ti_hdmi_ip_ops omap5_hdmi_functions = {
+#if defined(CONFIG_OMAP5_DSS_HDMI)
+	.video_configure	=	ti_hdmi_5xxx_basic_configure,
+	.read_edid		=	ti_hdmi_5xxx_read_edid,
+	.irq_core_handler	=	ti_hdmi_5xxx_core_irq_handler,
+	.dump_core		=	ti_hdmi_5xxx_core_dump,
+#endif
+	.phy_enable		=	ti_hdmi_4xxx_phy_enable,
+	.phy_disable		=	ti_hdmi_4xxx_phy_disable,
+	.detect			=	ti_hdmi_4xxx_detect,
+	.pll_enable		=	ti_hdmi_4xxx_pll_enable,
+	.pll_disable		=	ti_hdmi_4xxx_pll_disable,
+	.video_enable		=	ti_hdmi_4xxx_wp_video_start,
+	.video_disable		=	ti_hdmi_4xxx_wp_video_stop,
+	.dump_wrapper		=	ti_hdmi_4xxx_wp_dump,
+	.dump_pll		=	ti_hdmi_4xxx_pll_dump,
+	.dump_phy		=	ti_hdmi_4xxx_phy_dump,
+	.irq_handler		=	ti_hdmi_4xxx_irq_handler,
+};
+
 void dss_init_hdmi_ip_ops(struct hdmi_ip_data *ip_data,
 		enum omapdss_version version)
 {
@@ -829,6 +850,9 @@ void dss_init_hdmi_ip_ops(struct hdmi_ip_data *ip_data,
 	case OMAPDSS_VER_OMAP4430_ES2:
 	case OMAPDSS_VER_OMAP4:
 		ip_data->ops = &omap4_hdmi_functions;
+		break;
+	case OMAPDSS_VER_OMAP5:
+		ip_data->ops = &omap5_hdmi_functions;
 		break;
 	default:
 		ip_data->ops = NULL;
