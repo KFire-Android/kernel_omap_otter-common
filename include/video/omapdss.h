@@ -421,6 +421,7 @@ struct omap_overlay_info {
 	u8 pre_mult_alpha;
 	u8 zorder;
 	bool force_1d;
+	bool mflag_en;
 };
 
 struct omap_overlay {
