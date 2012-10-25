@@ -56,6 +56,14 @@
 			"40124000.mcbsp Playback", "MM_EXT_DL",
 			"MM_EXT_UL", "40124000.mcbsp Capture";
 	};
+
+	sound_hdmi {
+		compatible = "ti,omap-hdmi-tpd12s015-audio";
+		ti,model = "OMAP5HDMI";
+
+		ti,hdmi_audio = <&hdmi>;
+		ti,level_shifter = <&tpd12s015>;
+	};
 };
 
 &mmc1 {
@@ -107,6 +115,16 @@
 	};
 };
 
+
+&i2c5 {
+	tca6424a: tca6424a@22 {
+		compatible = "ti,tca6424a";
+		reg = <0x22>;
+		gpio-controller;
+		#gpio-cells = <2>;
+	};
+};
+
 &omap5_pmx_core {
 	pinctrl-names = "default";
 	pinctrl-0 = <
@@ -115,6 +133,9 @@
 			&dmic_pins
 			&mcbsp1_pins
 			&mcbsp2_pins
+			&dss_hdmi_pins
+			&tpd12s015_pins
+			&tca6424a_pins
 	>;
 
 	twl6040_pins: pinmux_twl6040_pins {
@@ -158,6 +179,42 @@
 			0x158 0x100	/* abemcbsp2_fsx.abemcbsp2_fsx INPUT | MODE0 */
 			0x15a 0x100	/* abemcbsp2_clkx.abemcbsp2_clkx INPUT | MODE0 */
 		>;
+	};
+
+	dss_hdmi_pins: pinmux_dss_hdmi_pins {
+		pinctrl-single,pins = <
+			0x0fc 0x118	/* hdmi_cec.hdmi_cec INPUT PULLUP | MODE 0 */
+			0x100 0x118	/* hdmi_scl.hdmi_scl INPUT PULLUP | MODE 0 */
+			0x102 0x118	/* hdmi_sda.hdmi_sda INPUT PULLUP | MODE 0 */
+		>;
+	};
+
+	tpd12s015_pins: pinmux_tpd12s015_pins {
+		pinctrl-single,pins = <
+			0x0fe 0x116	/* hdmi_hpd.gpio7_193 INPUT PULLDOWN | MODE6 */
+		>;
+	};
+
+	tca6424a_pins: pinmux_tca6424a_pins {
+		pinctrl-single,pins = <
+			0x186 0x100	/* i2c5_scl.i2c5_scl INPUT | MODE0 */
+			0x188 0x100	/* i2c5_sda.i2c5_sda INPUT | MODE0 */
+		>;
+	};
+};
+
+&hdmi {
+	tpd12s015: tpd12s015 {
+		compatible = "ti,tpd12s015";
+
+		gpios = <&tca6424a 0 0>,	/* TCA6424A P01, CT_CP_HDP */
+			<&tca6424a 1 0>,	/* TCA6424A P00, LS_OE*/
+			<&gpio7 1 0>;		/* 193, HPD */
+
+		hdmi-monitor {
+			compatible = "ti,hdmi_panel";
+		};
+
 	};
 };
 
