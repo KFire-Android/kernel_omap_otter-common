@@ -37,6 +37,7 @@
 #include <linux/interrupt.h>
 #include <linux/gpio.h>
 #include <linux/slab.h>
+#include <linux/debugfs.h>
 #include <linux/thermal_framework.h>
 #include <asm/unaligned.h>
 #include <linux/mfd/palmas.h>
@@ -147,6 +148,7 @@ struct bq27x00_device_info {
 	struct	mutex lock;
 	/* reference to the cooling device */
 	struct	thermal_dev *tdev;
+	bool enable_charger;
 };
 
 static enum power_supply_property bq27x00_battery_props[] = {
@@ -960,6 +962,7 @@ static int battery_apply_cooling(struct thermal_dev *dev,
 	 * for battery cooling device.
 	 */
 	dev_dbg(di->dev, "Cool levl %d percentage %d\n", level, percent);
+	mutex_lock(&battery_mutex);
 	if (percent) {
 		/* Set the Battery Charging to ON */
 		charge_level = 100;
@@ -973,12 +976,66 @@ static int battery_apply_cooling(struct thermal_dev *dev,
 									false);
 		charge_level = 0;
 	}
+	mutex_unlock(&battery_mutex);
 
 	return 0;
 }
 
+static int enable_charger_get(void *data, u64 *val)
+{
+	struct thermal_dev *tdev = data;
+	struct i2c_client *client = to_i2c_client(tdev->dev);
+	struct bq27x00_device_info *di = i2c_get_clientdata(client);
+
+	*val = di->enable_charger;
+
+	return 0;
+}
+
+static int enable_charger_set(void *data, u64 val)
+{
+	struct thermal_dev *tdev = data;
+	struct i2c_client *client = to_i2c_client(tdev->dev);
+	struct bq27x00_device_info *di = i2c_get_clientdata(client);
+
+	mutex_lock(&battery_mutex);
+	di->enable_charger = (int)val;
+
+	if (di->enable_charger) {
+		/* Set the Battery Charging to ON */
+		/* Control command is 0x001A */
+		bq27x00_write(di, BQ27x00_REG_CONTL, BQ27x00_CONTL_CMD_CHRG_EN,
+									false);
+	} else {
+		/* Set the Battery Charging to OFF */
+		/* Control command is 0x001B */
+		bq27x00_write(di, BQ27x00_REG_CONTL, BQ27x00_CONTL_CMD_CHRG_DIS,
+									false);
+	}
+	mutex_unlock(&battery_mutex);
+
+	return 0;
+}
+DEFINE_SIMPLE_ATTRIBUTE(enable_charger_fops, enable_charger_get,
+						enable_charger_set, "%llu\n");
+
+#ifdef CONFIG_THERMAL_FRAMEWORK_DEBUG
+static int battery_register_debug_entries(struct thermal_dev *tdev,
+					struct dentry *d)
+{
+	/* Read/Write - Debug properties of battery sensor */
+	(void) debugfs_create_file("enable_charger",
+			S_IRUGO | S_IWUSR, d, tdev,
+			&enable_charger_fops);
+	return 0;
+}
+#endif
+
 static struct thermal_dev_ops battery_cooling_ops = {
 	.cool_device = battery_apply_cooling,
+#ifdef CONFIG_THERMAL_FRAMEWORK_DEBUG
+	.register_debug_entries = battery_register_debug_entries,
+#endif
 };
 
 static struct thermal_dev battery_thermal_dev = {
@@ -1035,6 +1092,7 @@ static int bq27x00_battery_probe(struct i2c_client *client,
 		goto batt_failed_3;
 	}
 
+	di->enable_charger = true;
 	di->gpio_irq = gpio_to_irq(di->gpio);
 
 	if (bq27x00_powersupply_init(di))
