@@ -63,6 +63,22 @@ struct hdmi_pll_info {
 	enum hdmi_clk_refsel refsel;
 };
 
+struct hdmi_irq_vector {
+	u8      pll_recal;
+	u8      pll_unlock;
+	u8      pll_lock;
+	u8      phy_disconnect;
+	u8      phy_connect;
+	u8      phy_short_5v;
+	u8      video_end_fr;
+	u8      video_vsync;
+	u8      fifo_sample_req;
+	u8      fifo_overflow;
+	u8      fifo_underflow;
+	u8      ocp_timeout;
+	u8      core;
+};
+
 struct ti_hdmi_ip_ops {
 
 	void (*video_configure)(struct hdmi_ip_data *ip_data);
