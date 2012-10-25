@@ -379,7 +379,8 @@ struct dss2_ovl_cfg {
 	__u8 zonly;	/* only set zorder and enabled bit */
 	__u8 mgr_ix;	/* mgr index */
 
-	bool force_1d;
+	bool force_1d; /* force 1d access through tiled buffer */
+	bool mflag_en; /* mflag for the overlay */
 } __aligned(4);
 
 enum omapdss_buffer_type {
