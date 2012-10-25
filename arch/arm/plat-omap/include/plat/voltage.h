@@ -14,6 +14,10 @@
 /**
  * struct omap_volt_data - Omap voltage specific data.
  * @volt_nominal:	The possible voltage value in uV
+ * @voltage_calibrated:	The Calibrated voltage value in uV
+ * @voltage_dynamic_nominal:	The run time optimized nominal voltage for
+ *			the device. Dynamic nominal is the nominal voltage
+ *			specialized for that OPP on the device in uV.
  * @volt_margin:	Additional sofware margin to add to OPP calibrated
  *			voltage
  * @sr_efuse_offs:	The offset of the efuse register(from system
@@ -27,6 +31,8 @@
  */
 struct omap_volt_data {
 	u32	volt_nominal;
+	u32	volt_calibrated;
+	u32	volt_dynamic_nominal;
 	u32	volt_margin;
 	u32	sr_efuse_offs;
 	u32	lvt_sr_efuse_offs;

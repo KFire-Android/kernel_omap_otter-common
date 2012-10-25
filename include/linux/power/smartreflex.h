@@ -175,6 +175,8 @@ struct omap_sr {
 	struct omap_sr_nvalue_table	*nvalue_table;
 	struct omap_sr_nvalue_table	*lvt_nvalue_table;
 	struct voltagedomain		*voltdm;
+	/* Managed by class driver as needed */
+	void				*voltdm_cdata;
 	struct dentry			*dbg_dir;
 	unsigned int			irq;
 	bool				irq_enabled;
@@ -259,6 +261,7 @@ struct omap_smartreflex_dev_attr {
 #define SR_CLASS1	0x1
 #define SR_CLASS2	0x2
 #define SR_CLASS3	0x3
+#define SR_CLASS1P5	0x4
 
 /**
  * struct omap_sr_class_data - Smartreflex class driver info

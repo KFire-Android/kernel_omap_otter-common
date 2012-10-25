@@ -53,6 +53,9 @@ struct omap_vfsm_instance {
 	u8 voltsetup_off_reg;
 };
 
+/* Dynamic nominal voltage margin common for OMAP3630 and OMAP4 */
+#define OMAP3PLUS_DYNAMIC_NOMINAL_MARGIN_UV	50000
+
 /**
  * struct voltagedomain - omap voltage domain global structure.
  * @name: Name of the voltage domain which can be used as a unique identifier.
@@ -270,8 +273,27 @@ static inline unsigned long omap_get_operation_voltage(
 {
 	if (!vdata)
 		return 0;
+	return (vdata->volt_calibrated) ? vdata->volt_calibrated :
+		(vdata->volt_dynamic_nominal) ? vdata->volt_dynamic_nominal :
+			vdata->volt_nominal;
+}
+
+/* what is my dynamic nominal? */
+static inline unsigned long omap_get_dyn_nominal(struct omap_volt_data *vdata)
+{
+	if (IS_ERR_OR_NULL(vdata))
+		return 0;
+	if (vdata->volt_calibrated) {
+		unsigned long v = vdata->volt_calibrated +
+			OMAP3PLUS_DYNAMIC_NOMINAL_MARGIN_UV;
+		if (v > vdata->volt_nominal)
+			return vdata->volt_nominal;
+		return v;
+	}
+
 	return vdata->volt_nominal;
 }
+
 static inline unsigned long omap_get_nominal_voltage(
 				struct omap_volt_data *vdata)
 {
@@ -279,5 +301,7 @@ static inline unsigned long omap_get_nominal_voltage(
 		return 0;
 	return vdata->volt_nominal;
 }
+
+int omap_voltage_calib_reset(struct voltagedomain *voltdm);
 
 #endif

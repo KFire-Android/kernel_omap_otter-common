@@ -32,6 +32,8 @@
 #define CASE_SUBZONES_NUMBER		4
 #define CASE_MAX_COOLING_ACTION		(CASE_SUBZONES_NUMBER + 4)
 int case_subzone_number = CASE_SUBZONES_NUMBER;
+EXPORT_SYMBOL_GPL(case_subzone_number);
+
 static int sys_threshold_hot = SYS_THRESHOLD_HOT;
 static int sys_threshold_cold = SYS_THRESHOLD_COLD;
 static int thot = SYS_THRESHOLD_COLD;

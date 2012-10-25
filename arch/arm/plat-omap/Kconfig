@@ -66,6 +66,27 @@ config POWER_AVS_OMAP
 	  by default during system init via the enable_on_init flag
 	  which an be passed as platform data to the smartreflex driver.
 
+config POWER_AVS_OMAP_CLASS1_P5
+	bool "Class 1.5 mode of Smartreflex Implementation"
+	depends on POWER_AVS_OMAP
+	help
+	  Say Y to enable Class 1.5 implementation of Smartreflex.
+
+	  SmartReflex Class 1.5 is a software controlled hardware
+	  calibration mechanism designed to improve DVFS latencies and
+	  system performance.
+
+config OMAP_SR_CLASS1_P5_RECALIBRATION_DELAY
+	int "Class 1.5 mode recalibration recalibration delay(ms)"
+	depends on POWER_AVS_OMAP_CLASS1_P5
+	default 86400000
+	help
+	  Setup the recalibration delay in milliseconds.
+
+	  Use 0 for never doing a recalibration (operates in AVS Class 1 mode).
+	  Defaults to recommended recalibration every 24hrs.
+	  If you do not understand this, use the default.
+
 config POWER_AVS_OMAP_CLASS3
 	bool "Class 3 mode of Smartreflex Implementation"
 	depends on POWER_AVS_OMAP && TWL4030_CORE
