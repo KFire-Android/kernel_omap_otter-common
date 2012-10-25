@@ -139,6 +139,9 @@ static int omap4_enter_idle_coupled(struct cpuidle_device *dev,
 
 	mpuss_context_lost = omap_mpuss_read_prev_context_state();
 
+	omap_set_pwrdm_state(mpu_pd, PWRDM_POWER_ON);
+	omap_set_pwrdm_state(core_pd, PWRDM_POWER_ON);
+
 	/* Wakeup CPU1 only if it is not offlined */
 	if (dev->cpu == 0 && cpumask_test_cpu(1, cpu_online_mask)) {
 		/*
