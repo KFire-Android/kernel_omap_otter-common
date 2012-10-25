@@ -827,6 +827,12 @@ static void hdmi_wp_irq_enable(struct hdmi_ip_data *ip_data,
 	hdmi_write_reg(hdmi_wp_base(ip_data), HDMI_WP_IRQENABLE_SET, r);
 }
 
+int ti_hdmi_4xxx_core_irq_handler(struct hdmi_ip_data *ip_data)
+{
+	/*TODO: handle core interrupts*/
+	return 0;
+}
+
 int ti_hdmi_4xxx_irq_handler(struct hdmi_ip_data *ip_data)
 {
 	u32 val = 0;
