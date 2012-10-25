@@ -660,6 +660,19 @@ static void dispc_ovl_set_vid_size(enum omap_plane plane, int width, int height)
 	dispc_write_reg(DISPC_OVL_SIZE(plane), val);
 }
 
+static void dispc_ovl_set_1d_tiled_mode(enum omap_plane plane, bool force_1d)
+{
+	struct omap_overlay *ovl = omap_dss_get_overlay(plane);
+
+	if ((ovl->caps & OMAP_DSS_OVL_CAP_FORCE_1D) == 0)
+		return;
+
+	if (plane == OMAP_DSS_GFX)
+		REG_FLD_MOD(DISPC_OVL_ATTRIBUTES(plane), force_1d, 16, 16);
+	else
+		REG_FLD_MOD(DISPC_OVL_ATTRIBUTES(plane), force_1d, 20, 20);
+}
+
 static void dispc_ovl_set_zorder(enum omap_plane plane, u8 zorder)
 {
 	struct omap_overlay *ovl = omap_dss_get_overlay(plane);
@@ -1905,6 +1918,9 @@ int dispc_ovl_setup(enum omap_plane plane, struct omap_overlay_info *oi,
 		dispc_ovl_set_ba1_uv(plane, oi->p_uv_addr + offset1);
 	}
 
+	/* Force 1D tiled mode */
+	if (ovl->caps & OMAP_DSS_OVL_CAP_FORCE_1D)
+		dispc_ovl_set_1d_tiled_mode(plane, oi->force_1d);
 
 	dispc_ovl_set_row_inc(plane, row_inc);
 	dispc_ovl_set_pix_inc(plane, pix_inc);

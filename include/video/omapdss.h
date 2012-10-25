@@ -420,6 +420,7 @@ struct omap_overlay_info {
 	u8 global_alpha;
 	u8 pre_mult_alpha;
 	u8 zorder;
+	bool force_1d;
 };
 
 struct omap_overlay {
