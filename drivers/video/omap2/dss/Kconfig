@@ -58,7 +58,7 @@ config OMAP2_DSS_VENC
 	  OMAP Video Encoder support for S-Video and composite TV-out.
 
 config OMAP4_DSS_HDMI
-	bool "HDMI support"
+	bool "OMAP4 HDMI support"
         default y
 	help
 	  HDMI Interface. This adds the High Definition Multimedia Interface.
