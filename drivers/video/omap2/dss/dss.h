@@ -189,6 +189,7 @@ struct writeback_cache_data {
 	enum omap_writeback_mode		mode;
 	u8					rotation;
 	enum omap_dss_rotation_type		rotation_type;
+	bool force_1d;
 };
 
 struct seq_file;

@@ -1457,6 +1457,7 @@ int omap_dss_wb_mgr_apply(struct omap_overlay_manager *mgr,
 		wbc->fifo_high = 0x10;
 		wbc->fifo_low = 0x8;
 		wbc->source = wb->info.source;
+		wbc->force_1d = wb->info.force_1d;
 
 		wbc->rotation = wb->info.rotation;
 		wbc->rotation_type = wb->info.rotation_type;
