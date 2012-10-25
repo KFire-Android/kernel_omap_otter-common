@@ -27,27 +27,31 @@
 struct omap4_idle_statedata {
 	u32 cpu_state;
 	u32 mpu_state;
+	u32 core_state;
 };
 
 static struct omap4_idle_statedata omap4_idle_data[] = {
-	/* C1 - CPU0 ON + CPU1 ON + MPU ON */
+	/* C1 - CPU0 ON + CPU1 ON + MPU ON + CORE ON */
 	{
 		.cpu_state = PWRDM_POWER_ON,
 		.mpu_state = PWRDM_POWER_ON,
+		.core_state = PWRDM_POWER_ON,
 	},
-	/* C2 - CPU0 OFF + CPU1 OFF + MPU CSWR */
+	/* C2 - CPU0 OFF + CPU1 OFF + MPU CSWR + CORE ON */
 	{
 		.cpu_state = PWRDM_POWER_OFF,
 		.mpu_state = PWRDM_POWER_CSWR,
+		.core_state = PWRDM_POWER_ON,
 	},
-	/* C3 - CPU0 OFF + CPU1 OFF + MPU OSWR */
+	/* C3 - CPU0 OFF + CPU1 OFF + MPU OSWR + CORE ON*/
 	{
 		.cpu_state = PWRDM_POWER_OFF,
 		.mpu_state = PWRDM_POWER_OSWR,
+		.core_state = PWRDM_POWER_ON,
 	},
 };
 
-static struct powerdomain *mpu_pd, *cpu_pd[NR_CPUS];
+static struct powerdomain *mpu_pd, *core_pd, *cpu_pd[NR_CPUS];
 static struct clockdomain *cpu_clkdm[NR_CPUS];
 
 static atomic_t abort_barrier;
@@ -116,12 +120,13 @@ static int omap4_enter_idle_coupled(struct cpuidle_device *dev,
 
 	if (dev->cpu == 0) {
 		omap_set_pwrdm_state(mpu_pd, cx->mpu_state);
+		omap_set_pwrdm_state(core_pd, cx->core_state);
 
 		/*
 		 * Call idle CPU cluster PM enter notifier chain
 		 * to save GIC and wakeupgen context.
 		 */
-		if (cx->mpu_state == PWRDM_POWER_OSWR)
+		if (pwrdm_power_state_le(cx->mpu_state, PWRDM_POWER_OSWR))
 			cpu_cluster_pm_enter();
 	}
 
@@ -166,33 +171,33 @@ static struct cpuidle_driver omap4_idle_driver = {
 	.en_core_tk_irqen		= 1,
 	.states = {
 		{
-			/* C1 - CPU0 ON + CPU1 ON + MPU ON */
+			/* C1 - CPU0 ON + CPU1 ON + MPU ON + CORE ON*/
 			.exit_latency = 2 + 2,
 			.target_residency = 5,
 			.flags = CPUIDLE_FLAG_TIME_VALID,
 			.enter = omap4_enter_idle_simple,
 			.name = "C1",
-			.desc = "MPUSS ON",
+			.desc = "MPUSS ON CORE ON",
 			.disable = 0,
 		},
 		{
-			/* C2 - CPU0 OFF + CPU1 OFF + MPU CSWR */
+			/* C2 - CPU0 OFF + CPU1 OFF + MPU CSWR + CORE ON*/
 			.exit_latency = 328 + 440,
 			.target_residency = 960,
 			.flags = CPUIDLE_FLAG_TIME_VALID | CPUIDLE_FLAG_COUPLED,
 			.enter = omap4_enter_idle_coupled,
 			.name = "C2",
-			.desc = "MPUSS CSWR",
+			.desc = "MPUSS CSWR CORE ON",
 			.disable = 0,
 		},
 		{
-			/* C3 - CPU0 OFF + CPU1 OFF + MPU OSWR */
+			/* C3 - CPU0 OFF + CPU1 OFF + MPU OSWR + CORE ON*/
 			.exit_latency = 460 + 518,
 			.target_residency = 1100,
 			.flags = CPUIDLE_FLAG_TIME_VALID | CPUIDLE_FLAG_COUPLED,
 			.enter = omap4_enter_idle_coupled,
 			.name = "C3",
-			.desc = "MPUSS OSWR",
+			.desc = "MPUSS OSWR CORE ON",
 			.disable = 0,
 		},
 	},
@@ -215,7 +220,8 @@ int __init omap4_idle_init(void)
 	mpu_pd = pwrdm_lookup("mpu_pwrdm");
 	cpu_pd[0] = pwrdm_lookup("cpu0_pwrdm");
 	cpu_pd[1] = pwrdm_lookup("cpu1_pwrdm");
-	if ((!mpu_pd) || (!cpu_pd[0]) || (!cpu_pd[1]))
+	core_pd = pwrdm_lookup("core_pwrdm");
+	if ((!mpu_pd) || (!cpu_pd[0]) || (!cpu_pd[1]) || (!core_pd))
 		return -ENODEV;
 
 	cpu_clkdm[0] = clkdm_lookup("mpu0_clkdm");
