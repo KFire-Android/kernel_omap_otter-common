@@ -97,7 +97,8 @@
 struct bq27x00_device_info;
 struct bq27x00_access_methods {
 	int (*read)(struct bq27x00_device_info *di, u8 reg, bool single);
-	int (*write)(struct bq27x00_device_info *di, u8 reg, u8 val);
+	int (*write)(struct bq27x00_device_info *di, u8 reg, u16 val,
+							bool single);
 };
 
 enum bq27x00_chip { BQ27000, BQ27500, BQ27530 };
@@ -185,9 +186,9 @@ static inline int bq27x00_read(struct bq27x00_device_info *di, u8 reg,
 }
 
 static inline int bq27x00_write(struct bq27x00_device_info *di, u8 reg,
-				u8 val)
+				u16 val, bool single)
 {
-	return di->bus.write(di, reg, val);
+	return di->bus.write(di, reg, val, single);
 }
 
 /*
@@ -870,11 +871,32 @@ static int bq27x00_read_i2c(struct bq27x00_device_info *di, u8 reg, bool single)
 	return ret;
 }
 
-static int bq27x00_write_i2c(struct bq27x00_device_info *di, u8 reg, u8 val)
+static int
+bq27x00_write_i2c(struct bq27x00_device_info *di, u8 reg, u16 val, bool single)
 {
 	struct i2c_client *client = to_i2c_client(di->dev);
+	struct i2c_msg msg[1];
+	unsigned char data[3];
+	int ret;
 
-	return i2c_smbus_write_byte_data(client, reg, val);
+	if (!client->adapter)
+		return -ENODEV;
+
+	msg[0].addr = client->addr;
+	msg[0].flags = 0;
+	data[0] = reg;
+	data[1] = val & 0x00FF;
+	if (!single) {
+		data[2] = (val & 0xFF00) >> 8;
+		msg[0].len = 3; /* 1 reg addr + 2 cmd bytes */
+	} else {
+		msg[0].len = 2; /* 1 reg addr + 1 cmd byte */
+	}
+	msg[0].buf = data;
+
+	ret = i2c_transfer(client->adapter, msg, ARRAY_SIZE(msg));
+
+	return ret;
 }
 
 static int bq27x00_usb_notifier_call(struct notifier_block *nb,
@@ -892,19 +914,19 @@ static int bq27x00_usb_notifier_call(struct notifier_block *nb,
 	case POWER_SUPPLY_TYPE_UNKNOWN:
 	case POWER_SUPPLY_TYPE_BATTERY:
 		/* on disconnect set safe minimal current - 100 mA */
-		bq27x00_write_i2c(di, BQ24160_CHRGR_CONTROL_REG, val);
+		bq27x00_write(di, BQ24160_CHRGR_CONTROL_REG, val, true);
 		break;
 	case POWER_SUPPLY_TYPE_USB:
 		/* USB2.0 host with 500 mA current limit */
 		val |= IUSB_LIMIT_1;
-		bq27x00_write_i2c(di, BQ24160_CHRGR_CONTROL_REG, val);
+		bq27x00_write(di, BQ24160_CHRGR_CONTROL_REG, val, true);
 		break;
 	case POWER_SUPPLY_TYPE_USB_DCP:
 	case POWER_SUPPLY_TYPE_USB_CDP:
 	case POWER_SUPPLY_TYPE_USB_ACA:
 		/* USB host/charger with 1500 mA current limit */
 		val |= IUSB_LIMIT_2 | IUSB_LIMIT_0;
-		bq27x00_write_i2c(di, BQ24160_CHRGR_CONTROL_REG, val);
+		bq27x00_write(di, BQ24160_CHRGR_CONTROL_REG, val, true);
 	default:
 		return NOTIFY_OK;
 	}
