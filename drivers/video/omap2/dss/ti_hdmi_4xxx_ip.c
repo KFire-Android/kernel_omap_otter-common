@@ -1176,6 +1176,8 @@ void ti_hdmi_4xxx_phy_dump(struct hdmi_ip_data *ip_data, struct seq_file *s)
 	DUMPPHY(HDMI_TXPHY_DIGITAL_CTRL);
 	DUMPPHY(HDMI_TXPHY_POWER_CTRL);
 	DUMPPHY(HDMI_TXPHY_PAD_CFG_CTRL);
+	if (omapdss_get_version() == OMAPDSS_VER_OMAP5)
+		DUMPPHY(HDMI_TXPHY_BIST_CONTROL);
 }
 
 #if defined(CONFIG_OMAP4_DSS_HDMI_AUDIO)
