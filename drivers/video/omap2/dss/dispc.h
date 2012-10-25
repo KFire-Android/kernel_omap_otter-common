@@ -818,6 +818,8 @@ static inline u16 DISPC_MFLAG_OFFSET(enum omap_plane plane)
 		return 0x71C;
 	case OMAP_DSS_VIDEO3:
 		return 0x56C;
+	case OMAP_DSS_WB:
+		return 0x370;
 	default:
 		BUG();
 	}
