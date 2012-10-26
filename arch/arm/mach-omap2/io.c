@@ -42,6 +42,12 @@
 #include "clock44xx.h"
 #include "clock54xx.h"
 
+#ifdef CONFIG_OMAP_SO_MAP_FORCE
+#define OMAP_IO_MAP_TYPE	MT_MEMORY_SO
+#else
+#define OMAP_IO_MAP_TYPE	MT_DEVICE
+#endif
+
 /*
  * The machine specific code may provide the extra mapping besides the
  * default mapping provided here.
@@ -53,13 +59,13 @@ static struct map_desc omap24xx_io_desc[] __initdata = {
 		.virtual	= L3_24XX_VIRT,
 		.pfn		= __phys_to_pfn(L3_24XX_PHYS),
 		.length		= L3_24XX_SIZE,
-		.type		= MT_DEVICE
+		.type		= OMAP_IO_MAP_TYPE
 	},
 	{
 		.virtual	= L4_24XX_VIRT,
 		.pfn		= __phys_to_pfn(L4_24XX_PHYS),
 		.length		= L4_24XX_SIZE,
-		.type		= MT_DEVICE
+		.type		= OMAP_IO_MAP_TYPE
 	},
 };
 
@@ -69,19 +75,19 @@ static struct map_desc omap242x_io_desc[] __initdata = {
 		.virtual	= DSP_MEM_2420_VIRT,
 		.pfn		= __phys_to_pfn(DSP_MEM_2420_PHYS),
 		.length		= DSP_MEM_2420_SIZE,
-		.type		= MT_DEVICE
+		.type		= OMAP_IO_MAP_TYPE
 	},
 	{
 		.virtual	= DSP_IPI_2420_VIRT,
 		.pfn		= __phys_to_pfn(DSP_IPI_2420_PHYS),
 		.length		= DSP_IPI_2420_SIZE,
-		.type		= MT_DEVICE
+		.type		= OMAP_IO_MAP_TYPE
 	},
 	{
 		.virtual	= DSP_MMU_2420_VIRT,
 		.pfn		= __phys_to_pfn(DSP_MMU_2420_PHYS),
 		.length		= DSP_MMU_2420_SIZE,
-		.type		= MT_DEVICE
+		.type		= OMAP_IO_MAP_TYPE
 	},
 };
 
@@ -93,25 +99,25 @@ static struct map_desc omap243x_io_desc[] __initdata = {
 		.virtual	= L4_WK_243X_VIRT,
 		.pfn		= __phys_to_pfn(L4_WK_243X_PHYS),
 		.length		= L4_WK_243X_SIZE,
-		.type		= MT_DEVICE
+		.type		= OMAP_IO_MAP_TYPE
 	},
 	{
 		.virtual	= OMAP243X_GPMC_VIRT,
 		.pfn		= __phys_to_pfn(OMAP243X_GPMC_PHYS),
 		.length		= OMAP243X_GPMC_SIZE,
-		.type		= MT_DEVICE
+		.type		= OMAP_IO_MAP_TYPE
 	},
 	{
 		.virtual	= OMAP243X_SDRC_VIRT,
 		.pfn		= __phys_to_pfn(OMAP243X_SDRC_PHYS),
 		.length		= OMAP243X_SDRC_SIZE,
-		.type		= MT_DEVICE
+		.type		= OMAP_IO_MAP_TYPE
 	},
 	{
 		.virtual	= OMAP243X_SMS_VIRT,
 		.pfn		= __phys_to_pfn(OMAP243X_SMS_PHYS),
 		.length		= OMAP243X_SMS_SIZE,
-		.type		= MT_DEVICE
+		.type		= OMAP_IO_MAP_TYPE
 	},
 };
 #endif
@@ -123,43 +129,43 @@ static struct map_desc omap34xx_io_desc[] __initdata = {
 		.virtual	= L3_34XX_VIRT,
 		.pfn		= __phys_to_pfn(L3_34XX_PHYS),
 		.length		= L3_34XX_SIZE,
-		.type		= MT_DEVICE
+		.type		= OMAP_IO_MAP_TYPE
 	},
 	{
 		.virtual	= L4_34XX_VIRT,
 		.pfn		= __phys_to_pfn(L4_34XX_PHYS),
 		.length		= L4_34XX_SIZE,
-		.type		= MT_DEVICE
+		.type		= OMAP_IO_MAP_TYPE
 	},
 	{
 		.virtual	= OMAP34XX_GPMC_VIRT,
 		.pfn		= __phys_to_pfn(OMAP34XX_GPMC_PHYS),
 		.length		= OMAP34XX_GPMC_SIZE,
-		.type		= MT_DEVICE
+		.type		= OMAP_IO_MAP_TYPE
 	},
 	{
 		.virtual	= OMAP343X_SMS_VIRT,
 		.pfn		= __phys_to_pfn(OMAP343X_SMS_PHYS),
 		.length		= OMAP343X_SMS_SIZE,
-		.type		= MT_DEVICE
+		.type		= OMAP_IO_MAP_TYPE
 	},
 	{
 		.virtual	= OMAP343X_SDRC_VIRT,
 		.pfn		= __phys_to_pfn(OMAP343X_SDRC_PHYS),
 		.length		= OMAP343X_SDRC_SIZE,
-		.type		= MT_DEVICE
+		.type		= OMAP_IO_MAP_TYPE
 	},
 	{
 		.virtual	= L4_PER_34XX_VIRT,
 		.pfn		= __phys_to_pfn(L4_PER_34XX_PHYS),
 		.length		= L4_PER_34XX_SIZE,
-		.type		= MT_DEVICE
+		.type		= OMAP_IO_MAP_TYPE
 	},
 	{
 		.virtual	= L4_EMU_34XX_VIRT,
 		.pfn		= __phys_to_pfn(L4_EMU_34XX_PHYS),
 		.length		= L4_EMU_34XX_SIZE,
-		.type		= MT_DEVICE
+		.type		= OMAP_IO_MAP_TYPE
 	},
 #if defined(CONFIG_DEBUG_LL) &&							\
 	(defined(CONFIG_MACH_OMAP_ZOOM2) || defined(CONFIG_MACH_OMAP_ZOOM3))
@@ -167,7 +173,7 @@ static struct map_desc omap34xx_io_desc[] __initdata = {
 		.virtual	= ZOOM_UART_VIRT,
 		.pfn		= __phys_to_pfn(ZOOM_UART_BASE),
 		.length		= SZ_1M,
-		.type		= MT_DEVICE
+		.type		= OMAP_IO_MAP_TYPE
 	},
 #endif
 };
@@ -179,7 +185,7 @@ static struct map_desc omapti81xx_io_desc[] __initdata = {
 		.virtual	= L4_34XX_VIRT,
 		.pfn		= __phys_to_pfn(L4_34XX_PHYS),
 		.length		= L4_34XX_SIZE,
-		.type		= MT_DEVICE
+		.type		= OMAP_IO_MAP_TYPE
 	}
 };
 #endif
@@ -190,13 +196,13 @@ static struct map_desc omapam33xx_io_desc[] __initdata = {
 		.virtual	= L4_34XX_VIRT,
 		.pfn		= __phys_to_pfn(L4_34XX_PHYS),
 		.length		= L4_34XX_SIZE,
-		.type		= MT_DEVICE
+		.type		= OMAP_IO_MAP_TYPE
 	},
 	{
 		.virtual	= L4_WK_AM33XX_VIRT,
 		.pfn		= __phys_to_pfn(L4_WK_AM33XX_PHYS),
 		.length		= L4_WK_AM33XX_SIZE,
-		.type		= MT_DEVICE
+		.type		= OMAP_IO_MAP_TYPE
 	}
 };
 #endif
@@ -207,19 +213,19 @@ static struct map_desc omap44xx_io_desc[] __initdata = {
 		.virtual	= L3_44XX_VIRT,
 		.pfn		= __phys_to_pfn(L3_44XX_PHYS),
 		.length		= L3_44XX_SIZE,
-		.type		= MT_DEVICE,
+		.type		= OMAP_IO_MAP_TYPE,
 	},
 	{
 		.virtual	= L4_44XX_VIRT,
 		.pfn		= __phys_to_pfn(L4_44XX_PHYS),
 		.length		= L4_44XX_SIZE,
-		.type		= MT_DEVICE,
+		.type		= OMAP_IO_MAP_TYPE,
 	},
 	{
 		.virtual	= L4_PER_44XX_VIRT,
 		.pfn		= __phys_to_pfn(L4_PER_44XX_PHYS),
 		.length		= L4_PER_44XX_SIZE,
-		.type		= MT_DEVICE,
+		.type		= OMAP_IO_MAP_TYPE,
 	},
 #ifdef CONFIG_OMAP4_ERRATA_I688
 	{
@@ -239,25 +245,25 @@ static struct map_desc omap54xx_io_desc[] __initdata = {
 		.virtual	= L3_54XX_VIRT,
 		.pfn		= __phys_to_pfn(L3_54XX_PHYS),
 		.length		= L3_54XX_SIZE,
-		.type		= MT_DEVICE,
+		.type		= OMAP_IO_MAP_TYPE,
 	},
 	{
 		.virtual	= L4_54XX_VIRT,
 		.pfn		= __phys_to_pfn(L4_54XX_PHYS),
 		.length		= L4_54XX_SIZE,
-		.type		= MT_DEVICE,
+		.type		= OMAP_IO_MAP_TYPE,
 	},
 	{
 		.virtual	= L4_WK_54XX_VIRT,
 		.pfn		= __phys_to_pfn(L4_WK_54XX_PHYS),
 		.length		= L4_WK_54XX_SIZE,
-		.type		= MT_DEVICE,
+		.type		= OMAP_IO_MAP_TYPE,
 	},
 	{
 		.virtual	= L4_PER_54XX_VIRT,
 		.pfn		= __phys_to_pfn(L4_PER_54XX_PHYS),
 		.length		= L4_PER_54XX_SIZE,
-		.type		= MT_DEVICE,
+		.type		= OMAP_IO_MAP_TYPE,
 	},
 #ifdef CONFIG_OMAP4_ERRATA_I688
 	{
@@ -401,6 +407,33 @@ static void __init omap_hwmod_init_postsetup(void)
 	else
 		omap_pm_if_early_init();
 }
+#ifdef CONFIG_OMAP_SO_MAP_FORCE
+/* SO limits */
+static unsigned long _min_so_phy_map, _max_so_phy_map;
+
+void __iomem *__omap_ioremap_caller(unsigned long phys_addr, size_t size,
+				   unsigned int mtype, void *caller)
+{
+	/* change type if needed */
+	if (mtype == MT_DEVICE && _max_so_phy_map && _max_so_phy_map) {
+		if (phys_addr >= _min_so_phy_map && phys_addr < _max_so_phy_map)
+			mtype = MT_MEMORY_SO;
+	}
+
+	return __arm_ioremap_caller(phys_addr, size, mtype, caller);
+}
+
+static inline void _phy_map_set_so_range(unsigned long min, unsigned long max)
+{
+	_min_so_phy_map = min;
+	_max_so_phy_map = max;
+	arch_ioremap_caller = __omap_ioremap_caller;
+}
+
+#else
+static inline void _phy_map_set_so_range(unsigned long min, unsigned long max)
+{}
+#endif
 
 #ifdef CONFIG_SOC_OMAP2420
 void __init omap2420_init_early(void)
@@ -505,6 +538,12 @@ void __init omap4430_init_early(void)
 #ifdef CONFIG_ARCH_OMAP5
 void __init omap_5430evm_init_early(void)
 {
+	/*
+	 * Set MT_MEMORY_SO for range 0x44000000-0x60000000 for ioremap
+	 * calls.
+	 */
+	_phy_map_set_so_range(0x44000000, 0x60000000);
+
 	omap2_set_globals_543x();
 	omap5xxx_check_revision();
 	omap5xxx_check_features();

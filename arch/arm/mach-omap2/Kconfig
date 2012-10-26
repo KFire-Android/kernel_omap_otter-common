@@ -439,6 +439,19 @@ config OMAP4_ERRATA_I688
 	  IO barrier ensure that there is no synchronisation loss on initiators
 	  operating on both interconnect port simultaneously.
 
+config OMAP_SO_MAP_FORCE
+	bool "Force SO range for OMAP IP peripheral memory map"
+	depends on ARCH_OMAP2 || ARCH_OMAP3 || ARCH_OMAP4 || ARCH_OMAP5
+	default y
+	help
+	  Use Strongly Ordered for L3, L4CFG, L4_WK and L4_PER peripherals in
+	  the system. It's seen with robustness testing keeping SO memory
+	  attribute helps system stability. Additionally, having strongly
+	  ordered uncovered external aborts which could have gone un-noticed
+	  as freeze, actually a hidden L3 write abort. Having SO should ease
+	  debug of such external aborts.
+	  If you do not know what to set here, leave at default.
+
 config OMAP_TPS6236X
 	bool "OMAP4 support for TPS6236X power IC"
 	help
