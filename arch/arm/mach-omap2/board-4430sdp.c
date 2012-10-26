@@ -47,6 +47,7 @@
 #include <video/omap-panel-picodlp.h>
 #include <linux/wl12xx.h>
 #include <linux/platform_data/omap-abe-twl6040.h>
+#include <linux/leds-omap4430sdp-display.h>
 
 #include "mux.h"
 #include "hsmmc.h"
@@ -70,6 +71,18 @@
 #define FIXED_REG_VBAT_ID	0
 #define FIXED_REG_VWLAN_ID	1
 #define TPS62361_GPIO   7
+
+#define LED_SEC_DISP_GPIO	27
+
+/* PWM2 and TOGGLE3 register offsets */
+#define LED_PWM2ON		0x03
+#define LED_PWM2OFF		0x04
+#define LED_TOGGLE3		0x92
+#define TWL6030_TOGGLE3		0x92
+#define PWM2EN			BIT(5)
+#define PWM2S			BIT(4)
+#define PWM2R			BIT(3)
+#define PWM2CTL_MASK		(PWM2EN | PWM2S | PWM2R)
 
 static const uint32_t sdp4430_keymap[] = {
 	KEY(0, 0, KEY_E),
@@ -751,6 +764,94 @@ static void sdp4430_panel_disable_hdmi(struct omap_dss_device *dssdev)
 	gpio_free_array(sdp4430_hdmi_gpios, ARRAY_SIZE(sdp4430_hdmi_gpios));
 }
 
+static void blaze_init_display_led(void)
+{
+	twl_i2c_write_u8(TWL_MODULE_PWM, 0xFF, LED_PWM2ON);
+	twl_i2c_write_u8(TWL_MODULE_PWM, 0x7F, LED_PWM2OFF);
+	twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x30, LED_TOGGLE3);
+}
+
+static void blaze_set_primary_brightness(u8 brightness)
+{
+	u8 val;
+	static unsigned enabled = 0x01;
+
+	if (brightness) {
+
+		/*
+		 * Converting brightness 8-bit value into 7-bit value
+		 * for PWM cycles.
+		 * We need to check brightness maximum value for set
+		 * PWM2OFF equal to PWM2ON.
+		 * Additionally checking for 1 for prevent seting maximum
+		 * brightness in this case.
+		 */
+
+		brightness >>= (brightness ^ 0xFF) ?
+				 ((brightness ^ 0x01) ? 1 : 0) : 8;
+
+		if (twl_i2c_write_u8(TWL_MODULE_PWM, brightness, LED_PWM2OFF))
+				goto io_err;
+
+		/* Enable PWM2 just once */
+		if (!enabled) {
+			if (twl_i2c_read_u8(TWL6030_MODULE_ID1, &val,
+							TWL6030_TOGGLE3))
+				goto io_err;
+
+			val &= ~PWM2CTL_MASK;
+			val |= (PWM2S | PWM2EN);
+			if (twl_i2c_write_u8(TWL6030_MODULE_ID1, val,
+					 TWL6030_TOGGLE3))
+				goto io_err;
+			enabled = 0x01;
+		}
+	} else {
+		/* Disable PWM2 just once */
+		if (enabled) {
+			if (twl_i2c_read_u8(TWL6030_MODULE_ID1, &val,
+							TWL6030_TOGGLE3))
+				goto io_err;
+			val &= ~PWM2CTL_MASK;
+			val |= PWM2R;
+			if (twl_i2c_write_u8(TWL6030_MODULE_ID1, val,
+							TWL6030_TOGGLE3))
+				goto io_err;
+			val |= (PWM2EN | PWM2S);
+			if (twl_i2c_write_u8(TWL6030_MODULE_ID1, val,
+							TWL6030_TOGGLE3))
+				goto io_err;
+			enabled = 0x00;
+		}
+	}
+	return;
+io_err:
+	pr_err("%s: Error occured during adjust PWM2\n", __func__);
+}
+
+static void blaze_set_secondary_brightness(u8 brightness)
+{
+	if (brightness > 0)
+		brightness = 1;
+
+	gpio_set_value(LED_SEC_DISP_GPIO, brightness);
+}
+
+static struct omap4430_sdp_disp_led_platform_data blaze_disp_led_data = {
+	.flags = LEDS_CTRL_AS_ONE_DISPLAY,
+	.display_led_init = blaze_init_display_led,
+	.primary_display_set = blaze_set_primary_brightness,
+	.secondary_display_set = blaze_set_secondary_brightness,
+};
+
+static struct platform_device blaze_disp_led = {
+	.name	=	"display_led",
+	.id	=	-1,
+	.dev	= {
+		.platform_data = &blaze_disp_led_data,
+	},
+};
+
 static struct nokia_dsi_panel_data dsi1_panel = {
 		.name		= "taal",
 		.reset_gpio	= 102,
@@ -949,6 +1050,7 @@ static void __init omap_4430sdp_display_init(void)
 	if (r)
 		pr_err("%s: Could not get display_sel GPIO\n", __func__);
 
+	platform_device_register(&blaze_disp_led);
 	sdp4430_lcd_init();
 	sdp4430_picodlp_init();
 	omap_display_init(&sdp4430_dss_data);
