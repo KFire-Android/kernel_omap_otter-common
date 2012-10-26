@@ -133,6 +133,10 @@ static struct mfd_cell palmas_children[] = {
 		.resources = rtc_resource,
 		.id = 10,
 	},
+	{
+		.name = "palmas-poweroff",
+		.id = 11,
+	},
 };
 
 static int palmas_rtc_read_block(void *mfd, u8 *dest, u8 reg, int no_regs)

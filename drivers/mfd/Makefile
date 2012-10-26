@@ -124,4 +124,5 @@ obj-$(CONFIG_MFD_PALMAS)	+= palmas.o palmas-irq.o
 obj-$(CONFIG_MFD_PALMAS_GPADC)	+= palmas-gpadc.o
 obj-$(CONFIG_MFD_PALMAS_RESOURCE) += palmas-resource.o
 obj-$(CONFIG_MFD_PALMAS_PWM)	+= palmas-pwm.o
+obj-$(CONFIG_MFD_PALMAS_POWEROFF) += palmas-poweroff.o
 

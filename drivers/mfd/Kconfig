@@ -952,6 +952,13 @@ config MFD_PALMAS_PWM
 	  If you say yes here you get support for the PWM on
 	  Palmas series of PMIC chips from Texas Instruments.
 
+config MFD_PALMAS_POWEROFF
+	bool "Support for poweroff using Palmas series of chips"
+	depends on MFD_PALMAS
+	help
+	  If you say yes here you get support for switching off with
+	  Palmas series of PMIC chips from Texas Instruments.
+
 endmenu
 endif
 
