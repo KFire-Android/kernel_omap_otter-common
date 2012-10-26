@@ -260,7 +260,7 @@ static int __init case_governor_init(void)
 	}
 
 	case_gov->cooling_level = INIT_COOLING_LEVEL;
-	case_gov->max_cooling_level = CASE_SUBZONES_NUMBER + opps + 1;
+	case_gov->max_cooling_level = CASE_SUBZONES_NUMBER + opps;
 
 	return 0;
 }
