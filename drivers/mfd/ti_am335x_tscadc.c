@@ -33,6 +33,7 @@ static unsigned int tscadc_readl(struct ti_tscadc_dev *tsadc, unsigned int reg)
 {
 	unsigned int val;
 
+	val = (unsigned int)-1;
 	regmap_read(tsadc->regmap_tscadc, reg, &val);
 	return val;
 }

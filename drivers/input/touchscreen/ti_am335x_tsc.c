@@ -28,6 +28,7 @@
 #include <linux/delay.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
+#include <linux/regmap.h>
 
 #include <linux/mfd/ti_am335x_tscadc.h>
 
@@ -62,13 +63,17 @@ struct titsc {
 
 static unsigned int titsc_readl(struct titsc *ts, unsigned int reg)
 {
-	return readl(ts->mfd_tscadc->tscadc_base + reg);
+	unsigned int val;
+
+	val = (unsigned int)-1;
+	regmap_read(ts->mfd_tscadc->regmap_tscadc, reg, &val);
+	return val;
 }
 
 static void titsc_writel(struct titsc *tsc, unsigned int reg,
 					unsigned int val)
 {
-	writel(val, tsc->mfd_tscadc->tscadc_base + reg);
+	regmap_write(tsc->mfd_tscadc->regmap_tscadc, reg, val);
 }
 
 /*
@@ -500,10 +505,15 @@ static int titsc_probe(struct platform_device *pdev)
 
 	/* register to the input system */
 	err = input_register_device(input_dev);
-	if (err)
+	if (err) {
+		dev_err(&pdev->dev, "Failed to register input device\n");
 		goto err_free_irq;
+	}
 
 	platform_set_drvdata(pdev, ts_dev);
+
+	dev_info(&pdev->dev, "Initialized OK\n");
+
 	return 0;
 
 err_free_irq:
