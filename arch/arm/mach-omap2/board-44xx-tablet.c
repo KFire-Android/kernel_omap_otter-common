@@ -30,6 +30,7 @@
 #include <linux/regulator/fixed.h>
 #include <linux/leds_pwm.h>
 #include <linux/platform_data/omap-abe-twl6040.h>
+#include <linux/platform_data/thermistor_sensor.h>
 #include <linux/leds-omap4430sdp-display.h>
 
 #include <asm/hardware/gic.h>
@@ -829,6 +830,21 @@ static void __init omap4_ehci_ohci_init(void)
 static void __init omap4_ehci_ohci_init(void){}
 #endif
 
+static struct thermistor_pdata thermistor_device_data = {
+	.name = "thermistor_sensor",
+	.slope = 1142,
+	.offset = -393,
+	.domain = "pcb",
+};
+
+static struct platform_device thermistor = {
+		.name	=	"thermistor",
+		.id	=	-1,
+		.dev	= {
+		.platform_data = &thermistor_device_data,
+		},
+};
+
 static void __init omap_tablet_init(void)
 {
 	int status;
@@ -886,6 +902,9 @@ static void __init omap_tablet_init(void)
 	}
 
 	omap_enable_smartreflex_on_init();
+	if (cpu_is_omap446x())
+		platform_device_register(&thermistor);
+
 }
 
 static void __init omap_tablet_reserve(void)
