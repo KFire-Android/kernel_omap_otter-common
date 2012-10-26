@@ -267,6 +267,34 @@ static void omap_thermal_step_freq_up(struct cpufreq_policy *policy)
 			   CPUFREQ_RELATION_L);
 }
 
+/* This function needs to be called with omap_cpufreq_lock held */
+static void omap_thermal_step_freq(struct cpufreq_policy *policy,
+					int idx)
+{
+	unsigned int cur;
+	int max_idx = 0, i;
+
+	i = 0;
+	while (freq_table[i].frequency != CPUFREQ_TABLE_END)
+		i++;
+	max_idx = (i - 1) - idx;
+
+	if (max_idx < 0)
+		max_idx = 0;
+
+
+	max_thermal = freq_table[max_idx].frequency;
+
+	if (en_therm_freq_print)
+		pr_info("%s: temperature is changing, starting cpu throtling at max %u\n",
+			__func__, max_thermal);
+
+	cur = omap_getspeed(0);
+	if (cur > max_thermal)
+		omap_cpufreq_scale(policy, max_thermal, cur,
+				   CPUFREQ_RELATION_L);
+}
+
 /*
  * cpufreq_apply_cooling: based on requested cooling level, throttle the cpu
  * @param cooling_level: percentage of required cooling at the moment
@@ -293,24 +321,29 @@ static int cpufreq_apply_cooling(struct thermal_dev *dev, int cooling_level)
 		cpu_cooling_level = cooling_level;
 	}
 
-	if (case_cooling_level > cpu_cooling_level)
+	if (case_cooling_level > cpu_cooling_level) {
 		new_cooling_level = case_cooling_level;
-	else
+
+		omap_thermal_step_freq(&policy, case_cooling_level);
+	} else {
 		new_cooling_level = cpu_cooling_level;
+
+		if (new_cooling_level == 0) {
+			pr_debug("%s: Unthrottle cool level %i curr cool %i\n",
+				__func__, new_cooling_level,
+				current_cooling_level);
+			omap_thermal_step_freq_up(&policy);
+		} else if (new_cooling_level > current_cooling_level) {
+			pr_debug("%s: Throttle cool level %i curr cool %i\n",
+				 __func__, new_cooling_level,
+				 current_cooling_level);
+			omap_thermal_step_freq_down(&policy);
+		}
+	}
 
 	pr_debug("%s: cooling_level %d case %d cpu %d new %d curr %d\n",
 		__func__, cooling_level, case_cooling_level,
 		cpu_cooling_level, new_cooling_level, current_cooling_level);
-
-	if (new_cooling_level < current_cooling_level) {
-		pr_debug("%s: Unthrottle cool level %i curr cool %i\n",
-			__func__, new_cooling_level, current_cooling_level);
-		omap_thermal_step_freq_up(&policy);
-	} else if (new_cooling_level > current_cooling_level) {
-		pr_debug("%s: Throttle cool level %i curr cool %i\n",
-			__func__, new_cooling_level, current_cooling_level);
-		omap_thermal_step_freq_down(&policy);
-	}
 
 	current_cooling_level = new_cooling_level;
 
