@@ -139,7 +139,9 @@ static int aess_open(struct snd_pcm_substream *substream)
 
 	if (!abe->active++) {
 		abe->opp.level = 0;
-		abe_pm_restore_context(abe);
+		ret = abe_pm_restore_context(abe);
+		if (ret)
+			goto out;
 		omap_aess_wakeup(abe->aess);
 	}
 
