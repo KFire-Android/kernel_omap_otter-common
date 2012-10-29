@@ -503,6 +503,7 @@ int dispc_mgr_get_clock_div(enum omap_channel channel,
 		struct dispc_clock_info *cinfo);
 void dispc_mgr_setup(enum omap_channel channel,
 		struct omap_overlay_manager_info *info);
+void dispc_enable_lcd_out(enum omap_channel channel, bool enable);
 /* DISPC WRITEBACK */
 int dispc_setup_wb(struct writeback_cache_data *wb);
 void dispc_setup_wb_source(enum omap_writeback_source source);

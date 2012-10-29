@@ -2563,7 +2563,7 @@ static void dispc_disable_isr(void *data, u32 mask)
 	complete(compl);
 }
 
-static void _enable_lcd_out(enum omap_channel channel, bool enable)
+void dispc_enable_lcd_out(enum omap_channel channel, bool enable)
 {
 	if (channel == OMAP_DSS_CHANNEL_LCD2) {
 		REG_FLD_MOD(DISPC_CONTROL2, enable ? 1 : 0, 0, 0);
@@ -2617,7 +2617,14 @@ static void dispc_mgr_enable_lcd_out(enum omap_channel channel, bool enable)
 			DSSERR("failed to register FRAMEDONE isr\n");
 	}
 
-	_enable_lcd_out(channel, enable);
+	if (!(cpu_is_omap54xx() && ((omap_rev() <= OMAP5430_REV_ES1_0) ||
+		(omap_rev() == OMAP5432_REV_ES1_0))))
+		/*
+		 * For OMAP5 ES1.0, _enable_lcd_out is done as part of
+		 * dsi_handle_lcd_en_timing_pre() and
+		 * dsi_handle_lcd_en_timing_post()
+		 */
+		dispc_enable_lcd_out(channel, enable);
 
 	if (!enable && is_on) {
 		if (!wait_for_completion_timeout(&frame_done_completion,

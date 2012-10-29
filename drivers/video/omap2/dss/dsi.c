@@ -4139,11 +4139,12 @@ static void dsi_proto_timings(struct omap_dss_device *dssdev)
 	}
 }
 
-static void  dsi_handle_lcd_en_timing_pre(struct omap_dss_device *dssdev)
+static void  dsi_handle_lcd_en_timing_pre(struct omap_dss_device *dssdev,
+						bool enable)
 {
 	struct platform_device *dsidev = dsi_get_dsidev_from_dssdev(dssdev);
 
-	/* This needs to be OMAP5 ES1 only */
+	/* This is required for OMAP5 ES1 only - WA for OMAP5430-1.0BUG01565 */
 	if (!(cpu_is_omap54xx() && ((omap_rev() <= OMAP5430_REV_ES1_0) ||
 		omap_rev() == OMAP5432_REV_ES1_0)))
 		return;
@@ -4153,8 +4154,16 @@ static void  dsi_handle_lcd_en_timing_pre(struct omap_dss_device *dssdev)
 	 * same
 	 */
 	if (dssdev->clocks.dispc.dispc_fclk_src ==
-			dssdev->clocks.dispc.channel.lcd_clk_src)
+			dssdev->clocks.dispc.channel.lcd_clk_src) {
+		if (enable)
+			dss_select_lcd_clk_source(dssdev->manager->id,
+				dssdev->clocks.dispc.channel.lcd_clk_src);
+		else
+			dss_select_lcd_clk_source(dssdev->manager->id,
+				OMAP_DSS_CLK_SRC_FCK);
+		dispc_enable_lcd_out(dssdev->manager->id, enable);
 		return;
+	}
 
 	if (dssdev->clocks.dispc.channel.lcd_clk_src ==
 			OMAP_DSS_CLK_SRC_FCK) {
@@ -4175,11 +4184,12 @@ static void  dsi_handle_lcd_en_timing_pre(struct omap_dss_device *dssdev)
 	}
 }
 
-static void dsi_handle_lcd_en_timing_post(struct omap_dss_device *dssdev)
+static void dsi_handle_lcd_en_timing_post(struct omap_dss_device *dssdev,
+						bool enable)
 {
 	struct platform_device *dsidev = dsi_get_dsidev_from_dssdev(dssdev);
 
-	/* This needs to be OMAP5 ES1 only */
+	/* This is required for OMAP5 ES1 only - WA for OMAP5430-1.0BUG01565 */
 	if (!(cpu_is_omap54xx() && ((omap_rev() <= OMAP5430_REV_ES1_0) ||
 		(omap_rev() == OMAP5432_REV_ES1_0))))
 		return;
@@ -4189,8 +4199,14 @@ static void dsi_handle_lcd_en_timing_post(struct omap_dss_device *dssdev)
 	 * the same
 	 */
 	if (dssdev->clocks.dispc.dispc_fclk_src ==
-			dssdev->clocks.dispc.channel.lcd_clk_src)
+			dssdev->clocks.dispc.channel.lcd_clk_src) {
+		if (enable)
+			dss_select_dispc_clk_source(dssdev->
+				clocks.dispc.dispc_fclk_src);
+		else
+			dss_select_dispc_clk_source(OMAP_DSS_CLK_SRC_FCK);
 		return;
+	}
 
 	if (dssdev->clocks.dispc.channel.lcd_clk_src ==
 			OMAP_DSS_CLK_SRC_FCK) {
@@ -4250,7 +4266,7 @@ int dsi_enable_video_output(struct omap_dss_device *dssdev, int channel)
 		dsi_if_enable(dsidev, true);
 	}
 
-	dsi_handle_lcd_en_timing_pre(dssdev);
+	dsi_handle_lcd_en_timing_pre(dssdev, true);
 	r = dss_mgr_enable(dssdev->manager);
 	if (r) {
 		if (dssdev->panel.dsi_mode == OMAP_DSS_DSI_VIDEO_MODE) {
@@ -4260,7 +4276,7 @@ int dsi_enable_video_output(struct omap_dss_device *dssdev, int channel)
 
 		return r;
 	}
-	dsi_handle_lcd_en_timing_post(dssdev);
+	dsi_handle_lcd_en_timing_post(dssdev, true);
 	return 0;
 }
 EXPORT_SYMBOL(dsi_enable_video_output);
@@ -4279,9 +4295,9 @@ void dsi_disable_video_output(struct omap_dss_device *dssdev, int channel)
 		dsi_vc_enable(dsidev, channel, true);
 		dsi_if_enable(dsidev, true);
 	}
-	dsi_handle_lcd_en_timing_pre(dssdev);
+	dsi_handle_lcd_en_timing_pre(dssdev, false);
 	dss_mgr_disable(dssdev->manager);
-	dsi_handle_lcd_en_timing_post(dssdev);
+	dsi_handle_lcd_en_timing_post(dssdev, false);
 }
 EXPORT_SYMBOL(dsi_disable_video_output);
 
@@ -4348,10 +4364,10 @@ static void dsi_update_screen_dispc(struct omap_dss_device *dssdev,
 	r = schedule_delayed_work(&dsi->framedone_timeout_work,
 		msecs_to_jiffies(250));
 	BUG_ON(r == 0);
-	dsi_handle_lcd_en_timing_pre(dssdev);
+	dsi_handle_lcd_en_timing_pre(dssdev, true);
 
 	dss_mgr_start_update(dssdev->manager);
-	dsi_handle_lcd_en_timing_post(dssdev);
+	dsi_handle_lcd_en_timing_post(dssdev, true);
 
 	if (dsi->te_enabled) {
 		/* disable LP_RX_TO, so that we can receive TE.  Time to wait
@@ -4591,10 +4607,27 @@ static int dsi_display_init_dsi(struct omap_dss_device *dssdev)
 	if (r)
 		goto err1;
 
-	dss_select_dispc_clk_source(dssdev->clocks.dispc.dispc_fclk_src);
+	if (!(cpu_is_omap54xx() && ((omap_rev() <= OMAP5430_REV_ES1_0) ||
+		(omap_rev() == OMAP5432_REV_ES1_0))))
+		/*
+		 * For OMAP5 ES1.0, selecting dispc_fclk source
+		 * is done as part of dsi_handle_lcd_en_timing_pre() and
+		 * dsi_handle_lcd_en_timing_post()
+		 */
+		dss_select_dispc_clk_source(dssdev->
+				clocks.dispc.dispc_fclk_src);
+
 	dss_select_dsi_clk_source(dsi_module, dssdev->clocks.dsi.dsi_fclk_src);
-	dss_select_lcd_clk_source(dssdev->manager->id,
-			dssdev->clocks.dispc.channel.lcd_clk_src);
+
+	if (!(cpu_is_omap54xx() && ((omap_rev() <= OMAP5430_REV_ES1_0) ||
+		(omap_rev() == OMAP5432_REV_ES1_0))))
+		/*
+		 * For OMAP5 ES1.0, selecting lcd clk source
+		 * is done as part of dsi_handle_lcd_en_timing_pre() and
+		 * dsi_handle_lcd_en_timing_post()
+		 */
+		dss_select_lcd_clk_source(dssdev->manager->id,
+				dssdev->clocks.dispc.channel.lcd_clk_src);
 
 	DSSDBG("PLL OK\n");
 
@@ -4630,9 +4663,16 @@ static int dsi_display_init_dsi(struct omap_dss_device *dssdev)
 err3:
 	dsi_cio_uninit(dssdev);
 err2:
-	dss_select_dispc_clk_source(OMAP_DSS_CLK_SRC_FCK);
+	if (!(cpu_is_omap54xx() && ((omap_rev() <= OMAP5430_REV_ES1_0) ||
+		(omap_rev() == OMAP5432_REV_ES1_0))))
+		dss_select_dispc_clk_source(OMAP_DSS_CLK_SRC_FCK);
+
 	dss_select_dsi_clk_source(dsi_module, OMAP_DSS_CLK_SRC_FCK);
-	dss_select_lcd_clk_source(dssdev->manager->id, OMAP_DSS_CLK_SRC_FCK);
+
+	if (!(cpu_is_omap54xx() && ((omap_rev() <= OMAP5430_REV_ES1_0) ||
+		(omap_rev() == OMAP5432_REV_ES1_0))))
+		dss_select_lcd_clk_source(dssdev->manager->id,
+					OMAP_DSS_CLK_SRC_FCK);
 
 err1:
 	dsi_pll_uninit(dsidev, true);
@@ -4657,9 +4697,27 @@ static void dsi_display_uninit_dsi(struct omap_dss_device *dssdev,
 	dsi_vc_enable(dsidev, 2, 0);
 	dsi_vc_enable(dsidev, 3, 0);
 
-	dss_select_dispc_clk_source(OMAP_DSS_CLK_SRC_FCK);
+	if (!(cpu_is_omap54xx() && ((omap_rev() <= OMAP5430_REV_ES1_0) ||
+		(omap_rev() == OMAP5432_REV_ES1_0))))
+		/*
+		 * For OMAP5 ES1.0, selecting dispc_fclk source & lcd clk source
+		 * is done as part of dsi_handle_lcd_en_timing_pre() and
+		 * dsi_handle_lcd_en_timing_post()
+		 */
+		dss_select_dispc_clk_source(OMAP_DSS_CLK_SRC_FCK);
+
 	dss_select_dsi_clk_source(dsi_module, OMAP_DSS_CLK_SRC_FCK);
-	dss_select_lcd_clk_source(dssdev->manager->id, OMAP_DSS_CLK_SRC_FCK);
+
+	if (!(cpu_is_omap54xx() && ((omap_rev() <= OMAP5430_REV_ES1_0) ||
+		(omap_rev() == OMAP5432_REV_ES1_0))))
+		/*
+		 * For OMAP5 ES1.0, selecting dispc_fclk source & lcd clk source
+		 * is done as part of dsi_handle_lcd_en_timing_pre() and
+		 * dsi_handle_lcd_en_timing_post()
+		 */
+		dss_select_lcd_clk_source(dssdev->manager->id,
+					OMAP_DSS_CLK_SRC_FCK);
+
 	dsi_cio_uninit(dssdev);
 	dsi_pll_uninit(dsidev, disconnect_lanes);
 }
