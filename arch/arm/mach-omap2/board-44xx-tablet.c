@@ -307,6 +307,10 @@ static struct twl6040_vibra_data twl6040_vibra = {
 	.vibrmotor_res = 10,
 	.vddvibl_uV = 0,	/* fixed volt supply - VBAT */
 	.vddvibr_uV = 0,	/* fixed volt supply - VBAT */
+
+	.max_timeout = 15000,
+	.initial_vibrate = 0,
+	.voltage_raise_speed = 0x26,
 };
 
 static struct twl6040_platform_data twl6040_data = {
