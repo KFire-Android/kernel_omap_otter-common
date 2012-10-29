@@ -299,6 +299,7 @@ static int omap_hsmmc_set_power(struct device *dev, int slot, int power_on,
 		platform_get_drvdata(to_platform_device(dev));
 	struct mmc_ios *ios = &host->mmc->ios;
 	int ret = 0;
+	u32 ac12 = 0;
 
 	/*
 	 * If we don't see a Vcc regulator, assume it's a fixed
@@ -334,12 +335,21 @@ static int omap_hsmmc_set_power(struct device *dev, int slot, int power_on,
 		ret = mmc_regulator_set_ocr(host->mmc, host->vcc, ios->vdd);
 		/* Enable interface voltage rail, if needed */
 		if (host->vcc_aux) {
-			if (vdd_iopower == VDD_165_195)
+			ac12 = OMAP_HSMMC_READ(host->base, AC12);
+			if (vdd_iopower == VDD_165_195) {
 				ret = regulator_set_voltage(host->vcc_aux,
 				VDD_SIGNAL_VOLTAGE_180, VDD_SIGNAL_VOLTAGE_180);
-			else
+				ac12 |= OMAP_V1V8_SIGEN_V1V8;
+			} else {
 				ret = regulator_set_voltage(host->vcc_aux,
 				VDD_SIGNAL_VOLTAGE_330, VDD_SIGNAL_VOLTAGE_330);
+				ac12 &= ~OMAP_V1V8_SIGEN_V1V8;
+			}
+			OMAP_HSMMC_WRITE(host->base, AC12, ac12);
+			/* According to HSMMC TRM, the BIAS voltage needs upto
+			 * 5ms to stabilize before turning on the IOs
+			 */
+			msleep(5);
 		}
 		if (host->vcc_aux && !host->regulator_enabled && !ret) {
 			ret = regulator_enable(host->vcc_aux);
@@ -1951,31 +1961,16 @@ static int omap_start_signal_voltage_switch(struct mmc_host *mmc,
 		dev_err(mmc_dev(host->mmc), "timeout wait for dlev 0\n");
 
 	if (ios->signal_voltage == MMC_SIGNAL_VOLTAGE_180) {
-		mmc_slot(host).set_power(host->dev, host->slot_id,
-						 1, VDD_165_195);
-
 		value = OMAP_HSMMC_READ(host->base, HCTL);
 		value &= ~SDVS_MASK;
 		value |= SDVS18;
 		OMAP_HSMMC_WRITE(host->base, HCTL, value);
+		value |= SDBP;
+		OMAP_HSMMC_WRITE(host->base, HCTL, value);
 
-		value = OMAP_HSMMC_READ(host->base, AC12);
-		value |= OMAP_V1V8_SIGEN_V1V8;
-		OMAP_HSMMC_WRITE(host->base, AC12, value);
+		mmc_slot(host).set_power(host->dev, host->slot_id,
+						 1, VDD_165_195);
 		dev_dbg(mmc_dev(host->mmc), "i/o voltage switch to 1.8v\n\n");
-	}
-	/*
-	 * According to OMAP5 TRM and SD Host Controller Specification
-	 * regulator output shall be stable within 5ms.
-	 * TODO: Need to figure out why 5ms delay causes timeout waiting
-	 * for DAT[3:0] line signal level.
-	 */
-	msleep(50);
-
-	value = OMAP_HSMMC_READ(host->base, AC12);
-	if (!(value & OMAP_V1V8_SIGEN_V1V8)) {
-		dev_dbg(mmc_dev(host->mmc), "failed switch to 1.8v\n\n");
-		return -1;
 	}
 
 	value = OMAP_HSMMC_READ(host->base, CON);
