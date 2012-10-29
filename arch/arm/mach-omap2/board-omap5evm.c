@@ -1031,6 +1031,8 @@ static void __init omap_5430evm_init(void)
 	/* omap5evm_modem_init shall be called before omap_ehci_ohci_init */
 	if (!strcmp(modem_ipc, "hsi"))
 		omap5evm_modem_init(true);
+	else
+		omap5evm_modem_init(false);
 
 	status = omap4_keyboard_init(&evm5430_keypad_data, &keypad_data);
 	if (status)
