@@ -205,7 +205,7 @@ static int omap4_duty_frequency_change(struct notifier_block *nb,
 			if (duty_desc.heating_budget <= 0) {
 				queue_work(duty_wq, &work_enter_cool0);
 			} else {
-				cancel_delayed_work_sync(&work_exit_heat);
+				cancel_delayed_work(&work_exit_heat);
 				queue_work(duty_wq, &work_enter_cool1);
 			}
 		}
@@ -215,7 +215,7 @@ static int omap4_duty_frequency_change(struct notifier_block *nb,
 	case OMAP4_DUTY_COOLING_1:
 		if (freqs->new == nitro_rate) {
 			duty_desc.t_heating_start = jiffies;
-			cancel_delayed_work_sync(&work_exit_cool);
+			cancel_delayed_work(&work_exit_cool);
 			queue_work(duty_wq, &work_enter_heat.work);
 		}
 		break;
