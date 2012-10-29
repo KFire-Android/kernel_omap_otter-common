@@ -1398,7 +1398,7 @@ static void __init omap_4430sdp_init_early(void)
 }
 
 
-MACHINE_START(OMAP_4430SDP, "OMAP4430 4430SDP board")
+MACHINE_START(OMAP_4430SDP, "OMAP4 Blaze board")
 	/* Maintainer: Santosh Shilimkar - Texas Instruments Inc */
 	.atag_offset	= 0x100,
 	.reserve	= omap_4430sdp_reserve,
