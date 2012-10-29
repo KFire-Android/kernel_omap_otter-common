@@ -359,6 +359,7 @@ config MACH_OMAP_4430SDP
 	select OMAP_TPS6236X
 	select TWL6030_GPADC
 	select CDC_TCXO
+	select TWL6040_VIB
 
 config MACH_OMAP_BLAZE
 	bool "OMAP 44XX Tablet board"
@@ -369,6 +370,7 @@ config MACH_OMAP_BLAZE
 	select OMAP_TPS6236X
 	select TWL6030_GPADC
 	select CDC_TCXO
+	select TWL6040_VIB
 
 config MACH_OMAP4_PANDA
 	bool "OMAP4 Panda Board"
