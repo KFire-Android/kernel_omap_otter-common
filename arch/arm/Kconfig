@@ -1407,6 +1407,18 @@ config PL310_ERRATA_769419
 	  on systems with an outer cache, the store buffer is drained
 	  explicitly.
 
+config ARM_ERRATA_766421
+	bool "ARM errata: Strongly-Ordered/Device load or NC LDREX could return incorrect data"
+	depends on CPU_V7
+	help
+	  This option enables the workaround for the 766421 Cortex-A15 erratum.
+	  In certain situations, a strongly ordered or device load instruction,
+	  or a non-cacheable normal memory load-exclusive instruction could
+	  match multiple fill buffers and return incorrect data.
+	  This workaround is add DMB instruction when making any change to the
+	  translation regime and before doing any new loads/stores/preloads
+	  in the new translation regime.
+
 config ARM_ERRATA_761171
 	bool "ARM errata: Streaming write that does not allocate in L2 may cause data corruption"
 	depends on CPU_V7
