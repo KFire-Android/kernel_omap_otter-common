@@ -153,8 +153,7 @@ static int tmp006_report_temp(struct thermal_dev *tdev)
 	struct i2c_client *client = to_i2c_client(tdev->dev);
 	struct tmp006_temp_sensor *tmp006 = i2c_get_clientdata(client);
 
-	tmp006->therm_fw->current_temp =
-			tmp006_read_current_temp(tdev->dev);
+	tmp006->therm_fw->current_temp = thermal_request_temp(tdev);
 
 	pr_debug("%s: tmp006 temp %d\n", __func__,
 		tmp006->therm_fw->current_temp);
