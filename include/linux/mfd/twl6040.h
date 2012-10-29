@@ -166,6 +166,8 @@
 
 #define TWL6040_CELLS			2
 
+#define TWL6040_POWER_UP_TIME		16 /* ms */
+
 #define TWL6040_REV_ES1_0		0x00
 #define TWL6040_REV_ES1_1		0x01
 #define TWL6040_REV_ES1_2		0x02
@@ -198,6 +200,13 @@ struct twl6040_vibra_data {
 	unsigned int vibrmotor_res;	/* right motor resistance */
 	int vddvibl_uV;			/* VDDVIBL volt, set 0 for fixed reg */
 	int vddvibr_uV;			/* VDDVIBR volt, set 0 for fixed reg */
+
+	/* timed-output based implementations */
+	int max_timeout;
+	int initial_vibrate;
+	int (*init)(void);
+	void (*exit)(void);
+	u8 voltage_raise_speed;
 };
 
 struct twl6040_platform_data {

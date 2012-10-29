@@ -552,6 +552,13 @@ config OMAP_SEVM_DOCK
 	help
 	  Enable the docking station support for the sEVM platform
 
+config TWL6040_VIB
+	bool "TWL6040 Vibrator"
+	depends on TWL6040_CORE && ANDROID_TIMED_OUTPUT
+	default n
+	help
+	  Enable support for TWL6040 Android vibrator driver
+
 config CDC_TCXO
 	tristate "Texas Instruments CDC TCXO"
 	depends on I2C
