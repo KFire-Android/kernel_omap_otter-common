@@ -466,6 +466,24 @@ static void __init omap4_ehci_ohci_init(void)
 static void __init omap4_ehci_ohci_init(void){}
 #endif
 
+static void __init tablet_camera_mux_init(void)
+{
+	u32 r = 0;
+
+	/* Enable CSI22 pads for 4460 and 4470 */
+	if (cpu_is_omap446x() || cpu_is_omap447x()) {
+		r = omap4_ctrl_pad_readl(OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_CAMERA_RX);
+		r |= (0x7 << OMAP4_CAMERARX_CSI22_LANEENABLE_SHIFT);
+		omap4_ctrl_pad_writel(r,
+		OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_CAMERA_RX);
+
+		omap_mux_init_signal("csi22_dx2.csi22_dx2",
+				OMAP_PIN_INPUT | OMAP_MUX_MODE0);
+		omap_mux_init_signal("csi22_dy2.csi22_dy2",
+				OMAP_PIN_INPUT | OMAP_MUX_MODE0);
+	}
+}
+
 static void __init omap_tablet_init(void)
 {
 	int status;
@@ -497,6 +515,7 @@ static void __init omap_tablet_init(void)
 	omap4_register_ion();
 	tablet_display_init();
 	tablet_touch_init();
+	tablet_camera_mux_init();
 	tablet_sensor_init();
 	tablet_button_init();
 	omap4plus_connectivity_init(OMAP4_TABLET_2_0_ID);
