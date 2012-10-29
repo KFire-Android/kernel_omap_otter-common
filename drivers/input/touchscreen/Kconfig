@@ -851,6 +851,16 @@ config TOUCHSCREEN_TPS6507X
 	  To compile this driver as a module, choose M here: the
 	  module will be called tps6507x_ts.
 
+config TOUCHSCREEN_SYNTM12XX
+	  tristate "Synaptic TM12xx touchscreen"
+	  depends on I2C
+	  help
+	  Say Y here to enable support for Synaptic TM12xx
+	  series touchscreen controller
+	  If unsure, say N.
+	  To compile this driver as module, choose M here: the
+	  module will be called syntm12xx
+
 config TOUCHSCREEN_QUANTUM_OBP
 	tristate "Quantum OBP based touchscreens"
 	depends on I2C
