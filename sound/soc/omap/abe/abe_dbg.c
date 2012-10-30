@@ -74,12 +74,15 @@
  * Called in order to reset Audio Back End debug global data.
  * This ensures that ABE debug trace pointer is reset correctly.
  */
-int omap_aess_dbg_reset(struct omap_aess_dbg *dbg)
+int omap_aess_dbg_reset(struct omap_aess *abe)
 {
-	if (dbg == NULL)
-		dbg = kzalloc(sizeof(struct omap_aess_dbg), GFP_KERNEL);
-	dbg->activity_log_write_pointer = 0;
-	dbg->mask = 0;
+	if (abe->dbg == NULL) {
+		abe->dbg = kzalloc(sizeof(struct omap_aess_dbg), GFP_KERNEL);
+		if (abe->dbg == NULL)
+			return -ENOMEM;
+	}
+	abe->dbg->activity_log_write_pointer = 0;
+	abe->dbg->mask = 0;
 
 	return 0;
 }

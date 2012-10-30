@@ -121,7 +121,7 @@ struct omap_aess_dbg {
  * Called in order to reset Audio Back End debug global data.
  * This ensures that ABE debug trace pointer is reset correctly.
  */
-int omap_aess_dbg_reset(struct omap_aess_dbg *dbg);
+int omap_aess_dbg_reset(struct omap_aess *abe);
 void omap_aess_dbg_log(struct omap_aess *abe, u32 x, u32 y, u32 z, u32 t);
 void omap_aess_dbg_error(struct omap_aess *abe, int level, int error);
 

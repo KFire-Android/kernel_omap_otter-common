@@ -88,7 +88,7 @@ int omap_aess_reset_hal(struct omap_aess *abe)
 {
 	u32 i;
 
-	omap_aess_dbg_reset(abe->dbg);
+	omap_aess_dbg_reset(abe);
 
 	/* IRQ & DBG circular read pointer in DMEM */
 	abe->irq_dbg_read_ptr = 0;
