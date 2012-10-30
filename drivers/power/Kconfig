@@ -104,6 +104,14 @@ config BATTERY_PMU
 	  Say Y here to expose battery information on Apple machines
 	  through the generic battery class.
 
+config CHARGER_BQ2415x
+	tristate "BQ2415x charger"
+	help
+	  Say Y to enable support for BQ24156 battery charger.
+	  It enables battery charging via AC.
+	  By default it interacts with TWL603x via I2C and supports
+	  up to 1500mA charge current.
+
 config BATTERY_OLPC
 	tristate "One Laptop Per Child battery"
 	depends on X86_32 && OLPC
