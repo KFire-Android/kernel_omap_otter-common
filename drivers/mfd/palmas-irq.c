@@ -144,6 +144,27 @@ static void palmas_irq_mask(struct irq_data *data)
 	palmas->irq_mask |= (1 << irq_to_palmas_irq(palmas, data->irq));
 }
 
+static void palmas_irq_maskall(struct palmas *palmas)
+{
+	unsigned int reg, addr;
+	int slave;
+	slave = PALMAS_BASE_TO_SLAVE(PALMAS_INTERRUPT_BASE);
+
+	reg = 0xFF;
+
+	addr = PALMAS_BASE_TO_REG(PALMAS_INTERRUPT_BASE, PALMAS_INT1_MASK);
+	regmap_write(palmas->regmap[slave], addr, reg);
+
+	addr = PALMAS_BASE_TO_REG(PALMAS_INTERRUPT_BASE, PALMAS_INT2_MASK);
+	regmap_write(palmas->regmap[slave], addr, reg);
+
+	addr = PALMAS_BASE_TO_REG(PALMAS_INTERRUPT_BASE, PALMAS_INT3_MASK);
+	regmap_write(palmas->regmap[slave], addr, reg);
+
+	addr = PALMAS_BASE_TO_REG(PALMAS_INTERRUPT_BASE, PALMAS_INT4_MASK);
+	regmap_write(palmas->regmap[slave], addr, reg);
+}
+
 static struct irq_chip palmas_irq_chip = {
 	.name = "palmas",
 	.irq_bus_lock = palmas_irq_lock,
@@ -171,21 +192,10 @@ int palmas_irq_init(struct palmas *palmas)
 	/* Mask all IRQs by setting all registers to 0xff */
 	palmas->irq_mask = 0xffffffff;
 
+	/* Mask all interrupts at boot */
+	palmas_irq_maskall(palmas);
+
 	slave = PALMAS_BASE_TO_SLAVE(PALMAS_INTERRUPT_BASE);
-
-	reg = 0xFF;
-
-	addr = PALMAS_BASE_TO_REG(PALMAS_INTERRUPT_BASE, PALMAS_INT1_MASK);
-	regmap_write(palmas->regmap[slave], addr, reg);
-
-	addr = PALMAS_BASE_TO_REG(PALMAS_INTERRUPT_BASE, PALMAS_INT2_MASK);
-	regmap_write(palmas->regmap[slave], addr, reg);
-
-	addr = PALMAS_BASE_TO_REG(PALMAS_INTERRUPT_BASE, PALMAS_INT3_MASK);
-	regmap_write(palmas->regmap[slave], addr, reg);
-
-	addr = PALMAS_BASE_TO_REG(PALMAS_INTERRUPT_BASE, PALMAS_INT4_MASK);
-	regmap_write(palmas->regmap[slave], addr, reg);
 
 	/* Change into clear on read mode for efficiency */
 	addr = PALMAS_BASE_TO_REG(PALMAS_INTERRUPT_BASE, PALMAS_INT_CTRL);
@@ -239,6 +249,7 @@ int palmas_irq_init(struct palmas *palmas)
 
 int palmas_irq_exit(struct palmas *palmas)
 {
+	palmas_irq_maskall(palmas);
 	free_irq(palmas->irq, palmas);
 	return 0;
 }
