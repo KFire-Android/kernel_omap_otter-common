@@ -51,6 +51,7 @@
 #include <linux/wl12xx.h>
 #include <linux/platform_data/omap-abe-twl6040.h>
 #include <linux/leds-omap4430sdp-display.h>
+#include <linux/omap4_duty_cycle_governor.h>
 
 #include "mux.h"
 #include "hsmmc.h"
@@ -236,6 +237,32 @@ static struct omap_board_data keypad_data = {
 	.pads	 		= keypad_pads,
 	.pads_cnt       	= ARRAY_SIZE(keypad_pads),
 };
+
+#ifdef CONFIG_OMAP4_DUTY_CYCLE_GOVERNOR
+
+static struct pcb_section omap4_duty_governor_pcb_sections[] = {
+	{
+		.pcb_temp_level			= DUTY_GOVERNOR_DEFAULT_TEMP,
+		.max_opp			= 1200000,
+		.duty_cycle_enabled		= true,
+		.tduty_params = {
+			.nitro_rate		= 1200000,
+			.cooling_rate		= 1008000,
+			.nitro_interval		= 20000,
+			.nitro_percentage	= 24,
+		},
+	},
+};
+
+static void init_duty_governor(void)
+{
+	omap4_duty_pcb_section_reg(omap4_duty_governor_pcb_sections,
+				   ARRAY_SIZE
+				   (omap4_duty_governor_pcb_sections));
+}
+#else
+static void init_duty_governor(void){}
+#endif /*CONFIG_OMAP4_DUTY_CYCLE*/
 
 static struct gpio_led sdp4430_gpio_leds[] = {
 	{
@@ -1290,6 +1317,7 @@ static void __init omap_4430sdp_init(void)
 
 	omap_4430sdp_display_init();
 
+	init_duty_governor();
 	if (cpu_is_omap446x()) {
 		/* Vsel0 = gpio, vsel1 = gnd */
 		status = omap_tps6236x_board_setup(true, TPS62361_GPIO, -1,

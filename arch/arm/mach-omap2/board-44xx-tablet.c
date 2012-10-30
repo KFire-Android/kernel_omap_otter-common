@@ -34,6 +34,7 @@
 #include <linux/platform_data/omap-abe-twl6040.h>
 #include <linux/platform_data/thermistor_sensor.h>
 #include <linux/leds-omap4430sdp-display.h>
+#include <linux/omap4_duty_cycle_governor.h>
 
 #include <asm/hardware/gic.h>
 #include <asm/mach-types.h>
@@ -366,6 +367,32 @@ static struct omap2_hsmmc_info mmc[] = {
 	},
 	{}	/* Terminator */
 };
+
+#ifdef CONFIG_OMAP4_DUTY_CYCLE_GOVERNOR
+
+static struct pcb_section omap4_duty_governor_pcb_sections[] = {
+	{
+		.pcb_temp_level			= DUTY_GOVERNOR_DEFAULT_TEMP,
+		.max_opp			= 1200000,
+		.duty_cycle_enabled		= true,
+		.tduty_params = {
+			.nitro_rate		= 1200000,
+			.cooling_rate		= 1008000,
+			.nitro_interval		= 20000,
+			.nitro_percentage	= 24,
+		},
+	},
+};
+
+static void init_duty_governor(void)
+{
+	omap4_duty_pcb_section_reg(omap4_duty_governor_pcb_sections,
+				   ARRAY_SIZE
+				   (omap4_duty_governor_pcb_sections));
+}
+#else
+static void init_duty_governor(void){}
+#endif /*CONFIG_OMAP4_DUTY_CYCLE*/
 
 static int omap4_twl6030_hsmmc_late_init(struct device *dev)
 {
@@ -927,6 +954,7 @@ static void __init omap_tablet_init(void)
 
 	omap4_ehci_ohci_init();
 	usb_musb_init(&musb_board_data);
+	init_duty_governor();
 
 	tablet_display_init();
 	status = omap_ethernet_init();
