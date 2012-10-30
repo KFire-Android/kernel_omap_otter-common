@@ -31,12 +31,17 @@
 #include "../dss/dss.h"
 #include "hdcp.h"
 
+struct hdcp_worker_data {
+	struct delayed_work dwork;
+	atomic_t state;
+};
+
 struct hdcp_data {
 	void __iomem *deshdcp_base_addr;
 	struct mutex lock;
 	struct hdcp_enable_control *en_ctrl;
 	struct workqueue_struct *workqueue;
-	struct work_struct *work;
+	struct hdcp_worker_data *hdcp_work;
 	struct miscdevice *mdev;
 	bool hdcp_keys_loaded;
 	int hdcp_up_event;
@@ -97,10 +102,18 @@ static int hdcp_wq_start_authentication(void)
 
 static void hdcp_work_queue(struct work_struct *work)
 {
+	struct hdcp_worker_data *d = container_of(work, typeof(*d), dwork.work);
+	int state = atomic_read(&d->state);
+
 	HDCP_DBG("hdcp_work_queue() start\n");
-
-	hdcp_step2_authenticate_repeater(HDCP_EVENT_STEP2);
-
+	switch (state) {
+	case HDCP_STATE_STEP1:
+		hdcp_wq_start_authentication();
+	break;
+	case HDCP_STATE_STEP2:
+		hdcp_step2_authenticate_repeater(HDCP_EVENT_STEP2);
+	break;
+	}
 	HDCP_DBG("hdcp_work_queue() - END\n");
 }
 
@@ -190,11 +203,12 @@ static void hdcp_start_frame_cb(void)
 	}
 
 	/* Cancel any previous work submitted */
-	cancel_work_sync(hdcp->work);
-
+	__cancel_delayed_work(&hdcp->hdcp_work->dwork);
+	atomic_set(&hdcp->hdcp_work->state, HDCP_STATE_STEP1);
 	/* HDCP enable after 7 Vsync delay */
-	msleep(300);
-	hdcp_wq_start_authentication();
+	queue_delayed_work(hdcp->workqueue, &hdcp->hdcp_work->dwork,
+				msecs_to_jiffies(300));
+
 }
 
 static long hdcp_query_status_ctl(uint32_t *status)
@@ -402,9 +416,9 @@ static void hdcp_irq_cb(void)
 		intr = ip_data->ops->hdcp_int_handler(ip_data);
 
 	if (intr == KSVACCESSINT) {
-		cancel_work_sync(hdcp->work);
-
-		queue_work(hdcp->workqueue, hdcp->work);
+		__cancel_delayed_work(&hdcp->hdcp_work->dwork);
+		atomic_set(&hdcp->hdcp_work->state, HDCP_STATE_STEP2);
+		queue_delayed_work(hdcp->workqueue, &hdcp->hdcp_work->dwork, 0);
 	}
 
 	return;
@@ -426,6 +440,12 @@ static int __init hdcp_init(void)
 	if (!hdcp) {
 		HDCP_ERR("Could not allocate HDCP structure\n");
 		return -ENOMEM;
+	}
+
+	hdcp->hdcp_work = kzalloc(sizeof(struct hdcp_worker_data), GFP_KERNEL);
+	if (!hdcp->hdcp_work) {
+		HDCP_ERR("Could not allocate HDCP worker  structure\n");
+		goto err_alloc_worker;
 	}
 
 	hdcp->mdev = kzalloc(sizeof(struct miscdevice), GFP_KERNEL);
@@ -460,13 +480,7 @@ static int __init hdcp_init(void)
 		goto err_add_driver;
 	}
 
-	hdcp->work = kzalloc(sizeof(struct work_struct), GFP_ATOMIC);
-	if (hdcp->work) {
-		INIT_WORK(hdcp->work, hdcp_work_queue);
-	} else {
-		HDCP_ERR("Could not allocate memory to create work\n");
-		goto err_alloc_work;
-	}
+	INIT_DELAYED_WORK(&hdcp->hdcp_work->dwork, hdcp_work_queue);
 
 	mutex_init(&hdcp->re_entrant_lock);
 
@@ -488,9 +502,6 @@ static int __init hdcp_init(void)
 err_runtime:
 	mutex_destroy(&hdcp->re_entrant_lock);
 
-	kfree(hdcp->work);
-
-err_alloc_work:
 	destroy_workqueue(hdcp->workqueue);
 
 err_add_driver:
@@ -505,6 +516,9 @@ err_map_deshdcp:
 	kfree(hdcp->mdev);
 
 err_alloc_mdev:
+	kfree(hdcp->hdcp_work);
+
+err_alloc_worker:
 	kfree(hdcp);
 	return -EFAULT;
 }
@@ -533,7 +547,7 @@ err_handling:
 
 	iounmap(hdcp->deshdcp_base_addr);
 
-	kfree(hdcp->work);
+	kfree(hdcp->hdcp_work);
 	destroy_workqueue(hdcp->workqueue);
 
 	mutex_unlock(&hdcp->lock);

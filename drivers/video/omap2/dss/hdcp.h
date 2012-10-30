@@ -72,6 +72,9 @@ struct hdcp_wait_control {
 #define HDMI_HDCP_ENABLED	0x1
 #define HDMI_HDCP_FAILED	0x0
 
+#define HDCP_STATE_STEP1	0x0
+#define HDCP_STATE_STEP2	0x1
+
 /* HDCP events */
 #define HDCP_EVENT_STEP2	(1 << 0x1)
 #define HDCP_EVENT_EXIT		(1 << 0x2)
