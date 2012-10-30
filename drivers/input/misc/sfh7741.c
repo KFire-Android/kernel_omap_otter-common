@@ -26,6 +26,7 @@
 #include <linux/input/sfh7741.h>
 #include <linux/slab.h>
 #include <linux/workqueue.h>
+#include <linux/module.h>
 
 #define SFH7741_PROX_ON	1
 #define SFH7741_PROX_OFF	0
