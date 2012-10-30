@@ -411,7 +411,7 @@ static bool extra_info_update_ongoing(void)
 }
 
 /* wait until no extra_info updates are pending */
-static void wait_pending_extra_info_updates(struct omap_overlay_manager *mgr)
+static void wait_pending_extra_info_updates(void)
 {
 	bool updating;
 	unsigned long flags;
@@ -433,18 +433,8 @@ static void wait_pending_extra_info_updates(struct omap_overlay_manager *mgr)
 
 	t = msecs_to_jiffies(500);
 	r = wait_for_completion_timeout(&extra_updated_completion, t);
-	if (r == 0) {
-		if (cpu_is_omap54xx() && (omap_rev() <= OMAP5430_REV_ES1_0)) {
-			/* WA by Re-config LCD_EN bit in case previous enable
-			 * not gotten applied properly.
-			 * TODO: To root-cause why the previous LCD_EN is
-			 * not getting applied
-			 */
-			enable_disable_dss_mgr(mgr->id, false);
-			enable_disable_dss_mgr(mgr->id, true);
-		}
+	if (r == 0)
 		DSSWARN("timeout in wait_pending_extra_info_updates\n");
-	}
 	else if (r < 0)
 		DSSERR("wait_pending_extra_info_updates failed: %d\n", r);
 }
@@ -507,16 +497,6 @@ int dss_mgr_wait_for_go(struct omap_overlay_manager *mgr)
 
 		if (r) {
 			DSSERR("mgr(%d)->wait_for_go() timeout\n", mgr->id);
-			if (cpu_is_omap54xx() &&
-				(omap_rev() <= OMAP5430_REV_ES1_0)) {
-				/* WA by Re-config LCD_EN bit in case previous
-				 * enable not gotten applied properly.
-				 * TODO: To root-cause why the previous
-				 * LCD_EN is not getting applied
-				 */
-				enable_disable_dss_mgr(mgr->id, false);
-				enable_disable_dss_mgr(mgr->id, true);
-			}
 			break;
 		}
 	}
@@ -1735,7 +1715,7 @@ int dss_mgr_enable(struct omap_overlay_manager *mgr)
 	spin_unlock_irqrestore(&data_lock, flags);
 
 	/* wait until fifo config is in */
-	wait_pending_extra_info_updates(mgr);
+	wait_pending_extra_info_updates();
 
 	/* step 2: enable the manager */
 	spin_lock_irqsave(&data_lock, flags);
@@ -1788,7 +1768,7 @@ void dss_mgr_disable(struct omap_overlay_manager *mgr)
 
 	spin_unlock_irqrestore(&data_lock, flags);
 
-	wait_pending_extra_info_updates(mgr);
+	wait_pending_extra_info_updates();
 out:
 	mutex_unlock(&apply_lock);
 }
@@ -2073,7 +2053,7 @@ int dss_mgr_set_ovls(struct omap_overlay_manager *mgr)
 	dss_write_regs();
 	dss_set_go_bits();
 	spin_unlock_irqrestore(&data_lock, flags);
-	wait_pending_extra_info_updates(mgr);
+	wait_pending_extra_info_updates();
 	mutex_unlock(&apply_lock);
 	return 0;
 }
@@ -2120,7 +2100,7 @@ int dss_ovl_enable(struct omap_overlay *ovl)
 	spin_unlock_irqrestore(&data_lock, flags);
 
 	/* wait for fifo configs to go in */
-	wait_pending_extra_info_updates(ovl->manager);
+	wait_pending_extra_info_updates();
 
 	/* step 2: enable the overlay */
 	spin_lock_irqsave(&data_lock, flags);
@@ -2134,7 +2114,7 @@ int dss_ovl_enable(struct omap_overlay *ovl)
 	spin_unlock_irqrestore(&data_lock, flags);
 
 	/* wait for overlay to be enabled */
-	wait_pending_extra_info_updates(ovl->manager);
+	wait_pending_extra_info_updates();
 
 	mutex_unlock(&apply_lock);
 
@@ -2177,7 +2157,7 @@ int dss_ovl_disable(struct omap_overlay *ovl)
 	spin_unlock_irqrestore(&data_lock, flags);
 
 	/* wait for the overlay to be disabled */
-	wait_pending_extra_info_updates(ovl->manager);
+	wait_pending_extra_info_updates();
 
 	/* step 2: configure fifos/fifomerge */
 	spin_lock_irqsave(&data_lock, flags);
@@ -2192,7 +2172,7 @@ int dss_ovl_disable(struct omap_overlay *ovl)
 	spin_unlock_irqrestore(&data_lock, flags);
 
 	/* wait for fifo config to go in */
-	wait_pending_extra_info_updates(ovl->manager);
+	wait_pending_extra_info_updates();
 
 	mutex_unlock(&apply_lock);
 

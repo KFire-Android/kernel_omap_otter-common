@@ -279,8 +279,6 @@ bool omap_dss_check_wb(struct writeback_cache_data *wb, int overlayId,
 int dss_init_platform_driver(void);
 void dss_uninit_platform_driver(void);
 
-void enable_disable_dss_mgr(enum omap_channel channel, bool enable);
-
 void dss_select_hdmi_venc_clk_source(enum dss_hdmi_venc_clk_source_select);
 enum dss_hdmi_venc_clk_source_select dss_get_hdmi_venc_clk_source(void);
 const char *dss_get_generic_clk_source_name(enum omap_dss_clk_source clk_src);
