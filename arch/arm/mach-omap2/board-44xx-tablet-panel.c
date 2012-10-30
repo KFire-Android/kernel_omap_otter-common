@@ -233,6 +233,27 @@ static struct omap_dsi_timings dsi_timings_ld089wu1_lg_wuxga = {
 	.enter_lat	= 29,
 };
 
+static struct omap_dsi_timings dsi_timings_tc35876x = {
+	.hbp		= 3,
+	.hfp		= 4,
+	.hsa		= 0,
+	.vbp		= 4,
+	.vfp		= 6,
+	.vsa		= 2,
+	.vact		= 800,
+	.tl		= 970,
+	.hsa_hs_int	= 72,
+	.hfp_hs_int	= 114,
+	.hbp_hs_int	= 150,
+	.hsa_lp_int	= 130,
+	.hfp_lp_int	= 223,
+	.hbp_lp_int	= 59,
+	.bl_lp_int	= 0x31d1,
+	.bl_hs_int	= 0x7a67,
+	.exit_lat	= 15,
+	.enter_lat	= 18,
+};
+
 static struct omap_video_timings dispc_timings_ld089wu1_lg_wuxga = {
 	.x_res		= 1920,
 	.y_res		= 1200,
@@ -242,6 +263,18 @@ static struct omap_video_timings dispc_timings_ld089wu1_lg_wuxga = {
 	.vfp		= 9,
 	.vsw		= 2,
 	.vbp		= 9,
+};
+
+static struct omap_video_timings dispc_timings_tc35876x = {
+		.x_res = 1280,
+		.y_res = 800,
+		.hfp = 243,
+		.hsw = 9,
+		.hbp = 20,
+		.vfp = 6,
+		.vsw = 2,
+		.vbp = 4,
+
 };
 
 static struct omap_dss_device lcd_tc35876x_sharp_lq101k1lyxx = {
@@ -302,10 +335,10 @@ static struct omap_dss_device lcd_tc35876x_sharp_lq101k1lyxx = {
 		.timings = {
 			.x_res		= 1280,
 			.y_res		= 800,
-			.pixel_clock	= 65183,
-			.hfp		= 10,
-			.hsw		= 20,
-			.hbp		= 10,
+			.pixel_clock	= 63530,
+			.hfp		= 6,
+			.hsw		= 12,
+			.hbp		= 6,
 			.vfp		= 4,
 			.vsw		= 4,
 			.vbp		= 4,
@@ -324,8 +357,8 @@ static struct omap_dss_device lcd_tc35876x_sharp_lq101k1lyxx = {
 
 	.platform_enable = NULL,
 	.platform_disable = NULL,
-	.dispc_timings = NULL,
-	.dsi_timings = NULL,
+	.dispc_timings = &dispc_timings_tc35876x,
+	.dsi_timings = &dsi_timings_tc35876x,
 };
 
 static struct omap_dss_device lcd_tc35876x_samhyd_wuxga = {
@@ -674,8 +707,15 @@ static struct omap_tablet_panel_data *get_panel_data(enum omap_44xx_tablet_panel
 		if (omap_is_board_version(OMAP4_TABLET_1_0) ||
 		    omap_is_board_version(OMAP4_TABLET_1_1) ||
 		    omap_is_board_version(OMAP4_TABLET_1_2)) {
+			/* keep compatibility with old Tablet1 devices */
 			lcd_tc35876x_sharp_lq101k1lyxx.panel.timings.x_res = 1024;
 			lcd_tc35876x_sharp_lq101k1lyxx.panel.timings.y_res = 768;
+			lcd_tc35876x_sharp_lq101k1lyxx.panel.timings.pixel_clock = 65183;
+			lcd_tc35876x_sharp_lq101k1lyxx.panel.timings.hfp = 10;
+			lcd_tc35876x_sharp_lq101k1lyxx.panel.timings.hsw = 20;
+			lcd_tc35876x_sharp_lq101k1lyxx.panel.timings.hbp = 10;
+			lcd_tc35876x_sharp_lq101k1lyxx.dsi_timings = NULL;
+			lcd_tc35876x_sharp_lq101k1lyxx.dispc_timings = NULL;
 		}
 		return &panel_data_tc35876x_sharp_lq101k1lyxx;
 	}
