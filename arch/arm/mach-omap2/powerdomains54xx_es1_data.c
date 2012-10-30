@@ -27,8 +27,8 @@
 
 #include "prcm-common.h"
 #include "prcm44xx.h"
-#include "prm-regbits-54xx.h"
-#include "prm54xx.h"
+#include "prm-regbits-54xx_es1.h"
+#include "prm54xx_es1.h"
 #include "prcm_mpu54xx.h"
 
 /* core_54xx_pwrdm: CORE power domain */

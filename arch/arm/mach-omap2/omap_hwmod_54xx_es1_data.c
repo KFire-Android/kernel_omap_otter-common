@@ -34,10 +34,10 @@
 #include <plat/iommu.h>
 
 #include "omap_hwmod_common_data.h"
-#include "cm1_54xx.h"
-#include "cm2_54xx.h"
-#include "prm54xx.h"
-#include "prm-regbits-54xx.h"
+#include "cm1_54xx_es1.h"
+#include "cm2_54xx_es1.h"
+#include "prm54xx_es1.h"
+#include "prm-regbits-54xx_es1.h"
 #include "wd_timer.h"
 
 /* Base offset for all OMAP5 interrupts external to MPUSS */
