@@ -24,6 +24,7 @@
 #include <linux/spi/spi.h>
 #include <linux/hwspinlock.h>
 #include <linux/i2c/twl.h>
+#include <linux/i2c/bq2415x.h>
 #include <linux/mfd/twl6040.h>
 #include <linux/cdc_tcxo.h>
 #include <linux/regulator/machine.h>
@@ -525,10 +526,19 @@ static struct cdc_tcxo_platform_data tablet_cdc_data = {
 	},
 };
 
+static struct bq2415x_platform_data tablet_bqdata = {
+		.max_charger_voltagemV = 4200,
+		.max_charger_currentmA = 1550,
+};
+
 static struct i2c_board_info __initdata tablet_i2c_boardinfo[] = {
 	{
 		I2C_BOARD_INFO("cdc_tcxo_driver", 0x6c),
 		.platform_data = &tablet_cdc_data,
+	},
+	{
+		I2C_BOARD_INFO("bq24156", 0x6a),
+		.platform_data = &tablet_bqdata,
 	},
 };
 
@@ -581,7 +591,8 @@ static int __init omap4_i2c_init(void)
 	omap_register_i2c_bus_board_data(4, &omap4_i2c_4_bus_pdata);
 
 	omap4_pmic_get_config(&tablet_twldata, TWL_COMMON_PDATA_USB |
-			TWL_COMMON_PDATA_MADC,
+			TWL_COMMON_PDATA_MADC | \
+			TWL_COMMON_PDATA_BCI,
 			TWL_COMMON_REGULATOR_VDAC |
 			TWL_COMMON_REGULATOR_VAUX1 |
 			TWL_COMMON_REGULATOR_VAUX2 |
