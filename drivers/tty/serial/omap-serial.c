@@ -1825,7 +1825,36 @@ static int omap_serial_runtime_suspend(struct device *dev)
 		udelay(300);
 	}
 	if (up->use_dma) {
+		u32 iscr, ifcr, ilsr;
 		struct omap_device *od;
+
+		/* Stop baud clock */
+		serial_out(up, UART_LCR, UART_LCR_CONF_MODE_A);
+		serial_out(up, UART_DLL, 0);
+		serial_out(up, UART_DLM, 0);
+
+		/* A DMA disabling sequence for DMA mode 1 set by FCR[3] = 1, SCR[0] = 0 */
+		iscr = serial_in(up, UART_OMAP_SCR) & UART_OMAP_SCR_DMA_MODE_MASK;
+		serial_out(up, UART_OMAP_SCR, iscr | 0x02);
+		serial_out(up, UART_OMAP_SCR, iscr | 0x03);
+		ifcr = up->fcr & ~UART_FCR_DMA_SELECT;
+		serial_out(up, UART_FCR, ifcr);
+		ilsr = serial_in(up, UART_LSR);
+		while ((ilsr & 0x01) == 1) {
+			serial_in(up, UART_RX);
+			ilsr = serial_in(up, UART_LSR);
+		}
+		serial_out(up, UART_FCR, ifcr | UART_FCR_CLEAR_RCVR | UART_FCR_CLEAR_XMIT);
+		iscr = serial_in(up, UART_OMAP_SCR) & UART_OMAP_SCR_DMA_MODE_MASK;
+		serial_out(up, UART_OMAP_SCR, iscr | 0x04);
+		serial_out(up, UART_FCR, ifcr | UART_FCR_CLEAR_RCVR | UART_FCR_CLEAR_XMIT);
+		iscr = serial_in(up, UART_OMAP_SCR) & UART_OMAP_SCR_DMA_MODE_MASK;
+		serial_out(up, UART_OMAP_SCR, iscr);
+
+		/* Restart baud clock */
+		serial_out(up, UART_DLL, up->dll);	/* LS of divisor */
+		serial_out(up, UART_DLM, up->dlh);	/* MS of divisor */
+		serial_out(up, UART_LCR, up->lcr);
 
 		/* ENABLE IDLE MODE */
 		od = to_omap_device(up->pdev);
@@ -1855,6 +1884,20 @@ static int omap_serial_runtime_resume(struct device *dev)
 			od = to_omap_device(up->pdev);
 			omap_hwmod_set_slave_idlemode(od->hwmods[0],
 						HWMOD_IDLEMODE_NO);
+
+			/* Stop baud clock */
+			serial_out(up, UART_LCR, UART_LCR_CONF_MODE_A);
+			serial_out(up, UART_DLL, 0);
+			serial_out(up, UART_DLM, 0);
+
+			/* re-enable DMA */
+			serial_out(up, UART_OMAP_SCR, up->scr);
+			serial_out(up, UART_FCR,      up->fcr);
+
+			/* re-start baud clock */
+			serial_out(up, UART_DLL, up->dll);	/* LS of divisor */
+			serial_out(up, UART_DLM, up->dlh);	/* MS of divisor */
+			serial_out(up, UART_LCR, up->lcr);
 		}
 		if (up->rts_mux_driver_control && (!up->rts_pullup_in_suspend))
 			omap_rts_mux_write(0, up->port.line);
