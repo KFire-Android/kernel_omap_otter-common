@@ -75,7 +75,10 @@ static int case_read_average_temp(struct case_temp_sensor *temp_sensor,
 	if (sensor_temp < 0)
 		return -EINVAL;
 
-	if (temp_sensor->sample_idx == temp_sensor->average_number) {
+	mutex_lock(&temp_sensor->sensor_mutex);
+
+	if (temp_sensor->sample_idx >= temp_sensor->average_number ||
+	    temp_sensor->sample_idx >= AVERAGE_NUMBER_MAX) {
 		temp_sensor->avg_is_valid = 1;
 		temp_sensor->sample_idx = 0;
 	}
@@ -95,6 +98,8 @@ static int case_read_average_temp(struct case_temp_sensor *temp_sensor,
 		pr_debug("sensor_temp_table[%d] = %d\n", i,
 			temp_sensor->sensor_temp_table[i]);
 	}
+
+	mutex_unlock(&temp_sensor->sensor_mutex);
 
 	return temp_sensor->window_sum / tmp;
 }
@@ -221,8 +226,13 @@ static int average_number_set(void *data, u64 val)
 {
 	struct case_temp_sensor *temp_sensor = (struct case_temp_sensor *)data;
 
+	val = clamp((int)val, 1, AVERAGE_NUMBER_MAX);
+
 	mutex_lock(&temp_sensor->sensor_mutex);
 	temp_sensor->average_number = (int)val;
+	temp_sensor->sample_idx = 0;
+	temp_sensor->avg_is_valid = 0;
+	temp_sensor->window_sum = 0;
 	mutex_unlock(&temp_sensor->sensor_mutex);
 
 	return 0;
@@ -299,7 +309,7 @@ static int __devinit case_temp_sensor_probe(struct platform_device *pdev)
 	temp_sensor->therm_fw = kzalloc(sizeof(struct thermal_dev), GFP_KERNEL);
 	if (temp_sensor->therm_fw) {
 		temp_sensor->therm_fw->name = "case_sensor";
-		temp_sensor->therm_fw->domain_name = pdata->source_domain;
+		temp_sensor->therm_fw->domain_name = "case";
 		temp_sensor->therm_fw->dev = temp_sensor->dev;
 		temp_sensor->therm_fw->dev_ops = &case_sensor_ops;
 		thermal_sensor_dev_register(temp_sensor->therm_fw);
@@ -319,7 +329,7 @@ static int __devinit case_temp_sensor_probe(struct platform_device *pdev)
 	else
 		temp_sensor->average_number = pdata->average_number;
 
-	temp_sensor->work_delay = pdata->average_number;
+	temp_sensor->work_delay = pdata->report_delay_ms;
 	schedule_work(&temp_sensor->case_sensor_work.work);
 
 	dev_info(&pdev->dev, "%s: Initialised\n", temp_sensor->therm_fw->name);
@@ -344,6 +354,13 @@ static int __devexit case_temp_sensor_remove(struct platform_device *pdev)
 	kfree(temp_sensor);
 
 	return 0;
+}
+
+static void case_temp_sensor_shutdown(struct platform_device *pdev)
+{
+	struct case_temp_sensor *temp_sensor = platform_get_drvdata(pdev);
+
+	cancel_delayed_work_sync(&temp_sensor->case_sensor_work);
 }
 
 #ifdef CONFIG_PM
@@ -407,6 +424,7 @@ static struct platform_driver case_temp_sensor_driver = {
 		.name = "case_temp_sensor",
 		.pm = &case_temp_sensor_dev_pm_ops,
 	},
+	.shutdown = case_temp_sensor_shutdown,
 };
 
 static int __init case_temp_sensor_init(void)

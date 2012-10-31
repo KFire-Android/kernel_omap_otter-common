@@ -37,6 +37,7 @@
 #include <linux/mfd/twl6040.h>
 #include <linux/regulator/machine.h>
 #include <linux/regulator/fixed.h>
+#include <linux/power/bq27x00_battery.h>
 
 #include <mach/hardware.h>
 #include <mach/omap-secure.h>
@@ -837,10 +838,19 @@ static struct i2c_board_info __initdata omap5evm_i2c_5_boardinfo[] = {
 	},
 };
 
+static struct bq27x00_platform_data bq27x00_plat_data = {
+	.number_actions = 2,
+	.cooling_actions = {
+		{ .priority = 0, .percentage = 100, }, /* Full Charging Cur */
+		{ .priority = 1, .percentage = 0, }, /* Charging OFF */
+	},
+};
+
 static struct i2c_board_info __initdata omap5evm_i2c_1_boardinfo[] = {
 	{
 		I2C_BOARD_INFO("bq27530", 0x55),
 		.irq = GPIO_CHRGR_INT,
+		.platform_data = &bq27x00_plat_data,
 	},
 };
 

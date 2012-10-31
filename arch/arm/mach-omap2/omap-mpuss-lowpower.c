@@ -511,6 +511,8 @@ int omap_enter_lowpower(unsigned int cpu, unsigned int power_state)
 			__raw_writel(0x0, base);
 	}
 
+	cpu_clear_prev_logic_pwrst(cpu);
+	set_cpu_next_pwrst(cpu, power_state);
 	/* Decrease mpu / core usecounts to indicate we are entering idle */
 	omap_dec_mpu_core_pwrdm_usecount();
 
@@ -560,8 +562,6 @@ int omap_enter_lowpower(unsigned int cpu, unsigned int power_state)
 	    omap_wakeupgen_check_interrupts("Aborting Suspend"))
 		goto abort_suspend;
 
-	cpu_clear_prev_logic_pwrst(cpu);
-	set_cpu_next_pwrst(cpu, power_state);
 	set_cpu_wakeup_addr(cpu, virt_to_phys(omap_pm_ops.resume));
 	omap_pm_ops.scu_prepare(cpu, power_state);
 	l2x0_pwrst_prepare(cpu, save_state);
@@ -574,15 +574,6 @@ int omap_enter_lowpower(unsigned int cpu, unsigned int power_state)
 	else
 		omap_pm_ops.finish_suspend(save_state);
 
-	/*
-	 * Restore the CPUx power state to ON otherwise CPUx
-	 * power domain can transitions to programmed low power
-	 * state while doing WFI outside the low powe code. On
-	 * secure devices, CPUx does WFI which can result in
-	 * domain transition
-	 */
-	wakeup_cpu = smp_processor_id();
-	set_cpu_next_pwrst(wakeup_cpu, PWRDM_POWER_ON);
 
 	if (save_state == 3)
 		omap_wakeupgen_check_interrupts("At Resume");
@@ -606,6 +597,18 @@ abort_suspend:
 		prcmdebug_dump(PRCMDEBUG_LASTSLEEP);
 
 sar_save_failed:
+	/*
+	 * Restore the CPUx power state to ON otherwise CPUx
+	 * power domain can transitions to programmed low power
+	 * state while doing WFI outside the low powe code. On
+	 * secure devices, CPUx does WFI which can result in
+	 * domain transition.
+	 * XXX: Is it safe to configure here or should be configured
+	 * immediately after exiting low power state?
+	 */
+	wakeup_cpu = smp_processor_id();
+	set_cpu_next_pwrst(wakeup_cpu, PWRDM_POWER_ON);
+
 	/* Increase mpu / core usecounts to indicate we are leaving idle */
 	omap_inc_mpu_core_pwrdm_usecount();
 	/*

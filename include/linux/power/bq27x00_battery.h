@@ -16,4 +16,13 @@ struct bq27000_platform_data {
 	int (*read)(struct device *dev, unsigned int);
 };
 
+struct bq27x00_cooling_actions {
+	int priority;
+	int percentage;
+};
+
+struct bq27x00_platform_data {
+	int	number_actions;
+	struct	bq27x00_cooling_actions cooling_actions[];
+};
 #endif

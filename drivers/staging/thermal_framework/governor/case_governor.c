@@ -21,8 +21,12 @@
 #include <linux/slab.h>
 #include <linux/types.h>
 #include <linux/debugfs.h>
+#include <linux/syscalls.h>
 
 #include <linux/thermal_framework.h>
+
+#include <linux/opp.h>
+#include <plat/omap_device.h>
 
 /* System/Case Thermal thresholds */
 #define SYS_THRESHOLD_HOT		62000
@@ -30,7 +34,6 @@
 #define SYS_THRESHOLD_HOT_INC		500
 #define INIT_COOLING_LEVEL		0
 #define CASE_SUBZONES_NUMBER		4
-#define CASE_MAX_COOLING_ACTION		(CASE_SUBZONES_NUMBER + 4)
 int case_subzone_number = CASE_SUBZONES_NUMBER;
 EXPORT_SYMBOL_GPL(case_subzone_number);
 
@@ -42,6 +45,7 @@ static int tcold = SYS_THRESHOLD_COLD;
 struct case_governor {
 	struct thermal_dev *temp_sensor;
 	int cooling_level;
+	int max_cooling_level;
 };
 
 static struct thermal_dev *therm_fw;
@@ -51,6 +55,7 @@ static void case_reached_max_state(int temp)
 {
 	pr_emerg("%s: restart due to thermal case policy (temp == %d)\n",
 		 __func__, temp);
+	sys_sync();
 	kernel_restart(NULL);
 }
 
@@ -113,7 +118,7 @@ static int case_thermal_manager(struct list_head *cooling_list, int temp)
 		pr_debug("%s: temp: %d >= sys_threshold_hot, thot: %d:%d (%d)",
 			 __func__, temp, thot, tcold, case_gov->cooling_level);
 
-		if (case_gov->cooling_level >= CASE_MAX_COOLING_ACTION)
+		if (case_gov->cooling_level >= case_gov->max_cooling_level)
 			case_reached_max_state(temp);
 	} else if (temp > thot) { /* sys_thot > temp > sys_tcold */
 		case_gov->cooling_level++;
@@ -214,6 +219,26 @@ static struct thermal_dev_ops case_gov_ops = {
 static int __init case_governor_init(void)
 {
 	struct thermal_dev *thermal_fw;
+	struct device *dev;
+	int tmp, opps;
+
+	dev = omap_device_get_by_hwmod_name("mpu");
+	if (!dev) {
+		pr_err("%s: domain does not know the amount of throttling",
+			__func__);
+		return -ENODEV;
+	}
+	opps = opp_get_opp_count(dev);
+
+	dev = omap_device_get_by_hwmod_name("gpu");
+	if (!dev) {
+		pr_err("%s: domain does not know the amount of throttling",
+			__func__);
+		return -ENODEV;
+	}
+	tmp = opp_get_opp_count(dev);
+	if (tmp > opps)
+		opps = tmp;
 
 	case_gov = kzalloc(sizeof(struct case_governor), GFP_KERNEL);
 	if (!case_gov) {
@@ -235,6 +260,7 @@ static int __init case_governor_init(void)
 	}
 
 	case_gov->cooling_level = INIT_COOLING_LEVEL;
+	case_gov->max_cooling_level = CASE_SUBZONES_NUMBER + opps;
 
 	return 0;
 }
