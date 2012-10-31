@@ -20,20 +20,6 @@ config THERMAL_FRAMEWORK_DEBUG
 	  components, e.g. thermal domains, governors, sensors and
 	  cooling devices and their attributes.
 
-config OMAP_THERMAL
-	bool "OMAP Thermal Framework support"
-	depends on THERMAL_FRAMEWORK
-	help
-	  This is the thermal framework support for OMAP4
-	  processors.
 
-config OMAP4_DUTY_CYCLE
-        bool "Control OPP_NITRO usage based on duty cycle strategy"
-        depends on THERMAL_FRAMEWORK && ARCH_OMAP4 && CPU_FREQ
-        help
-        If you are going to use OPP_NITRO with high level of leakage which.
-        could pontentially sustain a thermal runaway, say Y here.
-
-source "drivers/staging/thermal_framework/governor/Kconfig"
-source "drivers/staging/thermal_framework/sensor/Kconfig"
-source "drivers/staging/thermal_framework/cooling_devices/Kconfig"
+source "drivers/staging/thermal_framework/Kconfig.omap_thermal"
+source "drivers/staging/thermal_framework/Kconfig.duty_cycle"
