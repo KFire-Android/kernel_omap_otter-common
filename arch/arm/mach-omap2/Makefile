@@ -88,8 +88,10 @@ endif
 
 obj-$(CONFIG_PM_DEBUG)			+= pm-debug.o
 ifeq ($(CONFIG_PM_DEBUG),y)
-obj-$(CONFIG_ARCH_OMAP5)		+= prcm-54xx-debug.o
+obj-$(CONFIG_ARCH_OMAP4)		+= prcm-44xx-debug_data.o
+obj-$(CONFIG_ARCH_OMAP5)		+= prcm-54xx-debug_data.o
 endif
+obj-$(CONFIG_PM_DEBUG)			+= prcm-debug.o
 obj-$(CONFIG_POWER_AVS_OMAP)		+= sr_device.o
 obj-$(CONFIG_POWER_AVS_OMAP_CLASS3)    += smartreflex-class3.o
 obj-$(CONFIG_POWER_AVS_OMAP_CLASS1_P5)   += smartreflex-class1_p5.o

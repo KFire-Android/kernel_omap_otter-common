@@ -581,7 +581,7 @@ abort_suspend:
 	}
 
 	if (pwrdm_read_device_off_state())
-		prcmdebug_dump(PRCMDEBUG_LASTSLEEP);
+		omap_prcmdebug_dump(PRCMDEBUG_LASTSLEEP);
 
 sar_save_failed:
 	/*

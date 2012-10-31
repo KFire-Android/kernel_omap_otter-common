@@ -18,10 +18,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
-
 #include <linux/io.h>
-#include <linux/debugfs.h>
-#include <linux/seq_file.h>
 
 #include "prcm-debug.h"
 #include "iomap.h"
@@ -44,20 +41,6 @@
 #include "powerdomain-private.h"
 
 /* DPLLs */
-
-struct d_dpll_info {
-	char *name;
-	void __iomem *clkmodereg;
-	void __iomem *autoidlereg;
-	void __iomem *idlestreg;
-	struct d_dpll_derived *derived[];
-};
-
-struct d_dpll_derived {
-	char *name;
-	void __iomem *gatereg;
-	u32 gatemask;
-};
 
 static struct d_dpll_derived derived_dpll_per_m2 = {
 	.name = "DPLL_PER_M2",
@@ -179,12 +162,6 @@ static struct d_dpll_info dpll_usb = {
 
 /* Other internal generators */
 
-struct d_intgen_info {
-	char *name;
-	void __iomem *gatereg;
-	u32 gatemask;
-};
-
 static struct d_intgen_info intgen_cm1_abe = {
 	.name = "CM1_ABE",
 	.gatereg = OMAP54XX_CM_CLKSEL_ABE,
@@ -192,17 +169,6 @@ static struct d_intgen_info intgen_cm1_abe = {
 };
 
 /* Modules */
-
-#define MOD_MASTER (1 << 0)
-#define MOD_SLAVE (1 << 1)
-#define MOD_MODE (1 << 2)
-
-struct d_mod_info {
-	char *name;
-	void __iomem *clkctrl;
-	int flags;
-	int optclk;
-};
 
 static struct d_mod_info mod_debug = {
 	.name = "DEBUGSS",
@@ -958,17 +924,6 @@ static struct d_mod_info mod_cryptodma = {
 
 /* Clock domains */
 
-struct d_clkd_info {
-	char *name;
-	const u8 prcm_partition;
-	const s16 cm_inst;
-	const u16 clkdm_offs;
-	int activity;
-	struct d_dpll_info *dplls[20];
-	struct d_intgen_info *intgens[20];
-	struct d_mod_info *mods[];
-};
-
 static struct d_clkd_info cd_emu = {
 	.name = "CD_EMU",
 	.prcm_partition	  = OMAP54XX_PRM_PARTITION,
@@ -1271,13 +1226,6 @@ static struct d_clkd_info cd_l4sec = {
 
 /* Power domains */
 
-struct d_pwrd_info {
-	char *name;
-	long prminst;
-	int pwrst;
-	struct d_clkd_info *cds[];
-};
-
 static struct d_pwrd_info pd_emu = {
 	.name = "PD_EMU",
 	.prminst = OMAP54XX_PRM_EMU_CM_INST,
@@ -1422,16 +1370,7 @@ static struct d_pwrd_info *vdd_mpu_pds[] = {
 
 /* Voltage domains */
 
-#define N_VDDS 4
-
-struct d_vdd_info {
-	char *name;
-	int auto_ctrl_shift;
-	int auto_ctrl_mask;
-	struct d_pwrd_info **pds;
-};
-
-static struct d_vdd_info d_vdd[N_VDDS] =  {
+struct d_vdd_info d_vddinfo_omap5[N_VDDS] =  {
 	{
 		.name = "VDD_WKUP",
 		.auto_ctrl_shift = -1,
@@ -1458,313 +1397,26 @@ static struct d_vdd_info d_vdd[N_VDDS] =  {
 	},
 };
 
-
-/* Display strings */
-
-static char *vddauto_s[] = {"disabled", "SLEEP", "RET", "reserved"};
-
-static char *pwrstate_s[] = {"OFF", "RET", "INACTIVE", "ON"};
-
-static char *logic_s[] = {"OFF", "ON"};
-
-static char *cmtrctrl_s[] = {"NOSLEEP", "SW_SLEEP", "SW_WKUP", "HW_AUTO"};
-
-static char *modmode_s[] = {"DISABLED", "AUTO", "ENABLED", "3"};
-
-static char *modstbyst_s[] = {"ON", "STBY"};
-
-static char *modidlest_s[] = {"ON", "TRANSITION", "IDLE", "DISABLED"};
-
-#define d_pr(sf, fmt, args...)				\
-	{						\
-		if (sf)					\
-			seq_printf(sf, fmt , ## args);	\
-		else					\
-			pr_info(fmt , ## args);		\
-	}
-
-#define d_pr_ctd(sf, fmt, args...)			\
-	{						\
-		if (sf)					\
-			seq_printf(sf, fmt , ## args);	\
-		else					\
-			pr_cont(fmt , ## args);		\
-	}
-
-static void prcmdebug_dump_dpll(struct seq_file *sf,
-				struct d_dpll_info *dpll,
-				int flags)
-{
-	u32 en = __raw_readl(dpll->clkmodereg) & 0x7;
-	u32 autoidle = __raw_readl(dpll->autoidlereg) & 0x7;
-	struct d_dpll_derived **derived;
-
-	if (flags & (PRCMDEBUG_LASTSLEEP | PRCMDEBUG_ON) &&
-	    (en == 0x5))
-		return;
-
-	d_pr(sf, "         %s auto=0x%x en=0x%x", dpll->name, autoidle, en);
-
-	if (dpll->idlestreg)
-		d_pr_ctd(sf, " st=0x%x",	__raw_readl(dpll->idlestreg));
-
-	d_pr_ctd(sf, "\n");
-
-	derived = dpll->derived;
-
-	while (*derived) {
-		u32 enabled = __raw_readl((*derived)->gatereg) &
-			(*derived)->gatemask;
-
-		if (!(flags & (PRCMDEBUG_LASTSLEEP | PRCMDEBUG_ON)) ||
-		    enabled)
-			d_pr(sf, "            %s enabled=0x%x\n",
-			     (*derived)->name, enabled);
-		derived++;
-	}
-}
-
-
-static void prcmdebug_dump_intgen(struct seq_file *sf,
-				  struct d_intgen_info *intgen,
-				  int flags)
-{
-	u32 enabled = __raw_readl(intgen->gatereg) & intgen->gatemask;
-
-	if (flags & (PRCMDEBUG_LASTSLEEP | PRCMDEBUG_ON) && !enabled)
-		return;
-
-	d_pr(sf, "         %s enabled=0x%x\n", intgen->name, enabled);
-}
-
-static void prcmdebug_dump_mod(struct seq_file *sf, struct d_mod_info *mod,
-	int flags)
-{
-	u32 clkctrl = __raw_readl(mod->clkctrl);
-	u32 stbyst = (clkctrl & OMAP54XX_STBYST_MASK) >> OMAP54XX_STBYST_SHIFT;
-	u32 idlest = (clkctrl & OMAP54XX_IDLEST_MASK) >> OMAP54XX_IDLEST_SHIFT;
-	u32 optclk = clkctrl & mod->optclk;
-
-	if (flags & (PRCMDEBUG_LASTSLEEP | PRCMDEBUG_ON) &&
-	    (!(mod->flags & MOD_MASTER) || stbyst == 1) &&
-	    (!(mod->flags & MOD_SLAVE) || idlest == 2 || idlest == 3) &&
-	    !optclk)
-		return;
-
-	if (flags & PRCMDEBUG_LASTSLEEP &&
-	    (mod->flags & MOD_MODE &&
-	     ((clkctrl & OMAP54XX_MODULEMODE_MASK) >>
-	      OMAP54XX_MODULEMODE_SHIFT) == 1 /* AUTO */) &&
-	    (!(mod->flags & MOD_SLAVE) || idlest == 0) /* ON */ &&
-	    !optclk)
-		return;
-
-	d_pr(sf, "         %s", mod->name);
-
-	if (mod->flags & MOD_MODE)
-		d_pr_ctd(sf, " mode=%s",
-			 modmode_s[(clkctrl & OMAP54XX_MODULEMODE_MASK) >>
-				   OMAP54XX_MODULEMODE_SHIFT]);
-
-	if (mod->flags & MOD_MASTER)
-		d_pr_ctd(sf, " stbyst=%s",
-			 modstbyst_s[stbyst]);
-
-	if (mod->flags & MOD_SLAVE)
-		d_pr_ctd(sf, " idlest=%s",
-			 modidlest_s[idlest]);
-
-	if (optclk)
-		d_pr_ctd(sf, " optclk=0x%x", optclk);
-
-	d_pr_ctd(sf, "\n");
-}
-
-static void prcmdebug_dump_real_cd(struct seq_file *sf, struct d_clkd_info *cd,
-	int flags)
-{
-	u32 clktrctrl =
-		omap4_cminst_read_inst_reg(cd->prcm_partition, cd->cm_inst,
-					   cd->clkdm_offs + OMAP4_CM_CLKSTCTRL);
-	u32 mode = (clktrctrl & OMAP54XX_CLKTRCTRL_MASK) >>
-		OMAP54XX_CLKTRCTRL_SHIFT;
-	u32 activity = clktrctrl & cd->activity;
-
-	if (flags & PRCMDEBUG_LASTSLEEP && mode == 3 /* HW_AUTO */)
-		return;
-
-	d_pr(sf, "      %s mode=%s", cd->name, cmtrctrl_s[mode]);
-
-	d_pr_ctd(sf, " activity=0x%x", activity);
-
-	d_pr_ctd(sf, "\n");
-}
-
-static void prcmdebug_dump_cd(struct seq_file *sf, struct d_clkd_info *cd,
-	int flags)
-{
-	struct d_mod_info **mod;
-	struct d_intgen_info **intgen;
-	struct d_dpll_info **dpll;
-
-	if (cd->cm_inst != -1)
-		prcmdebug_dump_real_cd(sf, cd, flags);
-	else if (!(flags & PRCMDEBUG_LASTSLEEP))
-		d_pr(sf, "      %s\n", cd->name);
-
-	mod = cd->mods;
-
-	while (*mod) {
-		prcmdebug_dump_mod(sf, *mod, flags);
-		mod++;
-	}
-
-	dpll = cd->dplls;
-
-	while (*dpll) {
-		prcmdebug_dump_dpll(sf, *dpll, flags);
-		dpll++;
-	}
-
-	intgen = cd->intgens;
-
-	while (*intgen) {
-		prcmdebug_dump_intgen(sf, *intgen, flags);
-		intgen++;
-	}
-}
-
-static void prcmdebug_dump_pd(struct seq_file *sf, struct d_pwrd_info *pd,
-	int flags)
-{
-	u32 pwrstst, currst, prevst;
-	struct d_clkd_info **cd;
-
-	if (pd->pwrst != -1 && pd->prminst != -1) {
-		pwrstst = omap4_prm_read_inst_reg(pd->prminst, pd->pwrst);
-		currst = (pwrstst & OMAP54XX_POWERSTATEST_MASK) >>
-			OMAP54XX_POWERSTATEST_SHIFT;
-		prevst = (pwrstst & OMAP54XX_LASTPOWERSTATEENTERED_MASK) >>
-			OMAP54XX_LASTPOWERSTATEENTERED_SHIFT;
-
-		if (flags & PRCMDEBUG_LASTSLEEP &&
-		    (prevst == PWRDM_POWER_OFF || prevst == PWRDM_POWER_RET))
-			return;
-
-		if (flags & PRCMDEBUG_ON &&
-		    (currst == PWRDM_POWER_OFF || currst == PWRDM_POWER_RET))
-			return;
-
-		d_pr(sf, "   %s curr=%s prev=%s logic=%s\n", pd->name,
-		     pwrstate_s[currst],
-		     pwrstate_s[prevst],
-		     logic_s[(pwrstst & OMAP54XX_LOGICSTATEST_MASK) >>
-			     OMAP54XX_LOGICSTATEST_SHIFT]);
-	} else {
-		if (flags & PRCMDEBUG_LASTSLEEP)
-			return;
-
-		d_pr(sf, "   %s\n", pd->name);
-	}
-
-	cd = pd->cds;
-
-	while (*cd) {
-		prcmdebug_dump_cd(sf, *cd, flags);
-		cd++;
-	}
-}
-
-static int _prcmdebug_dump(struct seq_file *sf, int flags)
-{
-	int i;
-	u32 prm_voltctrl =
-		omap4_prm_read_inst_reg(OMAP54XX_PRM_DEVICE_INST,
-					OMAP54XX_PRM_VOLTCTRL_OFFSET);
-	struct d_pwrd_info **pd;
-
-	for (i = 0; i < N_VDDS; i++) {
-		if (!(flags & PRCMDEBUG_LASTSLEEP)) {
-			d_pr(sf, "%s",
-			     d_vdd[i].name);
-
-			if (d_vdd[i].auto_ctrl_shift != -1) {
-				int auto_ctrl =
-					(prm_voltctrl &
-					 d_vdd[i].auto_ctrl_mask) >>
-					d_vdd[i].auto_ctrl_shift;
-				d_pr_ctd(sf, " auto=%s\n",
-					 vddauto_s[auto_ctrl]);
-			} else {
-				d_pr_ctd(sf, " (no auto)\n");
-			}
-
-		}
-
-		pd = d_vdd[i].pds;
-
-		while (*pd) {
-			prcmdebug_dump_pd(sf, *pd, flags);
-			pd++;
-		}
-	}
-
-	return 0;
-}
-
-void prcmdebug_dump(int flags)
-{
-	_prcmdebug_dump(NULL, flags);
-}
-
-static int prcmdebug_all_dump(struct seq_file *sf, void *private)
-{
-	_prcmdebug_dump(sf, 0);
-	return 0;
-}
-
-static int prcmdebug_all_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, prcmdebug_all_dump, NULL);
-}
-
-
-static const struct file_operations prcmdebug_all_fops = {
-	.open = prcmdebug_all_open,
-	.read = seq_read,
-	.llseek = seq_lseek,
-	.release = single_release,
+struct d_prcm_regs_info omap5_prcm_regs_data = {
+	.dpll_en_mask = OMAP54XX_DPLL_EN_MASK,
+	.dpll_autoidle_mask = OMAP54XX_AUTO_DPLL_MODE_MASK,
+	.clkctrl_stbyst_mask = OMAP54XX_STBYST_MASK,
+	.clkctrl_stbyst_shift = OMAP54XX_STBYST_SHIFT,
+	.clkctrl_idlest_mask = OMAP54XX_IDLEST_MASK,
+	.clkctrl_idlest_shift = OMAP54XX_IDLEST_SHIFT,
+	.clkctrl_module_mode_mask = OMAP54XX_MODULEMODE_MASK,
+	.clkctrl_module_mode_shift = OMAP54XX_MODULEMODE_SHIFT,
+	.clkstctrl_offset = OMAP4_CM_CLKSTCTRL,
+	.clktrctrl_mask = OMAP54XX_CLKTRCTRL_MASK,
+	.clktrctrl_shift = OMAP54XX_CLKTRCTRL_SHIFT,
+	.prm_pwrstatest_mask = OMAP54XX_POWERSTATEST_MASK,
+	.prm_pwrstatest_shift = OMAP54XX_POWERSTATEST_SHIFT,
+	.prm_lastpwrstatentered_mask = OMAP54XX_LASTPOWERSTATEENTERED_MASK,
+	.prm_lastpwrstatentered_shift = OMAP54XX_LASTPOWERSTATEENTERED_SHIFT,
+	.prm_logicstatest_mask = OMAP54XX_LOGICSTATEST_MASK,
+	.prm_logicstatest_shift = OMAP54XX_LOGICSTATEST_SHIFT,
+	.prm_dev_instance = OMAP54XX_PRM_DEVICE_INST,
+	.prm_volctrl_offset = OMAP54XX_PRM_VOLTCTRL_OFFSET,
 };
 
-static int prcmdebug_on_dump(struct seq_file *sf, void *private)
-{
-	_prcmdebug_dump(sf, PRCMDEBUG_ON);
-	return 0;
-}
-
-static int prcmdebug_on_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, prcmdebug_on_dump, NULL);
-}
-
-static const struct file_operations prcmdebug_on_fops = {
-	.open = prcmdebug_on_open,
-	.read = seq_read,
-	.llseek = seq_lseek,
-	.release = single_release,
-};
-
-static int __init prcmdebug_init(void)
-{
-	if (IS_ERR_OR_NULL(debugfs_create_file("prcm", S_IRUGO, NULL, NULL,
-					       &prcmdebug_all_fops)))
-		pr_err("%s: failed to create prcm file\n", __func__);
-
-	if (IS_ERR_OR_NULL(debugfs_create_file("prcm-on", S_IRUGO, NULL, NULL,
-					       &prcmdebug_on_fops)))
-		pr_err("%s: failed to create prcm-on file\n", __func__);
-
-	return 0;
-}
-
-arch_initcall(prcmdebug_init);
+struct d_prcm_regs_info *d_prcm_regs_omap5 = &omap5_prcm_regs_data;
