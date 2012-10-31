@@ -1029,6 +1029,7 @@ static long twl6030_gpadc_ioctl(struct file *filp, unsigned int cmd,
 		req.channels = (1 << par.channel);
 		req.method	= TWL6030_GPADC_SW2;
 		req.func_cb	= NULL;
+		req.type	= TWL6030_GPADC_WAIT;
 
 		val = twl6030_gpadc_conversion(&req);
 		if (likely(val > 0)) {
