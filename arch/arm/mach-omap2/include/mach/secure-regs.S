@@ -31,6 +31,23 @@
 	ldr	\base,	=0x107
 	smc	#0
 #endif
+#ifdef CONFIG_ARM_ERRATA_774769
+	cmp	r6, #0x4			@ present in r0p4
+	bgt	1f
+	mrc p15, 0, r0, c1, c0, 1		@ read aux control register
+	bic r0, r0, #7 << 26		@ clear bits #28-26
+	orr r0, r0, #1 << 25		@ set bit #25
+	ldr	\base, =0x107
+	smc 	#0
+#endif
+#ifdef CONFIG_ARM_ERRATA_773022
+	cmp	r6, #0x4			@ present in r0p4
+	bgt	1f
+	mrc p15, 0, r0, c1, c0, 1		@ read aux control register
+	orr r0, r0, #1 << 1			@ set bit #1
+	ldr	\base, =0x107
+	smc	#0
+#endif
 1:
 	/*
 	 * Setting the L2 ACTLR register for recommended value to get the optimum

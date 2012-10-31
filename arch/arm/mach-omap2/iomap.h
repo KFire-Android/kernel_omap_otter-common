@@ -196,3 +196,8 @@
 						/* 0x48000000 --> 0xfa000000 */
 #define L4_PER_54XX_VIRT	(L4_PER_54XX_PHYS + OMAP2_L4_IO_OFFSET)
 #define L4_PER_54XX_SIZE	SZ_4M
+
+#if !defined(__ASSEMBLY__) && defined(CONFIG_OMAP_SO_MAP_FORCE)
+extern void __iomem *__omap_ioremap_caller(unsigned long phys_addr, size_t size,
+					  unsigned int mtype, void *caller);
+#endif	/* __ASSEMBLY__ */

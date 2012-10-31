@@ -64,7 +64,10 @@ config ARCH_OMAP5
 	select CPU_V7
 	select ARM_GIC
 	select HAVE_SMP
+	select ARM_ERRATA_766421
 	select ARM_ERRATA_761171
+	select ARM_ERRATA_774769
+	select ARM_ERRATA_773022
 	select ARM_ERRATA_4668
 	select USB_ARCH_HAS_EHCI if USB_SUPPORT
 	select USB_ARCH_HAS_XHCI if USB_SUPPORT
@@ -449,6 +452,20 @@ config OMAP_RAM_CONSOLE
           that after a kernel panic they can be viewed in the next kernel
           invocation, by accessing /proc/last_kmsg
           NOTE: Board file needs to invoke relevant api to enable the support
+
+config OMAP_SO_MAP_FORCE
+	bool "Force SO range for OMAP IP peripheral memory map"
+	depends on ARCH_OMAP2 || ARCH_OMAP3 || ARCH_OMAP4 || ARCH_OMAP5
+	default y
+	help
+	  Use Strongly Ordered for L3, L4CFG, L4_WK and L4_PER peripherals in
+	  the system. It's seen with robustness testing keeping SO memory
+	  attribute helps system stability. Additionally, having strongly
+	  ordered uncovered external aborts which could have gone un-noticed
+	  as freeze, actually a hidden L3 write abort. Having SO should ease
+	  debug of such external aborts.
+	  If you do not know what to set here, leave at default.
+
 
 config OMAP_TPS6236X
 	bool "OMAP4 support for TPS6236X power IC"
