@@ -1249,9 +1249,17 @@ static void _omap5_gpio_apply_wa(struct gpio_bank *bank)
 				_set_gpio_direction(bank, i, 1);
 				bank->is_oe_wa |= (0x1 << i);
 			} else {
-				dev_err(bank->dev,
-					"Failed to apply WA for gpio %d\n",
-					i + (bank->id)*(bank->width));
+				/*
+				 * HACK: Temporarily removed print on
+				 * OMAP5432 due to a bug in ducati where
+				 * GPIO65 is misconfigured.
+				 */
+				if (omap_rev() != OMAP5432_REV_ES1_0) {
+					dev_err(bank->dev,
+						"Failed to apply WA for "
+						"gpio %d\n",
+						i + (bank->id)*(bank->width));
+				}
 			}
 		}
 	}
