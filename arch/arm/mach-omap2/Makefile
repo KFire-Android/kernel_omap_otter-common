@@ -264,7 +264,8 @@ obj-$(CONFIG_MACH_OMAP3_TOUCHBOOK)	+= board-omap3touchbook.o
 obj-$(CONFIG_MACH_OMAP_4430SDP)		+= board-4430sdp.o \
 					   board-44xx-serial.o \
 					   board-44xx-blaze-touch.o \
-					   board-44xx-blaze-sensors.o
+					   board-44xx-blaze-sensors.o \
+					   board-44xx-blaze-keypad.o
 
 obj-$(CONFIG_MACH_OMAP_BLAZE)		+= board-44xx-tablet.o \
 					   board-44xx-tablet-panel.o \

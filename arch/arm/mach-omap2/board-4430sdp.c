@@ -1146,6 +1146,7 @@ static void __init omap_4430sdp_init(void)
 	omap_init_dmm_tiler();
 	omap4_register_ion();
 	omap_4430sdp_display_init();
+	blaze_keypad_init();
 
 	if (cpu_is_omap446x()) {
 		/* Vsel0 = gpio, vsel1 = gnd */
