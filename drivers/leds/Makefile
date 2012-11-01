@@ -44,6 +44,7 @@ obj-$(CONFIG_LEDS_NS2)			+= leds-ns2.o
 obj-$(CONFIG_LEDS_NETXBIG)		+= leds-netxbig.o
 obj-$(CONFIG_LEDS_ASIC3)		+= leds-asic3.o
 obj-$(CONFIG_LEDS_OMAP4430_SDP_DISPLAY)	+= leds-omap4430sdp-display.o
+obj-$(CONFIG_LEDS_OMAP4430_SDP_KEYPAD)	+= leds-omap4430sdp-keypad.o
 obj-$(CONFIG_LEDS_RENESAS_TPU)		+= leds-renesas-tpu.o
 obj-$(CONFIG_LEDS_MAX8997)		+= leds-max8997.o
 obj-$(CONFIG_LEDS_PALMAS)		+= leds-palmas.o
