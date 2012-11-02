@@ -79,7 +79,10 @@ void __init omap_barriers_init(void)
 	dram_io_desc[0].type = MT_MEMORY_SO;
 	iotable_init(dram_io_desc, ARRAY_SIZE(dram_io_desc));
 	dram_sync = (void __iomem *) dram_io_desc[0].virtual;
-	sram_sync = (void __iomem *) OMAP4_SRAM_VA;
+	if (cpu_is_omap44xx())
+		sram_sync = (void __iomem *)OMAP4_ERRATA_I688_SRAM_VA;
+	else
+		sram_sync = (void __iomem *)OMAP5_ERRATA_I688_SRAM_VA;
 
 	pr_info("OMAP4: Map 0x%08llx to 0x%08lx for dram barrier\n",
 		(long long) paddr, dram_io_desc[0].virtual);
