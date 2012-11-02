@@ -466,6 +466,19 @@ config OMAP_SO_MAP_FORCE
 	  debug of such external aborts.
 	  If you do not know what to set here, leave at default.
 
+config OMAP4_HS_SECURE_SRAM_SIZE
+	int "Secure SRAM Resized size for OMAP4 HS devices in KB"
+	depends on ARCH_OMAP4
+	default 52
+	help
+	  resized secure SRAM size for OMAP4
+
+config OMAP5_HS_SECURE_SRAM_SIZE
+	int "Secure SRAM Resized size for OMAP5 HS devices in KB"
+	depends on ARCH_OMAP5
+	default 120
+	help
+	  resized secure SRAM size for OMAP5
 
 config OMAP_TPS6236X
 	bool "OMAP4 support for TPS6236X power IC"

@@ -39,15 +39,6 @@
 #define OMAP1_SRAM_PA		0x20000000
 #define OMAP2_SRAM_PUB_PA	(OMAP2_SRAM_PA + 0xf800)
 #define OMAP3_SRAM_PUB_PA       (OMAP3_SRAM_PA + 0x8000)
-#ifdef CONFIG_OMAP4_ERRATA_I688
-#define OMAP4_SRAM_PUB_PA	OMAP4_SRAM_PA
-#else
-#define OMAP4_SRAM_PUB_PA	(OMAP4_SRAM_PA + 0x4000)
-#endif
-#define OMAP5_SRAM_PA		0x40300000
-
-#define OMAP4_SRAM_RESERVE	0x4000
-#define OMAP5_SRAM_RESERVE 	0x10000
 
 #if defined(CONFIG_ARCH_OMAP2PLUS)
 #define SRAM_BOOTLOADER_SZ	0x00
@@ -120,13 +111,15 @@ static void __init omap_detect_sram(void)
 					omap_sram_size = 0x8000; /* 32K */
 				}
 			} else if (cpu_is_omap44xx()) {
-				omap_sram_start = OMAP4_SRAM_PUB_PA;
-				omap_sram_size = 0xa000; /* 40K */
-				omap_sram_size -= OMAP4_SRAM_RESERVE;
+				omap_sram_start = OMAP4_SRAM_START_PA;
+				omap_sram_size = OMAP4_SRAM_SIZE; /* 56KB */
+				omap_sram_size -= OMAP4_SRAM_HS_RESERVE;
+				omap_sram_start += OMAP4_SRAM_HS_RESERVE;
 			} else if (cpu_is_omap54xx()) {
-				omap_sram_start = OMAP5_SRAM_PA;
-				omap_sram_size = SZ_128K; /* 128KB */
-				omap_sram_size -= OMAP5_SRAM_RESERVE;
+				omap_sram_start = OMAP4_SRAM_START_PA;
+				omap_sram_size = OMAP5_SRAM_SIZE; /* 128KB */
+				omap_sram_size -= OMAP5_SRAM_HS_RESERVE;
+				omap_sram_start += OMAP5_SRAM_HS_RESERVE;
 			} else {
 				omap_sram_start = OMAP2_SRAM_PUB_PA;
 				omap_sram_size = 0x800; /* 2K */
@@ -139,13 +132,15 @@ static void __init omap_detect_sram(void)
 				omap_sram_start = OMAP3_SRAM_PA;
 				omap_sram_size = 0x10000; /* 64K */
 			} else if (cpu_is_omap44xx()) {
-				omap_sram_start = OMAP4_SRAM_PA;
-				omap_sram_size = 0xe000; /* 56K */
-				omap_sram_size -= OMAP4_SRAM_RESERVE;
+				omap_sram_start = OMAP4_SRAM_START_PA;
+				omap_sram_size = OMAP4_SRAM_SIZE; /* 56K */
+				omap_sram_size -= OMAP4_SRAM_GP_RESERVE;
+				omap_sram_start += OMAP4_SRAM_GP_RESERVE;
 			} else if (cpu_is_omap54xx()) {
-				omap_sram_start = OMAP5_SRAM_PA;
-				omap_sram_size = SZ_128K; /* 128KB */
-				omap_sram_size -= OMAP5_SRAM_RESERVE;
+				omap_sram_start = OMAP4_SRAM_START_PA;
+				omap_sram_size = OMAP5_SRAM_SIZE; /* 128KB */
+				omap_sram_size -= OMAP5_SRAM_GP_RESERVE;
+				omap_sram_start += OMAP5_SRAM_GP_RESERVE;
 			} else {
 				omap_sram_start = OMAP2_SRAM_PA;
 				if (cpu_is_omap242x())
@@ -178,13 +173,11 @@ static void __init omap_map_sram(void)
 {
 	int cached = 1;
 
+	omap_sram_size -= OMAP4_ERRATA_I688_SIZE;
+
 	if (omap_sram_size == 0)
 		return;
 
-#ifdef CONFIG_OMAP4_ERRATA_I688
-		omap_sram_start += PAGE_SIZE;
-		omap_sram_size -= SZ_16K;
-#endif
 	if (cpu_is_omap34xx()) {
 		/*
 		 * SRAM must be marked as non-cached on OMAP3 since the

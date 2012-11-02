@@ -229,9 +229,9 @@ static struct map_desc omap44xx_io_desc[] __initdata = {
 	},
 #ifdef CONFIG_OMAP4_ERRATA_I688
 	{
-		.virtual	= OMAP4_SRAM_VA,
-		.pfn		= __phys_to_pfn(OMAP4_SRAM_PA),
-		.length		= PAGE_SIZE,
+		.virtual	= OMAP4_ERRATA_I688_SRAM_VA,
+		.pfn		= __phys_to_pfn(OMAP4_ERRATA_I688_SRAM_PA),
+		.length		= OMAP4_ERRATA_I688_SIZE,
 		.type		= MT_MEMORY_SO,
 	},
 #endif
@@ -267,9 +267,9 @@ static struct map_desc omap54xx_io_desc[] __initdata = {
 	},
 #ifdef CONFIG_OMAP4_ERRATA_I688
 	{
-		.virtual	= OMAP4_SRAM_VA,
-		.pfn		= __phys_to_pfn(OMAP4_SRAM_PA),
-		.length		= PAGE_SIZE,
+		.virtual	= OMAP5_ERRATA_I688_SRAM_VA,
+		.pfn		= __phys_to_pfn(OMAP5_ERRATA_I688_SRAM_PA),
+		.length		= OMAP4_ERRATA_I688_SIZE,
 		.type		= MT_MEMORY_SO,
 	},
 #endif
