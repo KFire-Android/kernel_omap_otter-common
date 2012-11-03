@@ -56,6 +56,7 @@
 #define	EHCI_INSNREG05_ULPI_REGADD_SHIFT		16
 #define	EHCI_INSNREG05_ULPI_EXTREGADD_SHIFT		8
 #define	EHCI_INSNREG05_ULPI_WRDATA_SHIFT		0
+#define L3INIT_HSUSBHOST_CLKCTRL			(0x4A009358)
 
 /* EHCI-HSIC module requires L3 clocked @ 250MHz+ */
 #define PM_QOS_MEMORY_THROUGHPUT_USBHOST         (250 * 4 * 1000)
@@ -73,6 +74,73 @@ static inline void ehci_write(void __iomem *base, u32 reg, u32 val)
 static inline u32 ehci_read(void __iomem *base, u32 reg)
 {
 	return __raw_readl(base + reg);
+}
+
+u8 omap_ehci_ulpi_read(const struct usb_hcd *hcd, u8 port, u8 reg)
+{
+	unsigned reg_internal = 0;
+	u8 val;
+	int count = 2000;
+
+	reg_internal = ((reg) << EHCI_INSNREG05_ULPI_REGADD_SHIFT)
+			/* Read */
+			| (3 << EHCI_INSNREG05_ULPI_OPSEL_SHIFT)
+			/* PORTn */
+			| ((port) << EHCI_INSNREG05_ULPI_PORTSEL_SHIFT)
+			/* start ULPI access*/
+			| (1 << EHCI_INSNREG05_ULPI_CONTROL_SHIFT);
+
+	ehci_write(hcd->regs, EHCI_INSNREG05_ULPI, reg_internal);
+
+	/* Wait for ULPI access completion */
+	while ((ehci_read(hcd->regs, EHCI_INSNREG05_ULPI)
+			& (1 << EHCI_INSNREG05_ULPI_CONTROL_SHIFT))) {
+		udelay(1);
+		if (count-- == 0) {
+			pr_err("ehci: omap_ehci_ulpi_read: Error");
+			break;
+		}
+	}
+
+	val = ehci_read(hcd->regs, EHCI_INSNREG05_ULPI) & 0xFF;
+	return val;
+}
+
+int omap_ehci_ulpi_write(const struct usb_hcd *hcd, u8 port, u8 val,
+						u8 reg, u8 retry_times)
+{
+	unsigned reg_internal = 0;
+	int status = 0;
+	int count = 2000;
+
+again:
+	reg_internal = val |
+			((reg) << EHCI_INSNREG05_ULPI_REGADD_SHIFT)
+			/* Write */
+			| (2 << EHCI_INSNREG05_ULPI_OPSEL_SHIFT)
+			/* PORTn */
+			| ((port) << EHCI_INSNREG05_ULPI_PORTSEL_SHIFT)
+			/* start ULPI access*/
+			| (1 << EHCI_INSNREG05_ULPI_CONTROL_SHIFT);
+
+	ehci_write(hcd->regs, EHCI_INSNREG05_ULPI, reg_internal);
+
+	/* Wait for ULPI access completion */
+	while ((ehci_read(hcd->regs, EHCI_INSNREG05_ULPI)
+			& (1 << EHCI_INSNREG05_ULPI_CONTROL_SHIFT))) {
+		udelay(1);
+		if (count-- == 0) {
+			if (retry_times--) {
+				ehci_write(hcd->regs, EHCI_INSNREG05_ULPI, 0);
+				goto again;
+			} else {
+				pr_err("ehci: omap_ehci_ulpi_write: Error");
+				status = -ETIMEDOUT;
+				break;
+			}
+		}
+	}
+	return status;
 }
 
 static void omap_ehci_soft_phy_reset(struct platform_device *pdev, u8 port)
@@ -116,6 +184,83 @@ static void disable_put_regulator(
 			regulator_put(pdata->regulator[i]);
 		}
 	}
+}
+
+static int ehci_omap_hub_control(
+	struct usb_hcd	*hcd,
+	u16		typeReq,
+	u16		wValue,
+	u16		wIndex,
+	char		*buf,
+	u16		wLength
+) {
+	struct device *dev = hcd->self.controller;
+	struct ehci_hcd_omap_platform_data *pdata = dev->platform_data;
+	struct ehci_hcd	*ehci = hcd_to_ehci(hcd);
+	u32 __iomem	*status_reg = &ehci->regs->port_status[
+				(wIndex & 0xff) - 1];
+	u32		temp;
+	unsigned long	flags;
+
+	if (((wIndex & 0xff) > 0) && ((wIndex & 0xff) < OMAP3_HS_USB_PORTS) &&
+			(pdata->port_mode[wIndex-1] ==
+					OMAP_EHCI_PORT_MODE_PHY)) {
+
+		if (cpu_is_omap443x() && typeReq == SetPortFeature &&
+				wValue == USB_PORT_FEAT_SUSPEND) {
+			/* Errata i693 workaround sequence */
+			spin_lock_irqsave(&ehci->lock, flags);
+			temp = ehci_readl(ehci, status_reg);
+			if (temp & PORT_OWNER) {
+				spin_unlock_irqrestore(&ehci->lock, flags);
+				return 0;
+			}
+
+			if ((temp & PORT_PE) == 0
+					|| (temp & PORT_RESET) != 0) {
+				spin_unlock_irqrestore(&ehci->lock, flags);
+				return -EPIPE;
+			}
+
+			temp &= ~(PORT_WKCONN_E | PORT_RWC_BITS);
+			temp |= PORT_WKDISC_E | PORT_WKOC_E;
+			ehci_writel(ehci, temp | PORT_SUSPEND, status_reg);
+			mdelay(4);
+
+			if ((wIndex & 0xff) == 1) {
+				u32 temp_reg;
+				temp_reg = omap_readl(L3INIT_HSUSBHOST_CLKCTRL);
+				temp_reg |= 1 << 8;
+				temp_reg &= ~(1 << 24);
+				omap_writel(temp_reg, L3INIT_HSUSBHOST_CLKCTRL);
+
+				mdelay(1);
+				temp_reg &= ~(1 << 8);
+				temp_reg |= 1 << 24;
+				omap_writel(temp_reg, L3INIT_HSUSBHOST_CLKCTRL);
+			} else if ((wIndex & 0xff) == 2) {
+				u32 temp_reg;
+				temp_reg = omap_readl(L3INIT_HSUSBHOST_CLKCTRL);
+				temp_reg |= 1 << 9;
+				temp_reg &= ~(1 << 25);
+				omap_writel(temp_reg, L3INIT_HSUSBHOST_CLKCTRL);
+
+				mdelay(1);
+				temp_reg &= ~(1 << 9);
+				temp_reg |= 1 << 25;
+				omap_writel(temp_reg, L3INIT_HSUSBHOST_CLKCTRL);
+			}
+			set_bit((wIndex & 0xff) - 1, &ehci->suspended_ports);
+
+			/* unblock posted writes */
+			ehci_readl(ehci, &ehci->regs->command);
+
+			spin_unlock_irqrestore(&ehci->lock, flags);
+			return 0;
+		}
+	}
+
+	return ehci_hub_control(hcd, typeReq, wValue, wIndex, buf, wLength);
 }
 
 /* configure so an HC device and id are always provided */
@@ -414,7 +559,7 @@ static const struct hc_driver ehci_omap_hc_driver = {
 	 * root hub support
 	 */
 	.hub_status_data	= ehci_hub_status_data,
-	.hub_control		= ehci_hub_control,
+	.hub_control		= ehci_omap_hub_control,
 	.bus_suspend		= ehci_omap_bus_suspend,
 	.bus_resume		= ehci_omap_bus_resume,
 

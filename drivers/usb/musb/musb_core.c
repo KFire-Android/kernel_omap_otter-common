@@ -904,6 +904,7 @@ void musb_start(struct musb *musb)
 {
 	void __iomem	*regs = musb->mregs;
 	u8		devctl = musb_readb(regs, MUSB_DEVCTL);
+	u8		temp;
 
 	dev_dbg(musb->controller, "<== devctl %02x\n", devctl);
 
@@ -915,13 +916,16 @@ void musb_start(struct musb *musb)
 	musb_writeb(regs, MUSB_TESTMODE, 0);
 
 	/* put into basic highspeed mode and start session */
-	musb_writeb(regs, MUSB_POWER, MUSB_POWER_ISOUPDATE
-						| MUSB_POWER_HSENAB
-						/* ENSUSPEND wedges tusb */
-						/* | MUSB_POWER_ENSUSPEND */
-						);
+	temp = MUSB_POWER_ISOUPDATE | MUSB_POWER_HSENAB;
+					/* MUSB_POWER_ENSUSPEND wedges tusb */
+	if (musb->softconnect)
+		temp |= MUSB_POWER_SOFTCONN;
+	musb_writeb(regs, MUSB_POWER, temp);
 
 	musb->is_active = 0;
+
+	musb_platform_enable(musb);
+
 	devctl = musb_readb(regs, MUSB_DEVCTL);
 	devctl &= ~MUSB_DEVCTL_SESSION;
 
@@ -944,7 +948,7 @@ void musb_start(struct musb *musb)
 		if ((devctl & MUSB_DEVCTL_VBUS) == MUSB_DEVCTL_VBUS)
 			musb->is_active = 1;
 	}
-	musb_platform_enable(musb);
+
 	musb_writeb(regs, MUSB_DEVCTL, devctl);
 }
 
