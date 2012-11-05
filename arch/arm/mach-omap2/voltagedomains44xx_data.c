@@ -114,21 +114,33 @@ void __init omap44xx_voltagedomains_init(void)
 		omap4_voltdm_iva.volt_data = omap443x_vdd_iva_volt_data;
 		omap4_voltdm_iva.dep_vdd_info = omap443x_vddiva_dep_info;
 		omap4_voltdm_core.volt_data = omap443x_vdd_core_volt_data;
+
+		omap4_voltdm_mpu.vc_param = &omap443x_mpu_vc_data;
+		omap4_voltdm_iva.vc_param = &omap443x_iva_vc_data;
+		omap4_voltdm_core.vc_param = &omap443x_core_vc_data;
 	} else if (cpu_is_omap446x()) {
 		omap4_voltdm_mpu.volt_data = omap446x_vdd_mpu_volt_data;
 		omap4_voltdm_mpu.dep_vdd_info = omap446x_vddmpu_dep_info;
 		omap4_voltdm_iva.volt_data = omap446x_vdd_iva_volt_data;
 		omap4_voltdm_iva.dep_vdd_info = omap446x_vddiva_dep_info;
 		omap4_voltdm_core.volt_data = omap446x_vdd_core_volt_data;
+
+		omap4_voltdm_mpu.vc_param = &omap446x_mpu_vc_data;
+		omap4_voltdm_iva.vc_param = &omap446x_iva_vc_data;
+		omap4_voltdm_core.vc_param = &omap446x_core_vc_data;
+	} else if (cpu_is_omap447x()) {
+		omap4_voltdm_mpu.vc_param = &omap447x_mpu_vc_data;
+		omap4_voltdm_iva.vc_param = &omap447x_iva_vc_data;
+		omap4_voltdm_core.vc_param = &omap447x_core_vc_data;
 	}
 #endif
 	omap4_voltdm_mpu.vp_param = &omap4_mpu_vp_data;
 	omap4_voltdm_iva.vp_param = &omap4_iva_vp_data;
 	omap4_voltdm_core.vp_param = &omap4_core_vp_data;
 
-	omap4_voltdm_mpu.vc_param = &omap4_mpu_vc_data;
-	omap4_voltdm_iva.vc_param = &omap4_iva_vc_data;
-	omap4_voltdm_core.vc_param = &omap4_core_vc_data;
+	WARN(!omap4_voltdm_mpu.vc_param, "VC: mpu vc_param is not assigned!");
+	WARN(!omap4_voltdm_iva.vc_param, "VC: iva vc_param is not assigned!");
+	WARN(!omap4_voltdm_core.vc_param, "VC: core vc_param is not assigned!");
 
 	for (i = 0; voltdm = voltagedomains_omap4[i], voltdm; i++)
 		voltdm->sys_clk.name = sys_clk_name;

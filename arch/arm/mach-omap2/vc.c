@@ -109,8 +109,19 @@ int omap_vc_pre_scale(struct voltagedomain *voltdm,
 		      struct omap_volt_data *target_v,
 		      u8 *target_vsel, u8 *current_vsel)
 {
-	struct omap_vc_channel *vc = voltdm->vc;
+	struct omap_vc_channel *vc;
 	u32 vc_cmdval;
+
+	if (IS_ERR_OR_NULL(voltdm)) {
+		pr_err("%s bad voldm\n", __func__);
+		return -EINVAL;
+	}
+
+	vc = voltdm->vc;
+	if (IS_ERR_OR_NULL(vc)) {
+		pr_err("%s voldm=%s bad vc\n", __func__, voltdm->name);
+		return -EINVAL;
+	}
 
 	/* Check if sufficient pmic info is available for this vdd */
 	if (!voltdm->pmic) {
@@ -129,6 +140,30 @@ int omap_vc_pre_scale(struct voltagedomain *voltdm,
 	if (!voltdm->read || !voltdm->write) {
 		pr_err("%s: No read/write API for accessing vdd_%s regs\n",
 			__func__, voltdm->name);
+		return -EINVAL;
+	}
+
+	if (IS_ERR_OR_NULL(target_v)) {
+		pr_err("%s: No target_v info to scale vdd_%s\n",
+		       __func__, voltdm->name);
+		return -EINVAL;
+	}
+
+	if (IS_ERR_OR_NULL(voltdm->vc_param)) {
+		pr_err("%s: No vc_param info for vdd_%s\n",
+		       __func__, voltdm->name);
+		return -EINVAL;
+	}
+
+	if (IS_ERR_OR_NULL(target_vsel)) {
+		pr_err("%s: No target_vsel info to scale vdd_%s\n",
+		       __func__, voltdm->name);
+		return -EINVAL;
+	}
+
+	if (IS_ERR_OR_NULL(current_vsel)) {
+		pr_err("%s: No current_vsel info to scale vdd_%s\n",
+		       __func__, voltdm->name);
 		return -EINVAL;
 	}
 
@@ -169,6 +204,25 @@ void omap_vc_post_scale(struct voltagedomain *voltdm,
 		return;
 	}
 
+	if (IS_ERR_OR_NULL(target_vdata)) {
+		pr_err("%s: No target_vdata info to scale vdd_%s\n",
+		       __func__, voltdm->name);
+		return;
+	}
+
+	/* Check if sufficient pmic info is available for this vdd */
+	if (!voltdm->pmic) {
+		pr_err("%s: Insufficient pmic info to scale the vdd_%s\n",
+		       __func__, voltdm->name);
+		return;
+	}
+
+	if (!voltdm->write) {
+		pr_err("%s: No write API for accessing vdd_%s regs\n",
+		       __func__, voltdm->name);
+		return;
+	}
+
 	smps_steps = abs(target_vsel - current_vsel);
 	/* SMPS slew rate / step size. 2us added as buffer. */
 	smps_delay = DIV_ROUND_UP(smps_steps * voltdm->pmic->step_size,
@@ -190,12 +244,31 @@ void omap_vc_post_scale(struct voltagedomain *voltdm,
 int omap_vc_bypass_scale(struct voltagedomain *voltdm,
 				struct omap_volt_data *target_v)
 {
-	struct omap_vc_channel *vc = voltdm->vc;
+	struct omap_vc_channel *vc;
 	u32 loop_cnt = 0, retries_cnt = 0;
 	u32 vc_valid, vc_bypass_val_reg, vc_bypass_value;
 	u8 target_vsel, current_vsel;
+	unsigned long target_volt;
 	int ret;
-	unsigned long target_volt = omap_get_operation_voltage(target_v);
+
+	if (IS_ERR_OR_NULL(voltdm)) {
+		pr_err("%s bad voldm\n", __func__);
+		return -EINVAL;
+	}
+
+	if (IS_ERR_OR_NULL(target_v)) {
+		pr_err("%s: No target_v info to scale vdd_%s\n",
+		       __func__, voltdm->name);
+		return -EINVAL;
+	}
+
+	vc = voltdm->vc;
+	if (IS_ERR_OR_NULL(vc)) {
+		pr_err("%s voldm=%s bad vc\n", __func__, voltdm->name);
+		return -EINVAL;
+	}
+
+	target_volt = omap_get_operation_voltage(target_v);
 
 	ret = omap_vc_pre_scale(voltdm, target_volt,
 				target_v, &target_vsel, &current_vsel);
@@ -618,9 +691,14 @@ static u8 omap_vc_calc_vsel(struct voltagedomain *voltdm, u32 uvolt)
 
 void __init omap_vc_init_channel(struct voltagedomain *voltdm)
 {
-	struct omap_vc_channel *vc = voltdm->vc;
+	struct omap_vc_channel *vc;
 	u8 on_vsel, onlp_vsel, ret_vsel, off_vsel;
 	u32 val;
+
+	if (IS_ERR_OR_NULL(voltdm)) {
+		pr_err("%s bad voldm\n", __func__);
+		return;
+	}
 
 	if (!voltdm->pmic || !voltdm->pmic->uv_to_vsel) {
 		pr_err("%s: No PMIC info for vdd_%s\n", __func__, voltdm->name);
@@ -630,6 +708,24 @@ void __init omap_vc_init_channel(struct voltagedomain *voltdm)
 	if (!voltdm->read || !voltdm->write) {
 		pr_err("%s: No read/write API for accessing vdd_%s regs\n",
 			__func__, voltdm->name);
+		return;
+	}
+
+	if (IS_ERR_OR_NULL(voltdm->rmw)) {
+		pr_err("%s: No rmw API for reading vdd_%s regs\n",
+		       __func__, voltdm->name);
+		return;
+	}
+
+	vc = voltdm->vc;
+	if (IS_ERR_OR_NULL(vc)) {
+		pr_err("%s voldm=%s bad vc\n", __func__, voltdm->name);
+		return;
+	}
+
+	if (IS_ERR_OR_NULL(voltdm->vc_param)) {
+		pr_err("%s: No vc_param info for vdd_%s\n",
+		       __func__, voltdm->name);
 		return;
 	}
 

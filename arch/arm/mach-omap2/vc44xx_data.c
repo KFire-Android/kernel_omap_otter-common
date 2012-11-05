@@ -95,28 +95,70 @@ struct omap_vc_channel omap4_vc_core = {
 /*
  * Voltage levels for different operating modes: on, sleep, retention and off
  */
-#define OMAP4_ON_VOLTAGE_UV			1375000
-#define OMAP4_ONLP_VOLTAGE_UV			1375000
-#define OMAP4_RET_VOLTAGE_UV			837500
-#define OMAP4_OFF_VOLTAGE_UV			0
 
-struct omap_vc_param omap4_mpu_vc_data = {
-	.on			= OMAP4_ON_VOLTAGE_UV,
-	.onlp			= OMAP4_ONLP_VOLTAGE_UV,
-	.ret			= OMAP4_RET_VOLTAGE_UV,
-	.off			= OMAP4_OFF_VOLTAGE_UV,
+struct omap_vc_param omap443x_mpu_vc_data = {
+	.on			= 1388000,
+	.onlp			= 1388000,
+	.ret			= 750000,
+	.off			= 0,
 };
 
-struct omap_vc_param omap4_iva_vc_data = {
-	.on			= OMAP4_ON_VOLTAGE_UV,
-	.onlp			= OMAP4_ONLP_VOLTAGE_UV,
-	.ret			= OMAP4_RET_VOLTAGE_UV,
-	.off			= OMAP4_OFF_VOLTAGE_UV,
+struct omap_vc_param omap443x_iva_vc_data = {
+	.on			= 1291000,
+	.onlp			= 1291000,
+	.ret			= 750000,
+	.off			= 0,
 };
 
-struct omap_vc_param omap4_core_vc_data = {
-	.on			= OMAP4_ON_VOLTAGE_UV,
-	.onlp			= OMAP4_ONLP_VOLTAGE_UV,
-	.ret			= OMAP4_RET_VOLTAGE_UV,
-	.off			= OMAP4_OFF_VOLTAGE_UV,
+struct omap_vc_param omap443x_core_vc_data = {
+	.on			= 1127000,
+	.onlp			= 1127000,
+	.ret			= 750000,
+	.off			= 0,
+};
+
+struct omap_vc_param omap446x_mpu_vc_data = {
+	.on			= 1380000,
+	.onlp			= 1380000,
+	.ret			= 750000,
+	.off			= 0,
+};
+
+struct omap_vc_param omap446x_iva_vc_data = {
+	.on			= 1375000,
+	.onlp			= 1375000,
+	.ret			= 750000,
+	.off			= 0,
+};
+
+struct omap_vc_param omap446x_core_vc_data = {
+	.on			= 1250000,
+	.onlp			= 1250000,
+	.ret			= 750000,
+	/*
+	 * Errata i738:
+	 * OMAP4 + TWL + TPS limitation keep off_volt same as ret_volt
+	 */
+	.off			= 750000,
+};
+
+struct omap_vc_param omap447x_mpu_vc_data = {
+	.on			= 1387000,
+	.onlp			= 1387000,
+	.ret			= 750000,
+	.off			= 0,
+};
+
+struct omap_vc_param omap447x_iva_vc_data = {
+	.on			= 1380000,
+	.onlp			= 1380000,
+	.ret			= 750000,
+	.off			= 0,
+};
+
+struct omap_vc_param omap447x_core_vc_data = {
+	.on			= 1190000,
+	.onlp			= 1190000,
+	.ret			= 750000,
+	.off			= 0,
 };
