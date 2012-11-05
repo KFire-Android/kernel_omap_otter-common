@@ -140,9 +140,6 @@ obj-$(CONFIG_ARCH_OMAP3)		+= $(powerdomain-common) \
 obj-$(CONFIG_ARCH_OMAP4)		+= $(powerdomain-common) \
 					   powerdomain4xxx_5xxx.o \
 					   powerdomains44xx_data.o
-obj-$(CONFIG_ARCH_OMAP5)                += $(powerdomain-common) \
-					   powerdomain4xxx_5xxx.o \
-					   powerdomains54xx_data.o
 # PRCM clockdomain control
 obj-$(CONFIG_ARCH_OMAP2)		+= clockdomain.o \
 					   clockdomain2xxx_3xxx.o \
@@ -156,9 +153,6 @@ obj-$(CONFIG_ARCH_OMAP3)		+= clockdomain.o \
 obj-$(CONFIG_ARCH_OMAP4)		+= clockdomain.o \
 					   clockdomain44xx.o \
 					   clockdomains44xx_data.o
-obj-$(CONFIG_ARCH_OMAP5)                += clockdomain.o \
-                                           clockdomain44xx.o \
-                                           clockdomains54xx_data.o
 
 # Clock framework
 obj-$(CONFIG_ARCH_OMAP2)		+= $(clock-common) clock2xxx.o \
@@ -175,8 +169,6 @@ obj-$(CONFIG_ARCH_OMAP3)		+= $(clock-common) clock3xxx.o \
 					   dpll3xxx.o clock3xxx_data.o \
 					   clkt_iclk.o
 obj-$(CONFIG_ARCH_OMAP4)		+= $(clock-common) clock44xx_data.o \
-					   dpll3xxx.o dpll44xx_54xx.o clock4xxx_5xxx.o
-obj-$(CONFIG_ARCH_OMAP5)		+= $(clock-common) clock54xx_data.o \
 					   dpll3xxx.o dpll44xx_54xx.o clock4xxx_5xxx.o
 
 # OMAP2 clock rate set data (old "OPP" data)
@@ -198,7 +190,6 @@ obj-$(CONFIG_ARCH_OMAP3)		+= omap_hwmod_2xxx_3xxx_ipblock_data.o \
 					   omap_hwmod_2xxx_3xxx_interconnect_data.o \
 					   omap_hwmod_3xxx_data.o
 obj-$(CONFIG_ARCH_OMAP4)		+= omap_hwmod_44xx_data.o
-obj-$(CONFIG_ARCH_OMAP5)		+= omap_hwmod_54xx_data.o
 
 # EMU peripherals
 obj-$(CONFIG_OMAP3_EMU)			+= emu.o
@@ -331,6 +322,32 @@ emif-omap-$(CONFIG_TI_EMIF)		:= emif_omap.o
 obj-y					+= $(emif-omap-m) $(emif-omap-y)
 
 obj-$(CONFIG_OMAP_HSI_DEVICE)           += omap_hsi.o
+
+
+ifneq ($(CONFIG_ARCH_OMAP5_ES1),)
+obj-y					+=omap_hwmod_54xx_es1_data.o
+obj-y				        += $(clock-common) clock54xx_es1_data.o \
+                                        dpll3xxx.o dpll44xx_54xx.o clock4xxx_5xxx.o
+obj-y					+= clockdomain.o \
+                                        clockdomain44xx.o \
+                                        clockdomains54xx_es1_data.o
+obj-y					+= $(powerdomain-common) \
+                                        powerdomain4xxx_5xxx.o \
+                                        powerdomains54xx_es1_data.o
+endif
+
+ifeq ($(CONFIG_ARCH_OMAP5_ES1),)
+obj-y                                   +=omap_hwmod_54xx_data.o
+obj-y                                   += $(clock-common) clock54xx_data.o \
+                                        dpll3xxx.o dpll44xx_54xx.o clock4xxx_5xxx.o
+obj-y                                   += clockdomain.o \
+                                        clockdomain44xx.o \
+                                        clockdomains54xx_data.o
+obj-y                                   += $(powerdomain-common) \
+                                        powerdomain4xxx_5xxx.o \
+                                        powerdomains54xx_data.o
+endif
+
 ifneq ($(CONFIG_OMAP_REMOTEPROC),)
 obj-y					+= remoteproc.o
 endif

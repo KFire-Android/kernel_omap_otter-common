@@ -28,7 +28,12 @@
 #include "prcm44xx.h"
 #include "cm2_44xx.h"
 #include "cminst44xx.h"
+
+#ifdef CONFIG_ARCH_OMAP5_ES1
+#include "prm54xx_es1.h"
+#else
 #include "prm54xx.h"
+#endif
 
 static int omap4_pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst)
 {
