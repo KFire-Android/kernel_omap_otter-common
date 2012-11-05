@@ -38,7 +38,6 @@
 #include "mux.h"
 
 #define DP_4430_GPIO_59         59
-#define LED_DISP_EN		102
 #define DSI2_GPIO_59		59
 
 #define HDMI_GPIO_CT_CP_HPD             60
@@ -84,28 +83,17 @@ static void omap4_tablet_set_primary_brightness(u8 brightness)
 
 		twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x30, TWL6030_TOGGLE3);
 		twl_i2c_write_u8(TWL_MODULE_PWM, brightness, LED_PWM2ON);
-		gpio_set_value(LED_DISP_EN, 1);
 	} else if (brightness <= 1) {
 		twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x08, TWL6030_TOGGLE3);
 		twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x38, TWL6030_TOGGLE3);
-		if (brightness == 0)
-			gpio_set_value(LED_DISP_EN, 0);
 	}
-}
-
-static void omap4_tablet_set_secondary_brightness(u8 brightness)
-{
-	if (brightness > 0)
-		brightness = 1;
-
-	gpio_set_value(LED_DISP_EN, brightness);
 }
 
 static struct omap4430_sdp_disp_led_platform_data sdp4430_disp_led_data = {
 	.flags = LEDS_CTRL_AS_ONE_DISPLAY,
 	.display_led_init = omap4_tablet_init_display_led,
 	.primary_display_set = omap4_tablet_set_primary_brightness,
-	.secondary_display_set = omap4_tablet_set_secondary_brightness,
+	.secondary_display_set = NULL,
 };
 
 static struct platform_device omap4_tablet_disp_led = {
