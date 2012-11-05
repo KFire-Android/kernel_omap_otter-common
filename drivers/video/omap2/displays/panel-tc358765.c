@@ -825,6 +825,8 @@ static void tc358765_power_off(struct omap_dss_device *dssdev)
 
 	if (dssdev->platform_disable)
 		dssdev->platform_disable(dssdev);
+
+	gpio_set_value(dssdev->reset_gpio, 0);
 }
 
 static void tc358765_disable(struct omap_dss_device *dssdev)
