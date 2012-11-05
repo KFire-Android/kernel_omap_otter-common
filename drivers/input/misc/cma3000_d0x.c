@@ -24,6 +24,7 @@
 #include <linux/delay.h>
 #include <linux/input.h>
 #include <linux/platform_device.h>
+#include <linux/module.h>
 #include <linux/i2c/cma3000.h>
 
 #include "cma3000_d0x.h"
