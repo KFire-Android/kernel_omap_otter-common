@@ -149,7 +149,7 @@ static irqreturn_t palmas_vbus_wakeup_irq(int irq, void *_palmas_usb)
 	do {
 		regmap_read(palmas_usb->palmas->regmap[slave], addr, &vbus_line_state);
 
-		if (vbus_line_state == INT3_LINE_STATE_VBUS) {
+		if (vbus_line_state & INT3_LINE_STATE_VBUS) {
 			if (palmas_usb->linkstat != OMAP_DWC3_VBUS_VALID && palmas_usb->linkstat != OMAP_DWC3_DCP_CHARGER) {
 				charger_type = omap_usb2_charger_detect(&palmas_usb->comparator);
 				if (charger_type == POWER_SUPPLY_TYPE_USB_DCP) {
@@ -165,7 +165,7 @@ static irqreturn_t palmas_vbus_wakeup_irq(int irq, void *_palmas_usb)
 					"Spurious connect event detected\n");
 			}
 			break;
-		} else if (vbus_line_state == INT3_LINE_STATE_NONE) {
+		} else if (!(vbus_line_state & INT3_LINE_STATE_VBUS)) {
 			if (palmas_usb->linkstat == OMAP_DWC3_DCP_CHARGER) {
 				status = OMAP_DWC3_VBUS_OFF;
 				palmas_usb->linkstat = status;
