@@ -297,13 +297,13 @@ int omap5_thermal_expose_sensor(struct omap_bandgap *bg_ptr, int id,
 	data->therm_fw.name = sensor_name;
 
 	data->therm_fw.domain_name =
-		bg_ptr->pdata->sensors[id].domain;
+		bg_ptr->conf->sensors[id].domain;
 	data->therm_fw.dev = data->bg_ptr->dev;
 	*data->therm_fw.dev_ops = omap_sensor_ops;
 	data->therm_fw.sen_id = id;
-	data->therm_fw.slope = data->bg_ptr->pdata->sensors[id].slope;
+	data->therm_fw.slope = data->bg_ptr->conf->sensors[id].slope;
 	data->therm_fw.constant_offset =
-		data->bg_ptr->pdata->sensors[id].constant_offset;
+		data->bg_ptr->conf->sensors[id].constant_offset;
 
 	ret = thermal_sensor_dev_register(&data->therm_fw);
 	if (ret) {

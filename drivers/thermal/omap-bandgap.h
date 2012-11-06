@@ -109,7 +109,7 @@ struct omap_bandgap_data;
 /**
  * struct omap_bandgap - bandgap device structure
  * @dev: device pointer
- * @pdata: platform data with sensor data
+ * @conf: platform data with sensor data
  * @fclock: pointer to functional clock of temperature sensor
  * @div_clk: pointer to parent clock of temperature sensor fclk
  * @conv_table: Pointer to adc to temperature conversion table
@@ -121,7 +121,7 @@ struct omap_bandgap_data;
  */
 struct omap_bandgap {
 	struct device			*dev;
-	struct omap_bandgap_data	*pdata;
+	struct omap_bandgap_data	*conf;
 	struct clk			*fclock;
 	struct clk			*div_clk;
 	int				*conv_table;
