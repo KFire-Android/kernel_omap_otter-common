@@ -3864,8 +3864,8 @@ static struct omap_hwmod omap54xx_mcpdm_hwmod = {
 	 * on-chip or off-chip sources.  McPDM seems to be the only
 	 * current exception.
 	 */
-
-	.flags		= HWMOD_EXT_OPT_MAIN_CLK,
+/*
+	.flags		= HWMOD_EXT_OPT_MAIN_CLK,*/
 	.mpu_irqs	= omap54xx_mcpdm_irqs,
 	.sdma_reqs	= omap54xx_mcpdm_sdma_reqs,
 	.main_clk	= "pad_clks",
