@@ -37,6 +37,7 @@
 #include <linux/usb/musb-omap.h>
 #include <linux/usb/omap4_usb_phy.h>
 #include <linux/mfd/omap_control.h>
+#include <linux/wakelock.h>
 
 #include "musb_core.h"
 #include "omap2430.h"
@@ -47,6 +48,7 @@ struct omap2430_glue {
 	struct work_struct	omap_musb_mailbox_work;
 	struct device		*control_dev;
 	enum omap_musb_vbus_id_status status;
+	struct wake_lock	omap_musb_wakelock;
 };
 #define glue_to_musb(g)		platform_get_drvdata(g->musb)
 
@@ -242,6 +244,9 @@ int omap_musb_mailbox(enum omap_musb_vbus_id_status status)
 		return -ENODEV;
 	}
 
+	if (status == OMAP_MUSB_ID_GROUND || status == OMAP_MUSB_VBUS_VALID)
+		wake_lock(&glue->omap_musb_wakelock);
+
 	schedule_work(&glue->omap_musb_mailbox_work);
 
 	return 0;
@@ -309,6 +314,9 @@ static void omap_musb_set_mailbox(struct omap2430_glue *glue)
 			val = SESSEND | IDDIG;
 			omap4_usb_phy_mailbox(glue->control_dev, val);
 		}
+
+		wake_unlock(&glue->omap_musb_wakelock);
+
 		break;
 	default:
 		dev_dbg(dev, "ID float\n");
@@ -372,8 +380,13 @@ static int omap2430_musb_init(struct musb *musb)
 
 	setup_timer(&musb_idle_timer, musb_do_idle, (unsigned long) musb);
 
-	if (glue->status != OMAP_MUSB_UNKNOWN)
+	if (glue->status != OMAP_MUSB_UNKNOWN) {
+		if (glue->status == OMAP_MUSB_ID_GROUND ||
+				glue->status == OMAP_MUSB_VBUS_VALID)
+			wake_lock(&glue->omap_musb_wakelock);
+
 		omap_musb_set_mailbox(glue);
+	}
 
 	pm_runtime_put_sync(musb->controller);
 	return 0;
@@ -526,6 +539,9 @@ static int __devinit omap2430_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "failed to register musb device\n");
 		goto err2;
 	}
+
+	wake_lock_init(&glue->omap_musb_wakelock, WAKE_LOCK_SUSPEND,
+		       "omap_musb_wakelock");
 
 	return 0;
 
