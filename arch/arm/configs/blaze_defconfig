@@ -213,6 +213,7 @@ CONFIG_UID_STAT=y
 # Texas Instruments shared transport line discipline
 #
 CONFIG_TI_ST=y
+CONFIG_ST_GPS=m
 CONFIG_SCSI=y
 CONFIG_BLK_DEV_SD=y
 CONFIG_CHR_DEV_SG=y
