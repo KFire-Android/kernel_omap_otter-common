@@ -670,15 +670,6 @@ static struct twl6040_codec_data twl6040_codec = {
 	.amic_bias_settle_ms = 0xeb, /* 235 ms */
 };
 
-static struct twl6040_vibra_data twl6040_vibra = {
-	.vibldrv_res = 8,
-	.vibrdrv_res = 3,
-	.viblmotor_res = 10,
-	.vibrmotor_res = 10,
-	.vddvibl_uV = 0,	/* fixed volt supply - VBAT */
-	.vddvibr_uV = 0,	/* fixed volt supply - VBAT */
-};
-
 static int omap5evm_twl6040_set_pll_input(int pll_id, int on)
 {
 	u32 reg_offset = OMAP5_CTRL_MODULE_WKUP_PAD_CONTROL_CKOBUFFER;
@@ -701,7 +692,6 @@ static int omap5evm_twl6040_set_pll_input(int pll_id, int on)
 
 static struct twl6040_platform_data twl6040_data = {
 	.codec		= &twl6040_codec,
-	.vibra		= &twl6040_vibra,
 	.audpwron_gpio	= 145,
 	.set_pll_input	= omap5evm_twl6040_set_pll_input,
 };
