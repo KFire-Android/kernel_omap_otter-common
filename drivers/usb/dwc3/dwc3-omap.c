@@ -214,6 +214,7 @@ static void omap_dwc3_set_mailbox(struct dwc3_omap *omap)
 		dev_dbg(omap->dev, "VBUS Disconnect\n");
 
 		dwc->is_connected = false;
+		dwc->gadget_is_connected = false;
 
 		pm_qos_update_request(&omap->pm_qos_request,
 							PM_QOS_DEFAULT_VALUE);
@@ -263,6 +264,9 @@ void omap_dwc3_mailbox(enum omap_dwc3_vbus_id_status status)
 
 	if (status == OMAP_DWC3_ID_GROUND || status == OMAP_DWC3_VBUS_VALID)
 		dwc->is_connected = true;
+
+	if (status == OMAP_DWC3_VBUS_VALID)
+		dwc->gadget_is_connected = true;
 
 #ifdef CONFIG_PM
 	if (omap->dev->power.disable_depth)
