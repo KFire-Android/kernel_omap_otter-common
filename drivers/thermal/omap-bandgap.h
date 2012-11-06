@@ -23,7 +23,9 @@
 #ifndef __OMAP_BANDGAP_H
 #define __OMAP_BANDGAP_H
 
+#include <linux/mutex.h>
 #include <linux/types.h>
+#include <linux/err.h>
 
 /* Offsets from the base of temperature sensor registers */
 
