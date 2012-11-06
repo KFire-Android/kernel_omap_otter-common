@@ -96,6 +96,15 @@ config TWL6030_BCI_BATTERY
 	  Support for OMAP TWL6030 BCI Battery driver.
 	  This driver can give support for TWL6030 Battery Charge Interface.
 
+config FUEL_GAUGE
+	bool "Fuel Gauge"
+	depends on TWL6030_BCI_BATTERY
+	help
+	  Say Y to enable support for TWL6030-based Fuel Gauge. The Fuel Gauge
+	  estimates SOC, FCC, and other battery parameters, and reports them
+	  through sysfs interface. The Fuel Gauge works best with a single cell
+	  lithium battery.
+
 config CHARGER_BQ2415x
 	tristate "BQ2415x charger"
 	depends on TWL6030_BCI_BATTERY

@@ -38,3 +38,4 @@ obj-$(CONFIG_CHARGER_TWL4030)	+= twl4030_charger.o
 obj-$(CONFIG_CHARGER_GPIO)	+= gpio-charger.o
 obj-$(CONFIG_CHARGER_BQ2415x)	+= bq2415x_charger.o
 obj-$(CONFIG_TWL6030_BCI_BATTERY)	+= twl6030_bci_battery.o
+obj-$(CONFIG_FUEL_GAUGE)	+= fg/

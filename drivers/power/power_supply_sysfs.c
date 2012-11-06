@@ -193,7 +193,7 @@ static mode_t power_supply_attr_is_visible(struct kobject *kobj,
 		if (property == attrno) {
 			if (psy->property_is_writeable &&
 			    psy->property_is_writeable(psy, property) > 0)
-				mode |= S_IWUSR;
+				mode |= S_IWUSR | S_IWGRP | S_IWOTH;
 
 			return mode;
 		}
