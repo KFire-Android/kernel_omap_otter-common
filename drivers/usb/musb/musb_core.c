@@ -2038,6 +2038,10 @@ musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl)
 	if (status < 0)
 		goto fail3;
 
+	if (is_otg_enabled(musb) || is_host_enabled(musb))
+		wake_lock_init(&musb->musb_wakelock, WAKE_LOCK_SUSPEND,
+						"musb_autosuspend_wake_lock");
+
 	status = musb_init_debugfs(musb);
 	if (status < 0)
 		goto fail4;
@@ -2072,6 +2076,9 @@ fail4:
 		usb_remove_hcd(musb_to_hcd(musb));
 	else
 		musb_gadget_cleanup(musb);
+
+	if (is_otg_enabled(musb) || is_host_enabled(musb))
+		wake_lock_destroy(&musb->musb_wakelock);
 
 fail3:
 	pm_runtime_put_sync(musb->controller);
@@ -2144,6 +2151,9 @@ static int __devexit musb_remove(struct platform_device *pdev)
 	 */
 	musb_exit_debugfs(musb);
 	musb_shutdown(pdev);
+
+	if (is_otg_enabled(musb) || is_host_enabled(musb))
+		wake_lock_destroy(&musb->musb_wakelock);
 
 	musb_free(musb);
 	iounmap(ctrl_base);
