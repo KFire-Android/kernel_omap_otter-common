@@ -738,6 +738,26 @@ static int configure_temp_sensor_counter(struct omap_bandgap *bg_ptr, int id,
 	return 0;
 }
 
+#define bandgap_is_valid(b)						\
+			(!IS_ERR_OR_NULL(b))
+#define bandgap_is_valid_sensor_id(b, i)				\
+			((i) >= 0 && (i) < (b)->conf->sensor_count)
+static inline int omap_bandgap_validate(struct omap_bandgap *bg_ptr, int id)
+{
+	if (!bandgap_is_valid(bg_ptr)) {
+		pr_err("%s: invalid bandgap pointer\n", __func__);
+		return -EINVAL;
+	}
+
+	if (!bandgap_is_valid_sensor_id(bg_ptr, id)) {
+		dev_err(bg_ptr->dev, "%s: sensor id out of range (%d)\n",
+			__func__, id);
+		return -ERANGE;
+	}
+
+	return 0;
+}
+
 /* Exposed APIs */
 /**
  * omap_bandgap_read_thot() - reads sensor current thot
@@ -750,15 +770,20 @@ static int configure_temp_sensor_counter(struct omap_bandgap *bg_ptr, int id,
 int omap_bandgap_read_thot(struct omap_bandgap *bg_ptr, int id,
 			      int *thot)
 {
-	struct device *cdev = bg_ptr->dev->parent;
+	struct device *cdev;
 	struct temp_sensor_registers *tsr;
 	u32 temp;
 	int ret;
+
+	ret = omap_bandgap_validate(bg_ptr, id);
+	if (ret)
+		return ret;
 
 	/* If not using the HW Alert feature, just return success */
 	if (!bg_ptr->conf->has_talert)
 		return 0;
 
+	cdev = bg_ptr->dev->parent;
 	tsr = bg_ptr->conf->sensors[id].registers;
 	ret = omap_control_readl(cdev, tsr->bgap_threshold, &temp);
 	temp = (temp & tsr->threshold_thot_mask) >>
@@ -784,13 +809,17 @@ int omap_bandgap_read_thot(struct omap_bandgap *bg_ptr, int id,
  */
 int omap_bandgap_write_thot(struct omap_bandgap *bg_ptr, int id, int val)
 {
-	struct temp_sensor_data *ts_data = bg_ptr->conf->sensors[id].ts_data;
+	struct temp_sensor_data *ts_data;
 	struct temp_sensor_registers *tsr;
 	u32 t_hot;
 	int ret;
 
-	tsr = bg_ptr->conf->sensors[id].registers;
+	ret = omap_bandgap_validate(bg_ptr, id);
+	if (ret)
+		return ret;
 
+	ts_data = bg_ptr->conf->sensors[id].ts_data;
+	tsr = bg_ptr->conf->sensors[id].registers;
 	/* If not using the HW Alert feature, just return success */
 	if (!bg_ptr->conf->has_talert)
 		return 0;
@@ -819,15 +848,20 @@ int omap_bandgap_write_thot(struct omap_bandgap *bg_ptr, int id, int val)
 int omap_bandgap_read_tcold(struct omap_bandgap *bg_ptr, int id,
 			       int *tcold)
 {
-	struct device *cdev = bg_ptr->dev->parent;
+	struct device *cdev;
 	struct temp_sensor_registers *tsr;
 	u32 temp;
 	int ret;
+
+	ret = omap_bandgap_validate(bg_ptr, id);
+	if (ret)
+		return ret;
 
 	/* If not using the HW Alert feature, just return success */
 	if (!bg_ptr->conf->has_talert)
 		return 0;
 
+	cdev = bg_ptr->dev->parent;
 	tsr = bg_ptr->conf->sensors[id].registers;
 	ret = omap_control_readl(cdev, tsr->bgap_threshold, &temp);
 	temp = (temp & tsr->threshold_tcold_mask)
@@ -851,15 +885,20 @@ int omap_bandgap_read_tcold(struct omap_bandgap *bg_ptr, int id,
  */
 int omap_bandgap_write_tcold(struct omap_bandgap *bg_ptr, int id, int val)
 {
-	struct temp_sensor_data *ts_data = bg_ptr->conf->sensors[id].ts_data;
+	struct temp_sensor_data *ts_data;
 	struct temp_sensor_registers *tsr;
 	u32 t_cold;
 	int ret;
+
+	ret = omap_bandgap_validate(bg_ptr, id);
+	if (ret)
+		return ret;
 
 	/* If not using the HW Alert feature, just return success */
 	if (!bg_ptr->conf->has_talert)
 		return 0;
 
+	ts_data = bg_ptr->conf->sensors[id].ts_data;
 	tsr = bg_ptr->conf->sensors[id].registers;
 	if (val > ts_data->max_temp + ts_data->hyst_val)
 		return -EINVAL;
@@ -886,12 +925,17 @@ int omap_bandgap_write_tcold(struct omap_bandgap *bg_ptr, int id, int val)
 int omap_bandgap_read_update_interval(struct omap_bandgap *bg_ptr, int id,
 					 int *interval)
 {
-	struct device *cdev = bg_ptr->dev->parent;
+	struct device *cdev;
 	struct temp_sensor_registers *tsr;
 	u32 time;
 	int ret;
 
+	ret = omap_bandgap_validate(bg_ptr, id);
+	if (ret)
+		return ret;
+
 	tsr = bg_ptr->conf->sensors[id].registers;
+	cdev = bg_ptr->dev->parent;
 	ret = omap_control_readl(cdev, tsr->bgap_counter, &time);
 	if (ret)
 		return ret;
@@ -914,6 +958,10 @@ int omap_bandgap_read_update_interval(struct omap_bandgap *bg_ptr, int id,
 int omap_bandgap_write_update_interval(struct omap_bandgap *bg_ptr,
 					  int id, u32 interval)
 {
+	int ret = omap_bandgap_validate(bg_ptr, id);
+	if (ret)
+		return ret;
+
 	interval = interval * bg_ptr->clk_rate / 1000;
 	mutex_lock(&bg_ptr->bg_mutex);
 	configure_temp_sensor_counter(bg_ptr, id, interval);
@@ -933,12 +981,17 @@ int omap_bandgap_write_update_interval(struct omap_bandgap *bg_ptr,
 int omap_bandgap_read_temperature(struct omap_bandgap *bg_ptr, int id,
 				     int *temperature)
 {
-	struct device *cdev = bg_ptr->dev->parent;
+	struct device *cdev;
 	struct temp_sensor_registers *tsr;
 	u32 temp;
 	int ret;
 
+	ret = omap_bandgap_validate(bg_ptr, id);
+	if (ret)
+		return ret;
+
 	tsr = bg_ptr->conf->sensors[id].registers;
+	cdev = bg_ptr->dev->parent;
 	ret = omap_control_readl(cdev, tsr->temp_sensor_ctrl, &temp);
 	temp &= tsr->bgap_dtemp_mask;
 
@@ -963,15 +1016,9 @@ int omap_bandgap_read_temperature(struct omap_bandgap *bg_ptr, int id,
 int omap_bandgap_set_sensor_data(struct omap_bandgap *bg_ptr, int id,
 				void *data)
 {
-	if (!bg_ptr) {
-		pr_err("%s:Invalid pointer\n", __func__);
-		return -EINVAL;
-	}
-
-	if ((id < 0) || (id >= bg_ptr->conf->sensor_count)) {
-		dev_err(bg_ptr->dev, "Invalid sensor device\n");
-		return -ENODEV;
-	}
+	int ret = omap_bandgap_validate(bg_ptr, id);
+	if (ret)
+		return ret;
 
 	bg_ptr->conf->sensors[id].data = data;
 
@@ -988,15 +1035,9 @@ int omap_bandgap_set_sensor_data(struct omap_bandgap *bg_ptr, int id,
  */
 void *omap_bandgap_get_sensor_data(struct omap_bandgap *bg_ptr, int id)
 {
-	if (!bg_ptr) {
-		pr_err("%s:Invalid pointer\n", __func__);
-		return ERR_PTR(-EINVAL);
-	}
-
-	if ((id < 0) || (id >= bg_ptr->conf->sensor_count)) {
-		dev_err(bg_ptr->dev, "Invalid sensor device\n");
-		return ERR_PTR(-ENODEV);
-	}
+	int ret = omap_bandgap_validate(bg_ptr, id);
+	if (ret)
+		return ERR_PTR(ret);
 
 	return bg_ptr->conf->sensors[id].data;
 }
