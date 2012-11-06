@@ -1071,8 +1071,14 @@ void dss_mgr_start_update(struct omap_overlay_manager *mgr)
 
 	dispc_mgr_enable(mgr->id, true);
 
-	mgr_clear_shadow_dirty(mgr);
+	/* for manually updated displays invoke dsscomp callbacks manually,
+	 * as logic that relays on shadow_dirty flag can't correctly release
+	 * previous composition
+	*/
+	dss_ovl_configure_cb(&mp->cb, mgr->id, true);
+	dss_ovl_program_cb(&mp->cb, mgr->id);
 
+	mgr_clear_shadow_dirty(mgr);
 	spin_unlock_irqrestore(&data_lock, flags);
 }
 
