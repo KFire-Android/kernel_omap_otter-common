@@ -358,6 +358,9 @@ static int __devinit palmas_usb_probe(struct platform_device *pdev)
 
 	INIT_WORK(&palmas_usb->set_vbus_work, palmas_set_vbus_work);
 
+	/* Detect USB cold-plug scenario */
+	palmas_enable_irq(palmas_usb);
+
 	status = request_threaded_irq(palmas_usb->irq1, NULL,
 				palmas_id_irq,
 				IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING,
@@ -399,8 +402,6 @@ static int __devinit palmas_usb_probe(struct platform_device *pdev)
 	}
 
 	dev_info(&pdev->dev, "Initialized Palmas USB module\n");
-
-	palmas_enable_irq(palmas_usb);
 
 	return 0;
 
