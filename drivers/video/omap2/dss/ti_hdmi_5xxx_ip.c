@@ -624,9 +624,6 @@ static void hdmi_core_mask_interrupts(struct hdmi_ip_data *ip_data)
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_CEC_MASK, 0xff, 7, 0);
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_GP_MASK, 0x3, 1, 0);
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_HDCP_MASK, 0xff, 7, 0);
-	REG_FLD_MOD(core_sys_base, HDMI_CORE_CEC_MAGIC_MASK, 0xff, 7, 0);
-	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2C1_MASK, 0xff, 7, 0);
-	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2C2_MASK, 0xff, 7, 0);
 
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_IH_FC_STAT0, 0xff, 7, 0);
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_IH_FC_STAT1, 0xff, 7, 0);

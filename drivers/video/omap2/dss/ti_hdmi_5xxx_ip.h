@@ -297,9 +297,6 @@
 #define HDMI_CORE_I2CM_FS_SCL_LCNT_1_ADDR	0x17844
 #define HDMI_CORE_I2CM_FS_SCL_LCNT_0_ADDR	0x17848
 
-#define HDMI_CORE_CEC_MAGIC_MASK		0x1F408
-#define HDMI_CORE_I2C1_MASK			0x1F814
-#define HDMI_CORE_I2C2_MASK			0x1F818
 
 struct hdmi_core_vid_config	{
 	struct hdmi_config  v_fc_config;
