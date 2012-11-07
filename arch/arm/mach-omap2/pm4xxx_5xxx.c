@@ -531,6 +531,7 @@ static inline int omap4_init_static_deps(void)
 static inline int omap5_init_static_deps(void)
 {
 	struct clockdomain *mpuss_clkdm, *emif_clkdm, *dss_clkdm, *wkupaon_clkdm;
+	struct clockdomain *l3_2_clkdm, *l3_1_clkdm, *ipu_clkdm;
 	int ret;
 
 	/*
@@ -540,9 +541,14 @@ static inline int omap5_init_static_deps(void)
 	 * lock ups or random crashes.
 	 */
 	mpuss_clkdm = clkdm_lookup("mpu_clkdm");
+	ipu_clkdm = clkdm_lookup("ipu_clkdm");
 	emif_clkdm = clkdm_lookup("emif_clkdm");
 	dss_clkdm = clkdm_lookup("dss_clkdm");
-	if (!mpuss_clkdm || !emif_clkdm || !dss_clkdm)
+	l3_1_clkdm = clkdm_lookup("l3main1_clkdm");
+	l3_2_clkdm = clkdm_lookup("l3main2_clkdm");
+
+	if (!mpuss_clkdm || !emif_clkdm || !dss_clkdm ||
+	    !l3_1_clkdm || !l3_2_clkdm || !ipu_clkdm)
 		return -EINVAL;
 
 	ret = clkdm_add_wkdep(mpuss_clkdm, emif_clkdm);
@@ -574,6 +580,24 @@ static inline int omap5_init_static_deps(void)
 		pr_err("Failed to add dss -> l3main2/emif wakeup dependency\n");
 	else
 		WARN(1, "Enabled DSS->EMIF Static dependency, needs proper rootcause\n");
+
+	/*
+	 * COBRA-1.0BUG00191: System hang occurs with IPU to L3_main1,
+	 * L3_main2 Dynamic dependencies
+	 * Therefore, use static dependency between IPU and L3
+	 */
+	ret |= clkdm_add_wkdep(ipu_clkdm, l3_1_clkdm);
+	if (ret)
+		pr_err("Failed to add IPUSS -> l3main1 wakeup dependency\n");
+
+	/*
+	 * COBRA-1.0BUG00191: System hang occurs with IPU to L3_main1,
+	 * L3_main2 Dynamic dependencies
+	 * Therefore, use static dependency between IPU and L3
+	 */
+	ret |= clkdm_add_wkdep(ipu_clkdm, l3_2_clkdm);
+	if (ret)
+		pr_err("Failed to add IPUSS -> l3main2 dependency\n");
 
 	return ret;
 }
