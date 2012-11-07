@@ -26,6 +26,9 @@
 
 #if defined(CONFIG_MMC_OMAP_HS) || defined(CONFIG_MMC_OMAP_HS_MODULE)
 
+#define OMAP5_ES20_CONTROL_PBIAS_SDCARD_IO_PWRRDNZ	(1 << 26)
+#define OMAP5_ES20_CONTROL_PBIAS_SDCARD_BIAS_PWRDNZ	(1 << 27)
+
 static u16 control_pbias_offset;
 static u16 control_devconf1_offset;
 static u16 control_mmc1;
@@ -169,6 +172,36 @@ static void omap4_hsmmc1_after_set_reg(struct device *dev, int slot,
 			reg &= ~(OMAP4_MMC1_PWRDNZ_MASK);
 			omap4_ctrl_pad_writel(reg, control_pbias_offset);
 		}
+	}
+}
+
+/* OMAP5 ES2.0 PBIAS setting procedure */
+static void omap5_es2_before_set_reg(struct device *dev, int slot,
+					int power_on, int vdd)
+{
+	u32 reg;
+
+	reg = omap4_ctrl_pad_readl(control_pbias_offset);
+	reg &= ~(OMAP5_ES20_CONTROL_PBIAS_SDCARD_IO_PWRRDNZ);
+	omap4_ctrl_pad_writel(reg, control_pbias_offset);
+	udelay(10);
+	reg &= ~(OMAP5_ES20_CONTROL_PBIAS_SDCARD_BIAS_PWRDNZ);
+	omap4_ctrl_pad_writel(reg, control_pbias_offset);
+}
+
+static void omap5_es2_after_set_reg(struct device *dev, int slot,
+				 int power_on, int vdd)
+{
+	u32 reg;
+
+	if (power_on) {
+		reg = omap4_ctrl_pad_readl(control_pbias_offset);
+		reg |= OMAP5_ES20_CONTROL_PBIAS_SDCARD_BIAS_PWRDNZ;
+		omap4_ctrl_pad_writel(reg, control_pbias_offset);
+		udelay(150);
+		reg |= OMAP5_ES20_CONTROL_PBIAS_SDCARD_IO_PWRRDNZ;
+		omap4_ctrl_pad_writel(reg, control_pbias_offset);
+		udelay(150);
 	}
 }
 
@@ -500,7 +533,19 @@ static int __init omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
 	case 1:
 		if (mmc->slots[0].features & HSMMC_HAS_PBIAS) {
 			/* on-chip level shifting via PBIAS0/PBIAS1 */
-			if (cpu_is_omap54xx() || cpu_is_omap44xx()) {
+			if (cpu_is_omap54xx()) {
+				if (omap_rev() == OMAP5430_REV_ES2_0) {
+					mmc->slots[0].before_set_reg =
+						omap5_es2_before_set_reg;
+					mmc->slots[0].after_set_reg =
+						omap5_es2_after_set_reg;
+				} else {
+					mmc->slots[0].before_set_reg =
+						omap4_hsmmc1_before_set_reg;
+					mmc->slots[0].after_set_reg =
+						omap4_hsmmc1_after_set_reg;
+				}
+			} else if (cpu_is_omap44xx()) {
 				mmc->slots[0].before_set_reg =
 						omap4_hsmmc1_before_set_reg;
 				mmc->slots[0].after_set_reg =
