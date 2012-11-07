@@ -323,7 +323,10 @@ static void musb_otg_notifier_work(struct work_struct *data_notifier_work)
 		}
 
 #endif
+		pm_runtime_get_sync(dev->parent);
 		otg_init(musb->xceiv);
+		pm_runtime_mark_last_busy(dev->parent);
+		pm_runtime_put_autosuspend(dev->parent);
 		break;
 
 	case USB_EVENT_NONE:
