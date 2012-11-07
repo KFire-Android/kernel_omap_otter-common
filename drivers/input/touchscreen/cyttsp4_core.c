@@ -1588,6 +1588,7 @@ int cyttsp4_resume(void *handle)
 		 * This write should always fail because the part is not
 		 * ready to respond.
 		 */
+		enable_irq(ts->irq);
 		ts->cmd_rdy = false;
 		ts->power_state = CY_CMD_STATE;
 		retval = cyttsp4_read_block_data(ts, CY_REG_BASE,
@@ -1689,6 +1690,7 @@ int cyttsp4_suspend(void *handle)
 		if (retval < 0) {
 			pr_err("%s: Failed to write sleep bit\n", __func__);
 		} else {
+			disable_irq_nosync(ts->irq);
 			ts->power_state = CY_SLEEP_STATE;
 			cyttsp4_pr_state(ts);
 		}
