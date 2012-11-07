@@ -259,7 +259,7 @@ int omap_aess_reload_fw(struct omap_aess *abe, u32 *firmware)
 	abe->warm_boot = 0;
 	omap_aess_load_fw_param(abe, firmware);
 	omap_aess_build_scheduler_table(abe);
-	omap_aess_dbg_reset(abe->dbg);
+	omap_aess_dbg_reset(abe);
 	/* IRQ circular read pointer in DMEM */
 	abe->irq_dbg_read_ptr = 0;
 	/* Restore Gains not managed by the drivers */
