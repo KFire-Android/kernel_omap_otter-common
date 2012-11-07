@@ -55,6 +55,7 @@
 #include "hsmmc.h"
 #include "control.h"
 #include "common-board-devices.h"
+#include "board-44xx-blaze.h"
 
 #define ETH_KS8851_IRQ			34
 #define ETH_KS8851_POWER_ON		48
@@ -1148,6 +1149,7 @@ static void __init omap_4430sdp_init(void)
 	omap4_mux_init(board_mux, NULL, package);
 
 	omap4_i2c_init();
+	blaze_touch_init();
 	omap_sfh7741prox_init();
 	platform_add_devices(sdp4430_devices, ARRAY_SIZE(sdp4430_devices));
 	omap4_board_serial_init();
