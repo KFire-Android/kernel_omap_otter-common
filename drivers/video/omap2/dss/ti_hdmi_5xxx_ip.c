@@ -1106,7 +1106,7 @@ int ti_hdmi_5xxx_cec_get_rx_cmd(struct hdmi_ip_data *ip_data,
 {
 	int i = 1;
 	int temp = 0;
-	temp = hdmi_read_reg(hdmi_core_sys_base(ip_data),
+	temp = hdmi_read_reg(hdmi_core_cec_base(ip_data),
 		(HDMI_CORE_CEC_RX_DATA_0 + (i*4)));
 	*rx_cmd = FLD_GET(temp, 7, 0);
 
@@ -1120,7 +1120,7 @@ int ti_hdmi_5xxx_cec_read_rx_cmd(struct hdmi_ip_data *ip_data,
 	int i, j;
 	int r = -EINVAL;
 
-	temp = hdmi_read_reg(hdmi_core_sys_base(ip_data),
+	temp = hdmi_read_reg(hdmi_core_cec_base(ip_data),
 		HDMI_CORE_CEC_CTRL);
 
 	if (FLD_GET(temp, 0, 0)) {
@@ -1129,11 +1129,11 @@ int ti_hdmi_5xxx_cec_read_rx_cmd(struct hdmi_ip_data *ip_data,
 	}
 	/* TODO: Check follower id to the registerd device list */
 	/* Check if frame is present*/
-	temp = hdmi_read_reg(hdmi_core_sys_base(ip_data),
+	temp = hdmi_read_reg(hdmi_core_cec_base(ip_data),
 		HDMI_CORE_CEC_LOCK);
 	if (temp) {
 		/* Read total number of bytes received */
-		rx_byte_cnt = hdmi_read_reg(hdmi_core_sys_base(ip_data),
+		rx_byte_cnt = hdmi_read_reg(hdmi_core_cec_base(ip_data),
 				HDMI_CORE_CEC_RX_CNT);
 		if (rx_byte_cnt) {
 			if (rx_byte_cnt > (CEC_MAX_NUM_OPERANDS + CEC_HEADER_CMD_COUNT)) {
@@ -1142,7 +1142,7 @@ int ti_hdmi_5xxx_cec_read_rx_cmd(struct hdmi_ip_data *ip_data,
 				goto error_exit;
 			}
 			/* Read the header */
-			temp = hdmi_read_reg(hdmi_core_sys_base(ip_data),
+			temp = hdmi_read_reg(hdmi_core_cec_base(ip_data),
 				HDMI_CORE_CEC_RX_DATA_0);
 			rx_data->init_device_id = FLD_GET(temp, 7, 4);
 			rx_data->dest_device_id = FLD_GET(temp, 3, 0);
@@ -1157,16 +1157,16 @@ int ti_hdmi_5xxx_cec_read_rx_cmd(struct hdmi_ip_data *ip_data,
 			/*Get RX operands*/
 			rx_data->rx_count = rx_byte_cnt - CEC_HEADER_CMD_COUNT;
 			for (i = 2, j = 0; i < rx_byte_cnt; i++, j++) {
-				temp = RD_REG_32(hdmi_core_sys_base(ip_data),
+				temp = RD_REG_32(hdmi_core_cec_base(ip_data),
 					HDMI_CORE_CEC_RX_DATA_0 + (i * 4));
 				rx_data->rx_operand[j] = FLD_GET(temp, 7, 0);
 			}
-			hdmi_write_reg(hdmi_core_sys_base(ip_data),
+			hdmi_write_reg(hdmi_core_cec_base(ip_data),
 				HDMI_CORE_CEC_RX_CNT, 0x0);
 			r = 0;
 		}
 		/* Clear the LOCK register*/
-		hdmi_write_reg(hdmi_core_sys_base(ip_data), HDMI_CORE_CEC_LOCK,
+		hdmi_write_reg(hdmi_core_cec_base(ip_data), HDMI_CORE_CEC_LOCK,
 			0x0);
 	}
 error_exit:
@@ -1200,13 +1200,13 @@ int ti_hdmi_5xxx_cec_transmit_cmd(struct hdmi_ip_data *ip_data,
 			HDMI_CORE_IH_CEC_STAT0, 0x1, 4, 4);
 		/* Write TX CMD HEADER*/
 		/* Initiator ID*/
-		REG_FLD_MOD(hdmi_core_sys_base(ip_data),
+		REG_FLD_MOD(hdmi_core_cec_base(ip_data),
 			HDMI_CORE_CEC_TX_DATA_0, data->initiator_device_id,
 			7, 4);
 		temp = data->initiator_device_id << 4;
 		temp |= data->dest_device_id & 0xF;
 		/* Destination ID*/
-		REG_FLD_MOD(hdmi_core_sys_base(ip_data),
+		REG_FLD_MOD(hdmi_core_cec_base(ip_data),
 			HDMI_CORE_CEC_TX_DATA_0, temp, 7, 0);
 		count = 1;/* Add header count to total TX count*/
 
@@ -1214,20 +1214,20 @@ int ti_hdmi_5xxx_cec_transmit_cmd(struct hdmi_ip_data *ip_data,
 			goto send_ping;
 		/*Write opcode*/
 		i = 1;
-		hdmi_write_reg(hdmi_core_sys_base(ip_data),
+		hdmi_write_reg(hdmi_core_cec_base(ip_data),
 			(HDMI_CORE_CEC_TX_DATA_0 + (i * 4)), data->tx_cmd);
 		count++;
 		/*Write operands*/
 		i++;
 		for (j = 0; j < data->tx_count; j++, i++) {
-			hdmi_write_reg(hdmi_core_sys_base(ip_data),
+			hdmi_write_reg(hdmi_core_cec_base(ip_data),
 				(HDMI_CORE_CEC_TX_DATA_0 + (i * 4)),
 				data->tx_operand[j]);
 			count++;
 		}
 send_ping:
 		/* Write TX count*/
-		REG_FLD_MOD(hdmi_core_sys_base(ip_data), HDMI_CORE_CEC_TX_CNT,
+		REG_FLD_MOD(hdmi_core_cec_base(ip_data), HDMI_CORE_CEC_TX_CNT,
 			count, 4, 0);
 		ti_hdmi_5xxx_cec_add_reg_device(ip_data,
 			data->initiator_device_id, false);
@@ -1235,7 +1235,7 @@ send_ping:
 
 		ip_data->cec_int = 0;
 		/*Send CEC command*/
-		REG_FLD_MOD(hdmi_core_sys_base(ip_data), HDMI_CORE_CEC_CTRL,
+		REG_FLD_MOD(hdmi_core_cec_base(ip_data), HDMI_CORE_CEC_CTRL,
 			0x03, 7, 0);
 		/* Start bit ~4.6ms rounded to 5ms
 		*  Header 8bit + EOM+ACK = 8 *2.4 + 2.4 + 2.4
@@ -1276,7 +1276,7 @@ int ti_hdmi_5xxx_power_on_cec(struct hdmi_ip_data *ip_data)
 	 struct hdmi_irq_vector irq_enable;
 	/* Initialize the CEC to STANDBY, respond only to ping */
 	/* NACK broadcast messages */
-	REG_FLD_MOD(hdmi_core_sys_base(ip_data), HDMI_CORE_CEC_CTRL, 0x3, 4, 3);
+	REG_FLD_MOD(hdmi_core_cec_base(ip_data), HDMI_CORE_CEC_CTRL, 0x3, 4, 3);
 
 	/* Clear All CEC interrupts */
 	hdmi_write_reg(hdmi_core_sys_base(ip_data), HDMI_CORE_IH_CEC_STAT0,
@@ -1285,22 +1285,22 @@ int ti_hdmi_5xxx_power_on_cec(struct hdmi_ip_data *ip_data)
 	/* Set CEC interrupt mask */
 	/* Enable WAKEUP,Follower line error,initiator error,
 	ARD lost interrupt, NACK interrupt, EOM interrupt, TX done interrupt */
-	REG_FLD_MOD(hdmi_core_sys_base(ip_data), HDMI_CORE_CEC_MASK, 0x0, 7, 0);
+	REG_FLD_MOD(hdmi_core_cec_base(ip_data), HDMI_CORE_CEC_MASK, 0x0, 7, 0);
 	/*Unmute CEC interrupts*/
 	REG_FLD_MOD(hdmi_core_sys_base(ip_data), HDMI_CORE_IH_MUTE, 0x0, 1, 0);
 	/* On power on reset the registerd device to unregisterd*/
-	hdmi_write_reg(hdmi_core_sys_base(ip_data), HDMI_CORE_CEC_ADDR_L, 0x0);
-	hdmi_write_reg(hdmi_core_sys_base(ip_data), HDMI_CORE_CEC_ADDR_H, 0x80);
+	hdmi_write_reg(hdmi_core_cec_base(ip_data), HDMI_CORE_CEC_ADDR_L, 0x0);
+	hdmi_write_reg(hdmi_core_cec_base(ip_data), HDMI_CORE_CEC_ADDR_H, 0x80);
 
 	/* Set TX count to zero */
-	hdmi_write_reg(hdmi_core_sys_base(ip_data), HDMI_CORE_CEC_TX_CNT, 0x0);
+	hdmi_write_reg(hdmi_core_cec_base(ip_data), HDMI_CORE_CEC_TX_CNT, 0x0);
 
 	/*Set Wake up for all supported opcode*/
-	hdmi_write_reg(hdmi_core_sys_base(ip_data), HDMI_CORE_CEC_WKUPCTRL,
+	hdmi_write_reg(hdmi_core_cec_base(ip_data), HDMI_CORE_CEC_WKUPCTRL,
 		0xFF);
 
 	/*Clear read LOCK*/
-	hdmi_write_reg(hdmi_core_sys_base(ip_data), HDMI_CORE_CEC_LOCK, 0x0);
+	hdmi_write_reg(hdmi_core_cec_base(ip_data), HDMI_CORE_CEC_LOCK, 0x0);
 
 	/*Enable HDMI core interrupts*/
 	REG_FLD_MOD(hdmi_wp_base(ip_data), HDMI_WP_IRQENABLE_SET, 0x1,
@@ -1336,10 +1336,10 @@ int ti_hdmi_5xxx_cec_int_handler(struct hdmi_ip_data *ip_data)
 	/*check err follower*/
 	if (FLD_GET(temp, 5, 5)) {
 		/*Check the LOCK status*/
-		lock_val = hdmi_read_reg(hdmi_core_sys_base(ip_data),
+		lock_val = hdmi_read_reg(hdmi_core_cec_base(ip_data),
 			HDMI_CORE_CEC_LOCK);
 		if (lock_val)
-			hdmi_write_reg(hdmi_core_sys_base(ip_data),
+			hdmi_write_reg(hdmi_core_cec_base(ip_data),
 				HDMI_CORE_CEC_LOCK, 0x0);
 	}
 	if (FLD_GET(temp, 0, 0)) {
@@ -1369,10 +1369,10 @@ int ti_hdmi_5xxx_cec_get_reg_device_list(struct hdmi_ip_data *ip_data)
 	int dev_mask = 0;
 
 	/*Store current device listning ids*/
-	dev_mask = RD_REG_32(hdmi_core_sys_base(ip_data),
+	dev_mask = RD_REG_32(hdmi_core_cec_base(ip_data),
 		HDMI_CORE_CEC_ADDR_H);
 	dev_mask <<= 8;
-	dev_mask |= RD_REG_32(hdmi_core_sys_base(ip_data),
+	dev_mask |= RD_REG_32(hdmi_core_cec_base(ip_data),
 		HDMI_CORE_CEC_ADDR_L);
 	return dev_mask;
 
@@ -1392,15 +1392,15 @@ int ti_hdmi_5xxx_cec_add_reg_device(struct hdmi_ip_data *ip_data,
 		shift_cnt -= 0x7;
 	}
 	if (clear == 0x1) {
-		WR_REG_32(hdmi_core_sys_base(ip_data),
+		WR_REG_32(hdmi_core_cec_base(ip_data),
 			HDMI_CORE_CEC_ADDR_L, 0);
-		WR_REG_32(hdmi_core_sys_base(ip_data),
+		WR_REG_32(hdmi_core_cec_base(ip_data),
 			HDMI_CORE_CEC_ADDR_H, 0);
 	} else {
-		temp = RD_REG_32(hdmi_core_sys_base(ip_data), regis_reg);
+		temp = RD_REG_32(hdmi_core_cec_base(ip_data), regis_reg);
 	}
 	temp |= 0x1 << shift_cnt;
-	WR_REG_32(hdmi_core_sys_base(ip_data), regis_reg,
+	WR_REG_32(hdmi_core_cec_base(ip_data), regis_reg,
 		temp);
 	return 0;
 
@@ -1408,9 +1408,9 @@ int ti_hdmi_5xxx_cec_add_reg_device(struct hdmi_ip_data *ip_data,
 int ti_hdmi_5xxx_cec_set_reg_device_list(struct hdmi_ip_data *ip_data,
 	int mask)
 {
-	WR_REG_32(hdmi_core_sys_base(ip_data),
+	WR_REG_32(hdmi_core_cec_base(ip_data),
 		HDMI_CORE_CEC_ADDR_H, (mask >> 8) & 0xff);
-	WR_REG_32(hdmi_core_sys_base(ip_data),
+	WR_REG_32(hdmi_core_cec_base(ip_data),
 		HDMI_CORE_CEC_ADDR_L, mask & 0xff);
 	return 0;
 }
