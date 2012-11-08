@@ -180,10 +180,12 @@ static int temp_sensor_unmask_interrupts(struct omap_bandgap *bg_ptr, int id,
 		reg_val &= ~tsr->mask_cold_mask;
 	err |= omap_control_writel(cdev, reg_val, tsr->bgap_mask_ctrl);
 
-	if (err)
+	if (err) {
 		dev_err(bg_ptr->dev, "failed to unmask interrupts\n");
+		return -EIO;
+	}
 
-	return -EIO;
+	return 0;
 }
 
 static
