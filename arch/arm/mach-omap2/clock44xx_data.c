@@ -1375,6 +1375,27 @@ static struct clk bandgap_fclk = {
 	.recalc		= &followparent_recalc,
 };
 
+static const struct clksel bb2d_clk_mux_sel[] = {
+	{ .parent = &dpll_core_m7x2_ck, .rates = div_1_0_rates },
+	{ .parent = &dpll_per_m6x2_ck, .rates = div_1_1_rates },
+	{ .parent = NULL },
+};
+
+/* Merged bb2d_clk_mux into bb2d */
+static struct clk bb2d_fck = {
+	.name		= "bb2d_fck",
+	.parent		= &dpll_core_m7x2_ck,
+	.clksel		= bb2d_clk_mux_sel,
+	.init		= &omap2_init_clksel_parent,
+	.clksel_reg	= OMAP4470_CM_DSS_BB2D_CLKCTRL,
+	.clksel_mask	= OMAP4470_CLKSEL_BB2D_FCLK_MASK,
+	.ops		= &clkops_omap2_dflt,
+	.recalc		= &omap2_clksel_recalc,
+	.enable_reg	= OMAP4470_CM_DSS_BB2D_CLKCTRL,
+	.enable_bit	= OMAP4430_MODULEMODE_SWCTRL,
+	.clkdm_name	= "l3_dss_clkdm",
+};
+
 static struct clk des3des_fck = {
 	.name		= "des3des_fck",
 	.ops		= &clkops_omap2_dflt,
@@ -1815,6 +1836,16 @@ static struct clk ipu_fck = {
 	.recalc		= &followparent_recalc,
 };
 
+static struct clk ipu_fck_447x = {
+	.name		= "ipu_fck",
+	.ops		= &clkops_omap2_dflt,
+	.enable_reg	= OMAP4430_CM_DUCATI_DUCATI_CLKCTRL,
+	.enable_bit	= OMAP4430_MODULEMODE_HWCTRL,
+	.clkdm_name	= "ducati_clkdm",
+	.parent		= &div_core_ck,
+	.recalc		= &followparent_recalc,
+};
+
 static struct clk iss_ctrlclk = {
 	.name		= "iss_ctrlclk",
 	.ops		= &clkops_omap2_dflt,
@@ -1832,6 +1863,16 @@ static struct clk iss_fck = {
 	.enable_bit	= OMAP4430_MODULEMODE_SWCTRL,
 	.clkdm_name	= "iss_clkdm",
 	.parent		= &ducati_clk_mux_ck,
+	.recalc		= &followparent_recalc,
+};
+
+static struct clk iss_fck_447x = {
+	.name		= "iss_fck",
+	.ops		= &clkops_omap2_dflt,
+	.enable_reg	= OMAP4430_CM_CAM_ISS_CLKCTRL,
+	.enable_bit	= OMAP4430_MODULEMODE_SWCTRL,
+	.clkdm_name	= "iss_clkdm",
+	.parent		= &div_core_ck,
 	.recalc		= &followparent_recalc,
 };
 
@@ -3283,9 +3324,7 @@ static struct clk_lookup omap44xx_clks[] = {
 	CLKDEV_INIT(NULL,	"i2c2_fck",			&i2c2_fck),
 	CLKDEV_INIT(NULL,	"i2c3_fck",			&i2c3_fck),
 	CLKDEV_INIT(NULL,	"i2c4_fck",			&i2c4_fck),
-	CLKDEV_INIT(NULL,	"ipu_fck",			&ipu_fck),
 	CLKDEV_INIT(NULL,	"iss_ctrlclk",			&iss_ctrlclk),
-	CLKDEV_INIT(NULL,	"iss_fck",			&iss_fck),
 	CLKDEV_INIT(NULL,	"iva_fck",			&iva_fck),
 	CLKDEV_INIT(NULL,	"kbd_fck",			&kbd_fck),
 	CLKDEV_INIT(NULL,	"l3_instr_ick",			&l3_instr_ick),
@@ -3445,6 +3484,8 @@ static struct clk_lookup omap44xx_clks[] = {
 static struct clk_lookup omap443x_clks[] = {
 	CLKDEV_INIT(NULL,	"bandgap_fclk",			&bandgap_fclk),
 	CLKDEV_INIT("smp_twd",	NULL,				&mpu_periphclk_443x),
+	CLKDEV_INIT(NULL,	"ipu_fck",			&ipu_fck),
+	CLKDEV_INIT(NULL,	"iss_fck",			&iss_fck),
 	CLKDEV_INIT(NULL,	NULL,				NULL),
 };
 
@@ -3453,6 +3494,19 @@ static struct clk_lookup omap446x_clks[] = {
 	CLKDEV_INIT(NULL,	"div_ts_ck",			&div_ts_ck),
 	CLKDEV_INIT(NULL,	"bandgap_ts_fclk",		&bandgap_ts_fclk),
 	CLKDEV_INIT("smp_twd",	NULL,				&mpu_periphclk_446x),
+	CLKDEV_INIT(NULL,	"ipu_fck",			&ipu_fck),
+	CLKDEV_INIT(NULL,	"iss_fck",			&iss_fck),
+	CLKDEV_INIT(NULL,	NULL,				NULL),
+};
+
+static struct clk_lookup omap447x_clks[] = {
+	CLKDEV_INIT(NULL,	"virt_dpll_mpu_ck",		&virt_dpll_mpu_ck),
+	CLKDEV_INIT(NULL,	"div_ts_ck",			&div_ts_ck),
+	CLKDEV_INIT(NULL,	"bandgap_ts_fclk",		&bandgap_ts_fclk),
+	CLKDEV_INIT(NULL,	"bb2d_fck",			&bb2d_fck),
+	CLKDEV_INIT("smp_twd",	NULL,				&mpu_periphclk_446x),
+	CLKDEV_INIT(NULL,	"ipu_fck",			&ipu_fck_447x),
+	CLKDEV_INIT(NULL,	"iss_fck",			&iss_fck_447x),
 	CLKDEV_INIT(NULL,	NULL,				NULL),
 };
 
@@ -3466,6 +3520,9 @@ int __init omap4xxx_clk_init(void)
 	} else if (cpu_is_omap446x()) {
 		cpu_mask = RATE_IN_4460 | RATE_IN_4430;
 		omap4_specific_clks = omap446x_clks;
+	} else if (cpu_is_omap447x()) {
+		cpu_mask = RATE_IN_4460 | RATE_IN_4430;
+		omap4_specific_clks = omap447x_clks;
 	} else {
 		return 0;
 	}
