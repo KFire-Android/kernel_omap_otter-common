@@ -232,6 +232,8 @@ struct hdmi_ip_data {
 	void __iomem	*base_wp;	/* HDMI wrapper */
 	unsigned long	core_sys_offset;
 	unsigned long	core_av_offset;
+	unsigned long	core_i2cm_offset;
+	unsigned long	cec_offset;
 	unsigned long	pll_offset;
 	unsigned long	phy_offset;
 	const struct ti_hdmi_ip_ops *ops;
