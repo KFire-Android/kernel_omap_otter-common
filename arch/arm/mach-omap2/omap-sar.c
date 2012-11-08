@@ -40,7 +40,12 @@ static struct omap_hwmod *uhh_hwm, *tll_hwm;
 #define SZ_CM_USBHS	0xc
 #define OMAP44XX_CM2_USBHS_OFFSET	0x1e54
 
+#ifdef CONFIG_ARCH_OMAP5_ES1
 #define OMAP55XX_CM_USBHS_OFFSET	0x1e60
+#else
+#define OMAP55XX_CM_USBHS_OFFSET	0x1e64
+#endif
+
 /**
  * struct sar_ram_entry - SAR RAM layout descriptor
  * @io_base: IO base address for the entry
