@@ -31,6 +31,8 @@
 #define OMAP5_HDMI_CORE_OFFSET 0x20000
 #define OMAP5_ES_1_0_HDMI_CEC_OFFSET	(OMAP5_HDMI_CORE_OFFSET + 0x17400)
 #define OMAP5_ES_1_0_HDMI_I2CM_OFFSET	(OMAP5_HDMI_CORE_OFFSET + 0x17800)
+#define OMAP5_ES_2_0_HDMI_CEC_OFFSET	(OMAP5_HDMI_CORE_OFFSET + 0x153C8)
+#define OMAP5_ES_2_0_HDMI_I2CM_OFFSET	(OMAP5_HDMI_CORE_OFFSET + 0x157C8)
 
 /* Defines a generic omap register field */
 struct dss_reg_field {
@@ -787,8 +789,9 @@ static const struct omap_dss_features omap5_es2_0_dss_features = {
 	.buffer_size_unit = 16,
 	.burst_size_unit = 16,
 	.dsi_ddr_div = 2,
-	.hdmi_core_sys_offset = 0x20000,
-	.hdmi_cec_offset = 0x20000,
+	.hdmi_core_sys_offset = OMAP5_HDMI_CORE_OFFSET,
+	.hdmi_cec_offset = OMAP5_ES_2_0_HDMI_CEC_OFFSET,
+	.hdmi_core_i2cm_offset = OMAP5_ES_2_0_HDMI_I2CM_OFFSET,
 };
 
 #if defined(CONFIG_OMAP4_DSS_HDMI) || defined(CONFIG_OMAP5_DSS_HDMI)
