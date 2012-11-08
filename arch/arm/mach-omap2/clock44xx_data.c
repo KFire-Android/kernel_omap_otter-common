@@ -1244,9 +1244,17 @@ static const struct clksel ocp_abe_iclk_div[] = {
 	{ .parent = NULL },
 };
 
-static struct clk mpu_periphclk = {
+static struct clk mpu_periphclk_443x = {
 	.name		= "mpu_periphclk",
 	.parent		= &dpll_mpu_ck,
+	.ops		= &clkops_null,
+	.fixed_div	= 2,
+	.recalc		= &omap_fixed_divisor_recalc,
+};
+
+static struct clk mpu_periphclk_446x = {
+	.name		= "mpu_periphclk",
+	.parent		= &virt_dpll_mpu_ck,
 	.ops		= &clkops_null,
 	.fixed_div	= 2,
 	.recalc		= &omap_fixed_divisor_recalc,
@@ -3232,7 +3240,6 @@ static struct clk_lookup omap44xx_clks[] = {
 	CLKDEV_INIT(NULL,	"l4_div_ck",			&l4_div_ck),
 	CLKDEV_INIT(NULL,	"lp_clk_div_ck",		&lp_clk_div_ck),
 	CLKDEV_INIT(NULL,	"l4_wkup_clk_mux_ck",		&l4_wkup_clk_mux_ck),
-	CLKDEV_INIT("smp_twd",	NULL,				&mpu_periphclk),
 	CLKDEV_INIT(NULL,	"ocp_abe_iclk",			&ocp_abe_iclk),
 	CLKDEV_INIT(NULL,	"per_abe_24m_fclk",		&per_abe_24m_fclk),
 	CLKDEV_INIT(NULL,	"per_abe_nc_fclk",		&per_abe_nc_fclk),
@@ -3437,6 +3444,7 @@ static struct clk_lookup omap44xx_clks[] = {
 
 static struct clk_lookup omap443x_clks[] = {
 	CLKDEV_INIT(NULL,	"bandgap_fclk",			&bandgap_fclk),
+	CLKDEV_INIT("smp_twd",	NULL,				&mpu_periphclk_443x),
 	CLKDEV_INIT(NULL,	NULL,				NULL),
 };
 
@@ -3444,6 +3452,7 @@ static struct clk_lookup omap446x_clks[] = {
 	CLKDEV_INIT(NULL,	"virt_dpll_mpu_ck",		&virt_dpll_mpu_ck),
 	CLKDEV_INIT(NULL,	"div_ts_ck",			&div_ts_ck),
 	CLKDEV_INIT(NULL,	"bandgap_ts_fclk",		&bandgap_ts_fclk),
+	CLKDEV_INIT("smp_twd",	NULL,				&mpu_periphclk_446x),
 	CLKDEV_INIT(NULL,	NULL,				NULL),
 };
 
