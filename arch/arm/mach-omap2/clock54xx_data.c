@@ -737,8 +737,13 @@ static struct clk dpll_iva_h12x2_ck = {
 static struct clk mpu_dpll_hs_clk_div = {
 	.name		= "mpu_dpll_hs_clk_div",
 	.parent		= &dpll_core_h12x2_ck,
+	.clksel		= div_iva_hs_clk_div,
+	.clksel_reg	= OMAP54XX_CM_BYPCLK_DPLL_MPU,
+	.clksel_mask	= OMAP54XX_CLKSEL_0_1_MASK,
 	.ops		= &clkops_null,
 	.recalc		= &followparent_recalc,
+	.round_rate	= &omap2_clksel_round_rate,
+	.set_rate	= &omap2_clksel_set_rate,
 };
 
 /* DPLL_MPU */
