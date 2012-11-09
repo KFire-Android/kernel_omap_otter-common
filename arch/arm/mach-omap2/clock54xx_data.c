@@ -1590,6 +1590,359 @@ static struct clk timer9_gfclk_mux = {
 };
 
 /* Leaf clocks controlled by modules */
+static struct clk ocp2scp3_ick = {
+	.name		= "ocp2scp3_ick",
+	.ops		= &clkops_omap2_dflt,
+	.enable_reg	= OMAP54XX_CM_L3INIT_OCP2SCP3_CLKCTRL,
+	.enable_bit	= OMAP54XX_MODULEMODE_HWCTRL,
+	.clkdm_name	= "l3init_clkdm",
+	.parent		= &l4_root_clk_div,
+	.recalc		= &followparent_recalc,
+};
+
+static struct clk dss_32khz_clk = {
+	.name		= "dss_32khz_clk",
+	.parent		= &sys_32k_ck,
+	.ops		= &clkops_omap2_dflt,
+	.recalc		= &followparent_recalc,
+	.enable_reg	= OMAP54XX_CM_DSS_DSS_CLKCTRL,
+	.enable_bit	= OMAP54XX_OPTFCLKEN_32KHZ_CLK_SHIFT,
+	.clkdm_name	= "dss_clkdm",
+};
+
+static struct clk dss_48mhz_clk = {
+	.name		= "dss_48mhz_clk",
+	.parent		= &func_48m_fclk,
+	.ops		= &clkops_omap2_dflt,
+	.recalc		= &followparent_recalc,
+	.enable_reg	= OMAP54XX_CM_DSS_DSS_CLKCTRL,
+	.enable_bit	= OMAP54XX_OPTFCLKEN_48MHZ_CLK_SHIFT,
+	.clkdm_name	= "dss_clkdm",
+};
+
+static struct clk dss_dss_clk = {
+	.name		= "dss_dss_clk",
+	.parent		= &dpll_per_h12x2_ck,
+	.ops		= &clkops_omap2_dflt,
+	.recalc		= &followparent_recalc,
+	.enable_reg	= OMAP54XX_CM_DSS_DSS_CLKCTRL,
+	.enable_bit	= OMAP54XX_OPTFCLKEN_DSSCLK_SHIFT,
+	.clkdm_name	= "dss_clkdm",
+};
+
+static struct clk dss_sys_clk = {
+	.name		= "dss_sys_clk",
+	.parent		= &syc_clk_div,
+	.ops		= &clkops_omap2_dflt,
+	.recalc		= &followparent_recalc,
+	.enable_reg	= OMAP54XX_CM_DSS_DSS_CLKCTRL,
+	.enable_bit	= OMAP54XX_OPTFCLKEN_SYS_CLK_SHIFT,
+	.clkdm_name	= "dss_clkdm",
+};
+
+static struct clk gpio1_dbclk = {
+	.name		= "gpio1_dbclk",
+	.parent		= &sys_32k_ck,
+	.ops		= &clkops_omap2_dflt,
+	.recalc		= &followparent_recalc,
+	.enable_reg	= OMAP54XX_CM_WKUPAON_GPIO1_CLKCTRL,
+	.enable_bit	= OMAP54XX_OPTFCLKEN_DBCLK_SHIFT,
+	.clkdm_name	= "wkupaon_clkdm",
+};
+
+static struct clk gpio2_dbclk = {
+	.name		= "gpio2_dbclk",
+	.parent		= &sys_32k_ck,
+	.ops		= &clkops_omap2_dflt,
+	.recalc		= &followparent_recalc,
+	.enable_reg	= OMAP54XX_CM_L4PER_GPIO2_CLKCTRL,
+	.enable_bit	= OMAP54XX_OPTFCLKEN_DBCLK_SHIFT,
+	.clkdm_name	= "l4per_clkdm",
+};
+
+static struct clk gpio3_dbclk = {
+	.name		= "gpio3_dbclk",
+	.parent		= &sys_32k_ck,
+	.ops		= &clkops_omap2_dflt,
+	.recalc		= &followparent_recalc,
+	.enable_reg	= OMAP54XX_CM_L4PER_GPIO3_CLKCTRL,
+	.enable_bit	= OMAP54XX_OPTFCLKEN_DBCLK_SHIFT,
+	.clkdm_name	= "l4per_clkdm",
+};
+
+static struct clk gpio4_dbclk = {
+	.name		= "gpio4_dbclk",
+	.parent		= &sys_32k_ck,
+	.ops		= &clkops_omap2_dflt,
+	.recalc		= &followparent_recalc,
+	.enable_reg	= OMAP54XX_CM_L4PER_GPIO4_CLKCTRL,
+	.enable_bit	= OMAP54XX_OPTFCLKEN_DBCLK_SHIFT,
+	.clkdm_name	= "l4per_clkdm",
+};
+
+static struct clk gpio5_dbclk = {
+	.name		= "gpio5_dbclk",
+	.parent		= &sys_32k_ck,
+	.ops		= &clkops_omap2_dflt,
+	.recalc		= &followparent_recalc,
+	.enable_reg	= OMAP54XX_CM_L4PER_GPIO5_CLKCTRL,
+	.enable_bit	= OMAP54XX_OPTFCLKEN_DBCLK_SHIFT,
+	.clkdm_name	= "l4per_clkdm",
+};
+
+static struct clk gpio6_dbclk = {
+	.name		= "gpio6_dbclk",
+	.parent		= &sys_32k_ck,
+	.ops		= &clkops_omap2_dflt,
+	.recalc		= &followparent_recalc,
+	.enable_reg	= OMAP54XX_CM_L4PER_GPIO6_CLKCTRL,
+	.enable_bit	= OMAP54XX_OPTFCLKEN_DBCLK_SHIFT,
+	.clkdm_name	= "l4per_clkdm",
+};
+
+static struct clk gpio7_dbclk = {
+	.name		= "gpio7_dbclk",
+	.parent		= &sys_32k_ck,
+	.ops		= &clkops_omap2_dflt,
+	.recalc		= &followparent_recalc,
+	.enable_reg	= OMAP54XX_CM_L4PER_GPIO7_CLKCTRL,
+	.enable_bit	= OMAP54XX_OPTFCLKEN_DBCLK_SHIFT,
+	.clkdm_name	= "l4per_clkdm",
+};
+
+static struct clk gpio8_dbclk = {
+	.name		= "gpio8_dbclk",
+	.parent		= &sys_32k_ck,
+	.ops		= &clkops_omap2_dflt,
+	.recalc		= &followparent_recalc,
+	.enable_reg	= OMAP54XX_CM_L4PER_GPIO8_CLKCTRL,
+	.enable_bit	= OMAP54XX_OPTFCLKEN_DBCLK_SHIFT,
+	.clkdm_name	= "l4per_clkdm",
+};
+
+static struct clk iss_ctrlclk = {
+	.name		= "iss_ctrlclk",
+	.parent		= &func_96m_fclk,
+	.ops		= &clkops_omap2_dflt,
+	.recalc		= &followparent_recalc,
+	.enable_reg	= OMAP54XX_CM_CAM_ISS_CLKCTRL,
+	.enable_bit	= OMAP54XX_OPTFCLKEN_CTRLCLK_SHIFT,
+	.clkdm_name	= "cam_clkdm",
+};
+
+static struct clk lli_txphy_clk = {
+	.name		= "lli_txphy_clk",
+	.parent		= &dpll_unipro1_clkdcoldo,
+	.ops		= &clkops_omap2_dflt,
+	.recalc		= &followparent_recalc,
+	.enable_reg	= OMAP54XX_CM_MIPIEXT_LLI_CLKCTRL,
+	.enable_bit	= OMAP54XX_OPTFCLKEN_TXPHY_CLK_SHIFT,
+	.clkdm_name	= "mipiext_clkdm",
+};
+
+static struct clk lli_txphy_ls_clk = {
+	.name		= "lli_txphy_ls_clk",
+	.parent		= &dpll_unipro1_m2_ck,
+	.ops		= &clkops_omap2_dflt,
+	.recalc		= &followparent_recalc,
+	.enable_reg	= OMAP54XX_CM_MIPIEXT_LLI_CLKCTRL,
+	.enable_bit	= OMAP54XX_OPTFCLKEN_TXPHY_LS_CLK_SHIFT,
+	.clkdm_name	= "mipiext_clkdm",
+};
+
+static struct clk sata_ref_clk = {
+	.name		= "sata_ref_clk",
+	.parent		= &sys_clkin,
+	.ops		= &clkops_omap2_dflt,
+	.recalc		= &followparent_recalc,
+	.enable_reg	= OMAP54XX_CM_L3INIT_SATA_CLKCTRL,
+	.enable_bit	= OMAP54XX_OPTFCLKEN_REF_CLK_SHIFT,
+	.clkdm_name	= "l3init_clkdm",
+};
+
+static struct clk slimbus1_slimbus_clk = {
+	.name		= "slimbus1_slimbus_clk",
+	.parent		= &slimbus_clk,
+	.ops		= &clkops_omap2_dflt,
+	.recalc		= &followparent_recalc,
+	.enable_reg	= OMAP54XX_CM_ABE_SLIMBUS1_CLKCTRL,
+	.enable_bit	= OMAP54XX_OPTFCLKEN_SLIMBUS_CLK_SHIFT,
+	.clkdm_name	= "abe_clkdm",
+};
+
+static struct clk usb_host_hs_hsic480m_p1_clk = {
+	.name		= "usb_host_hs_hsic480m_p1_clk",
+	.parent		= &dpll_usb_m2_ck,
+	.ops		= &clkops_omap2_dflt,
+	.recalc		= &followparent_recalc,
+	.enable_reg	= OMAP54XX_CM_L3INIT_USB_HOST_HS_CLKCTRL,
+	.enable_bit	= OMAP54XX_OPTFCLKEN_HSIC480M_P1_CLK_SHIFT,
+	.clkdm_name	= "l3init_clkdm",
+};
+
+static struct clk usb_host_hs_hsic480m_p2_clk = {
+	.name		= "usb_host_hs_hsic480m_p2_clk",
+	.parent		= &dpll_usb_m2_ck,
+	.ops		= &clkops_omap2_dflt,
+	.recalc		= &followparent_recalc,
+	.enable_reg	= OMAP54XX_CM_L3INIT_USB_HOST_HS_CLKCTRL,
+	.enable_bit	= OMAP54XX_OPTFCLKEN_HSIC480M_P2_CLK_SHIFT,
+	.clkdm_name	= "l3init_clkdm",
+};
+
+static struct clk usb_host_hs_hsic480m_p3_clk = {
+	.name		= "usb_host_hs_hsic480m_p3_clk",
+	.parent		= &dpll_usb_m2_ck,
+	.ops		= &clkops_omap2_dflt,
+	.recalc		= &followparent_recalc,
+	.enable_reg	= OMAP54XX_CM_L3INIT_USB_HOST_HS_CLKCTRL,
+	.enable_bit	= OMAP54XX_OPTFCLKEN_HSIC480M_P3_CLK_SHIFT,
+	.clkdm_name	= "l3init_clkdm",
+};
+
+static struct clk usb_host_hs_hsic60m_p1_clk = {
+	.name		= "usb_host_hs_hsic60m_p1_clk",
+	.parent		= &l3init_60m_fclk,
+	.ops		= &clkops_omap2_dflt,
+	.recalc		= &followparent_recalc,
+	.enable_reg	= OMAP54XX_CM_L3INIT_USB_HOST_HS_CLKCTRL,
+	.enable_bit	= OMAP54XX_OPTFCLKEN_HSIC60M_P1_CLK_SHIFT,
+	.clkdm_name	= "l3init_clkdm",
+};
+
+static struct clk usb_host_hs_hsic60m_p2_clk = {
+	.name		= "usb_host_hs_hsic60m_p2_clk",
+	.parent		= &l3init_60m_fclk,
+	.ops		= &clkops_omap2_dflt,
+	.recalc		= &followparent_recalc,
+	.enable_reg	= OMAP54XX_CM_L3INIT_USB_HOST_HS_CLKCTRL,
+	.enable_bit	= OMAP54XX_OPTFCLKEN_HSIC60M_P2_CLK_SHIFT,
+	.clkdm_name	= "l3init_clkdm",
+};
+
+static struct clk usb_host_hs_hsic60m_p3_clk = {
+	.name		= "usb_host_hs_hsic60m_p3_clk",
+	.parent		= &l3init_60m_fclk,
+	.ops		= &clkops_omap2_dflt,
+	.recalc		= &followparent_recalc,
+	.enable_reg	= OMAP54XX_CM_L3INIT_USB_HOST_HS_CLKCTRL,
+	.enable_bit	= OMAP54XX_OPTFCLKEN_HSIC60M_P3_CLK_SHIFT,
+	.clkdm_name	= "l3init_clkdm",
+};
+
+static const struct clksel utmi_p1_gfclk_sel[] = {
+	{ .parent = &l3init_60m_fclk, .rates = div_1_0_rates },
+	{ .parent = &xclk60mhsp1, .rates = div_1_1_rates },
+	{ .parent = NULL },
+};
+
+static struct clk utmi_p1_gfclk = {
+	.name		= "utmi_p1_gfclk",
+	.parent		= &l3init_60m_fclk,
+	.clksel		= utmi_p1_gfclk_sel,
+	.init		= &omap2_init_clksel_parent,
+	.clksel_reg	= OMAP54XX_CM_L3INIT_USB_HOST_HS_CLKCTRL,
+	.clksel_mask	= OMAP54XX_CLKSEL_UTMI_P1_MASK,
+	.ops		= &clkops_null,
+	.recalc		= &omap2_clksel_recalc,
+};
+
+static struct clk usb_host_hs_utmi_p1_clk = {
+	.name		= "usb_host_hs_utmi_p1_clk",
+	.parent		= &utmi_p1_gfclk,
+	.ops		= &clkops_omap2_dflt,
+	.recalc		= &followparent_recalc,
+	.enable_reg	= OMAP54XX_CM_L3INIT_USB_HOST_HS_CLKCTRL,
+	.enable_bit	= OMAP54XX_OPTFCLKEN_UTMI_P1_CLK_SHIFT,
+	.clkdm_name	= "l3init_clkdm",
+};
+
+static const struct clksel utmi_p2_gfclk_sel[] = {
+	{ .parent = &l3init_60m_fclk, .rates = div_1_0_rates },
+	{ .parent = &xclk60mhsp2, .rates = div_1_1_rates },
+	{ .parent = NULL },
+};
+
+static struct clk utmi_p2_gfclk = {
+	.name		= "utmi_p2_gfclk",
+	.parent		= &l3init_60m_fclk,
+	.clksel		= utmi_p2_gfclk_sel,
+	.init		= &omap2_init_clksel_parent,
+	.clksel_reg	= OMAP54XX_CM_L3INIT_USB_HOST_HS_CLKCTRL,
+	.clksel_mask	= OMAP54XX_CLKSEL_UTMI_P2_MASK,
+	.ops		= &clkops_null,
+	.recalc		= &omap2_clksel_recalc,
+};
+
+static struct clk usb_host_hs_utmi_p2_clk = {
+	.name		= "usb_host_hs_utmi_p2_clk",
+	.parent		= &utmi_p2_gfclk,
+	.ops		= &clkops_omap2_dflt,
+	.recalc		= &followparent_recalc,
+	.enable_reg	= OMAP54XX_CM_L3INIT_USB_HOST_HS_CLKCTRL,
+	.enable_bit	= OMAP54XX_OPTFCLKEN_UTMI_P2_CLK_SHIFT,
+	.clkdm_name	= "l3init_clkdm",
+};
+
+static struct clk usb_host_hs_utmi_p3_clk = {
+	.name		= "usb_host_hs_utmi_p3_clk",
+	.parent		= &l3init_60m_fclk,
+	.ops		= &clkops_omap2_dflt,
+	.recalc		= &followparent_recalc,
+	.enable_reg	= OMAP54XX_CM_L3INIT_USB_HOST_HS_CLKCTRL,
+	.enable_bit	= OMAP54XX_OPTFCLKEN_UTMI_P3_CLK_SHIFT,
+	.clkdm_name	= "l3init_clkdm",
+};
+
+static struct clk usb_otg_ss_refclk960m = {
+	.name		= "usb_otg_ss_refclk960m",
+	.parent		= &dpll_usb_clkdcoldo,
+	.ops		= &clkops_omap2_dflt,
+	.recalc		= &followparent_recalc,
+	.enable_reg	= OMAP54XX_CM_L3INIT_USB_OTG_SS_CLKCTRL,
+	.enable_bit	= OMAP54XX_OPTFCLKEN_REFCLK960M_SHIFT,
+	.clkdm_name	= "l3init_clkdm",
+};
+
+static struct clk usb_phy_cm_clk32k = {
+	.name		= "usb_phy_cm_clk32k",
+	.parent		= &sys_32k_ck,
+	.ops		= &clkops_omap2_dflt,
+	.recalc		= &followparent_recalc,
+	.enable_reg	= OMAP54XX_CM_COREAON_USB_PHY_CORE_CLKCTRL,
+	.enable_bit	= OMAP54XX_OPTFCLKEN_CLK32K_SHIFT,
+	.clkdm_name	= "coreaon_clkdm",
+};
+
+static struct clk usb_tll_hs_usb_ch0_clk = {
+	.name		= "usb_tll_hs_usb_ch0_clk",
+	.parent		= &l3init_60m_fclk,
+	.ops		= &clkops_omap2_dflt,
+	.recalc		= &followparent_recalc,
+	.enable_reg	= OMAP54XX_CM_L3INIT_USB_TLL_HS_CLKCTRL,
+	.enable_bit	= OMAP54XX_OPTFCLKEN_USB_CH0_CLK_SHIFT,
+	.clkdm_name	= "l3init_clkdm",
+};
+
+static struct clk usb_tll_hs_usb_ch1_clk = {
+	.name		= "usb_tll_hs_usb_ch1_clk",
+	.parent		= &l3init_60m_fclk,
+	.ops		= &clkops_omap2_dflt,
+	.recalc		= &followparent_recalc,
+	.enable_reg	= OMAP54XX_CM_L3INIT_USB_TLL_HS_CLKCTRL,
+	.enable_bit	= OMAP54XX_OPTFCLKEN_USB_CH1_CLK_SHIFT,
+	.clkdm_name	= "l3init_clkdm",
+};
+
+static struct clk usb_tll_hs_usb_ch2_clk = {
+	.name		= "usb_tll_hs_usb_ch2_clk",
+	.parent		= &l3init_60m_fclk,
+	.ops		= &clkops_omap2_dflt,
+	.recalc		= &followparent_recalc,
+	.enable_reg	= OMAP54XX_CM_L3INIT_USB_TLL_HS_CLKCTRL,
+	.enable_bit	= OMAP54XX_OPTFCLKEN_USB_CH2_CLK_SHIFT,
+	.clkdm_name	= "l3init_clkdm",
+};
 
 /* Remaining optional clocks */
 static const struct clksel aess_fclk_div[] = {
@@ -1855,40 +2208,6 @@ static struct clk mmc2_fclk = {
 	.recalc		= &omap2_clksel_recalc,
 	.round_rate	= &omap2_clksel_round_rate,
 	.set_rate	= &omap2_clksel_set_rate,
-};
-
-static const struct clksel utmi_p1_gfclk_sel[] = {
-	{ .parent = &l3init_60m_fclk, .rates = div_1_0_rates },
-	{ .parent = &xclk60mhsp1, .rates = div_1_1_rates },
-	{ .parent = NULL },
-};
-
-static struct clk utmi_p1_gfclk = {
-	.name		= "utmi_p1_gfclk",
-	.parent		= &l3init_60m_fclk,
-	.clksel		= utmi_p1_gfclk_sel,
-	.init		= &omap2_init_clksel_parent,
-	.clksel_reg	= OMAP54XX_CM_L3INIT_USB_HOST_HS_CLKCTRL,
-	.clksel_mask	= OMAP54XX_CLKSEL_UTMI_P1_MASK,
-	.ops		= &clkops_null,
-	.recalc		= &omap2_clksel_recalc,
-};
-
-static const struct clksel utmi_p2_gfclk_sel[] = {
-	{ .parent = &l3init_60m_fclk, .rates = div_1_0_rates },
-	{ .parent = &xclk60mhsp2, .rates = div_1_1_rates },
-	{ .parent = NULL },
-};
-
-static struct clk utmi_p2_gfclk = {
-	.name		= "utmi_p2_gfclk",
-	.parent		= &l3init_60m_fclk,
-	.clksel		= utmi_p2_gfclk_sel,
-	.init		= &omap2_init_clksel_parent,
-	.clksel_reg	= OMAP54XX_CM_L3INIT_USB_HOST_HS_CLKCTRL,
-	.clksel_mask	= OMAP54XX_CLKSEL_UTMI_P2_MASK,
-	.ops		= &clkops_null,
-	.recalc		= &omap2_clksel_recalc,
 };
 
 /* SCRM aux clk nodes */
@@ -2253,6 +2572,38 @@ static struct omap_clk omap54xx_clks[] = {
 	CLK(NULL,	"timer7_gfclk_mux",		&timer7_gfclk_mux,	CK_54XX),
 	CLK(NULL,	"timer8_gfclk_mux",		&timer8_gfclk_mux,	CK_54XX),
 	CLK(NULL,	"timer9_gfclk_mux",		&timer9_gfclk_mux,	CK_54XX),
+	CLK(NULL,	"ocp2scp3_ick",			&ocp2scp3_ick,		CK_54XX),
+	CLK(NULL,	"dss_32khz_clk",		&dss_32khz_clk,		CK_54XX),
+	CLK(NULL,	"dss_48mhz_clk",		&dss_48mhz_clk,		CK_54XX),
+	CLK(NULL,	"dss_dss_clk",			&dss_dss_clk,		CK_54XX),
+	CLK(NULL,	"dss_sys_clk",			&dss_sys_clk,		CK_54XX),
+	CLK(NULL,	"gpio1_dbclk",			&gpio1_dbclk,		CK_54XX),
+	CLK(NULL,	"gpio2_dbclk",			&gpio2_dbclk,		CK_54XX),
+	CLK(NULL,	"gpio3_dbclk",			&gpio3_dbclk,		CK_54XX),
+	CLK(NULL,	"gpio4_dbclk",			&gpio4_dbclk,		CK_54XX),
+	CLK(NULL,	"gpio5_dbclk",			&gpio5_dbclk,		CK_54XX),
+	CLK(NULL,	"gpio6_dbclk",			&gpio6_dbclk,		CK_54XX),
+	CLK(NULL,	"gpio7_dbclk",			&gpio7_dbclk,		CK_54XX),
+	CLK(NULL,	"gpio8_dbclk",			&gpio8_dbclk,		CK_54XX),
+	CLK(NULL,	"iss_ctrlclk",			&iss_ctrlclk,		CK_54XX),
+	CLK(NULL,	"lli_txphy_clk",		&lli_txphy_clk,		CK_54XX),
+	CLK(NULL,	"lli_txphy_ls_clk",		&lli_txphy_ls_clk,	CK_54XX),
+	CLK(NULL,	"sata_ref_clk",			&sata_ref_clk,		CK_54XX),
+	CLK(NULL,	"slimbus1_slimbus_clk",		&slimbus1_slimbus_clk,	CK_54XX),
+	CLK(NULL,	"usb_host_hs_hsic480m_p1_clk",	&usb_host_hs_hsic480m_p1_clk,	CK_54XX),
+	CLK(NULL,	"usb_host_hs_hsic480m_p2_clk",	&usb_host_hs_hsic480m_p2_clk,	CK_54XX),
+	CLK(NULL,	"usb_host_hs_hsic480m_p3_clk",	&usb_host_hs_hsic480m_p3_clk,	CK_54XX),
+	CLK(NULL,	"usb_host_hs_hsic60m_p1_clk",	&usb_host_hs_hsic60m_p1_clk,	CK_54XX),
+	CLK(NULL,	"usb_host_hs_hsic60m_p2_clk",	&usb_host_hs_hsic60m_p2_clk,	CK_54XX),
+	CLK(NULL,	"usb_host_hs_hsic60m_p3_clk",	&usb_host_hs_hsic60m_p3_clk,	CK_54XX),
+	CLK(NULL,	"usb_host_hs_utmi_p1_clk",	&usb_host_hs_utmi_p1_clk,	CK_54XX),
+	CLK(NULL,	"usb_host_hs_utmi_p2_clk",	&usb_host_hs_utmi_p2_clk,	CK_54XX),
+	CLK(NULL,	"usb_host_hs_utmi_p3_clk",	&usb_host_hs_utmi_p3_clk,	CK_54XX),
+	CLK(NULL,	"usb_otg_ss_refclk960m",	&usb_otg_ss_refclk960m,		CK_54XX),
+	CLK(NULL,	"usb_phy_cm_clk32k",		&usb_phy_cm_clk32k,		CK_54XX),
+	CLK(NULL,	"usb_tll_hs_usb_ch0_clk",	&usb_tll_hs_usb_ch0_clk,	CK_54XX),
+	CLK(NULL,	"usb_tll_hs_usb_ch1_clk",	&usb_tll_hs_usb_ch1_clk,	CK_54XX),
+	CLK(NULL,	"usb_tll_hs_usb_ch2_clk",	&usb_tll_hs_usb_ch2_clk,	CK_54XX),
 	CLK(NULL,	"aess_fclk",			&aess_fclk,	CK_54XX),
 	CLK(NULL,	"dmic_sync_mux_ck",		&dmic_sync_mux_ck,	CK_54XX),
 	CLK(NULL,	"dmic_gfclk",			&dmic_gfclk,	CK_54XX),
