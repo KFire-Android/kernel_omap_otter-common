@@ -220,6 +220,10 @@ static struct clk abe_dpll_bypass_clk_mux = {
 static struct clk abe_dpll_clk_mux = {
 	.name		= "abe_dpll_clk_mux",
 	.parent		= &sys_clkin,
+	.clksel		= abe_dpll_bypass_clk_mux_sel,
+	.init		= &omap2_init_clksel_parent,
+	.clksel_reg	= OMAP54XX_CM_CLKSEL_ABE_PLL_REF,
+	.clksel_mask	= OMAP54XX_CLKSEL_0_0_MASK,
 	.ops		= &clkops_null,
 	.recalc		= &followparent_recalc,
 };
