@@ -1330,6 +1330,10 @@ static const struct clksel gpu_core_gclk_mux_sel[] = {
 static struct clk gpu_core_gclk_mux = {
 	.name		= "gpu_core_gclk_mux",
 	.parent		= &dpll_core_h14x2_ck,
+	.clksel		= gpu_core_gclk_mux_sel,
+	.init		= &omap2_init_clksel_parent,
+	.clksel_reg	= OMAP54XX_CM_GPU_GPU_CLKCTRL,
+	.clksel_mask	= OMAP54XX_CLKSEL_GPU_CORE_GCLK_MASK,
 	.ops		= &clkops_null,
 	.recalc		= &followparent_recalc,
 };
@@ -1337,6 +1341,10 @@ static struct clk gpu_core_gclk_mux = {
 static struct clk gpu_hyd_gclk_mux = {
 	.name		= "gpu_hyd_gclk_mux",
 	.parent		= &dpll_core_h14x2_ck,
+	.clksel		= gpu_core_gclk_mux_sel,
+	.init		= &omap2_init_clksel_parent,
+	.clksel_reg	= OMAP54XX_CM_GPU_GPU_CLKCTRL,
+	.clksel_mask	= OMAP54XX_CLKSEL_GPU_HYD_GCLK_MASK,
 	.ops		= &clkops_null,
 	.recalc		= &followparent_recalc,
 };
