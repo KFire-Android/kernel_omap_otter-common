@@ -641,11 +641,29 @@ static struct clk dpll_core_m3x2_ck = {
 	.set_rate	= &omap2_clksel_set_rate,
 };
 
+static const struct clksel_rate div4_1to8_rates[] = {
+	{ .div = 1, .val = 0, .flags = RATE_IN_54XX },
+	{ .div = 2, .val = 1, .flags = RATE_IN_54XX },
+	{ .div = 4, .val = 2, .flags = RATE_IN_54XX },
+	{ .div = 8, .val = 3, .flags = RATE_IN_54XX },
+	{ .div = 0 },
+};
+
+static const struct clksel div_iva_hs_clk_div[] = {
+	{ .parent = &dpll_core_h12x2_ck, .rates = div4_1to8_rates },
+	{ .parent = NULL },
+};
+
 static struct clk iva_dpll_hs_clk_div = {
 	.name		= "iva_dpll_hs_clk_div",
 	.parent		= &dpll_core_h12x2_ck,
+	.clksel		= div_iva_hs_clk_div,
+	.clksel_reg	= OMAP54XX_CM_BYPCLK_DPLL_IVA,
+	.clksel_mask	= OMAP54XX_CLKSEL_0_1_MASK,
 	.ops		= &clkops_null,
 	.recalc		= &followparent_recalc,
+	.round_rate	= &omap2_clksel_round_rate,
+	.set_rate	= &omap2_clksel_set_rate,
 };
 
 /* DPLL_IVA */
