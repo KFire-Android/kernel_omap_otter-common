@@ -877,13 +877,13 @@ EXPORT_SYMBOL(omap_device_scale);
 static int dvfs_dump_vdd(struct seq_file *sf, void *unused)
 {
 	int k;
-	struct omap_vdd_dvfs_info *dvfs_info;
+	struct omap_vdd_dvfs_info *dvfs_info, *tdvfs_info;
 	struct omap_vdd_user_list *vuser;
 	struct omap_vdd_dep_info *dep_info;
 	struct voltagedomain *voltdm;
 	struct omap_volt_data *volt_data;
+	struct omap_vdd_dev_list *temp_dev;
 	int anyreq;
-	struct opp *opp;
 	unsigned long freq = 0;
 
 	dvfs_info = (struct omap_vdd_dvfs_info *)sf->private;
@@ -905,15 +905,30 @@ static int dvfs_dump_vdd(struct seq_file *sf, void *unused)
 	seq_printf(sf, "|- voltage requests\n|  |\n");
 	anyreq = 0;
 	plist_for_each_entry(vuser, &dvfs_info->vdd_user_list, node) {
-		rcu_read_lock();
-		opp = _volt_to_opp_floor(vuser->dev, vuser->node.prio);
-		if (!IS_ERR(opp))
-			freq = opp_get_freq(opp);
-		rcu_read_unlock();
+		anyreq = 1;
+		tdvfs_info = _dev_to_dvfs_info(vuser->dev);
+		if (IS_ERR_OR_NULL(tdvfs_info)) {
+			seq_printf(sf, "|  |-no vdd!: %s:%s\n",
+				   dev_driver_string(vuser->dev),
+				   dev_name(vuser->dev));
+			continue;
+		}
+		list_for_each_entry(temp_dev, &tdvfs_info->dev_list, node) {
+			if (temp_dev->dev == vuser->dev)
+				break;
+		}
+
+		if (temp_dev->dev != vuser->dev) {
+			seq_printf(sf, "|  |-no DVFS device!: %s:%s\n",
+				   dev_driver_string(vuser->dev),
+				   dev_name(vuser->dev));
+			continue;
+		}
+
+		freq = clk_get_rate(temp_dev->clk);
 		seq_printf(sf, "|  |-%dmV (%ldHz): %s:%s\n",
 			   vuser->node.prio, freq,
 			   dev_driver_string(vuser->dev), dev_name(vuser->dev));
-		anyreq = 1;
 	}
 
 	spin_unlock(&dvfs_info->user_lock);

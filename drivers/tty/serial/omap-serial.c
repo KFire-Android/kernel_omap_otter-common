@@ -299,7 +299,8 @@ static void transmit_chars(struct uart_omap_port *up)
 		serial_omap_stop_tx(&up->port);
 		return;
 	}
-	count = up->port.fifosize / 4;
+	count = up->port.fifosize -
+		(serial_in(up, UART_OMAP_TXFIFO_LVL) & 0xFF);
 	do {
 		serial_out(up, UART_TX, xmit->buf[xmit->tail]);
 		xmit->tail = (xmit->tail + 1) & (UART_XMIT_SIZE - 1);
@@ -461,10 +462,9 @@ static inline irqreturn_t serial_omap_irq(int irq, void *dev_id)
 	}
 
 	check_modem_status(up);
-	if (int_id == UART_IIR_THRI) {
-		if (lsr & UART_LSR_THRE)
-			transmit_chars(up);
-	}
+	if (int_id == UART_IIR_THRI)
+		transmit_chars(up);
+
 
 	spin_unlock_irqrestore(&up->port.lock, flags);
 	serial_omap_port_disable(up);
