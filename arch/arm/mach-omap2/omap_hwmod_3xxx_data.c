@@ -3399,8 +3399,8 @@ static struct omap_hwmod_opt_clk omap3xxx_usb_host_hs_opt_clks[] = {
 };
 
 static struct omap_hwmod_irq_info omap3xxx_usb_host_hs_irqs[] = {
-	{ .name = "ohci-irq", .irq = 76 },
-	{ .name = "ehci-irq", .irq = 77 },
+	{ .name = "ohci", .irq = 76 },
+	{ .name = "ehci", .irq = 77 },
 	{ .irq = -1 }
 };
 

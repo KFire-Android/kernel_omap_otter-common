@@ -1235,15 +1235,6 @@ static struct clk dpll_usb_m2_ck = {
 	.set_rate	= &omap2_clksel_set_rate,
 };
 
-static struct clk dsp_fck = {
-	.name		= "dsp_fck",
-	.ops		= &clkops_omap2_dflt,
-	.enable_reg	= OMAP54XX_CM_DSP_DSP_CLKCTRL,
-	.clkdm_name	= "dsp_clkdm",
-	.parent		= &dpll_iva_h11x2_ck,
-	.recalc		= &followparent_recalc,
-};
-
 static struct clk func_12m_fclk = {
 	.name		= "func_12m_fclk",
 	.parent		= &dpll_per_m2x2_ck,
@@ -1831,34 +1822,6 @@ static struct clk fdif_fclk = {
 	.recalc		= &omap2_clksel_recalc,
 	.round_rate	= &omap2_clksel_round_rate,
 	.set_rate	= &omap2_clksel_set_rate,
-	.clkdm_name	= "cam_clkdm",
-};
-
-static struct clk ipu_fck = {
-	.name		= "ipu_fck",
-	.ops		= &clkops_omap2_dflt,
-	.enable_reg	= OMAP54XX_CM_IPU_IPU_CLKCTRL,
-	.clkdm_name	= "ipu_clkdm",
-	.parent		= &dpll_core_h22x2_ck,
-	.recalc		= &followparent_recalc,
-};
-
-static struct clk iva_fck = {
-	.name		= "iva_fck",
-	.ops		= &clkops_omap2_dflt,
-	.enable_reg	= OMAP54XX_CM_IVA_IVA_CLKCTRL,
-	.clkdm_name	= "iva_clkdm",
-	.parent		= &dpll_iva_h12x2_ck,
-	.recalc		= &followparent_recalc,
-};
-
-static struct clk iss_fck = {
-	.name		= "iss_fck",
-	.ops		= &clkops_omap2_dflt,
-	.enable_reg	= OMAP54XX_CM_CAM_ISS_CLKCTRL,
-	.clkdm_name	= "cam_clkdm",
-	.parent		= &dpll_core_h23x2_ck,
-	.recalc		= &followparent_recalc,
 };
 
 static const struct clksel gpu_core_clk_mux_sel[] = {
@@ -1887,15 +1850,6 @@ static struct clk gpu_hyd_clk_mux = {
 	.clksel_mask	= OMAP54XX_CLKSEL_GPU_HYD_GCLK_MASK,
 	.ops		= &clkops_null,
 	.recalc		= &omap2_clksel_recalc,
-};
-
-static struct clk sl2if_ick = {
-	.name		= "sl2if_ick",
-	.ops		= &clkops_omap2_dflt,
-	.enable_reg	= OMAP54XX_CM_IVA_SL2_CLKCTRL,
-	.clkdm_name	= "iva_clkdm",
-	.parent		= &dpll_iva_h12x2_ck,
-	.recalc		= &followparent_recalc,
 };
 
 static const struct clksel hsi_fclk_div[] = {
@@ -2628,7 +2582,6 @@ static struct omap_clk omap54xx_clks[] = {
 	CLK(NULL,	"dpll_usb_ck",			&dpll_usb_ck,	CK_54XX),
 	CLK(NULL,	"dpll_usb_clkdcoldo",		&dpll_usb_clkdcoldo,	CK_54XX),
 	CLK(NULL,	"dpll_usb_m2_ck",		&dpll_usb_m2_ck,	CK_54XX),
-	CLK(NULL,	"dsp_fck",			&dsp_fck,	CK_54XX),
 	CLK(NULL,	"func_12m_fclk",		&func_12m_fclk,	CK_54XX),
 	CLK(NULL,	"func_24m_clk",			&func_24m_clk,	CK_54XX),
 	CLK(NULL,	"func_24m_fclk",		&func_24m_fclk,	CK_54XX),
@@ -2655,13 +2608,9 @@ static struct omap_clk omap54xx_clks[] = {
 	CLK(NULL,	"gpio7_dbclk",			&gpio7_dbclk,	CK_54XX),
 	CLK(NULL,	"gpio8_dbclk",			&gpio8_dbclk,	CK_54XX),
 	CLK(NULL,	"iss_ctrlclk",			&iss_ctrlclk,	CK_54XX),
-	CLK(NULL,	"iss_fck",			&iss_fck,	CK_54XX),
-	CLK(NULL,	"ipu_fck",			&ipu_fck,	CK_54XX),
-	CLK(NULL,	"iva_fck",			&iva_fck,	CK_54XX),
 	CLK(NULL,	"lli_txphy_clk",		&lli_txphy_clk,	CK_54XX),
 	CLK(NULL,	"lli_txphy_ls_clk",		&lli_txphy_ls_clk,	CK_54XX),
 	CLK(NULL,	"sata_ref_clk",			&sata_ref_clk,	CK_54XX),
-	CLK(NULL,	"sl2if_ick",			&sl2if_ick,	CK_54XX),
 	CLK(NULL,	"slimbus1_slimbus_clk",		&slimbus1_slimbus_clk,	CK_54XX),
 	CLK(NULL,	"slimbus2_slimbus_clk",		&slimbus2_slimbus_clk,	CK_54XX),
 	CLK(NULL,	"usb_host_hs_hsic480m_p1_clk",	&usb_host_hs_hsic480m_p1_clk,	CK_54XX),

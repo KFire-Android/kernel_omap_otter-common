@@ -801,7 +801,7 @@ static struct omap_hwmod_addr_space omap44xx_aess_addrs[] = {
 		.pa_end		= 0x401e1fff
 	},
 	{
-		.name		= "mpu",
+		.name		= "aess",
 		.pa_start	= 0x401f1000,
 		.pa_end		= 0x401f13ff,
 		.flags		= ADDR_TYPE_RT
@@ -840,7 +840,7 @@ static struct omap_hwmod_addr_space omap44xx_aess_dma_addrs[] = {
 		.pa_end		= 0x490e1fff
 	},
 	{
-		.name		= "dma",
+		.name		= "aess_dma",
 		.pa_start	= 0x490f1000,
 		.pa_end		= 0x490f13ff,
 		.flags		= ADDR_TYPE_RT
@@ -6068,8 +6068,8 @@ static struct omap_hwmod_addr_space omap44xx_usb_host_hs_addrs[] = {
 };
 
 static struct omap_hwmod_irq_info omap44xx_usb_host_hs_irqs[] = {
-	{ .name = "ohci-irq", .irq = 76 + OMAP44XX_IRQ_GIC_START },
-	{ .name = "ehci-irq", .irq = 77 + OMAP44XX_IRQ_GIC_START },
+	{ .name = "ohci", .irq = 76 + OMAP44XX_IRQ_GIC_START },
+	{ .name = "ehci", .irq = 77 + OMAP44XX_IRQ_GIC_START },
 	{ .irq = -1 }
 };
 

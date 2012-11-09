@@ -47,7 +47,7 @@ static const char *abe_memory_bank[5] = {
 	"cmem",
 	"smem",
 	"pmem",
-	"mpu"
+	"aess"
 };
 
 static void abe_init_gains(struct omap_aess *abe)

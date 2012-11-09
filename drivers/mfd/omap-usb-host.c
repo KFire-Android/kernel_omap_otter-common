@@ -213,7 +213,7 @@ static int omap_usbhs_alloc_children(struct platform_device *pdev)
 	}
 	resources[0] = *res;
 
-	res = platform_get_resource_byname(pdev, IORESOURCE_IRQ, "ehci-irq");
+	res = platform_get_resource_byname(pdev, IORESOURCE_IRQ, "ehci");
 	if (!res) {
 		dev_err(dev, " EHCI get resource IORESOURCE_IRQ failed\n");
 		ret = -ENODEV;
@@ -238,7 +238,7 @@ static int omap_usbhs_alloc_children(struct platform_device *pdev)
 	}
 	resources[0] = *res;
 
-	res = platform_get_resource_byname(pdev, IORESOURCE_IRQ, "ohci-irq");
+	res = platform_get_resource_byname(pdev, IORESOURCE_IRQ, "ohci");
 	if (!res) {
 		dev_err(dev, "OHCI get resource IORESOURCE_IRQ failed\n");
 		ret = -ENODEV;
