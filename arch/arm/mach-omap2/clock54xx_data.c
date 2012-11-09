@@ -1388,6 +1388,10 @@ static const struct clksel wkupaon_iclk_mux_sel[] = {
 static struct clk wkupaon_iclk_mux = {
 	.name		= "wkupaon_iclk_mux",
 	.parent		= &sys_clkin,
+	.clksel		= wkupaon_iclk_mux_sel,
+	.init		= &omap2_init_clksel_parent,
+	.clksel_reg	= OMAP54XX_CM_CLKSEL_WKUPAON,
+	.clksel_mask	= OMAP54XX_CLKSEL_0_0_MASK,
 	.ops		= &clkops_null,
 	.recalc		= &followparent_recalc,
 };
