@@ -1364,11 +1364,21 @@ static struct clk l3instr_ts_gclk_div = {
 	.recalc		= &followparent_recalc,
 };
 
+static const struct clksel l4_root_clk_div_div[] = {
+	{ .parent = &l3_iclk_div, .rates = div2_1to2_rates },
+	{ .parent = NULL },
+};
+
 static struct clk l4_root_clk_div = {
 	.name		= "l4_root_clk_div",
 	.parent		= &l3_iclk_div,
+	.clksel		= l4_root_clk_div_div,
+	.clksel_reg	= OMAP54XX_CM_CLKSEL_CORE,
+	.clksel_mask	= OMAP54XX_CLKSEL_L4_MASK,
 	.ops		= &clkops_null,
 	.recalc		= &followparent_recalc,
+	.round_rate	= &omap2_clksel_round_rate,
+	.set_rate	= &omap2_clksel_set_rate,
 };
 
 static struct clk timer10_gfclk_mux = {
