@@ -84,6 +84,9 @@ static struct voltagedomain *mpu_vdd, *core_vdd, *mm_vdd;
  */
 #define OMAP44xx_54xx_PM_ERRATUM_RTA_i608		BIT(1)
 
+/* MPU EMIF Static Dependency Needed due to i731 erratum ID for 443x */
+#define OMAP44xx_54xx_PM_ERRATUM_MPU_EMIF_STATIC_DEP_NEEDED_i731	BIT(2)
+
 static u8 pm44xx_54xx_errata;
 #define is_pm44xx_54xx_erratum(erratum) (pm44xx_54xx_errata & \
 					OMAP44xx_54xx_PM_ERRATUM_##erratum)
@@ -491,7 +494,7 @@ static inline int omap4_init_static_deps(void)
 {
 	struct clockdomain *emif_clkdm, *mpuss_clkdm, *l3_1_clkdm, *l4wkup;
 	struct clockdomain *ducati_clkdm, *l3_2_clkdm, *l4_per_clkdm;
-	int ret;
+	int ret = 0;
 	/*
 	 * The dynamic dependency between MPUSS -> MEMIF and
 	 * MPUSS -> L4_PER/L3_* and DUCATI -> L3_* doesn't work as
@@ -513,7 +516,10 @@ static inline int omap4_init_static_deps(void)
 		(!l3_2_clkdm) || (!ducati_clkdm) || (!l4_per_clkdm))
 		return -EINVAL;
 
-	ret = clkdm_add_wkdep(mpuss_clkdm, emif_clkdm);
+	/* if we cannot ever enable dynamic dependencies. */
+	if (is_pm44xx_54xx_erratum(MPU_EMIF_STATIC_DEP_NEEDED_i731))
+		ret |= clkdm_add_wkdep(mpuss_clkdm, emif_clkdm);
+
 	ret |= clkdm_add_wkdep(mpuss_clkdm, l3_1_clkdm);
 	ret |= clkdm_add_wkdep(mpuss_clkdm, l3_2_clkdm);
 	ret |= clkdm_add_wkdep(mpuss_clkdm, l4_per_clkdm);
@@ -604,10 +610,15 @@ static inline int omap5_init_static_deps(void)
 
 static void __init omap_pm_setup_errata(void)
 {
-	if (cpu_is_omap44xx())
+	if (cpu_is_omap443x())
+		/* Dynamic Dependency errata for all 443x silicons */
+		pm44xx_54xx_errata |=
+		       OMAP44xx_54xx_PM_ERRATUM_MPU_EMIF_STATIC_DEP_NEEDED_i731;
+
+	if (cpu_is_omap44xx()) {
 		pm44xx_54xx_errata |= OMAP44xx_54xx_PM_ERRATUM_HSI_SWAKEUP_i702;
-	if (cpu_is_omap44xx())
 		pm44xx_54xx_errata |= OMAP44xx_54xx_PM_ERRATUM_RTA_i608;
+	}
 }
 
 static void __init prcm_setup_regs(void)
