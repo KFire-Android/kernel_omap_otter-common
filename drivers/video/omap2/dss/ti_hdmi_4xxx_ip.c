@@ -555,7 +555,7 @@ int ti_hdmi_4xxx_read_edid(struct hdmi_ip_data *ip_data,
 		l += 128;
 	}
 
-	return l;
+	return 0;
 }
 
 bool ti_hdmi_4xxx_detect(struct hdmi_ip_data *ip_data)
