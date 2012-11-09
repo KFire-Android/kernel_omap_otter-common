@@ -41,7 +41,7 @@
 #include "control.h"
 #include "scrm54xx.h"
 
-/* OMAP4 modulemode control */
+/* OMAP5 modulemode control */
 #define OMAP54XX_MODULEMODE_HWCTRL			0
 #define OMAP54XX_MODULEMODE_SWCTRL			1
 
