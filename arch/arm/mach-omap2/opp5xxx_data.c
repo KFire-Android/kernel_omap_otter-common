@@ -230,19 +230,6 @@ static struct device_info abe_dev_info = {
 	.voltdm_name	= "core",
 };
 
-static struct device_info mmc1_dev_info = {
-	.hwmod_name	= "mmc1",
-	.clk_name	= "mmc1_fck",
-	.voltdm_name	= "core",
-};
-
-static struct device_info mmc2_dev_info = {
-	.hwmod_name	= "mmc2",
-	.clk_name	= "mmc2_fck",
-	.voltdm_name	= "core",
-};
-
-
 static struct device_info iva_dev_info = {
 	.hwmod_name	= "iva",
 	.clk_name	= "virt_dpll_iva_ck",
@@ -307,17 +294,6 @@ static struct omap_opp_def __initdata omap5430_es1_opp_def_list[] = {
 	/* ABE OPP2 - OPPNOM */
 	OPP_INITIALIZER(&abe_dev_info, true, 196608000, OMAP5430_VDD_CORE_OPP_NOM),
 
-	/* MMC1 OPP1 - OPPLOW */
-	OPP_INITIALIZER(&mmc1_dev_info, true, 96000000, OMAP5430_VDD_CORE_OPP_LOW),
-	/* MMC1 OPP2 - OPPNOM */
-	OPP_INITIALIZER(&mmc1_dev_info, true, 192000000, OMAP5430_VDD_CORE_OPP_NOM),
-
-	/* MMC2 OPP1 - OPPLOW */
-	OPP_INITIALIZER(&mmc2_dev_info, true, 96000000, OMAP5430_VDD_CORE_OPP_LOW),
-	/* MMC2 OPP2 - OPPNOM */
-	OPP_INITIALIZER(&mmc2_dev_info, true, 192000000, OMAP5430_VDD_CORE_OPP_NOM),
-
-
 	/* IVA OPP1 - OPPLOW */
 	OPP_INITIALIZER(&iva_dev_info, true, 194200000, OMAP5430_VDD_MM_OPP_LOW),
 	/* IVA OPP2 - OPPNOM */
@@ -370,13 +346,6 @@ static struct omap_opp_def __initdata omap5432_es1_opp_def_list[] = {
 
 	/* ABE OPP2 - OPPNOM */
 	OPP_INITIALIZER(&abe_dev_info, true, 196608000, OMAP5432_VDD_CORE_OPP_NOM),
-
-	/* MMC1 OPP2 - OPPNOM */
-	OPP_INITIALIZER(&mmc1_dev_info, true, 192000000, OMAP5432_VDD_CORE_OPP_NOM),
-
-	/* MMC2 OPP2 - OPPNOM */
-	OPP_INITIALIZER(&mmc2_dev_info, true, 192000000, OMAP5432_VDD_CORE_OPP_NOM),
-
 
 	/* IVA OPP1 - OPPLOW */
 	OPP_INITIALIZER(&iva_dev_info, true, 194200000, OMAP5432_VDD_MM_OPP_LOW),

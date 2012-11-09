@@ -14,6 +14,7 @@
 #include <linux/string.h>
 #include <linux/delay.h>
 #include <linux/gpio.h>
+#include <linux/pm_qos.h>
 #include <mach/hardware.h>
 #include <plat/mmc.h>
 #include <plat/omap-pm.h>
@@ -34,6 +35,12 @@ static u16 control_devconf1_offset;
 static u16 control_mmc1;
 
 #define HSMMC_NAME_LEN	9
+
+/* To handle OPP Scaling */
+#define QOS_MMC			(250*4*1000)
+#define MMC_OPP_CLOCK_THRESHOLD	104000000
+#define MMC_OPP_NOM_FCLK	96000000
+#define MMC_OPP_100_FCLK	192000000
 
 #if (defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4) ||\
 		defined(CONFIG_ARCH_OMAP5)) && defined(CONFIG_PM)
@@ -327,6 +334,34 @@ static inline void omap_hsmmc_mux(struct omap_mmc_platform_data *mmc_controller,
 	}
 }
 
+static int omap_hsmmc_opp_scale_init(struct omap_mmc_platform_data *pdata)
+{
+	pm_qos_add_request(&pdata->pm_qos_request, PM_QOS_MEMORY_THROUGHPUT,
+				PM_QOS_MEMORY_THROUGHPUT_DEFAULT_VALUE);
+	return 0;
+}
+
+static int omap_hsmmc_opp_scale(struct omap_mmc_platform_data *pdata,
+					 unsigned int clock)
+{
+	int ret = 0;
+	if (clock > MMC_OPP_CLOCK_THRESHOLD) {
+		pm_qos_update_request(&pdata->pm_qos_request, QOS_MMC);
+		if (clk_get_rate(pdata->fclk) != MMC_OPP_100_FCLK)
+			ret = clk_set_rate(pdata->fclk, MMC_OPP_100_FCLK);
+	} else {
+		if (clk_get_rate(pdata->fclk) != MMC_OPP_NOM_FCLK)
+			ret = clk_set_rate(pdata->fclk, MMC_OPP_NOM_FCLK);
+	}
+	return ret;
+}
+
+static int omap_hsmmc_opp_relax(struct omap_mmc_platform_data *pdata)
+{
+	pm_qos_update_request(&pdata->pm_qos_request, PM_QOS_DEFAULT_VALUE);
+	return 0;
+}
+
 static int omap_hsmmc_set_clks_src(struct device *dev, unsigned int id)
 {
 	struct clk *fclk_child;
@@ -381,11 +416,7 @@ omap_hsmmc_max_min(u8 slot, unsigned long *max, unsigned long *min)
 		switch (slot) {
 		case 0:
 		case 1:
-#if defined(OMAP5432_REV_ES1_0)
-			*max = 96000000;
-#else
 			*max = 192000000;
-#endif
 			break;
 		case 2:
 		case 3:
@@ -434,6 +465,21 @@ omap_hsmmc_max_min(u8 slot, unsigned long *max, unsigned long *min)
 	return 0;
 }
 
+/* Set Silicon specific capabilities */
+static u32 __init omap_hsmmc_si_spec_caps(struct omap2_hsmmc_info *c)
+{
+	u32 caps = 0;
+	if (cpu_is_omap54xx()) {
+		if (c->mmc == 1) {
+			caps |= (MMC_CAP_UHS_SDR12 | MMC_CAP_UHS_SDR25 |
+				MMC_CAP_UHS_DDR50);
+			if (omap_rev() == OMAP5430_REV_ES2_0)
+				caps |= MMC_CAP_UHS_SDR104;
+		}
+	}
+	return caps;
+}
+
 static int __init omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
 					struct omap_mmc_platform_data *mmc)
 {
@@ -455,6 +501,7 @@ static int __init omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
 	mmc->slots[0].name = hc_name;
 	mmc->nr_slots = 1;
 	mmc->slots[0].caps = c->caps;
+	mmc->slots[0].caps |= omap_hsmmc_si_spec_caps(c);
 	mmc->slots[0].pm_caps = c->pm_caps;
 	mmc->slots[0].internal_clock = !c->ext_clock;
 	mmc->dma_mask = 0xffffffff;
@@ -472,6 +519,12 @@ static int __init omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
 		mmc->max_freq = max_freq;
 	mmc->max_si_freq = max_freq;
 	mmc->min_freq = min_freq;
+
+	if ((c->mmc <= 2) && (cpu_is_omap54xx())) {
+		mmc->opp_scale_init = omap_hsmmc_opp_scale_init;
+		mmc->opp_scale = omap_hsmmc_opp_scale;
+		mmc->opp_relax = omap_hsmmc_opp_relax;
+	}
 
 	if (cpu_is_omap44xx() || cpu_is_omap54xx())
 		mmc->reg_offset = OMAP4_MMC_REG_OFFSET;

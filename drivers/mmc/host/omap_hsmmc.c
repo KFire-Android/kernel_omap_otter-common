@@ -69,6 +69,8 @@
 #define OMAP_HSMMC_CAPA		0x0140
 #define OMAP_HSMMC_ADMA_ES	0x0154
 #define OMAP_HSMMC_ADMA_SAL	0x0158
+#define OMAP_HSMMC_CAPA2	0x0144
+#define OMAP_HSMMC_DLL		0x0034
 
 #define VS18			(1 << 26)
 #define VS30			(1 << 25)
@@ -84,6 +86,7 @@
 #define ICE			0x1
 #define ICS			0x2
 #define CEN			(1 << 2)
+#define CLKD_MAX		0x3FF
 #define CLKD_MASK		0x0000FFC0
 #define CLKD_SHIFT		6
 #define DTO_MASK		0x000F0000
@@ -102,6 +105,7 @@
 #define FOUR_BIT		(1 << 1)
 #define DDR			(1 << 19)
 #define DW8			(1 << 5)
+#define BRR			(1 << 5)
 #define CLKEXTFREE		(1 << 16)
 #define PADEN			(1 << 15)
 #define CLEV			(1 << 24)
@@ -132,6 +136,20 @@
 #define DMA_MNS_ADMA_MODE	(1 << 20)
 #define ADMA_ERR		(1 << 25)
 #define ADMA_XFER_INT		(1 << 3)
+#define AC12_SCLK_SEL		(1 << 23)
+#define AC12_UHSMC_MASK		(7 << 16)
+#define AC12_UHSMC_SDR50	(2 << 16)
+#define AC12_UHSMC_SDR104	(3 << 16)
+#define CAPA2_TSDR50		(1 << 13)
+#define CAPA2_SDR104		(1 << 1)
+#define DLL_LOCK		(1 << 0)
+#define DLL_CALIB		(1 << 1)
+#define DLL_UNLOCK_STICKY	(1 << 2)
+#define DLL_SWT			(1 << 20)
+#define DLL_FORCE_SR_C_MASK	(0x7F << 13)
+#define DLL_FORCE_SR_C_SHIFT	13
+#define DLL_FORCE_VALUE		(1 << 12)
+#define DLL_RESET		(1 << 31)
 
 /* Block Length at max can be 1024 */
 #define HSMMC_BLK_SIZE		512
@@ -154,16 +172,21 @@
 
 #define MMC_AUTOSUSPEND_DELAY	100
 #define MMC_TIMEOUT_MS		20
+#define MAX_PHASE_DELAY		0x7F
 #define DRIVER_NAME		"omap_hsmmc"
 
 #define VDD_SIGNAL_VOLTAGE_180	1800000
 #define VDD_SIGNAL_VOLTAGE_330	3300000
 #define VDD_165_195		(ffs(MMC_VDD_165_195) - 1)
 
+#define EMMC_HSDDR_SD_SDR25_MAX	52000000
+#define SD_SDR50_MAX_FREQ	104000000
+
 #define AUTO_CMD12		(1 << 0)	/* Auto CMD12 support */
 
 /* Errata definitions */
 #define OMAP_HSMMC_ERRATA_I761	BIT(0)
+#define OMAP_HSMMC_ERRATA_FSMR	BIT(1)
 
 /*
  * One controller can have multiple slots, like on some omap boards using
@@ -212,6 +235,7 @@ struct omap_hsmmc_host {
 	void	__iomem		*base;
 	resource_size_t		mapbase;
 	spinlock_t		irq_lock; /* Prevent races with irq handler */
+	struct completion	buf_ready;
 	unsigned int		dma_len;
 	unsigned int		dma_sg_idx;
 	unsigned char		bus_mode;
@@ -236,10 +260,37 @@ struct omap_hsmmc_host {
 	unsigned int		flags;
 	unsigned int		errata;
 	int			regulator_enabled;
+	int			tuning_done;
+	int			tuning_fsrc;
+	u32			tuning_uhsmc;
+	u32			tuning_opcode;
 	struct omap_hsmmc_next	next_data;
 
 	struct	omap_mmc_platform_data	*pdata;
 };
+static u32 tuning_data[16];
+static u32 ref_tuning[16] = { 0x00FF0FFF, 0xCCC3CCFF, 0xFFCC3CC3, 0xEFFEFFFE,
+				0xDDFFDFFF, 0xFBFFFBFF, 0xFF7FFFBF, 0xEFBDF777,
+				0xF0FFF0FF, 0x3CCCFC0F, 0xCFCC33CC, 0xEEFFEFFF,
+				0xFDFFFDFF, 0xFFBFFFDF, 0xFFF7FFBB, 0xDE7B7FF7,
+				};
+
+static inline int omap_hsmmc_set_dll(struct omap_hsmmc_host *host, int count)
+{
+	u32 dll;
+
+	dll = OMAP_HSMMC_READ(host->base, DLL);
+	dll &= ~(DLL_FORCE_SR_C_MASK);
+	dll &= ~DLL_CALIB;
+	dll |= (count << DLL_FORCE_SR_C_SHIFT);
+	OMAP_HSMMC_WRITE(host->base, DLL, dll);
+	dll |= DLL_CALIB;
+	OMAP_HSMMC_WRITE(host->base, DLL, dll);
+	dll &= ~DLL_CALIB;
+	dll = OMAP_HSMMC_READ(host->base, DLL);
+
+	return 0;
+}
 
 static int omap_hsmmc_card_detect(struct device *dev, int slot)
 {
@@ -543,7 +594,9 @@ static void omap_hsmmc_enable_irq(struct omap_hsmmc_host *host,
 {
 	unsigned int irq_mask;
 
-	if (host->dma_type)
+	if (cmd->opcode == MMC_SEND_TUNING_BLOCK)
+		irq_mask = INT_EN_MASK | BRR_ENABLE;
+	else if (host->dma_type)
 		irq_mask = INT_EN_MASK & ~(BRR_ENABLE | BWR_ENABLE);
 	else
 		irq_mask = INT_EN_MASK;
@@ -571,11 +624,59 @@ static u16 calc_divisor(struct omap_hsmmc_host *host, struct mmc_ios *ios)
 
 	if (ios->clock) {
 		dsor = DIV_ROUND_UP(clk_get_rate(host->fclk), ios->clock);
-		if (dsor > 250)
-			dsor = 250;
+		if (dsor > CLKD_MAX)
+			dsor = CLKD_MAX;
 	}
 
 	return dsor;
+}
+
+static inline void omap_hsmmc_opp_scale(struct omap_hsmmc_host *host)
+{
+	int ret = 0;
+	if (!host->pdata->opp_scale)
+		return;
+
+	ret = host->pdata->opp_scale(host->pdata, host->mmc->ios.clock);
+	if (ret)
+		dev_err(mmc_dev(host->mmc), "%s error: %d", __func__, ret);
+}
+
+static inline void omap_hsmmc_opp_relax(struct omap_hsmmc_host *host)
+{
+	int ret = 0;
+	if (!host->pdata->opp_relax)
+		return;
+	ret = host->pdata->opp_relax(host->pdata);
+	if (ret)
+		dev_err(mmc_dev(host->mmc), "%s error: %d\n", __func__, ret);
+}
+
+static inline int omap_hsmmc_restore_dll(struct omap_hsmmc_host *host)
+{
+	u32 ac12;
+	u32 dll;
+
+	ac12 = OMAP_HSMMC_READ(host->base, AC12);
+	ac12 |= host->tuning_uhsmc;
+	OMAP_HSMMC_WRITE(host->base, AC12, ac12);
+
+	dll = OMAP_HSMMC_READ(host->base, DLL);
+	dll |= DLL_FORCE_VALUE;
+	OMAP_HSMMC_WRITE(host->base, DLL, dll);
+
+	if (omap_hsmmc_set_dll(host, host->tuning_fsrc))
+		return -EIO;
+	return 0;
+}
+
+static inline void omap_hsmmc_save_dll(struct omap_hsmmc_host *host)
+{
+	u32 ac12;
+
+	ac12 = OMAP_HSMMC_READ(host->base, AC12);
+	ac12 &= ~AC12_UHSMC_MASK;
+	OMAP_HSMMC_WRITE(host->base, AC12, ac12);
 }
 
 static void omap_hsmmc_set_clock(struct omap_hsmmc_host *host)
@@ -587,6 +688,8 @@ static void omap_hsmmc_set_clock(struct omap_hsmmc_host *host)
 	dev_dbg(mmc_dev(host->mmc), "Set clock to %uHz\n", ios->clock);
 
 	omap_hsmmc_stop_clock(host);
+
+	omap_hsmmc_opp_scale(host);
 
 	regval = OMAP_HSMMC_READ(host->base, SYSCTL);
 	regval = regval & ~(CLKD_MASK | DTO_MASK);
@@ -645,7 +748,6 @@ static void omap_hsmmc_set_bus_mode(struct omap_hsmmc_host *host)
 }
 
 #ifdef CONFIG_PM
-
 /*
  * Restore the MMC host context, if it was lost as result of a
  * power state change.
@@ -657,6 +759,11 @@ static int omap_hsmmc_context_restore(struct omap_hsmmc_host *host)
 	int context_loss = 0;
 	u32 hctl, capa, value;
 	unsigned long timeout;
+
+	omap_hsmmc_opp_scale(host);
+
+	if (host->tuning_done)
+		omap_hsmmc_restore_dll(host);
 
 	if (pdata->get_context_loss_count) {
 		context_loss = pdata->get_context_loss_count(host->dev);
@@ -746,6 +853,9 @@ static void omap_hsmmc_context_save(struct omap_hsmmc_host *host)
 			return;
 		host->context_loss = context_loss;
 	}
+	if (host->tuning_done)
+		omap_hsmmc_save_dll(host);
+	omap_hsmmc_opp_relax(host);
 }
 
 #else
@@ -877,6 +987,12 @@ omap_hsmmc_start_command(struct omap_hsmmc_host *host, struct mmc_command *cmd,
 	if (host->dma_type)
 		cmdreg |= DMA_EN;
 
+	/* Tuning command is special. Data Present Select should be set */
+	if ((cmd->opcode == MMC_SEND_TUNING_BLOCK) ||
+		(cmd->opcode == MMC_SEND_TUNING_BLOCK_HS200)) {
+		cmdreg = (cmd->opcode << 24) | (resptype << 16) |
+			(cmdtype << 22) | DP_SELECT | DDIR;
+	}
 	host->req_in_progress = 1;
 
 	OMAP_HSMMC_WRITE(host->base, ARG, cmd->arg);
@@ -975,6 +1091,8 @@ omap_hsmmc_errata_i761(struct omap_hsmmc_host *host, struct mmc_command *cmd)
 static void
 omap_hsmmc_cmd_done(struct omap_hsmmc_host *host, struct mmc_command *cmd)
 {
+	if (host->cmd->opcode == MMC_SEND_TUNING_BLOCK)
+		return;
 	host->cmd = NULL;
 
 	if (cmd->flags & MMC_RSP_PRESENT) {
@@ -1078,16 +1196,17 @@ static inline void omap_hsmmc_reset_controller_fsm(struct omap_hsmmc_host *host,
 	 * OMAP4 ES2 and greater has an updated reset logic.
 	 * Monitor a 0->1 transition first
 	 */
-	if (mmc_slot(host).features & HSMMC_HAS_UPDATED_RESET) {
+	if (host->errata & OMAP_HSMMC_ERRATA_FSMR) {
 		while ((!(OMAP_HSMMC_READ(host->base, SYSCTL) & bit))
 					&& (i++ < limit))
-			cpu_relax();
+			udelay(10);
 	}
 	i = 0;
 
 	while ((OMAP_HSMMC_READ(host->base, SYSCTL) & bit) &&
-		(i++ < limit))
-		cpu_relax();
+		(i++ < limit)) {
+		udelay(10);
+	}
 
 	if (OMAP_HSMMC_READ(host->base, SYSCTL) & bit)
 		dev_err(mmc_dev(host->mmc),
@@ -1099,6 +1218,7 @@ static void omap_hsmmc_do_irq(struct omap_hsmmc_host *host, int status)
 {
 	struct mmc_data *data;
 	int end_cmd = 0, end_trans = 0;
+	int i = 0;
 
 	if (!host->req_in_progress) {
 		do {
@@ -1188,6 +1308,13 @@ static void omap_hsmmc_do_irq(struct omap_hsmmc_host *host, int status)
 	}
 
 	OMAP_HSMMC_WRITE(host->base, STAT, status);
+
+	if (status & BRR) {
+		for (i = 0; i < sizeof(tuning_data)/4; i++)
+			tuning_data[i] = OMAP_HSMMC_READ(host->base, DATA);
+		complete(&host->buf_ready);
+		return;
+	}
 
 	if (end_cmd || ((status & CC) && host->cmd))
 		omap_hsmmc_cmd_done(host, host->cmd);
@@ -1338,6 +1465,7 @@ static irqreturn_t omap_hsmmc_detect(int irq, void *dev_id)
 	if (carddetect) {
 		mmc_detect_change(host->mmc, (HZ * 200) / 1000);
 	} else {
+		host->tuning_done = 0;
 	/*
 	 * Because of OMAP4 Silicon errata (i705), we have to turn off the
 	 * PBIAS and VMMC for SD card as soon as we get card disconnect
@@ -1907,6 +2035,172 @@ static int omap_hsmmc_disable_fclk(struct mmc_host *mmc)
 	return 0;
 }
 
+static int omap_execute_tuning(struct mmc_host *mmc, u32 opcode)
+{
+	struct omap_hsmmc_host *host;
+	struct mmc_ios *ios = &mmc->ios;
+	int phase_delay = 0;
+	int err = 0;
+	int count = 0;
+	int length = 0;
+	int note_index = 0xFF;
+	int max_index = 0;
+	int max_window = 0;
+	bool previous_match = false;
+	bool current_match;
+	u32 ac12, capa2, dll;
+
+	host  = mmc_priv(mmc);
+	host->tuning_done = 0;
+	/* clock tuning is not needed for upto 52MHz */
+	if (ios->clock <= EMMC_HSDDR_SD_SDR25_MAX)
+		return 0;
+
+	ac12 = OMAP_HSMMC_READ(host->base, AC12);
+	capa2 = OMAP_HSMMC_READ(host->base, CAPA2);
+
+	ac12 &= ~AC12_UHSMC_MASK;
+	OMAP_HSMMC_WRITE(host->base, AC12, ac12);
+
+	/*
+	 * Host Controller needs tuning only in case of SDR104 mode
+	 * and for SDR50 mode when Use Tuning for SDR50 is set in
+	 * Capabilities register.
+	 */
+	if (ios->clock <= SD_SDR50_MAX_FREQ) {
+		if (!(capa2 & CAPA2_TSDR50))
+			return 0;
+		ac12 |= AC12_UHSMC_SDR50;
+	} else
+		ac12 |= AC12_UHSMC_SDR104;
+
+	/* Enable SDR50/SDR104 mode */
+	OMAP_HSMMC_WRITE(host->base, AC12, ac12);
+
+	/* Select the DLL clock */
+	dll = OMAP_HSMMC_READ(host->base, DLL);
+	dll |= DLL_FORCE_VALUE;
+	OMAP_HSMMC_WRITE(host->base, DLL, dll);
+
+	/* Start software tuning Procedure */
+	dll |= DLL_SWT;
+	OMAP_HSMMC_WRITE(host->base, DLL, dll);
+
+	/*
+	 * As per the Host Controller spec v3.00, tuning command
+	 * generates Buffer Read Ready interrupt, so enable that.
+	 * Issue tuning command repeatedly till AC12.ET is cleared
+	 * Tuning should maximum of 8 iterations
+	 */
+	do {
+		struct mmc_command cmd = {0};
+		struct mmc_request mrq = {0};
+
+		if (phase_delay > MAX_PHASE_DELAY)
+			break;
+
+		omap_hsmmc_set_dll(host, phase_delay);
+
+		cmd.opcode = opcode;
+		cmd.arg = 0;
+		cmd.flags = MMC_RSP_R1 | MMC_CMD_ADTC;
+		cmd.retries = 0;
+		cmd.data = NULL;
+		cmd.error = 0;
+
+		mrq.cmd = &cmd;
+		host->mrq = &mrq;
+
+		OMAP_HSMMC_WRITE(host->base, BLK, 64 | (1 << 16));
+		set_data_timeout(host, 50000000, 0);
+		omap_hsmmc_start_command(host, &cmd, NULL);
+
+		host->cmd = NULL;
+		host->mrq = NULL;
+
+		/* Wait for Buffer Read Ready interrupt */
+		err = wait_for_completion_timeout(&host->buf_ready,
+					msecs_to_jiffies(5000));
+		omap_hsmmc_disable_irq(host);
+		host->req_in_progress = 0;
+
+		if (err == 0) {
+			dev_err(mmc_dev(host->mmc),
+				"Tuning BRR timeout. phase_delay=%x",
+				phase_delay);
+			err = -ETIMEDOUT;
+			goto tuning_error;
+		}
+
+		current_match = true;
+		if (memcmp(tuning_data, ref_tuning, sizeof(tuning_data)))
+			current_match = false;
+		else
+			current_match = true;
+
+		if (current_match == true) {
+			if (previous_match == false) {
+				/* new window */
+				note_index = count;
+				length = 1;
+			} else {
+				length++;
+			}
+			previous_match = true;
+			if (length > max_window) {
+				max_index = note_index;
+				max_window = length;
+			}
+		} else {
+			previous_match = false;
+		}
+
+		phase_delay += 4;
+		ac12 = OMAP_HSMMC_READ(host->base, AC12);
+	} while (ac12 & AC12_SCLK_SEL);
+
+	if (note_index == 0xFF) {
+		dev_err(mmc_dev(host->mmc), "Unable to find match\n");
+		goto tuning_error;
+	}
+
+	if (ac12 & AC12_SCLK_SEL) {
+		dll = OMAP_HSMMC_READ(host->base, DLL);
+		dll &= ~DLL_SWT;
+		OMAP_HSMMC_WRITE(host->base, DLL, dll);
+		count = 2 * (max_index + (max_window >> 1));
+		if (omap_hsmmc_set_dll(host, count)) {
+			err = -EIO;
+			goto tuning_error;
+		}
+		host->tuning_fsrc = count;
+		host->tuning_uhsmc = (OMAP_HSMMC_READ(host->base, AC12)
+					& AC12_UHSMC_MASK);
+		host->tuning_opcode = opcode;
+		host->tuning_done = 1;
+		omap_hsmmc_reset_controller_fsm(host, SRD);
+		omap_hsmmc_reset_controller_fsm(host, SRC);
+		return 0;
+	} else {
+		dev_err(mmc_dev(host->mmc),
+			"Tuning failed. Using fixed sampling clock\n");
+		err = -EIO;
+		goto tuning_error;
+	}
+tuning_error:
+	ac12 = OMAP_HSMMC_READ(host->base, AC12);
+	ac12 &= ~(AC12_UHSMC_MASK | AC12_SCLK_SEL);
+	OMAP_HSMMC_WRITE(host->base, AC12, ac12);
+
+	dll = OMAP_HSMMC_READ(host->base, DLL);
+	dll &= ~(DLL_FORCE_VALUE | DLL_SWT);
+	OMAP_HSMMC_WRITE(host->base, DLL, dll);
+
+	omap_hsmmc_reset_controller_fsm(host, SRD);
+	omap_hsmmc_reset_controller_fsm(host, SRC);
+	return err;
+}
+
 static int omap_start_signal_voltage_switch(struct mmc_host *mmc,
 			struct mmc_ios *ios)
 {
@@ -2021,6 +2315,7 @@ static const struct mmc_host_ops omap_hsmmc_ops = {
 	.get_ro = omap_hsmmc_get_ro,
 	.init_card = omap_hsmmc_init_card,
 	.start_signal_voltage_switch = omap_start_signal_voltage_switch,
+	.execute_tuning = omap_execute_tuning,
 	/* NYET -- enable_sdio_irq */
 };
 
@@ -2140,9 +2435,6 @@ static struct omap_mmc_platform_data *of_get_hsmmc_pdata(struct device *dev)
 	else if (bus_width == 8)
 		pdata->slots[0].caps |= MMC_CAP_8_BIT_DATA;
 
-	if (of_find_property(np, "ti,needs-special-reset", NULL))
-		pdata->slots[0].features |= HSMMC_HAS_UPDATED_RESET;
-
 	return pdata;
 }
 #else
@@ -2162,7 +2454,6 @@ static int __devinit omap_hsmmc_probe(struct platform_device *pdev)
 	int ret, irq;
 	int ctrlr_caps = 0;
 	const struct of_device_id *match;
-	long mmc_fclk;
 
 	match = of_match_device(of_match_ptr(omap_mmc_of_match), &pdev->dev);
 	if (match) {
@@ -2222,9 +2513,12 @@ static int __devinit omap_hsmmc_probe(struct platform_device *pdev)
 	host->errata = 0;
 	if (cpu_is_omap44xx())
 		host->errata |= OMAP_HSMMC_ERRATA_I761;
+	if (cpu_is_omap44xx() && (omap_rev() > OMAP4430_REV_ES1_0))
+		host->errata |= OMAP_HSMMC_ERRATA_FSMR;
 
 	host->next_data.cookie = 1;
 	host->regulator_enabled = 0;
+	pdata->dev = host->dev;
 
 	platform_set_drvdata(pdev, host);
 
@@ -2237,14 +2531,11 @@ static int __devinit omap_hsmmc_probe(struct platform_device *pdev)
 	if (mmc_slot(host).vcc_aux_disable_is_sleep)
 		mmc_slot(host).no_off = 1;
 
-	if (pdata->set_clk_src)
-		if (pdata->set_clk_src(&pdev->dev, pdev->id))
-			goto err1;
-
 	mmc->f_min = pdata->min_freq;
 	mmc->f_max = pdata->max_freq;
 
 	spin_lock_init(&host->irq_lock);
+	init_completion(&host->buf_ready);
 
 	host->fclk = clk_get(&pdev->dev, "fck");
 	if (IS_ERR(host->fclk)) {
@@ -2252,14 +2543,9 @@ static int __devinit omap_hsmmc_probe(struct platform_device *pdev)
 		host->fclk = NULL;
 		goto err1;
 	}
-	if (clk_get_rate(host->fclk) != pdata->max_si_freq) {
-		mmc_fclk = clk_round_rate(host->fclk, pdata->max_si_freq);
-		if (mmc_fclk <= 0)
-			goto err_fclk;
-		ret = clk_set_rate(host->fclk, mmc_fclk);
-		if (ret)
-			goto err_fclk;
-	}
+	pdata->fclk = host->fclk;
+	if (pdata->opp_scale_init)
+		pdata->opp_scale_init(pdata);
 
 	if (host->pdata->controller_flags & OMAP_HSMMC_BROKEN_MULTIBLOCK_READ) {
 		dev_info(&pdev->dev, "multiblock reads disabled due to 35xx erratum 2.1.1.128; MMC read performance may suffer\n");
@@ -2337,6 +2623,11 @@ static int __devinit omap_hsmmc_probe(struct platform_device *pdev)
 		mmc->caps |= MMC_CAP_NONREMOVABLE;
 
 	mmc->pm_caps = mmc_slot(host).pm_caps;
+
+	mmc->caps |= MMC_CAP_DRIVER_TYPE_A | MMC_CAP_DRIVER_TYPE_C |
+			MMC_CAP_DRIVER_TYPE_D | MMC_CAP_MAX_CURRENT_800 |
+			MMC_CAP_MAX_CURRENT_600 | MMC_CAP_MAX_CURRENT_400 |
+			MMC_CAP_MAX_CURRENT_200;
 
 	omap_hsmmc_conf_bus_power(host);
 
@@ -2437,7 +2728,6 @@ err_irq:
 		clk_disable(host->dbclk);
 		clk_put(host->dbclk);
 	}
-err_fclk:
 	clk_put(host->fclk);
 	host->fclk = NULL;
 err1:
@@ -2527,6 +2817,7 @@ static int omap_hsmmc_suspend(struct device *dev)
 		}
 		goto err;
 	}
+	host->tuning_done = 0;
 
 	if (!(host->mmc->pm_flags & MMC_PM_KEEP_POWER)) {
 		omap_hsmmc_disable_irq(host);
