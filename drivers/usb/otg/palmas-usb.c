@@ -422,9 +422,22 @@ fail_irq1:
 	return status;
 }
 
-static int __devexit palmas_usb_remove(struct platform_device *pdev)
+static int palmas_usb_cleanup(struct platform_device *pdev)
 {
 	struct palmas_usb *palmas_usb = platform_get_drvdata(pdev);
+
+	if (!palmas_usb)
+		return 0;
+
+	if (palmas_usb->linkstat == OMAP_DWC3_ID_GROUND || palmas_usb->linkstat == OMAP_DWC3_VBUS_VALID) {
+		regulator_disable(palmas_usb->vbus_reg);
+		if (palmas_usb->linkstat == OMAP_DWC3_ID_GROUND)
+			palmas_set_switch_smps10(palmas_usb->palmas, 0);
+	}
+
+	/* Disable VBUS/ID ACT COMP */
+	palmas_usb_write(palmas_usb->palmas, PALMAS_USB_VBUS_CTRL_SET, 0x0);
+	palmas_usb_write(palmas_usb->palmas, PALMAS_USB_ID_CTRL_SET, 0x0);
 
 	free_irq(palmas_usb->irq1, palmas_usb);
 	free_irq(palmas_usb->irq2, palmas_usb);
@@ -434,13 +447,26 @@ static int __devexit palmas_usb_remove(struct platform_device *pdev)
 	device_remove_file(palmas_usb->dev, &dev_attr_vbus);
 	cancel_work_sync(&palmas_usb->set_vbus_work);
 	kfree(palmas_usb);
+	platform_set_drvdata(pdev, NULL);
 
 	return 0;
+}
+
+static int __devexit palmas_usb_remove(struct platform_device *pdev)
+{
+	return palmas_usb_cleanup(pdev);
+}
+
+static void palmas_usb_shutdown(struct platform_device *pdev)
+{
+	palmas_usb_cleanup(pdev);
+	return;
 }
 
 static struct platform_driver palmas_usb_driver = {
 	.probe		= palmas_usb_probe,
 	.remove		= __devexit_p(palmas_usb_remove),
+	.shutdown	= palmas_usb_shutdown,
 	.driver		= {
 		.name	= "palmas-usb",
 		.owner	= THIS_MODULE,
