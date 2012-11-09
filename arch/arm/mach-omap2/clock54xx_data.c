@@ -1218,11 +1218,27 @@ static struct clk dss_syc_gfclk_div = {
 	.recalc		= &followparent_recalc,
 };
 
+static const struct clksel_rate div2_1to2_rates[] = {
+	{ .div = 1, .val = 0, .flags = RATE_IN_54XX },
+	{ .div = 2, .val = 1, .flags = RATE_IN_54XX },
+	{ .div = 0 },
+};
+
+static const struct clksel l3_iclk_div_div[] = {
+	{ .parent = &dpll_core_h12x2_ck, .rates = div2_1to2_rates },
+	{ .parent = NULL },
+};
+
 static struct clk l3_iclk_div = {
 	.name		= "l3_iclk_div",
 	.parent		= &dpll_core_h12x2_ck,
+	.clksel		= l3_iclk_div_div,
+	.clksel_reg	= OMAP54XX_CM_CLKSEL_CORE,
+	.clksel_mask	= OMAP54XX_CLKSEL_L3_MASK,
 	.ops		= &clkops_null,
 	.recalc		= &followparent_recalc,
+	.round_rate	= &omap2_clksel_round_rate,
+	.set_rate	= &omap2_clksel_set_rate,
 };
 
 static const struct clksel emif_ll_gclk_mux_sel[] = {
@@ -1441,12 +1457,6 @@ static struct clk timer9_gfclk_mux = {
 /* Leaf clocks controlled by modules */
 
 /* Remaining optional clocks */
-static const struct clksel_rate div2_1to2_rates[] = {
-	{ .div = 1, .val = 0, .flags = RATE_IN_54XX },
-	{ .div = 2, .val = 1, .flags = RATE_IN_54XX },
-	{ .div = 0 },
-};
-
 static const struct clksel aess_fclk_div[] = {
 	{ .parent = &abe_clk, .rates = div2_1to2_rates },
 	{ .parent = NULL },
