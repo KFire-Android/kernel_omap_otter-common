@@ -545,6 +545,11 @@ static struct omap_hwmod omap54xx_mpu_private_hwmod = {
 	.name		= "mpu_private",
 	.class		= &omap54xx_mpu_bus_hwmod_class,
 	.clkdm_name	= "mpu_clkdm",
+	.prcm = {
+		.omap4 = {
+			.context_offs = USHRT_MAX,
+		},
+	},
 	.slaves		= omap54xx_mpu_private_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap54xx_mpu_private_slaves),
 };
@@ -859,6 +864,11 @@ static struct omap_hwmod omap54xx_ctrl_module_core_hwmod = {
 	.class		= &omap54xx_ctrl_module_hwmod_class,
 	.clkdm_name	= "l4cfg_clkdm",
 	.mpu_irqs	= omap54xx_ctrl_module_core_irqs,
+	.prcm = {
+		.omap4 = {
+			.context_offs = USHRT_MAX,
+		},
+	},
 	.slaves		= omap54xx_ctrl_module_core_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap54xx_ctrl_module_core_slaves),
 };
@@ -899,6 +909,11 @@ static struct omap_hwmod omap54xx_ctrl_module_wkup_hwmod = {
 	.name		= "ctrl_module_wkup",
 	.class		= &omap54xx_ctrl_module_hwmod_class,
 	.clkdm_name	= "wkupaon_clkdm",
+	.prcm = {
+		.omap4 = {
+			.context_offs = USHRT_MAX,
+		},
+	},
 	.slaves		= omap54xx_ctrl_module_wkup_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap54xx_ctrl_module_wkup_slaves),
 };
@@ -1256,7 +1271,7 @@ static struct omap_hwmod omap54xx_dss_hwmod = {
 	.prcm = {
 		.omap4 = {
 			.clkctrl_offs = OMAP54XX_CM_DSS_DSS_CLKCTRL_OFFSET,
-			.context_offs = USHRT_MAX,
+			.context_offs = OMAP54XX_RM_DSS_DSS_CONTEXT_OFFSET,
 			.modulemode   = MODULEMODE_SWCTRL,
 		},
 	},
@@ -1830,6 +1845,7 @@ static struct omap_hwmod omap54xx_fdif_hwmod = {
 	.prcm = {
 		.omap4 = {
 			.clkctrl_offs = OMAP54XX_CM_CAM_FDIF_CLKCTRL_OFFSET,
+			.context_offs = OMAP54XX_RM_CAM_FDIF_CONTEXT_OFFSET,
 			.modulemode   = MODULEMODE_SWCTRL,
 		},
 	},
