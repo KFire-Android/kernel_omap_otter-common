@@ -1358,6 +1358,7 @@ static struct omap_hwmod omap54xx_dss_dispc_hwmod = {
 	.main_clk	= "dss_dss_clk",
 	.prcm = {
 		.omap4 = {
+			.clkctrl_offs = OMAP54XX_CM_DSS_DSS_CLKCTRL_OFFSET,
 			.context_offs = USHRT_MAX,
 		},
 	},
@@ -1437,6 +1438,7 @@ static struct omap_hwmod omap54xx_dss_dsi1_a_hwmod = {
 	.main_clk	= "dss_dss_clk",
 	.prcm = {
 		.omap4 = {
+			.clkctrl_offs = OMAP54XX_CM_DSS_DSS_CLKCTRL_OFFSET,
 			.context_offs = USHRT_MAX,
 		},
 	},
@@ -1494,6 +1496,7 @@ static struct omap_hwmod omap54xx_dss_dsi1_c_hwmod = {
 	.main_clk	= "dss_dss_clk",
 	.prcm = {
 		.omap4 = {
+			.clkctrl_offs = OMAP54XX_CM_DSS_DSS_CLKCTRL_OFFSET,
 			.context_offs = USHRT_MAX,
 		},
 	},
@@ -1571,6 +1574,7 @@ static struct omap_hwmod omap54xx_dss_hdmi_hwmod = {
 	.main_clk	= "dss_48mhz_clk",
 	.prcm = {
 		.omap4 = {
+			.clkctrl_offs = OMAP54XX_CM_DSS_DSS_CLKCTRL_OFFSET,
 			.context_offs = USHRT_MAX,
 		},
 	},
@@ -1641,6 +1645,7 @@ static struct omap_hwmod omap54xx_dss_rfbi_hwmod = {
 	.sdma_reqs	= omap54xx_dss_rfbi_sdma_reqs,
 	.prcm = {
 		.omap4 = {
+			.clkctrl_offs = OMAP54XX_CM_DSS_DSS_CLKCTRL_OFFSET,
 			.context_offs = USHRT_MAX,
 		},
 	},
