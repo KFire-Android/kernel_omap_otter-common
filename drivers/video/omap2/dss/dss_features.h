@@ -65,6 +65,9 @@ enum dss_feat_id {
 	FEAT_DSI_PLL_SELFREQDCO,
 	FEAT_DSI_PLL_REFSEL,
 	FEAT_WB,
+	FEAT_FLIP_IMMEDIATE,
+	FEAT_MFLAG,
+	FEAT_3D,
 };
 
 /* DSS register field id */
@@ -117,6 +120,7 @@ int dss_feat_get_dsi_ddr_div(void);
 
 unsigned long dss_feat_get_hdmi_core_sys_offset(void);
 unsigned long dss_feat_get_hdmi_cec_offset(void);
+unsigned long dss_feat_get_hdmi_i2cm_offset(void);
 
 bool dss_has_feature(enum dss_feat_id id);
 void dss_feat_get_reg_field(enum dss_feat_reg_field id, u8 *start, u8 *end);

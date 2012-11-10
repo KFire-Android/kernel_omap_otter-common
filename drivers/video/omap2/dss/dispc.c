@@ -666,6 +666,19 @@ static void dispc_ovl_set_vid_size(enum omap_plane plane, int width, int height)
 	dispc_write_reg(DISPC_OVL_SIZE(plane), val);
 }
 
+static void dispc_ovl_set_1d_tiled_mode(enum omap_plane plane, bool force_1d)
+{
+	struct omap_overlay *ovl = omap_dss_get_overlay(plane);
+
+	if ((ovl->caps & OMAP_DSS_OVL_CAP_FORCE_1D) == 0)
+		return;
+
+	if (plane == OMAP_DSS_GFX)
+		REG_FLD_MOD(DISPC_OVL_ATTRIBUTES(plane), force_1d, 16, 16);
+	else
+		REG_FLD_MOD(DISPC_OVL_ATTRIBUTES(plane), force_1d, 20, 20);
+}
+
 static void dispc_ovl_set_zorder(enum omap_plane plane, u8 zorder)
 {
 	struct omap_overlay *ovl = omap_dss_get_overlay(plane);
@@ -732,6 +745,8 @@ static void dispc_ovl_set_color_mode(enum omap_plane plane,
 			m = 0x1; break;
 		case OMAP_DSS_COLOR_RGBA16:
 			m = 0x2; break;
+		case OMAP_DSS_COLOR_BGRA32:
+			m = 0x3; break;
 		case OMAP_DSS_COLOR_RGB12U:
 			m = 0x4; break;
 		case OMAP_DSS_COLOR_ARGB16:
@@ -768,6 +783,8 @@ static void dispc_ovl_set_color_mode(enum omap_plane plane,
 		case OMAP_DSS_COLOR_CLUT4:
 			m = 0x2; break;
 		case OMAP_DSS_COLOR_CLUT8:
+			m = 0x3; break;
+		case OMAP_DSS_COLOR_BGRA32:
 			m = 0x3; break;
 		case OMAP_DSS_COLOR_RGB12U:
 			m = 0x4; break;
@@ -1041,6 +1058,37 @@ static void dispc_read_plane_fifo_sizes(void)
 static u32 dispc_ovl_get_fifo_size(enum omap_plane plane)
 {
 	return dispc.fifo_size[plane];
+}
+
+static void dispc_ovl_set_mflag_attribute(enum dispc_mflag_ctrl ctrl)
+{
+	dispc_write_reg(DISPC_GLOBAL_MFLAG, ctrl);
+}
+
+void dispc_ovl_set_global_mflag(enum omap_plane plane, bool mflag)
+{
+	u32 fifosize;
+	u8 bit;
+
+	/* Set the ARBITRATION bit to give
+	 * highest priority to the pipeline.
+	 * MFLAG is applicable only to high
+	 * priority pipes.
+	 */
+	 if (plane == OMAP_DSS_GFX)
+		bit = 14;
+	 else
+		bit = 23;
+	 REG_FLD_MOD(DISPC_OVL_ATTRIBUTES(plane), mflag, bit, bit);
+
+	 fifosize = dispc_ovl_get_fifo_size(plane);
+	 /* As per the simultaion team suggestion, below thesholds are set:
+	  * HT = fifosize * 5/8;
+	  * LT = fifosize * 4/8;
+	  */
+	 dispc_write_reg(DISPC_OVL_MFLAG_THRESHOLD(plane),
+		FLD_VAL((fifosize*5)/8, 31, 16) |
+		FLD_VAL((fifosize*4)/8, 15, 0));
 }
 
 void dispc_ovl_set_fifo_threshold(enum omap_plane plane, u32 low, u32 high)
@@ -2269,6 +2317,12 @@ skip_errata:
 		dispc_ovl_set_ba1_uv(plane, oi->p_uv_addr + offset1);
 	}
 
+	/* Force 1D tiled mode */
+	if (ovl->caps & OMAP_DSS_OVL_CAP_FORCE_1D)
+		dispc_ovl_set_1d_tiled_mode(plane, oi->force_1d);
+
+	if (dss_has_feature(FEAT_MFLAG))
+		dispc_ovl_set_global_mflag(ovl->id, oi->mflag_en);
 
 	dispc_ovl_set_row_inc(plane, row_inc);
 	dispc_ovl_set_pix_inc(plane, pix_inc);
@@ -3975,6 +4029,9 @@ static void _omap_dispc_initial_config(void)
 	dispc_configure_burst_sizes();
 
 	dispc_ovl_enable_zorder_planes();
+
+	if (dss_has_feature(FEAT_MFLAG))
+		dispc_ovl_set_mflag_attribute(DISPC_MFLAG_CTRL_ENABLE);
 }
 
 /* DISPC HW IP initialisation */

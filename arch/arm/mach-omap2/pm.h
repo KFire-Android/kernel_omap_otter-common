@@ -164,8 +164,8 @@ static inline void enable_omap3630_toggle_l2_on_restore(void) { }
 #define PM_OMAP4_ROM_L3INSTR_ERRATUM_xxx	(1 << 2)
 #define PM_OMAP4_ROM_CPU1_BACKUP_ERRATUM_xxx	(1 << 3)
 
-#if defined(CONFIG_ARCH_OMAP4)
 extern u16 pm44xx_errata;
+#if defined(CONFIG_ARCH_OMAP4)
 #define IS_PM44XX_ERRATUM(id)		(pm44xx_errata & (id))
 #else
 #define IS_PM44XX_ERRATUM(id)		0

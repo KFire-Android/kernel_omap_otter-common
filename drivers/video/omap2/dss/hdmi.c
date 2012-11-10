@@ -1353,6 +1353,8 @@ static int omapdss_hdmihw_probe(struct platform_device *pdev)
 	hdmi.ip_data.core_av_offset = HDMI_CORE_AV;
 	hdmi.ip_data.pll_offset = HDMI_PLLCTRL;
 	hdmi.ip_data.phy_offset = HDMI_PHY;
+	hdmi.ip_data.cec_offset = dss_feat_get_hdmi_cec_offset();
+	hdmi.ip_data.core_i2cm_offset = dss_feat_get_hdmi_i2cm_offset();
 
 	hdmi_panel_init();
 
