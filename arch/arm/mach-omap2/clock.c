@@ -541,3 +541,43 @@ struct clk_functions omap2_clk_functions = {
 	.clk_disable_unused	= omap2_clk_disable_unused,
 };
 
+/**
+ * omap_clks_register() - register set of clocks
+ * @clks:	array of clock definitions
+ *
+ * The last array item should contain NULL value in c->lk.clk.
+ */
+int __init omap2_clks_register(struct clk_lookup *clks)
+{
+	struct clk_lookup *c;
+	int r;
+
+	if (!clks) {
+		pr_warn("%s: NULL pointer\n", __func__);
+		return -EINVAL;
+	}
+
+	c = clks;
+	while (c->clk) {
+		clk_preinit(c->clk);
+		c++;
+	}
+
+	c = clks;
+	while (c->clk) {
+		clkdev_add(c);
+		r = clk_register(c->clk);
+		if (r < 0) {
+			pr_warn("%s: Clock register failure %d.\n",
+				c->clk->name, r);
+			c++;
+			continue;
+		}
+
+		omap2_init_clk_clkdm(c->clk);
+
+		c++;
+	}
+
+	return 0;
+}

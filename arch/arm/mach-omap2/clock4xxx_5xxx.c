@@ -24,8 +24,10 @@
 #include "clock44xx.h"
 #include "clock54xx.h"
 
-#define OMAP4_L3_OPP50_RATE 100000000
-#define OMAP5_L3_OPP50_RATE 133000000
+#define OMAP4_L3_OPP50_RATE	100000000
+#define OMAP4470_L3_OPP50_RATE	116666666
+#define OMAP4470_LP_OPP_SET_CORE_DPLL_FREQ	1600000000
+#define OMAP5_L3_OPP50_RATE	133000000
 
 #define CLK_SCALE_DOWN					0
 #define CLK_SCALE_NONE					1
@@ -72,6 +74,34 @@ struct virt_iva_ck_deps {
 	unsigned long iva_dpll_rate;
 };
 
+static struct virt_iva_ck_deps omap4_virt_iva_clk_deps[] = {
+	{ /* OPP 50 */
+		.iva_ck_rate = DPLL_IVA_M5_OPP50_RATE,
+		.dsp_ck_rate = DPLL_IVA_M4_OPP50_RATE,
+		.iva_dpll_rate = DPLL_IVA_OPP50_RATE,
+	},
+	{ /* OPP 100 */
+		.iva_ck_rate = DPLL_IVA_M5_OPP100_RATE,
+		.dsp_ck_rate = DPLL_IVA_M4_OPP100_RATE,
+		.iva_dpll_rate = DPLL_IVA_OPP100_RATE,
+	},
+	{ /* OPP TURBO */
+		.iva_ck_rate = DPLL_IVA_M5_OPPTURBO_RATE,
+		.dsp_ck_rate = DPLL_IVA_M4_OPPTURBO_RATE,
+		.iva_dpll_rate = DPLL_IVA_OPPTURBO_RATE,
+	},
+	{ /* OPP NITRO */
+		.iva_ck_rate = DPLL_IVA_M5_OPPNITRO_RATE,
+		.dsp_ck_rate = DPLL_IVA_M4_OPPNITRO_RATE,
+		.iva_dpll_rate = DPLL_IVA_OPPNITRO_RATE,
+	},
+	{ /* OPP NITROSB */
+		.iva_ck_rate = DPLL_IVA_M5_OPPNITROSB_RATE,
+		.dsp_ck_rate = DPLL_IVA_M4_OPPNITROSB_RATE,
+		.iva_dpll_rate = DPLL_IVA_OPPNITROSB_RATE,
+	},
+};
+
 static struct virt_iva_ck_deps omap5_virt_iva_clk_deps[] = {
 	{ /* OPP LOW */
 		.iva_ck_rate = DPLL_IVA_H12_OPPLOW_RATE,
@@ -98,6 +128,8 @@ struct virt_l3_clk_data {
 };
 
 static struct virt_l3_clk_data *omap_virt_l3_clk_data;
+static struct virt_iva_ck_deps *omap_virt_iva_clk_deps;
+static int omap_virt_iva_clk_deps_size;
 static struct clk *main_l3_clk;
 static unsigned long l3_opp50_rate;
 static struct clk *iva_ck, *dsp_ck, *dpll_iva_ck;
@@ -126,6 +158,52 @@ static struct virt_l3_clk_data omap4_virt_l3_clk_data[] = {
 	},
 	{	.opp50_rate = 400000000,
 		.opp100_rate = 800000000,
+		.clk_name	=  "dpll_core_m2_ck"
+	},
+	{	.opp50_rate = 0,
+		.opp100_rate = 0,
+		.clk_name	=  NULL
+	},
+};
+
+static struct virt_l3_clk_data omap4470_low_virt_l3_clk_data[] = {
+	{	.opp50_rate = 200000000,
+		.opp100_rate = 320000000,
+		.clk_name	=  "dpll_core_m3x2_ck"
+	},
+	{	.opp50_rate = 200000000,
+		.opp100_rate = 266600000,
+		.clk_name	=  "dpll_core_m6x2_ck"
+	},
+	{	.opp50_rate = 192000000,
+		.opp100_rate = 256000000,
+		.clk_name	=  "dpll_per_m3x2_ck"
+	},
+	{	.opp50_rate = 400000000,
+		.opp100_rate = 800000000,
+		.clk_name	=  "dpll_core_m2_ck"
+	},
+	{	.opp50_rate = 0,
+		.opp100_rate = 0,
+		.clk_name	=  NULL
+	},
+};
+
+static struct virt_l3_clk_data omap4470_high_virt_l3_clk_data[] = {
+	{	.opp50_rate = 200000000,
+		.opp100_rate = 320000000,
+		.clk_name	=  "dpll_core_m3x2_ck"
+	},
+	{	.opp50_rate = 200000000,
+		.opp100_rate = 266600000,
+		.clk_name	=  "dpll_core_m6x2_ck"
+	},
+	{	.opp50_rate = 192000000,
+		.opp100_rate = 256000000,
+		.clk_name	=  "dpll_per_m3x2_ck"
+	},
+	{	.opp50_rate = 466000000,
+		.opp100_rate = 932000000,
 		.clk_name	=  "dpll_core_m2_ck"
 	},
 	{	.opp50_rate = 0,
@@ -252,12 +330,15 @@ long omap_virt_iva_round_rate(struct clk *clk, unsigned long rate)
 	if (!clk)
 		return 0;
 
-	for (i = 0; i < ARRAY_SIZE(omap5_virt_iva_clk_deps); i++) {
+	if (!omap_virt_iva_clk_deps_size)
+		return 0;
+
+	for (i = 0; i < omap_virt_iva_clk_deps_size; i++) {
 		long diff;
-		iva_deps = &omap5_virt_iva_clk_deps[i];
+		iva_deps = &omap_virt_iva_clk_deps[i];
 		diff = abs(rate - iva_deps->iva_ck_rate);
 		if (diff >= last_diff) {
-			iva_deps = &omap5_virt_iva_clk_deps[i-1];
+			iva_deps = &omap_virt_iva_clk_deps[i - 1];
 			break;
 		}
 		last_diff = diff;
@@ -283,12 +364,15 @@ int omap_virt_iva_set_rate(struct clk *clk, unsigned long rate)
 	if (!clk)
 		return -EINVAL;
 
-	for (i = 0; i < ARRAY_SIZE(omap5_virt_iva_clk_deps); i++)
-		if (rate == omap5_virt_iva_clk_deps[i].iva_ck_rate)
+	if (!omap_virt_iva_clk_deps_size || !dpll_iva_ck || !iva_ck || !dsp_ck)
+		return -EINVAL;
+
+	for (i = 0; i < omap_virt_iva_clk_deps_size; i++)
+		if (rate == omap_virt_iva_clk_deps[i].iva_ck_rate)
 			break;
 
-	if (i < ARRAY_SIZE(omap5_virt_iva_clk_deps))
-		iva_deps = &omap5_virt_iva_clk_deps[i];
+	if (i < omap_virt_iva_clk_deps_size)
+		iva_deps = &omap_virt_iva_clk_deps[i];
 	else
 		return -EINVAL;
 
@@ -390,13 +474,34 @@ int omap4xxx_custom_clk_init(void)
 		return 0;
 	}
 
-	omap_virt_l3_clk_data = omap4_virt_l3_clk_data;
 	main_l3_clk = clk_get(NULL, "dpll_core_m5x2_ck");
 	if (!main_l3_clk) {
 		pr_err("%s: Unable to get clock dpll_core_m5x2_ck\n", __func__);
 		return -EINVAL;
 	}
-	l3_opp50_rate = OMAP4_L3_OPP50_RATE;
+
+	if (cpu_is_omap447x()) {
+		struct clk *dpll_core_ck;
+		unsigned long rate = 0;
+
+		dpll_core_ck = clk_get(NULL, "dpll_core_ck");
+		if (dpll_core_ck) {
+			rate = clk_get_rate(dpll_core_ck);
+			clk_put(dpll_core_ck);
+		}
+
+		if (rate > OMAP4470_LP_OPP_SET_CORE_DPLL_FREQ / 2)
+			omap_virt_l3_clk_data = omap4470_high_virt_l3_clk_data;
+		else
+			omap_virt_l3_clk_data = omap4470_low_virt_l3_clk_data;
+
+		l3_opp50_rate = main_l3_clk->round_rate(main_l3_clk,
+							OMAP4470_L3_OPP50_RATE);
+	} else {
+		omap_virt_l3_clk_data = omap4_virt_l3_clk_data;
+		l3_opp50_rate = main_l3_clk->round_rate(main_l3_clk,
+							OMAP4_L3_OPP50_RATE);
+	}
 
 	for (i = 0; ; i++) {
 		char *clk_name = omap_virt_l3_clk_data[i].clk_name;
@@ -411,6 +516,28 @@ int omap4xxx_custom_clk_init(void)
 			return -EINVAL;
 		}
 	}
+
+	iva_ck = clk_get(NULL, "dpll_iva_m5x2_ck");
+	if (IS_ERR(iva_ck)) {
+		pr_warning("%s:dpll_iva_h12x2_ck clk_get failed.\n", __func__);
+		return -EINVAL;
+	};
+
+	dsp_ck = clk_get(NULL, "dpll_iva_m4x2_ck");
+	if (IS_ERR(dsp_ck)) {
+		pr_warning("%s:dpll_iva_h11x2_ck clk_get failed.\n", __func__);
+		return -EINVAL;
+	}
+
+	dpll_iva_ck = clk_get(NULL, "dpll_iva_ck");
+	if (IS_ERR(dpll_iva_ck)) {
+		pr_warning("%s:dpll_iva_ck clk_get failed.\n", __func__);
+		return -EINVAL;
+	}
+
+	omap_virt_iva_clk_deps = omap4_virt_iva_clk_deps;
+	omap_virt_iva_clk_deps_size = ARRAY_SIZE(omap4_virt_iva_clk_deps);
+
 	return 0;
 }
 
@@ -467,6 +594,9 @@ int omap5xxx_custom_clk_init(void)
 		pr_warning("%s:dpll_iva_ck clk_get failed.\n", __func__);
 		return -EINVAL;
 	}
+
+	omap_virt_iva_clk_deps = omap5_virt_iva_clk_deps;
+	omap_virt_iva_clk_deps_size = ARRAY_SIZE(omap5_virt_iva_clk_deps);
 
 	return 0;
 }
