@@ -1,7 +1,7 @@
 /*
  * OMAP54XX SCRM registers and bitfields
  *
- * Copyright (C) 2010-2012 Texas Instruments, Inc.
+ * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com
  *
  * Benoit Cousson (b-cousson@ti.com)
  *

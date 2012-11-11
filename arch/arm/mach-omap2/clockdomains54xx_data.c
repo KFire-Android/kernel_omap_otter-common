@@ -167,10 +167,10 @@ static struct clkdm_dep mpu_wkup_sleep_deps[] = {
 
 static struct clockdomain l4sec_54xx_clkdm = {
 	.name		  = "l4sec_clkdm",
-	.pwrdm		  = { .name = "l4per_pwrdm" },
+	.pwrdm		  = { .name = "core_pwrdm" },
 	.prcm_partition	  = OMAP54XX_CM_CORE_PARTITION,
-	.cm_inst	  = OMAP54XX_CM_CORE_L4PER_INST,
-	.clkdm_offs	  = OMAP54XX_CM_CORE_L4PER_L4SEC_CDOFFS,
+	.cm_inst	  = OMAP54XX_CM_CORE_CORE_INST,
+	.clkdm_offs	  = OMAP54XX_CM_CORE_CORE_L4SEC_CDOFFS,
 	.dep_bit	  = OMAP54XX_L4SEC_STATDEP_SHIFT,
 	.wkdep_srcs	  = l4sec_wkup_sleep_deps,
 	.sleepdep_srcs	  = l4sec_wkup_sleep_deps,
@@ -298,10 +298,10 @@ static struct clockdomain c2c_54xx_clkdm = {
 
 static struct clockdomain l4per_54xx_clkdm = {
 	.name		  = "l4per_clkdm",
-	.pwrdm		  = { .name = "l4per_pwrdm" },
+	.pwrdm		  = { .name = "core_pwrdm" },
 	.prcm_partition	  = OMAP54XX_CM_CORE_PARTITION,
-	.cm_inst	  = OMAP54XX_CM_CORE_L4PER_INST,
-	.clkdm_offs	  = OMAP54XX_CM_CORE_L4PER_L4PER_CDOFFS,
+	.cm_inst	  = OMAP54XX_CM_CORE_CORE_INST,
+	.clkdm_offs	  = OMAP54XX_CM_CORE_CORE_L4PER_CDOFFS,
 	.dep_bit	  = OMAP54XX_L4PER_STATDEP_SHIFT,
 	.flags		  = CLKDM_CAN_HWSUP_SWSUP,
 };
@@ -424,7 +424,7 @@ static struct clockdomain cam_54xx_clkdm = {
 	.clkdm_offs	  = OMAP54XX_CM_CORE_CAM_CAM_CDOFFS,
 	.wkdep_srcs	  = cam_wkup_sleep_deps,
 	.sleepdep_srcs	  = cam_wkup_sleep_deps,
-	.flags		  = CLKDM_CAN_SWSUP,
+	.flags		  = CLKDM_CAN_HWSUP_SWSUP,
 };
 
 /* As clockdomains are added or removed above, this list must also be changed */
