@@ -1400,9 +1400,25 @@ static struct clk wkupaon_iclk_mux = {
 	.recalc		= &followparent_recalc,
 };
 
+static const struct clksel_rate div3_8to32_rates[] = {
+	{ .div = 8, .val = 0, .flags = RATE_IN_54XX },
+	{ .div = 16, .val = 1, .flags = RATE_IN_54XX },
+	{ .div = 32, .val = 2, .flags = RATE_IN_54XX },
+	{ .div = 0 },
+};
+
+static const struct clksel l3instr_ts_gclk_div_div[] = {
+	{ .parent = &wkupaon_iclk_mux, .rates = div3_8to32_rates },
+	{ .parent = NULL },
+};
+
 static struct clk l3instr_ts_gclk_div = {
 	.name		= "l3instr_ts_gclk_div",
 	.parent		= &wkupaon_iclk_mux,
+	.clksel		= l3instr_ts_gclk_div_div,
+	.init		= &omap2_init_clksel_parent,
+	.clksel_reg	= OMAP54XX_CM_L3INSTR_CTRL_MODULE_BANDGAP_CLKCTRL,
+	.clksel_mask	= OMAP54XX_CLKSEL_24_25_MASK,
 	.ops		= &clkops_null,
 	.recalc		= &followparent_recalc,
 };
