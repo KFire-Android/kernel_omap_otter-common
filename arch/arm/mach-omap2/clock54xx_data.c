@@ -1440,6 +1440,28 @@ static struct clk l4_root_clk_div = {
 	.set_rate	= &omap2_clksel_set_rate,
 };
 
+static struct clk dpll_core_m3x2_opt_ck = {
+	.name		= "dpll_core_m3x2_opt_ck",
+	.parent		= &dpll_core_m3x2_ck,
+	.ops		= &clkops_omap2_dflt,
+	.recalc		= &followparent_recalc,
+	.enable_reg	= OMAP54XX_CM_WKUPAON_SCRM_CLKCTRL,
+	.enable_bit	= OMAP54XX_OPTFCLKEN_SCRM_CORE_SHIFT,
+	.clkdm_name	= "wkupaon_clkdm",
+	.set_rate	= &followparent_set_rate,
+};
+
+static struct clk dpll_per_m3x2_opt_ck = {
+	.name		= "dpll_per_m3x2_opt_ck",
+	.parent		= &dpll_per_m3x2_ck,
+	.ops		= &clkops_omap2_dflt,
+	.recalc		= &followparent_recalc,
+	.enable_reg	= OMAP54XX_CM_WKUPAON_SCRM_CLKCTRL,
+	.enable_bit	= OMAP54XX_OPTFCLKEN_SCRM_PER_SHIFT,
+	.clkdm_name	= "wkupaon_clkdm",
+	.set_rate	= &followparent_set_rate,
+};
+
 static struct clk timer10_gfclk_mux = {
 	.name		= "timer10_gfclk_mux",
 	.parent		= &sys_clkin,
@@ -2176,6 +2198,7 @@ static struct omap_clk omap54xx_clks[] = {
 	CLK(NULL,	"dpll_core_h24x2_ck",		&dpll_core_h24x2_ck,	CK_54XX),
 	CLK(NULL,	"dpll_core_m2_ck",		&dpll_core_m2_ck,	CK_54XX),
 	CLK(NULL,	"dpll_core_m3x2_ck",		&dpll_core_m3x2_ck,	CK_54XX),
+	CLK(NULL,	"dpll_core_m3x2_opt_ck",	&dpll_core_m3x2_opt_ck,	CK_54XX),
 	CLK(NULL,	"iva_dpll_hs_clk_div",		&iva_dpll_hs_clk_div,	CK_54XX),
 	CLK(NULL,	"dpll_iva_ck",			&dpll_iva_ck,	CK_54XX),
 	CLK(NULL,	"dpll_iva_x2_ck",		&dpll_iva_x2_ck,	CK_54XX),
@@ -2193,6 +2216,7 @@ static struct omap_clk omap54xx_clks[] = {
 	CLK(NULL,	"dpll_per_m2_ck",		&dpll_per_m2_ck,	CK_54XX),
 	CLK(NULL,	"dpll_per_m2x2_ck",		&dpll_per_m2x2_ck,	CK_54XX),
 	CLK(NULL,	"dpll_per_m3x2_ck",		&dpll_per_m3x2_ck,	CK_54XX),
+	CLK(NULL,	"dpll_per_m3x2_opt_ck",		&dpll_per_m3x2_opt_ck,	CK_54XX),
 	CLK(NULL,	"dpll_unipro1_ck",		&dpll_unipro1_ck,	CK_54XX),
 	CLK(NULL,	"dpll_unipro1_clkdcoldo",	&dpll_unipro1_clkdcoldo,	CK_54XX),
 	CLK(NULL,	"dpll_unipro1_m2_ck",		&dpll_unipro1_m2_ck,	CK_54XX),
