@@ -6021,7 +6021,7 @@ static struct omap_hwmod_addr_space omap54xx_usb_otg_ss_addrs[] = {
 	{
 		.name		= "dwc_usb3",
 		.pa_start	= 0x4a030000,
-		.pa_end		= 0x4a0300ff,
+		.pa_end		= 0x4a03cfff,
 	},
 	{ }
 };
