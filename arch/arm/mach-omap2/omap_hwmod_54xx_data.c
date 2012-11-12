@@ -3192,7 +3192,9 @@ static struct omap_hwmod omap54xx_iva_seq0_hwmod = {
 	.name		= "iva_seq0",
 	.class		= &omap54xx_iva_hwmod_class,
 	.clkdm_name	= "iva_clkdm",
+#ifndef CONFIG_OMAP_PM_STANDALONE
 	.flags		= HWMOD_INIT_NO_RESET,
+#endif
 	.rst_lines	= omap54xx_iva_seq0_resets,
 	.rst_lines_cnt	= ARRAY_SIZE(omap54xx_iva_seq0_resets),
 	.prcm = {
@@ -3207,7 +3209,9 @@ static struct omap_hwmod omap54xx_iva_seq1_hwmod = {
 	.name		= "iva_seq1",
 	.class		= &omap54xx_iva_hwmod_class,
 	.clkdm_name	= "iva_clkdm",
+#ifndef CONFIG_OMAP_PM_STANDALONE
 	.flags		= HWMOD_INIT_NO_RESET,
+#endif
 	.rst_lines	= omap54xx_iva_seq1_resets,
 	.rst_lines_cnt	= ARRAY_SIZE(omap54xx_iva_seq1_resets),
 	.prcm = {
@@ -6288,7 +6292,9 @@ static __initdata struct omap_hwmod *omap54xx_hwmods[] = {
 	&omap54xx_l3_main_3_hwmod,
 
 	/* l4 class */
+#ifndef CONFIG_OMAP_PM_STANDALONE
 	&omap54xx_l4_abe_hwmod,
+#endif
 	&omap54xx_l4_cfg_hwmod,
 	&omap54xx_l4_per_hwmod,
 	&omap54xx_l4_wkup_hwmod,
@@ -6296,8 +6302,10 @@ static __initdata struct omap_hwmod *omap54xx_hwmods[] = {
 	/* mpu_bus class */
 	&omap54xx_mpu_private_hwmod,
 
+#ifndef CONFIG_OMAP_PM_STANDALONE
 	/* aess class */
 	&omap54xx_aess_hwmod,
+#endif
 
 	/* bb2d class */
 	&omap54xx_bb2d_hwmod,
@@ -6312,12 +6320,14 @@ static __initdata struct omap_hwmod *omap54xx_hwmods[] = {
 	/* dma class */
 	&omap54xx_dma_system_hwmod,
 
+#ifndef CONFIG_OMAP_PM_STANDALONE
 	/* dmic class */
 	&omap54xx_dmic_hwmod,
 
 	/* dsp class */
 	&omap54xx_dsp_hwmod,
 	&omap54xx_dsp_c0_hwmod,
+#endif
 	&omap54xx_mmu_dsp_hwmod,
 
 	/* dss class */
@@ -6348,8 +6358,10 @@ static __initdata struct omap_hwmod *omap54xx_hwmods[] = {
 	/* gpu class */
 	&omap54xx_gpu_hwmod,
 
+#ifndef CONFIG_OMAP_PM_STANDALONE
 	/* hsi class */
 	&omap54xx_hsi_hwmod,
+#endif
 
 	/* i2c class */
 	&omap54xx_i2c1_hwmod,
@@ -6358,6 +6370,7 @@ static __initdata struct omap_hwmod *omap54xx_hwmods[] = {
 	&omap54xx_i2c4_hwmod,
 	&omap54xx_i2c5_hwmod,
 
+#ifndef CONFIG_OMAP_PM_STANDALONE
 	/* ipu class */
 	&omap54xx_ipu_hwmod,
 	&omap54xx_ipu_c0_hwmod,
@@ -6365,6 +6378,7 @@ static __initdata struct omap_hwmod *omap54xx_hwmods[] = {
 	&omap54xx_intc_ipu_c0_hwmod,
 	&omap54xx_intc_ipu_c1_hwmod,
 	&omap54xx_mmu_ipu_hwmod,
+#endif
 
 	/* iss class */
 	&omap54xx_iss_hwmod,
@@ -6388,8 +6402,10 @@ static __initdata struct omap_hwmod *omap54xx_hwmods[] = {
 	&omap54xx_mcbsp2_hwmod,
 	&omap54xx_mcbsp3_hwmod,
 
+#ifndef CONFIG_OMAP_PM_STANDALONE
 	/* mcpdm class */
 	&omap54xx_mcpdm_hwmod,
+#endif
 
 	/* mcspi class */
 	&omap54xx_mcspi1_hwmod,
@@ -6410,8 +6426,10 @@ static __initdata struct omap_hwmod *omap54xx_hwmods[] = {
 	/* ocp2scp class */
 	&omap54xx_ocp2scp1_hwmod,
 
+#ifndef CONFIG_OMAP_PM_STANDALONE
 	/* sata class */
 	&omap54xx_sata_hwmod,
+#endif
 
 	/* smartreflex class */
 	&omap54xx_smartreflex_core_hwmod,
