@@ -707,11 +707,20 @@ static struct omap_hwmod_irq_info omap54xx_bb2d_irqs[] = {
 	{ .irq = -1 }
 };
 
+static struct omap_hwmod_addr_space omap54xx_bb2d_addrs[] = {
+	{
+		.pa_start	= 0x59000000,
+		.pa_end		= 0x590007ff,
+	},
+	{ }
+};
+
 /* l3_main_2 -> bb2d */
 static struct omap_hwmod_ocp_if omap54xx_l3_main_2__bb2d = {
 	.master		= &omap54xx_l3_main_2_hwmod,
 	.slave		= &omap54xx_bb2d_hwmod,
 	.clk		= "l3_iclk_div",
+	.addr		= omap54xx_bb2d_addrs,
 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
 };
 
