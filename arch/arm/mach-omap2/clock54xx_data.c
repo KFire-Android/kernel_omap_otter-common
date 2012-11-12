@@ -2796,5 +2796,7 @@ int __init omap5xxx_clk_init(void)
 	 */
 	clk_enable_init_clocks();
 
+	omap5xxx_custom_clk_init();
+
 	return 0;
 }
