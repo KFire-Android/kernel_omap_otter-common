@@ -663,20 +663,6 @@ static struct i2c_board_info __initdata sdp4430_i2c_boardinfo[] = {
 	},
 };
 
-static struct i2c_board_info __initdata sdp4430_i2c_3_boardinfo[] = {
-	{
-		I2C_BOARD_INFO("tmp105", 0x48),
-	},
-	{
-		I2C_BOARD_INFO("bh1780", 0x29),
-	},
-};
-static struct i2c_board_info __initdata sdp4430_i2c_4_boardinfo[] = {
-	{
-		I2C_BOARD_INFO("hmc5843", 0x1e),
-	},
-};
-
 static void __init omap_i2c_hwspinlock_init(int bus_id, int spinlock_id,
 				struct omap_i2c_bus_board_data *pdata)
 {
@@ -730,22 +716,7 @@ static int __init omap4_i2c_init(void)
 	i2c_register_board_info(1, sdp4430_i2c_boardinfo,
 				ARRAY_SIZE(sdp4430_i2c_boardinfo));
 	omap_register_i2c_bus(2, 400, NULL, 0);
-	omap_register_i2c_bus(3, 400, sdp4430_i2c_3_boardinfo,
-				ARRAY_SIZE(sdp4430_i2c_3_boardinfo));
-	omap_register_i2c_bus(4, 400, sdp4430_i2c_4_boardinfo,
-				ARRAY_SIZE(sdp4430_i2c_4_boardinfo));
 	return 0;
-}
-
-static void __init omap_sfh7741prox_init(void)
-{
-	int error;
-
-	error = gpio_request_one(OMAP4_SFH7741_ENABLE_GPIO,
-				 GPIOF_OUT_INIT_LOW, "sfh7741");
-	if (error < 0)
-		pr_err("%s:failed to request GPIO %d, error %d\n",
-			__func__, OMAP4_SFH7741_ENABLE_GPIO, error);
 }
 
 static struct gpio sdp4430_hdmi_gpios[] = {
@@ -1149,8 +1120,8 @@ static void __init omap_4430sdp_init(void)
 	omap4_mux_init(board_mux, NULL, package);
 
 	omap4_i2c_init();
+	blaze_sensor_init();
 	blaze_touch_init();
-	omap_sfh7741prox_init();
 	platform_add_devices(sdp4430_devices, ARRAY_SIZE(sdp4430_devices));
 	omap4_board_serial_init();
 	omap_sdrc_init(NULL, NULL);
