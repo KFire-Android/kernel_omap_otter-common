@@ -1277,6 +1277,10 @@ static const struct clksel emif_ll_gclk_mux_sel[] = {
 static struct clk emif_ll_gclk_mux = {
 	.name		= "emif_ll_gclk_mux",
 	.parent		= &c2c_iclk,
+	.clksel		= emif_ll_gclk_mux_sel,
+	.init		= &omap2_init_clksel_parent,
+	.clksel_reg	= OMAP54XX_CM_EMIF_EMIF1_CLKCTRL,
+	.clksel_mask	= OMAP54XX_CLKSEL_LL_SHIFT,
 	.ops		= &clkops_null,
 	.recalc		= &followparent_recalc,
 };
