@@ -552,7 +552,7 @@ static struct snd_soc_dai_link legacy_mcbsp_dai = {
 static struct snd_soc_dai_link legacy_mcasp_dai = {
 	/* Legacy SPDIF */
 	SND_SOC_DAI_CONNECT("Legacy SPDIF", "spdif-dit", "omap-pcm-audio",
-			    "dit-hifi", "mcasp-legacy"),
+			    "dit-hifi", "omap-mcasp"),
 	SND_SOC_DAI_IGNORE_SUSPEND,
 };
 
@@ -771,6 +771,7 @@ static int omap_abe_add_legacy_dai_links(struct snd_soc_card *card,
 	struct omap_abe_data *card_data = snd_soc_card_get_drvdata(card);
 	struct device_node *node = card->dev->of_node;
 	struct device_node *dai_node;
+	int has_mcasp = 1;
 	int ret;
 
 	if (node) {
@@ -788,6 +789,14 @@ static int omap_abe_add_legacy_dai_links(struct snd_soc_card *card,
 		legacy_mcbsp_dai.cpu_dai_name  = NULL;
 		legacy_mcbsp_dai.cpu_of_node = dai_node;
 
+		dai_node = of_parse_phandle(node, "ti,mcasp", 0);
+		if (!dai_node) {
+			dev_warn(card->dev,"McASP node is not provided\n");
+			has_mcasp = 0;
+		} else {
+			legacy_mcasp_dai.cpu_dai_name  = NULL;
+			legacy_mcasp_dai.cpu_of_node = dai_node;
+		}
 	}
 	/* Add the Legacy McPDM */
 	ret = snd_soc_card_new_dai_links(card, &legacy_mcpdm_dai, 1);
@@ -800,9 +809,11 @@ static int omap_abe_add_legacy_dai_links(struct snd_soc_card *card,
 		return ret;
 
 	/* Add the Legacy McASP */
-	ret = snd_soc_card_new_dai_links(card, &legacy_mcasp_dai, 1);
-	if (ret < 0)
-		return ret;
+	if (has_mcasp) {
+		ret = snd_soc_card_new_dai_links(card, &legacy_mcasp_dai, 1);
+		if (ret < 0)
+			return ret;
+	}
 
 	/* Add the Legacy DMICs */
 	if (card_data->has_dmic) {
