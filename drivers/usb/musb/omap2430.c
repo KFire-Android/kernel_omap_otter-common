@@ -176,11 +176,7 @@ static void omap2430_musb_set_vbus(struct musb *musb, int is_on)
 
 			if (ret && otg->set_vbus)
 				otg_set_vbus(otg, 1);
-		} else {
-			musb->is_active = 1;
 			otg->default_a = 1;
-			musb->xceiv->state = OTG_STATE_A_WAIT_VRISE;
-			devctl |= MUSB_DEVCTL_SESSION;
 			MUSB_HST_MODE(musb);
 		}
 	} else {
@@ -194,9 +190,9 @@ static void omap2430_musb_set_vbus(struct musb *musb, int is_on)
 		musb->xceiv->state = OTG_STATE_B_IDLE;
 		devctl &= ~MUSB_DEVCTL_SESSION;
 
+		musb_writeb(musb->mregs, MUSB_DEVCTL, devctl);
 		MUSB_DEV_MODE(musb);
 	}
-	musb_writeb(musb->mregs, MUSB_DEVCTL, devctl);
 
 	dev_dbg(musb->controller, "VBUS %s, devctl %02x "
 		/* otg %3x conf %08x prcm %08x */ "\n",
@@ -306,6 +302,7 @@ static void omap_musb_set_mailbox(struct omap2430_glue *glue)
 			}
 
 		if (data->interface_type == MUSB_INTERFACE_UTMI) {
+			omap2430_musb_set_vbus(musb, 0);
 			if (musb->xceiv->otg->set_vbus)
 				otg_set_vbus(musb->xceiv->otg, 0);
 		}

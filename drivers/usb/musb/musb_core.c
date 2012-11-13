@@ -924,6 +924,7 @@ void musb_start(struct musb *musb)
 
 	musb->is_active = 0;
 
+	/* Detects cold-boot scenario using omap2430_musb_enable() */
 	musb_platform_enable(musb);
 
 	devctl = musb_readb(regs, MUSB_DEVCTL);
@@ -935,9 +936,9 @@ void musb_start(struct musb *musb)
 		 * (b) vbus present/connect IRQ, peripheral mode;
 		 * (c) peripheral initiates, using SRP
 		 */
-		if ((devctl & MUSB_DEVCTL_VBUS) == MUSB_DEVCTL_VBUS)
+		if (musb->xceiv->last_event == USB_EVENT_VBUS)
 			musb->is_active = 1;
-		else
+		else if (musb->xceiv->last_event == USB_EVENT_ID)
 			devctl |= MUSB_DEVCTL_SESSION;
 
 	} else if (is_host_enabled(musb)) {
@@ -945,7 +946,7 @@ void musb_start(struct musb *musb)
 		devctl |= MUSB_DEVCTL_SESSION;
 
 	} else /* peripheral is enabled */ {
-		if ((devctl & MUSB_DEVCTL_VBUS) == MUSB_DEVCTL_VBUS)
+		if (musb->xceiv->last_event == USB_EVENT_VBUS)
 			musb->is_active = 1;
 	}
 
