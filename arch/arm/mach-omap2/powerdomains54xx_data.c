@@ -110,7 +110,7 @@ static struct powerdomain dss_54xx_pwrdm = {
 	.voltdm		  = { .name = "core" },
 	.prcm_offs	  = OMAP54XX_PRM_DSS_INST,
 	.prcm_partition	  = OMAP54XX_PRM_PARTITION,
-	.pwrsts		  = PWRSTS_OFF_RET_ON,
+	.pwrsts		  = PWRSTS_OFF_RET_INA_ON,
 	.pwrsts_logic_ret = PWRSTS_OFF,
 	.banks		  = 1,
 	.pwrsts_mem_ret	= {
@@ -120,6 +120,14 @@ static struct powerdomain dss_54xx_pwrdm = {
 		[0] = PWRSTS_OFF_RET,	/* dss_mem */
 	},
 	.flags		  = PWRDM_HAS_LOWPOWERSTATECHANGE,
+	.wakeup_lat = {
+		[PWRDM_POWER_OFF] = 1000,
+		[PWRDM_POWER_OSWR] = 500,
+		[PWRDM_POWER_CSWR] = UNSUP_STATE,
+		[PWRDM_POWER_RET] = UNSUP_STATE,
+		[PWRDM_POWER_INACTIVE] = 20,
+		[PWRDM_POWER_ON] = 0,
+	},
 };
 
 /* cpu0_54xx_pwrdm: MPU0 processor and Neon coprocessor power domain */
