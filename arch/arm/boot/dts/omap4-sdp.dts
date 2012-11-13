@@ -99,6 +99,7 @@
 
 		ti,mcpdm = <&mcpdm>;
 		ti,dmic = <&dmic>;
+		ti,mcasp = <&mcasp>;
 		ti,mcbsp1 = <&mcbsp1>;
 		ti,mcbsp2 = <&mcbsp2>;
 
