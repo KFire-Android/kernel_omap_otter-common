@@ -243,6 +243,14 @@ static struct powerdomain custefuse_54xx_pwrdm = {
 	.prcm_partition	  = OMAP54XX_PRM_PARTITION,
 	.pwrsts		  = PWRSTS_OFF_ON,
 	.flags		  = PWRDM_HAS_LOWPOWERSTATECHANGE,
+	.wakeup_lat = {
+		[PWRDM_POWER_OFF] = UNSUP_STATE,
+		[PWRDM_POWER_OSWR] = UNSUP_STATE,
+		[PWRDM_POWER_CSWR] = UNSUP_STATE,
+		[PWRDM_POWER_RET] = UNSUP_STATE,
+		[PWRDM_POWER_INACTIVE] = UNSUP_STATE,
+		[PWRDM_POWER_ON] = 0,
+	},
 };
 
 /* dsp_54xx_pwrdm: Tesla processor power domain */
