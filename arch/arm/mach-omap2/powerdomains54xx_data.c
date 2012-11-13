@@ -196,6 +196,14 @@ static struct powerdomain emu_54xx_pwrdm = {
 	.pwrsts_mem_on	= {
 		[0] = PWRSTS_OFF_RET,	/* emu_bank */
 	},
+	.wakeup_lat = {
+		[PWRDM_POWER_OFF] = UNSUP_STATE,
+		[PWRDM_POWER_OSWR] = UNSUP_STATE,
+		[PWRDM_POWER_CSWR] = UNSUP_STATE,
+		[PWRDM_POWER_RET] = UNSUP_STATE,
+		[PWRDM_POWER_INACTIVE] = UNSUP_STATE,
+		[PWRDM_POWER_ON] = 0,
+	},
 };
 
 /* mpu_54xx_pwrdm: Modena processor and the Neon coprocessor power domain */
