@@ -382,7 +382,7 @@ static struct powerdomain iva_54xx_pwrdm = {
 	.voltdm		  = { .name = "mm" },
 	.prcm_offs	  = OMAP54XX_PRM_IVA_INST,
 	.prcm_partition	  = OMAP54XX_PRM_PARTITION,
-	.pwrsts		  = PWRSTS_OFF_RET_ON,
+	.pwrsts		  = PWRSTS_OFF_RET_INA_ON,
 	.pwrsts_logic_ret = PWRSTS_OFF,
 	.banks		  = 4,
 	.pwrsts_mem_ret	= {
@@ -398,6 +398,14 @@ static struct powerdomain iva_54xx_pwrdm = {
 		[3] = PWRSTS_OFF_RET,	/* tcm2_mem */
 	},
 	.flags		  = PWRDM_HAS_LOWPOWERSTATECHANGE,
+	.wakeup_lat = {
+		[PWRDM_POWER_OFF] = 1000,
+		[PWRDM_POWER_OSWR] = 500,
+		[PWRDM_POWER_CSWR] = UNSUP_STATE,
+		[PWRDM_POWER_RET] = UNSUP_STATE,
+		[PWRDM_POWER_INACTIVE] = 20,
+		[PWRDM_POWER_ON] = 0,
+	},
 };
 
 /*
