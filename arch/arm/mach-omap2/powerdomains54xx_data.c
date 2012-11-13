@@ -273,6 +273,14 @@ static struct powerdomain dsp_54xx_pwrdm = {
 		[2] = PWRSTS_OFF_RET,	/* dsp_l2 */
 	},
 	.flags		  = PWRDM_HAS_LOWPOWERSTATECHANGE,
+	.wakeup_lat = {
+		[PWRDM_POWER_OFF] = 1000,
+		[PWRDM_POWER_OSWR] = 600,
+		[PWRDM_POWER_CSWR] = 300,
+		[PWRDM_POWER_RET] = UNSUP_STATE,
+		[PWRDM_POWER_INACTIVE] = 20,
+		[PWRDM_POWER_ON] = 0,
+	},
 };
 
 /* cam_54xx_pwrdm: Camera subsystem power domain */
