@@ -325,7 +325,15 @@ static struct powerdomain l3init_54xx_pwrdm = {
 		[0] = PWRSTS_OFF_RET,	/* l3init_bank1 */
 		[1] = PWRSTS_OFF_RET,	/* l3init_bank2 */
 	},
-	.flags		  = PWRDM_HAS_LOWPOWERSTATECHANGE,
+	.flags		  = PWRDM_HAS_LOWPOWERSTATECHANGE | PWRDM_HAS_HDWR_SAR,
+	.wakeup_lat = {
+		[PWRDM_POWER_OFF] = 1000,
+		[PWRDM_POWER_OSWR] = 600,
+		[PWRDM_POWER_CSWR] = 300,
+		[PWRDM_POWER_RET] = UNSUP_STATE,
+		[PWRDM_POWER_INACTIVE] = 20,
+		[PWRDM_POWER_ON] = 0,
+	},
 };
 
 /* gpu_54xx_pwrdm: 3D accelerator power domain */
