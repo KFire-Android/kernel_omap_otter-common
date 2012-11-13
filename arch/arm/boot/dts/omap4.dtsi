@@ -376,6 +376,15 @@
 			ti,hwmods = "dmic";
 		};
 
+		mcasp: mcasp@4012e000 {
+			compatible = "ti,omap4-mcasp";
+			reg = <0x40128000 0x7f>, /* MPU private access */
+			      <0x49028000 0x7f>; /* L3 Interconnect */
+			reg-names = "mpu", "dma";
+			interrupts = <0 109 0x4>;
+			ti,hwmods = "mcasp";
+		};
+
 		mcbsp1: mcbsp@40122000 {
 			compatible = "ti,omap4-mcbsp";
 			reg = <0x40122000 0xff>, /* MPU private access */
