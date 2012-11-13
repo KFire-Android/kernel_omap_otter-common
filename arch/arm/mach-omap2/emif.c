@@ -369,7 +369,8 @@ static u32 get_sdram_tim_2_reg(const struct lpddr2_timings *timings,
 	return tim2;
 }
 
-static u32 get_sdram_tim_3_reg(const struct lpddr2_timings *timings,
+static u32 get_sdram_tim_3_reg(u32 freq,
+			       const struct lpddr2_timings *timings,
 			       const struct lpddr2_min_tck *min_tck,
 			       const struct lpddr2_addressing *addressing)
 {
@@ -382,7 +383,13 @@ static u32 get_sdram_tim_3_reg(const struct lpddr2_timings *timings,
 	mask_n_set(tim3, OMAP44XX_REG_T_RFC_SHIFT, OMAP44XX_REG_T_RFC_MASK,
 		   val);
 
-	val = ns_x2_2_cycles(timings->tDQSCKMAXx2) - 1;
+	if (freq < 400000000)
+		val = ns_x2_2_cycles(timings->tDQSCKMAXx2) - 1;
+	else if (freq == 400000000)
+		val = 0x2;
+	else
+		val = 0x3;
+
 	mask_n_set(tim3, OMAP44XX_REG_T_TDQSCKMAX_SHIFT,
 		   OMAP44XX_REG_T_TDQSCKMAX_MASK, val);
 
@@ -448,17 +455,28 @@ static u32 get_ddr_phy_ctrl_1(u32 freq, u8 RL)
 {
 	u32 phy = 0, val = 0;
 
+	if (RL == 6)
+		val = 0x9;
+	else if (RL == 7)
+		val = 0xB;
+	else
+		val = RL + 2;
+
 	mask_n_set(phy, OMAP44XX_REG_READ_LATENCY_SHIFT,
-		   OMAP44XX_REG_READ_LATENCY_MASK, RL + 2);
+		   OMAP44XX_REG_READ_LATENCY_MASK, val);
 
 	if (freq <= 100000000)
 		val = EMIF_DLL_SLAVE_DLY_CTRL_100_MHZ_AND_LESS;
 	else if (freq <= 200000000)
 		val = EMIF_DLL_SLAVE_DLY_CTRL_200_MHZ;
 	else if (freq <= 400000000)
-		val = EMIF_DLL_SLAVE_DLY_CTRL_400_MHZ;
+		if (cpu_is_omap447x())
+			val = EMIF_DLL_SLAVE_DLY_CTRL_466_MHZ;
+		else
+			val = EMIF_DLL_SLAVE_DLY_CTRL_400_MHZ;
 	else
 		val = EMIF_DLL_SLAVE_DLY_CTRL_466_MHZ;
+
 	mask_n_set(phy, OMAP44XX_REG_DLL_SLAVE_DLY_CTRL_SHIFT,
 		   OMAP44XX_REG_DLL_SLAVE_DLY_CTRL_MASK, val);
 
@@ -956,7 +974,7 @@ static void emif_calculate_regs(const struct emif_device_details *devices,
 	regs->sdram_tim2_shdw = get_sdram_tim_2_reg(timings, min_tck);
 
 	regs->sdram_tim3_shdw =
-	    get_sdram_tim_3_reg(timings, min_tck, addressing);
+	    get_sdram_tim_3_reg(freq, timings, min_tck, addressing);
 
 	regs->read_idle_ctrl_shdw_normal =
 	    get_read_idle_ctrl_reg(LPDDR2_VOLTAGE_STABLE);
