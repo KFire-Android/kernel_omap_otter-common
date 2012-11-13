@@ -37,7 +37,8 @@ static struct powerdomain core_54xx_pwrdm = {
 	.voltdm		  = { .name = "core" },
 	.prcm_offs	  = OMAP54XX_PRM_CORE_INST,
 	.prcm_partition	  = OMAP54XX_PRM_PARTITION,
-	.pwrsts		  = PWRSTS_RET_ON,
+	.context_offs	  = OMAP54XX_RM_L3MAIN1_L3_MAIN_1_CONTEXT_OFFSET,
+	.pwrsts		  = PWRSTS_RET_INA_ON,
 	.pwrsts_logic_ret = PWRSTS_OFF_RET,
 	.banks		  = 5,
 	.pwrsts_mem_ret	= {
@@ -55,6 +56,15 @@ static struct powerdomain core_54xx_pwrdm = {
 		[4] = PWRSTS_OFF_RET,	/* ipu_unicache */
 	},
 	.flags		  = PWRDM_HAS_LOWPOWERSTATECHANGE,
+	.wakeup_lat = {
+		/* CPUIdle and suspend controls this explicitly */
+		[PWRDM_POWER_OFF] = UNSUP_STATE,
+		[PWRDM_POWER_OSWR] = UNSUP_STATE,
+		[PWRDM_POWER_CSWR] = UNSUP_STATE,
+		[PWRDM_POWER_RET] = UNSUP_STATE,
+		[PWRDM_POWER_INACTIVE] = UNSUP_STATE,
+		[PWRDM_POWER_ON] = UNSUP_STATE,
+	},
 };
 
 /* abe_54xx_pwrdm: Audio back end power domain */
