@@ -16,7 +16,7 @@
  *
  */
 
-#include <mach/ctrl_module_core_44xx.h>
+#include <mach/ctrl_module_core_54xx.h>
 #include "omap-bandgap.h"
 
 /*
@@ -29,37 +29,37 @@
  */
 static struct temp_sensor_registers
 omap5430_mpu_temp_sensor_registers = {
-	.temp_sensor_ctrl = OMAP5430_TEMP_SENSOR_MPU_OFFSET,
-	.bgap_tempsoff_mask = OMAP5430_BGAP_TEMPSOFF_MASK,
-	.bgap_soc_mask = OMAP5430_BGAP_TEMP_SENSOR_SOC_MASK,
-	.bgap_eocz_mask = OMAP5430_BGAP_TEMP_SENSOR_EOCZ_MASK,
-	.bgap_dtemp_mask = OMAP5430_BGAP_TEMP_SENSOR_DTEMP_MASK,
+	.temp_sensor_ctrl = OMAP5_CTRL_MODULE_CORE_TEMP_SENSOR_MPU,
+	.bgap_tempsoff_mask = OMAP5_BGAP_TMPSOFF_MPU_MASK,
+	.bgap_soc_mask = OMAP5_BGAP_SOC_MPU_MASK,
+	.bgap_eocz_mask = OMAP5_BGAP_EOCZ_MPU_MASK,
+	.bgap_dtemp_mask = OMAP5_BGAP_DTEMP_MPU_MASK,
 
-	.bgap_mask_ctrl = OMAP5430_BGAP_CTRL_OFFSET,
-	.mask_hot_mask = OMAP5430_MASK_HOT_MPU_MASK,
-	.mask_cold_mask = OMAP5430_MASK_COLD_MPU_MASK,
+	.bgap_mask_ctrl = OMAP5_CTRL_MODULE_CORE_BANDGAP_MASK,
+	.mask_hot_mask = OMAP5_MASK_HOT_MPU_MASK,
+	.mask_cold_mask = OMAP5_MASK_COLD_MPU_MASK,
 
-	.bgap_mode_ctrl = OMAP5430_BGAP_COUNTER_MPU_OFFSET,
-	.mode_ctrl_mask = OMAP5430_REPEAT_MODE_MASK,
+	.bgap_mode_ctrl = OMAP5_CTRL_MODULE_CORE_BANDGAP_COUNTER_MPU,
+	.mode_ctrl_mask = OMAP5_REPEAT_MODE_MPU_MASK,
 
-	.bgap_counter = OMAP5430_BGAP_COUNTER_MPU_OFFSET,
-	.counter_mask = OMAP5430_COUNTER_MASK,
+	.bgap_counter = OMAP5_CTRL_MODULE_CORE_BANDGAP_COUNTER_MPU,
+	.counter_mask = OMAP5_COUNTER_MPU_MASK,
 
-	.bgap_threshold = OMAP5430_BGAP_THRESHOLD_MPU_OFFSET,
-	.threshold_thot_mask = OMAP5430_T_HOT_MASK,
-	.threshold_tcold_mask = OMAP5430_T_COLD_MASK,
+	.bgap_threshold = OMAP5_CTRL_MODULE_CORE_BANDGAP_THRESHOLD_MPU,
+	.threshold_thot_mask = OMAP5_THOLD_HOT_MPU_MASK,
+	.threshold_tcold_mask = OMAP5_THOLD_COLD_MPU_MASK,
 
-	.tshut_threshold = OMAP5430_BGAP_TSHUT_MPU_OFFSET,
-	.tshut_hot_mask = OMAP5430_TSHUT_HOT_MASK,
-	.tshut_cold_mask = OMAP5430_TSHUT_COLD_MASK,
+	.tshut_threshold = OMAP5_CTRL_MODULE_CORE_BANDGAP_TSHUT_MPU,
+	.tshut_hot_mask = OMAP5_TSHUT_HOT_MPU_MASK,
+	.tshut_cold_mask = OMAP5_TSHUT_COLD_MPU_MASK,
 
-	.bgap_status = OMAP5430_BGAP_STATUS_OFFSET,
+	.bgap_status = OMAP5_CTRL_MODULE_CORE_BANDGAP_STATUS,
 	.status_clean_stop_mask = 0x0,
-	.status_bgap_alert_mask = OMAP5430_BGAP_ALERT_MASK,
-	.status_hot_mask = OMAP5430_HOT_MPU_FLAG_MASK,
-	.status_cold_mask = OMAP5430_COLD_MPU_FLAG_MASK,
+	.status_bgap_alert_mask = OMAP5_ALERT_MASK,
+	.status_hot_mask = OMAP5_HOT_MPU_MASK,
+	.status_cold_mask = OMAP5_COLD_MPU_MASK,
 
-	.bgap_efuse = OMAP5430_FUSE_OPP_BGAP_MPU,
+	.bgap_efuse = OMAP5_CTRL_MODULE_CORE_STD_FUSE_OPP_BGAP_MPU,
 };
 
 /*
@@ -67,37 +67,37 @@ omap5430_mpu_temp_sensor_registers = {
  */
 static struct temp_sensor_registers
 omap5430_gpu_temp_sensor_registers = {
-	.temp_sensor_ctrl = OMAP5430_TEMP_SENSOR_GPU_OFFSET,
-	.bgap_tempsoff_mask = OMAP5430_BGAP_TEMPSOFF_MASK,
-	.bgap_soc_mask = OMAP5430_BGAP_TEMP_SENSOR_SOC_MASK,
-	.bgap_eocz_mask = OMAP5430_BGAP_TEMP_SENSOR_EOCZ_MASK,
-	.bgap_dtemp_mask = OMAP5430_BGAP_TEMP_SENSOR_DTEMP_MASK,
+	.temp_sensor_ctrl = OMAP5_CTRL_MODULE_CORE_TEMP_SENSOR_MM,
+	.bgap_tempsoff_mask = OMAP5_BGAP_TMPSOFF_MM_MASK,
+	.bgap_soc_mask = OMAP5_BGAP_SOC_MM_MASK,
+	.bgap_eocz_mask = OMAP5_BGAP_EOCZ_MM_MASK,
+	.bgap_dtemp_mask = OMAP5_BGAP_DTEMP_MM_MASK,
 
-	.bgap_mask_ctrl = OMAP5430_BGAP_CTRL_OFFSET,
-	.mask_hot_mask = OMAP5430_MASK_HOT_MM_MASK,
-	.mask_cold_mask = OMAP5430_MASK_COLD_MM_MASK,
+	.bgap_mask_ctrl = OMAP5_CTRL_MODULE_CORE_BANDGAP_MASK,
+	.mask_hot_mask = OMAP5_MASK_HOT_MM_MASK,
+	.mask_cold_mask = OMAP5_MASK_COLD_MM_MASK,
 
-	.bgap_mode_ctrl = OMAP5430_BGAP_COUNTER_GPU_OFFSET,
-	.mode_ctrl_mask = OMAP5430_REPEAT_MODE_MASK,
+	.bgap_mode_ctrl = OMAP5_CTRL_MODULE_CORE_BANDGAP_COUNTER_MM,
+	.mode_ctrl_mask = OMAP5_REPEAT_MODE_MM_MASK,
 
-	.bgap_counter = OMAP5430_BGAP_COUNTER_GPU_OFFSET,
-	.counter_mask = OMAP5430_COUNTER_MASK,
+	.bgap_counter = OMAP5_CTRL_MODULE_CORE_BANDGAP_COUNTER_MM,
+	.counter_mask = OMAP5_COUNTER_MM_MASK,
 
-	.bgap_threshold = OMAP5430_BGAP_THRESHOLD_GPU_OFFSET,
-	.threshold_thot_mask = OMAP5430_T_HOT_MASK,
-	.threshold_tcold_mask = OMAP5430_T_COLD_MASK,
+	.bgap_threshold = OMAP5_CTRL_MODULE_CORE_BANDGAP_THRESHOLD_MM,
+	.threshold_thot_mask = OMAP5_THOLD_HOT_MM_MASK,
+	.threshold_tcold_mask = OMAP5_THOLD_COLD_MM_MASK,
 
-	.tshut_threshold = OMAP5430_BGAP_TSHUT_GPU_OFFSET,
-	.tshut_hot_mask = OMAP5430_TSHUT_HOT_MASK,
-	.tshut_cold_mask = OMAP5430_TSHUT_COLD_MASK,
+	.tshut_threshold = OMAP5_CTRL_MODULE_CORE_BANDGAP_TSHUT_MM,
+	.tshut_hot_mask = OMAP5_TSHUT_HOT_MM_MASK,
+	.tshut_cold_mask = OMAP5_TSHUT_COLD_MM_MASK,
 
-	.bgap_status = OMAP5430_BGAP_STATUS_OFFSET,
+	.bgap_status = OMAP5_CTRL_MODULE_CORE_BANDGAP_STATUS,
 	.status_clean_stop_mask = 0x0,
-	.status_bgap_alert_mask = OMAP5430_BGAP_ALERT_MASK,
-	.status_hot_mask = OMAP5430_HOT_MM_FLAG_MASK,
-	.status_cold_mask = OMAP5430_COLD_MM_FLAG_MASK,
+	.status_bgap_alert_mask = OMAP5_ALERT_MASK,
+	.status_hot_mask = OMAP5_HOT_MM_MASK,
+	.status_cold_mask = OMAP5_COLD_MM_MASK,
 
-	.bgap_efuse = OMAP5430_FUSE_OPP_BGAP_GPU,
+	.bgap_efuse = OMAP5_CTRL_MODULE_CORE_STD_FUSE_OPP_BGAP_MM,
 };
 
 /*
@@ -105,37 +105,37 @@ omap5430_gpu_temp_sensor_registers = {
  */
 static struct temp_sensor_registers
 omap5430_core_temp_sensor_registers = {
-	.temp_sensor_ctrl = OMAP5430_TEMP_SENSOR_CORE_OFFSET,
-	.bgap_tempsoff_mask = OMAP5430_BGAP_TEMPSOFF_MASK,
-	.bgap_soc_mask = OMAP5430_BGAP_TEMP_SENSOR_SOC_MASK,
-	.bgap_eocz_mask = OMAP5430_BGAP_TEMP_SENSOR_EOCZ_MASK,
-	.bgap_dtemp_mask = OMAP5430_BGAP_TEMP_SENSOR_DTEMP_MASK,
+	.temp_sensor_ctrl = OMAP5_CTRL_MODULE_CORE_TEMP_SENSOR_CORE,
+	.bgap_tempsoff_mask = OMAP5_BGAP_TMPSOFF_CORE_MASK,
+	.bgap_soc_mask = OMAP5_BGAP_SOC_CORE_MASK,
+	.bgap_eocz_mask = OMAP5_BGAP_EOCZ_CORE_MASK,
+	.bgap_dtemp_mask = OMAP5_BGAP_DTEMP_CORE_MASK,
 
-	.bgap_mask_ctrl = OMAP5430_BGAP_CTRL_OFFSET,
-	.mask_hot_mask = OMAP5430_MASK_HOT_CORE_MASK,
-	.mask_cold_mask = OMAP5430_MASK_COLD_CORE_MASK,
+	.bgap_mask_ctrl = OMAP5_CTRL_MODULE_CORE_BANDGAP_MASK,
+	.mask_hot_mask = OMAP5_MASK_HOT_CORE_MASK,
+	.mask_cold_mask = OMAP5_MASK_COLD_CORE_MASK,
 
-	.bgap_mode_ctrl = OMAP5430_BGAP_COUNTER_CORE_OFFSET,
-	.mode_ctrl_mask = OMAP5430_REPEAT_MODE_MASK,
+	.bgap_mode_ctrl = OMAP5_CTRL_MODULE_CORE_BANDGAP_COUNTER_CORE,
+	.mode_ctrl_mask = OMAP5_REPEAT_MODE_MPU_MASK,
 
-	.bgap_counter = OMAP5430_BGAP_COUNTER_CORE_OFFSET,
-	.counter_mask = OMAP5430_COUNTER_MASK,
+	.bgap_counter = OMAP5_CTRL_MODULE_CORE_BANDGAP_COUNTER_CORE,
+	.counter_mask = OMAP5_COUNTER_CORE_MASK,
 
-	.bgap_threshold = OMAP5430_BGAP_THRESHOLD_CORE_OFFSET,
-	.threshold_thot_mask = OMAP5430_T_HOT_MASK,
-	.threshold_tcold_mask = OMAP5430_T_COLD_MASK,
+	.bgap_threshold = OMAP5_CTRL_MODULE_CORE_BANDGAP_THRESHOLD_CORE,
+	.threshold_thot_mask = OMAP5_THOLD_HOT_CORE_MASK,
+	.threshold_tcold_mask = OMAP5_THOLD_COLD_CORE_MASK,
 
-	.tshut_threshold = OMAP5430_BGAP_TSHUT_CORE_OFFSET,
-	.tshut_hot_mask = OMAP5430_TSHUT_HOT_MASK,
-	.tshut_cold_mask = OMAP5430_TSHUT_COLD_MASK,
+	.tshut_threshold = OMAP5_CTRL_MODULE_CORE_BANDGAP_TSHUT_CORE,
+	.tshut_hot_mask = OMAP5_TSHUT_HOT_CORE_MASK,
+	.tshut_cold_mask = OMAP5_TSHUT_COLD_CORE_MASK,
 
-	.bgap_status = OMAP5430_BGAP_STATUS_OFFSET,
+	.bgap_status = OMAP5_CTRL_MODULE_CORE_BANDGAP_STATUS,
 	.status_clean_stop_mask = 0x0,
-	.status_bgap_alert_mask = OMAP5430_BGAP_ALERT_MASK,
-	.status_hot_mask = OMAP5430_HOT_CORE_FLAG_MASK,
-	.status_cold_mask = OMAP5430_COLD_CORE_FLAG_MASK,
+	.status_bgap_alert_mask = OMAP5_ALERT_MASK,
+	.status_hot_mask = OMAP5_HOT_CORE_MASK,
+	.status_cold_mask = OMAP5_COLD_CORE_MASK,
 
-	.bgap_efuse = OMAP5430_FUSE_OPP_BGAP_CORE,
+	.bgap_efuse = OMAP5_CTRL_MODULE_CORE_STD_FUSE_OPP_BGAP_CORE,
 };
 
 /* Thresholds and limits for OMAP5430 MPU temperature sensor */
