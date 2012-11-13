@@ -52,6 +52,7 @@
 #include "mux.h"
 #include "common-board-devices.h"
 #include "omap4_ion.h"
+#include "omap_ram_console.h"
 
 #define GPIO_HUB_POWER		1
 #define GPIO_HUB_NRESET		62
@@ -611,6 +612,9 @@ static void __init omap4_panda_init(void)
 
 static void __init omap4_panda_reserve(void)
 {
+	omap_ram_console_init(OMAP_RAM_CONSOLE_START_DEFAULT,
+			OMAP_RAM_CONSOLE_SIZE_DEFAULT);
+
 	omap_rproc_reserve_cma(RPROC_CMA_OMAP4);
 
 	omap4_ion_init();
