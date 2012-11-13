@@ -2870,12 +2870,6 @@ static struct omap_hwmod_rst_info omap54xx_ipu_resets[] = {
 
 static struct omap_hwmod_addr_space omap54xx_ipu_addrs[] = {
 	{
-		.name		= "unicache_mmu",
-		.pa_start	= 0x55080800,
-		.pa_end		= 0x55080fff,
-	},
-	{
-		.name		= "teslass_mmu",
 		.pa_start	= 0x55082000,
 		.pa_end		= 0x550820ff,
 		.flags		= ADDR_TYPE_RT
