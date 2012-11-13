@@ -41,10 +41,10 @@ static struct cpuidle_params cpuidle_params_table[] = {
 	/* C1 - CPU0 ON + CPU1 ON + MPU ON + CORE ON */
 	{.exit_latency = 2 + 2 , .target_residency = 5, .valid = 1},
 	/* C2- CPU0 CSWR + CPU1 CSWR + MPU CSWR + CORE INA */
-	{.exit_latency = 100 + 100 , .target_residency = 200, .valid = 1},
+	{.exit_latency = 150 + 2110 , .target_residency = 100, .valid = 1},
 
 	/* C3- CPU0 CSWR + CPU1 CSWR + MPU CSWR + CORE CSWR */
-	{.exit_latency = 328 + 440 , .target_residency = 960, .valid = 1},
+	{.exit_latency = 155 + 2120 , .target_residency = 1000, .valid = 1},
 
 	/*
 	 * FIXME: Original C state target:
@@ -56,7 +56,7 @@ static struct cpuidle_params cpuidle_params_table[] = {
 	 * and CORE OSWR.
 	 */
 	/* C4 - CPU0 CSWR + CPU1 CSWR + MPU CSWR  + CORE OSWR */
-	{.exit_latency = 1200, .target_residency = 1200, .valid = 1},
+	{.exit_latency = 164 + 2130, .target_residency = 2000, .valid = 1},
 };
 
 #define OMAP5_NUM_STATES ARRAY_SIZE(cpuidle_params_table)
