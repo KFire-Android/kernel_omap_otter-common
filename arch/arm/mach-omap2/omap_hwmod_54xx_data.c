@@ -1452,45 +1452,6 @@ static struct omap_hwmod omap54xx_dss_dsi1_a_hwmod = {
 	.slaves_cnt	= ARRAY_SIZE(omap54xx_dss_dsi1_a_slaves),
 };
 
-/* dss_dsi1_b */
-static struct omap_hwmod omap54xx_dss_dsi1_b_hwmod;
-static struct omap_hwmod_addr_space omap54xx_dss_dsi1_b_addrs[] = {
-	{
-		.pa_start	= 0x58005000,
-		.pa_end		= 0x580051ff,
-		.flags		= ADDR_TYPE_RT
-	},
-	{ }
-};
-
-/* l3_main_2 -> dss_dsi1_b */
-static struct omap_hwmod_ocp_if omap54xx_l3_main_2__dss_dsi1_b = {
-	.master		= &omap54xx_l3_main_2_hwmod,
-	.slave		= &omap54xx_dss_dsi1_b_hwmod,
-	.clk		= "l3_iclk_div",
-	.addr		= omap54xx_dss_dsi1_b_addrs,
-	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-};
-
-/* dss_dsi1_b slave ports */
-static struct omap_hwmod_ocp_if *omap54xx_dss_dsi1_b_slaves[] = {
-	&omap54xx_l3_main_2__dss_dsi1_b,
-};
-
-static struct omap_hwmod omap54xx_dss_dsi1_b_hwmod = {
-	.name		= "dss_dsi1_b",
-	.class		= &omap54xx_dsi1_hwmod_class,
-	.clkdm_name	= "dss_clkdm",
-	.main_clk	= "dss_dss_clk",
-	.prcm = {
-		.omap4 = {
-			.context_offs = USHRT_MAX,
-		},
-	},
-	.slaves		= omap54xx_dss_dsi1_b_slaves,
-	.slaves_cnt	= ARRAY_SIZE(omap54xx_dss_dsi1_b_slaves),
-};
-
 /* dss_dsi1_c */
 static struct omap_hwmod omap54xx_dss_dsi1_c_hwmod;
 static struct omap_hwmod_irq_info omap54xx_dss_dsi1_c_irqs[] = {
@@ -6363,7 +6324,6 @@ static __initdata struct omap_hwmod *omap54xx_hwmods[] = {
 	&omap54xx_dss_hwmod,
 	&omap54xx_dss_dispc_hwmod,
 	&omap54xx_dss_dsi1_a_hwmod,
-	&omap54xx_dss_dsi1_b_hwmod,
 	&omap54xx_dss_dsi1_c_hwmod,
 	&omap54xx_dss_hdmi_hwmod,
 	&omap54xx_dss_rfbi_hwmod,
