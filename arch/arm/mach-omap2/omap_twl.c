@@ -29,13 +29,14 @@
 #define TWL4030_VDD1_SR_CONTROL_REG	0x00
 #define TWL4030_VDD2_SR_CONTROL_REG	0x01
 
-#define OMAP4_SRI2C_SLAVE_ADDR		0x12
-#define OMAP4_VDD_MPU_SR_VOLT_REG	0x55
-#define OMAP4_VDD_MPU_SR_CMD_REG	0x56
-#define OMAP4_VDD_IVA_SR_VOLT_REG	0x5B
-#define OMAP4_VDD_IVA_SR_CMD_REG	0x5C
-#define OMAP4_VDD_CORE_SR_VOLT_REG	0x61
-#define OMAP4_VDD_CORE_SR_CMD_REG	0x62
+/* TWL6030 */
+#define TWL6030_SRI2C_SLAVE_ADDR	0x12
+#define TWL6030_VCORE1_SR_VOLT_REG	0x55
+#define TWL6030_VCORE1_SR_CMD_REG	0x56
+#define TWL6030_VCORE2_SR_VOLT_REG	0x5B
+#define TWL6030_VCORE2_SR_CMD_REG	0x5C
+#define TWL6030_VCORE3_SR_VOLT_REG	0x61
+#define TWL6030_VCORE3_SR_CMD_REG	0x62
 
 static bool is_offset_valid;
 static u8 smps_offset;
@@ -174,9 +175,9 @@ static struct omap_voltdm_pmic twl6030_vcore1_pmic = {
 	.vddmin			= 0,
 	.vddmax			= 2100000,
 	.vp_timeout_us		= OMAP4_VP_VLIMITTO_TIMEOUT_US,
-	.i2c_slave_addr		= OMAP4_SRI2C_SLAVE_ADDR,
-	.volt_reg_addr		= OMAP4_VDD_MPU_SR_VOLT_REG,
-	.cmd_reg_addr		= OMAP4_VDD_MPU_SR_CMD_REG,
+	.i2c_slave_addr		= TWL6030_SRI2C_SLAVE_ADDR,
+	.volt_reg_addr		= TWL6030_VCORE1_SR_VOLT_REG,
+	.cmd_reg_addr		= TWL6030_VCORE1_SR_CMD_REG,
 	.i2c_high_speed		= true,
 	.i2c_scll_low		= 0x28,
 	.i2c_scll_high		= 0x2C,
@@ -196,9 +197,9 @@ static struct omap_voltdm_pmic twl6030_vcore2_pmic = {
 	.vddmin			= 0,
 	.vddmax			= 2100000,
 	.vp_timeout_us		= OMAP4_VP_VLIMITTO_TIMEOUT_US,
-	.i2c_slave_addr		= OMAP4_SRI2C_SLAVE_ADDR,
-	.volt_reg_addr		= OMAP4_VDD_IVA_SR_VOLT_REG,
-	.cmd_reg_addr		= OMAP4_VDD_IVA_SR_CMD_REG,
+	.i2c_slave_addr		= TWL6030_SRI2C_SLAVE_ADDR,
+	.volt_reg_addr		= TWL6030_VCORE2_SR_VOLT_REG,
+	.cmd_reg_addr		= TWL6030_VCORE2_SR_CMD_REG,
 	.i2c_high_speed		= true,
 	.i2c_scll_low		= 0x28,
 	.i2c_scll_high		= 0x2C,
@@ -218,14 +219,14 @@ static struct omap_voltdm_pmic twl6030_vcore3_pmic = {
 	.vddmin			= 0,
 	.vddmax			= 2100000,
 	.vp_timeout_us		= OMAP4_VP_VLIMITTO_TIMEOUT_US,
-	.i2c_slave_addr		= OMAP4_SRI2C_SLAVE_ADDR,
+	.i2c_slave_addr		= TWL6030_SRI2C_SLAVE_ADDR,
+	.volt_reg_addr		= TWL6030_VCORE3_SR_VOLT_REG,
+	.cmd_reg_addr		= TWL6030_VCORE3_SR_CMD_REG,
 	.i2c_high_speed		= true,
 	.i2c_scll_low		= 0x28,
 	.i2c_scll_high		= 0x2C,
 	.i2c_hscll_low		= 0x0B,
 	.i2c_hscll_high		= 0x00,
-	.volt_reg_addr		= OMAP4_VDD_CORE_SR_VOLT_REG,
-	.cmd_reg_addr		= OMAP4_VDD_CORE_SR_CMD_REG,
 	.vsel_to_uv		= twl6030_vsel_to_uv,
 	.uv_to_vsel		= twl6030_uv_to_vsel,
 };
