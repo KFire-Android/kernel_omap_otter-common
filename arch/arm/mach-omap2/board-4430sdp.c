@@ -1048,7 +1048,7 @@ static void __init omap_4430sdp_display_init(void)
 
 #ifdef CONFIG_OMAP_MUX
 static struct omap_board_mux board_mux[] __initdata = {
-	OMAP4_MUX(USBB2_ULPITLL_CLK, OMAP_MUX_MODE4 | OMAP_PIN_OUTPUT),
+	OMAP4_MUX(USBB2_ULPITLL_CLK, OMAP_MUX_MODE3 | OMAP_PIN_OUTPUT),
 	OMAP4_MUX(SYS_NIRQ2, OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP |
 				OMAP_PIN_OFF_WAKEUPENABLE),
 	{ .reg_offset = OMAP_MUX_TERMINATOR },
@@ -1098,6 +1098,37 @@ static void __init omap4_sdp4430_wifi_init(void)
 		pr_err("Error registering wl12xx device: %d\n", ret);
 }
 
+#if defined(CONFIG_USB_EHCI_HCD_OMAP) || defined(CONFIG_USB_OHCI_HCD_OMAP3)
+static const struct usbhs_omap_board_data usbhs_bdata __initconst = {
+	.port_mode[0] = OMAP_EHCI_PORT_MODE_PHY,
+	.port_mode[1] = OMAP_OHCI_PORT_MODE_PHY_6PIN_DATSE0,
+	.port_mode[2] = OMAP_USBHS_PORT_MODE_UNUSED,
+	.phy_reset  = false,
+	.reset_gpio_port[0]  = -EINVAL,
+	.reset_gpio_port[1]  = -EINVAL,
+	.reset_gpio_port[2]  = -EINVAL
+};
+
+static void __init omap4_ehci_ohci_init(void)
+{
+	omap_mux_init_signal("usbb2_ulpitll_clk.gpio_157", \
+		OMAP_PIN_OUTPUT | \
+		OMAP_PIN_OFF_NONE);
+
+	/* Power on the ULPI PHY */
+	if (gpio_is_valid(BLAZE_MDM_PWR_EN_GPIO)) {
+		gpio_request(BLAZE_MDM_PWR_EN_GPIO, "USBB1 PHY VMDM_3V3");
+		gpio_direction_output(BLAZE_MDM_PWR_EN_GPIO, 1);
+	}
+
+	usbhs_init(&usbhs_bdata);
+
+	return;
+}
+#else
+static void __init omap4_ehci_ohci_init(void){}
+#endif
+
 static void __init omap_4430sdp_init(void)
 {
 	int status;
@@ -1128,6 +1159,7 @@ static void __init omap_4430sdp_init(void)
 	omap4_sdp4430_wifi_init();
 	omap4_twl6030_hsmmc_init(mmc);
 
+	omap4_ehci_ohci_init();
 	usb_musb_init(&musb_board_data);
 
 	status = omap_ethernet_init();
