@@ -22,13 +22,12 @@
 #include "pm.h"
 #include "twl-common.h"
 
-#define OMAP3_SRI2C_SLAVE_ADDR		0x12
-#define OMAP3_VDD_MPU_SR_CONTROL_REG	0x00
-#define OMAP3_VDD_CORE_SR_CONTROL_REG	0x01
-#define OMAP3_VP_CONFIG_ERROROFFSET	0x00
-#define OMAP3_VP_VSTEPMIN_VSTEPMIN	0x1
-#define OMAP3_VP_VSTEPMAX_VSTEPMAX	0x04
-#define OMAP3_VP_VLIMITTO_TIMEOUT_US	200
+/* PMIC SmartReflex registers */
+
+/* TWL4030 */
+#define TWL4030_SRI2C_SLAVE_ADDR	0x12
+#define TWL4030_VDD1_SR_CONTROL_REG	0x00
+#define TWL4030_VDD2_SR_CONTROL_REG	0x01
 
 #define OMAP4_SRI2C_SLAVE_ADDR		0x12
 #define OMAP4_VDD_MPU_SR_VOLT_REG	0x55
@@ -133,7 +132,7 @@ static u8 twl6030_uv_to_vsel(unsigned long uv)
 		return DIV_ROUND_UP(uv - 607700, 12660) + 1;
 }
 
-static struct omap_voltdm_pmic omap3_mpu_pmic = {
+static struct omap_voltdm_pmic twl4030_vdd1_pmic = {
 	.slew_rate		= 4000,
 	.step_size		= 12500,
 	.vp_erroroffset		= OMAP3_VP_CONFIG_ERROROFFSET,
@@ -142,14 +141,14 @@ static struct omap_voltdm_pmic omap3_mpu_pmic = {
 	.vddmin			= 600000,
 	.vddmax			= 1450000,
 	.vp_timeout_us		= OMAP3_VP_VLIMITTO_TIMEOUT_US,
-	.i2c_slave_addr		= OMAP3_SRI2C_SLAVE_ADDR,
-	.volt_reg_addr		= OMAP3_VDD_MPU_SR_CONTROL_REG,
+	.i2c_slave_addr		= TWL4030_SRI2C_SLAVE_ADDR,
+	.volt_reg_addr		= TWL4030_VDD1_SR_CONTROL_REG,
 	.i2c_high_speed		= true,
 	.vsel_to_uv		= twl4030_vsel_to_uv,
 	.uv_to_vsel		= twl4030_uv_to_vsel,
 };
 
-static struct omap_voltdm_pmic omap3_core_pmic = {
+static struct omap_voltdm_pmic twl4030_vdd2_pmic = {
 	.slew_rate		= 4000,
 	.step_size		= 12500,
 	.vp_erroroffset		= OMAP3_VP_CONFIG_ERROROFFSET,
@@ -158,8 +157,8 @@ static struct omap_voltdm_pmic omap3_core_pmic = {
 	.vddmin			= 600000,
 	.vddmax			= 1450000,
 	.vp_timeout_us		= OMAP3_VP_VLIMITTO_TIMEOUT_US,
-	.i2c_slave_addr		= OMAP3_SRI2C_SLAVE_ADDR,
-	.volt_reg_addr		= OMAP3_VDD_CORE_SR_CONTROL_REG,
+	.i2c_slave_addr		= TWL4030_SRI2C_SLAVE_ADDR,
+	.volt_reg_addr		= TWL4030_VDD2_SR_CONTROL_REG,
 	.i2c_high_speed		= true,
 	.vsel_to_uv		= twl4030_vsel_to_uv,
 	.uv_to_vsel		= twl4030_uv_to_vsel,
@@ -254,13 +253,13 @@ static __initdata struct omap_pmic_map omap_twl_map[] = {
 	{
 		.name = "mpu_iva",
 		.cpu = PMIC_CPU_OMAP3,
-		.pmic_data = &omap3_mpu_pmic,
+		.pmic_data = &twl4030_vdd1_pmic,
 		.special_action = twl_set_sr,
 	},
 	{
 		.name = "core",
 		.cpu = PMIC_CPU_OMAP3,
-		.pmic_data = &omap3_core_pmic,
+		.pmic_data = &twl4030_vdd2_pmic,
 	},
 	{
 		.name = "mpu",
