@@ -65,8 +65,15 @@
 #include "prm-regbits-44xx.h"
 
 #include "prcm_mpu54xx.h"
-#include "prm54xx.h"
+
+#ifdef CONFIG_ARCH_OMAP5_ES1
+#include "prm-regbits-54xx_es1.h"
+#include "prm54xx_es1.h"
+#else
 #include "prm-regbits-54xx.h"
+#include "prm54xx.h"
+#endif
+
 #include "cm44xx.h"
 
 #ifdef CONFIG_SMP

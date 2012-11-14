@@ -716,6 +716,14 @@ static int __init omap4_i2c_init(void)
 	i2c_register_board_info(1, sdp4430_i2c_boardinfo,
 				ARRAY_SIZE(sdp4430_i2c_boardinfo));
 	omap_register_i2c_bus(2, 400, NULL, 0);
+
+	/*
+	 * Drive MSECURE high for TWL6030/6032 write access.
+	 */
+	omap_mux_init_signal("fref_clk0_out.gpio_wk6", OMAP_PIN_OUTPUT);
+	gpio_request(6, "msecure");
+	gpio_direction_output(6, 1);
+
 	return 0;
 }
 

@@ -24,19 +24,26 @@
 #include "clock.h"
 #include "clock44xx.h"
 #include "cm-regbits-44xx.h"
-#include "cm-regbits-54xx.h"
 #include "cm.h"
 #include "clockdomain.h"
 #include "cm1_44xx.h"
-#include "cm1_54xx.h"
 #include "iomap.h"
 #include "common.h"
 #include "cm2_44xx.h"
-#include "cm2_54xx.h"
 
 #include "prcm44xx.h"
 #include "cminst44xx.h"
 #include "cm44xx.h"
+
+#ifdef CONFIG_ARCH_OMAP5_ES1
+#include "cm-regbits-54xx_es1.h"
+#include "cm1_54xx_es1.h"
+#include "cm2_54xx_es1.h"
+#else
+#include "cm-regbits-54xx.h"
+#include "cm1_54xx.h"
+#include "cm2_54xx.h"
+#endif
 
 #define MAX_DPLL_WAIT_TRIES	1000000
 #define MAX_FREQ_UPDATE_TIMEOUT  100000

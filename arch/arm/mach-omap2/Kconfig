@@ -77,6 +77,11 @@ config ARCH_OMAP5
 	select PM_OPP if PM
 	select TI_EMIF
 
+config ARCH_OMAP5_ES1
+	bool "TI OMAP5 ES1"
+	default n
+	depends on ARCH_OMAP5
+
 comment "OMAP Core Type"
 	depends on ARCH_OMAP2
 
