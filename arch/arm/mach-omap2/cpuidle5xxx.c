@@ -44,7 +44,7 @@ static struct cpuidle_params cpuidle_params_table[] = {
 	{.exit_latency = 150 + 2110 , .target_residency = 100, .valid = 1},
 
 	/* C3- CPU0 CSWR + CPU1 CSWR + MPU CSWR + CORE CSWR */
-	{.exit_latency = 155 + 2120 , .target_residency = 1000, .valid = 1},
+	{.exit_latency = 155 + 2120 , .target_residency = 1000, .valid = 0},
 
 	/*
 	 * FIXME: Original C state target:
