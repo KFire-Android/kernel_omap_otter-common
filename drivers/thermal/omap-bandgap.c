@@ -44,6 +44,29 @@
 /* Global bandgap pointer used in PM notifier handlers. */
 static struct omap_bandgap *g_bg_ptr;
 
+static int omap_bandgap_power(struct omap_bandgap *bg_ptr, bool on)
+{
+	struct device *cdev = bg_ptr->dev->parent;
+	struct temp_sensor_registers *tsr;
+	int i, r = 0;
+	u32 ctrl;
+
+	if (!OMAP_BANDGAP_HAS(bg_ptr, POWER_SWITCH))
+		return 0;
+
+	for (i = 0; i < bg_ptr->conf->sensor_count; i++) {
+		tsr = bg_ptr->conf->sensors[i].registers;
+		r |= omap_control_readl(cdev, tsr->temp_sensor_ctrl, &ctrl);
+		ctrl &= ~tsr->bgap_tempsoff_mask;
+		ctrl |= on << __ffs(tsr->bgap_tempsoff_mask);
+
+		/* write BGAP_TEMPSOFF should be reset to 0 */
+		r |= omap_control_writel(cdev, ctrl, tsr->temp_sensor_ctrl);
+	}
+
+	return r;
+}
+
 /* This is the Talert handler. Call it only if HAS(TALERT) is set */
 static irqreturn_t talert_irq_handler(int irq, void *data)
 {
@@ -710,6 +733,41 @@ void *omap_bandgap_get_sensor_data(struct omap_bandgap *bg_ptr, int id)
 	return bg_ptr->conf->sensors[id].data;
 }
 
+static int
+omap_bandgap_force_single_read(struct omap_bandgap *bg_ptr, int id)
+{
+	struct device *cdev = bg_ptr->dev->parent;
+	struct temp_sensor_registers *tsr;
+	u32 temp = 0, counter = 1000;
+	int err = 0;
+
+	tsr = bg_ptr->conf->sensors[id].registers;
+	/* Select single conversion mode */
+	if (OMAP_BANDGAP_HAS(bg_ptr, MODE_CONFIG)) {
+		err = omap_control_readl(cdev, tsr->bgap_mode_ctrl, &temp);
+		temp &= ~(1 << __ffs(tsr->mode_ctrl_mask));
+		omap_control_writel(cdev, temp, tsr->bgap_mode_ctrl);
+	}
+
+	/* Start of Conversion = 1 */
+	err |= omap_control_readl(cdev, tsr->temp_sensor_ctrl, &temp);
+	temp |= 1 << __ffs(tsr->bgap_soc_mask);
+	omap_control_writel(cdev, temp, tsr->temp_sensor_ctrl);
+	/* Wait until DTEMP is updated */
+	err |= omap_control_readl(cdev, tsr->temp_sensor_ctrl, &temp);
+	temp &= (tsr->bgap_dtemp_mask);
+	while ((temp == 0) && --counter) {
+		err |= omap_control_readl(cdev, tsr->temp_sensor_ctrl, &temp);
+		temp &= (tsr->bgap_dtemp_mask);
+	}
+	/* Start of Conversion = 0 */
+	err |= omap_control_readl(cdev, tsr->temp_sensor_ctrl, &temp);
+	temp &= ~(1 << __ffs(tsr->bgap_soc_mask));
+	err |= omap_control_writel(cdev, temp, tsr->temp_sensor_ctrl);
+
+	return err ? -EIO : 0;
+}
+
 /**
  * enable_continuous_mode() - One time enabling of continuous conversion mode
  * @bg_ptr - pointer to scm instance
@@ -724,8 +782,10 @@ static int enable_continuous_mode(struct omap_bandgap *bg_ptr)
 	u32 val;
 
 	for (i = 0; i < bg_ptr->conf->sensor_count; i++) {
+		/* Perform a single read just before enabling continuous */
+		r = omap_bandgap_force_single_read(bg_ptr, i);
 		tsr = bg_ptr->conf->sensors[i].registers;
-		r = omap_control_readl(cdev, tsr->bgap_mode_ctrl, &val);
+		r |= omap_control_readl(cdev, tsr->bgap_mode_ctrl, &val);
 
 		val |= 1 << __ffs(tsr->mode_ctrl_mask);
 
@@ -985,6 +1045,7 @@ int __devinit omap_bandgap_probe(struct platform_device *pdev)
 	if (clk_rate < bg_ptr->conf->sensors[0].ts_data->min_freq ||
 	    clk_rate == 0xffffffff) {
 		ret = -ENODEV;
+		dev_err(&pdev->dev, "wrong clock rate (%d)\n", clk_rate);
 		goto put_clks;
 	}
 
@@ -1000,6 +1061,8 @@ int __devinit omap_bandgap_probe(struct platform_device *pdev)
 	mutex_init(&bg_ptr->bg_mutex);
 	bg_ptr->dev = &pdev->dev;
 	platform_set_drvdata(pdev, bg_ptr);
+
+	omap_bandgap_power(bg_ptr, true);
 
 	/* Set default counter to 1 for now */
 	if (OMAP_BANDGAP_HAS(bg_ptr, COUNTER))
@@ -1083,6 +1146,8 @@ int __devexit omap_bandgap_remove(struct platform_device *pdev)
 		if (bg_ptr->conf->remove_sensor)
 			bg_ptr->conf->remove_sensor(bg_ptr, i);
 
+	omap_bandgap_power(bg_ptr, false);
+
 	clk_disable(bg_ptr->fclock);
 	clk_put(bg_ptr->fclock);
 	clk_put(bg_ptr->div_clk);
@@ -1137,41 +1202,6 @@ static int omap_bandgap_save_ctxt(struct omap_bandgap *bg_ptr)
 	return err ? -EIO : 0;
 }
 
-static int
-omap_bandgap_force_single_read(struct omap_bandgap *bg_ptr, int id)
-{
-	struct device *cdev = bg_ptr->dev->parent;
-	struct temp_sensor_registers *tsr;
-	u32 temp = 0, counter = 1000;
-	int err = 0;
-
-	tsr = bg_ptr->conf->sensors[id].registers;
-	if (OMAP_BANDGAP_HAS(bg_ptr, MODE_CONFIG)) {
-		/* Select single conversion mode */
-		err = omap_control_readl(cdev, tsr->bgap_mode_ctrl, &temp);
-		temp &= ~(1 << __ffs(tsr->mode_ctrl_mask));
-		omap_control_writel(cdev, temp, tsr->bgap_mode_ctrl);
-	}
-
-	/* Start of Conversion = 1 */
-	err |= omap_control_readl(cdev, tsr->temp_sensor_ctrl, &temp);
-	temp |= 1 << __ffs(tsr->bgap_soc_mask);
-	omap_control_writel(cdev, temp, tsr->temp_sensor_ctrl);
-	/* Wait until DTEMP is updated */
-	err |= omap_control_readl(cdev, tsr->temp_sensor_ctrl, &temp);
-	temp &= (tsr->bgap_dtemp_mask);
-	while ((temp == 0) && --counter) {
-		err |= omap_control_readl(cdev, tsr->temp_sensor_ctrl, &temp);
-		temp &= (tsr->bgap_dtemp_mask);
-	}
-	/* Start of Conversion = 0 */
-	err |= omap_control_readl(cdev, tsr->temp_sensor_ctrl, &temp);
-	temp &= ~(1 << __ffs(tsr->bgap_soc_mask));
-	err |= omap_control_writel(cdev, temp, tsr->temp_sensor_ctrl);
-
-	return err ? -EIO : 0;
-}
-
 static int omap_bandgap_restore_ctxt(struct omap_bandgap *bg_ptr)
 {
 	struct device *cdev = bg_ptr->dev->parent;
@@ -1219,6 +1249,7 @@ static int omap_bandgap_suspend(struct device *dev)
 	int err;
 
 	err = omap_bandgap_save_ctxt(bg_ptr);
+	omap_bandgap_power(bg_ptr, false);
 	clk_disable(bg_ptr->fclock);
 
 	return err;
@@ -1229,6 +1260,7 @@ static int omap_bandgap_resume(struct device *dev)
 	struct omap_bandgap *bg_ptr = dev_get_drvdata(dev);
 
 	clk_enable(bg_ptr->fclock);
+	omap_bandgap_power(bg_ptr, true);
 
 	return omap_bandgap_restore_ctxt(bg_ptr);
 }
