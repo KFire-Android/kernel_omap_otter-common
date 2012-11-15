@@ -40,11 +40,13 @@
 #include <linux/of_platform.h>
 #include <linux/irq.h>
 #include <linux/irqdomain.h>
+#include <linux/slab.h>
 
 #include <linux/regulator/machine.h>
 
 #include <linux/i2c.h>
 #include <linux/i2c/twl.h>
+#include <linux/i2c/twl-rtc.h>
 
 #include "twl-core.h"
 
@@ -672,6 +674,51 @@ add_regulator(int num, struct regulator_init_data *pdata,
 }
 
 /*
+ * RTC: callback functions
+ */
+
+static int twl_rtc_read_block(void *mfd, u8 *data, u8 reg, int no_regs)
+{
+	return twl_i2c_read(TWL_MODULE_RTC, data, reg, no_regs);
+}
+
+static int twl_rtc_write_block(void *mfd, u8 *data, u8 reg, int no_regs)
+{
+	u8 tmpdata[2];
+	u8 *datatowrite = data;
+
+	if (no_regs == 1) {
+		tmpdata[1] = data[0];
+		datatowrite = tmpdata;
+	}
+	return twl_i2c_write(TWL_MODULE_RTC, datatowrite, reg, no_regs);
+}
+
+static int twl_rtc_unmask_irq(void *mfd)
+{
+	int ret = 0;
+	if (twl_class_is_6030()) {
+		ret = twl6030_interrupt_unmask(TWL6030_RTC_INT_MASK,
+			REG_INT_MSK_LINE_A);
+		ret |= twl6030_interrupt_unmask(TWL6030_RTC_INT_MASK,
+			REG_INT_MSK_STS_A);
+	}
+	return ret;
+}
+
+static int twl_rtc_mask_irq(void *mfd)
+{
+	int ret = 0;
+	if (twl_class_is_6030()) {
+		ret = twl6030_interrupt_mask(TWL6030_RTC_INT_MASK,
+			REG_INT_MSK_LINE_A);
+		ret |= twl6030_interrupt_mask(TWL6030_RTC_INT_MASK,
+			REG_INT_MSK_STS_A);
+	}
+	return ret;
+}
+
+/*
  * NOTE:  We know the first 8 IRQs after pdata->base_irq are
  * for the PIH, and the next are for the PWR_INT SIH, since
  * that's how twl_init_irq() sets things up.
@@ -726,12 +773,27 @@ add_children(struct twl4030_platform_data *pdata, unsigned irq_base,
 		 * Eventually, Linux might become more aware of such
 		 * HW security concerns, and "least privilege".
 		 */
+		struct twl_rtc_data *twl_rtc;
+
+		twl_rtc = kzalloc(sizeof(*twl_rtc), GFP_KERNEL);
+		if (!twl_rtc) {
+			pr_err("%s: Can't allocate memory\n", __func__);
+			return -ENOMEM;
+		}
+		twl_rtc->read_block = twl_rtc_read_block;
+		twl_rtc->write_block = twl_rtc_write_block;
+		twl_rtc->unmask_irq = twl_rtc_unmask_irq;
+		twl_rtc->mask_irq = twl_rtc_mask_irq;
+		twl_rtc->chip_version = twl_rev();
+
 		sub_chip_id = twl_map[TWL_MODULE_RTC].sid;
 		child = add_child(sub_chip_id, "twl_rtc",
-				NULL, 0,
+				twl_rtc, sizeof(*twl_rtc),
 				true, irq_base + RTC_INTR_OFFSET, 0);
-		if (IS_ERR(child))
+		if (IS_ERR(child)) {
+			kfree(twl_rtc);
 			return PTR_ERR(child);
+		}
 	}
 
 	if (twl_has_usb() && pdata->usb && twl_class_is_4030()) {

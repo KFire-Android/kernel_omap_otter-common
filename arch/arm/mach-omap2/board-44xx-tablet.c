@@ -413,6 +413,13 @@ static int __init omap4_i2c_init(void)
 	omap_register_i2c_bus(2, 400, NULL, 0);
 	omap_register_i2c_bus(3, 400, NULL, 0);
 	omap_register_i2c_bus(4, 400, NULL, 0);
+	/*
+	 * Drive MSECURE high for TWL6030/6032 write access.
+	 */
+	omap_mux_init_signal("fref_clk0_out.gpio_wk6", OMAP_PIN_OUTPUT);
+	gpio_request(6, "msecure");
+	gpio_direction_output(6, 1);
+
 	return 0;
 }
 
@@ -494,14 +501,25 @@ static void __init omap_tablet_init(void)
 	int package = OMAP_PACKAGE_CBS;
 
 #if defined(CONFIG_TI_EMIF) || defined(CONFIG_TI_EMIF_MODULE)
-	omap_emif_set_device_details(1, &lpddr2_elpida_2G_S4_x2_info,
-			lpddr2_elpida_2G_S4_timings,
-			ARRAY_SIZE(lpddr2_elpida_2G_S4_timings),
-			&lpddr2_elpida_S4_min_tck, NULL);
-	omap_emif_set_device_details(2, &lpddr2_elpida_2G_S4_x2_info,
-			lpddr2_elpida_2G_S4_timings,
-			ARRAY_SIZE(lpddr2_elpida_2G_S4_timings),
-			&lpddr2_elpida_S4_min_tck, NULL);
+	if (cpu_is_omap447x()) {
+		omap_emif_set_device_details(1, &lpddr2_elpida_4G_S4_info,
+				lpddr2_elpida_4G_S4_timings,
+				ARRAY_SIZE(lpddr2_elpida_4G_S4_timings),
+				&lpddr2_elpida_S4_min_tck, NULL);
+		omap_emif_set_device_details(2, &lpddr2_elpida_4G_S4_info,
+				lpddr2_elpida_4G_S4_timings,
+				ARRAY_SIZE(lpddr2_elpida_4G_S4_timings),
+				&lpddr2_elpida_S4_min_tck, NULL);
+	} else {
+		omap_emif_set_device_details(1, &lpddr2_elpida_2G_S4_x2_info,
+				lpddr2_elpida_2G_S4_timings,
+				ARRAY_SIZE(lpddr2_elpida_2G_S4_timings),
+				&lpddr2_elpida_S4_min_tck, NULL);
+		omap_emif_set_device_details(2, &lpddr2_elpida_2G_S4_x2_info,
+				lpddr2_elpida_2G_S4_timings,
+				ARRAY_SIZE(lpddr2_elpida_2G_S4_timings),
+				&lpddr2_elpida_S4_min_tck, NULL);
+	}
 #endif
 
 	omap4_mux_init(board_mux, NULL, package);
