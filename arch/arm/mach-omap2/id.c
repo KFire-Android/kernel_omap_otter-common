@@ -582,10 +582,10 @@ void __init omap5xxx_check_revision(void)
 			omap_revision = OMAP5430_REV_ES1_0;
 			break;
 		case 1:
+		/* FALLTHROUGH */
+		default:
 			omap_revision = OMAP5430_REV_ES2_0;
 			break;
-		default:
-			omap_revision = OMAP5430_REV_ES1_0;
 		}
 		break;
 
@@ -594,8 +594,11 @@ void __init omap5xxx_check_revision(void)
 		case 0:
 			omap_revision = OMAP5432_REV_ES1_0;
 			break;
+		case 1:
+		/* FALLTHROUGH */
 		default:
-			omap_revision = OMAP5432_REV_ES1_0;
+			omap_revision = OMAP5432_REV_ES2_0;
+			break;
 		}
 		break;
 
