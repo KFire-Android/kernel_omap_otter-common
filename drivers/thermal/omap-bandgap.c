@@ -394,6 +394,7 @@ omap5430_adc_to_temp[OMAP5430_ADC_END_VALUE - OMAP5430_ADC_START_VALUE + 1] = {
 	124600, 124900, 125000, 125000, 125000, 125000,
 };
 
+/* This is the Talert handler. Call it only if HAS(TALERT) is set */
 static irqreturn_t talert_irq_handler(int irq, void *data)
 {
 	struct omap_bandgap *bg_ptr = data;
@@ -454,6 +455,7 @@ static irqreturn_t talert_irq_handler(int irq, void *data)
 	return IRQ_HANDLED;
 }
 
+/* This is the Tshut handler. Call it only if HAS(TSHUT) is set */
 static irqreturn_t omap_bandgap_tshut_irq_handler(int irq, void *data)
 {
 	orderly_poweroff(true);
@@ -502,6 +504,7 @@ static int temp_to_adc_conversion(long temp, struct omap_bandgap *bg_ptr, int i,
 	return 0;
 }
 
+/* Talert masks. Call it only if HAS(TALERT) is set */
 static int temp_sensor_unmask_interrupts(struct omap_bandgap *bg_ptr, int id,
 					 u32 t_hot, u32 t_cold)
 {
@@ -549,6 +552,7 @@ int add_hyst(int adc_val, int hyst_val, struct omap_bandgap *bg_ptr, int i,
 	return temp_to_adc_conversion(temp, bg_ptr, i, sum);
 }
 
+/* Talert Thot threshold. Call it only if HAS(TALERT) is set */
 static
 int temp_sensor_configure_thot(struct omap_bandgap *bg_ptr, int id, int t_hot)
 {
@@ -585,6 +589,7 @@ int temp_sensor_configure_thot(struct omap_bandgap *bg_ptr, int id, int t_hot)
 	return temp_sensor_unmask_interrupts(bg_ptr, id, t_hot, cold);
 }
 
+/* Talert Thot and Tcold thresholds. Call it only if HAS(TALERT) is set */
 static
 int temp_sensor_init_talert_thresholds(struct omap_bandgap *bg_ptr, int id,
 				       int t_hot, int t_cold)
@@ -629,6 +634,7 @@ int temp_sensor_init_talert_thresholds(struct omap_bandgap *bg_ptr, int id,
 	return err;
 }
 
+/* Talert Tcold threshold. Call it only if HAS(TALERT) is set */
 static
 int temp_sensor_configure_tcold(struct omap_bandgap *bg_ptr, int id,
 				int t_cold)
@@ -667,6 +673,7 @@ int temp_sensor_configure_tcold(struct omap_bandgap *bg_ptr, int id,
 	return temp_sensor_unmask_interrupts(bg_ptr, id, hot, t_cold);
 }
 
+/* This is Tshut Thot config. Call it only if HAS(TSHUT_CONFIG) is set */
 static int temp_sensor_configure_tshut_hot(struct omap_bandgap *bg_ptr,
 					   int id, int tshut_hot)
 {
@@ -676,7 +683,7 @@ static int temp_sensor_configure_tshut_hot(struct omap_bandgap *bg_ptr,
 	int err;
 
 	/* If not using the HW TSHUT feature, just return success */
-	if (!bg_ptr->conf->has_tshut_config)
+	if (!OMAP_BANDGAP_HAS(bg_ptr, TSHUT_CONFIG))
 		return 0;
 
 	tsr = bg_ptr->conf->sensors[id].registers;
@@ -692,6 +699,7 @@ static int temp_sensor_configure_tshut_hot(struct omap_bandgap *bg_ptr,
 	return 0;
 }
 
+/* This is Tshut Tcold config. Call it only if HAS(TSHUT_CONFIG) is set */
 static int temp_sensor_configure_tshut_cold(struct omap_bandgap *bg_ptr,
 					    int id, int tshut_cold)
 {
@@ -701,7 +709,7 @@ static int temp_sensor_configure_tshut_cold(struct omap_bandgap *bg_ptr,
 	int err;
 
 	/* If not using the HW TSHUT feature, just return success */
-	if (!bg_ptr->conf->has_tshut_config)
+	if (!OMAP_BANDGAP_HAS(bg_ptr, TSHUT_CONFIG))
 		return 0;
 
 	tsr = bg_ptr->conf->sensors[id].registers;
@@ -717,6 +725,7 @@ static int temp_sensor_configure_tshut_cold(struct omap_bandgap *bg_ptr,
 	return 0;
 }
 
+/* This is counter config. Call it only if HAS(COUNTER) is set */
 static int configure_temp_sensor_counter(struct omap_bandgap *bg_ptr, int id,
 					 u32 counter)
 {
@@ -780,7 +789,7 @@ int omap_bandgap_read_thot(struct omap_bandgap *bg_ptr, int id,
 		return ret;
 
 	/* If not using the HW Alert feature, just return success */
-	if (!bg_ptr->conf->has_talert)
+	if (!OMAP_BANDGAP_HAS(bg_ptr, TALERT))
 		return 0;
 
 	cdev = bg_ptr->dev->parent;
@@ -820,8 +829,9 @@ int omap_bandgap_write_thot(struct omap_bandgap *bg_ptr, int id, int val)
 
 	ts_data = bg_ptr->conf->sensors[id].ts_data;
 	tsr = bg_ptr->conf->sensors[id].registers;
+
 	/* If not using the HW Alert feature, just return success */
-	if (!bg_ptr->conf->has_talert)
+	if (!OMAP_BANDGAP_HAS(bg_ptr, TALERT))
 		return 0;
 
 	if (val < ts_data->min_temp + ts_data->hyst_val)
@@ -858,7 +868,7 @@ int omap_bandgap_read_tcold(struct omap_bandgap *bg_ptr, int id,
 		return ret;
 
 	/* If not using the HW Alert feature, just return success */
-	if (!bg_ptr->conf->has_talert)
+	if (!OMAP_BANDGAP_HAS(bg_ptr, TALERT))
 		return 0;
 
 	cdev = bg_ptr->dev->parent;
@@ -895,7 +905,7 @@ int omap_bandgap_write_tcold(struct omap_bandgap *bg_ptr, int id, int val)
 		return ret;
 
 	/* If not using the HW Alert feature, just return success */
-	if (!bg_ptr->conf->has_talert)
+	if (!OMAP_BANDGAP_HAS(bg_ptr, TALERT))
 		return 0;
 
 	ts_data = bg_ptr->conf->sensors[id].ts_data;
@@ -934,6 +944,9 @@ int omap_bandgap_read_update_interval(struct omap_bandgap *bg_ptr, int id,
 	if (ret)
 		return ret;
 
+	if (!OMAP_BANDGAP_HAS(bg_ptr, COUNTER))
+		return 0;
+
 	tsr = bg_ptr->conf->sensors[id].registers;
 	cdev = bg_ptr->dev->parent;
 	ret = omap_control_readl(cdev, tsr->bgap_counter, &time);
@@ -961,6 +974,9 @@ int omap_bandgap_write_update_interval(struct omap_bandgap *bg_ptr,
 	int ret = omap_bandgap_validate(bg_ptr, id);
 	if (ret)
 		return ret;
+
+	if (!OMAP_BANDGAP_HAS(bg_ptr, COUNTER))
+		return 0;
 
 	interval = interval * bg_ptr->clk_rate / 1000;
 	mutex_lock(&bg_ptr->bg_mutex);
@@ -1045,6 +1061,8 @@ void *omap_bandgap_get_sensor_data(struct omap_bandgap *bg_ptr, int id)
 /**
  * enable_continuous_mode() - One time enabling of continuous conversion mode
  * @bg_ptr - pointer to scm instance
+ *
+ * Call this function only if HAS(MODE_CONFIG) is set
  */
 static int enable_continuous_mode(struct omap_bandgap *bg_ptr)
 {
@@ -1100,6 +1118,7 @@ static int omap_bandgap_tshut_init(struct omap_bandgap *bg_ptr,
 	return 0;
 }
 
+/* Initialization of Talert. Call it only if HAS(TALERT) is set */
 static int omap_bandgap_talert_init(struct omap_bandgap *bg_ptr,
 				       struct platform_device *pdev)
 {
@@ -1123,9 +1142,11 @@ static int omap_bandgap_talert_init(struct omap_bandgap *bg_ptr,
 }
 
 static struct omap_bandgap_data omap4460_data = {
-	.has_talert = true,
-	.has_tshut = true,
-	.has_tshut_config = true,
+	.features = OMAP_BANDGAP_FEATURE_TSHUT |
+			OMAP_BANDGAP_FEATURE_TSHUT_CONFIG |
+			OMAP_BANDGAP_FEATURE_TALERT |
+			OMAP_BANDGAP_FEATURE_MODE_CONFIG |
+			OMAP_BANDGAP_FEATURE_COUNTER,
 	.fclock_name = "bandgap_ts_fclk",
 	.div_ck_name = "div_ts_ck",
 	.conv_table = omap4460_adc_to_temp,
@@ -1142,9 +1163,10 @@ static struct omap_bandgap_data omap4460_data = {
 };
 
 static struct omap_bandgap_data omap5430_data = {
-	.has_talert = true,
-	.has_tshut = false,
-	.has_tshut_config = true,
+	.features = OMAP_BANDGAP_FEATURE_TSHUT_CONFIG |
+			OMAP_BANDGAP_FEATURE_TALERT |
+			OMAP_BANDGAP_FEATURE_MODE_CONFIG |
+			OMAP_BANDGAP_FEATURE_COUNTER,
 	.fclock_name = "ts_clk_div_ck",
 	.div_ck_name = "ts_clk_div_ck",
 	.conv_table = omap5430_adc_to_temp,
@@ -1211,7 +1233,7 @@ struct omap_bandgap *omap_bandgap_platform_build(struct platform_device *pdev)
 		return ERR_PTR(-EINVAL);
 	}
 
-	if (bg_ptr->conf->has_tshut) {
+	if (OMAP_BANDGAP_HAS(bg_ptr, TSHUT)) {
 		bg_ptr->tshut_gpio = conf->tshut_gpio;
 		if (!gpio_is_valid(bg_ptr->tshut_gpio)) {
 			dev_err(&pdev->dev, "invalid gpio for tshut (%d)\n",
@@ -1231,7 +1253,7 @@ struct omap_bandgap *omap_bandgap_platform_build(struct platform_device *pdev)
 	if (((omap_rev() == OMAP5430_REV_ES1_0) ||
 		(omap_rev() == OMAP5432_REV_ES1_0)) &&
 		(omap_type() != OMAP2_DEVICE_TYPE_GP))
-			bg_ptr->conf->has_talert = false;
+			bg_ptr->conf->features &= ~OMAP_BANDGAP_FEATURE_TALERT;
 
 	/*
 	 * On OMAP5 ES1.0, due to TSHUT HW errata, thresholds for TSHUT
@@ -1242,7 +1264,8 @@ struct omap_bandgap *omap_bandgap_platform_build(struct platform_device *pdev)
 	if (((omap_rev() == OMAP5430_REV_ES1_0) ||
 		(omap_rev() == OMAP5432_REV_ES1_0)) &&
 		(omap_type() != OMAP2_DEVICE_TYPE_GP))
-			bg_ptr->conf->has_tshut_config = false;
+			bg_ptr->conf->features &=
+					~OMAP_BANDGAP_FEATURE_TSHUT_CONFIG;
 
 	return bg_ptr;
 }
@@ -1272,7 +1295,7 @@ static struct omap_bandgap *omap_bandgap_build(struct platform_device *pdev)
 	if (of_id)
 		bg_ptr->conf = of_id->data;
 
-	if (bg_ptr->conf->has_tshut) {
+	if (OMAP_BANDGAP_HAS(bg_ptr, TSHUT)) {
 		if (of_property_read_u32(node, "ti,tshut-gpio", &prop) < 0) {
 			dev_err(&pdev->dev, "missing tshut gpio in device tree\n");
 			return ERR_PTR(-EINVAL);
@@ -1310,7 +1333,7 @@ int __devinit omap_bandgap_probe(struct platform_device *pdev)
 		return PTR_ERR(bg_ptr);
 	}
 
-	if (bg_ptr->conf->has_tshut) {
+	if (OMAP_BANDGAP_HAS(bg_ptr, TSHUT)) {
 		ret = omap_bandgap_tshut_init(bg_ptr, pdev);
 		if (ret) {
 			dev_err(&pdev->dev,
@@ -1382,20 +1405,21 @@ int __devinit omap_bandgap_probe(struct platform_device *pdev)
 	bg_ptr->dev = &pdev->dev;
 	platform_set_drvdata(pdev, bg_ptr);
 
-	/* 1 clk cycle */
-	for (i = 0; i < bg_ptr->conf->sensor_count; i++)
-		configure_temp_sensor_counter(bg_ptr, i, 1);
+	/* Set default counter to 1 for now */
+	if (OMAP_BANDGAP_HAS(bg_ptr, COUNTER))
+		for (i = 0; i < bg_ptr->conf->sensor_count; i++)
+			configure_temp_sensor_counter(bg_ptr, i, 1);
 
 	for (i = 0; i < bg_ptr->conf->sensor_count; i++) {
 		struct temp_sensor_data *ts_data;
 
 		ts_data = bg_ptr->conf->sensors[i].ts_data;
 
-		if (bg_ptr->conf->has_talert)
+		if (OMAP_BANDGAP_HAS(bg_ptr, TALERT))
 			temp_sensor_init_talert_thresholds(bg_ptr, i,
 							   ts_data->t_hot,
 							   ts_data->t_cold);
-		if (bg_ptr->conf->has_tshut_config) {
+		if (OMAP_BANDGAP_HAS(bg_ptr, TSHUT_CONFIG)) {
 			temp_sensor_configure_tshut_hot(bg_ptr, i,
 							ts_data->tshut_hot);
 			temp_sensor_configure_tshut_cold(bg_ptr, i,
@@ -1403,11 +1427,13 @@ int __devinit omap_bandgap_probe(struct platform_device *pdev)
 		}
 	}
 
-	enable_continuous_mode(bg_ptr);
+	if (OMAP_BANDGAP_HAS(bg_ptr, MODE_CONFIG))
+		enable_continuous_mode(bg_ptr);
 
 	/* Set .250 seconds time as default counter */
-	for (i = 0; i < bg_ptr->conf->sensor_count; i++)
-		configure_temp_sensor_counter(bg_ptr, i,
+	if (OMAP_BANDGAP_HAS(bg_ptr, COUNTER))
+		for (i = 0; i < bg_ptr->conf->sensor_count; i++)
+			configure_temp_sensor_counter(bg_ptr, i,
 					      bg_ptr->clk_rate / 4);
 
 	/* Every thing is good? Then expose the sensors */
@@ -1424,7 +1450,7 @@ int __devinit omap_bandgap_probe(struct platform_device *pdev)
 	 * might be called as soon as it is enabled where as rest of framework
 	 * is still getting initialised.
 	 */
-	if (bg_ptr->conf->has_talert) {
+	if (OMAP_BANDGAP_HAS(bg_ptr, TALERT)) {
 		ret = omap_bandgap_talert_init(bg_ptr, pdev);
 		if (ret) {
 			dev_err(&pdev->dev, "failed to initialize Talert IRQ\n");
@@ -1442,7 +1468,7 @@ put_clks:
 	clk_put(bg_ptr->fclock);
 	clk_put(bg_ptr->div_clk);
 free_irqs:
-	if (bg_ptr->conf->has_tshut) {
+	if (OMAP_BANDGAP_HAS(bg_ptr, TSHUT)) {
 		free_irq(gpio_to_irq(bg_ptr->tshut_gpio), NULL);
 		gpio_free(bg_ptr->tshut_gpio);
 	}
@@ -1464,9 +1490,9 @@ int __devexit omap_bandgap_remove(struct platform_device *pdev)
 	clk_disable(bg_ptr->fclock);
 	clk_put(bg_ptr->fclock);
 	clk_put(bg_ptr->div_clk);
-	if (bg_ptr->conf->has_talert)
+	if (OMAP_BANDGAP_HAS(bg_ptr, TALERT))
 		free_irq(bg_ptr->irq, bg_ptr);
-	if (bg_ptr->conf->has_tshut) {
+	if (OMAP_BANDGAP_HAS(bg_ptr, TSHUT)) {
 		free_irq(gpio_to_irq(bg_ptr->tshut_gpio), NULL);
 		gpio_free(bg_ptr->tshut_gpio);
 	}
@@ -1488,16 +1514,23 @@ static int omap_bandgap_save_ctxt(struct omap_bandgap *bg_ptr)
 		rval = &bg_ptr->conf->sensors[i].regval;
 		tsr = bg_ptr->conf->sensors[i].registers;
 
-		err = omap_control_readl(cdev, tsr->bgap_mode_ctrl,
-					 &rval->bg_mode_ctrl);
-		err |= omap_control_readl(cdev,	tsr->bgap_mask_ctrl,
+		if (OMAP_BANDGAP_HAS(bg_ptr, MODE_CONFIG))
+			err = omap_control_readl(cdev, tsr->bgap_mode_ctrl,
+						 &rval->bg_mode_ctrl);
+
+		if (OMAP_BANDGAP_HAS(bg_ptr, COUNTER))
+			err |= omap_control_readl(cdev,	tsr->bgap_counter,
+						&rval->bg_counter);
+
+		if (OMAP_BANDGAP_HAS(bg_ptr, TALERT)) {
+			err |= omap_control_readl(cdev,	tsr->bgap_mask_ctrl,
 					  &rval->bg_ctrl);
-		err |= omap_control_readl(cdev,	tsr->bgap_counter,
-					&rval->bg_counter);
-		if (bg_ptr->conf->has_talert)
+
 			err |= omap_control_readl(cdev, tsr->bgap_threshold,
 						  &rval->bg_threshold);
-		if (bg_ptr->conf->has_tshut_config)
+		}
+
+		if (OMAP_BANDGAP_HAS(bg_ptr, TSHUT_CONFIG))
 			err |= omap_control_readl(cdev, tsr->tshut_threshold,
 						  &rval->tshut_threshold);
 
@@ -1514,13 +1547,15 @@ omap_bandgap_force_single_read(struct omap_bandgap *bg_ptr, int id)
 	struct device *cdev = bg_ptr->dev->parent;
 	struct temp_sensor_registers *tsr;
 	u32 temp = 0, counter = 1000;
-	int err;
+	int err = 0;
 
 	tsr = bg_ptr->conf->sensors[id].registers;
-	/* Select single conversion mode */
-	err = omap_control_readl(cdev, tsr->bgap_mode_ctrl, &temp);
-	temp &= ~(1 << __ffs(tsr->mode_ctrl_mask));
-	omap_control_writel(cdev, temp, tsr->bgap_mode_ctrl);
+	if (OMAP_BANDGAP_HAS(bg_ptr, MODE_CONFIG)) {
+		/* Select single conversion mode */
+		err = omap_control_readl(cdev, tsr->bgap_mode_ctrl, &temp);
+		temp &= ~(1 << __ffs(tsr->mode_ctrl_mask));
+		omap_control_writel(cdev, temp, tsr->bgap_mode_ctrl);
+	}
 
 	/* Start of Conversion = 1 */
 	err |= omap_control_readl(cdev, tsr->temp_sensor_ctrl, &temp);
@@ -1553,22 +1588,28 @@ static int omap_bandgap_restore_ctxt(struct omap_bandgap *bg_ptr)
 		rval = &bg_ptr->conf->sensors[i].regval;
 		tsr = bg_ptr->conf->sensors[i].registers;
 
-		if (bg_ptr->conf->has_talert)
-			err = omap_control_writel(cdev, rval->bg_threshold,
-							tsr->bgap_threshold);
-		if (bg_ptr->conf->has_tshut_config)
+		if (OMAP_BANDGAP_HAS(bg_ptr, TSHUT_CONFIG))
 			err |= omap_control_writel(cdev, rval->tshut_threshold,
 							tsr->tshut_threshold);
 		/* Force immediate temperature measurement and update
 		 * of the DTEMP field
 		 */
 		omap_bandgap_force_single_read(bg_ptr, i);
-		err |= omap_control_writel(cdev, rval->bg_counter,
+		if (OMAP_BANDGAP_HAS(bg_ptr, COUNTER))
+			err |= omap_control_writel(cdev, rval->bg_counter,
 						tsr->bgap_counter);
-		err |= omap_control_writel(cdev, rval->bg_mode_ctrl,
-						tsr->bgap_mode_ctrl);
-		err |= omap_control_writel(cdev, rval->bg_ctrl,
-						tsr->bgap_mask_ctrl);
+
+		if (OMAP_BANDGAP_HAS(bg_ptr, TALERT)) {
+			err = omap_control_writel(cdev, rval->bg_threshold,
+							tsr->bgap_threshold);
+
+			err |= omap_control_writel(cdev, rval->bg_ctrl,
+							tsr->bgap_mask_ctrl);
+		}
+
+		if (OMAP_BANDGAP_HAS(bg_ptr, MODE_CONFIG))
+			err |= omap_control_writel(cdev, rval->bg_mode_ctrl,
+							tsr->bgap_mode_ctrl);
 		if (err)
 			dev_err(bg_ptr->dev, "could not save sensor %d\n", i);
 	}

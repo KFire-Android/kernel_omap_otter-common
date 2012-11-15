@@ -228,9 +228,7 @@ struct omap_temp_sensor {
 
 /**
  * struct omap_bandgap_data - bandgap platform data structure
- * @has_talert: indicates if the chip has talert output line
- * @has_tshut: indicates if the chip has tshut output line
- * @has_tshut_config: indicates if the chip tshut thresholds can be configured
+ * @features: indicates various features supported by silicon
  * @conv_table: Pointer to adc to temperature conversion table
  * @fclock_name: clock name of the functional clock
  * @div_ck_nme: clock name of the clock divisor
@@ -241,9 +239,14 @@ struct omap_temp_sensor {
  * @expose_sensor: callback to export sensor to thermal API
  */
 struct omap_bandgap_data {
-	bool				has_talert;
-	bool				has_tshut;
-	bool				has_tshut_config;
+#define OMAP_BANDGAP_FEATURE_TSHUT		(1 << 0)
+#define OMAP_BANDGAP_FEATURE_TSHUT_CONFIG	(1 << 1)
+#define OMAP_BANDGAP_FEATURE_TALERT		(1 << 2)
+#define OMAP_BANDGAP_FEATURE_MODE_CONFIG	(1 << 3)
+#define OMAP_BANDGAP_FEATURE_COUNTER		(1 << 4)
+#define OMAP_BANDGAP_HAS(b, f)			\
+			((b)->conf->features & OMAP_BANDGAP_FEATURE_ ## f)
+	unsigned int			features;
 	int				*conv_table;
 	char				*fclock_name;
 	char				*div_ck_name;
