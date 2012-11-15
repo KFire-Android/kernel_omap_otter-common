@@ -1648,6 +1648,15 @@ static const struct dev_pm_ops omap_bandgap_dev_pm_ops = {
 
 void omap_bandgap_prepare_for_idle(void)
 {
+	/*
+	 * These functions are directly called from PM framework
+	 * during CpuIdle execution. Hence need to check if the
+	 * driver is initialised before accessing any driver related
+	 * data. If the driver probe has failed, then accessing the
+	 * driver data will crash the system.
+	 */
+	if (!g_bg_ptr)
+		return;
 
 	clk_disable(g_bg_ptr->fclock);
 	g_bg_ptr->bg_clk_idle = true;
@@ -1657,6 +1666,16 @@ void omap_bandgap_prepare_for_idle(void)
 void omap_bandgap_resume_after_idle(void)
 {
 	u8 i;
+
+	/*
+	 * These functions are directly called from PM framework
+	 * during CpuIdle execution. Hence need to check if the
+	 * driver is initialised before accessing any driver related
+	 * data. If the driver probe has failed, then accessing the
+	 * driver data will crash the system.
+	 */
+	if (!g_bg_ptr)
+		return;
 
 	/* Enable clock for sensor, if it was disabled during idle */
 	if (g_bg_ptr->bg_clk_idle) {
