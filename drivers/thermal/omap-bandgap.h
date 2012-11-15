@@ -124,7 +124,7 @@ struct omap_bandgap {
 	struct omap_bandgap_data	*conf;
 	struct clk			*fclock;
 	struct clk			*div_clk;
-	int				*conv_table;
+	const int			*conv_table;
 	struct mutex			bg_mutex; /* Mutex for irq and PM */
 	int				irq;
 	int				tshut_gpio;
@@ -222,8 +222,9 @@ struct omap_temp_sensor {
 	struct temp_sensor_regval	regval;
 	char				*domain;
 	void				*data;
+	/* for hotspot extrapolation */
 	int				slope;
-	int				constant_offset;
+	int				constant;
 };
 
 /**
@@ -276,6 +277,19 @@ int omap_bandgap_read_temperature(struct omap_bandgap *bg_ptr, int id,
 int omap_bandgap_set_sensor_data(struct omap_bandgap *bg_ptr, int id,
 				void *data);
 void *omap_bandgap_get_sensor_data(struct omap_bandgap *bg_ptr, int id);
+
+#ifdef CONFIG_OMAP4_BG_TEMP_SENSOR_DATA
+extern struct omap_bandgap_data omap4460_data;
+#else
+#define omap4460_data					NULL
+#endif
+
+#ifdef CONFIG_OMAP5_BG_TEMP_SENSOR_DATA
+extern struct omap_bandgap_data omap5430_data;
+#else
+#define omap5430_data					NULL
+#endif
+
 #ifdef CONFIG_OMAP5_THERMAL
 int omap5_thermal_expose_sensor(struct omap_bandgap *bg_ptr, int id,
 					char *domain);

@@ -38,361 +38,11 @@
 #include <linux/of_platform.h>
 #include <linux/of_irq.h>
 #include <linux/mfd/omap_control.h>
-#include <mach/ctrl_module_core_44xx.h>
 
 #include "omap-bandgap.h"
 
 /* Global bandgap pointer used in PM notifier handlers. */
 static struct omap_bandgap *g_bg_ptr;
-
-/* TODO: provide data structures for 4430 */
-
-/*
- * OMAP4460 has one instance of thermal sensor for MPU
- * need to describe the individual bit fields
- */
-static struct temp_sensor_registers
-omap4460_mpu_temp_sensor_registers = {
-	.temp_sensor_ctrl = OMAP4460_TEMP_SENSOR_CTRL_OFFSET,
-	.bgap_tempsoff_mask = OMAP4460_BGAP_TEMPSOFF_MASK,
-	.bgap_soc_mask = OMAP4460_BGAP_TEMP_SENSOR_SOC_MASK,
-	.bgap_eocz_mask = OMAP4460_BGAP_TEMP_SENSOR_EOCZ_MASK,
-	.bgap_dtemp_mask = OMAP4460_BGAP_TEMP_SENSOR_DTEMP_MASK,
-
-	.bgap_mask_ctrl = OMAP4460_BGAP_CTRL_OFFSET,
-	.mask_hot_mask = OMAP4460_MASK_HOT_MASK,
-	.mask_cold_mask = OMAP4460_MASK_COLD_MASK,
-
-	.bgap_mode_ctrl = OMAP4460_BGAP_CTRL_OFFSET,
-	.mode_ctrl_mask = OMAP4460_SINGLE_MODE_MASK,
-
-	.bgap_counter = OMAP4460_BGAP_COUNTER_OFFSET,
-	.counter_mask = OMAP4460_COUNTER_MASK,
-
-	.bgap_threshold = OMAP4460_BGAP_THRESHOLD_OFFSET,
-	.threshold_thot_mask = OMAP4460_T_HOT_MASK,
-	.threshold_tcold_mask = OMAP4460_T_COLD_MASK,
-
-	.tshut_threshold = OMAP4460_BGAP_TSHUT_OFFSET,
-	.tshut_hot_mask = OMAP4460_TSHUT_HOT_MASK,
-	.tshut_cold_mask = OMAP4460_TSHUT_COLD_MASK,
-
-	.bgap_status = OMAP4460_BGAP_STATUS_OFFSET,
-	.status_clean_stop_mask = OMAP4460_CLEAN_STOP_MASK,
-	.status_bgap_alert_mask = OMAP4460_BGAP_ALERT_MASK,
-	.status_hot_mask = OMAP4460_HOT_FLAG_MASK,
-	.status_cold_mask = OMAP4460_COLD_FLAG_MASK,
-
-	.bgap_efuse = OMAP4460_FUSE_OPP_BGAP,
-};
-
-/*
- * OMAP4460 has one instance of thermal sensor for MPU
- * need to describe the individual bit fields
- */
-static struct temp_sensor_registers
-omap5430_mpu_temp_sensor_registers = {
-	.temp_sensor_ctrl = OMAP5430_TEMP_SENSOR_MPU_OFFSET,
-	.bgap_tempsoff_mask = OMAP5430_BGAP_TEMPSOFF_MASK,
-	.bgap_soc_mask = OMAP5430_BGAP_TEMP_SENSOR_SOC_MASK,
-	.bgap_eocz_mask = OMAP5430_BGAP_TEMP_SENSOR_EOCZ_MASK,
-	.bgap_dtemp_mask = OMAP5430_BGAP_TEMP_SENSOR_DTEMP_MASK,
-
-	.bgap_mask_ctrl = OMAP5430_BGAP_CTRL_OFFSET,
-	.mask_hot_mask = OMAP5430_MASK_HOT_MPU_MASK,
-	.mask_cold_mask = OMAP5430_MASK_COLD_MPU_MASK,
-
-	.bgap_mode_ctrl = OMAP5430_BGAP_COUNTER_MPU_OFFSET,
-	.mode_ctrl_mask = OMAP5430_REPEAT_MODE_MASK,
-
-	.bgap_counter = OMAP5430_BGAP_COUNTER_MPU_OFFSET,
-	.counter_mask = OMAP5430_COUNTER_MASK,
-
-	.bgap_threshold = OMAP5430_BGAP_THRESHOLD_MPU_OFFSET,
-	.threshold_thot_mask = OMAP5430_T_HOT_MASK,
-	.threshold_tcold_mask = OMAP5430_T_COLD_MASK,
-
-	.tshut_threshold = OMAP5430_BGAP_TSHUT_MPU_OFFSET,
-	.tshut_hot_mask = OMAP5430_TSHUT_HOT_MASK,
-	.tshut_cold_mask = OMAP5430_TSHUT_COLD_MASK,
-
-	.bgap_status = OMAP5430_BGAP_STATUS_OFFSET,
-	.status_clean_stop_mask = 0x0,
-	.status_bgap_alert_mask = OMAP5430_BGAP_ALERT_MASK,
-	.status_hot_mask = OMAP5430_HOT_MPU_FLAG_MASK,
-	.status_cold_mask = OMAP5430_COLD_MPU_FLAG_MASK,
-
-	.bgap_efuse = OMAP5430_FUSE_OPP_BGAP_MPU,
-};
-
-/*
- * OMAP4460 has one instance of thermal sensor for MPU
- * need to describe the individual bit fields
- */
-static struct temp_sensor_registers
-omap5430_gpu_temp_sensor_registers = {
-	.temp_sensor_ctrl = OMAP5430_TEMP_SENSOR_GPU_OFFSET,
-	.bgap_tempsoff_mask = OMAP5430_BGAP_TEMPSOFF_MASK,
-	.bgap_soc_mask = OMAP5430_BGAP_TEMP_SENSOR_SOC_MASK,
-	.bgap_eocz_mask = OMAP5430_BGAP_TEMP_SENSOR_EOCZ_MASK,
-	.bgap_dtemp_mask = OMAP5430_BGAP_TEMP_SENSOR_DTEMP_MASK,
-
-	.bgap_mask_ctrl = OMAP5430_BGAP_CTRL_OFFSET,
-	.mask_hot_mask = OMAP5430_MASK_HOT_MM_MASK,
-	.mask_cold_mask = OMAP5430_MASK_COLD_MM_MASK,
-
-	.bgap_mode_ctrl = OMAP5430_BGAP_COUNTER_GPU_OFFSET,
-	.mode_ctrl_mask = OMAP5430_REPEAT_MODE_MASK,
-
-	.bgap_counter = OMAP5430_BGAP_COUNTER_GPU_OFFSET,
-	.counter_mask = OMAP5430_COUNTER_MASK,
-
-	.bgap_threshold = OMAP5430_BGAP_THRESHOLD_GPU_OFFSET,
-	.threshold_thot_mask = OMAP5430_T_HOT_MASK,
-	.threshold_tcold_mask = OMAP5430_T_COLD_MASK,
-
-	.tshut_threshold = OMAP5430_BGAP_TSHUT_GPU_OFFSET,
-	.tshut_hot_mask = OMAP5430_TSHUT_HOT_MASK,
-	.tshut_cold_mask = OMAP5430_TSHUT_COLD_MASK,
-
-	.bgap_status = OMAP5430_BGAP_STATUS_OFFSET,
-	.status_clean_stop_mask = 0x0,
-	.status_bgap_alert_mask = OMAP5430_BGAP_ALERT_MASK,
-	.status_hot_mask = OMAP5430_HOT_MM_FLAG_MASK,
-	.status_cold_mask = OMAP5430_COLD_MM_FLAG_MASK,
-
-	.bgap_efuse = OMAP5430_FUSE_OPP_BGAP_GPU,
-};
-
-/*
- * OMAP4460 has one instance of thermal sensor for MPU
- * need to describe the individual bit fields
- */
-static struct temp_sensor_registers
-omap5430_core_temp_sensor_registers = {
-	.temp_sensor_ctrl = OMAP5430_TEMP_SENSOR_CORE_OFFSET,
-	.bgap_tempsoff_mask = OMAP5430_BGAP_TEMPSOFF_MASK,
-	.bgap_soc_mask = OMAP5430_BGAP_TEMP_SENSOR_SOC_MASK,
-	.bgap_eocz_mask = OMAP5430_BGAP_TEMP_SENSOR_EOCZ_MASK,
-	.bgap_dtemp_mask = OMAP5430_BGAP_TEMP_SENSOR_DTEMP_MASK,
-
-	.bgap_mask_ctrl = OMAP5430_BGAP_CTRL_OFFSET,
-	.mask_hot_mask = OMAP5430_MASK_HOT_CORE_MASK,
-	.mask_cold_mask = OMAP5430_MASK_COLD_CORE_MASK,
-
-	.bgap_mode_ctrl = OMAP5430_BGAP_COUNTER_CORE_OFFSET,
-	.mode_ctrl_mask = OMAP5430_REPEAT_MODE_MASK,
-
-	.bgap_counter = OMAP5430_BGAP_COUNTER_CORE_OFFSET,
-	.counter_mask = OMAP5430_COUNTER_MASK,
-
-	.bgap_threshold = OMAP5430_BGAP_THRESHOLD_CORE_OFFSET,
-	.threshold_thot_mask = OMAP5430_T_HOT_MASK,
-	.threshold_tcold_mask = OMAP5430_T_COLD_MASK,
-
-	.tshut_threshold = OMAP5430_BGAP_TSHUT_CORE_OFFSET,
-	.tshut_hot_mask = OMAP5430_TSHUT_HOT_MASK,
-	.tshut_cold_mask = OMAP5430_TSHUT_COLD_MASK,
-
-	.bgap_status = OMAP5430_BGAP_STATUS_OFFSET,
-	.status_clean_stop_mask = 0x0,
-	.status_bgap_alert_mask = OMAP5430_BGAP_ALERT_MASK,
-	.status_hot_mask = OMAP5430_HOT_CORE_FLAG_MASK,
-	.status_cold_mask = OMAP5430_COLD_CORE_FLAG_MASK,
-
-	.bgap_efuse = OMAP5430_FUSE_OPP_BGAP_CORE,
-};
-
-/* Thresholds and limits for OMAP4460 MPU temperature sensor */
-static struct temp_sensor_data omap4460_mpu_temp_sensor_data = {
-	.tshut_hot = OMAP4460_TSHUT_HOT,
-	.tshut_cold = OMAP4460_TSHUT_COLD,
-	.t_hot = OMAP4460_T_HOT,
-	.t_cold = OMAP4460_T_COLD,
-	.min_freq = OMAP4460_MIN_FREQ,
-	.max_freq = OMAP4460_MAX_FREQ,
-	.max_temp = OMAP4460_MAX_TEMP,
-	.min_temp = OMAP4460_MIN_TEMP,
-	.hyst_val = OMAP4460_HYST_VAL,
-	.adc_start_val = OMAP4460_ADC_START_VALUE,
-	.adc_end_val = OMAP4460_ADC_END_VALUE,
-	.update_int1 = 1000,
-	.update_int2 = 2000,
-};
-
-/* Thresholds and limits for OMAP5430 MPU temperature sensor */
-static struct temp_sensor_data omap5430_mpu_temp_sensor_data = {
-	.tshut_hot = OMAP5430_MPU_TSHUT_HOT,
-	.tshut_cold = OMAP5430_MPU_TSHUT_COLD,
-	.t_hot = OMAP5430_MPU_T_HOT,
-	.t_cold = OMAP5430_MPU_T_COLD,
-	.min_freq = OMAP5430_MPU_MIN_FREQ,
-	.max_freq = OMAP5430_MPU_MAX_FREQ,
-	.max_temp = OMAP5430_MPU_MAX_TEMP,
-	.min_temp = OMAP5430_MPU_MIN_TEMP,
-	.hyst_val = OMAP5430_MPU_HYST_VAL,
-	.adc_start_val = OMAP5430_ADC_START_VALUE,
-	.adc_end_val = OMAP5430_ADC_END_VALUE,
-	.update_int1 = 1000,
-	.update_int2 = 2000,
-};
-
-/* Thresholds and limits for OMAP5430 GPU temperature sensor */
-static struct temp_sensor_data omap5430_gpu_temp_sensor_data = {
-	.tshut_hot = OMAP5430_GPU_TSHUT_HOT,
-	.tshut_cold = OMAP5430_GPU_TSHUT_COLD,
-	.t_hot = OMAP5430_GPU_T_HOT,
-	.t_cold = OMAP5430_GPU_T_COLD,
-	.min_freq = OMAP5430_GPU_MIN_FREQ,
-	.max_freq = OMAP5430_GPU_MAX_FREQ,
-	.max_temp = OMAP5430_GPU_MAX_TEMP,
-	.min_temp = OMAP5430_GPU_MIN_TEMP,
-	.hyst_val = OMAP5430_GPU_HYST_VAL,
-	.adc_start_val = OMAP5430_ADC_START_VALUE,
-	.adc_end_val = OMAP5430_ADC_END_VALUE,
-	.update_int1 = 1000,
-	.update_int2 = 2000,
-};
-
-/* Thresholds and limits for OMAP5430 CORE temperature sensor */
-static struct temp_sensor_data omap5430_core_temp_sensor_data = {
-	.tshut_hot = OMAP5430_CORE_TSHUT_HOT,
-	.tshut_cold = OMAP5430_CORE_TSHUT_COLD,
-	.t_hot = OMAP5430_CORE_T_HOT,
-	.t_cold = OMAP5430_CORE_T_COLD,
-	.min_freq = OMAP5430_CORE_MIN_FREQ,
-	.max_freq = OMAP5430_CORE_MAX_FREQ,
-	.max_temp = OMAP5430_CORE_MAX_TEMP,
-	.min_temp = OMAP5430_CORE_MIN_TEMP,
-	.hyst_val = OMAP5430_CORE_HYST_VAL,
-	.adc_start_val = OMAP5430_ADC_START_VALUE,
-	.adc_end_val = OMAP5430_ADC_END_VALUE,
-	.update_int1 = 1000,
-	.update_int2 = 2000,
-};
-
-/*
- * Temperature values in milli degree celsius
- * ADC code values from 530 to 923
- */
-static int
-omap4460_adc_to_temp[OMAP4460_ADC_END_VALUE - OMAP4460_ADC_START_VALUE + 1] = {
-	-40000, -40000, -40000, -40000, -39800, -39400, -39000, -38600, -38200,
-	-37800, -37300, -36800, -36400, -36000, -35600, -35200, -34800,
-	-34300, -33800, -33400, -33000, -32600, -32200, -31800, -31300,
-	-30800, -30400, -30000, -29600, -29200, -28700, -28200, -27800,
-	-27400, -27000, -26600, -26200, -25700, -25200, -24800, -24400,
-	-24000, -23600, -23200, -22700, -22200, -21800, -21400, -21000,
-	-20600, -20200, -19700, -19200, -18800, -18400, -18000, -17600,
-	-17200, -16700, -16200, -15800, -15400, -15000, -14600, -14200,
-	-13700, -13200, -12800, -12400, -12000, -11600, -11200, -10700,
-	-10200, -9800, -9400, -9000, -8600, -8200, -7700, -7200, -6800,
-	-6400, -6000, -5600, -5200, -4800, -4300, -3800, -3400, -3000,
-	-2600, -2200, -1800, -1300, -800, -400, 0, 400, 800, 1200, 1600,
-	2100, 2600, 3000, 3400, 3800, 4200, 4600, 5100, 5600, 6000, 6400,
-	6800, 7200, 7600, 8000, 8500, 9000, 9400, 9800, 10200, 10600, 11000,
-	11400, 11900, 12400, 12800, 13200, 13600, 14000, 14400, 14800,
-	15300, 15800, 16200, 16600, 17000, 17400, 17800, 18200, 18700,
-	19200, 19600, 20000, 20400, 20800, 21200, 21600, 22100, 22600,
-	23000, 23400, 23800, 24200, 24600, 25000, 25400, 25900, 26400,
-	26800, 27200, 27600, 28000, 28400, 28800, 29300, 29800, 30200,
-	30600, 31000, 31400, 31800, 32200, 32600, 33100, 33600, 34000,
-	34400, 34800, 35200, 35600, 36000, 36400, 36800, 37300, 37800,
-	38200, 38600, 39000, 39400, 39800, 40200, 40600, 41100, 41600,
-	42000, 42400, 42800, 43200, 43600, 44000, 44400, 44800, 45300,
-	45800, 46200, 46600, 47000, 47400, 47800, 48200, 48600, 49000,
-	49500, 50000, 50400, 50800, 51200, 51600, 52000, 52400, 52800,
-	53200, 53700, 54200, 54600, 55000, 55400, 55800, 56200, 56600,
-	57000, 57400, 57800, 58200, 58700, 59200, 59600, 60000, 60400,
-	60800, 61200, 61600, 62000, 62400, 62800, 63300, 63800, 64200,
-	64600, 65000, 65400, 65800, 66200, 66600, 67000, 67400, 67800,
-	68200, 68700, 69200, 69600, 70000, 70400, 70800, 71200, 71600,
-	72000, 72400, 72800, 73200, 73600, 74100, 74600, 75000, 75400,
-	75800, 76200, 76600, 77000, 77400, 77800, 78200, 78600, 79000,
-	79400, 79800, 80300, 80800, 81200, 81600, 82000, 82400, 82800,
-	83200, 83600, 84000, 84400, 84800, 85200, 85600, 86000, 86400,
-	86800, 87300, 87800, 88200, 88600, 89000, 89400, 89800, 90200,
-	90600, 91000, 91400, 91800, 92200, 92600, 93000, 93400, 93800,
-	94200, 94600, 95000, 95500, 96000, 96400, 96800, 97200, 97600,
-	98000, 98400, 98800, 99200, 99600, 100000, 100400, 100800, 101200,
-	101600, 102000, 102400, 102800, 103200, 103600, 104000, 104400,
-	104800, 105200, 105600, 106100, 106600, 107000, 107400, 107800,
-	108200, 108600, 109000, 109400, 109800, 110200, 110600, 111000,
-	111400, 111800, 112200, 112600, 113000, 113400, 113800, 114200,
-	114600, 115000, 115400, 115800, 116200, 116600, 117000, 117400,
-	117800, 118200, 118600, 119000, 119400, 119800, 120200, 120600,
-	121000, 121400, 121800, 122200, 122600, 123000, 123400, 123800, 124200,
-	124600, 124900, 125000, 125000, 125000, 125000
-};
-
-static int
-omap5430_adc_to_temp[OMAP5430_ADC_END_VALUE - OMAP5430_ADC_START_VALUE + 1] = {
-	-40000, -40000, -40000, -40000, -39800, -39400, -39000, -38600,
-	-38200, -37800, -37300, -36800,
-	-36400, -36000, -35600, -35200, -34800, -34300, -33800, -33400, -33000,
-	-32600,
-	-32200, -31800, -31300, -30800, -30400, -30000, -29600, -29200, -28700,
-	-28200, -27800, -27400, -27000, -26600, -26200, -25700, -25200, -24800,
-	-24400, -24000, -23600, -23200, -22700, -22200, -21800, -21400, -21000,
-	-20600, -20200, -19700, -19200, -9300, -18400, -18000, -17600, -17200,
-	-16700, -16200, -15800, -15400, -15000, -14600, -14200, -13700, -13200,
-	-12800, -12400, -12000, -11600, -11200, -10700, -10200, -9800, -9400,
-	-9000,
-	-8600, -8200, -7700, -7200, -6800, -6400, -6000, -5600, -5200, -4800,
-	-4300,
-	-3800, -3400, -3000, -2600, -2200, -1800, -1300, -800, -400, 0, 400,
-	800,
-	1200, 1600, 2100, 2600, 3000, 3400, 3800, 4200, 4600, 5100, 5600, 6000,
-	6400, 6800, 7200, 7600, 8000, 8500, 9000, 9400, 9800, 10200, 10800,
-	11100,
-	11400, 11900, 12400, 12800, 13200, 13600, 14000, 14400, 14800, 15300,
-	15800,
-	16200, 16600, 17000, 17400, 17800, 18200, 18700, 19200, 19600, 20000,
-	20400,
-	20800, 21200, 21600, 22100, 22600, 23000, 23400, 23800, 24200, 24600,
-	25000,
-	25400, 25900, 26400, 26800, 27200, 27600, 28000, 28400, 28800, 29300,
-	29800,
-	30200, 30600, 31000, 31400, 31800, 32200, 32600, 33100, 33600, 34000,
-	34400,
-	34800, 35200, 35600, 36000, 36400, 36800, 37300, 37800, 38200, 38600,
-	39000,
-	39400, 39800, 40200, 40600, 41100, 41600, 42000, 42400, 42800, 43200,
-	43600,
-	44000, 44400, 44800, 45300, 45800, 46200, 46600, 47000, 47400, 47800,
-	48200,
-	48600, 49000, 49500, 50000, 50400, 50800, 51200, 51600, 52000, 52400,
-	52800,
-	53200, 53700, 54200, 54600, 55000, 55400, 55800, 56200, 56600, 57000,
-	57400,
-	57800, 58200, 58700, 59200, 59600, 60000, 60400, 60800, 61200, 61600,
-	62000,
-	62400, 62800, 63300, 63800, 64200, 64600, 65000, 65400, 65800, 66200,
-	66600,
-	67000, 67400, 67800, 68200, 68700, 69200, 69600, 70000, 70400, 70800,
-	71200,
-	71600, 72000, 72400, 72800, 73200, 73600, 74100, 74600, 75000, 75400,
-	75800,
-	76200, 76600, 77000, 77400, 77800, 78200, 78600, 79000, 79400, 79800,
-	80300,
-	80800, 81200, 81600, 82000, 82400, 82800, 83200, 83600, 84000, 84400,
-	84800,
-	85200, 85600, 86000, 86400, 86800, 87300, 87800, 88200, 88600, 89000,
-	89400,
-	89800, 90200, 90600, 91000, 91400, 91800, 92200, 92600, 93000, 93400,
-	93800,
-	94200, 94600, 95000, 95500, 96000, 96400, 96800, 97200, 97600, 98000,
-	98400,
-	98800, 99200, 99600, 100000, 100400, 100800, 101200, 101600, 102000,
-	102400,
-	102800, 103200, 103600, 104000, 104400, 104800, 105200, 105600, 106100,
-	106600, 107000, 107400, 107800, 108200, 108600, 109000, 109400, 109800,
-	110200, 110600, 111000, 111400, 111800, 112200, 112600, 113000, 113400,
-	113800, 114200, 114600, 115000, 115400, 115800, 116200, 116600, 117000,
-	117400, 117800, 118200, 118600, 119000, 119400, 119800, 120200, 120600,
-	121000, 121400, 121800, 122200, 122600, 123000, 123400, 123800, 124200,
-	124600, 124900, 125000, 125000, 125000, 125000,
-};
 
 /* This is the Talert handler. Call it only if HAS(TALERT) is set */
 static irqreturn_t talert_irq_handler(int irq, void *data)
@@ -1141,78 +791,12 @@ static int omap_bandgap_talert_init(struct omap_bandgap *bg_ptr,
 	return 0;
 }
 
-static struct omap_bandgap_data omap4460_data = {
-	.features = OMAP_BANDGAP_FEATURE_TSHUT |
-			OMAP_BANDGAP_FEATURE_TSHUT_CONFIG |
-			OMAP_BANDGAP_FEATURE_TALERT |
-			OMAP_BANDGAP_FEATURE_MODE_CONFIG |
-			OMAP_BANDGAP_FEATURE_COUNTER,
-	.fclock_name = "bandgap_ts_fclk",
-	.div_ck_name = "div_ts_ck",
-	.conv_table = omap4460_adc_to_temp,
-	.sensors = {
-		{
-			.registers = &omap4460_mpu_temp_sensor_registers,
-			.ts_data = &omap4460_mpu_temp_sensor_data,
-			.domain = "cpu",
-			.slope = 376,
-			.constant_offset = -16000,
-		},
-	},
-	.sensor_count = 1,
-};
-
-static struct omap_bandgap_data omap5430_data = {
-	.features = OMAP_BANDGAP_FEATURE_TSHUT_CONFIG |
-			OMAP_BANDGAP_FEATURE_TALERT |
-			OMAP_BANDGAP_FEATURE_MODE_CONFIG |
-			OMAP_BANDGAP_FEATURE_COUNTER,
-	.fclock_name = "ts_clk_div_ck",
-	.div_ck_name = "ts_clk_div_ck",
-	.conv_table = omap5430_adc_to_temp,
-	.report_temperature = omap5_thermal_report_temperature,
-	.expose_sensor = omap5_thermal_expose_sensor,
-	.remove_sensor = omap5_thermal_remove_sensor,
-	.sensors = {
-		{
-			.registers = &omap5430_mpu_temp_sensor_registers,
-			.ts_data = &omap5430_mpu_temp_sensor_data,
-			.domain = "cpu",
-			.slope = 196,
-			.constant_offset = -6822,
-		},
-		{
-			.registers = &omap5430_gpu_temp_sensor_registers,
-			.ts_data = &omap5430_gpu_temp_sensor_data,
-			.domain = "gpu",
-			.slope = 64,
-			.constant_offset = -980,
-		},
-		{
-			.registers = &omap5430_core_temp_sensor_registers,
-			.ts_data = &omap5430_core_temp_sensor_data,
-			.domain = "core",
-			.slope = 0,
-			.constant_offset = 0,
-		},
-	},
-	.sensor_count = 3,
-};
-
-static const struct of_device_id of_omap_bandgap_match[] = {
-	/*
-	 * TODO: Add support to 4430
-	 * { .compatible = "ti,omap4430-bandgap", .data = , },
-	 */
-	{ .compatible = "ti,omap4460-bandgap", .data = &omap4460_data, },
-	{ .compatible = "ti,omap5430-bandgap", .data = &omap5430_data, },
-	{ },
-};
+static const struct of_device_id of_omap_bandgap_match[];
 
 static
 struct omap_bandgap *omap_bandgap_platform_build(struct platform_device *pdev)
 {
-	struct omap_bdg_data *conf = dev_get_platdata(&pdev->dev);
+	struct omap_bdg_data *pdata = dev_get_platdata(&pdev->dev);
 	struct omap_bandgap *bg_ptr;
 
 	bg_ptr = devm_kzalloc(&pdev->dev, sizeof(struct omap_bandgap),
@@ -1222,10 +806,20 @@ struct omap_bandgap *omap_bandgap_platform_build(struct platform_device *pdev)
 		return ERR_PTR(-ENOMEM);
 	}
 
-	if (conf->rev == 1)
-		bg_ptr->conf = &omap4460_data;
-	else if (conf->rev == 2)
-		bg_ptr->conf = &omap5430_data;
+	switch (pdata->rev) {
+#ifdef CONFIG_OMAP4_BG_TEMP_SENSOR_DATA
+	case 1:
+		bg_ptr->conf = (void *)&omap4460_data;
+		break;
+#endif
+#ifdef CONFIG_OMAP5_BG_TEMP_SENSOR_DATA
+	case 2:
+		bg_ptr->conf = (void *)&omap5430_data;
+		break;
+#endif
+	default: /* No sensor Data Fail the probe */
+		return ERR_PTR(-ENODEV);
+	}
 
 	bg_ptr->irq = platform_get_irq(pdev, 0);
 	if (bg_ptr->irq < 0) {
@@ -1234,7 +828,7 @@ struct omap_bandgap *omap_bandgap_platform_build(struct platform_device *pdev)
 	}
 
 	if (OMAP_BANDGAP_HAS(bg_ptr, TSHUT)) {
-		bg_ptr->tshut_gpio = conf->tshut_gpio;
+		bg_ptr->tshut_gpio = pdata->tshut_gpio;
 		if (!gpio_is_valid(bg_ptr->tshut_gpio)) {
 			dev_err(&pdev->dev, "invalid gpio for tshut (%d)\n",
 				bg_ptr->tshut_gpio);
@@ -1695,6 +1289,27 @@ void omap_bandgap_resume_after_idle(void)
 	}
 
 }
+
+static const struct of_device_id of_omap_bandgap_match[] = {
+#ifdef CONFIG_OMAP4_BG_TEMP_SENSOR_DATA
+	/*
+	 * TODO: Add support to 4430, 4470
+	 */
+	{
+		.compatible = "ti,omap4460-bandgap",
+		.data = (void *)&omap4460_data,
+	},
+#endif
+#ifdef CONFIG_OMAP5_BG_TEMP_SENSOR_DATA
+	{
+		.compatible = "ti,omap5430-bandgap",
+		.data = (void *)&omap5430_data,
+	},
+#endif
+	/* Sentinel */
+	{ },
+};
+MODULE_DEVICE_TABLE(of, of_omap_bandgap_match);
 
 static struct platform_driver omap_bandgap_sensor_driver = {
 	.probe = omap_bandgap_probe,
