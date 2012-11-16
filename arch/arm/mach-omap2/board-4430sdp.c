@@ -774,9 +774,10 @@ static void sdp4430_panel_disable_hdmi(struct omap_dss_device *dssdev)
 
 static void blaze_init_display_led(void)
 {
-	twl_i2c_write_u8(TWL_MODULE_PWM, 0xFF, LED_PWM2ON);
-	twl_i2c_write_u8(TWL_MODULE_PWM, 0x7F, LED_PWM2OFF);
-	twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x30, LED_TOGGLE3);
+	/* Set maximum brightness on init */
+	twl_i2c_write_u8(TWL_MODULE_PWM, 0x00, LED_PWM2ON);
+	twl_i2c_write_u8(TWL_MODULE_PWM, 0x00, LED_PWM2OFF);
+	twl_i2c_write_u8(TWL6030_MODULE_ID1, PWM2S | PWM2EN, TWL6030_TOGGLE3);
 }
 
 static void blaze_set_primary_brightness(u8 brightness)
