@@ -43,6 +43,7 @@
 #include <plat/omap4-keypad.h>
 #include <plat/drm.h>
 #include <plat/remoteproc.h>
+#include <plat/omap_apps_brd_id.h>
 #include <video/omapdss.h>
 #include <video/omap-panel-nokia-dsi.h>
 #include <video/omap-panel-picodlp.h>
@@ -1168,6 +1169,7 @@ static void __init omap_4430sdp_init(void)
 #endif
 
 	omap4_mux_init(board_mux, NULL, package);
+	omap_create_board_props();
 
 	omap4_i2c_init();
 	blaze_sensor_init();
