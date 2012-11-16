@@ -53,6 +53,7 @@
 #include "hsmmc.h"
 #include "control.h"
 #include "common-board-devices.h"
+#include "pm.h"
 
 #define ETH_KS8851_IRQ			34
 #define ETH_KS8851_POWER_ON		48
@@ -1157,6 +1158,8 @@ static void __init omap_4430sdp_init(void)
 		if (status)
 			pr_err("TPS62361 initialization failed: %d\n", status);
 	}
+
+	omap_enable_smartreflex_on_init();
 }
 
 static void __init omap_4430sdp_reserve(void)
