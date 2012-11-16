@@ -860,7 +860,7 @@ static int __init omap_pm_init(void)
 	 * stability level. Hence disable voltage scaling during Low
 	 * Power states for samples which do not support it.
 	 */
-	if (!omap5_has_auto_ret()) {
+	if (cpu_is_omap54xx() && !omap5_has_auto_ret()) {
 		u32 mask = OMAP4430_VDD_MPU_I2C_DISABLE_MASK |
 				OMAP4430_VDD_CORE_I2C_DISABLE_MASK |
 				OMAP4430_VDD_IVA_I2C_DISABLE_MASK;
