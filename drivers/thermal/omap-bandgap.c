@@ -502,12 +502,12 @@ int omap_bandgap_write_thot(struct omap_bandgap *bg_ptr, int id, int val)
 	if (ret)
 		return ret;
 
-	ts_data = bg_ptr->conf->sensors[id].ts_data;
-	tsr = bg_ptr->conf->sensors[id].registers;
-
 	/* If not using the HW Alert feature, just return success */
 	if (!OMAP_BANDGAP_HAS(bg_ptr, TALERT))
 		return 0;
+
+	ts_data = bg_ptr->conf->sensors[id].ts_data;
+	tsr = bg_ptr->conf->sensors[id].registers;
 
 	if (val < ts_data->min_temp + ts_data->hyst_val)
 		return -EINVAL;
