@@ -78,12 +78,16 @@ static int omap4_enter_idle_simple(struct cpuidle_device *dev,
 	return index;
 }
 
+#include <asm/hardware/gic.h>
+
+
 static int omap4_enter_idle_coupled(struct cpuidle_device *dev,
 			struct cpuidle_driver *drv,
 			int index)
 {
 	struct omap4_idle_statedata *cx = &omap4_idle_data[index];
 	int cpu_id = smp_processor_id();
+	u32 mpuss_context_lost = 0;
 
 	local_fiq_disable();
 
@@ -133,11 +137,42 @@ static int omap4_enter_idle_coupled(struct cpuidle_device *dev,
 	omap_enter_lowpower(dev->cpu, cx->cpu_state);
 	cpu_done[dev->cpu] = true;
 
+	mpuss_context_lost = omap_mpuss_read_prev_context_state();
+
 	/* Wakeup CPU1 only if it is not offlined */
 	if (dev->cpu == 0 && cpumask_test_cpu(1, cpu_online_mask)) {
+		/*
+		 * GIC distributor control register has changed between
+		 * CortexA9 r1pX and r2pX. The Control Register secure
+		 * banked version is now composed of 2 bits:
+		 * bit 0 == Secure Enable
+		 * bit 1 == Non-Secure Enable
+		 * The Non-Secure banked register has not changed
+		 * Because the ROM Code is based on the r1pX GIC, the CPU1
+		 * GIC restoration will cause a problem to CPU0 Non-Secure SW.
+		 * The workaround must be:
+		 * 1) Before doing the CPU1 wakeup, CPU0 must disable
+		 * the GIC distributor and wait until it will be enabled by CPU1
+		 * 2) CPU1 must re-enable the GIC distributor on
+		 * it's wakeup path.
+		 */
+		if (IS_PM44XX_ERRATUM(PM_OMAP4_ROM_SMP_BOOT_ERRATUM_xxx) &&
+		    mpuss_context_lost)
+			gic_dist_disable();
+
 		clkdm_wakeup(cpu_clkdm[1]);
 		clkdm_allow_idle(cpu_clkdm[1]);
+
+		if (IS_PM44XX_ERRATUM(PM_OMAP4_ROM_SMP_BOOT_ERRATUM_xxx) &&
+		    mpuss_context_lost)
+			while (gic_dist_disabled()) {
+				udelay(1);
+				cpu_relax();
+			}
 	}
+
+	if (IS_PM44XX_ERRATUM(PM_OMAP4_ROM_SMP_BOOT_ERRATUM_xxx) && dev->cpu)
+		gic_dist_enable();
 
 	/*
 	 * Call idle CPU PM exit notifier chain to restore
@@ -149,7 +184,7 @@ static int omap4_enter_idle_coupled(struct cpuidle_device *dev,
 	 * Call idle CPU cluster PM exit notifier chain
 	 * to restore GIC and wakeupgen context.
 	 */
-	if (omap_mpuss_read_prev_context_state())
+	if (mpuss_context_lost)
 		cpu_cluster_pm_exit();
 
 	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu_id);
