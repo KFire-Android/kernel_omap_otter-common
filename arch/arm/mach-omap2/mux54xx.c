@@ -615,12 +615,21 @@ static struct omap_mux __initdata omap5_core_muxmodes[] = {
 			NULL, "gpio5_147", "safe_mode"),
 	_OMAP5_MUXENTRY(I2C5_SDA, 148, "i2c5_sda", NULL, "uart4_tx", NULL, NULL,
 			NULL, "gpio5_148", "safe_mode"),
+#ifdef CONFIG_ARCH_OMAP5_ES1
 	_OMAP5_MUXENTRY(PERSLIMBUS2_CLOCK, 145, "perslimbus2_clock",
 			"mcspi1_cs2", "uart4_cts", "sdio5_clk", NULL,
 			"usbd0_ulpiphy_data2", "gpio5_145", "safe_mode"),
 	_OMAP5_MUXENTRY(PERSLIMBUS2_DATA, 146, "perslimbus2_data", "mcspi1_cs3",
 			"uart4_rts", "sdio5_cmd", NULL,
 			"usbd0_ulpiphy_data3", "gpio5_146", "safe_mode"),
+#else
+	_OMAP5_MUXENTRY(GPIO5_145, 145, "gpio5_145",
+			"mcspi1_cs2", "uart4_cts", "sdio5_clk", NULL,
+			"usbd0_ulpiphy_data2", "gpio5_145", "safe_mode"),
+	_OMAP5_MUXENTRY(GPIO5_146, 146, "gpio5_146", "mcspi1_cs3",
+			"uart4_rts", "sdio5_cmd", NULL,
+			"usbd0_ulpiphy_data3", "gpio5_146", "safe_mode"),
+#endif
 	_OMAP5_MUXENTRY(UART6_TX, 149, "uart6_tx", NULL, NULL, "sdio5_data3",
 			"usbb2_mm_rxdp", NULL, "gpio5_149", "safe_mode"),
 	_OMAP5_MUXENTRY(UART6_RX, 150, "uart6_rx", NULL, NULL, "sdio5_data2",
@@ -900,8 +909,13 @@ static struct omap_ball __initdata omap5_core_cbl_ball[] = {
 	_OMAP5_BALLENTRY(MCSPI1_CS1, "ah30", NULL),
 	_OMAP5_BALLENTRY(I2C5_SCL, "al32", NULL),
 	_OMAP5_BALLENTRY(I2C5_SDA, "al31", NULL),
+#ifdef CONFIG_ARCH_OMAP5_ES1
 	_OMAP5_BALLENTRY(PERSLIMBUS2_CLOCK, "aj32", NULL),
 	_OMAP5_BALLENTRY(PERSLIMBUS2_DATA, "ak32", NULL),
+#else
+	_OMAP5_BALLENTRY(GPIO5_145, "aj32", NULL),
+	_OMAP5_BALLENTRY(GPIO5_146, "ak32", NULL),
+#endif
 	_OMAP5_BALLENTRY(UART6_TX, "aj27", NULL),
 	_OMAP5_BALLENTRY(UART6_RX, "aj26", NULL),
 	_OMAP5_BALLENTRY(UART6_CTS, "ak26", NULL),
@@ -1071,6 +1085,7 @@ static struct omap_ball __initdata omap5_wkup_cbl_ball[] = {
 #define omap5_wkup_cbl_ball  NULL
 #endif
 
+#ifdef CONFIG_ARCH_OMAP5_ES1
 /*
  * Core subset for OMAP5432 ES1.0
  */
@@ -1106,9 +1121,7 @@ static struct omap_mux __initdata omap5_5432_wkup_subset[] = {
 	_OMAP5_MUXENTRY_SAFE(FREF_CLK2_OUT, 10),
 	{ .reg_offset = OMAP_MUX_TERMINATOR },
 };
-
-
-
+#endif
 
 int __init omap5_mux_init(struct omap_board_mux *board_subset,
 	struct omap_board_mux *board_wkup_subset, int flags)
@@ -1124,11 +1137,13 @@ int __init omap5_mux_init(struct omap_board_mux *board_subset,
 	case OMAP5430_REV_ES2_0:
 		pr_debug("%s: OMAP5430 ES1.0/ES2.0 mux\n", __func__);
 		break;
+#ifdef CONFIG_ARCH_OMAP5_ES1
 	case OMAP5432_REV_ES1_0:
 		pr_debug("%s: OMAP5432 ES1.0 mux\n", __func__);
 		core_subset = omap5_5432es1_core_subset;
 		wkup_subset = omap5_5432_wkup_subset;
 		break;
+#endif
 	default:
 		pr_err("mux: Unknown omap package, mux disabled\n");
 		return -EINVAL;
