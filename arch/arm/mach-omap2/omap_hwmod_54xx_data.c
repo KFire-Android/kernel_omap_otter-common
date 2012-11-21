@@ -531,7 +531,7 @@ static struct omap_hwmod_class omap54xx_mpu_bus_hwmod_class = {
 static struct omap_hwmod_ocp_if omap54xx_mpu__mpu_private = {
 	.master		= &omap54xx_mpu_hwmod,
 	.slave		= &omap54xx_mpu_private_hwmod,
-	.clk		= "l3_div_ck",
+	.clk		= "l3_iclk_div",
 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
 };
 
@@ -1637,7 +1637,7 @@ static struct omap_hwmod_ocp_if *omap54xx_dss_rfbi_slaves[] = {
 };
 
 static struct omap_hwmod_opt_clk dss_rfbi_opt_clks[] = {
-	{ .role = "ick", .clk = "l3_div_ck" },
+	{ .role = "ick", .clk = "l3_iclk_div" },
 };
 
 static struct omap_hwmod omap54xx_dss_rfbi_hwmod = {
