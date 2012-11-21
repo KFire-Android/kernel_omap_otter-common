@@ -210,10 +210,6 @@ static struct omap2_hsmmc_info mmc[] = {
 	{}	/* Terminator */
 };
 
-static struct regulator_consumer_supply tablet_vaux_supply[] = {
-	REGULATOR_SUPPLY("vmmc", "omap_hsmmc.1"),
-};
-
 static int omap4_twl6030_hsmmc_late_init(struct device *dev)
 {
 	int irq = 0;
@@ -258,41 +254,6 @@ static int __init omap4_twl6030_hsmmc_init(struct omap2_hsmmc_info *controllers)
 	return 0;
 }
 
-static struct regulator_init_data tablet_vaux1 = {
-	.constraints = {
-		.min_uV			= 1000000,
-		.max_uV			= 3000000,
-		.apply_uV		= true,
-		.valid_modes_mask	= REGULATOR_MODE_NORMAL
-					| REGULATOR_MODE_STANDBY,
-		.valid_ops_mask	 = REGULATOR_CHANGE_VOLTAGE
-					| REGULATOR_CHANGE_MODE
-					| REGULATOR_CHANGE_STATUS,
-	},
-	.num_consumer_supplies  = ARRAY_SIZE(tablet_vaux_supply),
-	.consumer_supplies      = tablet_vaux_supply,
-};
-
-static struct regulator_init_data tablet_vusim = {
-	.constraints = {
-		.min_uV			= 1200000,
-		.max_uV			= 2900000,
-		.apply_uV		= true,
-		.valid_modes_mask	= REGULATOR_MODE_NORMAL
-					| REGULATOR_MODE_STANDBY,
-		.valid_ops_mask	 = REGULATOR_CHANGE_VOLTAGE
-					| REGULATOR_CHANGE_MODE
-					| REGULATOR_CHANGE_STATUS,
-	},
-};
-
-static struct regulator_init_data clk32kg = {
-	.constraints = {
-		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
-		.always_on		= true,
-	},
-};
-
 static struct twl6040_codec_data twl6040_codec = {
 	/* single-step ramp for headset and handsfree */
 	.hs_left_step	= 0x0f,
@@ -320,17 +281,7 @@ static struct twl6040_platform_data twl6040_data = {
 	.audpwron_gpio	= 127,
 };
 
-static struct twl4030_madc_platform_data twl6030_gpadc = {
-	.irq_line = -1,
-};
-
-static struct twl4030_platform_data tablet_twldata = {
-	/* Regulators */
-	.vusim		= &tablet_vusim,
-	.vaux1		= &tablet_vaux1,
-	.clk32kg	= &clk32kg,
-	.madc		= &twl6030_gpadc,
-};
+static struct twl4030_platform_data tablet_twldata;
 
 /*
  * The Clock Driver Chip (TCXO) on OMAP4 based SDP needs to
@@ -395,18 +346,24 @@ static int __init omap4_i2c_init(void)
 	omap_register_i2c_bus_board_data(3, &omap4_i2c_3_bus_pdata);
 	omap_register_i2c_bus_board_data(4, &omap4_i2c_4_bus_pdata);
 
-	omap4_pmic_get_config(&tablet_twldata, TWL_COMMON_PDATA_USB,
+	omap4_pmic_get_config(&tablet_twldata, TWL_COMMON_PDATA_USB |
+			TWL_COMMON_PDATA_MADC,
 			TWL_COMMON_REGULATOR_VDAC |
+			TWL_COMMON_REGULATOR_VAUX1 |
 			TWL_COMMON_REGULATOR_VAUX2 |
 			TWL_COMMON_REGULATOR_VAUX3 |
 			TWL_COMMON_REGULATOR_VMMC |
 			TWL_COMMON_REGULATOR_VPP |
+			TWL_COMMON_REGULATOR_VUSIM |
 			TWL_COMMON_REGULATOR_VANA |
 			TWL_COMMON_REGULATOR_VCXIO |
 			TWL_COMMON_REGULATOR_VUSB |
 			TWL_COMMON_REGULATOR_CLK32KG |
 			TWL_COMMON_REGULATOR_V1V8 |
-			TWL_COMMON_REGULATOR_V2V1);
+			TWL_COMMON_REGULATOR_V2V1 |
+			TWL_COMMON_REGULATOR_SYSEN |
+			TWL_COMMON_REGULATOR_CLK32KAUDIO |
+			TWL_COMMON_REGULATOR_REGEN1);
 	omap4_pmic_init("twl6030", &tablet_twldata,
 			&twl6040_data, OMAP44XX_IRQ_SYS_2N);
 	i2c_register_board_info(1, tablet_i2c_boardinfo,

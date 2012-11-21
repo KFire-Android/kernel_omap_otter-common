@@ -96,7 +96,7 @@
 #define twl_has_gpadc()	false
 #endif
 
-#ifdef CONFIG_TWL4030_POWER
+#if defined(CONFIG_TWL4030_POWER) || defined(CONFIG_TWL6030_POWER)
 #define twl_has_power()        true
 #else
 #define twl_has_power()        false
@@ -1091,11 +1091,6 @@ add_children(struct twl4030_platform_data *pdata, unsigned irq_base,
 					features);
 		if (IS_ERR(child))
 			return PTR_ERR(child);
-
-		child = add_regulator(TWL6030_REG_CLK32KG, pdata->clk32kg,
-					features);
-		if (IS_ERR(child))
-			return PTR_ERR(child);
 	}
 
 	/* 6030 and 6032 share this regulator */
@@ -1119,11 +1114,21 @@ add_children(struct twl4030_platform_data *pdata, unsigned irq_base,
 				pdata->sysen, features);
 		if (IS_ERR(child))
 			return PTR_ERR(child);
+
+		child = add_regulator(TWL6030_REG_CLK32KG, pdata->clk32kg,
+					features);
+		if (IS_ERR(child))
+			return PTR_ERR(child);
 	}
 
 	/* twl6032 regulators */
 	if (twl_has_regulator() && twl_class_is_6030() &&
 			(features & TWL6032_SUBCLASS)) {
+		child = add_regulator(TWL6032_REG_EXT_V2V1, pdata->ext_v2v1,
+					features);
+		if (IS_ERR(child))
+			return PTR_ERR(child);
+
 		child = add_regulator(TWL6032_REG_LDO5, pdata->ldo5,
 					features);
 		if (IS_ERR(child))
@@ -1395,8 +1400,12 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	}
 
 	/* load power event scripts */
-	if (twl_has_power() && pdata->power)
-		twl4030_power_init(pdata->power);
+	if (twl_has_power()) {
+		if (twl_class_is_4030() && pdata->power)
+			twl4030_power_init(pdata->power);
+		if (twl_class_is_6030())
+			twl6030_power_init(pdata->power);
+	}
 
 	features = id->driver_data;
 	if (twl_class_is_6030()) {
