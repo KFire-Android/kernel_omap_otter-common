@@ -559,8 +559,8 @@
 #define OMAP5_LDOSRAMMPU_LVT_ACTMODE_VSET_OUT_MASK	(0x1f << 0)
 
 /* CONF_DEBUG_SEL_TST_0 */
-#define OMAP5_MODE_SHIFT				0
-#define OMAP5_MODE_MASK					(0x3 << 0)
+#define OMAP5_WKUP_MODE_SHIFT				0
+#define OMAP5_WKUP_MODE_MASK				(0x3 << 0)
 
 /* CONF_XBAR_SEL_0 */
 #define OMAP5_CONF_XBAR_SEL_3_SHIFT			24
@@ -643,7 +643,7 @@
 #define OMAP5_CONF_XBAR_SEL_28_MASK			(0x1f << 0)
 
 /* CONF_XBAR_BYPASS */
-#define OMAP5_SELECT_SHIFT				0
-#define OMAP5_SELECT_MASK				(1 << 0)
+#define OMAP5_WKUP_SELECT_SHIFT				0
+#define OMAP5_WKUP_SELECT_MASK				(1 << 0)
 
 #endif
