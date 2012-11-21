@@ -177,11 +177,13 @@ static int omap4_enter_idle_coupled(struct cpuidle_device *dev,
 		clkdm_allow_idle(cpu_clkdm[1]);
 
 		if (IS_PM44XX_ERRATUM(PM_OMAP4_ROM_SMP_BOOT_ERRATUM_xxx) &&
-		    mpuss_context_lost)
+		    mpuss_context_lost) {
 			while (gic_dist_disabled()) {
 				udelay(1);
 				cpu_relax();
 			}
+			gic_timer_retrigger();
+		}
 	}
 
 	if (IS_PM44XX_ERRATUM(PM_OMAP4_ROM_SMP_BOOT_ERRATUM_xxx) && dev->cpu)

@@ -22,6 +22,7 @@
 #include <asm/hardware/cache-l2x0.h>
 #include <asm/mach/map.h>
 #include <asm/memblock.h>
+#include <asm/smp_twd.h>
 
 #include <plat/irqs.h>
 #include <plat/sram.h>
@@ -39,6 +40,7 @@ static void __iomem *l2cache_base;
 #endif
 
 static void __iomem *gic_dist_base_addr;
+static void __iomem *twd_base;
 
 #ifdef CONFIG_OMAP4_ERRATA_I688
 /* Used to implement memory barrier on DRAM path */
@@ -116,6 +118,9 @@ void __init gic_init_irq(void)
 
 	BUG_ON(!omap_irq_base);
 
+	twd_base = ioremap(OMAP44XX_LOCAL_TWD_BASE, SZ_4K);
+	BUG_ON(!twd_base);
+
 	omap_wakeupgen_init();
 
 	gic_init(0, 29, gic_dist_base_addr, omap_irq_base);
@@ -144,6 +149,27 @@ u32 gic_readl(u32 offset, u8 idx)
 		return 0;
 
 	return __raw_readl(gic_dist_base_addr + offset + 4 * idx);
+}
+
+void gic_timer_retrigger(void)
+{
+	u32 twd_int = __raw_readl(twd_base + TWD_TIMER_INTSTAT);
+	u32 gic_int = __raw_readl(gic_dist_base_addr + GIC_DIST_PENDING_SET);
+	u32 twd_ctrl = __raw_readl(twd_base + TWD_TIMER_CONTROL);
+
+	if (twd_int && !(gic_int & BIT(OMAP44XX_IRQ_LOCALTIMER))) {
+		/*
+		 * The local timer interrupt got lost while the distributor was
+		 * disabled.  Ack the pending interrupt, and retrigger it.
+		 */
+		pr_warn("%s: lost localtimer interrupt\n", __func__);
+		__raw_writel(1, twd_base + TWD_TIMER_INTSTAT);
+		if (!(twd_ctrl & TWD_TIMER_CONTROL_PERIODIC)) {
+			__raw_writel(1, twd_base + TWD_TIMER_COUNTER);
+			twd_ctrl |= TWD_TIMER_CONTROL_ENABLE;
+			__raw_writel(twd_ctrl, twd_base + TWD_TIMER_CONTROL);
+		}
+	}
 }
 
 #ifdef CONFIG_CACHE_L2X0
