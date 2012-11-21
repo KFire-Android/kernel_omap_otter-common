@@ -20,10 +20,17 @@
 #include <mach/ctrl_module_wkup_44xx.h>
 #include <mach/ctrl_module_pad_core_44xx.h>
 #include <mach/ctrl_module_pad_wkup_44xx.h>
+#ifdef CONFIG_ARCH_OMAP5_ES1
+#include <mach/ctrl_module_core_54xx_es1.h>
+#include <mach/ctrl_module_core_pad_54xx_es1.h>
+#include <mach/ctrl_module_wkup_54xx_es1.h>
+#include <mach/ctrl_module_wkup_pad_54xx_es1.h>
+#else
 #include <mach/ctrl_module_core_54xx.h>
 #include <mach/ctrl_module_core_pad_54xx.h>
 #include <mach/ctrl_module_wkup_54xx.h>
 #include <mach/ctrl_module_wkup_pad_54xx.h>
+#endif
 
 #ifndef __ASSEMBLY__
 #define OMAP242X_CTRL_REGADDR(reg)					\
