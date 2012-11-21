@@ -2207,7 +2207,7 @@ static struct clk mmc1_fclk_mux = {
 	.clksel		= mmc1_fclk_mux_sel,
 	.init		= &omap2_init_clksel_parent,
 	.clksel_reg	= OMAP54XX_CM_L3INIT_MMC1_CLKCTRL,
-	.clksel_mask	= OMAP54XX_CLKSEL_SOURCE_MASK,
+	.clksel_mask	= OMAP54XX_CLKSEL_SOURCE_L3INIT_MMC1_MASK,
 	.ops		= &clkops_null,
 	.recalc		= &omap2_clksel_recalc,
 };
