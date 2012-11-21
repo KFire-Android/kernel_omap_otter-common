@@ -245,8 +245,60 @@ static int sensor_get_temperature(void *data, u64 *val)
 
 	return 0;
 }
+
+static int thermal_debug_report_temp(struct thermal_dev *tdev)
+{
+	if (tdev == NULL) {
+		pr_err("%s:Not a valid device\n", __func__);
+		return -ENODEV;
+	}
+
+	/* If we reached here, means user is injecting temperature */
+	return tdev->current_temp;
+}
+
+static int sensor_set_temperature(void *data, u64 val)
+{
+	struct thermal_dev *temp_sensor = (struct thermal_dev *)data;
+
+	mutex_lock(&temp_sensor->mutex);
+	if ((s64)val > 0) {
+		/*
+		 * Need to update the func pointer, only for the first test
+		 * temperature input. Otherwise the original function pointer
+		 * will be lost if two consecutive test temperature values are
+		 * written.
+		 */
+		if (!temp_sensor->dev_ops->orig_report) {
+			temp_sensor->dev_ops->orig_report =
+					temp_sensor->dev_ops->report_temp;
+			temp_sensor->dev_ops->report_temp =
+					thermal_debug_report_temp;
+		}
+
+		temp_sensor->current_temp = val;
+	} else {
+		/*
+		 * Restore the pointer only if it was changed. Otherwise writing
+		 * -1 to debugfs entry will nullify the original pointer and
+		 * will break the thermal policy.
+		 */
+		if (temp_sensor->dev_ops->orig_report) {
+			temp_sensor->dev_ops->report_temp =
+					temp_sensor->dev_ops->orig_report;
+			temp_sensor->dev_ops->orig_report = NULL;
+		}
+
+		thermal_device_call(temp_sensor, report_temp);
+	}
+
+	thermal_sensor_set_temp(temp_sensor);
+	mutex_unlock(&temp_sensor->mutex);
+
+	return 0;
+}
 DEFINE_SIMPLE_ATTRIBUTE(sensor_temp_fops, sensor_get_temperature,
-			NULL, "%llu\n");
+			sensor_set_temperature, "%lld\n");
 
 static void thermal_debug_register_device(struct thermal_dev *tdev)
 {
@@ -269,9 +321,13 @@ static void thermal_debug_register_device(struct thermal_dev *tdev)
 	}
 
 	/* Am I a sensor device ? */
-	if (tdev->dev_ops && tdev->dev_ops->report_temp)
-		(void) debugfs_create_file("temperature", S_IRUGO, d,
+	if (tdev->dev_ops && tdev->dev_ops->report_temp) {
+		mutex_init(&tdev->mutex);
+		(void) debugfs_create_file("temperature", S_IRUGO | S_IWUSR, d,
 					(void *)tdev, &sensor_temp_fops);
+
+		tdev->dev_ops->orig_report = NULL;
+	}
 
 	thermal_device_call(tdev, register_debug_entries, d);
 }

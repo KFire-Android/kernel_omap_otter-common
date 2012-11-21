@@ -284,6 +284,14 @@ int omap5_thermal_expose_sensor(struct omap_bandgap *bg_ptr, int id,
 	INIT_WORK(&data->report_temperature_work,
 		report_temperature_delayed_work_fn);
 
+	data->therm_fw.dev_ops = devm_kzalloc(bg_ptr->dev,
+					sizeof(*data->therm_fw.dev_ops),
+					GFP_KERNEL);
+	if (!data->therm_fw.dev_ops) {
+		dev_err(bg_ptr->dev, "Bandgap data - kzalloc fail\n");
+		return -ENOMEM;
+	}
+
 	/* Construct the sensor name for the domain */
 	sprintf(sensor_name, "omap_%s_sensor", domain);
 	data->therm_fw.name = sensor_name;
@@ -291,7 +299,7 @@ int omap5_thermal_expose_sensor(struct omap_bandgap *bg_ptr, int id,
 	data->therm_fw.domain_name =
 		bg_ptr->pdata->sensors[id].domain;
 	data->therm_fw.dev = data->bg_ptr->dev;
-	data->therm_fw.dev_ops = &omap_sensor_ops;
+	*data->therm_fw.dev_ops = omap_sensor_ops;
 	data->therm_fw.sen_id = id;
 	data->therm_fw.slope = data->bg_ptr->pdata->sensors[id].slope;
 	data->therm_fw.constant_offset =

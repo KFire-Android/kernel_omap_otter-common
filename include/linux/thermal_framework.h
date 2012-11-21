@@ -56,6 +56,8 @@ struct thermal_dev_ops {
 	/* Debugging interface */
 	int (*debug_report) (struct thermal_dev *, struct seq_file *s);
 	int (*register_debug_entries) (struct thermal_dev *, struct dentry *d);
+	/* copy of report_temp, while doing temperature injections */
+	int (*orig_report) (struct thermal_dev *);
 #endif
 };
 
@@ -99,6 +101,8 @@ struct thermal_dev {
 	int		sen_id;
 	struct thermal_domain   *domain;
 	struct dentry *debug_dentry;
+	/* for serializing sensor.ops manipulations and temp injection */
+	struct mutex	mutex;
 };
 
 /**
