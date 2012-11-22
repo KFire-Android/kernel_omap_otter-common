@@ -1352,9 +1352,17 @@ static struct clk func_96m_fclk = {
 	.recalc		= &omap_fixed_divisor_recalc,
 };
 
+static struct clk gpu_l3_iclk = {
+	.name		= "gpu_l3_iclk",
+	.parent		= &l3_iclk_div,
+	.ops		= &clkops_null,
+	.recalc		= &followparent_recalc,
+};
+
 static const struct clksel gpu_core_gclk_mux_sel[] = {
 	{ .parent = &dpll_core_h14x2_ck, .rates = div_1_0_rates },
 	{ .parent = &dpll_per_h14x2_ck, .rates = div_1_1_rates },
+	{ .parent = &gpu_l3_iclk, .rates = div2_1to2_rates},
 	{ .parent = NULL },
 };
 
@@ -1380,9 +1388,13 @@ static struct clk gpu_hyd_gclk_mux = {
 	.recalc		= &followparent_recalc,
 };
 
-static struct clk gpu_l3_iclk = {
-	.name		= "gpu_l3_iclk",
-	.parent		= &l3_iclk_div,
+static struct clk gpu_l3_giclk = {
+	.name		= "gpu_l3_giclk",
+	.parent		= &gpu_l3_iclk,
+	.clksel		= gpu_core_gclk_mux_sel,
+	.init		= &omap2_init_clksel_parent,
+	.clksel_reg	= OMAP54XX_CM_GPU_GPU_CLKCTRL,
+	.clksel_mask	= OMAP54XX_CLKSEL_GPU_SYS_CLK_SHIFT,
 	.ops		= &clkops_null,
 	.recalc		= &followparent_recalc,
 };
@@ -2203,6 +2215,7 @@ static struct clk mmc1_fclk_mux = {
 
 static const struct clksel mmc1_fclk_div[] = {
 	{ .parent = &mmc1_fclk_mux, .rates = div2_1to2_rates },
+	{ .parent = &sys_32k_ck, .rates = div2_1to2_rates },
 	{ .parent = NULL },
 };
 
@@ -2212,6 +2225,20 @@ static struct clk mmc1_fclk = {
 	.clksel		= mmc1_fclk_div,
 	.clksel_reg	= OMAP54XX_CM_L3INIT_MMC1_CLKCTRL,
 	.clksel_mask	= OMAP54XX_CLKSEL_DIV_MASK,
+	.ops		= &clkops_null,
+	.recalc		= &omap2_clksel_recalc,
+	.round_rate	= &omap2_clksel_round_rate,
+	.set_rate	= &omap2_clksel_set_rate,
+};
+
+static struct clk mmc1_32k_gfclk = {
+	.name		= "mmc1_32k_gfclk",
+	.parent		= &sys_32k_ck,
+	.clksel		= mmc1_fclk_div,
+	.clksel_reg	= OMAP54XX_CM_L3INIT_MMC1_CLKCTRL,
+	.clksel_mask	= OMAP54XX_CLKSEL_DIV_MASK,
+	.enable_reg	= OMAP54XX_CM_L3INIT_MMC1_CLKCTRL,
+	.enable_bit	= OMAP54XX_OPTFCLKEN_32KHZ_CLK_8_8_SHIFT,
 	.ops		= &clkops_null,
 	.recalc		= &omap2_clksel_recalc,
 	.round_rate	= &omap2_clksel_round_rate,
@@ -2597,6 +2624,7 @@ static struct omap_clk omap54xx_clks[] = {
 	CLK(NULL,	"gpu_core_gclk_mux",		&gpu_core_gclk_mux,	CK_54XX),
 	CLK(NULL,	"gpu_hyd_gclk_mux",		&gpu_hyd_gclk_mux,	CK_54XX),
 	CLK(NULL,	"gpu_l3_iclk",			&gpu_l3_iclk,	CK_54XX),
+	CLK(NULL,	"gpu_l3_giclk",			&gpu_l3_giclk,	CK_54XX),
 	CLK(NULL,	"l3init_60m_fclk",		&l3init_60m_fclk,	CK_54XX),
 	CLK(NULL,	"wkupaon_iclk_mux",		&wkupaon_iclk_mux,	CK_54XX),
 	CLK(NULL,	"l3instr_ts_gclk_div",		&l3instr_ts_gclk_div,	CK_54XX),
@@ -2659,6 +2687,7 @@ static struct omap_clk omap54xx_clks[] = {
 	CLK(NULL,	"mcbsp3_gfclk",			&mcbsp3_gfclk,	CK_54XX),
 	CLK(NULL,	"mmc1_fclk_mux",		&mmc1_fclk_mux,	CK_54XX),
 	CLK(NULL,	"mmc1_fclk",			&mmc1_fclk,	CK_54XX),
+	CLK(NULL,	"mmc1_32k_gfclk",		&mmc1_32k_gfclk,	CK_54XX),
 	CLK(NULL,	"mmc2_fclk_mux",		&mmc2_fclk_mux,	CK_54XX),
 	CLK(NULL,	"mmc2_fclk",			&mmc2_fclk,	CK_54XX),
 	CLK(NULL,	"utmi_p1_gfclk",		&utmi_p1_gfclk,	CK_54XX),
