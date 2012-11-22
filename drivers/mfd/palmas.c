@@ -133,6 +133,10 @@ static struct mfd_cell palmas_children[] = {
 		.resources = rtc_resource,
 		.id = 10,
 	},
+	{
+		.name = "palmas-poweroff",
+		.id = 11,
+	},
 };
 
 static int palmas_rtc_read_block(void *mfd, u8 *dest, u8 reg, int no_regs)
@@ -386,6 +390,16 @@ static int palmas_i2c_remove(struct i2c_client *i2c)
 	return 0;
 }
 
+static void palmas_i2c_shutdown(struct i2c_client *i2c)
+{
+	struct palmas *palmas = i2c_get_clientdata(i2c);
+
+	mfd_remove_devices(palmas->dev);
+	palmas_irq_exit(palmas);
+	/* Dont free the palmas pointer -> poweroff might need it */
+	return;
+}
+
 static const struct i2c_device_id palmas_i2c_id[] = {
 	{ "twl6035", PALMAS_ID_TWL6035 },
 	{ "tps65913", PALMAS_ID_TPS65913 },
@@ -406,6 +420,7 @@ static struct i2c_driver palmas_i2c_driver = {
 	},
 	.probe = palmas_i2c_probe,
 	.remove = palmas_i2c_remove,
+	.shutdown = palmas_i2c_shutdown,
 	.id_table = palmas_i2c_id,
 };
 

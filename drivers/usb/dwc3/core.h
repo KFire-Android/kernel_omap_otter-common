@@ -733,8 +733,9 @@ struct dwc3 {
 
 	u8			test_mode;
 	u8			test_mode_nr;
-	bool		is_connected:1;
-	u8			allow_pullup:1;
+	bool			is_connected:1;
+	bool			gadget_is_connected:1;
+	u8                      allow_pullup:1;
 };
 
 /* -------------------------------------------------------------------------- */

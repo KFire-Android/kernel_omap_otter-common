@@ -1487,7 +1487,7 @@ static int dwc3_gadget_pullup(struct usb_gadget *g, int is_on)
 
 	spin_lock_irqsave(&dwc->lock, flags);
 
-	if (!dwc->is_connected) {
+	if (!dwc->gadget_is_connected) {
 		dev_vdbg(dwc->dev, "pullup operation not permitted\n");
 		ret = -EPERM;
 		goto err0;
@@ -1585,7 +1585,7 @@ static int dwc3_gadget_start(struct usb_gadget *g,
 	dwc->gadget.dev.driver	= &driver->driver;
 
 
-	if (dwc->is_connected) {
+	if (dwc->gadget_is_connected) {
 		spin_unlock_irqrestore(&dwc->lock, flags);
 		ret = dwc3_core_late_init(dwc->dev);
 		if (ret)
@@ -1618,7 +1618,7 @@ static int dwc3_gadget_stop(struct usb_gadget *g,
 
 	spin_lock_irqsave(&dwc->lock, flags);
 
-	if (dwc->is_connected) {
+	if (dwc->gadget_is_connected) {
 		spin_unlock_irqrestore(&dwc->lock, flags);
 		dwc3_core_shutdown(dwc->dev);
 		spin_lock_irqsave(&dwc->lock, flags);

@@ -149,7 +149,7 @@ static irqreturn_t palmas_vbus_wakeup_irq(int irq, void *_palmas_usb)
 	do {
 		regmap_read(palmas_usb->palmas->regmap[slave], addr, &vbus_line_state);
 
-		if (vbus_line_state == INT3_LINE_STATE_VBUS) {
+		if (vbus_line_state & INT3_LINE_STATE_VBUS) {
 			if (palmas_usb->linkstat != OMAP_DWC3_VBUS_VALID && palmas_usb->linkstat != OMAP_DWC3_DCP_CHARGER) {
 				charger_type = omap_usb2_charger_detect(&palmas_usb->comparator);
 				if (charger_type == POWER_SUPPLY_TYPE_USB_DCP) {
@@ -165,7 +165,7 @@ static irqreturn_t palmas_vbus_wakeup_irq(int irq, void *_palmas_usb)
 					"Spurious connect event detected\n");
 			}
 			break;
-		} else if (vbus_line_state == INT3_LINE_STATE_NONE) {
+		} else if (!(vbus_line_state & INT3_LINE_STATE_VBUS)) {
 			if (palmas_usb->linkstat == OMAP_DWC3_DCP_CHARGER) {
 				status = OMAP_DWC3_VBUS_OFF;
 				palmas_usb->linkstat = status;
@@ -210,21 +210,12 @@ static irqreturn_t palmas_id_wakeup_irq(int irq, void *_palmas_usb)
 	unsigned int			set;
 	struct palmas_usb	*palmas_usb = _palmas_usb;
 
-	palmas_usb_read(palmas_usb->palmas, PALMAS_USB_ID_INT_LATCH_SET, &set);
+	palmas_usb_read(palmas_usb->palmas, PALMAS_USB_ID_INT_SRC, &set);
 
 	if (set & USB_ID_INT_SRC_ID_GND) {
 		if (palmas_usb->linkstat != OMAP_DWC3_ID_GROUND) {
 			palmas_set_switch_smps10(palmas_usb->palmas, 1);
 			regulator_enable(palmas_usb->vbus_reg);
-			palmas_usb_write(palmas_usb->palmas,
-						PALMAS_USB_ID_INT_EN_HI_SET,
-					    USB_ID_INT_EN_HI_SET_ID_FLOAT);
-			palmas_usb_write(palmas_usb->palmas,
-						PALMAS_USB_ID_INT_EN_HI_CLR,
-						USB_ID_INT_EN_HI_CLR_ID_GND);
-			palmas_usb_write(palmas_usb->palmas,
-						PALMAS_USB_ID_INT_LATCH_CLR,
-						USB_ID_INT_SRC_ID_GND);
 			status = OMAP_DWC3_ID_GROUND;
 			palmas_usb->linkstat = status;
 		} else {
@@ -233,15 +224,6 @@ static irqreturn_t palmas_id_wakeup_irq(int irq, void *_palmas_usb)
 	} else if (set & USB_ID_INT_SRC_ID_FLOAT) {
 		if (palmas_usb->linkstat == OMAP_DWC3_ID_GROUND) {
 			palmas_set_switch_smps10(palmas_usb->palmas, 0);
-			palmas_usb_write(palmas_usb->palmas,
-						PALMAS_USB_ID_INT_EN_HI_SET,
-						USB_ID_INT_EN_HI_SET_ID_GND);
-			palmas_usb_write(palmas_usb->palmas,
-						PALMAS_USB_ID_INT_EN_HI_CLR,
-						USB_ID_INT_EN_HI_CLR_ID_FLOAT);
-			palmas_usb_write(palmas_usb->palmas,
-						PALMAS_USB_ID_INT_LATCH_CLR,
-						USB_ID_INT_SRC_ID_FLOAT);
 			regulator_disable(palmas_usb->vbus_reg);
 			status = OMAP_DWC3_ID_FLOAT;
 			palmas_usb->linkstat = status;
@@ -266,8 +248,8 @@ static int palmas_enable_irq(struct palmas_usb *palmas_usb)
 	palmas_usb_write(palmas_usb->palmas, PALMAS_USB_ID_CTRL_SET,
 					USB_ID_CTRL_SET_ID_ACT_COMP);
 
-	palmas_usb_write(palmas_usb->palmas, PALMAS_USB_ID_INT_EN_HI_SET,
-						USB_ID_INT_EN_HI_SET_ID_GND);
+	/* Give some time for the VBUS/ID active comparator logic to become active */
+	mdelay(25);
 
 	palmas_vbus_wakeup_irq(palmas_usb->irq4, palmas_usb);
 
@@ -376,6 +358,9 @@ static int __devinit palmas_usb_probe(struct platform_device *pdev)
 
 	INIT_WORK(&palmas_usb->set_vbus_work, palmas_set_vbus_work);
 
+	/* Detect USB cold-plug scenario */
+	palmas_enable_irq(palmas_usb);
+
 	status = request_threaded_irq(palmas_usb->irq1, NULL,
 				palmas_id_irq,
 				IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING,
@@ -418,8 +403,6 @@ static int __devinit palmas_usb_probe(struct platform_device *pdev)
 
 	dev_info(&pdev->dev, "Initialized Palmas USB module\n");
 
-	palmas_enable_irq(palmas_usb);
-
 	return 0;
 
 fail_irq4:
@@ -439,9 +422,22 @@ fail_irq1:
 	return status;
 }
 
-static int __devexit palmas_usb_remove(struct platform_device *pdev)
+static int palmas_usb_cleanup(struct platform_device *pdev)
 {
 	struct palmas_usb *palmas_usb = platform_get_drvdata(pdev);
+
+	if (!palmas_usb)
+		return 0;
+
+	if (palmas_usb->linkstat == OMAP_DWC3_ID_GROUND || palmas_usb->linkstat == OMAP_DWC3_VBUS_VALID) {
+		regulator_disable(palmas_usb->vbus_reg);
+		if (palmas_usb->linkstat == OMAP_DWC3_ID_GROUND)
+			palmas_set_switch_smps10(palmas_usb->palmas, 0);
+	}
+
+	/* Disable VBUS/ID ACT COMP */
+	palmas_usb_write(palmas_usb->palmas, PALMAS_USB_VBUS_CTRL_SET, 0x0);
+	palmas_usb_write(palmas_usb->palmas, PALMAS_USB_ID_CTRL_SET, 0x0);
 
 	free_irq(palmas_usb->irq1, palmas_usb);
 	free_irq(palmas_usb->irq2, palmas_usb);
@@ -451,13 +447,26 @@ static int __devexit palmas_usb_remove(struct platform_device *pdev)
 	device_remove_file(palmas_usb->dev, &dev_attr_vbus);
 	cancel_work_sync(&palmas_usb->set_vbus_work);
 	kfree(palmas_usb);
+	platform_set_drvdata(pdev, NULL);
 
 	return 0;
+}
+
+static int __devexit palmas_usb_remove(struct platform_device *pdev)
+{
+	return palmas_usb_cleanup(pdev);
+}
+
+static void palmas_usb_shutdown(struct platform_device *pdev)
+{
+	palmas_usb_cleanup(pdev);
+	return;
 }
 
 static struct platform_driver palmas_usb_driver = {
 	.probe		= palmas_usb_probe,
 	.remove		= __devexit_p(palmas_usb_remove),
+	.shutdown	= palmas_usb_shutdown,
 	.driver		= {
 		.name	= "palmas-usb",
 		.owner	= THIS_MODULE,
