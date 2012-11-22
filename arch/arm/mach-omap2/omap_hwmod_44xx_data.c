@@ -1439,7 +1439,7 @@ static struct omap_hwmod_ocp_if omap44xx_l3_main_2__dss = {
 	.slave		= &omap44xx_dss_hwmod,
 	.clk		= "l3_div_ck",
 	.addr		= omap44xx_dss_dma_addrs,
-	.user		= OCP_USER_SDMA,
+	.user		= OCP_USER_SDMA | OCP_USER_MPU,
 };
 
 static struct omap_hwmod_addr_space omap44xx_dss_addrs[] = {
@@ -1543,7 +1543,7 @@ static struct omap_hwmod_ocp_if omap44xx_l3_main_2__dss_dispc = {
 	.slave		= &omap44xx_dss_dispc_hwmod,
 	.clk		= "l3_div_ck",
 	.addr		= omap44xx_dss_dispc_dma_addrs,
-	.user		= OCP_USER_SDMA,
+	.user		= OCP_USER_SDMA | OCP_USER_MPU,
 };
 
 static struct omap_hwmod_addr_space omap44xx_dss_dispc_addrs[] = {
@@ -1641,7 +1641,7 @@ static struct omap_hwmod_ocp_if omap44xx_l3_main_2__dss_dsi1 = {
 	.slave		= &omap44xx_dss_dsi1_hwmod,
 	.clk		= "l3_div_ck",
 	.addr		= omap44xx_dss_dsi1_dma_addrs,
-	.user		= OCP_USER_SDMA,
+	.user		= OCP_USER_SDMA | OCP_USER_MPU,
 };
 
 static struct omap_hwmod_addr_space omap44xx_dss_dsi1_addrs[] = {
@@ -1718,7 +1718,7 @@ static struct omap_hwmod_ocp_if omap44xx_l3_main_2__dss_dsi2 = {
 	.slave		= &omap44xx_dss_dsi2_hwmod,
 	.clk		= "l3_div_ck",
 	.addr		= omap44xx_dss_dsi2_dma_addrs,
-	.user		= OCP_USER_SDMA,
+	.user		= OCP_USER_SDMA | OCP_USER_MPU,
 };
 
 static struct omap_hwmod_addr_space omap44xx_dss_dsi2_addrs[] = {
@@ -1815,7 +1815,7 @@ static struct omap_hwmod_ocp_if omap44xx_l3_main_2__dss_hdmi = {
 	.slave		= &omap44xx_dss_hdmi_hwmod,
 	.clk		= "l3_div_ck",
 	.addr		= omap44xx_dss_hdmi_dma_addrs,
-	.user		= OCP_USER_SDMA,
+	.user		= OCP_USER_SDMA | OCP_USER_MPU,
 };
 
 static struct omap_hwmod_addr_space omap44xx_dss_hdmi_addrs[] = {
@@ -1907,7 +1907,7 @@ static struct omap_hwmod_ocp_if omap44xx_l3_main_2__dss_rfbi = {
 	.slave		= &omap44xx_dss_rfbi_hwmod,
 	.clk		= "l3_div_ck",
 	.addr		= omap44xx_dss_rfbi_dma_addrs,
-	.user		= OCP_USER_SDMA,
+	.user		= OCP_USER_SDMA | OCP_USER_MPU,
 };
 
 static struct omap_hwmod_addr_space omap44xx_dss_rfbi_addrs[] = {
@@ -1982,7 +1982,7 @@ static struct omap_hwmod_ocp_if omap44xx_l3_main_2__dss_venc = {
 	.slave		= &omap44xx_dss_venc_hwmod,
 	.clk		= "l3_div_ck",
 	.addr		= omap44xx_dss_venc_dma_addrs,
-	.user		= OCP_USER_SDMA,
+	.user		= OCP_USER_SDMA | OCP_USER_MPU,
 };
 
 static struct omap_hwmod_addr_space omap44xx_dss_venc_addrs[] = {
