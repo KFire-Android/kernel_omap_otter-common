@@ -23,14 +23,93 @@
 #ifndef __OMAP_BANDGAP_H
 #define __OMAP_BANDGAP_H
 
+#include <linux/mutex.h>
 #include <linux/types.h>
+#include <linux/err.h>
+
+/* Offsets from the base of temperature sensor registers */
+
+#define OMAP4460_TEMP_SENSOR_CTRL_OFFSET	0x32C
+#define OMAP4460_BGAP_CTRL_OFFSET		0x378
+#define OMAP4460_BGAP_COUNTER_OFFSET		0x37C
+#define OMAP4460_BGAP_THRESHOLD_OFFSET		0x380
+#define OMAP4460_BGAP_TSHUT_OFFSET		0x384
+#define OMAP4460_BGAP_STATUS_OFFSET		0x388
+#define OMAP4460_FUSE_OPP_BGAP			0x260
+
+#define OMAP5430_TEMP_SENSOR_MPU_OFFSET		0x32C
+#define OMAP5430_BGAP_CTRL_OFFSET		0x380
+#define OMAP5430_BGAP_COUNTER_MPU_OFFSET	0x39C
+#define OMAP5430_BGAP_THRESHOLD_MPU_OFFSET	0x384
+#define OMAP5430_BGAP_TSHUT_MPU_OFFSET		0x390
+#define OMAP5430_BGAP_STATUS_OFFSET		0x3A8
+#define OMAP5430_FUSE_OPP_BGAP_MPU		0x1E4
+
+#define OMAP5430_TEMP_SENSOR_GPU_OFFSET		0x330
+#define OMAP5430_BGAP_COUNTER_GPU_OFFSET	0x3A0
+#define OMAP5430_BGAP_THRESHOLD_GPU_OFFSET	0x388
+#define OMAP5430_BGAP_TSHUT_GPU_OFFSET		0x394
+#define OMAP5430_FUSE_OPP_BGAP_GPU		0x1E0
+
+#define OMAP5430_TEMP_SENSOR_CORE_OFFSET	0x334
+#define OMAP5430_BGAP_COUNTER_CORE_OFFSET	0x3A4
+#define OMAP5430_BGAP_THRESHOLD_CORE_OFFSET	0x38C
+#define OMAP5430_BGAP_TSHUT_CORE_OFFSET		0x398
+#define OMAP5430_FUSE_OPP_BGAP_CORE		0x1E8
+
+#define OMAP4460_TSHUT_HOT		900	/* 122 deg C */
+#define OMAP4460_TSHUT_COLD		895	/* 100 deg C */
+#define OMAP4460_T_HOT			800	/* 73 deg C */
+#define OMAP4460_T_COLD			795	/* 71 deg C */
+#define OMAP4460_MAX_FREQ		1500000
+#define OMAP4460_MIN_FREQ		1000000
+#define OMAP4460_MIN_TEMP		-40000
+#define OMAP4460_MAX_TEMP		123000
+#define OMAP4460_HYST_VAL		5000
+#define OMAP4460_ADC_START_VALUE	530
+#define OMAP4460_ADC_END_VALUE		932
+
+/* COBRA-BUG-175: set T_HOT to 0x3FF */
+#define OMAP54XX_ES1_0_TSHUT_HOT	1023
+
+#define OMAP5430_MPU_TSHUT_HOT		915
+#define OMAP5430_MPU_TSHUT_COLD		900
+#define OMAP5430_MPU_T_HOT		800
+#define OMAP5430_MPU_T_COLD		795
+#define OMAP5430_MPU_MAX_FREQ		1500000
+#define OMAP5430_MPU_MIN_FREQ		1000000
+#define OMAP5430_MPU_MIN_TEMP		-40000
+#define OMAP5430_MPU_MAX_TEMP		125000
+#define OMAP5430_MPU_HYST_VAL		5000
+#define OMAP5430_ADC_START_VALUE	532
+#define OMAP5430_ADC_END_VALUE		934
+
+#define OMAP5430_GPU_TSHUT_HOT		915
+#define OMAP5430_GPU_TSHUT_COLD		900
+#define OMAP5430_GPU_T_HOT		800
+#define OMAP5430_GPU_T_COLD		795
+#define OMAP5430_GPU_MAX_FREQ		1500000
+#define OMAP5430_GPU_MIN_FREQ		1000000
+#define OMAP5430_GPU_MIN_TEMP		-40000
+#define OMAP5430_GPU_MAX_TEMP		125000
+#define OMAP5430_GPU_HYST_VAL		5000
+
+#define OMAP5430_CORE_TSHUT_HOT		915
+#define OMAP5430_CORE_TSHUT_COLD	900
+#define OMAP5430_CORE_T_HOT		800
+#define OMAP5430_CORE_T_COLD		795
+#define OMAP5430_CORE_MAX_FREQ		1500000
+#define OMAP5430_CORE_MIN_FREQ		1000000
+#define OMAP5430_CORE_MIN_TEMP		-40000
+#define OMAP5430_CORE_MAX_TEMP		125000
+#define OMAP5430_CORE_HYST_VAL		5000
 
 struct omap_bandgap_data;
 
 /**
  * struct omap_bandgap - bandgap device structure
  * @dev: device pointer
- * @pdata: platform data with sensor data
+ * @conf: platform data with sensor data
  * @fclock: pointer to functional clock of temperature sensor
  * @div_clk: pointer to parent clock of temperature sensor fclk
  * @conv_table: Pointer to adc to temperature conversion table
@@ -42,10 +121,10 @@ struct omap_bandgap_data;
  */
 struct omap_bandgap {
 	struct device			*dev;
-	struct omap_bandgap_data	*pdata;
+	struct omap_bandgap_data	*conf;
 	struct clk			*fclock;
 	struct clk			*div_clk;
-	int				*conv_table;
+	const int			*conv_table;
 	struct mutex			bg_mutex; /* Mutex for irq and PM */
 	int				irq;
 	int				tshut_gpio;
@@ -143,15 +222,14 @@ struct omap_temp_sensor {
 	struct temp_sensor_regval	regval;
 	char				*domain;
 	void				*data;
+	/* for hotspot extrapolation */
 	int				slope;
-	int				constant_offset;
+	int				constant;
 };
 
 /**
  * struct omap_bandgap_data - bandgap platform data structure
- * @has_talert: indicates if the chip has talert output line
- * @has_tshut: indicates if the chip has tshut output line
- * @has_tshut_config: indicates if the chip tshut thresholds can be configured
+ * @features: indicates various features supported by silicon
  * @conv_table: Pointer to adc to temperature conversion table
  * @fclock_name: clock name of the functional clock
  * @div_ck_nme: clock name of the clock divisor
@@ -162,9 +240,15 @@ struct omap_temp_sensor {
  * @expose_sensor: callback to export sensor to thermal API
  */
 struct omap_bandgap_data {
-	bool				has_talert;
-	bool				has_tshut;
-	bool				has_tshut_config;
+#define OMAP_BANDGAP_FEATURE_TSHUT		(1 << 0)
+#define OMAP_BANDGAP_FEATURE_TSHUT_CONFIG	(1 << 1)
+#define OMAP_BANDGAP_FEATURE_TALERT		(1 << 2)
+#define OMAP_BANDGAP_FEATURE_MODE_CONFIG	(1 << 3)
+#define OMAP_BANDGAP_FEATURE_COUNTER		(1 << 4)
+#define OMAP_BANDGAP_FEATURE_POWER_SWITCH	(1 << 5)
+#define OMAP_BANDGAP_HAS(b, f)			\
+			((b)->conf->features & OMAP_BANDGAP_FEATURE_ ## f)
+	unsigned int			features;
 	int				*conv_table;
 	char				*fclock_name;
 	char				*div_ck_name;
@@ -194,6 +278,19 @@ int omap_bandgap_read_temperature(struct omap_bandgap *bg_ptr, int id,
 int omap_bandgap_set_sensor_data(struct omap_bandgap *bg_ptr, int id,
 				void *data);
 void *omap_bandgap_get_sensor_data(struct omap_bandgap *bg_ptr, int id);
+
+#ifdef CONFIG_OMAP4_BG_TEMP_SENSOR_DATA
+extern struct omap_bandgap_data omap4460_data;
+#else
+#define omap4460_data					NULL
+#endif
+
+#ifdef CONFIG_OMAP5_BG_TEMP_SENSOR_DATA
+extern struct omap_bandgap_data omap5430_data;
+#else
+#define omap5430_data					NULL
+#endif
+
 #ifdef CONFIG_OMAP5_THERMAL
 int omap5_thermal_expose_sensor(struct omap_bandgap *bg_ptr, int id,
 					char *domain);

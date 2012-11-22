@@ -97,7 +97,7 @@ struct thermal_dev {
 	struct list_head node;
 	int		current_temp;
 	int		slope;
-	int		constant_offset;
+	int		constant;
 	int		sen_id;
 	struct thermal_domain   *domain;
 	struct dentry *debug_dentry;
