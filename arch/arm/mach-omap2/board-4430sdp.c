@@ -1260,6 +1260,17 @@ static void __init omap4_sdp4430_wifi_init(void)
 		pr_err("Error registering wl12xx device: %d\n", ret);
 }
 
+#if defined(CONFIG_TI_EMIF) || defined(CONFIG_TI_EMIF_MODULE)
+static struct __devinitdata emif_custom_configs custom_configs = {
+	.mask	= EMIF_CUSTOM_CONFIG_LPMODE,
+	.lpmode	= EMIF_LP_MODE_SELF_REFRESH,
+	.lpmode_timeout_performance = 512,
+	.lpmode_timeout_power = 512,
+	/* only at OPP100 should we use performance value */
+	.lpmode_freq_threshold = 400000000,
+};
+#endif
+
 static void __init omap_4430sdp_init(void)
 {
 	int status;
@@ -1273,20 +1284,20 @@ static void __init omap_4430sdp_init(void)
 		omap_emif_set_device_details(1, &lpddr2_elpida_4G_S4_info,
 				lpddr2_elpida_4G_S4_timings,
 				ARRAY_SIZE(lpddr2_elpida_4G_S4_timings),
-				&lpddr2_elpida_S4_min_tck, NULL);
+				&lpddr2_elpida_S4_min_tck, &custom_configs);
 		omap_emif_set_device_details(2, &lpddr2_elpida_4G_S4_info,
 				lpddr2_elpida_4G_S4_timings,
 				ARRAY_SIZE(lpddr2_elpida_4G_S4_timings),
-				&lpddr2_elpida_S4_min_tck, NULL);
+				&lpddr2_elpida_S4_min_tck, &custom_configs);
 	} else {
 		omap_emif_set_device_details(1, &lpddr2_elpida_2G_S4_x2_info,
 				lpddr2_elpida_2G_S4_timings,
 				ARRAY_SIZE(lpddr2_elpida_2G_S4_timings),
-				&lpddr2_elpida_S4_min_tck, NULL);
+				&lpddr2_elpida_S4_min_tck, &custom_configs);
 		omap_emif_set_device_details(2, &lpddr2_elpida_2G_S4_x2_info,
 				lpddr2_elpida_2G_S4_timings,
 				ARRAY_SIZE(lpddr2_elpida_2G_S4_timings),
-				&lpddr2_elpida_S4_min_tck, NULL);
+				&lpddr2_elpida_S4_min_tck, &custom_configs);
 	}
 #endif
 
