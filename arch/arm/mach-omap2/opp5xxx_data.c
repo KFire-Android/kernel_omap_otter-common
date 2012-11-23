@@ -203,7 +203,11 @@ static struct device_info l3_dev_info = {
 
 static struct device_info hsi_dev_info = {
 	.hwmod_name	= "hsi",
+#ifdef CONFIG_ARCH_OMAP5_ES1
 	.clk_name	= "hsi_fck",
+#else
+	.clk_name       = "hsi_fclk",
+#endif
 	.voltdm_name	= "core",
 };
 
