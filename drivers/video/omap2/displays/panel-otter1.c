@@ -38,6 +38,7 @@
 
 #include <video/omap-panel-generic-dpi.h>
 #include <linux/gpio.h>
+#include <plat/io.h>
 
 #define GPIO_3V_ENABLE		47
 #define GPIO_OMAP_RGB_SHTDN	37
