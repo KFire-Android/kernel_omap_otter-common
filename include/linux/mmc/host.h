@@ -385,6 +385,8 @@ extern void mmc_request_done(struct mmc_host *, struct mmc_request *);
 
 extern int mmc_cache_ctrl(struct mmc_host *, u8);
 
+extern void mmc_flush_scheduled_work(void);
+
 static inline void mmc_signal_sdio_irq(struct mmc_host *host)
 {
 	host->ops->enable_sdio_irq(host, 0);

@@ -8,6 +8,8 @@ menuconfig POWER_SUPPLY
 
 if POWER_SUPPLY
 
+source "drivers/power/kc1_summit/Kconfig"
+
 config POWER_SUPPLY_DEBUG
 	bool "Power supply debug"
 	help
@@ -149,6 +151,12 @@ config BATTERY_BQ27X00_I2C
 	default y
 	help
 	  Say Y here to enable support for batteries with BQ27x00 (I2C) chips.
+
+config BATTERY_BQ27541_Q
+	tristate "BQ27541 battery driver"
+	depends on I2C
+	help
+	  Say Y here to enable support for batteries with BQ27541 (I2C) chips.
 
 config BATTERY_BQ27X00_PLATFORM
 	bool "BQ27000 support"

@@ -75,7 +75,11 @@
 #if BITS_PER_LONG > 32
 #define PERCPU_DYNAMIC_RESERVE		(20 << 10)
 #else
+#ifdef CONFIG_MACH_OMAP_4430_KC1
+#define PERCPU_DYNAMIC_RESERVE		(20 << 10)
+#else
 #define PERCPU_DYNAMIC_RESERVE		(12 << 10)
+#endif
 #endif
 
 extern void *pcpu_base_addr;

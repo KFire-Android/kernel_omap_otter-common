@@ -42,6 +42,9 @@ END	{
 
 	  for (i = 0; i < nr; i++)
 	    if (num[i] ~ /..*/) {
+	      if(config[i] == "CONFIG_MACH_OMAP_4430SDP")
+	      printf("#if defined(%s) || defined(CONFIG_MACH_OMAP_4430_KC1)\n", config[i]);
+	      else
 	      printf("#ifdef %s\n", config[i]);
 	      printf("# ifdef machine_arch_type\n");
 	      printf("#  undef machine_arch_type\n");

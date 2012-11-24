@@ -237,6 +237,11 @@ static inline int twl6030_mmc_card_detect(struct device *dev, int slot)
 #define TWL4030_SIH_CTRL_COR_MASK	BIT(2)
 
 /*----------------------------------------------------------------------*/
+/*
+* PMC Master Module offser
+*/
+#define REG_START_CONDITION         0x0
+#define REG_STS_HW_CONDITIONS       0x2
 
 /*
  * GPIO Block Register offsets (use TWL4030_MODULE_GPIO)
@@ -410,6 +415,26 @@ static inline int twl6030_mmc_card_detect(struct device *dev, int slot)
 #define TWL5031_INTERRUPTS_BCIEDR2	0x6
 #define TWL5031_INTERRUPTS_BCISIHCTRL	0x7
 
+#define CONTROLLER_INT_MASK	0x00
+#define CONTROLLER_CTRL1	0x01
+#define CONTROLLER_WDG		0x02
+#define CONTROLLER_STAT1	0x03
+#define CHARGERUSB_INT_STATUS	0x04
+#define CHARGERUSB_INT_MASK	0x05
+#define CHARGERUSB_STATUS_INT1	0x06
+#define CHARGERUSB_STATUS_INT2	0x07
+#define CHARGERUSB_CTRL1	0x08
+#define CHARGERUSB_CTRL2	0x09
+#define CHARGERUSB_CTRL3	0x0A
+#define CHARGERUSB_STAT1	0x0B
+#define CHARGERUSB_VOREG	0x0C
+#define CHARGERUSB_VICHRG	0x0D
+#define CHARGERUSB_CINLIMIT	0x0E
+#define CHARGERUSB_CTRLLIMIT1	0x0F
+#define CHARGERUSB_CTRLLIMIT2	0x10
+#define ANTICOLLAPSE_CTRL1	0x11
+#define ANTICOLLAPSE_CTRL2	0x12
+
 /*----------------------------------------------------------------------*/
 
 /*
@@ -456,7 +481,7 @@ static inline int twl6030_mmc_card_detect(struct device *dev, int slot)
 
 #define TWL4030_PM_MASTER_GLOBAL_TST		0xb6
 
-#define TWL6030_PHOENIX_DEV_ON			0x06
+#define TWL6030_PHOENIX_DEV_ON			0x25 //0x06
 
 #define TWL6030_PM_MASTER_MSK_TRANSITION	0x01
 

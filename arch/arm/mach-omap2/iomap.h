@@ -197,6 +197,21 @@
 #define L4_PER_54XX_VIRT	(L4_PER_54XX_PHYS + OMAP2_L4_IO_OFFSET)
 #define L4_PER_54XX_SIZE	SZ_4M
 
+#ifndef __ASSEMBLER__
+
+/*
+ * NOTE: Please use ioremap + __raw_read/write where possible instead of these
+ */
+
+extern u8 omap_readb(u32 pa);
+extern u16 omap_readw(u32 pa);
+extern u32 omap_readl(u32 pa);
+extern void omap_writeb(u8 v, u32 pa);
+extern void omap_writew(u16 v, u32 pa);
+extern void omap_writel(u32 v, u32 pa);
+
+#endif
+
 #if !defined(__ASSEMBLY__) && defined(CONFIG_OMAP_SO_MAP_FORCE)
 extern void __iomem *__omap_ioremap_caller(unsigned long phys_addr, size_t size,
 					  unsigned int mtype, void *caller);

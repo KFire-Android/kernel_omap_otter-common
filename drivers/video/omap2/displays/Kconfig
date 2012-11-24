@@ -94,4 +94,11 @@ config TC358765_DEBUG
 	depends on PANEL_TC358765 && DEBUG_FS
 	help
 	  Support of TC358765 DSI-2-LVDS chip register access via debugfs
+
+config PANEL_OTTER1
+        tristate "Amazon Kindle Fire (Otter) Panel"
+        depends on OMAP2_DSS
+        help
+          LCD Panel used in KC1 
+
 endmenu

@@ -4918,18 +4918,30 @@ EXPORT_SYMBOL(omap_dsi_release_vc);
 
 void dsi_wait_pll_hsdiv_dispc_active(struct platform_device *dsidev)
 {
-	if (wait_for_bit_change(dsidev, DSI_PLL_STATUS, 7, 1) != 1)
+	int clock_id;
+	if (wait_for_bit_change(dsidev, DSI_PLL_STATUS, 7, 1) != 1) {
+		if (dsi_get_dsidev_id(dsidev) == 0)
+			clock_id = OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DISPC;
+		else
+			clock_id = OMAP_DSS_CLK_SRC_DSI2_PLL_HSDIV_DISPC;
 		DSSERR("%s (%s) not active\n",
-			dss_get_generic_clk_source_name(OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DISPC),
-			dss_feat_get_clk_source_name(OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DISPC));
+			dss_get_generic_clk_source_name(clock_id),
+			dss_feat_get_clk_source_name(clock_id));
+	}
 }
 
 void dsi_wait_pll_hsdiv_dsi_active(struct platform_device *dsidev)
 {
-	if (wait_for_bit_change(dsidev, DSI_PLL_STATUS, 8, 1) != 1)
+	int clock_id;
+	if (wait_for_bit_change(dsidev, DSI_PLL_STATUS, 8, 1) != 1) {
+		if (dsi_get_dsidev_id(dsidev) == 0)
+			clock_id = OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DSI;
+		else
+			clock_id = OMAP_DSS_CLK_SRC_DSI2_PLL_HSDIV_DSI;
 		DSSERR("%s (%s) not active\n",
-			dss_get_generic_clk_source_name(OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DSI),
-			dss_feat_get_clk_source_name(OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DSI));
+			dss_get_generic_clk_source_name(clock_id),
+			dss_feat_get_clk_source_name(clock_id));
+	}
 }
 
 static void dsi_calc_clock_param_ranges(struct platform_device *dsidev)
