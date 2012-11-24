@@ -28,10 +28,14 @@
 #include "prcm44xx.h"
 #include "cm-regbits-44xx.h"
 
+#ifdef CONFIG_ARCH_OMAP4
+#include "cm2_54xx_es1.h"
+#else
 #ifdef CONFIG_ARCH_OMAP5_ES1
 #include "cm2_54xx_es1.h"
 #else
 #include "cm2_54xx.h"
+#endif
 #endif
 
 /* CM1 hardware module low-level functions */
