@@ -22,6 +22,7 @@
 #include <plat/board.h>
 #include <plat/dmtimer.h>
 #include <linux/clk.h>
+#include <linux/module.h>
 
 struct omap_pwm_led {
 	struct led_classdev cdev;
