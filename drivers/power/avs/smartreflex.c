@@ -1353,7 +1353,6 @@ static int __devexit omap_sr_remove(struct platform_device *pdev)
 {
 	struct omap_sr_data *pdata = pdev->dev.platform_data;
 	struct omap_sr *sr_info;
-	struct resource *mem;
 
 	if (!pdata) {
 		dev_err(&pdev->dev, "%s: platform data missing\n", __func__);
@@ -1373,12 +1372,7 @@ static int __devexit omap_sr_remove(struct platform_device *pdev)
 		debugfs_remove_recursive(sr_info->dbg_dir);
 
 	list_del(&sr_info->node);
-	iounmap(sr_info->base);
 	kfree(sr_info->name);
-	kfree(sr_info->ops);
-	kfree(sr_info);
-	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	release_mem_region(mem->start, resource_size(mem));
 
 	return 0;
 }
