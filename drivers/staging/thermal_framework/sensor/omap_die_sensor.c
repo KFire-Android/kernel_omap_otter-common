@@ -22,6 +22,7 @@
 #include <linux/io.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/suspend.h>
 #include <linux/platform_device.h>
 #include <linux/thermal_framework.h>
 
@@ -33,6 +34,9 @@ struct omap_thermal_data {
 	struct thermal_dev therm_fw;
 	struct omap_bandgap *bg_ptr;
 	struct work_struct report_temperature_work;
+	struct mutex thermal_mutex; /* to synchronize PM ops */
+	struct notifier_block pm_notifier;
+	bool enabled;
 };
 
 static void report_temperature_delayed_work_fn(struct work_struct *work)
@@ -224,11 +228,12 @@ int omap_thermal_report_temperature(struct omap_bandgap *bg_ptr, int id)
 		return -EINVAL;
 	}
 
-	schedule_work(&therm_data->report_temperature_work);
-	/*
-	 * TODO: Add support to cancel the scheduled work to
-	 * support suspend/resume of PM.
-	 */
+	mutex_lock(&therm_data->thermal_mutex);
+
+	if (therm_data->enabled)
+		schedule_work(&therm_data->report_temperature_work);
+
+	mutex_unlock(&therm_data->thermal_mutex);
 
 	return 0;
 }
@@ -248,11 +253,46 @@ int omap_thermal_remove_sensor(struct omap_bandgap *bg_ptr, int id)
 		return -EINVAL;
 	}
 
+	mutex_lock(&therm_data->thermal_mutex);
+
+	therm_data->enabled = false;
 	cancel_work_sync(&therm_data->report_temperature_work);
 	thermal_sensor_dev_unregister(&therm_data->therm_fw);
 
+	mutex_unlock(&therm_data->thermal_mutex);
+
+	unregister_pm_notifier(&therm_data->pm_notifier);
+
 	return 0;
 }
+
+static int omap_thermal_pm_notifier_cb(struct notifier_block *notifier,
+				unsigned long pm_event,  void *unused)
+{
+	struct omap_thermal_data *therm_data = container_of(notifier, struct
+							    omap_thermal_data,
+							    pm_notifier);
+
+	mutex_lock(&therm_data->thermal_mutex);
+
+	switch (pm_event) {
+	case PM_SUSPEND_PREPARE:
+		therm_data->enabled = false;
+		cancel_work_sync(&therm_data->report_temperature_work);
+		break;
+	case PM_POST_SUSPEND:
+		therm_data->enabled = true;
+		break;
+	}
+
+	mutex_unlock(&therm_data->thermal_mutex);
+
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block thermal_die_pm_notifier = {
+	.notifier_call = omap_thermal_pm_notifier_cb,
+};
 
 int omap_thermal_expose_sensor(struct omap_bandgap *bg_ptr, int id,
 				char *domain)
@@ -292,6 +332,12 @@ int omap_thermal_expose_sensor(struct omap_bandgap *bg_ptr, int id,
 		return -ENOMEM;
 	}
 
+	mutex_init(&data->thermal_mutex);
+
+	data->pm_notifier = thermal_die_pm_notifier;
+	if (register_pm_notifier(&data->pm_notifier))
+		dev_err(bg_ptr->dev, "PM registration failed!\n");
+
 	/* Construct the sensor name for the domain */
 	sprintf(sensor_name, "omap_%s_sensor", domain);
 	data->therm_fw.name = sensor_name;
@@ -305,15 +351,17 @@ int omap_thermal_expose_sensor(struct omap_bandgap *bg_ptr, int id,
 	data->therm_fw.constant =
 		data->bg_ptr->conf->sensors[id].constant;
 
-	ret = thermal_sensor_dev_register(&data->therm_fw);
-	if (ret) {
-		dev_err(bg_ptr->dev, "Fail to register to TFW\n");
-		return ret;
-	}
+	data->enabled = true;
 
 	ret = omap_bandgap_set_sensor_data(data->bg_ptr, id, data);
 	if (ret) {
 		dev_err(bg_ptr->dev, "Fail to store TFW data\n");
+		return ret;
+	}
+
+	ret = thermal_sensor_dev_register(&data->therm_fw);
+	if (ret) {
+		dev_err(bg_ptr->dev, "Fail to register to TFW\n");
 		return ret;
 	}
 
