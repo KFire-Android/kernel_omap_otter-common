@@ -259,7 +259,6 @@ obj-$(CONFIG_MACH_OMAP_4430SDP)		+= board-4430sdp.o \
 					   board-44xx-blaze-keypad.o
 
 obj-$(CONFIG_MACH_OMAP_4430_KC1)	+= board-4430kc1-tablet.o \
-					   board-4430kc1-power.o \
 					   board-4430kc1-serial.o \
 					   board-4430kc1-tablet-panel.o
 
@@ -346,27 +345,27 @@ obj-$(CONFIG_OMAP_HSI_DEVICE)           += omap_hsi.o
 
 
 ifneq ($(CONFIG_ARCH_OMAP5_ES1),)
-obj-y					+=omap_hwmod_54xx_es1_data.o
-obj-y				        += $(clock-common) clock54xx_es1_data.o \
+#obj-y					+=omap_hwmod_54xx_es1_data.o
+obj-y				        += $(clock-common) # clock54xx_es1_data.o \
                                         dpll3xxx.o dpll44xx_54xx.o clock4xxx_5xxx.o
 obj-y					+= clockdomain.o \
                                         clockdomain44xx.o \
-                                        clockdomains54xx_es1_data.o
+                                        # clockdomains54xx_es1_data.o
 obj-y					+= $(powerdomain-common) \
                                         powerdomain4xxx_5xxx.o \
-                                        powerdomains54xx_es1_data.o
+                                        # powerdomains54xx_es1_data.o
 endif
 
 ifeq ($(CONFIG_ARCH_OMAP5_ES1),)
-obj-y                                   +=omap_hwmod_54xx_data.o
-obj-y                                   += $(clock-common) clock54xx_data.o \
+#obj-y                                   +=omap_hwmod_54xx_data.o
+obj-y                                   += $(clock-common) # clock54xx_data.o \
                                         dpll3xxx.o dpll44xx_54xx.o clock4xxx_5xxx.o
 obj-y                                   += clockdomain.o \
                                         clockdomain44xx.o \
-                                        clockdomains54xx_data.o
+                                        # clockdomains54xx_data.o
 obj-y                                   += $(powerdomain-common) \
                                         powerdomain4xxx_5xxx.o \
-                                        powerdomains54xx_data.o
+                                        # powerdomains54xx_data.o
 endif
 
 ifneq ($(CONFIG_OMAP_REMOTEPROC),)
