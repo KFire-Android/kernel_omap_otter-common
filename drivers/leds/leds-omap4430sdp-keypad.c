@@ -44,7 +44,7 @@ struct keypad_led_data {
 
 struct keypad_led_data *g_green_led_data;
 
-static void omap4430_green_led_set(struct led_classdev *led_cdev,
+void omap4430_green_led_set(struct led_classdev *led_cdev,
 				enum led_brightness value)
 {
 	u8 brightness = 0;
