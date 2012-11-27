@@ -59,10 +59,6 @@
 #include <linux/i2c/twl.h>
 
 #include <linux/thermal_framework.h>
-#ifdef CONFIG_LAB126
-#include <linux/metricslog.h>
-#define THERMO_METRICS_STR_LEN 128
-#endif
 
 #define CONTROL_DEV_CONF                0x300
 #define PHY_PD                          0x1
@@ -106,7 +102,7 @@ struct summit_smb347_info {
     struct proc_dir_entry       *summit_proc_fs;
     struct power_supply	        usb;
     struct power_supply	        ac;
-    struct otg_transceiver      *xceiv;
+    struct usb_phy		*xceiv;
     //struct mutex                mutex;
     //struct work_struct	        summit_monitor_work;
     struct delayed_work         summit_monitor_work;
@@ -730,7 +726,7 @@ enum usb_charger_events
 int summit_smb347_read_id(struct summit_smb347_info *di);
 int summit_usb_notifier_call(struct notifier_block *nb, unsigned long val,void *priv);
 int summit_charge_reset( struct summit_smb347_info *di);
-void summit_set_input_current_limit(struct otg_transceiver *otg,unsigned mA);
+void summit_set_input_current_limit(struct usb_phy *otg,unsigned mA);
 int summit_charger_reconfig( struct summit_smb347_info *di);
 int summit_check_bmd( struct summit_smb347_info *di);
 void summit_switch_mode( struct summit_smb347_info *di,int mode);

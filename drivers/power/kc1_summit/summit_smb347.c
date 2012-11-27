@@ -965,10 +965,6 @@ void summit_read_interrupt_c(struct summit_smb347_info *di){
 }
 void summit_read_interrupt_d(struct summit_smb347_info *di){
 	int value = 0;
-#ifdef CONFIG_LAB126
-	char *thermal_metric_prefix = "smb347:def:";
-	char buf[THERMO_METRICS_STR_LEN];
-#endif
 	value = i2c_smbus_read_byte_data(di->client ,
 		SUMMIT_SMB347_INTSTAT_REG_D);
 	if (APSD_COMPLETED_IRQ & value) {
@@ -993,17 +989,9 @@ void summit_read_interrupt_d(struct summit_smb347_info *di){
 	}
 	if (COMPLETE_CHARGE_TIMEOUT_IRQ & value) {
 		dev_dbg(di->dev , "Complete Charge Timeout IRQ\n");
-		if (COMPLETE_CHARGE_TIMEOUT_STATUS & value){
-			snprintf(buf, THERMO_METRICS_STR_LEN,"%scomplete_charge_timeout=1:", thermal_metric_prefix);
-			log_to_metrics(ANDROID_LOG_INFO, "", buf);
-		}
 	}
 	if (PC_TIMEOUT_IRQ & value) {
 		dev_dbg(di->dev , "Pre-Charge Timeout IRQ\n");
-		if (PC_TIMEOUT_STATUS & value){
-			snprintf(buf, THERMO_METRICS_STR_LEN,"%sprecharge_timeout=1:", thermal_metric_prefix);
-			log_to_metrics(ANDROID_LOG_INFO, "", buf);
-		}
 	}
 }
 void summit_read_interrupt_e(struct summit_smb347_info *di){
@@ -1260,7 +1248,7 @@ static int __devinit summit_probe(struct i2c_client *client ,
 	di->bat_notifier.notifier_call = summit_bat_notifier_call;
 	di->irq	= client->irq;
 	di->mbid = 0;
-	di->xceiv = otg_get_transceiver();
+	di->xceiv = usb_get_phy(USB_PHY_TYPE_USB2);
 	di->bad_battery = 0;
 	di->pin_en = 101;
 	di->pin_susp = 155;
@@ -1324,7 +1312,8 @@ static int __devinit summit_probe(struct i2c_client *client ,
 		summit_check_work_func);
 	initCBuffer(&di->events , 30);
 	summit_init_fsm(di);
-	status = otg_register_notifier(di->xceiv , &di->usb_notifier);
+	usb_phy_init(di->xceiv);
+	status = usb_register_notifier(di->xceiv, &di->usb_notifier);
 	status = bq275xx_register_notifier(&di->bat_notifier);
 	wake_lock_init(&di->chrg_lock ,  WAKE_LOCK_SUSPEND ,
 		"usb_wake_lock");
@@ -1380,7 +1369,7 @@ static void summit_shutdown(struct i2c_client *client)
 
 	disable_irq(di->irq);
 	free_irq(di->irq ,  di);
-	otg_unregister_notifier(di->xceiv ,  &di->usb_notifier);
+	usb_register_notifier(di->xceiv, &di->usb_notifier);
 	bq275xx_unregister_notifier(&di->bat_notifier);
 	cancel_delayed_work_sync(&di->summit_monitor_work);
 	cancel_delayed_work_sync(&di->summit_check_work);
