@@ -1473,14 +1473,14 @@ static int sr_resume(struct device *dev)
 	return ret;
 }
 
-static SIMPLE_DEV_PM_OPS(serial_omap_dev_pm_ops, sr_suspend, sr_resume);
+static SIMPLE_DEV_PM_OPS(sr_omap_dev_pm_ops, sr_suspend, sr_resume);
 
 static struct platform_driver smartreflex_driver = {
 	.remove         = __devexit_p(omap_sr_remove),
 	.shutdown	= __devexit_p(omap_sr_shutdown),
 	.driver		= {
 		.name	= "smartreflex",
-		.pm	= &serial_omap_dev_pm_ops,
+		.pm	= &sr_omap_dev_pm_ops,
 	},
 };
 
