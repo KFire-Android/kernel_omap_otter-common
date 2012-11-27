@@ -1576,14 +1576,14 @@ static struct clk timer4_gfclk_mux = {
 };
 
 static const struct clksel timer5_gfclk_mux_sel[] = {
-	{ .parent = &dss_syc_gfclk_div, .rates = div_1_0_rates },
+	{ .parent = &syc_clk_div, .rates = div_1_0_rates },
 	{ .parent = &sys_32k_ck, .rates = div_1_1_rates },
 	{ .parent = NULL },
 };
 
 static struct clk timer5_gfclk_mux = {
 	.name		= "timer5_gfclk_mux",
-	.parent		= &dss_syc_gfclk_div,
+	.parent		= &syc_clk_div,
 	.clksel		= timer5_gfclk_mux_sel,
 	.init		= &omap2_init_clksel_parent,
 	.clksel_reg	= OMAP54XX_CM_ABE_TIMER5_CLKCTRL,
@@ -1594,7 +1594,7 @@ static struct clk timer5_gfclk_mux = {
 
 static struct clk timer6_gfclk_mux = {
 	.name		= "timer6_gfclk_mux",
-	.parent		= &dss_syc_gfclk_div,
+	.parent		= &syc_clk_div,
 	.clksel		= timer5_gfclk_mux_sel,
 	.init		= &omap2_init_clksel_parent,
 	.clksel_reg	= OMAP54XX_CM_ABE_TIMER6_CLKCTRL,
@@ -1605,7 +1605,7 @@ static struct clk timer6_gfclk_mux = {
 
 static struct clk timer7_gfclk_mux = {
 	.name		= "timer7_gfclk_mux",
-	.parent		= &dss_syc_gfclk_div,
+	.parent		= &syc_clk_div,
 	.clksel		= timer5_gfclk_mux_sel,
 	.init		= &omap2_init_clksel_parent,
 	.clksel_reg	= OMAP54XX_CM_ABE_TIMER7_CLKCTRL,
@@ -1616,7 +1616,7 @@ static struct clk timer7_gfclk_mux = {
 
 static struct clk timer8_gfclk_mux = {
 	.name		= "timer8_gfclk_mux",
-	.parent		= &dss_syc_gfclk_div,
+	.parent		= &syc_clk_div,
 	.clksel		= timer5_gfclk_mux_sel,
 	.init		= &omap2_init_clksel_parent,
 	.clksel_reg	= OMAP54XX_CM_ABE_TIMER8_CLKCTRL,
