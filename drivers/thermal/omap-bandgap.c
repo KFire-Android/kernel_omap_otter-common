@@ -1081,6 +1081,26 @@ int __devinit omap_bandgap_probe(struct platform_device *pdev)
 							   ts_data->t_hot,
 							   ts_data->t_cold);
 		if (OMAP_BANDGAP_HAS(bg_ptr, TSHUT_CONFIG)) {
+			/*
+			 * On OMAP54xx ES2.0, TSHUT values are loaded from
+			 * e-fuse. To override the e-fuse value, need to set
+			 * MUXCTRL bit(31) to 1.
+			 * Older TRM (ver J) has this bit information. Later TRM
+			 * shows this bit as reserved. This code need re-visit
+			 * after the wakeup since SW control will be disabled
+			 * in production devices.
+			 */
+			if (cpu_is_omap543x() &&
+			    (omap_rev() != OMAP5430_REV_ES1_0) &&
+			    (omap_rev() != OMAP5432_REV_ES1_0)) {
+				struct temp_sensor_registers *tsr;
+				tsr = bg_ptr->conf->sensors[i].registers;
+
+				omap_control_writel(cdev,
+						(1 << tsr->tshut_efuse_shift),
+						tsr->tshut_threshold);
+			}
+
 			temp_sensor_configure_tshut_hot(bg_ptr, i,
 							ts_data->tshut_hot);
 			temp_sensor_configure_tshut_cold(bg_ptr, i,

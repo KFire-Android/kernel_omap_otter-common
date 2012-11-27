@@ -19,6 +19,13 @@
 #include <mach/ctrl_module_core_54xx.h>
 #include "omap-bandgap.h"
 
+#define OMAP5430_MPU_TSHUT_HOT		915
+#define OMAP5430_MPU_TSHUT_COLD		900
+#define OMAP5430_GPU_TSHUT_HOT		915
+#define OMAP5430_GPU_TSHUT_COLD		900
+#define OMAP5430_CORE_TSHUT_HOT		915
+#define OMAP5430_CORE_TSHUT_COLD	900
+
 /*
  * OMAP5430 has three instances of thermal sensor for MPU, GPU & CORE,
  * need to describe the individual registers and bit fields.

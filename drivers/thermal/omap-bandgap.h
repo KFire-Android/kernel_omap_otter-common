@@ -52,8 +52,6 @@
 /* COBRA-BUG-175: set T_HOT to 0x3FF */
 #define OMAP54XX_ES1_0_TSHUT_HOT	1023
 
-#define OMAP5430_MPU_TSHUT_HOT		915
-#define OMAP5430_MPU_TSHUT_COLD		900
 #define OMAP5430_MPU_T_HOT		800
 #define OMAP5430_MPU_T_COLD		795
 #define OMAP5430_MPU_MAX_FREQ		1500000
@@ -63,9 +61,9 @@
 #define OMAP5430_MPU_HYST_VAL		5000
 #define OMAP5430_ADC_START_VALUE	532
 #define OMAP5430_ADC_END_VALUE		934
+#define OMAP5430_ES2_ADC_START_VALUE	540
+#define OMAP5430_ES2_ADC_END_VALUE	945
 
-#define OMAP5430_GPU_TSHUT_HOT		915
-#define OMAP5430_GPU_TSHUT_COLD		900
 #define OMAP5430_GPU_T_HOT		800
 #define OMAP5430_GPU_T_COLD		795
 #define OMAP5430_GPU_MAX_FREQ		1500000
@@ -74,8 +72,6 @@
 #define OMAP5430_GPU_MAX_TEMP		125000
 #define OMAP5430_GPU_HYST_VAL		5000
 
-#define OMAP5430_CORE_TSHUT_HOT		915
-#define OMAP5430_CORE_TSHUT_COLD	900
 #define OMAP5430_CORE_T_HOT		800
 #define OMAP5430_CORE_T_COLD		795
 #define OMAP5430_CORE_MAX_FREQ		1500000
@@ -127,6 +123,10 @@ struct temp_sensor_registers {
 	u32	bgap_mask_ctrl;
 	u32	mask_hot_mask;
 	u32	mask_cold_mask;
+	u32	mask_sidlemode_mask;
+	u32	mask_freeze_mask;
+	u32	mask_clear_mask;
+	u32	mask_clear_accum_mask;
 
 	u32	bgap_mode_ctrl;
 	u32	mode_ctrl_mask;
@@ -139,6 +139,8 @@ struct temp_sensor_registers {
 	u32	threshold_tcold_mask;
 
 	u32	tshut_threshold;
+	u32	tshut_efuse_mask;
+	u32	tshut_efuse_shift;
 	u32	tshut_hot_mask;
 	u32	tshut_cold_mask;
 
@@ -148,6 +150,12 @@ struct temp_sensor_registers {
 	u32	status_hot_mask;
 	u32	status_cold_mask;
 
+	u32	bgap_cumul_dtemp;
+	u32	ctrl_dtemp_0;
+	u32	ctrl_dtemp_1;
+	u32	ctrl_dtemp_2;
+	u32	ctrl_dtemp_3;
+	u32	ctrl_dtemp_4;
 	u32	bgap_efuse;
 };
 
