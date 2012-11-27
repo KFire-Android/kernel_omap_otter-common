@@ -1056,7 +1056,9 @@ int __devinit omap_bandgap_probe(struct platform_device *pdev)
 	}
 
 	bg_ptr->clk_rate = clk_rate;
-	clk_enable(bg_ptr->fclock);
+	if (OMAP_BANDGAP_HAS(bg_ptr, CLK_CTRL))
+		clk_enable(bg_ptr->fclock);
+
 
 	mutex_init(&bg_ptr->bg_mutex);
 	bg_ptr->dev = &pdev->dev;
@@ -1123,7 +1125,8 @@ int __devinit omap_bandgap_probe(struct platform_device *pdev)
 	return 0;
 
 put_clks:
-	clk_disable(bg_ptr->fclock);
+	if (OMAP_BANDGAP_HAS(bg_ptr, CLK_CTRL))
+		clk_disable(bg_ptr->fclock);
 	clk_put(bg_ptr->fclock);
 	clk_put(bg_ptr->div_clk);
 free_irqs:
@@ -1148,7 +1151,8 @@ int __devexit omap_bandgap_remove(struct platform_device *pdev)
 
 	omap_bandgap_power(bg_ptr, false);
 
-	clk_disable(bg_ptr->fclock);
+	if (OMAP_BANDGAP_HAS(bg_ptr, CLK_CTRL))
+		clk_disable(bg_ptr->fclock);
 	clk_put(bg_ptr->fclock);
 	clk_put(bg_ptr->div_clk);
 	if (OMAP_BANDGAP_HAS(bg_ptr, TALERT))
@@ -1250,7 +1254,9 @@ static int omap_bandgap_suspend(struct device *dev)
 
 	err = omap_bandgap_save_ctxt(bg_ptr);
 	omap_bandgap_power(bg_ptr, false);
-	clk_disable(bg_ptr->fclock);
+
+	if (OMAP_BANDGAP_HAS(bg_ptr, CLK_CTRL))
+		clk_disable(bg_ptr->fclock);
 
 	return err;
 }
@@ -1259,7 +1265,9 @@ static int omap_bandgap_resume(struct device *dev)
 {
 	struct omap_bandgap *bg_ptr = dev_get_drvdata(dev);
 
-	clk_enable(bg_ptr->fclock);
+	if (OMAP_BANDGAP_HAS(bg_ptr, CLK_CTRL))
+		clk_enable(bg_ptr->fclock);
+
 	omap_bandgap_power(bg_ptr, true);
 
 	return omap_bandgap_restore_ctxt(bg_ptr);
@@ -1286,7 +1294,9 @@ void omap_bandgap_prepare_for_idle(void)
 	if (!g_bg_ptr)
 		return;
 
-	clk_disable(g_bg_ptr->fclock);
+	if (OMAP_BANDGAP_HAS(g_bg_ptr, CLK_CTRL))
+		clk_disable(g_bg_ptr->fclock);
+
 	g_bg_ptr->bg_clk_idle = true;
 
 }
@@ -1307,7 +1317,8 @@ void omap_bandgap_resume_after_idle(void)
 
 	/* Enable clock for sensor, if it was disabled during idle */
 	if (g_bg_ptr->bg_clk_idle) {
-		clk_enable(g_bg_ptr->fclock);
+		if (OMAP_BANDGAP_HAS(g_bg_ptr, CLK_CTRL))
+			clk_enable(g_bg_ptr->fclock);
 		/*
 		 * Since the clocks are gated, the temperature reading
 		 * is not correct. Hence force the single read to get the
