@@ -242,7 +242,7 @@ int __init omap_mux_get_by_name(const char *muxname,
 	return -ENODEV;
 }
 
-int omap_mux_enable_wkup(const char *muxname)
+int __init omap_mux_enable_wkup(const char *muxname)
 {
 	struct omap_mux_partition *partition = NULL;
 	struct omap_mux *mux = NULL;
