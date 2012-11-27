@@ -97,17 +97,47 @@ struct omap_vp_instance omap4_vp_core = {
 	.voltage = OMAP4_PRM_VP_CORE_VOLTAGE_OFFSET,
 };
 
-struct omap_vp_param omap4_mpu_vp_data = {
+struct omap_vp_param omap443x_mpu_vp_data = {
 	.vddmin			= 830000,
 	.vddmax			= 1410000,
 };
 
-struct omap_vp_param omap4_iva_vp_data = {
+struct omap_vp_param omap443x_iva_vp_data = {
 	.vddmin			= 830000,
 	.vddmax			= 1260000,
 };
 
-struct omap_vp_param omap4_core_vp_data = {
+struct omap_vp_param omap443x_core_vp_data = {
+	.vddmin			= 830000,
+	.vddmax			= 1200000,
+};
+
+struct omap_vp_param omap446x_mpu_vp_data = {
+	.vddmin			= 830000,
+	.vddmax			= 1410000,
+};
+
+struct omap_vp_param omap446x_iva_vp_data = {
+	.vddmin			= 830000,
+	.vddmax			= 1260000,
+};
+
+struct omap_vp_param omap446x_core_vp_data = {
+	.vddmin			= 830000,
+	.vddmax			= 1200000,
+};
+
+struct omap_vp_param omap447x_mpu_vp_data = {
+	.vddmin			= 830000,
+	.vddmax			= 1410000,
+};
+
+struct omap_vp_param omap447x_iva_vp_data = {
+	.vddmin			= 830000,
+	.vddmax			= 1260000,
+};
+
+struct omap_vp_param omap447x_core_vp_data = {
 	.vddmin			= 830000,
 	.vddmax			= 1200000,
 };
