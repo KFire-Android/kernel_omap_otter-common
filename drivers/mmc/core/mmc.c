@@ -90,7 +90,7 @@ static int mmc_parse_ext_csd(struct mmc_card *card, u8 *ext_csd)
 	printk("EXT_CSD_MAX_ENH_SIZE_MULT = 0x%02x%02x%02x\n", ext_csd[EXT_CSD_MAX_ENH_SIZE_MULT+2], ext_csd[EXT_CSD_MAX_ENH_SIZE_MULT+1], ext_csd[EXT_CSD_MAX_ENH_SIZE_MULT]);    /* RO, 3 bytes */
 	printk("EXT_CSD_PARTITION_SUPPORT = 0x%02x\n", ext_csd[EXT_CSD_PARTITION_SUPPORT]); /* RO */
 	printk("EXT_CSD_HPI_MGMT = 0x%02x\n", ext_csd[EXT_CSD_HPI_MGMT]);             /* R/W/E_P */
-	printk("EXT_CSD_RST_n_FUNCTION = 0x%02x\n", ext_csd[EXT_CSD_RST_n_FUNCTION]);       /* R/W */
+	printk("EXT_CSD_RST_N_FUNCTION = 0x%02x\n", ext_csd[EXT_CSD_RST_N_FUNCTION]);       /* R/W */
 	printk("EXT_CSD_BKOPS_EN = 0x%02x\n", ext_csd[EXT_CSD_BKOPS_EN]);             /* R/W */
 	printk("EXT_CSD_BKOPS_START = 0x%02x\n", ext_csd[EXT_CSD_BKOPS_START]);          /* W/E_P */
 	printk("EXT_CSD_WR_REL_PARAM = 0x%02x\n", ext_csd[EXT_CSD_WR_REL_PARAM]);         /* RO */
@@ -114,10 +114,10 @@ static int mmc_parse_ext_csd(struct mmc_card *card, u8 *ext_csd)
 	printk("EXT_CSD_CARD_TYPE = 0x%02x\n", ext_csd[EXT_CSD_CARD_TYPE]);	/* RO */
 	printk("EXT_CSD_OUT_OF_INTERRUPT_TIME = 0x%02x\n", ext_csd[EXT_CSD_OUT_OF_INTERRUPT_TIME]);  /* RO */
 	printk("EXT_CSD_PART_SWITCH_TIME = 0x%02x\n", ext_csd[EXT_CSD_PART_SWITCH_TIME]);  /* RO */
-	printk("EXT_CSD_POWER_CL_52_195 = 0x%02x\n", ext_csd[EXT_CSD_POWER_CL_52_195]);        /* RO */
-	printk("EXT_CSD_POWER_CL_26_195 = 0x%02x\n", ext_csd[EXT_CSD_POWER_CL_26_195]);        /* RO */
-	printk("EXT_CSD_POWER_CL_52_360 = 0x%02x\n", ext_csd[EXT_CSD_POWER_CL_52_360]);        /* RO */
-	printk("EXT_CSD_POWER_CL_26_360 = 0x%02x\n", ext_csd[EXT_CSD_POWER_CL_26_360]);        /* RO */
+	printk("EXT_CSD_PWR_CL_52_195 = 0x%02x\n", ext_csd[EXT_CSD_PWR_CL_52_195]);        /* RO */
+	printk("EXT_CSD_PWR_CL_26_195 = 0x%02x\n", ext_csd[EXT_CSD_PWR_CL_26_195]);        /* RO */
+	printk("EXT_CSD_PWR_CL_52_360 = 0x%02x\n", ext_csd[EXT_CSD_PWR_CL_52_360]);        /* RO */
+	printk("EXT_CSD_PWR_CL_26_360 = 0x%02x\n", ext_csd[EXT_CSD_PWR_CL_26_360]);        /* RO */
 	printk("EXT_CSD_MIN_PERF_R_4_26 = 0x%02x\n", ext_csd[EXT_CSD_MIN_PERF_R_4_26]);        /* RO */
 	printk("EXT_CSD_MIN_PERF_W_4_26 = 0x%02x\n", ext_csd[EXT_CSD_MIN_PERF_W_4_26]);        /* RO */
 	printk("EXT_CSD_MIN_PERF_R_8_26_4_52 = 0x%02x\n", ext_csd[EXT_CSD_MIN_PERF_R_8_26_4_52]);   /* RO */
