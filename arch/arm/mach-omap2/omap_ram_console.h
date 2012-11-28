@@ -18,7 +18,7 @@
 #define __OMAP_RAM_CONSOLE_H
 
 /* Board files use the following if they are ok with 512M size defaults */
-#define OMAP_RAM_CONSOLE_START_DEFAULT	(UL(0x80000000) + SZ_512M)
+#define OMAP_RAM_CONSOLE_START_DEFAULT	(UL(0x80000000) + SZ_256M)
 #define OMAP_RAM_CONSOLE_SIZE_DEFAULT	SZ_2M
 
 #ifdef CONFIG_OMAP_RAM_CONSOLE
