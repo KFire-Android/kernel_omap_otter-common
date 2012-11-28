@@ -98,16 +98,16 @@ struct omap_vp_instance omap4_vp_core = {
 };
 
 struct omap_vp_param omap4_mpu_vp_data = {
-	.vddmin			= OMAP4_VP_MPU_VLIMITTO_VDDMIN,
-	.vddmax			= OMAP4_VP_MPU_VLIMITTO_VDDMAX,
+	.vddmin			= 830000,
+	.vddmax			= 1410000,
 };
 
 struct omap_vp_param omap4_iva_vp_data = {
-	.vddmin			= OMAP4_VP_IVA_VLIMITTO_VDDMIN,
-	.vddmax			= OMAP4_VP_IVA_VLIMITTO_VDDMAX,
+	.vddmin			= 830000,
+	.vddmax			= 1260000,
 };
 
 struct omap_vp_param omap4_core_vp_data = {
-	.vddmin			= OMAP4_VP_CORE_VLIMITTO_VDDMIN,
-	.vddmax			= OMAP4_VP_CORE_VLIMITTO_VDDMAX,
+	.vddmin			= 830000,
+	.vddmax			= 1200000,
 };
