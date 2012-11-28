@@ -221,7 +221,7 @@ void __init omap_reserve_secure_workspace_addr(void)
 	phys_addr_t start, size;
 
 	/* Dont need to do anything for GP devices */
-	if (OMAP2_DEVICE_TYPE_GP == omap_type())
+//	if (OMAP2_DEVICE_TYPE_GP == omap_type())
 		return;
 
 	start = omap_secure_data.secure_workspace_addr;
