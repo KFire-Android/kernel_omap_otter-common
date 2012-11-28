@@ -79,6 +79,8 @@
 #ifdef CONFIG_SMP
 #define NUM_DEN_MASK			0xfffff000
 
+#define GIC_ISR_NON_SECURE	0xffffffff
+
 struct omap4_cpu_pm_info {
 	struct powerdomain *pwrdm;
 	void __iomem *scu_sar_addr;
@@ -118,6 +120,9 @@ static void dummy_cpu_resume(void)
 
 static void dummy_scu_prepare(unsigned int cpu_id, unsigned int cpu_state)
 {}
+
+extern void sar_writel(u32 val, u32 offset, u8 idx);
+extern void omap_wakeupgen_init_finish(void);
 
 static struct cpu_pm_ops omap_pm_ops = {
 	.finish_suspend		= default_finish_suspend,
@@ -809,6 +814,9 @@ int __init omap_mpuss_init(void)
 		__raw_writel(1, sar_base + omap_type_offset);
 	else
 		__raw_writel(0, sar_base + omap_type_offset);
+
+	/* calling this here after sar is setup */
+	omap_wakeupgen_init_finish();
 
 	save_l2x0_context();
 
