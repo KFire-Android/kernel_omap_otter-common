@@ -27,10 +27,15 @@
 #include <mach/id.h>
 
 #include "control.h"
+#include "iomap.h"
 
 static unsigned int omap_revision;
 static const char *cpu_rev;
 u32 omap_features;
+
+#define MAX_ID_STRING		(4*8 + 4)
+#define DIE_ID_REG_BASE		(L4_44XX_PHYS + 0x2000)
+#define DIE_ID_REG_OFFSET	0x200
 
 unsigned int omap_rev(void)
 {
@@ -56,7 +61,7 @@ int omap_type(void)
 		val >>= 6;
 		goto out;
 	} else {
-		pr_err("Cannot detect omap type!\n");
+		pr_err("omap_type: Cannot detect omap type!\n");
 		goto out;
 	}
 
@@ -88,7 +93,7 @@ u8 omap_get_sysboot_value(void)
 	} else if (cpu_is_omap54xx()) {
 		val = omap_ctrl_readl(OMAP5XXX_CONTROL_STATUS);
 	} else {
-		pr_err("Cannot detect omap type!\n");
+		pr_err("omap_get_sysboot_value: Cannot detect omap type!\n");
 	}
 
 	return val & mask;
@@ -500,6 +505,17 @@ void __init omap4xxx_check_revision(void)
 	u32 idcode;
 	u16 hawkeye;
 	u8 rev;
+	u8 *type;
+	u32 reg;
+
+	u32 id[4] = { 0 };
+	u8 id_string[MAX_ID_STRING];
+
+	/*
+	 * NOTE: OMAP4460+ uses ramp system for identification and hawkeye
+	 * variable is reused for the same. Since the values are unique
+	 * we continue to use the current system
+	 */
 
 	/*
 	 * The IC rev detection is done with hawkeye and rev.
@@ -567,8 +583,51 @@ void __init omap4xxx_check_revision(void)
 		omap_revision = OMAP4430_REV_ES2_3;
 	}
 
-	pr_info("OMAP%04x ES%d.%d\n", omap_rev() >> 16,
-		((omap_rev() >> 12) & 0xf), ((omap_rev() >> 8) & 0xf));
+//	pr_info("OMAP%04x ES%d.%d\n", omap_rev() >> 16,
+//		((omap_rev() >> 12) & 0xf), ((omap_rev() >> 8) & 0xf));
+
+               switch (omap_type()) {
+       case OMAP2_DEVICE_TYPE_GP:
+               type = "GP";
+               break;
+       case OMAP2_DEVICE_TYPE_EMU:
+               type = "EMU";
+               break;
+       case OMAP2_DEVICE_TYPE_SEC:
+               type = "HS";
+       break;
+       default:
+               type = "bad-type";
+               break;
+       }
+
+       pr_info("***********************\n");
+       pr_info("OMAP%04x ES%d.%d type(%s)\n",
+                       omap_rev() >> 16, ((omap_rev() >> 12) & 0xf), ((omap_rev() >> 8) & 0xf), type);
+       pr_info("id-code  (%x)\n", read_tap_reg(OMAP_TAP_IDCODE));
+
+       reg = DIE_ID_REG_BASE + DIE_ID_REG_OFFSET;
+       /* Get Die-id */
+       id[0] = omap_readl(reg);
+       id[1] = omap_readl(reg + 0x8);
+       id[2] = omap_readl(reg + 0xC);
+       id[3] = omap_readl(reg + 0x10);
+       /* die-id string */
+       snprintf(id_string, MAX_ID_STRING, "%08X-%08X-%08X-%08X",
+                                               id[3], id[2],
+                                               id[1], id[0]);
+       pr_info("Die-id   (%s)\n", id_string);
+
+       /* Get prod-id */
+       id[0] = omap_readl(reg + 0x14);
+       id[1] = omap_readl(reg + 0x18);
+       snprintf(id_string, MAX_ID_STRING, "%08X-%08X",
+                                               id[1], id[0]);
+       pr_info("Prod-id  (%s)\n", id_string);
+       pr_info("***********************\n");
+       //pr_info("OMAP%04x ES%d.%d\n", omap_rev() >> 16,
+       //      ((omap_rev() >> 12) & 0xf), ((omap_rev() >> 8) & 0xf));
+
 }
 
 void __init omap5xxx_check_revision(void)
