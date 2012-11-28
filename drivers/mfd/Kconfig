@@ -824,6 +824,7 @@ config MFD_WL1273_CORE
 config MFD_OMAP_CONTROL
 	bool "Texas Instruments OMAP System control module"
 	depends on ARCH_OMAP
+	select MFD_CORE
 	help
 	  This is the core driver for system control module. This driver
 	  is responsible for creating the control module mfd child,
