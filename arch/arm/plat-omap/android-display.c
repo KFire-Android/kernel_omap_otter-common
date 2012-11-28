@@ -25,6 +25,7 @@
 #include <plat/android-display.h>
 #include <plat/dsscomp.h>
 #include <plat/vram.h>
+#include "../../../drivers/staging/omapdrm/omap_dmm_tiler.h"
 
 struct omap_android_display_data {
 	/* members with default values */
@@ -195,11 +196,57 @@ static void set_vram_sizes(struct sgx_omaplfb_config *sgx_config,
 	omap_vram_set_sdram_vram(vram, 0);
 }
 
+static void set_ion_carveouts(struct sgx_omaplfb_config *sgx_config,
+			     struct omap_ion_platform_data *ion,
+			     struct omap_android_display_data *mem)
+{
+	u32 alloc_pages, width;
+	enum tiler_fmt fmt;
+	u32 num_buffers = 2;
+
+	BUG_ON(!mem || (mem->bpp == 0));
+
+	if (sgx_config)
+		num_buffers = sgx_config->tiler2d_buffers;
+
+
+	/* width must be aligned to 128 bytes */
+	width = ALIGN(mem->width, 128 / mem->bpp);
+	fmt = mem->bpp <= 2 ? TILFMT_16BIT : TILFMT_32BIT;
+
+	/* max pages used from TILER2D container */
+	alloc_pages = tiler_backpages(fmt,
+				      ALIGN(width, PAGE_SIZE / mem->bpp),
+				      mem->height);
+
+	/* actual pages used is the same */
+	ion->nonsecure_tiler2d_size = alloc_pages * PAGE_SIZE * num_buffers;
+
+	ion->tiler2d_size = SZ_128M;
+
+	/* min pages used from TILER2D container */
+	alloc_pages = tiler_backpages(fmt,
+				      ALIGN(width, PAGE_SIZE / mem->bpp),
+				      mem->height * num_buffers);
+	ion->tiler2d_size -= alloc_pages * PAGE_SIZE;
+
+	/*
+	 * On OMAP4 tiler1d and tiler2d are in the same container.  However,
+	 * leftover space must be in 32-page bands
+	 */
+	if (1 /* !cpu_is_omap54xx() */)
+		ion->tiler2d_size -= ALIGN(mem->tiler1d_mem, PAGE_SIZE * 32);
+
+	pr_info("android_display: ion carveouts: %u tiler2d, %u nonsecure\n",
+		ion->tiler2d_size, ion->nonsecure_tiler2d_size);
+}
+
 /* coordinate between sgx, omapdss, dsscomp and ion needs */
 void __init omap_android_display_setup(struct omap_dss_board_info *dss,
 			       struct dsscomp_platform_data *dsscomp,
 			       struct sgx_omaplfb_platform_data *sgx,
-			       struct omapfb_platform_data *fb)
+			       struct omapfb_platform_data *fb,
+			       struct omap_ion_platform_data *ion)
 {
 	struct sgx_omaplfb_config *p_sgx_config = NULL;
 
@@ -220,6 +267,8 @@ void __init omap_android_display_setup(struct omap_dss_board_info *dss,
 		set_tiler1d_slot_size(dsscomp, &mem);
 
 	set_vram_sizes(p_sgx_config, fb, &mem);
+	if (ion)
+		set_ion_carveouts(p_sgx_config, ion, &mem);
 
 	sgx_omaplfb_set(0, p_sgx_config);
 }
