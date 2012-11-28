@@ -56,7 +56,7 @@ size_t omap_smc_size(void);
 size_t omap_ducati_heap_size(void);
 
 #ifdef CONFIG_ION_OMAP
-void omap_ion_init(void);
+void omap4_ion_init(void);
 void omap4_register_ion(void);
 
 phys_addr_t omap_ion_heap_secure_input_addr(void);
@@ -70,7 +70,7 @@ size_t omap_ion_heap_tiler_mem_size(void);
 size_t omap_ion_heap_nonsec_tiler_mem_size(void);
 
 #else
-static inline void omap_ion_init(void) { return; }
+static inline void omap4_ion_init(void) { return; }
 static inline void omap4_register_ion(void) { return; }
 
 phys_addr_t omap_ion_heap_secure_input_addr(void) { return 0; }
