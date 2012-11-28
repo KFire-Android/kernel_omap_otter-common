@@ -409,7 +409,7 @@ config SECURE_REGS
 
 config MACH_OMAP_5430ZEBU
 	bool "OMAP5 ZEBU"
-	depends on ARCH_OMAP5 && MACH_OMAP_5430EVM
+	depends on ARCH_OMAP5
 
 config OMAP3_EMU
 	bool "OMAP3 debugging peripherals"

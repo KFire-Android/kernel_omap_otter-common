@@ -65,11 +65,7 @@
 #define OMAP2_CLKEV_SOURCE	OMAP2_32K_SOURCE
 #define OMAP3_CLKEV_SOURCE	OMAP3_32K_SOURCE
 #define OMAP4_CLKEV_SOURCE	OMAP4_32K_SOURCE
-#ifndef CONFIG_MACH_OMAP_5430ZEBU
 #define OMAP5_CLKEV_SOURCE	OMAP5_32K_SOURCE
-#else
-#define OMAP5_CLKEV_SOURCE      OMAP5_MPU_SOURCE
-#endif
 #define OMAP3_SECURE_TIMER	12
 #else
 #define OMAP2_CLKEV_SOURCE	OMAP2_MPU_SOURCE
@@ -125,9 +121,7 @@ static void omap2_gp_timer_set_mode(enum clock_event_mode mode,
 	case CLOCK_EVT_MODE_PERIODIC:
 		period = clkev.rate / HZ;
 		period -= 1;
-#ifdef CONFIG_MACH_OMAP_5430ZEBU
-		period = 0x3ff;
-#endif
+
 		/* Looks like we need to first set the load value separately */
 		__omap_dm_timer_write(&clkev, OMAP_TIMER_LOAD_REG,
 					0xffffffff - period, 1);
