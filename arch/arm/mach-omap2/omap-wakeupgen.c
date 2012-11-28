@@ -575,7 +575,6 @@ int __init omap_wakeupgen_init(void)
 		secure_hw_api_index = OMAP4_HAL_SAVEHW_INDEX;
 		secure_hal_save_all_api_index = OMAP4_HAL_SAVEALL_INDEX;
 		secure_ram_api_index  = OMAP4_HAL_SAVESECURERAM_INDEX;
-		pr_info("%s: is_omap44xx: NR_BANKS=%d, NR_IRQS=%d, OMAP4_HAL_SAVEGIC_INDEX=%x\n", __func__, OMAP4_NR_BANKS, OMAP4_NR_IRQS, OMAP4_HAL_SAVEGIC_INDEX);
 	} else if (cpu_is_omap54xx()) {
 		secure_api_index = OMAP5_HAL_SAVEGIC_INDEX;
 		secure_hw_api_index = OMAP5_HAL_SAVEHW_INDEX;
@@ -627,11 +626,8 @@ int __init omap_wakeupgen_init(void)
 	if (cpu_is_omap446x() && omap_type() == OMAP2_DEVICE_TYPE_GP)
 		pm44xx_errata |= PM_OMAP4_ROM_CPU1_BACKUP_ERRATUM_xxx;
 
-	pr_info("%s: 9\n", __func__);
 	irq_hotplug_init();
-	pr_info("%s: 10\n", __func__);
 	irq_pm_init();
-	pr_info("%s: 11\n", __func__);
 
 	return 0;
 }
