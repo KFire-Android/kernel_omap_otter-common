@@ -532,6 +532,33 @@ void tiler_align(enum tiler_fmt fmt, uint16_t *w, uint16_t *h)
 }
 EXPORT_SYMBOL(tiler_align);
 
+uint32_t tiler_backpages(enum tiler_fmt fmt, uint16_t width, uint16_t height)
+{
+	uint32_t x, y;
+
+//	geom_init();
+
+	if (fmt == TILFMT_PAGE) {
+		/* for 1D area keep the height (1), width is in tiler slots */
+		x = DIV_ROUND_UP(width, TILER_PAGE);
+
+		if (x > TILER_WIDTH * TILER_HEIGHT)
+			return 0;
+		return x;
+	} else if (fmt >= TILFMT_8BIT && fmt <= TILFMT_32BIT) {
+		/* adjust to slots */
+		x = DIV_ROUND_UP(width, geom[fmt].slot_w);
+		y = DIV_ROUND_UP(height, geom[fmt].slot_h);
+
+		if (x > TILER_WIDTH || y > TILER_HEIGHT)
+			return 0;
+		return x * y;
+	} else {
+		return 0;
+	}
+}
+EXPORT_SYMBOL(tiler_backpages);
+
 uint32_t tiler_stride(dma_addr_t tsptr)
 {
 	enum tiler_fmt fmt = TILER_FMT(tsptr);
