@@ -39,7 +39,7 @@
 #include <plat/omap_apps_brd_id.h>
 #include <plat/dmtimer.h>
 #include <plat/omap_device.h>
-//#include <plat/android-display.h>
+#include <plat/android-display.h>
 #include <plat/sgx_omaplfb.h>
 
 #include "board-4430kc1-tablet.h"
@@ -183,17 +183,6 @@ static struct platform_device __initdata *sdp4430_panel_devices[] = {
 	&kc1_led_device,
 };
 
-void omap4_kc1_android_display_setup(struct omap_ion_platform_data *ion)
-{
-#if 0
-	omap_android_display_setup(&sdp4430_dss_data,
-				   NULL,
-				   NULL,
-				   &sdp4430_fb_data,
-				   ion);
-#endif
-}
-
 static struct omapfb_platform_data sdp4430_fb_data = {
 	.mem_desc = {
 		.region_cnt = 1,
@@ -204,6 +193,15 @@ static struct omapfb_platform_data sdp4430_fb_data = {
 		},
 	},
 };
+
+void __init omap4_kc1_android_display_setup(struct omap_ion_platform_data *ion)
+{
+	omap_android_display_setup(&sdp4430_dss_data,
+				   NULL,
+				   NULL,
+				   &sdp4430_fb_data,
+				   ion);
+}
 
 void __init omap4_kc1_display_init(void)
 {
@@ -216,7 +214,6 @@ void __init omap4_kc1_display_init(void)
 	};
 
 	omapfb_set_platform_data(&sdp4430_fb_data);
-	omap_vram_set_sdram_vram(OTTER_FB_RAM_SIZE, 0);
 #ifdef CONFIG_OMAPLFB
 	sgx_omaplfb_set(0, &data);
 #endif
