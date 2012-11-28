@@ -36,12 +36,12 @@ struct display_led_data {
 	struct omap4430_sdp_disp_led_platform_data *led_pdata;
 	struct mutex pri_disp_lock;
 	struct mutex sec_disp_lock;
-    struct timer_list timer;
-    struct work_struct work;
-    int delay_on;
-    int delay_off;
-    int blink_step;
-    int brightness;
+	struct timer_list timer;
+	struct work_struct work;
+	int delay_on;
+	int delay_off;
+	int blink_step;
+	int brightness;
 };
 
 #if OMAP4430_LED_DEBUG
@@ -67,8 +67,8 @@ void omap4430_orange_led_set(struct led_classdev *led_cdev,
 {
 	mutex_lock(&g_orange_led_data->pri_disp_lock);
 
-    flush_work(&g_orange_led_data->work);
-    del_timer_sync(&g_orange_led_data->timer);
+	flush_work(&g_orange_led_data->work);
+	del_timer_sync(&g_orange_led_data->timer);
 
 	if (g_orange_led_data->led_pdata->primary_display_set)
 		g_orange_led_data->led_pdata->primary_display_set(value);
@@ -94,45 +94,44 @@ static void omap4430_sdp_secondary_disp_store(struct led_classdev *led_cdev,
 
 static void omap4430_sdp_display_work(struct work_struct *work)
 {
-    struct display_led_data *led_data = container_of(work,
-            struct display_led_data, work);
+	struct display_led_data *led_data = container_of(work, struct display_led_data, work);
 
-    if (led_data->brightness == 0)
-        led_data->blink_step = 1;
-    else if (led_data->brightness == 255)
-        led_data->blink_step = -1;
+	if (led_data->brightness == 0)
+		led_data->blink_step = 1;
+	else if (led_data->brightness == 255)
+		led_data->blink_step = -1;
 
-    led_data->brightness += led_data->blink_step;
+	led_data->brightness += led_data->blink_step;
 
-    if (led_data->blink_step == 1) {
-        led_data->led_pdata->primary_display_set(led_data->brightness);
-        mod_timer(&led_data->timer, jiffies + msecs_to_jiffies(led_data->delay_on));
-    } else {
-        led_data->led_pdata->primary_display_set(led_data->brightness);
-        mod_timer(&led_data->timer, jiffies + msecs_to_jiffies(led_data->delay_off));
-    }
+	if (led_data->blink_step == 1) {
+		led_data->led_pdata->primary_display_set(led_data->brightness);
+		mod_timer(&led_data->timer, jiffies + msecs_to_jiffies(led_data->delay_on));
+	} else {
+		led_data->led_pdata->primary_display_set(led_data->brightness);
+		mod_timer(&led_data->timer, jiffies + msecs_to_jiffies(led_data->delay_off));
+	}
 }
 
 static void omap4430_sdp_display_timer(unsigned long data)
 {
-    struct display_led_data *led_data = (struct display_led_data *) data;
+	struct display_led_data *led_data = (struct display_led_data *) data;
 
-    schedule_work(&led_data->work);
+	schedule_work(&led_data->work);
 }
 
 int omap4430_orange_led_set_blink(struct led_classdev *led_cdev, 
         unsigned long *delay_on, unsigned long *delay_off)
 {
-    if (*delay_on == 0 || *delay_off == 0)
-        return -1;
+	if (*delay_on == 0 || *delay_off == 0)
+		return -1;
 
-    g_orange_led_data->delay_on = *delay_on;
-    g_orange_led_data->delay_off = *delay_off;
-    g_orange_led_data->brightness = 0;
+	g_orange_led_data->delay_on = *delay_on;
+	g_orange_led_data->delay_off = *delay_off;
+	g_orange_led_data->brightness = 0;
 	g_orange_led_data->led_pdata->primary_display_set(g_orange_led_data->brightness);
-    mod_timer(&g_orange_led_data->timer, jiffies + msecs_to_jiffies(g_orange_led_data->delay_on));
+	mod_timer(&g_orange_led_data->timer, jiffies + msecs_to_jiffies(g_orange_led_data->delay_on));
 
-    return 0;
+	return 0;
 }
 EXPORT_SYMBOL(omap4430_orange_led_set_blink);
 
@@ -208,8 +207,6 @@ static int omap4430_sdp_display_probe(struct platform_device *pdev)
 	int ret;
 	struct display_led_data *info;
 
-	pr_info("%s:Enter\n", __func__);
-
 	if (pdev->dev.platform_data == NULL) {
 		pr_err("%s: platform data required\n", __func__);
 		return -ENODEV;
@@ -220,7 +217,7 @@ static int omap4430_sdp_display_probe(struct platform_device *pdev)
 		ret = -ENOMEM;
 		return ret;
 	}
-    g_orange_led_data = info;
+	g_orange_led_data = info;
 
 	info->led_pdata = pdev->dev.platform_data;
 	platform_set_drvdata(pdev, info);
@@ -231,10 +228,10 @@ static int omap4430_sdp_display_probe(struct platform_device *pdev)
 	info->pri_display_class_dev.brightness = LED_OFF;
 	info->pri_display_class_dev.blink_set = omap4430_orange_led_set_blink;
 	mutex_init(&info->pri_disp_lock);
-    init_timer(&info->timer);
-    info->timer.function = omap4430_sdp_display_timer;
-    info->timer.data = (unsigned long) info;
-    INIT_WORK(&info->work, omap4430_sdp_display_work);
+	init_timer(&info->timer);
+	info->timer.function = omap4430_sdp_display_timer;
+	info->timer.data = (unsigned long) info;
+	INIT_WORK(&info->work, omap4430_sdp_display_work);
 
 	ret = led_classdev_register(&pdev->dev,
 				    &info->pri_display_class_dev);
@@ -279,8 +276,6 @@ static int omap4430_sdp_display_probe(struct platform_device *pdev)
 	if (info->led_pdata->display_led_init)
 		info->led_pdata->display_led_init();
 
-	pr_info("%s:Exit\n", __func__);
-
 	return ret;
 }
 
@@ -297,35 +292,32 @@ static int omap4430_sdp_display_remove(struct platform_device *pdev)
 		led_classdev_unregister(&info->sec_display_class_dev);
 		mutex_destroy(&info->sec_disp_lock);
 	}
-    flush_work(&info->work);
-    del_timer_sync(&info->timer);
+	flush_work(&info->work);
+	del_timer_sync(&info->timer);
 	kfree(info);
 	return 0;
 }
 
 static int omap4430_sdp_display_suspend(struct platform_device *pdev, pm_message_t state)
 {
-    printk("!!!!!!!%s!!!!!!!!!!\n",__func__);
-    struct display_led_data *info = platform_get_drvdata(pdev);
-    omap4430_orange_led_set(&info->pri_display_class_dev,LED_OFF);
-	
-	
+	printk("!!!!!!!%s!!!!!!!!!!\n",__func__);
+	struct display_led_data *info = platform_get_drvdata(pdev);
+	omap4430_orange_led_set(&info->pri_display_class_dev,LED_OFF);
 	return 0;
 }
 
 static int omap4430_sdp_display_resume(struct platform_device *pdev)
 {
-    struct display_led_data *info = platform_get_drvdata(pdev);
-    omap4430_orange_led_set(&info->pri_display_class_dev,LED_OFF);
+	struct display_led_data *info = platform_get_drvdata(pdev);
+	omap4430_orange_led_set(&info->pri_display_class_dev,LED_OFF);
 	printk("!!!!!!!%s!!!!!!!!!!\n",__func__);
-	
 	return 0;
 }
 
 static struct platform_driver omap4430_sdp_display_driver = {
 	.probe = omap4430_sdp_display_probe,
 	.remove = omap4430_sdp_display_remove,
-    .suspend	= omap4430_sdp_display_suspend,
+	.suspend	= omap4430_sdp_display_suspend,
 	.resume		= omap4430_sdp_display_resume,
 	.driver = {
 		   .name = "display_led",
