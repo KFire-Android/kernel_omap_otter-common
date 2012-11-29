@@ -177,7 +177,7 @@ static struct platform_device __initdata *sdp4430_devices[] = {
 static struct omap_musb_board_data musb_board_data = {
 	.interface_type		= MUSB_INTERFACE_UTMI,
 	.mode			= MUSB_OTG,
-	.power			= 100,
+	.power			= 500,
 };
 
 static int sdp4430_wifi_power_state;
