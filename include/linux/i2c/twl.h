@@ -736,6 +736,24 @@ struct twl4030_audio_data {
 	unsigned int irq_base;
 };
 
+/**
+ * struct twl_reg_setup_array - NULL terminated array giving configuration
+ * @mod_no:    TWL Module id
+ * @addr:      reg address to write to
+ * @val:       value to write with
+ * @desc:      description of this reg for error printing
+ *             NOTE: a NULL pointer in this indicates end of array.
+ *
+ * TWL one-time registers configuration which will be applied at the end of TWL
+ * initialization.
+ */
+struct twl_reg_setup_array {
+	u8 mod_no;
+	u8 addr;
+	u8 val;
+	char *desc;
+};
+
 struct twl4030_platform_data {
 	unsigned				irq_base, irq_end;
 	struct twl4030_clock_init_data		*clock;
@@ -798,6 +816,9 @@ struct twl4030_platform_data {
 
 	/* TWL6032 external SMPS regulators */
 	struct regulator_init_data		*ext_v2v1;
+
+	/* Common one-time registers configuration */
+	struct twl_reg_setup_array		*reg_setup_script;
 };
 
 struct twl_regulator_driver_data {
