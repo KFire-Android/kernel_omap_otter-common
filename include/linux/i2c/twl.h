@@ -474,6 +474,11 @@ static inline int twl6030_mmc_card_detect(struct device *dev, int slot)
 #define TWL6030_REG_CFG_TRANS_SLEEP_CMD_OFFSET	0x2
 #define TWL6030_REG_CFG_TRANS_ACT_CMD_OFFSET	0x0
 
+/*
+* PMC Pull-Up / Pull-Down / High-Z Register Map (use TWL6030_MODULE_ID0)
+*/
+#define TWL6030_REG_CFG_SMPS_PD		0xF6
+
 /*----------------------------------------------------------------------*/
 
 /* Power bus message definitions */

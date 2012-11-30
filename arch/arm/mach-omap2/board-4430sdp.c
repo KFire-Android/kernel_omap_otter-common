@@ -636,6 +636,12 @@ static struct twl_reg_setup_array omap4460_twl6030_setup[] = {
 		.val = TWL6030_REG_VCOREx_CFG_TRANS_MODE,
 		.desc = "VCORE2 " TWL6030_REG_VCOREx_CFG_TRANS_MODE_DESC,
 	},
+	{
+		.mod_no = TWL6030_MODULE_ID0,
+		.addr = TWL6030_REG_CFG_SMPS_PD,
+		.val = 0x77,
+		.desc = "VCORE1 disable PD on shutdown",
+	},
 	{ .desc = NULL} /* TERMINATOR */
 };
 
