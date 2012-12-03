@@ -1323,12 +1323,12 @@ int __init omap4_mux_init(struct omap_board_mux *board_subset,
 
 	switch (flags & OMAP_PACKAGE_MASK) {
 	case OMAP_PACKAGE_CBL:
-		pr_debug("%s: OMAP4430 ES1.0 -> OMAP_PACKAGE_CBL\n", __func__);
+		pr_debug("%s: OMAP_PACKAGE_CBL\n", __func__);
 		package_balls_core = omap4_core_cbl_ball;
 		core_muxmodes = omap4_core_muxmodes;
 		break;
 	case OMAP_PACKAGE_CBS:
-		pr_debug("%s: OMAP4430 ES2.X -> OMAP_PACKAGE_CBS\n", __func__);
+		pr_debug("%s: OMAP_PACKAGE_CBS\n", __func__);
 		package_balls_core = omap4_core_cbs_ball;
 		core_muxmodes = omap4_core_muxmodes;
 		core_subset = omap4_es2_core_subset;
