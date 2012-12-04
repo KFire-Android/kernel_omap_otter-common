@@ -110,7 +110,8 @@ void __init omap54xx_voltagedomains_init(void)
 		omap5_voltdm_mm.dep_vdd_info = omap5430_vddmm_dep_info;
 
 		omap5_voltdm_core.volt_data = omap5430_vdd_core_volt_data;
-	} else if (omap_rev() == OMAP5432_REV_ES1_0) {
+	} else if (omap_rev() == OMAP5432_REV_ES1_0 ||
+		   omap_rev() == OMAP5432_REV_ES2_0) {
 		omap5_voltdm_mpu.volt_data = omap5432_vdd_mpu_volt_data;
 		omap5_voltdm_mpu.dep_vdd_info = omap5432_vddmpu_dep_info;
 
