@@ -352,4 +352,9 @@ void omap_pm_disable_off_mode(void);
 /* For mach PM core files to control usage of OFF mode */
 extern bool off_mode_enabled;
 
+#ifdef CONFIG_PM_DEBUG
+extern u32	wakeup_timer_seconds;
+extern u32	wakeup_timer_milliseconds;
+#endif
+
 #endif

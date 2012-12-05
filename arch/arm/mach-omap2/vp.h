@@ -132,9 +132,17 @@ extern struct omap_vp_instance omap4_vp_core;
 extern struct omap_vp_param omap3_mpu_vp_data;
 extern struct omap_vp_param omap3_core_vp_data;
 
-extern struct omap_vp_param omap4_mpu_vp_data;
-extern struct omap_vp_param omap4_iva_vp_data;
-extern struct omap_vp_param omap4_core_vp_data;
+extern struct omap_vp_param omap443x_mpu_vp_data;
+extern struct omap_vp_param omap443x_iva_vp_data;
+extern struct omap_vp_param omap443x_core_vp_data;
+
+extern struct omap_vp_param omap446x_mpu_vp_data;
+extern struct omap_vp_param omap446x_iva_vp_data;
+extern struct omap_vp_param omap446x_core_vp_data;
+
+extern struct omap_vp_param omap447x_mpu_vp_data;
+extern struct omap_vp_param omap447x_iva_vp_data;
+extern struct omap_vp_param omap447x_core_vp_data;
 
 extern struct omap_vp_instance omap5_vp_mpu;
 extern struct omap_vp_instance omap5_vp_mm;

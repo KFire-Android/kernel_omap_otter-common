@@ -1993,7 +1993,7 @@ void omap2_dma_context_save(void)
 	for (ch = 0; ch < dma_chan_count; ch++) {
 		if (dma_chan[ch].dev_id == -1)
 			continue;
-		for (i = 0; i <= ch_spec_regs; i++)
+		for (i = 0; i < ch_spec_regs; i++)
 			ch_ctx_regs[ch_count++] =
 				p->dma_read(omap_context_registers[i], ch);
 	}
@@ -2010,7 +2010,7 @@ void omap2_dma_context_restore(void)
 	for (ch = 0; ch < dma_chan_count; ch++) {
 		if (dma_chan[ch].dev_id == -1)
 			continue;
-		for (i = 0; i <= ch_spec_regs; i++)
+		for (i = 0; i < ch_spec_regs; i++)
 			p->dma_write(ch_ctx_regs[ch_count++],
 					omap_context_registers[i], ch);
 	}

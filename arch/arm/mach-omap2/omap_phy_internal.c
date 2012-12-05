@@ -157,3 +157,22 @@ void ti81xx_musb_phy_power(u8 on)
 
 	iounmap(scm_base);
 }
+
+/*
+ * omap4_phy_power_down: disable MUSB PHY during early init
+ *
+ * OMAP4/OMAP5 MUSB PHY module is enabled by default on reset, but this will
+ * prevent core retention if not disabled by SW. USB driver will
+ * later on enable this, once and if the driver needs it.
+ */
+static int __init omap4_phy_power_down(void)
+{
+	if (!cpu_is_omap44xx() && !cpu_is_omap54xx())
+		return 0;
+
+	/* Power down the phy */
+	omap_ctrl_writel(OMAP4_USBPHY_PD_MASK, OMAP4_CTRL_MODULE_CORE_DEV_CONF);
+
+	return 0;
+}
+early_initcall(omap4_phy_power_down);

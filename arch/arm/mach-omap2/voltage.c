@@ -569,7 +569,8 @@ void voltdm_pwrdm_disable(struct voltagedomain *voltdm)
 		 */
 		list_for_each_entry(pwrdm, &voltdm->pwrdm_list, voltdm_node) {
 			state = pwrdm_read_next_pwrst(pwrdm);
-			if (pwrdm_power_state_lt(target_state, state))
+			if (pwrdm->pwrsts != PWRSTS_ON &&
+			    pwrdm_power_state_lt(target_state, state))
 				target_state = state;
 		}
 		if (voltdm->sleep) {
