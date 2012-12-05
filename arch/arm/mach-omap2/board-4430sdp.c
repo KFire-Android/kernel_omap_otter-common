@@ -37,6 +37,7 @@
 #include <asm/mach/map.h>
 
 #include <plat/board.h>
+#include <plat/vram.h>
 #include "common.h"
 #include <plat/usb.h>
 #include <plat/mmc.h>
@@ -58,6 +59,8 @@
 #include "common-board-devices.h"
 #include "board-44xx-blaze.h"
 #include "omap_ram_console.h"
+
+#define SDP4430_FB_RAM_SIZE		SZ_16M /* 1920×1080*4 * 2 */
 
 #define ETH_KS8851_IRQ			34
 #define ETH_KS8851_POWER_ON		48
@@ -693,27 +696,13 @@ static int __init omap4_i2c_init(void)
 	return 0;
 }
 
-static struct gpio sdp4430_hdmi_gpios[] = {
-	{ HDMI_GPIO_CT_CP_HPD, GPIOF_OUT_INIT_HIGH, "hdmi_gpio_ct_cp_hpd" },
-	{ HDMI_GPIO_LS_OE,	GPIOF_OUT_INIT_HIGH,	"hdmi_gpio_ls_oe" },
-	{ HDMI_GPIO_HPD, GPIOF_DIR_IN, "hdmi_gpio_hpd" },
-};
-
 static int sdp4430_panel_enable_hdmi(struct omap_dss_device *dssdev)
 {
-	int status;
-
-	status = gpio_request_array(sdp4430_hdmi_gpios,
-				    ARRAY_SIZE(sdp4430_hdmi_gpios));
-	if (status)
-		pr_err("%s: Cannot request HDMI GPIOs\n", __func__);
-
-	return status;
+	return 0;
 }
 
 static void sdp4430_panel_disable_hdmi(struct omap_dss_device *dssdev)
 {
-	gpio_free_array(sdp4430_hdmi_gpios, ARRAY_SIZE(sdp4430_hdmi_gpios));
 }
 
 static void blaze_init_display_led(void)
@@ -920,6 +909,8 @@ static void sdp4430_lcd_init(void)
 
 static struct omap_dss_hdmi_data sdp4430_hdmi_data = {
 	.hpd_gpio = HDMI_GPIO_HPD,
+	.ls_oe_gpio = HDMI_GPIO_LS_OE,
+	.ct_cp_hpd_gpio = HDMI_GPIO_CT_CP_HPD,
 };
 
 static struct omap_dss_device sdp4430_hdmi_device = {
@@ -982,8 +973,8 @@ static struct omap_dss_device sdp4430_picodlp_device = {
 
 static struct omap_dss_device *sdp4430_dss_devices[] = {
 	&sdp4430_lcd_device,
-	&sdp4430_lcd2_device,
 	&sdp4430_hdmi_device,
+	&sdp4430_lcd2_device,
 	&sdp4430_picodlp_device,
 };
 
@@ -997,6 +988,9 @@ static void __init omap_4430sdp_display_init(void)
 {
 	int r;
 
+	omap_mux_init_signal("fref_clk4_out.fref_clk4_out",
+				OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP);
+
 	/* Enable LCD2 by default (instead of Pico DLP) */
 	r = gpio_request_one(DISPLAY_SEL_GPIO, GPIOF_OUT_INIT_HIGH,
 			"display_sel");
@@ -1006,6 +1000,7 @@ static void __init omap_4430sdp_display_init(void)
 	platform_device_register(&blaze_disp_led);
 	sdp4430_lcd_init();
 	sdp4430_picodlp_init();
+	omap_vram_set_sdram_vram(SDP4430_FB_RAM_SIZE, 0);
 	omap_display_init(&sdp4430_dss_data);
 	/*
 	 * OMAP4460SDP/Blaze and OMAP4430 ES2.3 SDP/Blaze boards and
