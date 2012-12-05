@@ -1608,15 +1608,18 @@ int pwrdm_wakeuplat_update_constraint(struct powerdomain *pwrdm, void *cookie,
 		}
 	}
 
-	/* If nothing to update, job done */
-	if (user && (user->node.prio == min_latency))
-		goto out;
-
 	if (!user) {
 		/* Add new entry to the list */
 		user = new_user;
 		user->cookie = cookie;
 	} else {
+		/* If nothing to update, job done */
+		if (user->node.prio == min_latency) {
+			mutex_unlock(&pwrdm->wkup_lat_plist_lock);
+			kfree(new_user);
+			return 0;
+		}
+
 		/* Update existing entry */
 		plist_del(&user->node, &pwrdm->wkup_lat_plist_head);
 		free_new_user = 1;
@@ -1639,10 +1642,6 @@ int pwrdm_wakeuplat_update_constraint(struct powerdomain *pwrdm, void *cookie,
 	pr_debug("powerdomain: %s: pwrdm %s, value=%ld\n",
 		 __func__, pwrdm->name, value);
 	return _pwrdm_wakeuplat_update_pwrst(pwrdm, value);
-
-out:
-	mutex_unlock(&pwrdm->wkup_lat_plist_lock);
-	return 0;
 }
 
 /**
