@@ -24,7 +24,7 @@
 	 * could lead to data corruption.
 	 */
 #if defined(CONFIG_ARM_ERRATA_761171) || defined(CONFIG_ARM_ERRATA_763722) \
-	|| defined(CONFIG_ARM_ERRATA_775619)
+	|| defined(CONFIG_ARM_ERRATA_775619) || defined(CONFIG_ARM_ERRATA_773022)
 
 	cmp	r6, #0x03		@ Present before r0p3, fixed later
 	bgt	1f
@@ -37,6 +37,11 @@
 #ifdef CONFIG_ARM_ERRATA_775619
 	orr r0, r0, #0x1 << 23		@ Forces in-order requests to the same set and way
 #endif
+
+#ifdef CONFIG_ARM_ERRATA_773022
+	orr r0, r0, #0x1 << 1		@ Disable Loop Buffer
+#endif
+
 	ldr	\base,	=0x107
 	smc	#0
 #endif
