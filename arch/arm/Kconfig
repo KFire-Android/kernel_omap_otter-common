@@ -1467,6 +1467,15 @@ config ARM_ERRATA_774769
 	  affected by this erratum such that no streaming-write ever allocates
 	  into the L2 cache.
 
+config ARM_ERRATA_763722
+	bool "ARM errata: Store streaming and normal store collisions could cause snoop deadlock"
+	depends on CPU_V7
+	help
+	 This option enables the workaround for erratum 763722
+	 affecting Cortex-A15 MPCore with two or more processors (all
+	 revisions till r0p3). This workaround disables the
+	 store streaming by setting bits [28:25] of L1 ACTLR to 0x3.
+
 endmenu
 
 source "arch/arm/common/Kconfig"
