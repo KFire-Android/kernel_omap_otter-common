@@ -23,7 +23,9 @@
 	 * Streaming write that will not allocate in L2
 	 * could lead to data corruption.
 	 */
-#if defined(CONFIG_ARM_ERRATA_761171) || defined(CONFIG_ARM_ERRATA_763722)
+#if defined(CONFIG_ARM_ERRATA_761171) || defined(CONFIG_ARM_ERRATA_763722) \
+	|| defined(CONFIG_ARM_ERRATA_775619)
+
 	cmp	r6, #0x03		@ Present before r0p3, fixed later
 	bgt	1f
 	mrc p15, 0, r0, c1, c0, 1	@ Read Auxiliary Control Register
@@ -31,6 +33,10 @@
 	orr r0, r0, #0x3 << 25
 #endif
 	orr r0, r0, #0x3 << 27		@ set bits[28:27], L1_mode3_threshold to 0x3.
+
+#ifdef CONFIG_ARM_ERRATA_775619
+	orr r0, r0, #0x1 << 23		@ Forces in-order requests to the same set and way
+#endif
 	ldr	\base,	=0x107
 	smc	#0
 #endif
