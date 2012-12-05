@@ -1521,6 +1521,8 @@ late_initcall(sr_init);
 static void __exit sr_exit(void)
 {
 	atomic_set(&sr_driver_ready, 0);
+	if (sr_dbg_dir)
+		debugfs_remove_recursive(sr_dbg_dir);
 	platform_driver_unregister(&smartreflex_driver);
 }
 module_exit(sr_exit);
