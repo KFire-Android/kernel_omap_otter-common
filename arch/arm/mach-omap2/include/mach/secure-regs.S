@@ -51,6 +51,15 @@
 	ldr	\base, =0x107
 	smc	#0
 #endif
+
+#ifdef CONFIG_ARM_ERRATA_762974
+	cmp	r6, #0x03		@ Present before r0p3, fixed later
+	bgt	1f
+	mov	r0, #0x400		@ L2 prefetch completely
+	ldr	\base, =0x106
+	smc	#0
+#endif
+
 1:
 	/*
 	 * Setting the L2 ACTLR register for recommended value to get the optimum
