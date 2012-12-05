@@ -83,10 +83,6 @@
 #define MAX_GPTIMER_ID		12
 
 static u32 sys_timer_reserved;
-#ifdef CONFIG_PM_DEBUG
-extern u32	wakeup_timer_seconds;
-extern u32	wakeup_timer_milliseconds;
-#endif
 
 /* Clockevent code */
 

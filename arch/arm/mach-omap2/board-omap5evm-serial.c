@@ -41,6 +41,27 @@ static struct omap_device_pad uart1_pads[] __initdata = {
 	},
 };
 
+static struct omap_device_pad uart1_543x_pads[] __initdata = {
+	{
+		.name   = "timer5_pwm_evt.uart1_cts",
+		.enable = OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE2,
+	},
+	{
+		.name   = "timer8_pwm_evt.uart1_rts",
+		.enable = OMAP_PIN_OUTPUT | OMAP_MUX_MODE2,
+	},
+	{
+		.name   = "timer11_pwm_evt.uart1_tx",
+		.enable = OMAP_PIN_OUTPUT | OMAP_MUX_MODE2,
+	},
+	{
+		.name   = "timer6_pwm_evt.uart1_rx",
+		.flags  = OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
+		.enable = OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE2,
+		.idle   = OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE2,
+	},
+};
+
 static struct omap_device_pad uart3_pads[] __initdata = {
 	{
 		.name   = "uart3_cts_rctx.uart3_cts_rctx",
@@ -90,6 +111,12 @@ static struct omap_board_data uart1_board_data __initdata = {
 	.pads_cnt = ARRAY_SIZE(uart1_pads),
 };
 
+static struct omap_board_data uart1_543x_board_data __initdata = {
+	.id = 0,
+	.pads = uart1_543x_pads,
+	.pads_cnt = ARRAY_SIZE(uart1_543x_pads),
+};
+
 static struct omap_board_data uart3_board_data __initdata = {
 	.id = 2,
 	.pads = uart3_pads,
@@ -129,8 +156,20 @@ static struct omap_uart_port_info uart5_info __initdata = {
 
 void __init omap5_board_serial_init(void)
 {
-	if (omap_rev() < OMAP5432_REV_ES1_0)
+	unsigned int rev = omap_rev();
+
+	/* UART1 */
+	switch (rev) {
+	case OMAP5430_REV_ES1_0:
 		omap_serial_init_port(&uart1_board_data, &uart1_info);
+		break;
+	case OMAP5430_REV_ES2_0:
+	case OMAP5432_REV_ES2_0:
+		omap_serial_init_port(&uart1_543x_board_data, &uart1_info);
+		break;
+	default:
+		break;
+	}
 
 	omap_serial_init_port(&uart3_board_data, &uart3_info);
 	omap_serial_init_port(&uart5_board_data, &uart5_info);
