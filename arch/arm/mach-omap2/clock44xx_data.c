@@ -3316,6 +3316,7 @@ static struct clk_lookup omap44xx_clks[] = {
 	CLKDEV_INIT(NULL,	"dss_48mhz_clk",		&dss_48mhz_clk),
 	CLKDEV_INIT(NULL,	"dss_dss_clk",			&dss_dss_clk),
 	CLKDEV_INIT("omapdss_dss",	"ick",			&dss_fck),
+	CLKDEV_INIT("omapdss_hdmi",	"ick",			&dss_fck),
 	CLKDEV_INIT(NULL,	"efuse_ctrl_cust_fck",		&efuse_ctrl_cust_fck),
 	CLKDEV_INIT(NULL,	"emif1_fck",			&emif1_fck),
 	CLKDEV_INIT(NULL,	"emif2_fck",			&emif2_fck),
