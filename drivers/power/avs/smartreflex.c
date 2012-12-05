@@ -1530,5 +1530,5 @@ module_exit(sr_exit);
 
 MODULE_DESCRIPTION("OMAP Smartreflex Driver");
 MODULE_LICENSE("GPL");
-MODULE_ALIAS("platform:" DRIVER_NAME);
+MODULE_ALIAS("platform:omap_sr");
 MODULE_AUTHOR("Texas Instruments Inc");
