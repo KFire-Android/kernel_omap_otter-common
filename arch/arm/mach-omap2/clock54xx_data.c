@@ -2276,8 +2276,8 @@ static struct clk mmc2_fclk = {
 
 static const struct clksel auxclk_src_sel[] = {
 	{ .parent = &sys_clkin, .rates = div_1_0_rates },
-	{ .parent = &dpll_core_m3x2_ck, .rates = div_1_1_rates },
-	{ .parent = &dpll_per_m3x2_ck, .rates = div_1_2_rates },
+	{ .parent = &dpll_core_m3x2_opt_ck, .rates = div_1_1_rates },
+	{ .parent = &dpll_per_m3x2_opt_ck, .rates = div_1_2_rates },
 	{ .parent = NULL },
 };
 
