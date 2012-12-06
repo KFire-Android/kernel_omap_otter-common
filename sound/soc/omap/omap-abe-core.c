@@ -35,6 +35,7 @@
 #include <linux/of_device.h>
 
 #include <sound/soc.h>
+#include <sound/soc-fw.h>
 #include <plat/cpu.h>
 #include "../../../arch/arm/mach-omap2/omap-pm.h"
 
@@ -43,7 +44,7 @@
 int abe_opp_stream_event(struct snd_soc_dapm_context *dapm, int event);
 int abe_pm_suspend(struct snd_soc_dai *dai);
 int abe_pm_resume(struct snd_soc_dai *dai);
-int abe_mixer_add_widgets(struct snd_soc_platform *platform);
+
 int abe_mixer_write(struct snd_soc_platform *platform, unsigned int reg,
 		unsigned int val);
 unsigned int abe_mixer_read(struct snd_soc_platform *platform,
@@ -119,162 +120,181 @@ static void abe_init_gains(struct omap_aess *abe)
 	omap_aess_mute_gain(abe, OMAP_AESS_MIXSDT_DL);
 }
 
-static int abe_fw_init(struct snd_soc_platform *platform,
-	const struct firmware *fw)
+static int abe_load_coeffs(struct snd_soc_platform *platform,
+	struct snd_soc_fw_hdr *hdr)
 {
 	struct omap_abe *abe = snd_soc_platform_get_drvdata(platform);
-	const u8 *fw_data;
-	int ret = 0, i, offset;
+	const struct snd_soc_file_coeff_data *cd = snd_soc_fw_get_data(hdr);
+	const void *coeff_data = cd + 1;
 
-	fw_data = fw->data;
+	dev_dbg(platform->dev,"coeff %d size 0x%x with %d elems\n",
+		cd->id, cd->size, cd->count);
 
-	/* get firmware and coefficients header info */
-	memcpy(&abe->hdr, fw_data, sizeof(struct fw_header));
-	if (abe->hdr.firmware_size > OMAP_ABE_MAX_FW_SIZE) {
-		dev_err(abe->dev, "Firmware too large at %d bytes: %d\n",
-					abe->hdr.firmware_size, ret);
-		ret = -EINVAL;
-		goto err_fw;
-	}
-	dev_dbg(abe->dev, "ABE firmware header size %d bytes\n", abe->hdr.fw_header_size);
-	dev_dbg(abe->dev, "ABE firmware size %d bytes\n", abe->hdr.firmware_size);
-
-	dev_info(abe->dev, "ABE Firmware version %x\n", abe->hdr.firmware_version);
-
-	if (omap_abe_get_supported_fw_version() != abe->hdr.firmware_version) {
-		dev_err(abe->dev, "firmware version mismatch. Need %x have %x\n",
-			omap_abe_get_supported_fw_version(), abe->hdr.firmware_version);
+	switch (cd->id) {
+	case OMAP_AESS_CMEM_DL1_COEFS_ID:
+		abe->equ.dl1.profile_size = cd->size / cd->count;
+		abe->equ.dl1.num_profiles = cd->count;
+		abe->equ.dl1.coeff_data = kmalloc(cd->size, GFP_KERNEL);
+		if (abe->equ.dl1.coeff_data == NULL)
+			return -ENOMEM;
+		memcpy(abe->equ.dl1.coeff_data, coeff_data, cd->size);
+		break;
+	case OMAP_AESS_CMEM_DL2_L_COEFS_ID:
+		abe->equ.dl2l.profile_size = cd->size / cd->count;
+		abe->equ.dl2l.num_profiles = cd->count;
+		abe->equ.dl2l.coeff_data = kmalloc(cd->size, GFP_KERNEL);
+		if (abe->equ.dl2l.coeff_data == NULL)
+			return -ENOMEM;
+		memcpy(abe->equ.dl2l.coeff_data, coeff_data, cd->size);
+		break;
+	case OMAP_AESS_CMEM_DL2_R_COEFS_ID:
+		abe->equ.dl2r.profile_size = cd->size / cd->count;
+		abe->equ.dl2r.num_profiles = cd->count;
+		abe->equ.dl2r.coeff_data = kmalloc(cd->size, GFP_KERNEL);
+		if (abe->equ.dl2r.coeff_data == NULL)
+			return -ENOMEM;
+		memcpy(abe->equ.dl2r.coeff_data, coeff_data, cd->size);
+		break;
+	case OMAP_AESS_CMEM_SDT_COEFS_ID:
+		abe->equ.sdt.profile_size = cd->size / cd->count;
+		abe->equ.sdt.num_profiles = cd->count;
+		abe->equ.sdt.coeff_data = kmalloc(cd->size, GFP_KERNEL);
+		if (abe->equ.sdt.coeff_data == NULL)
+			return -ENOMEM;
+		memcpy(abe->equ.sdt.coeff_data, coeff_data, cd->size);
+		break;
+	case OMAP_AESS_CMEM_96_48_AMIC_COEFS_ID:
+		abe->equ.amic.profile_size = cd->size / cd->count;
+		abe->equ.amic.num_profiles = cd->count;
+		abe->equ.amic.coeff_data = kmalloc(cd->size, GFP_KERNEL);
+		if (abe->equ.amic.coeff_data == NULL)
+			return -ENOMEM;
+		memcpy(abe->equ.amic.coeff_data, coeff_data, cd->size);
+		break;
+	case OMAP_AESS_CMEM_96_48_DMIC_COEFS_ID:
+		abe->equ.dmic.profile_size = cd->size / cd->count;
+		abe->equ.dmic.num_profiles = cd->count;
+		abe->equ.dmic.coeff_data = kmalloc(cd->size, GFP_KERNEL);
+		if (abe->equ.dmic.coeff_data == NULL)
+			return -ENOMEM;
+		memcpy(abe->equ.dmic.coeff_data, coeff_data, cd->size);
+		break;
+	default:
+		dev_err(platform->dev, "invalid coefficient ID %d\n", cd->id);
 		return -EINVAL;
 	}
 
-	if (abe->hdr.coeff_size > OMAP_ABE_MAX_COEFF_SIZE) {
-		dev_err(abe->dev, "Coefficients too large at %d bytes: %d\n",
-					abe->hdr.coeff_size, ret);
-		ret = -EINVAL;
-		goto err_fw;
+	return 0;
+}
+
+static int abe_load_fw(struct snd_soc_platform *platform,
+	struct snd_soc_fw_hdr *hdr)
+{
+	struct omap_abe *abe = snd_soc_platform_get_drvdata(platform);
+	const u8 *fw_data = snd_soc_fw_get_data(hdr);
+
+	/* get firmware and coefficients header info */
+	memcpy(&abe->hdr, fw_data, sizeof(struct fw_header));
+	if (hdr->size > OMAP_ABE_MAX_FW_SIZE) {
+		dev_err(abe->dev, "Firmware too large at %d bytes\n",
+			hdr->size);
+		return -ENOMEM;
 	}
-	dev_dbg(abe->dev, "ABE coefficients size %d bytes\n", abe->hdr.coeff_size);
+	dev_info(abe->dev, "ABE firmware size %d bytes\n", hdr->size);
+	dev_info(abe->dev, "ABE mem P %d C %d D %d S %d bytes\n",
+		abe->hdr.pmem_size, abe->hdr.cmem_size,
+		abe->hdr.dmem_size, abe->hdr.smem_size);
 
-	/* get coefficient EQU mixer strings */
-	if (abe->hdr.num_equ >= OMAP_ABE_MAX_EQU) {
-		dev_err(abe->dev, "Too many equalizers got %d\n", abe->hdr.num_equ);
-		ret = -EINVAL;
-		goto err_fw;
+	dev_info(abe->dev, "ABE Firmware version %x\n", abe->hdr.version);
+#if 0
+	if (omap_abe_get_supported_fw_version() <= abe->hdr.firmware_version) {
+		dev_err(abe->dev, "firmware version too old. Need %x have %x\n",
+			omap_abe_get_supported_fw_version(),
+			abe->hdr.firmware_version);
+		return -EINVAL;
 	}
-	abe->equ.texts = kzalloc(abe->hdr.num_equ * sizeof(struct coeff_config),
-			GFP_KERNEL);
-	if (abe->equ.texts == NULL) {
-		ret = -ENOMEM;
-		goto err_fw;
-	}
-
-	offset = sizeof(struct fw_header);
-	memcpy(abe->equ.texts, fw_data + offset,
-			abe->hdr.num_equ * sizeof(struct coeff_config));
-
-	/* get coefficients from firmware */
-	abe->equ.equ[0] = kmalloc(abe->hdr.coeff_size, GFP_KERNEL);
-	if (abe->equ.equ[0] == NULL) {
-		ret = -ENOMEM;
-		goto err_equ;
-	}
-
-	offset += abe->hdr.num_equ * sizeof(struct coeff_config);
-	memcpy(abe->equ.equ[0], fw_data + offset, abe->hdr.coeff_size);
-
-	/* allocate coefficient mixer texts */
-	dev_dbg(abe->dev, "loaded %d equalizers\n", abe->hdr.num_equ);
-	for (i = 0; i < abe->hdr.num_equ; i++) {
-		dev_dbg(abe->dev, "equ %d: %s profiles %d\n", i,
-				abe->equ.texts[i].name, abe->equ.texts[i].count);
-		if (abe->equ.texts[i].count >= OMAP_ABE_MAX_PROFILES) {
-			dev_err(abe->dev, "Too many profiles got %d for equ %d\n",
-					abe->equ.texts[i].count, i);
-			ret = -EINVAL;
-			goto err_texts;
-		}
-		abe->equ.senum[i].dtexts =
-				kzalloc(abe->equ.texts[i].count * sizeof(char *), GFP_KERNEL);
-		if (abe->equ.senum[i].dtexts == NULL) {
-			ret = -ENOMEM;
-			goto err_texts;
-		}
-	}
-
-	/* initialise coefficient equalizers */
-	for (i = 1; i < abe->hdr.num_equ; i++) {
-		abe->equ.equ[i] = abe->equ.equ[i - 1] +
-			abe->equ.texts[i - 1].count * abe->equ.texts[i - 1].coeff;
-	}
-
-	/* store ABE firmware Header for later context restore */
-	abe->fw_header = kzalloc(abe->hdr.fw_header_size, GFP_KERNEL);
-	if (abe->fw_header == NULL) {
-		ret = -ENOMEM;
-		goto err_texts;
-	}
-	memcpy(abe->fw_header,
-		fw_data + sizeof(struct fw_header) + abe->hdr.coeff_size,
-		abe->hdr.fw_header_size);
-
+#endif
 	/* store ABE firmware for later context restore */
-	abe->firmware = kzalloc(abe->hdr.firmware_size, GFP_KERNEL);
-	if (abe->firmware == NULL) {
-		ret = -ENOMEM;
-		goto err_texts;
-	}
-	memcpy(abe->firmware,
-		fw_data + sizeof(struct fw_header) + abe->hdr.coeff_size +
-		abe->hdr.fw_header_size,
-		abe->hdr.firmware_size);
+	abe->fw_text = kzalloc(hdr->size, GFP_KERNEL);
+	if (abe->fw_text == NULL)
+		return -ENOMEM;
 
-	release_firmware(fw);
+	memcpy(abe->fw_text, fw_data, hdr->size);
 
 	return 0;
+}
 
-err_texts:
-	for (i = 0; i < abe->hdr.num_equ; i++)
-		kfree(abe->equ.senum[i].texts);
-	kfree(abe->equ.equ[0]);
-err_equ:
-	kfree(abe->equ.texts);
-err_fw:
-	release_firmware(fw);
-	return ret;
+static int abe_load_config(struct snd_soc_platform *platform,
+	struct snd_soc_fw_hdr *hdr)
+{
+	struct omap_abe *abe = snd_soc_platform_get_drvdata(platform);
+	const u8 *fw_data = snd_soc_fw_get_data(hdr);
 
+	/* store ABE config for later context restore */
+	abe->fw_config = kzalloc(hdr->size, GFP_KERNEL);
+	if (abe->fw_config == NULL)
+		return -ENOMEM;
+
+	dev_info(abe->dev, "ABE Config size %d bytes\n", hdr->size);
+
+	memcpy(abe->fw_config, fw_data, hdr->size);
+
+	return 0;
 }
 
 static void abe_free_fw(struct omap_abe *abe)
 {
-	int i;
+	kfree(abe->fw_text);
+	kfree(abe->fw_config);
 
-	for (i = 0; i < abe->hdr.num_equ; i++)
-		kfree(abe->equ.senum[i].texts);
+	/* This below should be done in HAL  - oposite of init_mem()*/
+	if (!abe->aess)
+		return;
 
-	kfree(abe->equ.equ[0]);
-	kfree(abe->equ.texts);
-	kfree(abe->firmware);
-	kfree(abe->fw_header);
-	if (abe->aess) {
-		if (abe->aess->fw_info) {
-			kfree(abe->aess->fw_info->init_table);
-			kfree(abe->aess->fw_info);
-		}
-		kfree(abe->aess);
+	if (abe->aess->fw_info) {
+		kfree(abe->aess->fw_info->init_table);
+		kfree(abe->aess->fw_info);
 	}
 }
+
+/* callback to handle vendor data */
+static int abe_vendor_load(struct snd_soc_platform *platform,
+	struct snd_soc_fw_hdr *hdr)
+{
+
+	switch (hdr->type) {
+	case SND_SOC_FW_VENDOR_FW:
+		return abe_load_fw(platform, hdr);
+	case SND_SOC_FW_VENDOR_CONFIG:
+		return abe_load_config(platform, hdr);
+	case SND_SOC_FW_COEFF:
+		return abe_load_coeffs(platform, hdr);
+	case SND_SOC_FW_VENDOR_CODEC:
+	default:
+		dev_err(platform->dev, "vendor type %d:%d not supported\n",
+			hdr->type, hdr->vendor_type);
+		return 0;
+	}
+	return 0;
+}
+
+static struct snd_soc_fw_platform_ops soc_fw_ops = {
+	.vendor_load	= abe_vendor_load,
+	.io_ops		= abe_ops,
+	.io_ops_count	= 7,
+};
 
 static int abe_probe(struct snd_soc_platform *platform)
 {
 	struct omap_abe *abe = snd_soc_platform_get_drvdata(platform);
-	int ret, i;
+	int ret = 0, i;
 
 	pm_runtime_enable(abe->dev);
 	pm_runtime_irq_safe(abe->dev);
 
-	ret = abe_fw_init(platform, abe->fw);
-	if (ret) {
-		dev_err(platform->dev, "firmware init failed %d\n", ret);
+	ret = snd_soc_fw_load_platform(platform, &soc_fw_ops, abe->fw, 0);
+	if (ret < 0) {
+		dev_err(platform->dev, "request for ABE FW failed %d\n", ret);
 		goto err_fw;
 	}
 
@@ -286,18 +306,18 @@ static int abe_probe(struct snd_soc_platform *platform)
 		goto err_irq;
 	}
 
-	/* No OPP definition for OMAP5 inside the tree */
 	ret = abe_opp_init_initial_opp(abe);
 	if (ret < 0)
-		dev_warn(platform->dev, "No OPP scaling\n");
+		goto err_opp;
 
 	/* aess_clk has to be enabled to access hal register.
 	 * Disable the clk after it has been used.
 	 */
 	pm_runtime_get_sync(abe->dev);
 
+	/* lrg - rework for better init flow */
 	abe->aess = omap_abe_port_mgr_get();
-	omap_aess_init_mem(abe->aess, abe->dev, abe->io_base, abe->fw_header);
+	omap_aess_init_mem(abe->aess, abe->dev, abe->io_base, abe->fw_config);
 
 	omap_aess_reset_hal(abe->aess);
 
@@ -305,7 +325,7 @@ static int abe_probe(struct snd_soc_platform *platform)
 	for (i = 0; i < OMAP_ABE_ROUTES_UL + 2; i++)
 		abe->mixer.route_ul[i] = abe->aess->fw_info->label_id[OMAP_AESS_BUFFER_ZERO_ID];
 
-	omap_aess_load_fw(abe->aess, abe->firmware);
+	omap_aess_load_fw(abe->aess, abe->fw_text);
 
 	/* "tick" of the audio engine */
 	omap_aess_write_event_generator(abe->aess, EVENT_TIMER);
@@ -316,15 +336,16 @@ static int abe_probe(struct snd_soc_platform *platform)
 	omap_aess_disable_irq(abe->aess);
 
 	pm_runtime_put_sync(abe->dev);
-	abe_mixer_add_widgets(platform);
 	abe_init_debugfs(abe);
-	return 0;
 
+	return ret;
+
+err_opp:
+	free_irq(abe->irq, (void *)abe);
 err_irq:
 	abe_free_fw(abe);
 err_fw:
 	pm_runtime_disable(abe->dev);
-
 	return ret;
 }
 
@@ -348,27 +369,30 @@ static struct snd_soc_platform_driver omap_aess_platform = {
 	.resume		= abe_pm_resume,
 	.read		= abe_mixer_read,
 	.write		= abe_mixer_write,
-	.stream_event = abe_opp_stream_event,
+	.stream_event	= abe_opp_stream_event,
 };
 
-static void abe_fw_load(const struct firmware *fw, void *context)
+static void abe_fw_ready(const struct firmware *fw, void *context)
 {
-	struct omap_abe *abe = (struct omap_abe *)context;
+	struct platform_device *pdev = (struct platform_device *)context;
+	struct omap_abe *abe = dev_get_drvdata(&pdev->dev);
 	int err;
 
 	abe->fw = fw;
 
-	err = snd_soc_register_platform(abe->dev, &omap_aess_platform);
+	err = snd_soc_register_platform(&pdev->dev, &omap_aess_platform);
 	if (err < 0) {
-		dev_err(abe->dev, "failed to register ABE platform %d\n", err);
+		dev_err(&pdev->dev, "failed to register ABE platform %d\n", err);
+		release_firmware(fw);
 		return;
 	}
 
-	err = snd_soc_register_dais(abe->dev, omap_abe_dai,
+	err = snd_soc_register_dais(&pdev->dev, omap_abe_dai,
 			ARRAY_SIZE(omap_abe_dai));
 	if (err < 0) {
-		dev_err(abe->dev, "failed to register ABE DAIs %d\n", err);
-		snd_soc_unregister_platform(abe->dev);
+		dev_err(&pdev->dev, "failed to register ABE DAIs %d\n", err);
+		snd_soc_unregister_platform(&pdev->dev);
+		release_firmware(fw);
 	}
 }
 
@@ -419,13 +443,13 @@ static int abe_engine_probe(struct platform_device *pdev)
 	abe->dev->coherent_dma_mask = omap_abe_dmamask;
 	put_device(abe->dev);
 
-	/* request firmware & coefficients */
-	ret = request_firmware_nowait(THIS_MODULE, 1, "omap4_abe",
-		abe->dev, GFP_KERNEL, abe, abe_fw_load);
+	ret = request_firmware_nowait(THIS_MODULE, 1, "omap4_abe_new", abe->dev,
+		GFP_KERNEL, pdev, abe_fw_ready);
 	if (ret != 0) {
-		dev_err(abe->dev, "Failed to load firmware: %d\n", ret);
+		dev_err(abe->dev, "Failed to load firmware %d\n", ret);
 		goto err;
 	}
+
 	return ret;
 
 err:
@@ -442,7 +466,7 @@ static int abe_engine_remove(struct platform_device *pdev)
 
 	snd_soc_unregister_dais(&pdev->dev, ARRAY_SIZE(omap_abe_dai));
 	snd_soc_unregister_platform(&pdev->dev);
-
+	release_firmware(abe->fw);
 	for (i = 0; i < OMAP_ABE_IO_RESOURCES; i++)
 		iounmap(abe->io_base[i]);
 
