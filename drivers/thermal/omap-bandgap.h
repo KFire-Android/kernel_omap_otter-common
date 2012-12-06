@@ -37,8 +37,8 @@
 #define OMAP4460_BGAP_STATUS_OFFSET		0x388
 #define OMAP4460_FUSE_OPP_BGAP			0x260
 
-#define OMAP4460_TSHUT_HOT		900	/* 122 deg C */
-#define OMAP4460_TSHUT_COLD		895	/* 100 deg C */
+#define OMAP4460_TSHUT_HOT		866	/* 100 deg C */
+#define OMAP4460_TSHUT_COLD		817	/* 80 deg C */
 #define OMAP4460_T_HOT			800	/* 73 deg C */
 #define OMAP4460_T_COLD			795	/* 71 deg C */
 #define OMAP4460_MAX_FREQ		1500000
