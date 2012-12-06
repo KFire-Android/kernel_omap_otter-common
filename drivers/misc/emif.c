@@ -718,14 +718,20 @@ static u32 get_pwr_mgmt_ctrl(u32 freq, struct emif_data *emif, u32 ip_rev)
 	u32 timeout_perf	= EMIF_LP_MODE_TIMEOUT_PERFORMANCE;
 	u32 timeout_pwr		= EMIF_LP_MODE_TIMEOUT_POWER;
 	u32 freq_threshold	= EMIF_LP_MODE_FREQ_THRESHOLD;
+	u32 mask;
+	u8 shift;
 
 	struct emif_custom_configs *cust_cfgs = emif->plat_data->custom_configs;
 
 	if (cust_cfgs && (cust_cfgs->mask & EMIF_CUSTOM_CONFIG_LPMODE)) {
-		lpmode		= cust_cfgs->lpmode;
-		timeout_perf	= cust_cfgs->lpmode_timeout_performance;
-		timeout_pwr	= cust_cfgs->lpmode_timeout_power;
-		freq_threshold  = cust_cfgs->lpmode_freq_threshold;
+		lpmode	= cust_cfgs->lpmode;
+
+		if (cust_cfgs->lpmode_timeout_performance)
+			timeout_perf = cust_cfgs->lpmode_timeout_performance;
+		if (cust_cfgs->lpmode_timeout_power)
+			timeout_pwr = cust_cfgs->lpmode_timeout_power;
+		if (cust_cfgs->lpmode_freq_threshold)
+			freq_threshold  = cust_cfgs->lpmode_freq_threshold;
 	}
 
 	/* Timeout based on DDR frequency */
@@ -735,33 +741,51 @@ static u32 get_pwr_mgmt_ctrl(u32 freq, struct emif_data *emif, u32 ip_rev)
 	if (timeout < 16) {
 		timeout = 0;
 	} else {
-		timeout = __fls(timeout) - 3;
 		if (timeout & (timeout - 1))
-			timeout++;
+			timeout <<= 1;
+		timeout = __fls(timeout) - 3;
 	}
 
 	switch (lpmode) {
 	case EMIF_LP_MODE_CLOCK_STOP:
-		pwr_mgmt_ctrl = (timeout << CS_TIM_SHIFT) |
-					SR_TIM_MASK | PD_TIM_MASK;
+		shift = CS_TIM_SHIFT;
+		mask = CS_TIM_MASK;
 		break;
 	case EMIF_LP_MODE_SELF_REFRESH:
 		/* Workaround for errata i735 */
 		if (timeout < 6)
 			timeout = 6;
 
-		pwr_mgmt_ctrl = (timeout << SR_TIM_SHIFT) |
-					CS_TIM_MASK | PD_TIM_MASK;
+		shift = SR_TIM_SHIFT;
+		mask = SR_TIM_MASK;
 		break;
 	case EMIF_LP_MODE_PWR_DN:
-		pwr_mgmt_ctrl = (timeout << PD_TIM_SHIFT) |
-					CS_TIM_MASK | SR_TIM_MASK;
+		shift = PD_TIM_SHIFT;
+		mask = PD_TIM_MASK;
 		break;
 	case EMIF_LP_MODE_DISABLE:
 	default:
-		pwr_mgmt_ctrl = CS_TIM_MASK |
-					PD_TIM_MASK | SR_TIM_MASK;
+		mask = 0;
+		shift = 0;
+		break;
 	}
+	/* Round to maximum in case of overflow, BUT warn! */
+	if (lpmode != EMIF_LP_MODE_DISABLE && timeout > mask >> shift) {
+		pr_err("TIMEOUT Overflow - lpmode=%d perf=%d pwr=%d freq=%d\n",
+		       lpmode,
+		       timeout_perf,
+		       timeout_pwr,
+		       freq_threshold);
+		WARN(1, "timeout=0x%02x greater than 0x%02x. Using max\n",
+		     timeout, mask >> shift);
+		timeout = mask >> shift;
+	}
+
+	/* Setup required timing */
+	pwr_mgmt_ctrl = (timeout << shift) & mask;
+	/* setup a default mask for rest of the modes */
+	pwr_mgmt_ctrl |= (SR_TIM_MASK | CS_TIM_MASK | PD_TIM_MASK) &
+			  ~mask;
 
 	/* No CS_TIM in EMIF_4D5 */
 	if (ip_rev == EMIF_4D5)
@@ -818,6 +842,8 @@ static void setup_registers(struct emif_data *emif, struct emif_regs *regs)
 
 	writel(regs->sdram_tim2_shdw, base + EMIF_SDRAM_TIMING_2_SHDW);
 	writel(regs->phy_ctrl_1_shdw, base + EMIF_DDR_PHY_CTRL_1_SHDW);
+	writel(regs->pwr_mgmt_ctrl_shdw,
+	       base + EMIF_POWER_MANAGEMENT_CTRL_SHDW);
 
 	/* Settings specific for EMIF4D5 */
 	if (emif->plat_data->ip_rev != EMIF_4D5)
@@ -1106,7 +1132,16 @@ static void __init_or_module emif_onetime_settings(struct emif_data *emif)
 	pwr_mgmt_ctrl = get_pwr_mgmt_ctrl(1000000000, emif,
 			emif->plat_data->ip_rev);
 	emif->lpmode = (pwr_mgmt_ctrl & LP_MODE_MASK) >> LP_MODE_SHIFT;
-	writel(pwr_mgmt_ctrl, base + EMIF_POWER_MANAGEMENT_CONTROL);
+
+	/* First update the time in shadow register */
+	pwr_mgmt_ctrl &= CS_TIM_MASK | SR_TIM_MASK | PD_TIM_MASK;
+	writel(pwr_mgmt_ctrl, base + EMIF_POWER_MANAGEMENT_CTRL_SHDW);
+
+	/*
+	 * Next set the LP mode in ctrl reg. In the next cycle, timing
+	 * values in shadow will get updated to the ctrl register.
+	 */
+	set_lpmode(emif, emif->lpmode);
 
 	/* Init ZQ calibration settings */
 	zq = get_zq_config_reg(addressing, device_info->cs1_used,

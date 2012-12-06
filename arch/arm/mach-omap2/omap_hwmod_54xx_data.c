@@ -49,7 +49,6 @@
 /* Backward references (IPs with Bus Master capability) */
 static struct omap_hwmod omap54xx_aess_hwmod;
 static struct omap_hwmod omap54xx_bb2d_hwmod;
-static struct omap_hwmod omap54xx_debug_logic_hwmod;
 static struct omap_hwmod omap54xx_dma_system_hwmod;
 static struct omap_hwmod omap54xx_dmm_hwmod;
 static struct omap_hwmod omap54xx_dsp_hwmod;
@@ -74,7 +73,6 @@ static struct omap_hwmod omap54xx_mmc2_hwmod;
 static struct omap_hwmod omap54xx_mpu_hwmod;
 static struct omap_hwmod omap54xx_mpu_private_hwmod;
 static struct omap_hwmod omap54xx_sata_hwmod;
-static struct omap_hwmod omap54xx_sl2_hwmod;
 static struct omap_hwmod omap54xx_usb_host_hs_hwmod;
 static struct omap_hwmod omap54xx_usb_otg_ss_hwmod;
 
@@ -803,15 +801,6 @@ static struct omap_hwmod omap54xx_counter_32k_hwmod = {
  * omap5430 core control module
  * This class contains several variants: ['ctrl_module', 'ctrl_module']
  */
-
-static struct omap_hwmod_class_sysconfig omap54xx_ctrl_module_sysc = {
-	.rev_offs	= 0x0000,
-};
-
-static struct omap_hwmod_class omap54xx_ctrl_module_hwmod_class = {
-	.name	= "ctrl_module",
-	.sysc	= &omap54xx_ctrl_module_sysc,
-};
 
 static struct omap_hwmod_class_sysconfig omap54xx_ctrl_module_sysc = {
 	.rev_offs	= 0x0000,
@@ -3039,10 +3028,6 @@ static struct omap_hwmod omap54xx_intc_ipu_c1_hwmod = {
  * ipu unicache and mmu controllers
  */
 
-static struct omap_hwmod_class omap54xx_mmu_hwmod_class = {
-	.name	= "mmu",
-};
-
 /* mmu_ipu */
 static struct omap_hwmod omap54xx_mmu_ipu_hwmod;
 static struct omap_hwmod_addr_space omap54xx_mmu_ipu_addrs[] = {
@@ -3879,8 +3864,8 @@ static struct omap_hwmod omap54xx_mcpdm_hwmod = {
 	 * on-chip or off-chip sources.  McPDM seems to be the only
 	 * current exception.
 	 */
-
-	.flags		= HWMOD_EXT_OPT_MAIN_CLK,
+/*
+	.flags		= HWMOD_EXT_OPT_MAIN_CLK,*/
 	.mpu_irqs	= omap54xx_mcpdm_irqs,
 	.sdma_reqs	= omap54xx_mcpdm_sdma_reqs,
 	.main_clk	= "pad_clks",

@@ -179,6 +179,13 @@ static struct clk sys_clkin = {
 	.recalc		= &omap2_clksel_recalc,
 };
 
+static struct clk syc_clk_div = {
+	.name		= "syc_clk_div",
+	.parent		= &sys_clkin,
+	.ops		= &clkops_null,
+	.recalc		= &followparent_recalc,
+};
+
 static struct clk xclk60mhsp1 = {
 	.name		= "xclk60mhsp1",
 	.rate		= 60000000,
@@ -333,7 +340,7 @@ static struct clk abe_clk = {
 	.parent		= &dpll_abe_m2x2_ck,
 	.clksel		= abe_clk_div,
 	.clksel_reg	= OMAP54XX_CM_CLKSEL_ABE,
-	.clksel_mask	= OMAP54XX_CLKSEL_OPP_0_1_MASK,
+	.clksel_mask	= OMAP54XX_CLKSEL_OPP_MASK,
 	.ops		= &clkops_null,
 	.recalc		= &omap2_clksel_recalc,
 	.round_rate	= &omap2_clksel_round_rate,
@@ -1683,7 +1690,7 @@ static struct clk mmc2_fclk_mux = {
 	.clksel		= mmc1_fclk_mux_sel,
 	.init		= &omap2_init_clksel_parent,
 	.clksel_reg	= OMAP54XX_CM_L3INIT_MMC2_CLKCTRL,
-	.clksel_mask	= OMAP54XX_CLKSEL_SOURCE_24_24_MASK,
+	.clksel_mask	= OMAP54XX_CLKSEL_SOURCE_L3INIT_MMC1_MASK,
 	.ops		= &clkops_null,
 	.recalc		= &omap2_clksel_recalc,
 };
@@ -1881,6 +1888,66 @@ static struct clk auxclk3_ck = {
 	.parent		= &auxclk3_src_ck,
 	.clksel		= auxclk3_sel,
 	.clksel_reg	= OMAP5_SCRM_AUXCLK3,
+	.clksel_mask	= OMAP5_CLKDIV_MASK,
+	.ops		= &clkops_null,
+	.recalc		= &omap2_clksel_recalc,
+	.round_rate	= &omap2_clksel_round_rate,
+	.set_rate	= &omap2_clksel_set_rate,
+};
+
+static struct clk auxclk4_src_ck = {
+	.name		= "auxclk4_src_ck",
+	.parent		= &sys_clkin,
+	.init		= &omap2_init_clksel_parent,
+	.ops		= &clkops_omap2_dflt,
+	.clksel		= auxclk_src_sel,
+	.clksel_reg	= OMAP5_SCRM_AUXCLK4,
+	.clksel_mask	= OMAP5_SRCSELECT_MASK,
+	.recalc		= &omap2_clksel_recalc,
+	.enable_reg	= OMAP5_SCRM_AUXCLK4,
+	.enable_bit	= OMAP5_ENABLE_SHIFT,
+};
+
+static const struct clksel auxclk4_sel[] = {
+	{ .parent = &auxclk4_src_ck, .rates = div16_1to16_rates },
+	{ .parent = NULL },
+};
+
+static struct clk auxclk4_ck = {
+	.name		= "auxclk4_ck",
+	.parent		= &auxclk4_src_ck,
+	.clksel		= auxclk4_sel,
+	.clksel_reg	= OMAP5_SCRM_AUXCLK4,
+	.clksel_mask	= OMAP5_CLKDIV_MASK,
+	.ops		= &clkops_null,
+	.recalc		= &omap2_clksel_recalc,
+	.round_rate	= &omap2_clksel_round_rate,
+	.set_rate	= &omap2_clksel_set_rate,
+};
+
+static struct clk auxclk5_src_ck = {
+	.name		= "auxclk5_src_ck",
+	.parent		= &sys_clkin,
+	.init		= &omap2_init_clksel_parent,
+	.ops		= &clkops_omap2_dflt,
+	.clksel		= auxclk_src_sel,
+	.clksel_reg	= OMAP5_SCRM_AUXCLK5,
+	.clksel_mask	= OMAP5_SRCSELECT_MASK,
+	.recalc		= &omap2_clksel_recalc,
+	.enable_reg	= OMAP5_SCRM_AUXCLK5,
+	.enable_bit	= OMAP5_ENABLE_SHIFT,
+};
+
+static const struct clksel auxclk5_sel[] = {
+	{ .parent = &auxclk5_src_ck, .rates = div16_1to16_rates },
+	{ .parent = NULL },
+};
+
+static struct clk auxclk5_ck = {
+	.name		= "auxclk5_ck",
+	.parent		= &auxclk5_src_ck,
+	.clksel		= auxclk5_sel,
+	.clksel_reg	= OMAP5_SCRM_AUXCLK5,
 	.clksel_mask	= OMAP5_CLKDIV_MASK,
 	.ops		= &clkops_null,
 	.recalc		= &omap2_clksel_recalc,
@@ -2107,17 +2174,17 @@ static struct omap_clk omap54xx_clks[] = {
 	CLK("omap_timer.9",	"32k_ck",		&sys_32k_ck,	CK_54XX),
 	CLK("omap_timer.10",	"32k_ck",		&sys_32k_ck,	CK_54XX),
 	CLK("omap_timer.11",	"32k_ck",		&sys_32k_ck,	CK_54XX),
-	CLK("omap_timer.1",	"sys_ck",		&sys_clkin_ck,	CK_54XX),
-	CLK("omap_timer.2",	"sys_ck",		&sys_clkin_ck,	CK_54XX),
-	CLK("omap_timer.3",	"sys_ck",		&sys_clkin_ck,	CK_54XX),
-	CLK("omap_timer.4",	"sys_ck",		&sys_clkin_ck,	CK_54XX),
-	CLK("omap_timer.9",	"sys_ck",		&sys_clkin_ck,	CK_54XX),
-	CLK("omap_timer.10",	"sys_ck",		&sys_clkin_ck,	CK_54XX),
-	CLK("omap_timer.11",	"sys_ck",		&sys_clkin_ck,	CK_54XX),
-	CLK("omap_timer.5",	"sys_ck",		&syc_clk_div_ck,	CK_54XX),
-	CLK("omap_timer.6",	"sys_ck",		&syc_clk_div_ck,	CK_54XX),
-	CLK("omap_timer.7",	"sys_ck",		&syc_clk_div_ck,	CK_54XX),
-	CLK("omap_timer.8",	"sys_ck",		&syc_clk_div_ck,	CK_54XX),
+	CLK("omap_timer.1",	"sys_ck",		&sys_clkin,	CK_54XX),
+	CLK("omap_timer.2",	"sys_ck",		&sys_clkin,	CK_54XX),
+	CLK("omap_timer.3",	"sys_ck",		&sys_clkin,	CK_54XX),
+	CLK("omap_timer.4",	"sys_ck",		&sys_clkin,	CK_54XX),
+	CLK("omap_timer.9",	"sys_ck",		&sys_clkin,	CK_54XX),
+	CLK("omap_timer.10",	"sys_ck",		&sys_clkin,	CK_54XX),
+	CLK("omap_timer.11",	"sys_ck",		&sys_clkin,	CK_54XX),
+	CLK("omap_timer.5",	"sys_ck",		&syc_clk_div,	CK_54XX),
+	CLK("omap_timer.6",	"sys_ck",		&syc_clk_div,	CK_54XX),
+	CLK("omap_timer.7",	"sys_ck",		&syc_clk_div,	CK_54XX),
+	CLK("omap_timer.8",	"sys_ck",		&syc_clk_div,	CK_54XX),
 };
 
 int __init omap5xxx_clk_init(void)

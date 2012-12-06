@@ -160,7 +160,12 @@ static struct omap_board_mux board_mux[] __initdata = {
 #ifndef CONFIG_MACH_OMAP_5430ZEBU
 static struct __devinitdata emif_custom_configs custom_configs = {
 	.mask	= EMIF_CUSTOM_CONFIG_LPMODE,
-	.lpmode	= EMIF_LP_MODE_DISABLE
+	.lpmode	= EMIF_LP_MODE_SELF_REFRESH,
+	/* TBD: optimize based on benchmarks such as renderscript */
+	.lpmode_timeout_performance = 262144,
+	.lpmode_timeout_power = 262144,
+	/* only at OPP100 should we use performance value */
+	.lpmode_freq_threshold = 532000000,
 };
 #endif
 #endif

@@ -221,12 +221,14 @@ static struct d_mod_info mod_debug = {
 	.optclk = 0x0,
 };
 
+#ifdef CONFIG_ARCH_OMAP5_ES1
 static struct d_mod_info mod_bandgap = {
 	.name = "BANDGAPTS",
 	.clkctrl = OMAP54XX_CM_COREAON_BANDGAP_CLKCTRL,
 	.flags = 0,
 	.optclk = 0x100,
 };
+#endif
 
 static struct d_mod_info mod_gpio1 = {
 	.name = "GPIO1",
@@ -473,12 +475,14 @@ static struct d_mod_info mod_mphy = {
 	.optclk = 0x0,
 };
 
+#ifdef CONFIG_ARCH_OMAP5_ES1
 static struct d_mod_info mod_unipro1 = {
 	.name = "UNIPRO1",
 	.clkctrl = OMAP54XX_CM_MIPIEXT_UNIPRO1_CLKCTRL,
 	.flags = MOD_MODE | MOD_MASTER | MOD_SLAVE,
 	.optclk = 0x0,
 };
+#endif
 
 static struct d_mod_info mod_sdma = {
 	.name = "sDMA",
@@ -754,12 +758,16 @@ static struct d_mod_info mod_hsmmc5 = {
 	.flags = MOD_MODE | MOD_SLAVE,
 	.optclk = 0x0,
 };
+
+#ifdef CONFIG_ARCH_OMAP5_ES1
 static struct d_mod_info mod_slimbus2 = {
 	.name = "SLIMBUS2",
 	.clkctrl = OMAP54XX_CM_L4PER_SLIMBUS2_CLKCTRL,
 	.flags = MOD_MODE | MOD_SLAVE,
 	.optclk = 0x700,
 };
+#endif
+
 static struct d_mod_info mod_uart1 = {
 	.name = "UART1",
 	.clkctrl = OMAP54XX_CM_L4PER_UART1_CLKCTRL,
@@ -1003,7 +1011,11 @@ static struct d_clkd_info cd_l4_alwon_core = {
 	.clkdm_offs	  = OMAP54XX_CM_CORE_COREAON_COREAON_CDOFFS,
 	.activity	  = 0x7f00,
 	.mods = {&mod_sr_core, &mod_sr_mm, &mod_sr_mpu,
+#ifdef CONFIG_ARCH_OMAP5_ES1
 		 &mod_bandgap, NULL},
+#else
+		 NULL},
+#endif
 	.dplls = {&dpll_per, &dpll_core, &dpll_abe, NULL},
 	.intgens = {NULL},
 	/* TBD: TRM mentions: CM1, CORTEXM3_WKUPGEN,
@@ -1103,7 +1115,11 @@ static struct d_clkd_info cd_mipiext = {
 	.clkdm_offs	  = OMAP54XX_CM_CORE_CORE_MIPIEXT_CDOFFS,
 	.activity	  = 0x3d00,
 	.mods = {&mod_lli, &mod_lli_ocp_fw, &mod_mphy,
+#ifdef CONFIG_ARCH_OMAP5_ES1
 		 &mod_unipro1, NULL},
+#else
+		 NULL},
+#endif
 	.intgens = {NULL},
 };
 
@@ -1154,8 +1170,13 @@ static struct d_clkd_info cd_l3_init = {
 static struct d_clkd_info cd_l4_per = {
 	.name = "CD_L4_PER",
 	.prcm_partition	  = OMAP4430_CM2_PARTITION,
+#ifdef CONFIG_ARCH_OMAP5_ES1
 	.cm_inst	  = OMAP54XX_CM_CORE_L4PER_INST,
 	.clkdm_offs	  = OMAP54XX_CM_CORE_L4PER_L4PER_CDOFFS,
+#else
+	.cm_inst	  = OMAP54XX_CM_CORE_CORE_INST,
+	.clkdm_offs	  = OMAP54XX_CM_CORE_CORE_L4PER_CDOFFS,
+#endif
 	.activity	  = 0x60fff00,
 	.mods = {&mod_gptimer10, &mod_gptimer11, &mod_gptimer2,
 		 &mod_gptimer3, &mod_gptimer4, &mod_gptimer9, &mod_elm,
@@ -1164,7 +1185,11 @@ static struct d_clkd_info cd_l4_per = {
 		 &mod_i2c2, &mod_i2c3, &mod_i2c4, &mod_i2c5,
 		 &mod_l4_per_interconnect, &mod_mcspi1,
 		 &mod_mcspi2, &mod_mcspi3, &mod_mcspi4, &mod_hsmmc3,
+#ifdef CONFIG_ARCH_OMAP5_ES1
 		 &mod_hsmmc4, &mod_hsmmc5, &mod_slimbus2, &mod_uart1,
+#else
+		 &mod_hsmmc4, &mod_hsmmc5, &mod_uart1,
+#endif
 		 &mod_uart2, &mod_uart3, &mod_uart4, &mod_uart5,
 		 &mod_uart6, NULL},
 	/* TBD: Linux refs: I2C5 */
@@ -1241,8 +1266,13 @@ static struct d_clkd_info cd_cortexa15 = {
 static struct d_clkd_info cd_l4sec = {
 	.name = "CD_L4_SEC",
 	.prcm_partition	  = OMAP4430_CM2_PARTITION,
+#ifdef CONFIG_ARCH_OMAP5_ES1
 	.cm_inst	  = OMAP54XX_CM_CORE_L4PER_INST,
 	.clkdm_offs	  = OMAP54XX_CM_CORE_L4PER_L4PER_CDOFFS,
+#else
+	.cm_inst	  = OMAP54XX_CM_CORE_CORE_INST,
+	.clkdm_offs	  = OMAP54XX_CM_CORE_CORE_L4PER_CDOFFS,
+#endif
 	.activity	  = 0x300,
 	.mods = {&mod_aes1, &mod_aes2, &mod_des3des, &mod_fpka, &mod_rng,
 		 &mod_sha2md5, &mod_cryptodma, NULL},
@@ -1291,7 +1321,12 @@ static struct d_pwrd_info pd_core = {
 	.prminst = OMAP54XX_PRM_CORE_INST,
 	.pwrst = OMAP54XX_PM_CORE_PWRSTST_OFFSET,
 	.cds = {&cd_l4_cfg, &cd_ipu, &cd_emif, &cd_l3_2, &cd_l3_instr,
+#ifdef CONFIG_ARCH_OMAP5_ES1
 		&cd_l3_1, &cd_c2c, &cd_dma, &cd_mipiext, NULL},
+#else
+		&cd_l3_1, &cd_c2c, &cd_dma, &cd_mipiext, &cd_l4_per, &cd_l4sec,
+		NULL},
+#endif
 	/* TBD: TRM mentions: CM2 */
 };
 
@@ -1315,14 +1350,14 @@ static struct d_pwrd_info pd_l3_init = {
 	.pwrst = OMAP54XX_PM_L3INIT_PWRSTST_OFFSET,
 	.cds = {&cd_l3_init, NULL},
 };
-
+#ifdef CONFIG_ARCH_OMAP5_ES1
 static struct d_pwrd_info pd_l4_per = {
 	.name = "PD_L4_PER",
 	.prminst = OMAP54XX_PRM_L4PER_INST,
 	.pwrst = OMAP54XX_PM_L4PER_PWRSTST_OFFSET,
 	.cds = {&cd_l4_per, &cd_l4sec, NULL},
 };
-
+#endif
 static struct d_pwrd_info pd_std_efuse = {
 	.name = "PD_STD_EFUSE",
 	.prminst = OMAP54XX_PRM_CUSTEFUSE_INST,
@@ -1380,7 +1415,11 @@ static struct d_pwrd_info *vdd_wkup_pds[] = {
 
 static struct d_pwrd_info *vdd_core_pds[] = {
 		&pd_alwon_core, &pd_cam, &pd_core,
+#ifdef CONFIG_ARCH_OMAP5_ES1
 		&pd_dss, &pd_l3_init, &pd_l4_per,
+#else
+		&pd_dss, &pd_l3_init,
+#endif
 		&pd_std_efuse, &pd_audio, NULL};
 
 static struct d_pwrd_info *vdd_mm_pds[] = {
