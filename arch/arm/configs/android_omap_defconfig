@@ -221,6 +221,7 @@ CONFIG_OMAP_OCP2SCP=y
 # Texas Instruments shared transport line discipline
 #
 CONFIG_TI_ST=y
+CONFIG_ST_HCI=y
 CONFIG_ST_GPS=m
 CONFIG_NFC_DEVICES=y
 CONFIG_ST_NFC=y
