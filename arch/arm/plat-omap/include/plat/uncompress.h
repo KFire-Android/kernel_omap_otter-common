@@ -95,9 +95,16 @@ static inline void flush(void)
 	_DEBUG_LL_ENTRY(mach, OMAP4_UART##p##_BASE, OMAP_PORT_SHIFT,	\
 		OMAP4UART##p)
 
+#ifdef CONFIG_MACH_OMAP_5430ZEBU
 #define DEBUG_LL_OMAP5(p, mach)						\
 	_DEBUG_LL_ENTRY(mach, OMAP5_UART##p##_BASE, OMAP_PORT_SHIFT,	\
-		OMAP5UART##p)
+		OMAP2UART##p)
+#else
+#define DEBUG_LL_OMAP5(p, mach)                                         \
+        _DEBUG_LL_ENTRY(mach, OMAP5_UART##p##_BASE, OMAP_PORT_SHIFT,    \
+                OMAP5UART##p)
+#endif
+
 /* Zoom2/3 shift is different for UART1 and external port */
 #define DEBUG_LL_ZOOM(mach)						\
 	_DEBUG_LL_ENTRY(mach, ZOOM_UART_BASE, ZOOM_PORT_SHIFT, ZOOM_UART)
@@ -177,8 +184,13 @@ static inline void __arch_decomp_setup(unsigned long arch_id)
 		DEBUG_LL_OMAP4(3, omap_tabletblaze);
 		DEBUG_LL_OMAP4(3, omap4_panda);
 
+#ifdef CONFIG_MACH_OMAP_5430ZEBU
+		/* omap5 based boards using UART1 */
+		DEBUG_LL_OMAP5(1, omap5_sevm);
+#else
 		/* omap5 based boards using UART3 */
 		DEBUG_LL_OMAP5(3, omap5_sevm);
+#endif
 		DEBUG_LL_OMAP5(3, omap5_panda);
 
 		/* zoom2/3 external uart */

@@ -86,6 +86,11 @@ config ARCH_OMAP5_ES1
 	default n
 	depends on ARCH_OMAP5
 
+config MACH_OMAP_5430ZEBU
+	bool "TI OMAP5 ZEBU"
+	default n
+	depends on ARCH_OMAP5
+
 comment "OMAP Core Type"
 	depends on ARCH_OMAP2
 
