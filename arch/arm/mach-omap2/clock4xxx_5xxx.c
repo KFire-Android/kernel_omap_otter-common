@@ -59,6 +59,7 @@
 #define DPLL_IVA_OPPNITROSB_RATE	1500000000
 
 /* OMAP5 IVA/DSP Clock rates */
+#ifdef CONFIG_ARCH_OMAP5_ES1
 #define DPLL_IVA_H11_OPPLOW_RATE	233000000
 #define DPLL_IVA_H11_OPPNOM_RATE	466000000
 #define DPLL_IVA_H11_OPPOD_RATE		532000000
@@ -67,6 +68,16 @@
 #define DPLL_IVA_H12_OPPOD_RATE		582503225
 #define DPLL_IVA_OPPNOM_RATE		2329600000LL
 #define DPLL_IVA_OPPOD_RATE			1064000000
+#else
+#define DPLL_IVA_H11_OPPLOW_RATE	233000000
+#define DPLL_IVA_H11_OPPNOM_RATE	465900000
+#define DPLL_IVA_H11_OPPOD_RATE		531200000
+#define DPLL_IVA_H12_OPPLOW_RATE	194100000
+#define DPLL_IVA_H12_OPPNOM_RATE	388300000
+#define DPLL_IVA_H12_OPPOD_RATE		531200000
+#define DPLL_IVA_OPPNOM_RATE		2330000000LL
+#define DPLL_IVA_OPPOD_RATE		1062400000
+#endif
 
 struct virt_iva_ck_deps {
 	unsigned long iva_ck_rate;
@@ -213,6 +224,7 @@ static struct virt_l3_clk_data omap4470_high_virt_l3_clk_data[] = {
 };
 
 static struct virt_l3_clk_data omap5_virt_l3_clk_data[] = {
+#ifdef CONFIG_ARCH_OMAP5_ES1
 	{	.opp50_rate = 266000000,
 		.opp100_rate = 532000000,
 		.clk_name	=  "dpll_core_m2_ck"
@@ -221,7 +233,16 @@ static struct virt_l3_clk_data omap5_virt_l3_clk_data[] = {
 		.opp100_rate = 425600000,
 		.clk_name	=  "dpll_core_m3x2_ck"
 	},
-
+#else
+	{	.opp50_rate = 265800000,
+		.opp100_rate = 531800000,
+		.clk_name	=  "dpll_core_m2_ck"
+	},
+	{	.opp50_rate = 265900000,
+		.opp100_rate = 425500000,
+		.clk_name	=  "dpll_core_m3x2_ck"
+	},
+#endif
 	{	.opp50_rate = 192000000,
 		.opp100_rate = 384000000,
 		.clk_name	=  "dpll_per_h14x2_ck"

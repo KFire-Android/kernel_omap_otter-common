@@ -72,7 +72,6 @@ config ARCH_OMAP5
 	select ARM_ERRATA_762974
 	select ARM_ERRATA_775619
 	select ARM_ERRATA_773022
-	select ARM_ERRATA_4668
 	select USB_ARCH_HAS_EHCI if USB_SUPPORT
 	select USB_ARCH_HAS_XHCI if USB_SUPPORT
 	select ARM_ARCH_TIMER
@@ -83,6 +82,12 @@ config ARCH_OMAP5
 
 config ARCH_OMAP5_ES1
 	bool "TI OMAP5 ES1"
+	default n
+	depends on ARCH_OMAP5
+	select ARM_ERRATA_4668
+
+config MACH_OMAP_5430ZEBU
+	bool "TI OMAP5 ZEBU"
 	default n
 	depends on ARCH_OMAP5
 
@@ -410,7 +415,7 @@ config SECURE_REGS
 
 config MACH_OMAP_5430ZEBU
 	bool "OMAP5 ZEBU"
-	depends on ARCH_OMAP5 && MACH_OMAP_5430EVM
+	depends on ARCH_OMAP5
 
 config OMAP3_EMU
 	bool "OMAP3 debugging peripherals"

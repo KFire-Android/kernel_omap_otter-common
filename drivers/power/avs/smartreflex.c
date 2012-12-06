@@ -653,11 +653,16 @@ int sr_disable_errgen(struct omap_sr *sr)
 		return -EINVAL;
 	}
 
-	/* Disable the interrupts of ERROR module */
-	sr_modify_reg(sr, errconfig_offs, vpboundint_en | vpboundint_st, 0);
-
 	/* Disable the Sensor and errorgen */
 	sr_modify_reg(sr, SRCONFIG, SRCONFIG_SENENABLE | SRCONFIG_ERRGEN_EN, 0);
+
+	/*
+	 * Disable the interrupts of ERROR module
+	 * NOTE: modify is a read, modify,write - an implicit OCP barrier
+	 * which is required is present here - sequencing is critical
+	 * at this point (after errgen is disabled, vpboundint disable)
+	 */
+	sr_modify_reg(sr, errconfig_offs, vpboundint_en | vpboundint_st, 0);
 
 	return 0;
 }
@@ -1348,7 +1353,6 @@ static int __devexit omap_sr_remove(struct platform_device *pdev)
 {
 	struct omap_sr_data *pdata = pdev->dev.platform_data;
 	struct omap_sr *sr_info;
-	struct resource *mem;
 
 	if (!pdata) {
 		dev_err(&pdev->dev, "%s: platform data missing\n", __func__);
@@ -1367,13 +1371,9 @@ static int __devexit omap_sr_remove(struct platform_device *pdev)
 	if (sr_info->dbg_dir)
 		debugfs_remove_recursive(sr_info->dbg_dir);
 
+	pm_runtime_disable(&pdev->dev);
 	list_del(&sr_info->node);
-	iounmap(sr_info->base);
 	kfree(sr_info->name);
-	kfree(sr_info->ops);
-	kfree(sr_info);
-	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	release_mem_region(mem->start, resource_size(mem));
 
 	return 0;
 }
@@ -1473,14 +1473,14 @@ static int sr_resume(struct device *dev)
 	return ret;
 }
 
-static SIMPLE_DEV_PM_OPS(serial_omap_dev_pm_ops, sr_suspend, sr_resume);
+static SIMPLE_DEV_PM_OPS(sr_omap_dev_pm_ops, sr_suspend, sr_resume);
 
 static struct platform_driver smartreflex_driver = {
 	.remove         = __devexit_p(omap_sr_remove),
 	.shutdown	= __devexit_p(omap_sr_shutdown),
 	.driver		= {
 		.name	= "smartreflex",
-		.pm	= &serial_omap_dev_pm_ops,
+		.pm	= &sr_omap_dev_pm_ops,
 	},
 };
 
@@ -1522,11 +1522,13 @@ late_initcall(sr_init);
 static void __exit sr_exit(void)
 {
 	atomic_set(&sr_driver_ready, 0);
+	if (sr_dbg_dir)
+		debugfs_remove_recursive(sr_dbg_dir);
 	platform_driver_unregister(&smartreflex_driver);
 }
 module_exit(sr_exit);
 
 MODULE_DESCRIPTION("OMAP Smartreflex Driver");
 MODULE_LICENSE("GPL");
-MODULE_ALIAS("platform:" DRIVER_NAME);
+MODULE_ALIAS("platform:omap_sr");
 MODULE_AUTHOR("Texas Instruments Inc");

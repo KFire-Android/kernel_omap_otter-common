@@ -203,7 +203,11 @@ static struct device_info l3_dev_info = {
 
 static struct device_info hsi_dev_info = {
 	.hwmod_name	= "hsi",
+#ifdef CONFIG_ARCH_OMAP5_ES1
 	.clk_name	= "hsi_fck",
+#else
+	.clk_name       = "hsi_fclk",
+#endif
 	.voltdm_name	= "core",
 };
 
@@ -369,6 +373,55 @@ static struct omap_opp_def __initdata omap5432_es1_opp_def_list[] = {
 	OPP_INITIALIZER(&gpu_dev_info, false, 532000000, OMAP5432_VDD_MM_OPP_OD),
 };
 
+static struct omap_opp_def __initdata omap5432_opp_def_list[] = {
+	/* MPU OPP1 - OPPLOW */
+	OPP_INITIALIZER(&mpu_dev_info, true, 600000000, OMAP5432_VDD_MPU_OPP_LOW),
+	/* MPU OPP2 - OPPNOM */
+	OPP_INITIALIZER(&mpu_dev_info, true, 1200000000, OMAP5432_VDD_MPU_OPP_NOM),
+	/* MPU OPP3 - OPP-HIGH */
+	OPP_INITIALIZER(&mpu_dev_info, false, 1699000000, OMAP5432_VDD_MPU_OPP_HIGH),
+	/* MPU OPP4 - OPP-SPEEDBIN */
+	OPP_INITIALIZER(&mpu_dev_info, false, 2000000000, OMAP5432_VDD_MPU_OPP_SB),
+
+	/* L3 OPP2 - OPPNOM */
+	OPP_INITIALIZER(&l3_dev_info, true, 265800000, OMAP5432_VDD_CORE_OPP_NOM),
+
+	/* HSI OPP3 - OPPNOM */
+	OPP_INITIALIZER(&hsi_dev_info, true, 192000000, OMAP5432_VDD_CORE_OPP_NOM),
+
+	/* CORE_IPU_ISS_BOOST_CLK OPP2 - OPPNOM */
+	OPP_INITIALIZER(&ipu_dev_info, true, 425500000, OMAP5432_VDD_CORE_OPP_NOM),
+
+	/* CORE_ISS_MAIN_CLK OPP2 - OPPNOM */
+	OPP_INITIALIZER(&iss_dev_info, true, 303900000, OMAP5432_VDD_CORE_OPP_NOM),
+
+	/* FDIF OPP3 - OPPNOM */
+	OPP_INITIALIZER(&fdif_dev_info, true, 256000000, OMAP5432_VDD_CORE_OPP_NOM),
+
+	/* ABE OPP2 - OPPNOM */
+	OPP_INITIALIZER(&abe_dev_info, true, 196608000, OMAP5432_VDD_CORE_OPP_NOM),
+
+	/* IVA OPP1 - OPPLOW */
+	OPP_INITIALIZER(&iva_dev_info, true, 194100000, OMAP5432_VDD_MM_OPP_LOW),
+	/* IVA OPP2 - OPPNOM */
+	OPP_INITIALIZER(&iva_dev_info, true, 388300000, OMAP5432_VDD_MM_OPP_NOM),
+	/* IVA OPP3 - OPP-OD */
+	OPP_INITIALIZER(&iva_dev_info, false, 531200000, OMAP5432_VDD_MM_OPP_OD),
+
+	/* DSP OPP1 - OPP50 */
+	OPP_INITIALIZER(&dsp_dev_info, true, 233000000, OMAP5432_VDD_MM_OPP_LOW),
+	/* DSP OPP2 - OPP100 */
+	OPP_INITIALIZER(&dsp_dev_info, true, 465900000, OMAP5432_VDD_MM_OPP_NOM),
+	/* DSP OPP3 - OPPTB */
+	OPP_INITIALIZER(&dsp_dev_info, false, 531200000, OMAP5432_VDD_MM_OPP_OD),
+
+	/* SGX OPP1 - OPPLOW */
+	OPP_INITIALIZER(&gpu_dev_info, true, 212700000, OMAP5432_VDD_MM_OPP_LOW),
+	/* SGX OPP2 - OPPNOM */
+	OPP_INITIALIZER(&gpu_dev_info, true, 425600000, OMAP5432_VDD_MM_OPP_NOM),
+	/* SGX OPP3 - OPPOV */
+	OPP_INITIALIZER(&gpu_dev_info, false, 532000000, OMAP5432_VDD_MM_OPP_OD),
+};
 
 static int __init opp_def_list_enable_opp(struct omap_opp_def *list,
 					  unsigned int size,
@@ -447,6 +500,9 @@ static int __init omap5_opp_init(void)
 
 		r = omap_init_opp_table(omap5432_es1_opp_def_list,
 			ARRAY_SIZE(omap5432_es1_opp_def_list));
+	} else if (omap_rev() == OMAP5432_REV_ES2_0) {
+		r = omap_init_opp_table(omap5432_opp_def_list,
+			ARRAY_SIZE(omap5432_opp_def_list));
 	} else {
 		pr_err("%s: Unsupported OMAP5 chipset rev=0x%08x: NO OPPs!\n",
 			__func__, omap_rev());
