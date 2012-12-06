@@ -1144,6 +1144,9 @@ static struct omap_hwmod omap54xx_dsp_c0_hwmod = {
 static struct omap_hwmod omap54xx_dsp_hwmod = {
 	.name		= "dsp",
 	.class		= &omap54xx_dsp_hwmod_class,
+#ifndef CONFIG_OMAP_PM_STANDALONE
+	.flags          = HWMOD_INIT_NO_RESET,
+#endif
 	.clkdm_name	= "dsp_clkdm",
 	.mpu_irqs	= omap54xx_dsp_irqs,
 	.rst_lines	= omap54xx_dsp_resets,
