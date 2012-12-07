@@ -584,6 +584,7 @@ static struct regulator_init_data sdp4430_vusb = {
 	.num_consumer_supplies		= 1,
 //	.consumer_supplies		= vusb_supply,
 };
+#endif
 
 static struct regulator_init_data sdp4430_clk32kg = {
 	.constraints = {
@@ -592,7 +593,6 @@ static struct regulator_init_data sdp4430_clk32kg = {
 		.always_on		= true,
 	},
 };
-#endif
 
 static struct regulator_init_data sdp4430_v2v1 = {
 	.constraints = {
@@ -641,7 +641,7 @@ static struct twl4030_platform_data sdp4430_twldata = {
 //	.vusb		= &sdp4430_vusb,
 
 	/* TWL6030/6032 common resources */
-//	.clk32kg	= &sdp4430_clk32kg,
+	.clk32kg	= &sdp4430_clk32kg,
 
 	/* SMPS */
 	.vdd1		= &sdp4430_vcore1,
@@ -664,21 +664,21 @@ static int __init omap4_i2c_init(void)
 	omap_register_i2c_bus_board_data(4, &sdp4430_i2c_4_bus_pdata);
 
 	omap4_pmic_get_config(&sdp4430_twldata, TWL_COMMON_PDATA_USB | TWL_COMMON_PDATA_MADC,
-		TWL_COMMON_REGULATOR_VUSB |
-		TWL_COMMON_REGULATOR_CLK32KG
+		TWL_COMMON_REGULATOR_VUSB
 		);
 #if 0
+		TWL_COMMON_REGULATOR_CLK32KG
 
-	TWL_COMMON_REGULATOR_VAUX2 |
-	TWL_COMMON_REGULATOR_VAUX3 |
-	TWL_COMMON_REGULATOR_VMMC |
-	TWL_COMMON_REGULATOR_VPP |
-	TWL_COMMON_REGULATOR_VANA |
-	TWL_COMMON_REGULATOR_VCXIO |
-	TWL_COMMON_REGULATOR_VUSB |
-	TWL_COMMON_REGULATOR_CLK32KG |
-	TWL_COMMON_REGULATOR_V1V8 |
-	TWL_COMMON_REGULATOR_V2V1);
+		TWL_COMMON_REGULATOR_VAUX2 |
+		TWL_COMMON_REGULATOR_VAUX3 |
+		TWL_COMMON_REGULATOR_VMMC |
+		TWL_COMMON_REGULATOR_VPP |
+		TWL_COMMON_REGULATOR_VANA |
+		TWL_COMMON_REGULATOR_VCXIO |
+		TWL_COMMON_REGULATOR_VUSB |
+		TWL_COMMON_REGULATOR_CLK32KG |
+		TWL_COMMON_REGULATOR_V1V8 |
+		TWL_COMMON_REGULATOR_V2V1);
 #endif
 	omap_pmic_init(1, 400, "twl6030", OMAP44XX_IRQ_SYS_1N, &sdp4430_twldata);
 
