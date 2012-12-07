@@ -206,7 +206,7 @@ static int ehci_omap_hub_control(
 			(pdata->port_mode[wIndex-1] ==
 					OMAP_EHCI_PORT_MODE_PHY)) {
 
-		if (cpu_is_omap443x() && typeReq == SetPortFeature &&
+		if (cpu_is_omap44xx() && typeReq == SetPortFeature &&
 				wValue == USB_PORT_FEAT_SUSPEND) {
 			/* Errata i693 workaround sequence */
 			spin_lock_irqsave(&ehci->lock, flags);
