@@ -661,7 +661,7 @@ int omap5_mpu_dpll_set_rate(struct clk *clk, unsigned long rate)
 		 * than 1 Ghz, lock the DPLL at half the rate so the
 		 * CLKOUTX2_M3 then matches the requested rate.
 		 */
-		if (rate == dpll_rate/2)
+		if (rate / 2 == dpll_rate)
 			return 0;
 		v |= OMAP54XX_DCC_EN_MASK;
 		__raw_writel(v, dd->mult_div1_reg);
