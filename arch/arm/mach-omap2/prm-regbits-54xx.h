@@ -162,24 +162,24 @@
 #define OMAP54XX_DATA_MASK							(0xff << 16)
 
 /* Used by PRM_DEBUG_CORE_RET_TRANS */
-#define OMAP54XX_DEBUG_OUT_SHIFT						0
-#define OMAP54XX_DEBUG_OUT_MASK							(0xfffffff << 0)
+#define OMAP54XX_PRM_DEBUG_OUT_SHIFT						0
+#define OMAP54XX_PRM_DEBUG_OUT_MASK						(0xfffffff << 0)
 
 /* Renamed from DEBUG_OUT Used by PRM_DEBUG_MM_RET_TRANS */
-#define OMAP54XX_DEBUG_OUT_0_9_SHIFT						0
-#define OMAP54XX_DEBUG_OUT_0_9_MASK						(0x3ff << 0)
+#define OMAP54XX_PRM_DEBUG_OUT_0_9_SHIFT					0
+#define OMAP54XX_PRM_DEBUG_OUT_0_9_MASK						(0x3ff << 0)
 
 /* Renamed from DEBUG_OUT Used by PRM_DEBUG_MPU_RET_TRANS */
-#define OMAP54XX_DEBUG_OUT_0_6_SHIFT						0
-#define OMAP54XX_DEBUG_OUT_0_6_MASK						(0x7f << 0)
+#define OMAP54XX_PRM_DEBUG_OUT_0_6_SHIFT					0
+#define OMAP54XX_PRM_DEBUG_OUT_0_6_MASK						(0x7f << 0)
 
 /* Renamed from DEBUG_OUT Used by PRM_DEBUG_OFF_TRANS */
-#define OMAP54XX_DEBUG_OUT_0_31_SHIFT						0
-#define OMAP54XX_DEBUG_OUT_0_31_MASK						(0xffffffff << 0)
+#define OMAP54XX_PRM_DEBUG_OUT_0_31_SHIFT					0
+#define OMAP54XX_PRM_DEBUG_OUT_0_31_MASK					(0xffffffff << 0)
 
 /* Renamed from DEBUG_OUT Used by PRM_DEBUG_WKUPAON_FD_TRANS */
-#define OMAP54XX_DEBUG_OUT_0_11_SHIFT						0
-#define OMAP54XX_DEBUG_OUT_0_11_MASK						(0xfff << 0)
+#define OMAP54XX_PRM_DEBUG_OUT_0_11_SHIFT					0
+#define OMAP54XX_PRM_DEBUG_OUT_0_11_MASK					(0xfff << 0)
 
 /* Used by PRM_DEVICE_OFF_CTRL */
 #define OMAP54XX_DEVICE_OFF_ENABLE_SHIFT					0

@@ -146,9 +146,15 @@ static struct omap_mux __initdata omap5_core_muxmodes[] = {
 			"gpio2_45", "safe_mode"),
 	_OMAP5_MUXENTRY(LLIB_WAKEREQOUT, 32, "llib_wakereqout", NULL, NULL,
 			NULL, "gpmc_ncs0", NULL, "gpio2_32", "safe_mode"),
+#ifdef CONFIG_ARCH_OMAP5_ES1
 	_OMAP5_MUXENTRY(HSI1_ACREADY, 64, "hsi1_acready", NULL, NULL,
 			"usbb2_ulpitll_clk", NULL, NULL, "gpio3_64",
 			"safe_mode"),
+#else
+	_OMAP5_MUXENTRY(HSI1_ACREADY, 64, "hsi1_acready", "cam_strobe", NULL,
+			"usbb2_ulpitll_clk", NULL, NULL, "gpio3_64",
+			"safe_mode"),
+#endif
 	_OMAP5_MUXENTRY(HSI1_CAREADY, 65, "hsi1_caready", NULL, NULL,
 			"usbb2_ulpitll_nxt", NULL, NULL, "gpio3_65",
 			"safe_mode"),
@@ -272,6 +278,7 @@ static struct omap_mux __initdata omap5_core_muxmodes[] = {
 			NULL, NULL, NULL, NULL, NULL),
 	_OMAP5_MUXENTRY(DSIPORTC_TE0, 191, "dsiportc_te0", NULL, NULL, NULL,
 			NULL, NULL, "gpio6_191", "safe_mode"),
+#ifdef CONFIG_ARCH_OMAP5_ES1
 	_OMAP5_MUXENTRY(TIMER9_PWM_EVT, 190, "timer9_pwm_evt", NULL, NULL, NULL,
 			NULL, NULL, "gpio6_190", "safe_mode"),
 	_OMAP5_MUXENTRY(I2C4_SCL, 200, "i2c4_scl", NULL, NULL, NULL, NULL, NULL,
@@ -286,6 +293,24 @@ static struct omap_mux __initdata omap5_core_muxmodes[] = {
 			"hw_dbg21", "gpio7_199", "safe_mode"),
 	_OMAP5_MUXENTRY(MCSPI2_CS0, 196, "mcspi2_cs0", NULL, NULL, "dispc_fid",
 			NULL, NULL, "gpio7_196", "safe_mode"),
+#else
+	_OMAP5_MUXENTRY(TIMER9_PWM_EVT, 190, "timer9_pwm_evt", "sync_sof_clk",
+			"sync_usof_itp_clk", NULL, NULL, NULL, "gpio6_190",
+			"safe_mode"),
+	_OMAP5_MUXENTRY(I2C4_SCL, 200, "i2c4_scl", "jtagtapext_tdi", NULL, NULL,
+			NULL, NULL, "gpio7_200", "safe_mode"),
+	_OMAP5_MUXENTRY(I2C4_SDA, 201, "i2c4_sda", "jtagtapext_rtck", NULL,
+			NULL, NULL, NULL, "gpio7_201", "safe_mode"),
+	_OMAP5_MUXENTRY(MCSPI2_CLK, 197, "mcspi2_clk", "jtagtapext_tck", NULL,
+			NULL, NULL, NULL, "gpio7_197", "safe_mode"),
+	_OMAP5_MUXENTRY(MCSPI2_SIMO, 198, "mcspi2_simo", "jtagtapext_tmcs",
+			NULL, NULL, NULL, "hw_dbg20", "gpio7_198",
+			"safe_mode"),
+	_OMAP5_MUXENTRY(MCSPI2_SOMI, 199, "mcspi2_somi", "jtagtapext_tdo", NULL,
+			NULL, NULL, "hw_dbg21", "gpio7_199", "safe_mode"),
+	_OMAP5_MUXENTRY(MCSPI2_CS0, 196, "mcspi2_cs0", "jtagtapext_ntrst", NULL,
+			"dispc_fid", NULL, NULL, "gpio7_196", "safe_mode"),
+#endif
 	_OMAP5_MUXENTRY(RFBI_DATA15, 181, "rfbi_data15", "mcspi2_cs1", NULL,
 			"dispc_data15", "kbd_col6", "drm_emu19", "gpio6_181",
 			"safe_mode"),
@@ -310,6 +335,7 @@ static struct omap_mux __initdata omap5_core_muxmodes[] = {
 	_OMAP5_MUXENTRY(RFBI_DATA8, 174, "rfbi_data8", NULL, NULL,
 			"dispc_data8", "kbd_col3", "drm_emu12", "gpio6_174",
 			"safe_mode"),
+#ifdef CONFIG_ARCH_OMAP5_ES1
 	_OMAP5_MUXENTRY(RFBI_DATA7, 173, "rfbi_data7", NULL, NULL,
 			"dispc_data7", NULL, "drm_emu11", "gpio6_173",
 			"safe_mode"),
@@ -325,15 +351,38 @@ static struct omap_mux __initdata omap5_core_muxmodes[] = {
 	_OMAP5_MUXENTRY(RFBI_DATA3, 169, "rfbi_data3", NULL, NULL,
 			"dispc_data3", NULL, "drm_emu7", "gpio6_169",
 			"safe_mode"),
+#else
+	_OMAP5_MUXENTRY(RFBI_DATA7, 173, "rfbi_data7", NULL, NULL,
+			"dispc_data7", "jtagtapext_tdi", "drm_emu11",
+			"gpio6_173", "safe_mode"),
+	_OMAP5_MUXENTRY(RFBI_DATA6, 172, "rfbi_data6", NULL, NULL,
+			"dispc_data6", "jtagtapext_tdo", "drm_emu10",
+			"gpio6_172", "safe_mode"),
+	_OMAP5_MUXENTRY(RFBI_DATA5, 171, "rfbi_data5", NULL, NULL,
+			"dispc_data5", "jtagtapext_tmsc", "drm_emu9",
+			"gpio6_171", "safe_mode"),
+	_OMAP5_MUXENTRY(RFBI_DATA4, 170, "rfbi_data4", NULL, NULL,
+			"dispc_data4", "jtagtapext_tck", "drm_emu8",
+			"gpio6_170", "safe_mode"),
+	_OMAP5_MUXENTRY(RFBI_DATA3, 169, "rfbi_data3", NULL, NULL,
+			"dispc_data3", "jtagtapext_ntrst", "drm_emu7",
+			"gpio6_169", "safe_mode"),
+#endif
 	_OMAP5_MUXENTRY(RFBI_DATA2, 168, "rfbi_data2", NULL, NULL,
 			"dispc_data2", "uart3_tx_irtx", "drm_emu6",
 			"gpio6_168", "safe_mode"),
 	_OMAP5_MUXENTRY(RFBI_DATA1, 167, "rfbi_data1", NULL, NULL,
 			"dispc_data1", "uart3_rx_irrx", "drm_emu5",
 			"gpio6_167", "safe_mode"),
+#ifdef CONFIG_ARCH_OMAP5_ES1
 	_OMAP5_MUXENTRY(RFBI_DATA0, 166, "rfbi_data0", NULL, NULL,
 			"dispc_data0", NULL, "drm_emu4", "gpio6_166",
 			"safe_mode"),
+#else
+	_OMAP5_MUXENTRY(RFBI_DATA0, 166, "rfbi_data0", NULL, NULL,
+			"dispc_data0", "jtagtapext_rtck", "drm_emu4",
+			"gpio6_166", "safe_mode"),
+#endif
 	_OMAP5_MUXENTRY(RFBI_WE, 162, "rfbi_we", NULL, NULL, "dispc_vsync",
 			NULL, "drm_emu2", "gpio6_162", "safe_mode"),
 	_OMAP5_MUXENTRY(RFBI_CS0, 163, "rfbi_cs0", NULL, NULL, "dispc_hsync",
@@ -414,6 +463,7 @@ static struct omap_mux __initdata omap5_core_muxmodes[] = {
 			"sys_nodeid0", "gpio8_224", "safe_mode"),
 	_OMAP5_MUXENTRY(CAM_STROBE, 225, "cam_strobe", NULL, NULL, NULL, NULL,
 			"sys_nodeid1", "gpio8_225", "safe_mode"),
+#ifdef CONFIG_ARCH_OMAP5_ES1
 	_OMAP5_MUXENTRY(CAM_GLOBALRESET, 226, "cam_globalreset", NULL, NULL,
 			"cpi_fid", NULL, NULL, "gpio8_226", "safe_mode"),
 	_OMAP5_MUXENTRY(TIMER11_PWM_EVT, 227, "timer11_pwm_evt", NULL, NULL,
@@ -426,6 +476,22 @@ static struct omap_mux __initdata omap5_core_muxmodes[] = {
 	_OMAP5_MUXENTRY(TIMER8_PWM_EVT, 230, "timer8_pwm_evt", NULL, NULL,
 			"cpi_data15", NULL, "hw_dbg27", "gpio8_230",
 			"safe_mode"),
+#else
+	_OMAP5_MUXENTRY(CAM_GLOBALRESET, 226, "cam_globalreset", "cam_shutter",
+			NULL, "cpi_fid", NULL, NULL, "gpio8_226", "safe_mode"),
+	_OMAP5_MUXENTRY(TIMER11_PWM_EVT, 227, "timer11_pwm_evt", NULL,
+			"uart1_tx", "cpi_data12", NULL, "hw_dbg26", "gpio8_227",
+			"safe_mode"),
+	_OMAP5_MUXENTRY(TIMER5_PWM_EVT, 228, "timer5_pwm_evt", "sdcard_cd",
+			"uart1_cts", "cpi_data13", NULL, NULL, "gpio8_228",
+			"safe_mode"),
+	_OMAP5_MUXENTRY(TIMER6_PWM_EVT, 229, "timer6_pwm_evt", "sdcard_wp",
+			"uart1_rx", "cpi_data14", NULL, NULL, "gpio8_229",
+			"safe_mode"),
+	_OMAP5_MUXENTRY(TIMER8_PWM_EVT, 230, "timer8_pwm_evt", "sdcard_wp",
+			"uart1_rts", "cpi_data15", NULL, "hw_dbg27",
+			"gpio8_230", "safe_mode"),
+#endif
 	_OMAP5_MUXENTRY(I2C3_SCL, 231, "i2c3_scl", NULL, NULL, NULL, NULL, NULL,
 			"gpio8_231", "safe_mode"),
 	_OMAP5_MUXENTRY(I2C3_SDA, 232, "i2c3_sda", NULL, NULL, NULL, NULL, NULL,
@@ -435,12 +501,23 @@ static struct omap_mux __initdata omap5_core_muxmodes[] = {
 			"gpio8_233", "safe_mode"),
 	_OMAP5_MUXENTRY(GPIO8_234, 234, "gpio8_234", "sys_drm_msecure", NULL,
 			"cpi_vsync", NULL, NULL, "gpio8_234", "safe_mode"),
+#ifdef CONFIG_ARCH_OMAP5_ES1
 	_OMAP5_MUXENTRY(ABE_CLKS, 96, "abe_clks", NULL, NULL, NULL, NULL, NULL,
 			"gpio4_96", "safe_mode"),
 	_OMAP5_MUXENTRY(ABEDMIC_DIN1, 97, "abedmic_din1", NULL, NULL, NULL,
 			"abemcbsp3_fsx", NULL, "gpio4_97", "safe_mode"),
 	_OMAP5_MUXENTRY(ABEDMIC_DIN2, 98, "abedmic_din2", NULL, NULL, NULL,
 			"abemcbsp3_dx", NULL, "gpio4_98", "safe_mode"),
+#else
+	_OMAP5_MUXENTRY(ABE_CLKS, 96, "abe_clks", NULL, NULL, "abemcasp_axr",
+			NULL, NULL, "gpio4_96", "safe_mode"),
+	_OMAP5_MUXENTRY(ABEDMIC_DIN1, 97, "abedmic_din1", NULL, NULL,
+			"abemcasp_ahclkr", "abemcbsp3_fsx", NULL, "gpio4_97",
+			"safe_mode"),
+	_OMAP5_MUXENTRY(ABEDMIC_DIN2, 98, "abedmic_din2", NULL, NULL,
+			"abemcasp_axr", "abemcbsp3_dx", NULL, "gpio4_98",
+			"safe_mode"),
+#endif
 	_OMAP5_MUXENTRY(ABEDMIC_DIN3, 99, "abedmic_din3", NULL, NULL, NULL,
 			"abemcbsp3_dr", NULL, "gpio4_99", "safe_mode"),
 	_OMAP5_MUXENTRY(ABEDMIC_CLK1, 100, "abedmic_clk1", NULL, NULL, NULL,
@@ -451,12 +528,21 @@ static struct omap_mux __initdata omap5_core_muxmodes[] = {
 	_OMAP5_MUXENTRY(ABEDMIC_CLK3, 102, "abedmic_clk3", "abemcbsp1_dx", NULL,
 			"abemcasp_aclkx", NULL, NULL, "gpio4_102",
 			"safe_mode"),
+#ifdef CONFIG_ARCH_OMAP5_ES1
 	_OMAP5_MUXENTRY(ABESLIMBUS1_CLOCK, 103, "abeslimbus1_clock",
 			"abemcbsp1_clkx", NULL, NULL, NULL, NULL, "gpio4_103",
 			"safe_mode"),
 	_OMAP5_MUXENTRY(ABESLIMBUS1_DATA, 104, "abeslimbus1_data",
 			"abemcbsp1_dr", NULL, NULL, NULL, NULL, "gpio4_104",
 			"safe_mode"),
+#else
+	_OMAP5_MUXENTRY(ABESLIMBUS1_CLOCK, 103, "abeslimbus1_clock",
+			"abemcbsp1_clkx", NULL, "abemcasp_afsr", NULL, NULL,
+			"gpio4_103", "safe_mode"),
+	_OMAP5_MUXENTRY(ABESLIMBUS1_DATA, 104, "abeslimbus1_data",
+			"abemcbsp1_dr", NULL, "abemcasp_aclkr", NULL, NULL,
+			"gpio4_104", "safe_mode"),
+#endif
 	_OMAP5_MUXENTRY(ABEMCBSP2_DR, 105, "abemcbsp2_dr", NULL, NULL,
 			"abemcasp_axr", NULL, NULL, "gpio4_105", "safe_mode"),
 	_OMAP5_MUXENTRY(ABEMCBSP2_DX, 106, "abemcbsp2_dx", NULL, NULL,
@@ -468,6 +554,7 @@ static struct omap_mux __initdata omap5_core_muxmodes[] = {
 	_OMAP5_MUXENTRY(ABEMCBSP2_CLKX, 108, "abemcbsp2_clkx", NULL, NULL,
 			"abemcasp_ahclkx", NULL, NULL, "gpio4_108",
 			"safe_mode"),
+#ifdef CONFIG_ARCH_OMAP5_ES1
 	_OMAP5_MUXENTRY(ABEMCPDM_UL_DATA, 109, "abemcpdm_ul_data",
 			"abemcbsp3_dr", NULL, NULL, NULL, NULL, "gpio4_109",
 			"safe_mode"),
@@ -476,6 +563,17 @@ static struct omap_mux __initdata omap5_core_muxmodes[] = {
 			"safe_mode"),
 	_OMAP5_MUXENTRY(ABEMCPDM_FRAME, 111, "abemcpdm_frame", "abemcbsp3_clkx",
 			NULL, NULL, NULL, NULL, "gpio4_111", "safe_mode"),
+#else
+	_OMAP5_MUXENTRY(ABEMCPDM_UL_DATA, 109, "abemcpdm_ul_data",
+			"abemcbsp3_dr", NULL, "abemcasp_axr3", NULL, NULL,
+			"gpio4_109", "safe_mode"),
+	_OMAP5_MUXENTRY(ABEMCPDM_DL_DATA, 110, "abemcpdm_dl_data",
+			"abemcbsp3_dx", NULL, "abemcasp_axr2", NULL, NULL,
+			"gpio4_110", "safe_mode"),
+	_OMAP5_MUXENTRY(ABEMCPDM_FRAME, 111, "abemcpdm_frame",
+			"abemcbsp3_clkx", NULL, "abemcasp_axr1", NULL, NULL,
+			"gpio4_111", "safe_mode"),
+#endif
 	_OMAP5_MUXENTRY(ABEMCPDM_LB_CLK, 112, "abemcpdm_lb_clk",
 			"abemcbsp3_fsx", NULL, NULL, NULL, NULL, "gpio4_112",
 			"safe_mode"),
@@ -517,21 +615,39 @@ static struct omap_mux __initdata omap5_core_muxmodes[] = {
 			NULL, "gpio5_147", "safe_mode"),
 	_OMAP5_MUXENTRY(I2C5_SDA, 148, "i2c5_sda", NULL, "uart4_tx", NULL, NULL,
 			NULL, "gpio5_148", "safe_mode"),
+#ifdef CONFIG_ARCH_OMAP5_ES1
 	_OMAP5_MUXENTRY(PERSLIMBUS2_CLOCK, 145, "perslimbus2_clock",
 			"mcspi1_cs2", "uart4_cts", "sdio5_clk", NULL,
 			"usbd0_ulpiphy_data2", "gpio5_145", "safe_mode"),
 	_OMAP5_MUXENTRY(PERSLIMBUS2_DATA, 146, "perslimbus2_data", "mcspi1_cs3",
 			"uart4_rts", "sdio5_cmd", NULL,
 			"usbd0_ulpiphy_data3", "gpio5_146", "safe_mode"),
+#else
+	_OMAP5_MUXENTRY(GPIO5_145, 145, "gpio5_145",
+			"mcspi1_cs2", "uart4_cts", "sdio5_clk", NULL,
+			"usbd0_ulpiphy_data2", "gpio5_145", "safe_mode"),
+	_OMAP5_MUXENTRY(GPIO5_146, 146, "gpio5_146", "mcspi1_cs3",
+			"uart4_rts", "sdio5_cmd", NULL,
+			"usbd0_ulpiphy_data3", "gpio5_146", "safe_mode"),
+#endif
 	_OMAP5_MUXENTRY(UART6_TX, 149, "uart6_tx", NULL, NULL, "sdio5_data3",
 			"usbb2_mm_rxdp", NULL, "gpio5_149", "safe_mode"),
 	_OMAP5_MUXENTRY(UART6_RX, 150, "uart6_rx", NULL, NULL, "sdio5_data2",
 			"usbb2_mm_rxdm", NULL, "gpio5_150", "safe_mode"),
+#ifdef CONFIG_ARCH_OMAP5_ES1
 	_OMAP5_MUXENTRY(UART6_CTS, 151, "uart6_cts", NULL, NULL, "sdio5_data1",
 			"usbb2_mm_rxrcv", NULL, "gpio5_151", "safe_mode"),
 	_OMAP5_MUXENTRY(UART6_RTS, 152, "uart6_rts", NULL, NULL, "sdio5_data0",
 			"usbb2_mm_txse0", "usbd0_ulpiphy_stp", "gpio5_152",
 			"safe_mode"),
+#else
+	_OMAP5_MUXENTRY(UART6_CTS, 151, "uart6_cts", "sys_ndmareq1", NULL,
+			"sdio5_data1", "usbb2_mm_rxrcv", NULL, "gpio5_151",
+			"safe_mode"),
+	_OMAP5_MUXENTRY(UART6_RTS, 152, "uart6_rts", "sys_ndmareq0", NULL,
+			"sdio5_data0", "usbb2_mm_txse0", "usbd0_ulpiphy_stp",
+			"gpio5_152", "safe_mode"),
+#endif
 	_OMAP5_MUXENTRY(UART3_CTS_RCTX, 153, "uart3_cts_rctx", "sata_actled",
 			NULL, "sdio5_data7", "usbb2_mm_txen",
 			"usbd0_ulpiphy_data4", "gpio5_153", "safe_mode"),
@@ -548,6 +664,7 @@ static struct omap_mux __initdata omap5_core_muxmodes[] = {
 			NULL, NULL, NULL, "gpio5_158", "safe_mode"),
 	_OMAP5_MUXENTRY(USBB3_HSIC_DATA, 159, "usbb3_hsic_data", NULL, NULL,
 			NULL, NULL, NULL, "gpio5_159", "safe_mode"),
+#ifdef CONFIG_ARCH_OMAP5_ES1
 	_OMAP5_MUXENTRY(SDCARD_CLK, 0, "sdcard_clk", NULL, NULL, "jtag_rtck",
 			NULL, "drm_emu2", NULL, "safe_mode"),
 	_OMAP5_MUXENTRY(SDCARD_CMD, 0, "sdcard_cmd", NULL, NULL, "jtag_tdo",
@@ -560,6 +677,20 @@ static struct omap_mux __initdata omap5_core_muxmodes[] = {
 			"jtag_tdi", NULL, "drm_emu0", NULL, "safe_mode"),
 	_OMAP5_MUXENTRY(SDCARD_DATA1, 0, "sdcard_data1", NULL, NULL,
 			"jtag_ntrst", NULL, "drm_emu1", NULL, "safe_mode"),
+#else
+	_OMAP5_MUXENTRY(SDCARD_CLK, 0, "sdcard_clk", NULL, NULL, "jtag_rtck",
+			NULL, "n_clk", NULL, "safe_mode"),
+	_OMAP5_MUXENTRY(SDCARD_CMD, 0, "sdcard_cmd", NULL, NULL, "jtag_tdo",
+			"uart6_rx", NULL, "n_d2", "safe_mode"),
+	_OMAP5_MUXENTRY(SDCARD_DATA2, 0, "sdcard_data2", NULL, NULL,
+			"jtag_tmsc", NULL, "n_d2", NULL, "safe_mode"),
+	_OMAP5_MUXENTRY(SDCARD_DATA3, 0, "sdcard_data3", NULL, NULL,
+			"jtag_tck", NULL, "n_d3", NULL, "safe_mode"),
+	_OMAP5_MUXENTRY(SDCARD_DATA0, 0, "sdcard_data0", NULL, NULL,
+			"jtag_tdi", NULL, "n_d0", NULL, "safe_mode"),
+	_OMAP5_MUXENTRY(SDCARD_DATA1, 0, "sdcard_data1", NULL, NULL,
+			"jtag_ntrst", NULL, "n_d1", NULL, "safe_mode"),
+#endif
 	_OMAP5_MUXENTRY(USBD0_HS_DP, 0, "usbd0_hs_dp", NULL, NULL, NULL,
 			"uart3_rx_irrx", NULL, NULL, "safe_mode"),
 	_OMAP5_MUXENTRY(USBD0_HS_DM, 0, "usbd0_hs_dm", NULL, NULL, NULL,
@@ -778,8 +909,13 @@ static struct omap_ball __initdata omap5_core_cbl_ball[] = {
 	_OMAP5_BALLENTRY(MCSPI1_CS1, "ah30", NULL),
 	_OMAP5_BALLENTRY(I2C5_SCL, "al32", NULL),
 	_OMAP5_BALLENTRY(I2C5_SDA, "al31", NULL),
+#ifdef CONFIG_ARCH_OMAP5_ES1
 	_OMAP5_BALLENTRY(PERSLIMBUS2_CLOCK, "aj32", NULL),
 	_OMAP5_BALLENTRY(PERSLIMBUS2_DATA, "ak32", NULL),
+#else
+	_OMAP5_BALLENTRY(GPIO5_145, "aj32", NULL),
+	_OMAP5_BALLENTRY(GPIO5_146, "ak32", NULL),
+#endif
 	_OMAP5_BALLENTRY(UART6_TX, "aj27", NULL),
 	_OMAP5_BALLENTRY(UART6_RX, "aj26", NULL),
 	_OMAP5_BALLENTRY(UART6_CTS, "ak26", NULL),
@@ -855,13 +991,10 @@ static struct omap_mux __initdata omap5_wkup_muxmodes[] = {
 			NULL, NULL, NULL, NULL),
 	_OMAP5_MUXENTRY(SYS_PWR_REQ, 0, "sys_pwr_req", NULL, NULL, NULL, NULL,
 			"hw_wkdbg15", NULL, "safe_mode"),
+#ifdef CONFIG_ARCH_OMAP5_ES1
 	_OMAP5_MUXENTRY(SYS_NIRQ1, 0, "sys_nirq1", NULL, NULL, NULL, NULL,
 			NULL, NULL, NULL),
 	_OMAP5_MUXENTRY(SYS_NIRQ2, 0, "sys_nirq2", NULL, NULL, NULL, NULL,
-			NULL, NULL, NULL),
-	_OMAP5_MUXENTRY(SR_PMIC_SCL, 0, "sr_pmic_scl", NULL, NULL, NULL, NULL,
-			NULL, NULL, NULL),
-	_OMAP5_MUXENTRY(SR_PMIC_SDA, 0, "sr_pmic_sda", NULL, NULL, NULL, NULL,
 			NULL, NULL, NULL),
 	_OMAP5_MUXENTRY(SYS_BOOT0, 0, "sys_boot0", NULL, NULL, NULL,
 			"drm_emu15", "hw_wkdbg0", "gpio1_wkout0",
@@ -878,6 +1011,31 @@ static struct omap_mux __initdata omap5_wkup_muxmodes[] = {
 	_OMAP5_MUXENTRY(SYS_BOOT4, 4, "sys_boot4", NULL, NULL, NULL,
 			"drm_emu19", "hw_wkdbg4", "gpio1_wkout4",
 			"safe_mode"),
+#else
+	_OMAP5_MUXENTRY(SYS_NIRQ1, 0, "sys_nirq1", NULL, NULL, NULL, NULL,
+			NULL, "gpio1_wk16", NULL),
+	_OMAP5_MUXENTRY(SYS_NIRQ2, 0, "sys_nirq2", NULL, NULL, NULL, NULL,
+			NULL, "gpio1_wk17", NULL),
+	_OMAP5_MUXENTRY(SYS_BOOT0, 0, "sys_boot0", NULL, NULL, "drm_emu2",
+			"drm_emu15", "hw_wkdbg0", "gpio1_wkout0",
+			"safe_mode"),
+	_OMAP5_MUXENTRY(SYS_BOOT1, 1, "sys_boot1", NULL, NULL, "drm_emu3",
+			"drm_emu16", "hw_wkdbg1", "gpio1_wkout1",
+			"safe_mode"),
+	_OMAP5_MUXENTRY(SYS_BOOT2, 2, "sys_boot2", NULL, NULL, "drm_emu4",
+			"drm_emu17", "hw_wkdbg2", "gpio1_wkout2",
+			"safe_mode"),
+	_OMAP5_MUXENTRY(SYS_BOOT3, 3, "sys_boot3", NULL, NULL, "drm_emu5",
+			"drm_emu18", "hw_wkdbg3", "gpio1_wkout3",
+			"safe_mode"),
+	_OMAP5_MUXENTRY(SYS_BOOT4, 4, "sys_boot4", NULL, NULL, "drm_emu6",
+			"drm_emu19", "hw_wkdbg4", "gpio1_wkout4",
+			"safe_mode"),
+#endif
+	_OMAP5_MUXENTRY(SR_PMIC_SCL, 0, "sr_pmic_scl", NULL, NULL, NULL, NULL,
+			NULL, NULL, NULL),
+	_OMAP5_MUXENTRY(SR_PMIC_SDA, 0, "sr_pmic_sda", NULL, NULL, NULL, NULL,
+			NULL, NULL, NULL),
 	_OMAP5_MUXENTRY(SYS_BOOT5, 5, "sys_boot5", "sys_aux_msecure", NULL,
 			NULL, NULL, "hw_wkdbg8", "gpio1_wkout5", "safe_mode"),
 	{ .reg_offset = OMAP_MUX_TERMINATOR },
@@ -927,6 +1085,7 @@ static struct omap_ball __initdata omap5_wkup_cbl_ball[] = {
 #define omap5_wkup_cbl_ball  NULL
 #endif
 
+#ifdef CONFIG_ARCH_OMAP5_ES1
 /*
  * Core subset for OMAP5432 ES1.0
  */
@@ -962,9 +1121,7 @@ static struct omap_mux __initdata omap5_5432_wkup_subset[] = {
 	_OMAP5_MUXENTRY_SAFE(FREF_CLK2_OUT, 10),
 	{ .reg_offset = OMAP_MUX_TERMINATOR },
 };
-
-
-
+#endif
 
 int __init omap5_mux_init(struct omap_board_mux *board_subset,
 	struct omap_board_mux *board_wkup_subset, int flags)
@@ -980,11 +1137,13 @@ int __init omap5_mux_init(struct omap_board_mux *board_subset,
 	case OMAP5430_REV_ES2_0:
 		pr_debug("%s: OMAP5430 ES1.0/ES2.0 mux\n", __func__);
 		break;
+#ifdef CONFIG_ARCH_OMAP5_ES1
 	case OMAP5432_REV_ES1_0:
 		pr_debug("%s: OMAP5432 ES1.0 mux\n", __func__);
 		core_subset = omap5_5432es1_core_subset;
 		wkup_subset = omap5_5432_wkup_subset;
 		break;
+#endif
 	default:
 		pr_err("mux: Unknown omap package, mux disabled\n");
 		return -EINVAL;

@@ -48,7 +48,9 @@ omap_uart_lsr:	.word	0
 		ldr	\rv, =OMAP_UART_INFO_OFS
 		and	\rp, \rp, #0xff000000
 		ldr	\rp, [\rp, \rv]
-
+#ifdef CONFIG_MACH_OMAP_5430ZEBU
+		mov     \rp, #0
+#endif
 		/* Select the UART to use based on the UART1 scratchpad value */
 		cmp	\rp, #0			@ no port configured?
 		beq	21f			@ if none, try to use UART1

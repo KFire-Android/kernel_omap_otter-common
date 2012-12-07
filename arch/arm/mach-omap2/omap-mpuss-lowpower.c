@@ -695,12 +695,19 @@ int __cpuinit omap_hotplug_cpu(unsigned int cpu, unsigned int power_state)
 static void enable_mercury_retention_mode(void)
 {
 	u32 reg;
+	u32 rev = omap_rev();
 
 	reg = omap4_prcm_mpu_read_inst_reg(
 		OMAP54XX_PRCM_MPU_DEVICE_INST,
 		OMAP54XX_PRCM_MPU_PRM_PSCON_COUNT_OFFSET);
-	/* Enable the Mercury retention mode */
-	reg |= BIT(24);
+
+	if ((rev == OMAP5430_REV_ES1_0) || (rev == OMAP5432_REV_ES1_0))
+		/* Enable Mercury Slow HG retention mode */
+		reg |= BIT(24);
+	else
+		/* Enable Mercury Fast HG retention mode */
+		reg |= BIT(24) | BIT(25);
+
 	omap4_prcm_mpu_write_inst_reg(reg,
 		OMAP54XX_PRCM_MPU_DEVICE_INST,
 		OMAP54XX_PRCM_MPU_PRM_PSCON_COUNT_OFFSET);

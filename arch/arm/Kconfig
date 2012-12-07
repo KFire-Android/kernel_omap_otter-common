@@ -1467,6 +1467,42 @@ config ARM_ERRATA_774769
 	  affected by this erratum such that no streaming-write ever allocates
 	  into the L2 cache.
 
+config ARM_ERRATA_763722
+	bool "ARM errata: Store streaming and normal store collisions could cause snoop deadlock"
+	depends on CPU_V7
+	help
+	 This option enables the workaround for erratum 763722
+	 affecting Cortex-A15 MPCore with two or more processors (all
+	 revisions till r0p3). This workaround disables the
+	 store streaming by setting bits [28:25] of L1 ACTLR to 0x3.
+
+config ARM_ERRATA_762974
+	bool "ARM errata: Multiple L1 instruction fetches hitting in L2 causes inclusion bit error"
+	depends on CPU_V7
+	help
+	 This option enables the workaround for erratum 762974
+	 affecting Cortex-A15 MPCore with two or more processors (all
+	 revisions till r0p3). This workaround disables the
+	 L2 prefetch completely.
+
+config ARM_ERRATA_775619
+	bool "L2 may deadlock or corrupt data if all ways in a single set become blocked from replacement"
+	depends on CPU_V7
+	help
+         This option enables the workaround for erratum 775619
+         affecting Cortex-A15 MPCore with two or more processors (all
+         revisions till r2p1). This workaround sets ACTLR[23] to 0x1 by
+         which "Forces in-order requests to same set/way"
+
+config ARM_ERRATA_773022
+	bool "Disable Loop Buffer"
+	depends on CPU_V7
+	help
+	 This options enables the workaround for erratum 773022
+	 affecting Cortex-A15 MPCore with two or more processors (all
+	 revisions till r0p3). The workaround is to set ACTLR[1] which
+	 disables Loop Buffer.
+
 endmenu
 
 source "arch/arm/common/Kconfig"
