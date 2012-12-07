@@ -643,11 +643,11 @@ int omap5_mpu_dpll_set_rate(struct clk *clk, unsigned long rate)
 	 * And needs to be kept disabled for <= 1.4 Ghz.
 	 */
 	dpll_rate = omap2_get_dpll_rate(clk->parent);
-	v = __raw_readl(dd->mult_div1_reg);
 	if (rate <= OMAP_1_4GHz) {
 		if (rate == dpll_rate)
 			return 0;
 		/* If DCC is enabled, disable it */
+		v = __raw_readl(dd->mult_div1_reg);
 		if (v & OMAP54XX_DCC_EN_MASK) {
 			v &= ~OMAP54XX_DCC_EN_MASK;
 			__raw_writel(v, dd->mult_div1_reg);
@@ -663,9 +663,12 @@ int omap5_mpu_dpll_set_rate(struct clk *clk, unsigned long rate)
 		 */
 		if (rate / 2 == dpll_rate)
 			return 0;
+
+		clk->parent->set_rate(clk->parent, rate/2);
+
+		v = __raw_readl(dd->mult_div1_reg);
 		v |= OMAP54XX_DCC_EN_MASK;
 		__raw_writel(v, dd->mult_div1_reg);
-		clk->parent->set_rate(clk->parent, rate/2);
 	}
 
 	if (rate < clk->rate)
