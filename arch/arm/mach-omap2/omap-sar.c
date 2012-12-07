@@ -30,10 +30,21 @@
 #include "prcm44xx.h"
 #include "cminst44xx.h"
 
+#include <plat/usb.h>
+
 static void __iomem *sar_ram_base;
 static struct powerdomain *l3init_pwrdm;
 static struct clockdomain *l3init_clkdm;
 static struct omap_hwmod *uhh_hwm, *tll_hwm;
+
+#define SZ_CM_USBHS	0xc
+#define OMAP44XX_CM2_USBHS_OFFSET	0x1e54
+
+#ifdef CONFIG_ARCH_OMAP5_ES1
+#define OMAP55XX_CM_USBHS_OFFSET	0x1e60
+#else
+#define OMAP55XX_CM_USBHS_OFFSET	0x1e64
+#endif
 
 /**
  * struct sar_ram_entry - SAR RAM layout descriptor
@@ -41,12 +52,16 @@ static struct omap_hwmod *uhh_hwm, *tll_hwm;
  * @offset: IO offset from @io_base
  * @size: size of entry in words, size=0 marks end of descriptor array
  * @ram_addr: SAR RAM address to store the data to
+ * @flags: flags for the entry
+ * @mod_func: function pointer relevant when the flags had "SAR_SAVE_COND"
  */
 struct sar_ram_entry {
 	void __iomem *io_base;
 	u32 offset;
 	u32 size;
 	u32 ram_addr;
+	u32 flags;
+	int (*mod_func)(void);
 };
 
 /**
@@ -71,6 +86,10 @@ enum {
 	L3INIT_CLKSTCTRL_IDX,
 	OW_IDX_SIZE
 };
+
+/* SAR flags, used with entries */
+#define SAR_SAVE_COND	(1 << 0)
+#define SAR_INVALID	(1 << 1)
 
 static struct sar_ram_entry *sar_ram_layout[3];
 static struct sar_overwrite_entry *sar_overwrite_data;
@@ -138,6 +157,18 @@ static void sar_save(struct sar_ram_entry *entry)
 	void __iomem *reg_read_addr, *sar_wr_addr;
 
 	while (entry->size) {
+		if (entry->flags & SAR_INVALID) {
+			entry++;
+			continue;
+		}
+
+		if (entry->flags & SAR_SAVE_COND) {
+			if (!(entry->mod_func && entry->mod_func())) {
+				entry++;
+				continue;
+			}
+		}
+
 		size = entry->size;
 		reg_read_addr = entry->io_base + entry->offset;
 		sar_wr_addr = sar_ram_base + entry->ram_addr;
@@ -332,7 +363,8 @@ int omap_sar_save(void)
 	 * SAR bits and clocks needs to be enabled
 	 */
 	clkdm_wakeup(l3init_clkdm);
-	pwrdm_enable_hdwr_sar(l3init_pwrdm);
+	if (omap_usbhs_update_sar())
+		pwrdm_enable_hdwr_sar(l3init_pwrdm);
 	omap_hwmod_enable_clocks(uhh_hwm);
 	omap_hwmod_enable_clocks(tll_hwm);
 
@@ -341,7 +373,11 @@ int omap_sar_save(void)
 
 	omap_hwmod_disable_clocks(uhh_hwm);
 	omap_hwmod_disable_clocks(tll_hwm);
-	pwrdm_disable_hdwr_sar(l3init_pwrdm);
+	if (omap_usbhs_update_sar()) {
+		pwrdm_disable_hdwr_sar(l3init_pwrdm);
+		/* For errata i719 */
+		omap_usbhs_disable_update_sar();
+	}
 	clkdm_allow_idle(l3init_clkdm);
 
 	/* Save SAR BANK2 */
@@ -374,13 +410,15 @@ static const u32 sar_rom_phases[] = {
  * @io_base: IO base pointer for the module
  * @base: base physical address for the module
  * @size: size of the module
- * @invalid: flag for marking modules invalid for certain architectures
+ * @flags: flags for the module
+ * @mod_func: function pointer relevant when the flags had "SAR_SAVE_COND"
  */
 struct sar_module {
 	void __iomem *io_base;
 	u32 base;
 	u32 size;
-	bool invalid;
+	u32 flags;
+	int (*mod_func)(void);
 };
 
 static struct sar_module *sar_modules;
@@ -398,7 +436,7 @@ static void sar_ioremap_modules(void)
 	mod = sar_modules;
 
 	while (mod->base) {
-		if (!mod->invalid) {
+		if (!(mod->flags & SAR_INVALID)) {
 			mod->io_base = ioremap(mod->base, mod->size);
 			if (!mod->io_base)
 				pr_err("%s: ioremap failed for %08x[%08x]\n",
@@ -427,10 +465,12 @@ static int set_sar_io_addr(struct sar_ram_entry *entry, u32 addr)
 
 	while (mod->base) {
 		if (addr >= mod->base && addr < mod->base + mod->size) {
-			if (mod->invalid)
+			if (mod->flags & SAR_INVALID)
 				break;
 			entry->io_base = mod->io_base;
 			entry->offset = addr - mod->base;
+			entry->flags = mod->flags;
+			entry->mod_func = mod->mod_func;
 			return 0;
 		}
 		mod++;
@@ -574,14 +614,19 @@ static struct sar_module omap44xx_sar_modules[] = {
 	{ .base = OMAP44XX_EMIF2_BASE, .size = SZ_1M },
 	{ .base = OMAP44XX_DMM_BASE, .size = SZ_1M },
 	{ .base = OMAP4430_CM1_BASE, .size = SZ_8K },
+	{ .base = OMAP4430_CM2_BASE + OMAP44XX_CM2_USBHS_OFFSET,
+	  .size = SZ_CM_USBHS, .flags = SAR_SAVE_COND,
+	  .mod_func = &omap_usbhs_update_sar },
 	{ .base = OMAP4430_CM2_BASE, .size = SZ_8K },
 	{ .base = OMAP44XX_C2C_BASE, .size = SZ_1M },
 	{ .base = OMAP443X_CTRL_BASE, .size = SZ_4K },
 	{ .base = L3_44XX_BASE_CLK1, .size = SZ_1M },
 	{ .base = L3_44XX_BASE_CLK2, .size = SZ_1M },
 	{ .base = L3_44XX_BASE_CLK3, .size = SZ_1M },
-	{ .base = OMAP44XX_USBTLL_BASE, .size = SZ_8K },
-	{ .base = OMAP44XX_UHH_CONFIG_BASE, .size = SZ_8K },
+	{ .base = OMAP44XX_USBTLL_BASE, .size = SZ_8K,
+	  .flags = SAR_SAVE_COND, .mod_func = &omap_usbhs_update_sar },
+	{ .base = OMAP44XX_UHH_CONFIG_BASE, .size = SZ_8K,
+	  .flags = SAR_SAVE_COND, .mod_func = &omap_usbhs_update_sar },
 	{ .base = L4_44XX_PHYS, .size = SZ_4M },
 	{ .base = L4_PER_44XX_PHYS, .size = SZ_4M },
 	{ .base = 0 },
@@ -651,6 +696,9 @@ static struct sar_module omap54xx_sar_modules[] = {
 	{ .base = OMAP54XX_EMIF2_BASE, .size = SZ_1M },
 	{ .base = OMAP54XX_DMM_BASE, .size = SZ_1M },
 	{ .base = OMAP54XX_CM_CORE_AON_BASE, .size = SZ_8K },
+	{ .base = OMAP54XX_CM_CORE_BASE + OMAP55XX_CM_USBHS_OFFSET,
+	  .size = SZ_CM_USBHS, .flags = SAR_SAVE_COND,
+	  .mod_func = &omap_usbhs_update_sar },
 	{ .base = OMAP54XX_CM_CORE_BASE, .size = SZ_8K },
 	{ .base = OMAP54XX_C2C_BASE, .size = SZ_1M },
 	{ .base = OMAP543x_CTRL_BASE, .size = SZ_4K },
@@ -659,11 +707,14 @@ static struct sar_module omap54xx_sar_modules[] = {
 	{ .base = L3_54XX_BASE_CLK2, .size = SZ_1M },
 	{ .base = L3_54XX_BASE_CLK3, .size = SZ_1M },
 #ifndef CONFIG_MACH_OMAP_5430ZEBU
-	{ .base = OMAP54XX_USBTLL_BASE, .size = SZ_8K },
-	{ .base = OMAP54XX_UHH_CONFIG_BASE, .size = SZ_8K },
+	{ .base = OMAP54XX_USBTLL_BASE, .size = SZ_8K,
+	  .flags = SAR_SAVE_COND, .mod_func = &omap_usbhs_update_sar },
+	{ .base = OMAP54XX_UHH_CONFIG_BASE, .size = SZ_8K,
+	  .flags = SAR_SAVE_COND, .mod_func = &omap_usbhs_update_sar },
 #else
-	{ .base = OMAP54XX_USBTLL_BASE, .size = SZ_8K, .invalid = true },
-	{ .base = OMAP54XX_UHH_CONFIG_BASE, .size = SZ_8K, .invalid = true },
+	{ .base = OMAP54XX_USBTLL_BASE, .size = SZ_8K, .flags = SAR_INVALID },
+	{ .base = OMAP54XX_UHH_CONFIG_BASE, .size = SZ_8K,
+	   .flags = SAR_INVALID },
 #endif
 	{ .base = L4_54XX_PHYS, .size = SZ_4M },
 	{ .base = L4_PER_54XX_PHYS, .size = SZ_4M },

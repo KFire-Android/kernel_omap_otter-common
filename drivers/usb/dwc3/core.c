@@ -108,6 +108,20 @@ void dwc3_set_mode(struct dwc3 *dwc, u32 mode)
 {
 	u32 reg;
 
+	switch (mode) {
+	case DWC3_GCTL_PRTCAP_HOST:
+		dwc->mode = DWC3_MODE_HOST;
+		break;
+	case DWC3_GCTL_PRTCAP_DEVICE:
+		dwc->mode = DWC3_MODE_DEVICE;
+		break;
+	case DWC3_GCTL_PRTCAP_OTG:
+		dwc->mode = DWC3_MODE_DRD;
+		break;
+	default:
+		dev_err(dwc->dev, "non existent mode setting\n");
+	}
+
 	reg = dwc3_readl(dwc->regs, DWC3_GCTL);
 	reg &= ~(DWC3_GCTL_PRTCAPDIR(DWC3_GCTL_PRTCAP_OTG));
 	reg |= DWC3_GCTL_PRTCAPDIR(mode);
@@ -675,7 +689,6 @@ static int __devinit dwc3_probe(struct platform_device *pdev)
 		dev_err(dev, "Unsupported mode of operation %d\n", mode);
 		goto err2;
 	}
-	dwc->mode = mode;
 
 	ret = dwc3_debugfs_init(dwc);
 	if (ret) {
