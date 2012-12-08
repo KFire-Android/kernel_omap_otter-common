@@ -231,7 +231,6 @@ out:
 
 static void __init prcm_setup_regs(void)
 {
-	int i, num_mem_banks;
 	struct powerdomain *pwrdm;
 
 	/*
@@ -240,14 +239,6 @@ static void __init prcm_setup_regs(void)
 	 */
 	omap2_prm_write_mod_reg(OMAP24XX_AUTOIDLE_MASK, OCP_MOD,
 			  OMAP2_PRCM_SYSCONFIG_OFFSET);
-
-	/*
-	 * Set CORE powerdomain memory banks to retain their contents
-	 * during RETENTION
-	 */
-	num_mem_banks = pwrdm_get_mem_bank_count(core_pwrdm);
-	for (i = 0; i < num_mem_banks; i++)
-		pwrdm_set_mem_retst(core_pwrdm, i, PWRDM_POWER_RET);
 
 	/* Force-power down DSP, GFX powerdomains */
 

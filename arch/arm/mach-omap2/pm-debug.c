@@ -107,10 +107,6 @@ static int pwrdm_dbg_show_counter(struct powerdomain *pwrdm, void *user)
 		seq_printf(s, ",%s:%d", pwrdm_convert_fpwrst_to_name(i),
 			   pwrdm->fpwrst_counter[i - PWRDM_FPWRST_OFFSET]);
 
-	for (i = 0; i < pwrdm->banks; i++)
-		seq_printf(s, ",RET-MEMBANK%d-OFF:%d", i + 1,
-				pwrdm->ret_mem_off_counter[i]);
-
 	seq_printf(s, "\n");
 
 	return 0;

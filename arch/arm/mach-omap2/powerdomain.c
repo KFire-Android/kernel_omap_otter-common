@@ -123,9 +123,6 @@ static int _pwrdm_register(struct powerdomain *pwrdm)
 	for (i = 0; i < PWRDM_FPWRSTS_COUNT; i++)
 		pwrdm->fpwrst_counter[i] = 0;
 
-	for (i = 0; i < pwrdm->banks; i++)
-		pwrdm->ret_mem_off_counter[i] = 0;
-
 	arch_pwrdm->pwrdm_wait_transition(pwrdm);
 	pwrdm->fpwrst = pwrdm_read_fpwrst(pwrdm);
 	pwrdm->fpwrst_counter[pwrdm->fpwrst - PWRDM_FPWRST_OFFSET] = 1;
@@ -443,7 +440,6 @@ static int _pwrdm_read_next_fpwrst(struct powerdomain *pwrdm)
 		if (next_logic < 0)
 			return next_logic;
 	}
-
 	ret = _pwrdm_pwrst_to_fpwrst(pwrdm, next_pwrst, next_logic, &fpwrst);
 
 	return (ret) ? ret : fpwrst;
@@ -516,12 +512,86 @@ static int _pwrdm_read_prev_fpwrst(struct powerdomain *pwrdm)
 	return (ret) ? ret : fpwrst;
 }
 
+/**
+ * _pwrdm_set_mem_onst - set memory power state while powerdomain ON
+ * @pwrdm: struct powerdomain * to set
+ * @bank: memory bank number to set (0-3)
+ * @pwrst: one of the PWRDM_POWER_* macros
+ *
+ * Set the next power state @pwrst that memory bank @bank of the
+ * powerdomain @pwrdm will enter when the powerdomain enters the ON
+ * state.  @bank will be a number from 0 to 3, and represents different
+ * types of memory, depending on the powerdomain.  Returns -EINVAL if
+ * the powerdomain pointer is null or the target power state is not
+ * not supported for this memory bank, -EEXIST if the target memory
+ * bank does not exist or is not controllable, or returns 0 upon
+ * success.
+ */
+static int _pwrdm_set_mem_onst(struct powerdomain *pwrdm, u8 bank, u8 pwrst)
+{
+	int ret = -EINVAL;
+
+	if (!pwrdm)
+		return -EINVAL;
+
+	if (pwrdm->banks < (bank + 1))
+		return -EEXIST;
+
+	if (!(pwrdm->pwrsts_mem_on[bank] & (1 << pwrst)))
+		return -EINVAL;
+
+	pr_debug("powerdomain: %s: setting next memory powerstate for bank %0x while pwrdm-ON to %0x\n",
+		 pwrdm->name, bank, pwrst);
+
+	if (arch_pwrdm && arch_pwrdm->pwrdm_set_mem_onst)
+		ret = arch_pwrdm->pwrdm_set_mem_onst(pwrdm, bank, pwrst);
+
+	return ret;
+}
+
+/**
+ * _pwrdm_set_mem_retst - set memory power state while powerdomain in RET
+ * @pwrdm: struct powerdomain * to set
+ * @bank: memory bank number to set (0-3)
+ * @pwrst: one of the PWRDM_POWER_* macros
+ *
+ * Set the next power state @pwrst that memory bank @bank of the
+ * powerdomain @pwrdm will enter when the powerdomain enters the
+ * RETENTION state.  Bank will be a number from 0 to 3, and represents
+ * different types of memory, depending on the powerdomain.  @pwrst
+ * will be either RETENTION or OFF, if supported.  Returns -EINVAL if
+ * the powerdomain pointer is null or the target power state is not
+ * not supported for this memory bank, -EEXIST if the target memory
+ * bank does not exist or is not controllable, or returns 0 upon
+ * success.
+ */
+static int _pwrdm_set_mem_retst(struct powerdomain *pwrdm, u8 bank, u8 pwrst)
+{
+	int ret = -EINVAL;
+
+	if (!pwrdm)
+		return -EINVAL;
+
+	if (pwrdm->banks < (bank + 1))
+		return -EEXIST;
+
+	if (!(pwrdm->pwrsts_mem_ret[bank] & (1 << pwrst)))
+		return -EINVAL;
+
+	pr_debug("powerdomain: %s: setting next memory powerstate for bank %0x while pwrdm-RET to %0x\n",
+		 pwrdm->name, bank, pwrst);
+
+	if (arch_pwrdm && arch_pwrdm->pwrdm_set_mem_retst)
+		ret = arch_pwrdm->pwrdm_set_mem_retst(pwrdm, bank, pwrst);
+
+	return ret;
+}
+
+
 /* XXX Caller must hold pwrdm->_lock */
 static int _pwrdm_state_switch(struct powerdomain *pwrdm, int flag)
 {
 	int prev, next, fpwrst, trace_state = 0;
-	int i;
-	u8 prev_mem_pwrst;
 
 	if (pwrdm == NULL)
 		return -EINVAL;
@@ -536,17 +606,6 @@ static int _pwrdm_state_switch(struct powerdomain *pwrdm, int flag)
 		prev = _pwrdm_read_prev_fpwrst(pwrdm);
 		if (pwrdm->fpwrst != prev)
 			pwrdm->fpwrst_counter[prev - PWRDM_FPWRST_OFFSET]++;
-		if (prev == PWRDM_FUNC_PWRST_CSWR ||
-		    prev == PWRDM_FUNC_PWRST_OSWR) {
-			for (i = 0; i < pwrdm->banks; i++) {
-				prev_mem_pwrst =
-					pwrdm_read_prev_mem_pwrst(pwrdm, i);
-				if ((pwrdm->pwrsts_mem_ret[i] ==
-				     PWRSTS_OFF_RET) &&
-				    (prev_mem_pwrst == PWRDM_POWER_OFF))
-					pwrdm->ret_mem_off_counter[i]++;
-			}
-		}
 		/*
 		 * If the power domain did not hit the desired state,
 		 * generate a trace event with both the desired and hit states
@@ -659,8 +718,8 @@ int pwrdm_complete_init(void)
 
 	list_for_each_entry(temp_p, &pwrdm_list, node) {
 		for (i = 0; i < temp_p->banks; i++) {
-			pwrdm_set_mem_onst(temp_p, i, PWRDM_POWER_ON);
-			pwrdm_set_mem_retst(temp_p, i, PWRDM_POWER_RET);
+			_pwrdm_set_mem_onst(temp_p, i, PWRDM_POWER_ON);
+			_pwrdm_set_mem_retst(temp_p, i, PWRDM_POWER_RET);
 		}
 		WARN_ON(pwrdm_set_next_fpwrst(temp_p, PWRDM_FUNC_PWRST_ON));
 	}
@@ -868,181 +927,6 @@ struct voltagedomain *pwrdm_get_voltdm(struct powerdomain *pwrdm)
 }
 
 /**
- * pwrdm_get_mem_bank_count - get number of memory banks in this powerdomain
- * @pwrdm: struct powerdomain *
- *
- * Return the number of controllable memory banks in powerdomain @pwrdm,
- * starting with 1.  Returns -EINVAL if the powerdomain pointer is null.
- */
-int pwrdm_get_mem_bank_count(struct powerdomain *pwrdm)
-{
-	if (!pwrdm)
-		return -EINVAL;
-
-	return pwrdm->banks;
-}
-
-/**
- * pwrdm_set_mem_onst - set memory power state while powerdomain ON
- * @pwrdm: struct powerdomain * to set
- * @bank: memory bank number to set (0-3)
- * @pwrst: one of the PWRDM_POWER_* macros
- *
- * Set the next power state @pwrst that memory bank @bank of the
- * powerdomain @pwrdm will enter when the powerdomain enters the ON
- * state.  @bank will be a number from 0 to 3, and represents different
- * types of memory, depending on the powerdomain.  Returns -EINVAL if
- * the powerdomain pointer is null or the target power state is not
- * not supported for this memory bank, -EEXIST if the target memory
- * bank does not exist or is not controllable, or returns 0 upon
- * success.
- */
-int pwrdm_set_mem_onst(struct powerdomain *pwrdm, u8 bank, u8 pwrst)
-{
-	int ret = -EINVAL;
-
-	if (!pwrdm)
-		return -EINVAL;
-
-	if (pwrdm->banks < (bank + 1))
-		return -EEXIST;
-
-	if (!(pwrdm->pwrsts_mem_on[bank] & (1 << pwrst)))
-		return -EINVAL;
-
-	pr_debug("powerdomain: %s: setting next memory powerstate for bank %0x while pwrdm-ON to %0x\n",
-		 pwrdm->name, bank, pwrst);
-
-	if (arch_pwrdm && arch_pwrdm->pwrdm_set_mem_onst)
-		ret = arch_pwrdm->pwrdm_set_mem_onst(pwrdm, bank, pwrst);
-
-	return ret;
-}
-
-/**
- * pwrdm_set_mem_retst - set memory power state while powerdomain in RET
- * @pwrdm: struct powerdomain * to set
- * @bank: memory bank number to set (0-3)
- * @pwrst: one of the PWRDM_POWER_* macros
- *
- * Set the next power state @pwrst that memory bank @bank of the
- * powerdomain @pwrdm will enter when the powerdomain enters the
- * RETENTION state.  Bank will be a number from 0 to 3, and represents
- * different types of memory, depending on the powerdomain.  @pwrst
- * will be either RETENTION or OFF, if supported.  Returns -EINVAL if
- * the powerdomain pointer is null or the target power state is not
- * not supported for this memory bank, -EEXIST if the target memory
- * bank does not exist or is not controllable, or returns 0 upon
- * success.
- */
-int pwrdm_set_mem_retst(struct powerdomain *pwrdm, u8 bank, u8 pwrst)
-{
-	int ret = -EINVAL;
-
-	if (!pwrdm)
-		return -EINVAL;
-
-	if (pwrdm->banks < (bank + 1))
-		return -EEXIST;
-
-	if (!(pwrdm->pwrsts_mem_ret[bank] & (1 << pwrst)))
-		return -EINVAL;
-
-	pr_debug("powerdomain: %s: setting next memory powerstate for bank %0x while pwrdm-RET to %0x\n",
-		 pwrdm->name, bank, pwrst);
-
-	if (arch_pwrdm && arch_pwrdm->pwrdm_set_mem_retst)
-		ret = arch_pwrdm->pwrdm_set_mem_retst(pwrdm, bank, pwrst);
-
-	return ret;
-}
-
-/**
- * pwrdm_read_mem_pwrst - get current memory bank power state
- * @pwrdm: struct powerdomain * to get current memory bank power state
- * @bank: memory bank number (0-3)
- *
- * Return the powerdomain @pwrdm's current memory power state for bank
- * @bank.  Returns -EINVAL if the powerdomain pointer is null, -EEXIST if
- * the target memory bank does not exist or is not controllable, or
- * returns the current memory power state upon success.
- */
-int pwrdm_read_mem_pwrst(struct powerdomain *pwrdm, u8 bank)
-{
-	int ret = -EINVAL;
-
-	if (!pwrdm)
-		return ret;
-
-	if (pwrdm->banks < (bank + 1))
-		return ret;
-
-	if (pwrdm->flags & PWRDM_HAS_MPU_QUIRK)
-		bank = 1;
-
-	if (arch_pwrdm && arch_pwrdm->pwrdm_read_mem_pwrst)
-		ret = arch_pwrdm->pwrdm_read_mem_pwrst(pwrdm, bank);
-
-	return ret;
-}
-
-/**
- * pwrdm_read_prev_mem_pwrst - get previous memory bank power state
- * @pwrdm: struct powerdomain * to get previous memory bank power state
- * @bank: memory bank number (0-3)
- *
- * Return the powerdomain @pwrdm's previous memory power state for
- * bank @bank.  Returns -EINVAL if the powerdomain pointer is null,
- * -EEXIST if the target memory bank does not exist or is not
- * controllable, or returns the previous memory power state upon
- * success.
- */
-int pwrdm_read_prev_mem_pwrst(struct powerdomain *pwrdm, u8 bank)
-{
-	int ret = -EINVAL;
-
-	if (!pwrdm)
-		return ret;
-
-	if (pwrdm->banks < (bank + 1))
-		return ret;
-
-	if (pwrdm->flags & PWRDM_HAS_MPU_QUIRK)
-		bank = 1;
-
-	if (arch_pwrdm && arch_pwrdm->pwrdm_read_prev_mem_pwrst)
-		ret = arch_pwrdm->pwrdm_read_prev_mem_pwrst(pwrdm, bank);
-
-	return ret;
-}
-
-/**
- * pwrdm_read_mem_retst - get next memory bank power state
- * @pwrdm: struct powerdomain * to get mext memory bank power state
- * @bank: memory bank number (0-3)
- *
- * Return the powerdomain pwrdm's next memory power state for bank
- * x.  Returns -EINVAL if the powerdomain pointer is null, -EEXIST if
- * the target memory bank does not exist or is not controllable, or
- * returns the next memory power state upon success.
- */
-int pwrdm_read_mem_retst(struct powerdomain *pwrdm, u8 bank)
-{
-	int ret = -EINVAL;
-
-	if (!pwrdm)
-		return ret;
-
-	if (pwrdm->banks < (bank + 1))
-		return ret;
-
-	if (arch_pwrdm && arch_pwrdm->pwrdm_read_mem_retst)
-		ret = arch_pwrdm->pwrdm_read_mem_retst(pwrdm, bank);
-
-	return ret;
-}
-
-/**
  * pwrdm_clear_all_prev_pwrst - clear previous powerstate register for a pwrdm
  * @pwrdm: struct powerdomain * to clear
  *
@@ -1197,7 +1081,7 @@ int pwrdm_post_transition(struct powerdomain *pwrdm)
  */
 int pwrdm_get_context_loss_count(struct powerdomain *pwrdm)
 {
-	int i, count;
+	int count;
 
 	if (!pwrdm) {
 		WARN(1, "powerdomain: %s: pwrdm is null\n", __func__);
@@ -1208,9 +1092,6 @@ int pwrdm_get_context_loss_count(struct powerdomain *pwrdm)
 				      PWRDM_FPWRST_OFFSET];
 	count += pwrdm->fpwrst_counter[PWRDM_FUNC_PWRST_OSWR -
 				       PWRDM_FPWRST_OFFSET];
-
-	for (i = 0; i < pwrdm->banks; i++)
-		count += pwrdm->ret_mem_off_counter[i];
 
 	/*
 	 * Context loss count has to be a non-negative value. Clear the sign

@@ -153,7 +153,6 @@ struct powerdomain {
 	struct list_head node;
 	struct list_head voltdm_node;
 	unsigned fpwrst_counter[PWRDM_FPWRSTS_COUNT];
-	unsigned ret_mem_off_counter[PWRDM_MAX_MEM_BANKS];
 	spinlock_t _lock;
 	unsigned long _lock_flags;
 	const u8 pwrstctrl_offs;
@@ -230,15 +229,7 @@ int pwrdm_for_each_clkdm(struct powerdomain *pwrdm,
 				   struct clockdomain *clkdm));
 struct voltagedomain *pwrdm_get_voltdm(struct powerdomain *pwrdm);
 
-int pwrdm_get_mem_bank_count(struct powerdomain *pwrdm);
-
 int pwrdm_clear_all_prev_pwrst(struct powerdomain *pwrdm);
-
-int pwrdm_set_mem_onst(struct powerdomain *pwrdm, u8 bank, u8 pwrst);
-int pwrdm_set_mem_retst(struct powerdomain *pwrdm, u8 bank, u8 pwrst);
-int pwrdm_read_mem_pwrst(struct powerdomain *pwrdm, u8 bank);
-int pwrdm_read_prev_mem_pwrst(struct powerdomain *pwrdm, u8 bank);
-int pwrdm_read_mem_retst(struct powerdomain *pwrdm, u8 bank);
 
 int pwrdm_enable_hdwr_sar(struct powerdomain *pwrdm);
 int pwrdm_disable_hdwr_sar(struct powerdomain *pwrdm);
