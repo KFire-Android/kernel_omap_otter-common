@@ -394,7 +394,14 @@ restore:
 	/* Restore next_pwrsts */
 	list_for_each_entry(pwrst, &pwrst_list, node) {
 		prev_fpwrst = pwrdm_read_prev_fpwrst(pwrst->pwrdm);
-		if (prev_fpwrst > pwrst->next_fpwrst) {
+		/*
+		 * The SGX powerdomain will report its previous state as
+		 * INACTIVE when it's been programmed to ON.  This seems to
+		 * be the only OMAP3 powerdomain that does this.
+		 */
+		if (prev_fpwrst == PWRDM_FUNC_PWRST_INACTIVE)
+			prev_fpwrst = PWRDM_FUNC_PWRST_ON;
+		if (prev_fpwrst != pwrst->next_fpwrst) {
 			pr_info("Powerdomain %s didn't enter target state %s - entered state %s instead\n",
 				pwrst->pwrdm->name,
 				pwrdm_convert_fpwrst_to_name(pwrst->next_fpwrst),
@@ -574,6 +581,10 @@ void omap3_pm_off_mode_enable(int enable)
 
 	fpwrst = (enable) ? PWRDM_FUNC_PWRST_OFF : PWRDM_FUNC_PWRST_CSWR;
 
+	/*
+	 * XXX This should be replaced by explicit lists of
+	 * powerdomains with specific powerstates to set
+	 */
 	list_for_each_entry(pwrst, &pwrst_list, node) {
 		if (IS_PM34XX_ERRATUM(PM_SDRC_WAKEUP_ERRATUM_i583) &&
 		    pwrst->pwrdm == core_pwrdm &&
@@ -583,6 +594,12 @@ void omap3_pm_off_mode_enable(int enable)
 				__func__);
 		} else {
 			pwrst->next_fpwrst = fpwrst;
+			if (!pwrdm_supports_fpwrst(pwrst->pwrdm,
+						   pwrst->next_fpwrst))
+				pwrst->next_fpwrst = PWRDM_FUNC_PWRST_CSWR;
+			if (!pwrdm_supports_fpwrst(pwrst->pwrdm,
+						   pwrst->next_fpwrst))
+				pwrst->next_fpwrst = PWRDM_FUNC_PWRST_ON;
 		}
 		WARN_ON(pwrdm_set_fpwrst(pwrst->pwrdm, pwrst->next_fpwrst));
 	}
@@ -602,9 +619,17 @@ int omap3_pm_set_suspend_state(struct powerdomain *pwrdm, u8 fpwrst)
 {
 	struct power_state *pwrst;
 
+	/*
+	 * XXX This should be replaced by per-powerdomain suspend
+	 * power state files
+	 */
 	list_for_each_entry(pwrst, &pwrst_list, node) {
 		if (pwrst->pwrdm == pwrdm) {
 			pwrst->next_fpwrst = fpwrst;
+			if (!pwrdm_supports_fpwrst(pwrdm, pwrst->next_fpwrst))
+				pwrst->next_fpwrst = PWRDM_FUNC_PWRST_CSWR;
+			if (!pwrdm_supports_fpwrst(pwrdm, pwrst->next_fpwrst))
+				pwrst->next_fpwrst = PWRDM_FUNC_PWRST_ON;
 			return 0;
 		}
 	}
@@ -622,7 +647,14 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
 	if (!pwrst)
 		return -ENOMEM;
 	pwrst->pwrdm = pwrdm;
+
+	/*
+	 * XXX This should be replaced by explicit lists of
+	 * powerdomains with specific powerstates to set
+	 */
 	pwrst->next_fpwrst = PWRDM_FUNC_PWRST_CSWR;
+	if (!pwrdm_supports_fpwrst(pwrdm, pwrst->next_fpwrst))
+		pwrst->next_fpwrst = PWRDM_FUNC_PWRST_ON;
 	list_add(&pwrst->node, &pwrst_list);
 
 	if (pwrdm_has_hdwr_sar(pwrdm))

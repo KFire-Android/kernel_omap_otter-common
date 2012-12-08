@@ -264,61 +264,9 @@ static bool _pwrdm_logic_retst_can_change(struct powerdomain *pwrdm)
 }
 
 /**
- * _match_pwrst: determine the closest supported power state
- * @pwrsts: list of allowed states, defined as a bitmask
- * @pwrst: initial state to be used as a starting point
- * @min: minimum (i.e. lowest consumption) allowed state
- * @max: maximum (i.e. highest consumption) allowed state
- *
  * Search down then up for a valid state from a list of allowed
  * states.  Used by states conversion functions (_pwrdm_fpwrst_to_*)
  * to look for allowed power and logic states for a powerdomain.
- * Returns the matching allowed state.  XXX Deprecated.  The software
- * should not try to program unsupported powerstates.
- */
-static int _match_pwrst(u32 pwrsts, int pwrst, int min, int max)
-{
-	int found = 1, new_pwrst = pwrst;
-
-	/*
-	 * If the power domain does not allow any state programmation
-	 * return the max state which is always allowed
-	 */
-	if (!pwrsts)
-		return max;
-
-	/*
-	 * Search lower: if the requested state is not supported
-	 * try the lower states, stopping at the minimum allowed
-	 * state
-	 */
-	while (!(pwrsts & (1 << new_pwrst))) {
-		if (new_pwrst <= min) {
-			found = 0;
-			break;
-		}
-		new_pwrst--;
-	}
-
-	/*
-	 * Search higher: if no lower state found fallback to the higher
-	 * states, stopping at the maximum allowed state
-	 */
-	if (!found) {
-		new_pwrst = pwrst;
-		while (!(pwrsts & (1 << new_pwrst))) {
-			if (new_pwrst >= max) {
-				new_pwrst = max;
-				break;
-			}
-			new_pwrst++;
-		}
-	}
-
-	return new_pwrst;
-}
-
-/**
  * _pwrdm_fpwrst_to_pwrst - Convert functional (i.e. logical) to
  * internal (i.e. registers) values for the power domains states.
  * @pwrdm: struct powerdomain * to convert the values for
@@ -363,13 +311,6 @@ static int _pwrdm_fpwrst_to_pwrst(struct powerdomain *pwrdm, u8 fpwrst,
 	default:
 		return -EINVAL;
 	}
-
-	/* XXX deprecated */
-	*pwrdm_pwrst = _match_pwrst(pwrdm->pwrsts, *pwrdm_pwrst,
-				    PWRDM_POWER_OFF, PWRDM_POWER_ON);
-
-	*logic_retst = _match_pwrst(pwrdm->pwrsts_logic_ret, *logic_retst,
-				    PWRDM_POWER_OFF, PWRDM_POWER_RET);
 
 	pr_debug("powerdomain %s: convert fpwrst %0x to pwrst %0x\n",
 		 pwrdm->name, fpwrst, *pwrdm_pwrst);
@@ -440,6 +381,10 @@ static int _set_logic_retst_and_pwrdm_pwrst(struct powerdomain *pwrdm,
 {
 	int ret;
 
+	/*
+	 * XXX Should return an error, but this means that our PM code
+	 * will need to be much more careful about what it programs
+	 */
 	if (!_pwrdm_pwrst_is_controllable(pwrdm))
 		return 0;
 
@@ -1351,6 +1296,10 @@ int pwrdm_set_next_fpwrst(struct powerdomain *pwrdm, u8 fpwrst)
 	if (!pwrdm || IS_ERR(pwrdm))
 		return -EINVAL;
 
+	/*
+	 * XXX Should return an error, but this means that our PM code
+	 * will need to be much more careful about what it programs
+	 */
 	if (!_pwrdm_pwrst_is_controllable(pwrdm))
 		return 0;
 
@@ -1431,6 +1380,10 @@ int pwrdm_set_fpwrst(struct powerdomain *pwrdm, enum pwrdm_func_state fpwrst)
 	    !arch_pwrdm->pwrdm_read_pwrst)
 		return -EINVAL;
 
+	/*
+	 * XXX Should return an error, but this means that our PM code
+	 * will need to be much more careful about what it programs
+	 */
 	if (!_pwrdm_pwrst_is_controllable(pwrdm))
 		return 0;
 
@@ -1551,9 +1504,6 @@ bool pwrdm_supports_fpwrst(struct powerdomain *pwrdm, u8 fpwrst)
 	ret = _pwrdm_fpwrst_to_pwrst(pwrdm, fpwrst, &pwrst, &logic);
 	if (ret)
 		return false;
-
-	pr_debug("%s: pwrdm %s: set fpwrst %0x\n", __func__, pwrdm->name,
-		 fpwrst);
 
 	if (pwrdm->pwrsts_logic_ret && pwrst == PWRDM_POWER_RET &&
 	    !(pwrdm->pwrsts_logic_ret & (1 << logic)))

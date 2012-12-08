@@ -67,8 +67,7 @@ static int omap4_pm_suspend(void)
 	/* Restore next powerdomain state */
 	list_for_each_entry(pwrst, &pwrst_list, node) {
 		prev_fpwrst = pwrdm_read_prev_fpwrst(pwrst->pwrdm);
-		/* XXX test below should be != */
-		if (prev_fpwrst > pwrst->next_fpwrst) {
+		if (prev_fpwrst != pwrst->next_fpwrst) {
 			pr_info("Powerdomain (%s) didn't enter target state %s - entered state %s instead\n",
 				pwrst->pwrdm->name,
 				pwrdm_convert_fpwrst_to_name(pwrst->next_fpwrst),
@@ -106,7 +105,13 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
 		return -ENOMEM;
 
 	pwrst->pwrdm = pwrdm;
+	/*
+	 * XXX This should be replaced by explicit lists of
+	 * powerdomains with specific powerstates to set
+	 */
 	pwrst->next_fpwrst = PWRDM_FUNC_PWRST_CSWR;
+	if (!pwrdm_supports_fpwrst(pwrdm, pwrst->next_fpwrst))
+		pwrst->next_fpwrst = PWRDM_FUNC_PWRST_ON;
 	list_add(&pwrst->node, &pwrst_list);
 
 	return WARN_ON(pwrdm_set_fpwrst(pwrst->pwrdm, pwrst->next_fpwrst));
