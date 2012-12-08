@@ -260,6 +260,7 @@ extern int pwrdm_set_fpwrst(struct powerdomain *pwrdm,
 			    enum pwrdm_func_state fpwrst);
 extern int pwrdm_read_fpwrst(struct powerdomain *pwrdm);
 extern int pwrdm_read_prev_fpwrst(struct powerdomain *pwrdm);
+extern bool pwrdm_supports_fpwrst(struct powerdomain *pwrdm, u8 fpwrst);
 
 extern void omap242x_powerdomains_init(void);
 extern void omap243x_powerdomains_init(void);

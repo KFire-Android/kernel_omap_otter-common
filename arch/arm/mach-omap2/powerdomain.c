@@ -1531,3 +1531,36 @@ int pwrdm_read_prev_fpwrst(struct powerdomain *pwrdm)
 	return ret;
 }
 
+/**
+ * pwrdm_supports_fpwrst - does the powerdomain @pwrdm support the @fpwrst power
+ * state?
+ * @pwrdm: struct powerdomain * pointing to a powerdomain to test
+ * @fpwrst: functional power state
+ *
+ * Returns true if the powerdomain pointed to by @pwrdm can enter the
+ * functional power state @fpwrst, or false if not.
+ */
+bool pwrdm_supports_fpwrst(struct powerdomain *pwrdm, u8 fpwrst)
+{
+	u8 pwrst, logic;
+	int ret;
+
+	if (!pwrdm || IS_ERR(pwrdm))
+		return false;
+
+	ret = _pwrdm_fpwrst_to_pwrst(pwrdm, fpwrst, &pwrst, &logic);
+	if (ret)
+		return false;
+
+	pr_debug("%s: pwrdm %s: set fpwrst %0x\n", __func__, pwrdm->name,
+		 fpwrst);
+
+	if (pwrdm->pwrsts_logic_ret && pwrst == PWRDM_POWER_RET &&
+	    !(pwrdm->pwrsts_logic_ret & (1 << logic)))
+		return false;
+
+	if (!(pwrdm->pwrsts & (1 << pwrst)))
+		return false;
+
+	return true;
+}
