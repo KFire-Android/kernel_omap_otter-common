@@ -642,21 +642,28 @@ int pwrdm_register_pwrdms(struct powerdomain **ps)
  *
  * Do whatever is necessary to initialize registered powerdomains and
  * powerdomain code.  Currently, this programs the next power state
- * for each powerdomain to ON.  This prevents powerdomains from
- * unexpectedly losing context or entering high wakeup latency modes
- * with non-power-management-enabled kernels.  Must be called after
- * pwrdm_register_pwrdms().  Returns -EACCES if called before
- * pwrdm_register_pwrdms(), or 0 upon success.
+ * for each powerdomain to ON, and programs the memory bank power
+ * states to follow the powerdomain power states.  This prevents
+ * powerdomains from unexpectedly losing context or entering high
+ * wakeup latency modes with non-power-management-enabled kernels.
+ * Must be called after pwrdm_register_pwrdms().  Returns -EACCES if
+ * called before pwrdm_register_pwrdms(), or 0 upon success.
  */
 int pwrdm_complete_init(void)
 {
 	struct powerdomain *temp_p;
+	int i;
 
 	if (list_empty(&pwrdm_list))
 		return -EACCES;
 
-	list_for_each_entry(temp_p, &pwrdm_list, node)
-		pwrdm_set_next_fpwrst(temp_p, PWRDM_FUNC_PWRST_ON);
+	list_for_each_entry(temp_p, &pwrdm_list, node) {
+		for (i = 0; i < temp_p->banks; i++) {
+			pwrdm_set_mem_onst(temp_p, i, PWRDM_POWER_ON);
+			pwrdm_set_mem_retst(temp_p, i, PWRDM_POWER_RET);
+		}
+		WARN_ON(pwrdm_set_next_fpwrst(temp_p, PWRDM_FUNC_PWRST_ON));
+	}
 
 	return 0;
 }
