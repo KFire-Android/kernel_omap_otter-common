@@ -227,8 +227,6 @@ static void omap3xxx_clkdm_deny_idle(struct clockdomain *clkdm)
 
 static int omap3xxx_clkdm_clk_enable(struct clockdomain *clkdm)
 {
-	bool hwsup = false;
-
 	if (!clkdm->clktrctrl_mask)
 		return 0;
 
@@ -243,10 +241,7 @@ static int omap3xxx_clkdm_clk_enable(struct clockdomain *clkdm)
 		return 0;
 	}
 
-	hwsup = omap3xxx_cm_is_clkdm_in_hwsup(clkdm->pwrdm.ptr->prcm_offs,
-					      clkdm->clktrctrl_mask);
-
-	if (hwsup) {
+	if (clkdm_in_hwsup(clkdm)) {
 		/* Disable HW transitions when we are changing deps */
 		omap3xxx_cm_clkdm_disable_hwsup(clkdm->pwrdm.ptr->prcm_offs,
 						clkdm->clktrctrl_mask);
@@ -263,8 +258,6 @@ static int omap3xxx_clkdm_clk_enable(struct clockdomain *clkdm)
 
 static int omap3xxx_clkdm_clk_disable(struct clockdomain *clkdm)
 {
-	bool hwsup = false;
-
 	if (!clkdm->clktrctrl_mask)
 		return 0;
 
@@ -280,10 +273,7 @@ static int omap3xxx_clkdm_clk_disable(struct clockdomain *clkdm)
 		return 0;
 	}
 
-	hwsup = omap3xxx_cm_is_clkdm_in_hwsup(clkdm->pwrdm.ptr->prcm_offs,
-					      clkdm->clktrctrl_mask);
-
-	if (hwsup) {
+	if (clkdm_in_hwsup(clkdm)) {
 		/* Disable HW transitions when we are changing deps */
 		omap3xxx_cm_clkdm_disable_hwsup(clkdm->pwrdm.ptr->prcm_offs,
 						clkdm->clktrctrl_mask);

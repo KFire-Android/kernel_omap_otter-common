@@ -285,14 +285,7 @@ static void omap2xxx_clkdm_deny_idle(struct clockdomain *clkdm)
 
 static int omap2xxx_clkdm_clk_enable(struct clockdomain *clkdm)
 {
-	bool hwsup = false;
-
-	if (!clkdm->clktrctrl_mask)
-		return 0;
-
-	hwsup = omap2xxx_cm_is_clkdm_in_hwsup(clkdm->pwrdm.ptr->prcm_offs,
-					      clkdm->clktrctrl_mask);
-	if (!hwsup && clkdm->flags & CLKDM_CAN_FORCE_WAKEUP)
+	if (!clkdm_in_hwsup(clkdm) && clkdm->flags & CLKDM_CAN_FORCE_WAKEUP)
 		omap2xxx_clkdm_wakeup(clkdm);
 
 	return 0;
@@ -300,15 +293,7 @@ static int omap2xxx_clkdm_clk_enable(struct clockdomain *clkdm)
 
 static int omap2xxx_clkdm_clk_disable(struct clockdomain *clkdm)
 {
-	bool hwsup = false;
-
-	if (!clkdm->clktrctrl_mask)
-		return 0;
-
-	hwsup = omap2xxx_cm_is_clkdm_in_hwsup(clkdm->pwrdm.ptr->prcm_offs,
-					      clkdm->clktrctrl_mask);
-
-	if (!hwsup && clkdm->flags & CLKDM_CAN_FORCE_SLEEP)
+	if (!clkdm_in_hwsup(clkdm) && clkdm->flags & CLKDM_CAN_FORCE_SLEEP)
 		omap2xxx_clkdm_sleep(clkdm);
 
 	return 0;
