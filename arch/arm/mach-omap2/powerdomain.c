@@ -95,7 +95,7 @@ static int _pwrdm_register(struct powerdomain *pwrdm)
 	int i;
 	struct voltagedomain *voltdm;
 
-	if (!pwrdm || !pwrdm->name)
+	if (!pwrdm->name)
 		return -EINVAL;
 
 	if (cpu_is_omap44xx() &&
@@ -528,9 +528,6 @@ static int _pwrdm_set_mem_onst(struct powerdomain *pwrdm, u8 bank, u8 pwrst)
 {
 	int ret = -EINVAL;
 
-	if (!pwrdm)
-		return -EINVAL;
-
 	if (pwrdm->banks < (bank + 1))
 		return -EEXIST;
 
@@ -565,9 +562,6 @@ static int _pwrdm_set_mem_onst(struct powerdomain *pwrdm, u8 bank, u8 pwrst)
 static int _pwrdm_set_mem_retst(struct powerdomain *pwrdm, u8 bank, u8 pwrst)
 {
 	int ret = -EINVAL;
-
-	if (!pwrdm)
-		return -EINVAL;
 
 	if (pwrdm->banks < (bank + 1))
 		return -EEXIST;
@@ -635,6 +629,11 @@ static void _pwrdm_state_switch(struct powerdomain *pwrdm)
 
 static int _pwrdm_pre_transition_cb(struct powerdomain *pwrdm, void *unused)
 {
+	/*
+	 * XXX It should be possible to avoid the clear_all_prev_pwrst
+	 * call for powerdomains if we are programming them to stay on,
+	 * for example.
+	 */
 	pwrdm_clear_all_prev_pwrst(pwrdm);
 	_pwrdm_state_switch(pwrdm);
 	return 0;
@@ -998,6 +997,11 @@ int pwrdm_clear_all_prev_pwrst(struct powerdomain *pwrdm)
 
 	if (!pwrdm)
 		return ret;
+
+	/*
+	 * XXX Is there some way for us to skip powerdomains that
+	 * don't have a prev pwrst register?
+	 */
 
 	/*
 	 * XXX should get the powerdomain's current state here;
