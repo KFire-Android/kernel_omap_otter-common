@@ -46,6 +46,8 @@ enum pwrdm_func_state {
 	PWRDM_MAX_FUNC_PWRSTS		/* Last value, used as the max value */
 };
 
+#define PWRDM_FPWRSTS_COUNT	(PWRDM_MAX_FUNC_PWRSTS - PWRDM_FPWRST_OFFSET)
+
 /* Powerdomain basic power states */
 #define PWRDM_POWER_OFF		0x0
 #define PWRDM_POWER_RET		0x1
@@ -123,10 +125,10 @@ struct powerdomain;
  * @mem_pwrst_mask: (AM33XX only) mask for mem state bitfield in @pwrstst_offs
  * @mem_retst_mask: (AM33XX only) mask for mem retention state bitfield
  *	in @pwrstctrl_offs
- * @state:
- * @state_counter:
- * @timer:
- * @state_timer:
+ * @fpwrst: current func power state (set in pwrdm_state_switch() or post_trans)
+ * @fpwrst_counter: estimated number of times the pwrdm entered the power states
+ * @timer: sched_clock() timestamp of last pwrdm_state_switch()
+ * @fpwrst_timer: estimated nanoseconds of residency in the various power states
  * @_lock: spinlock used to serialize powerdomain and some clockdomain ops
  * @_lock_flags: stored flags when @_lock is taken
  *
@@ -146,12 +148,11 @@ struct powerdomain {
 	const u8 pwrsts_mem_ret[PWRDM_MAX_MEM_BANKS];
 	const u8 pwrsts_mem_on[PWRDM_MAX_MEM_BANKS];
 	const u8 prcm_partition;
+	u8 fpwrst;
 	struct clockdomain *pwrdm_clkdms[PWRDM_MAX_CLKDMS];
 	struct list_head node;
 	struct list_head voltdm_node;
-	int state;
-	unsigned state_counter[PWRDM_MAX_PWRSTS];
-	unsigned ret_logic_off_counter;
+	unsigned fpwrst_counter[PWRDM_FPWRSTS_COUNT];
 	unsigned ret_mem_off_counter[PWRDM_MAX_MEM_BANKS];
 	spinlock_t _lock;
 	unsigned long _lock_flags;
@@ -165,7 +166,7 @@ struct powerdomain {
 
 #ifdef CONFIG_PM_DEBUG
 	s64 timer;
-	s64 state_timer[PWRDM_MAX_PWRSTS];
+	s64 fpwrst_timer[PWRDM_FPWRSTS_COUNT];
 #endif
 };
 

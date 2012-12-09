@@ -120,97 +120,16 @@ static int _pwrdm_register(struct powerdomain *pwrdm)
 	list_add(&pwrdm->node, &pwrdm_list);
 
 	/* Initialize the powerdomain's state counter */
-	for (i = 0; i < PWRDM_MAX_PWRSTS; i++)
-		pwrdm->state_counter[i] = 0;
+	for (i = 0; i < PWRDM_FPWRSTS_COUNT; i++)
+		pwrdm->fpwrst_counter[i] = 0;
 
-	pwrdm->ret_logic_off_counter = 0;
 	for (i = 0; i < pwrdm->banks; i++)
 		pwrdm->ret_mem_off_counter[i] = 0;
 
 	arch_pwrdm->pwrdm_wait_transition(pwrdm);
-	pwrdm->state = pwrdm_read_pwrst(pwrdm);
-	pwrdm->state_counter[pwrdm->state] = 1;
+	pwrdm->fpwrst = pwrdm_read_fpwrst(pwrdm);
+	pwrdm->fpwrst_counter[pwrdm->fpwrst - PWRDM_FPWRST_OFFSET] = 1;
 
-	pr_debug("powerdomain: registered %s\n", pwrdm->name);
-
-	return 0;
-}
-
-static void _update_logic_membank_counters(struct powerdomain *pwrdm)
-{
-	int i;
-	u8 prev_logic_pwrst, prev_mem_pwrst;
-
-	prev_logic_pwrst = pwrdm_read_prev_logic_pwrst(pwrdm);
-	if ((pwrdm->pwrsts_logic_ret == PWRSTS_OFF_RET) &&
-	    (prev_logic_pwrst == PWRDM_POWER_OFF))
-		pwrdm->ret_logic_off_counter++;
-
-	for (i = 0; i < pwrdm->banks; i++) {
-		prev_mem_pwrst = pwrdm_read_prev_mem_pwrst(pwrdm, i);
-
-		if ((pwrdm->pwrsts_mem_ret[i] == PWRSTS_OFF_RET) &&
-		    (prev_mem_pwrst == PWRDM_POWER_OFF))
-			pwrdm->ret_mem_off_counter[i]++;
-	}
-}
-
-static int _pwrdm_state_switch(struct powerdomain *pwrdm, int flag)
-{
-	int prev, next, state, trace_state = 0;
-
-	if (pwrdm == NULL)
-		return -EINVAL;
-
-	state = pwrdm_read_pwrst(pwrdm);
-
-	switch (flag) {
-	case PWRDM_STATE_NOW:
-		prev = pwrdm->state;
-		break;
-	case PWRDM_STATE_PREV:
-		prev = pwrdm_read_prev_pwrst(pwrdm);
-		if (pwrdm->state != prev)
-			pwrdm->state_counter[prev]++;
-		if (prev == PWRDM_POWER_RET)
-			_update_logic_membank_counters(pwrdm);
-		/*
-		 * If the power domain did not hit the desired state,
-		 * generate a trace event with both the desired and hit states
-		 */
-		next = pwrdm_read_next_pwrst(pwrdm);
-		if (next != prev) {
-			trace_state = (PWRDM_TRACE_STATES_FLAG |
-				       ((next & OMAP_POWERSTATE_MASK) << 8) |
-				       ((prev & OMAP_POWERSTATE_MASK) << 0));
-			trace_power_domain_target(pwrdm->name, trace_state,
-						  smp_processor_id());
-		}
-		break;
-	default:
-		return -EINVAL;
-	}
-
-	if (state != prev)
-		pwrdm->state_counter[state]++;
-
-	pm_dbg_update_time(pwrdm, prev);
-
-	pwrdm->state = state;
-
-	return 0;
-}
-
-static int _pwrdm_pre_transition_cb(struct powerdomain *pwrdm, void *unused)
-{
-	pwrdm_clear_all_prev_pwrst(pwrdm);
-	_pwrdm_state_switch(pwrdm, PWRDM_STATE_NOW);
-	return 0;
-}
-
-static int _pwrdm_post_transition_cb(struct powerdomain *pwrdm, void *unused)
-{
-	_pwrdm_state_switch(pwrdm, PWRDM_STATE_PREV);
 	return 0;
 }
 
@@ -647,6 +566,76 @@ static int _pwrdm_read_prev_fpwrst(struct powerdomain *pwrdm)
 	return (ret) ? ret : fpwrst;
 }
 
+/* XXX Caller must hold pwrdm->_lock */
+static int _pwrdm_state_switch(struct powerdomain *pwrdm, int flag)
+{
+	int prev, next, fpwrst, trace_state = 0;
+	int i;
+	u8 prev_mem_pwrst;
+
+	if (pwrdm == NULL)
+		return -EINVAL;
+
+	fpwrst = _pwrdm_read_fpwrst(pwrdm);
+
+	switch (flag) {
+	case PWRDM_STATE_NOW:
+		prev = pwrdm->fpwrst;
+		break;
+	case PWRDM_STATE_PREV:
+		prev = _pwrdm_read_prev_fpwrst(pwrdm);
+		if (pwrdm->fpwrst != prev)
+			pwrdm->fpwrst_counter[prev - PWRDM_FPWRST_OFFSET]++;
+		if (prev == PWRDM_FUNC_PWRST_CSWR ||
+		    prev == PWRDM_FUNC_PWRST_OSWR) {
+			for (i = 0; i < pwrdm->banks; i++) {
+				prev_mem_pwrst =
+					pwrdm_read_prev_mem_pwrst(pwrdm, i);
+				if ((pwrdm->pwrsts_mem_ret[i] ==
+				     PWRSTS_OFF_RET) &&
+				    (prev_mem_pwrst == PWRDM_POWER_OFF))
+					pwrdm->ret_mem_off_counter[i]++;
+			}
+		}
+		/*
+		 * If the power domain did not hit the desired state,
+		 * generate a trace event with both the desired and hit states
+		 */
+		next = _pwrdm_read_next_fpwrst(pwrdm);
+		if (next != prev) {
+			trace_state = (PWRDM_TRACE_STATES_FLAG | next << 8 |
+				       prev);
+			trace_power_domain_target(pwrdm->name, trace_state,
+						  smp_processor_id());
+		}
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	if (fpwrst != prev)
+		pwrdm->fpwrst_counter[fpwrst - PWRDM_FPWRST_OFFSET]++;
+
+	pm_dbg_update_time(pwrdm, prev);
+
+	pwrdm->fpwrst = fpwrst;
+
+	return 0;
+}
+
+static int _pwrdm_pre_transition_cb(struct powerdomain *pwrdm, void *unused)
+{
+	pwrdm_clear_all_prev_pwrst(pwrdm);
+	_pwrdm_state_switch(pwrdm, PWRDM_STATE_NOW);
+	return 0;
+}
+
+static int _pwrdm_post_transition_cb(struct powerdomain *pwrdm, void *unused)
+{
+	_pwrdm_state_switch(pwrdm, PWRDM_STATE_PREV);
+	return 0;
+}
+
 /* Public functions */
 
 /**
@@ -717,7 +706,7 @@ int pwrdm_complete_init(void)
 		return -EACCES;
 
 	list_for_each_entry(temp_p, &pwrdm_list, node)
-		pwrdm_set_next_pwrst(temp_p, PWRDM_POWER_ON);
+		pwrdm_set_next_fpwrst(temp_p, PWRDM_FUNC_PWRST_ON);
 
 	return 0;
 }
@@ -1494,8 +1483,10 @@ int pwrdm_get_context_loss_count(struct powerdomain *pwrdm)
 		return -ENODEV;
 	}
 
-	count = pwrdm->state_counter[PWRDM_POWER_OFF];
-	count += pwrdm->ret_logic_off_counter;
+	count = pwrdm->fpwrst_counter[PWRDM_FUNC_PWRST_OFF -
+				      PWRDM_FPWRST_OFFSET];
+	count += pwrdm->fpwrst_counter[PWRDM_FUNC_PWRST_OSWR -
+				       PWRDM_FPWRST_OFFSET];
 
 	for (i = 0; i < pwrdm->banks; i++)
 		count += pwrdm->ret_mem_off_counter[i];
