@@ -681,7 +681,9 @@ static int _pwrdm_post_transition_cb(struct powerdomain *pwrdm, void *unused)
 	int prev, fpwrst;
 	int trace_state = 0;
 
-	prev = _pwrdm_read_prev_fpwrst(pwrdm);
+	prev = (pwrdm->next_fpwrst == PWRDM_FUNC_PWRST_ON) ?
+		PWRDM_FUNC_PWRST_ON : _pwrdm_read_prev_fpwrst(pwrdm);
+
 	if (pwrdm->fpwrst != prev)
 		pwrdm->fpwrst_counter[prev - PWRDM_FPWRST_OFFSET]++;
 
