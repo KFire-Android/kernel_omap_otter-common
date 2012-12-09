@@ -179,10 +179,22 @@ static int omap2xxx_pwrdm_read_pwrst(struct powerdomain *pwrdm)
 	return omap2xxx_pwrst_to_common_pwrst(omap2xxx_pwrst);
 }
 
+static int omap2xxx_pwrdm_read_prev_pwrst(struct powerdomain *pwrdm)
+{
+	u8 omap2xxx_pwrst;
+
+	omap2xxx_pwrst = omap2_prm_read_mod_bits_shift(pwrdm->prcm_offs,
+						       OMAP2_PM_PWSTST,
+						       OMAP24XX_LASTSTATEENTERED_MASK);
+
+	return omap2xxx_pwrst_to_common_pwrst(omap2xxx_pwrst);
+}
+
 struct pwrdm_ops omap2_pwrdm_operations = {
 	.pwrdm_set_next_pwrst	= omap2xxx_pwrdm_set_next_pwrst,
 	.pwrdm_read_next_pwrst	= omap2xxx_pwrdm_read_next_pwrst,
 	.pwrdm_read_pwrst	= omap2xxx_pwrdm_read_pwrst,
+	.pwrdm_read_prev_pwrst	= omap2xxx_pwrdm_read_prev_pwrst,
 	.pwrdm_set_logic_retst	= omap2_pwrdm_set_logic_retst,
 	.pwrdm_set_mem_onst	= omap2_pwrdm_set_mem_onst,
 	.pwrdm_set_mem_retst	= omap2_pwrdm_set_mem_retst,
