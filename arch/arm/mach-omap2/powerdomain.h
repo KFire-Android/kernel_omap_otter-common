@@ -84,6 +84,16 @@ enum pwrdm_func_state {
 #define PWRDM_HAS_LOWPOWERSTATECHANGE	BIT(2)
 
 /*
+ * Powerdomain internal flags (struct powerdomain._flags)
+ *
+ * _PWRDM_NEXT_FPWRST_IS_VALID: the locally-cached copy of the
+ *    powerdomain's next-functional-power-state -- struct
+ *    powerdomain.next_fpwrst -- is valid.  If this bit is not set,
+ *    the code needs to load the current value from the hardware.
+ */
+#define _PWRDM_NEXT_FPWRST_IS_VALID	BIT(0)
+
+/*
  * Number of memory banks that are power-controllable.	On OMAP4430, the
  * maximum is 5.
  */
@@ -127,12 +137,17 @@ struct powerdomain;
  *	in @pwrstctrl_offs
  * @fpwrst: current func power state (set in pwrdm_state_switch() or post_trans)
  * @fpwrst_counter: estimated number of times the pwrdm entered the power states
+ * @next_fpwrst: cache of the powerdomain's next-power-state
  * @timer: sched_clock() timestamp of last pwrdm_state_switch()
  * @fpwrst_timer: estimated nanoseconds of residency in the various power states
  * @_lock: spinlock used to serialize powerdomain and some clockdomain ops
  * @_lock_flags: stored flags when @_lock is taken
+ * @_flags: flags (for internal use only)
  *
  * @prcm_partition possible values are defined in mach-omap2/prcm44xx.h.
+ *
+ * Possible values for @_flags are documented above in the
+ * "Powerdomain internal flags (struct powerdomain._flags)" comments.
  */
 struct powerdomain {
 	const char *name;
@@ -149,6 +164,8 @@ struct powerdomain {
 	const u8 pwrsts_mem_on[PWRDM_MAX_MEM_BANKS];
 	const u8 prcm_partition;
 	u8 fpwrst;
+	u8 next_fpwrst;
+	u8 _flags;
 	struct clockdomain *pwrdm_clkdms[PWRDM_MAX_CLKDMS];
 	struct list_head node;
 	struct list_head voltdm_node;
