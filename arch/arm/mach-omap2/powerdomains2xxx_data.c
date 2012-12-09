@@ -54,6 +54,7 @@ static struct powerdomain mpu_24xx_pwrdm = {
 		[0] = PWRSTS_ON,
 	},
 	.voltdm		  = { .name = "core" },
+	.flags		  = PWRDM_ACTIVE_WITH_KERNEL,
 };
 
 static struct powerdomain core_24xx_pwrdm = {
@@ -73,6 +74,7 @@ static struct powerdomain core_24xx_pwrdm = {
 		[2] = PWRSTS_OFF_RET_ON, /* MEM3ONSTATE */
 	},
 	.voltdm		  = { .name = "core" },
+	.flags		  = PWRDM_ACTIVE_WITH_KERNEL,
 };
 
 

@@ -78,10 +78,14 @@ enum pwrdm_func_state {
  *
  * PWRDM_HAS_LOWPOWERSTATECHANGE - can transition from a sleep state
  * to a lower sleep state without waking up the powerdomain
+ *
+ * PWRDM_ACTIVE_WITH_KERNEL - this powerdomain's current power state is
+ * guaranteed to be ON whenever the kernel is running
  */
 #define PWRDM_HAS_HDWR_SAR		BIT(0)
 #define PWRDM_HAS_MPU_QUIRK		BIT(1)
 #define PWRDM_HAS_LOWPOWERSTATECHANGE	BIT(2)
+#define PWRDM_ACTIVE_WITH_KERNEL	BIT(3)
 
 /*
  * Powerdomain internal flags (struct powerdomain._flags)

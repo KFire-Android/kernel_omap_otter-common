@@ -58,7 +58,7 @@ static struct powerdomain mpu_3xxx_pwrdm = {
 	.prcm_offs	  = MPU_MOD,
 	.pwrsts		  = PWRSTS_OFF_RET_ON,
 	.pwrsts_logic_ret = PWRSTS_OFF_RET,
-	.flags		  = PWRDM_HAS_MPU_QUIRK,
+	.flags		  = (PWRDM_HAS_MPU_QUIRK | PWRDM_ACTIVE_WITH_KERNEL),
 	.banks		  = 1,
 	.pwrsts_mem_ret	  = {
 		[0] = PWRSTS_OFF_RET,
@@ -74,7 +74,7 @@ static struct powerdomain mpu_am35x_pwrdm = {
 	.prcm_offs	  = MPU_MOD,
 	.pwrsts		  = PWRSTS_ON,
 	.pwrsts_logic_ret = PWRSTS_ON,
-	.flags		  = PWRDM_HAS_MPU_QUIRK,
+	.flags		  = (PWRDM_HAS_MPU_QUIRK | PWRDM_ACTIVE_WITH_KERNEL),
 	.banks		  = 1,
 	.pwrsts_mem_ret	  = {
 		[0] = PWRSTS_ON,
@@ -110,6 +110,7 @@ static struct powerdomain core_3xxx_pre_es3_1_pwrdm = {
 		[1] = PWRSTS_OFF_RET_ON, /* MEM2ONSTATE */
 	},
 	.voltdm		  = { .name = "core" },
+	.flags		  = PWRDM_ACTIVE_WITH_KERNEL,
 };
 
 static struct powerdomain core_3xxx_es3_1_pwrdm = {
@@ -121,7 +122,8 @@ static struct powerdomain core_3xxx_es3_1_pwrdm = {
 	 * Setting the SAR flag for errata ID i478 which applies
 	 *  to 3430 <= ES3.1
 	 */
-	.flags		  = PWRDM_HAS_HDWR_SAR, /* for USBTLL only */
+	.flags		  = (PWRDM_HAS_HDWR_SAR |  /* for USBTLL only */
+			     PWRDM_ACTIVE_WITH_KERNEL),
 	.banks		  = 2,
 	.pwrsts_mem_ret	  = {
 		[0] = PWRSTS_OFF_RET,	 /* MEM1RETSTATE */
@@ -149,6 +151,7 @@ static struct powerdomain core_am35x_pwrdm = {
 		[1] = PWRSTS_ON, /* MEM2ONSTATE */
 	},
 	.voltdm		  = { .name = "core" },
+	.flags		  = PWRDM_ACTIVE_WITH_KERNEL,
 };
 
 static struct powerdomain dss_pwrdm = {

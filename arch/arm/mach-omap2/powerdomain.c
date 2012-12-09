@@ -462,7 +462,8 @@ static int _pwrdm_read_fpwrst(struct powerdomain *pwrdm)
 	int pwrst, logic_pwrst, ret;
 	u8 fpwrst;
 
-	if (!_pwrdm_pwrst_can_change(pwrdm))
+	if (!_pwrdm_pwrst_can_change(pwrdm) ||
+	    pwrdm->flags & PWRDM_ACTIVE_WITH_KERNEL)
 		return PWRDM_FUNC_PWRST_ON;
 
 	pwrst = arch_pwrdm->pwrdm_read_pwrst(pwrdm);
@@ -1104,12 +1105,14 @@ bool pwrdm_has_hdwr_sar(struct powerdomain *pwrdm)
 
 int pwrdm_state_switch_nolock(struct powerdomain *pwrdm)
 {
-	int ret;
+	int ret = 0;
 
 	if (!pwrdm || !arch_pwrdm)
 		return -EINVAL;
 
-	ret = arch_pwrdm->pwrdm_wait_transition(pwrdm);
+	if (!(pwrdm->flags & PWRDM_ACTIVE_WITH_KERNEL))
+		ret = arch_pwrdm->pwrdm_wait_transition(pwrdm);
+
 	if (!ret)
 		_pwrdm_state_switch(pwrdm);
 
