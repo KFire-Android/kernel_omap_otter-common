@@ -90,8 +90,17 @@ enum pwrdm_func_state {
  *    powerdomain's next-functional-power-state -- struct
  *    powerdomain.next_fpwrst -- is valid.  If this bit is not set,
  *    the code needs to load the current value from the hardware.
+ *
+ * _PWRDM_PREV_FPWRST_IS_VALID: the locally-cached copy of the
+ *    powerdomain's previous-functional-power-state -- struct
+ *    powerdomain.prev_fpwrst -- is valid.  If this bit is not set,
+ *    the code needs to load the current value from the hardware.  The
+ *    previous-functional-power-state cache for the CORE and MPU needs
+ *    to be invalidated right before WFI, unless they were not programmed
+ *    to change power states.
  */
 #define _PWRDM_NEXT_FPWRST_IS_VALID	BIT(0)
+#define _PWRDM_PREV_FPWRST_IS_VALID	BIT(1)
 
 /*
  * Number of memory banks that are power-controllable.	On OMAP4430, the
@@ -138,6 +147,7 @@ struct powerdomain;
  * @fpwrst: current func power state (set in pwrdm_state_switch() or post_trans)
  * @fpwrst_counter: estimated number of times the pwrdm entered the power states
  * @next_fpwrst: cache of the powerdomain's next-power-state
+ * @prev_fpwrst: cache of the powerdomain's previous-power-state bitfield
  * @timer: sched_clock() timestamp of last pwrdm_state_switch()
  * @fpwrst_timer: estimated nanoseconds of residency in the various power states
  * @_lock: spinlock used to serialize powerdomain and some clockdomain ops
@@ -145,6 +155,9 @@ struct powerdomain;
  * @_flags: flags (for internal use only)
  *
  * @prcm_partition possible values are defined in mach-omap2/prcm44xx.h.
+ *
+ * @prev_fpwrst is updated during pwrdm_pre_transition(), but presumably
+ * should also be updated upon clock/IP block idle transitions.
  *
  * Possible values for @_flags are documented above in the
  * "Powerdomain internal flags (struct powerdomain._flags)" comments.
@@ -165,6 +178,7 @@ struct powerdomain {
 	const u8 prcm_partition;
 	u8 fpwrst;
 	u8 next_fpwrst;
+	u8 prev_fpwrst;
 	u8 _flags;
 	struct clockdomain *pwrdm_clkdms[PWRDM_MAX_CLKDMS];
 	struct list_head node;

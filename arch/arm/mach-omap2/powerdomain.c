@@ -499,6 +499,9 @@ static int _pwrdm_read_prev_fpwrst(struct powerdomain *pwrdm)
 	if (!_pwrdm_pwrst_can_change(pwrdm))
 		return PWRDM_FUNC_PWRST_ON;
 
+	if (pwrdm->_flags & _PWRDM_PREV_FPWRST_IS_VALID)
+		return pwrdm->prev_fpwrst;
+
 	pwrst = arch_pwrdm->pwrdm_read_prev_pwrst(pwrdm);
 	if (pwrst < 0)
 		return pwrst;
@@ -512,6 +515,10 @@ static int _pwrdm_read_prev_fpwrst(struct powerdomain *pwrdm)
 	}
 
 	ret = _pwrdm_pwrst_to_fpwrst(pwrdm, pwrst, logic_pwrst, &fpwrst);
+	if (!ret) {
+		pwrdm->prev_fpwrst = fpwrst;
+		pwrdm->_flags |= _PWRDM_PREV_FPWRST_IS_VALID;
+	}
 
 	return (ret) ? ret : fpwrst;
 }
@@ -1016,6 +1023,8 @@ int pwrdm_clear_all_prev_pwrst(struct powerdomain *pwrdm)
 
 	pr_debug("powerdomain: %s: clearing previous power state reg\n",
 		 pwrdm->name);
+
+	pwrdm->_flags &= ~_PWRDM_PREV_FPWRST_IS_VALID;
 
 	if (arch_pwrdm && arch_pwrdm->pwrdm_clear_all_prev_pwrst)
 		ret = arch_pwrdm->pwrdm_clear_all_prev_pwrst(pwrdm);
