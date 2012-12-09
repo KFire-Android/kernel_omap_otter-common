@@ -232,19 +232,10 @@ struct voltagedomain *pwrdm_get_voltdm(struct powerdomain *pwrdm);
 
 int pwrdm_get_mem_bank_count(struct powerdomain *pwrdm);
 
-int pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst);
-int pwrdm_read_next_pwrst(struct powerdomain *pwrdm);
-int pwrdm_read_pwrst(struct powerdomain *pwrdm);
-int pwrdm_read_prev_pwrst(struct powerdomain *pwrdm);
 int pwrdm_clear_all_prev_pwrst(struct powerdomain *pwrdm);
 
-int pwrdm_set_logic_retst(struct powerdomain *pwrdm, u8 pwrst);
 int pwrdm_set_mem_onst(struct powerdomain *pwrdm, u8 bank, u8 pwrst);
 int pwrdm_set_mem_retst(struct powerdomain *pwrdm, u8 bank, u8 pwrst);
-
-int pwrdm_read_logic_pwrst(struct powerdomain *pwrdm);
-int pwrdm_read_prev_logic_pwrst(struct powerdomain *pwrdm);
-int pwrdm_read_logic_retst(struct powerdomain *pwrdm);
 int pwrdm_read_mem_pwrst(struct powerdomain *pwrdm, u8 bank);
 int pwrdm_read_prev_mem_pwrst(struct powerdomain *pwrdm, u8 bank);
 int pwrdm_read_mem_retst(struct powerdomain *pwrdm, u8 bank);
