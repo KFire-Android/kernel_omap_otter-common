@@ -824,52 +824,80 @@ static void tc358765_power_off(struct omap_dss_device *dssdev)
 	gpio_set_value(dssdev->reset_gpio, 0);
 }
 
-static void tc358765_disable(struct omap_dss_device *dssdev)
+static inline void tc358765_disable_int(struct omap_dss_device *dssdev,
+		enum omap_dss_display_state target)
 {
 	struct tc358765_data *d2d = dev_get_drvdata(&dssdev->dev);
 
-	dev_dbg(&dssdev->dev, "disable\n");
+	mutex_lock(&d2d->lock);
+	dsi_bus_lock(dssdev);
 
-	if (dssdev->state == OMAP_DSS_DISPLAY_ACTIVE) {
-		mutex_lock(&d2d->lock);
-		dsi_bus_lock(dssdev);
+	tc358765_power_off(dssdev);
+	dssdev->state = target;
 
-		tc358765_power_off(dssdev);
-
-		dsi_bus_unlock(dssdev);
-		mutex_unlock(&d2d->lock);
-	}
-
-	dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
+	dsi_bus_unlock(dssdev);
+	mutex_unlock(&d2d->lock);
 }
 
-static int tc358765_enable(struct omap_dss_device *dssdev)
+static inline int tc358765_enable_int(struct omap_dss_device *dssdev)
 {
 	struct tc358765_data *d2d = dev_get_drvdata(&dssdev->dev);
 	int r = 0;
-
-	dev_dbg(&dssdev->dev, "enable\n");
-
-	if (dssdev->state != OMAP_DSS_DISPLAY_DISABLED)
-		return -EINVAL;
 
 	mutex_lock(&d2d->lock);
 	dsi_bus_lock(dssdev);
 
 	r = tc358765_power_on(dssdev);
 
-	dsi_bus_unlock(dssdev);
-
-	if (r) {
+	if (r)
 		dev_dbg(&dssdev->dev, "enable failed\n");
-		dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
-	} else {
+	else
 		dssdev->state = OMAP_DSS_DISPLAY_ACTIVE;
-	}
 
+	dsi_bus_unlock(dssdev);
 	mutex_unlock(&d2d->lock);
 
 	return r;
+}
+
+static void tc358765_disable(struct omap_dss_device *dssdev)
+{
+	dev_dbg(&dssdev->dev, "disable\n");
+
+	if (dssdev->state == OMAP_DSS_DISPLAY_ACTIVE)
+		tc358765_disable_int(dssdev, OMAP_DSS_DISPLAY_DISABLED);
+}
+
+static int tc358765_enable(struct omap_dss_device *dssdev)
+{
+	dev_dbg(&dssdev->dev, "enable\n");
+
+	if (dssdev->state != OMAP_DSS_DISPLAY_DISABLED)
+		return -EINVAL;
+
+	return tc358765_enable_int(dssdev);
+}
+
+static int tc358765_suspend(struct omap_dss_device *dssdev)
+{
+	dev_dbg(&dssdev->dev, "suspend\n");
+
+	if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE)
+		return -EINVAL;
+
+	tc358765_disable_int(dssdev, OMAP_DSS_DISPLAY_SUSPENDED);
+
+	return 0;
+}
+
+static int tc358765_resume(struct omap_dss_device *dssdev)
+{
+	dev_dbg(&dssdev->dev, "resume\n");
+
+	if (dssdev->state != OMAP_DSS_DISPLAY_SUSPENDED)
+		return -EINVAL;
+
+	return tc358765_enable_int(dssdev);
 }
 
 static struct omap_dss_driver tc358765_driver = {
@@ -878,6 +906,8 @@ static struct omap_dss_driver tc358765_driver = {
 
 	.enable		= tc358765_enable,
 	.disable	= tc358765_disable,
+	.suspend	= tc358765_suspend,
+	.resume		= tc358765_resume,
 
 	.get_resolution	= tc358765_get_resolution,
 	.get_recommended_bpp = omapdss_default_get_recommended_bpp,
