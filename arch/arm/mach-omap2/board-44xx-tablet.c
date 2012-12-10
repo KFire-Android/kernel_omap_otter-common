@@ -486,6 +486,18 @@ static struct twl_reg_setup_array omap4460_twl6030_setup[] = {
 		.val = 0x77,
 		.desc = "VCORE1 disable PD on shutdown",
 	},
+	{
+		.mod_no = TWL6030_MODULE_ID0,
+		.addr = TWL6030_REG_VCORE3_CFG_GRP,
+		.val = 0x00,
+		.desc = "VCORE3 - remove binding to groups",
+	},
+	{
+		.mod_no = TWL6030_MODULE_ID0,
+		.addr = TWL6030_REG_VMEM_CFG_GRP,
+		.val = 0x00,
+		.desc = "VMEM - remove binding to groups",
+	},
 	{ .desc = NULL} /* TERMINATOR */
 };
 

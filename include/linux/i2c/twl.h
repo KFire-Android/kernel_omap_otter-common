@@ -470,6 +470,8 @@ static inline int twl6030_mmc_card_detect(struct device *dev, int slot)
 #define TWL6030_REG_VCORE3_CFG_GRP		0x5e
 #define TWL6030_REG_VCORE3_CFG_TRANS		0x5f
 
+#define TWL6030_REG_VMEM_CFG_GRP		0x64
+
 #define TWL6030_REG_CFG_TRANS_OFF_CMD_OFFSET	0x4
 #define TWL6030_REG_CFG_TRANS_SLEEP_CMD_OFFSET	0x2
 #define TWL6030_REG_CFG_TRANS_ACT_CMD_OFFSET	0x0
