@@ -4178,7 +4178,7 @@ static struct omap_hwmod_ocp_if *omap54xx_mmc1_slaves[] = {
 };
 
 static struct omap_hwmod_opt_clk mmc1_opt_clks[] = {
-	{ .role = "32khz_clk", .clk = "mmc1_32khz_clk" },
+	{ .role = "32khz_clk", .clk = "mmc1_32k_gfclk" },
 };
 
 /* mmc1 dev_attr */
