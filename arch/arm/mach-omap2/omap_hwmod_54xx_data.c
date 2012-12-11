@@ -1690,7 +1690,7 @@ static struct omap_hwmod_ocp_if omap54xx_emif_ocp_fw__emif1 = {
 	.master		= &omap54xx_emif_ocp_fw_hwmod,
 	.slave		= &omap54xx_emif1_hwmod,
 	.clk		= "dpll_core_h11x2_ck",
-	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+	.user		= OCP_USER_SDMA,
 };
 
 static struct omap_hwmod_addr_space omap54xx_emif1_addrs[] = {
@@ -1747,7 +1747,7 @@ static struct omap_hwmod_ocp_if omap54xx_emif_ocp_fw__emif2 = {
 	.master		= &omap54xx_emif_ocp_fw_hwmod,
 	.slave		= &omap54xx_emif2_hwmod,
 	.clk		= "dpll_core_h11x2_ck",
-	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+	.user		= OCP_USER_SDMA,
 };
 
 static struct omap_hwmod_addr_space omap54xx_emif2_addrs[] = {
