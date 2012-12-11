@@ -1026,17 +1026,20 @@ int omap_usbhs_disable_update_sar(void)
 }
 #else
 
+static int usbhs_update_sar = 1;
+
 void __init usbhs_init(const struct usbhs_omap_board_data *pdata)
 {
 }
 
 int omap_usbhs_update_sar(void)
 {
-	return 0;
+	return usbhs_update_sar;
 }
 
 int omap_usbhs_disable_update_sar(void)
 {
+	usbhs_update_sar = 0;
 	return 0;
 }
 #endif
