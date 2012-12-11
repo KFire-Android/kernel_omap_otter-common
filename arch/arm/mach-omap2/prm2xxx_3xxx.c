@@ -387,3 +387,39 @@ static int __init omap3xxx_prcm_init(void)
 	return ret;
 }
 subsys_initcall(omap3xxx_prcm_init);
+
+/* PRM ABB */
+
+/*
+ * struct omap36xx_abb - OMAP3 ABB register access description
+ * @tranxdone_status: ABB_xxx_DONE_ST bitmask in PRM_IRQSTATUS reg
+ */
+struct omap36xx_abb {
+	u32 tranxdone_status;
+};
+
+static struct omap36xx_abb omap36xx_abb[] = {
+	[OMAP3_VP_VDD_MPU_ID] = {
+		.tranxdone_status = OMAP3630_ABB_LDO_TRANXDONE_ST_MASK,
+	},
+};
+
+#define MAX_ABB_ID ARRAY_SIZE(omap36xx_abb);
+
+u32 omap3_prm_abb_check_txdone(u8 abb_id)
+{
+	struct omap36xx_abb *abb = &omap36xx_abb[abb_id];
+	u32 irqstatus;
+
+	irqstatus = omap2_prm_read_mod_reg(OCP_MOD,
+					   OMAP3_PRM_IRQSTATUS_MPU_OFFSET);
+	return irqstatus & abb->tranxdone_status;
+}
+
+void omap3_prm_abb_clear_txdone(u8 abb_id)
+{
+	struct omap36xx_abb *abb = &omap36xx_abb[abb_id];
+
+	omap2_prm_write_mod_reg(abb->tranxdone_status,
+				OCP_MOD, OMAP3_PRM_IRQSTATUS_MPU_OFFSET);
+}

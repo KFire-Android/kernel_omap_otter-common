@@ -327,3 +327,47 @@ static int __init omap4xxx_prcm_init(void)
 	return ret;
 }
 subsys_initcall(omap4xxx_prcm_init);
+
+/* PRM ABB */
+
+/*
+ * struct omap4_vp - OMAP4 VP register access description.
+ * @irqstatus_mpu: offset to IRQSTATUS_MPU register for VP
+ * @tranxdone_status: VP_TRANXDONE_ST bitmask in PRM_IRQSTATUS_MPU reg
+ */
+struct omap4_abb {
+	u32 irqstatus_mpu;
+	u32 tranxdone_status;
+};
+
+static struct omap4_abb omap4_abb[] = {
+	[OMAP4_VP_VDD_MPU_ID] = {
+		.irqstatus_mpu = OMAP4_PRM_IRQSTATUS_MPU_2_OFFSET,
+		.tranxdone_status = OMAP4430_ABB_MPU_DONE_ST_MASK,
+	},
+	[OMAP4_VP_VDD_IVA_ID] = {
+		.irqstatus_mpu = OMAP4_PRM_IRQSTATUS_MPU_OFFSET,
+		.tranxdone_status = OMAP4430_ABB_IVA_DONE_ST_MASK,
+	},
+};
+
+u32 omap4_prm_abb_check_txdone(u8 abb_id)
+{
+	struct omap4_abb *abb = &omap4_abb[abb_id];
+	u32 irqstatus;
+
+	irqstatus = omap4_prminst_read_inst_reg(OMAP4430_PRM_PARTITION,
+						OMAP4430_PRM_OCP_SOCKET_INST,
+						abb->irqstatus_mpu);
+	return irqstatus & abb->tranxdone_status;
+}
+
+void omap4_prm_abb_clear_txdone(u8 abb_id)
+{
+	struct omap4_abb *abb = &omap4_abb[abb_id];
+
+	omap4_prminst_write_inst_reg(abb->tranxdone_status,
+				     OMAP4430_PRM_PARTITION,
+				     OMAP4430_PRM_OCP_SOCKET_INST,
+				     abb->irqstatus_mpu);
+};

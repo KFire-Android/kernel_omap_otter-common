@@ -31,6 +31,7 @@
 #include "omap_opp_data.h"
 #include "vc.h"
 #include "vp.h"
+#include "abb.h"
 
 static const struct omap_vfsm_instance omap4_vdd_mpu_vfsm = {
 	.voltsetup_reg = OMAP4_PRM_VOLTSETUP_MPU_RET_SLEEP_OFFSET,
@@ -57,6 +58,7 @@ static struct voltagedomain omap4_voltdm_mpu = {
 	.vfsm = &omap4_vdd_mpu_vfsm,
 	.vp = &omap4_vp_mpu,
 	.auto_ret = true,
+	.abb = &omap4_abb_mpu,
 };
 
 static struct voltagedomain omap4_voltdm_iva = {
@@ -70,6 +72,7 @@ static struct voltagedomain omap4_voltdm_iva = {
 	.vp = &omap4_vp_iva,
 	/* disable auto_ret for mm domain due to known issues */
 	.auto_ret = false,
+	.abb = &omap4_abb_iva,
 };
 
 static struct voltagedomain omap4_voltdm_core = {
