@@ -105,12 +105,21 @@ static struct sar_overwrite_entry omap4_sar_overwrite_data[OW_IDX_SIZE] = {
 };
 
 static struct sar_overwrite_entry omap5_sar_overwrite_data[OW_IDX_SIZE] = {
+#ifdef CONFIG_ARCH_OMAP5_ES1
 	[MEMIF_CLKSTCTRL_IDX] = { .reg_addr = 0x4a009e24 },
 	[MEMIF_CLKSTCTRL_2_IDX] = { .reg_addr = 0x4a009e24 },
 	[SHADOW_FREQ_CFG1_IDX] = { .reg_addr = 0x4a004e38 },
 	[HSUSBHOST_CLKCTRL_IDX] = { .reg_addr = 0x4a009e60 },
 	[HSUSBHOST_CLKCTRL_2_IDX] = { .reg_addr = 0x4a009e60 },
 	[L3INIT_CLKSTCTRL_IDX] = { .reg_addr = 0x4a009e2c },
+#else
+	[MEMIF_CLKSTCTRL_IDX] = { .reg_addr = 0x4a009e24 },
+	[MEMIF_CLKSTCTRL_2_IDX] = { .reg_addr = 0x4a009e24 },
+	[SHADOW_FREQ_CFG1_IDX] = { .reg_addr = 0x4a004e40 },
+	[HSUSBHOST_CLKCTRL_IDX] = { .reg_addr = 0x4a009e64 },
+	[HSUSBHOST_CLKCTRL_2_IDX] = { .reg_addr = 0x4a009e64 },
+	[L3INIT_CLKSTCTRL_IDX] = { .reg_addr = 0x4a009e2c },
+#endif
 };
 
 /**
