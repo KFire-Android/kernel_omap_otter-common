@@ -292,6 +292,25 @@ static int ehci_omap_hub_control(
 					temp & ~(PORT_RWC_BITS | PORT_RESUME),
 					status_reg);
 				clear_bit(wIndex - 1, &ehci->resuming_ports);
+
+				/*
+				 * i701 errata WA:
+				 * Manually send the "switch to HS" command
+				 * to the PHY (write 0x40 to function_control
+				 * register thanks to INSNREG05_ULPI register)
+				 * right after the "stop drive K" (that is
+				 * clear PORTSC[6]:FPR).
+				 */
+				if ((cpu_is_omap44xx() || (cpu_is_omap543x()
+						&& ((omap_rev()
+							== OMAP5430_REV_ES1_0)
+						|| omap_rev() ==
+							OMAP5432_REV_ES1_0)))
+						&& (pdata->port_mode[wIndex - 1]
+						   == OMAP_EHCI_PORT_MODE_PHY))
+					omap_ehci_ulpi_write(hcd, wIndex, 0x40,
+							0x4, 20);
+
 				retval = handshake(ehci, status_reg,
 					   PORT_RESUME, 0, 2000 /* 2msec */);
 				if (retval != 0) {
