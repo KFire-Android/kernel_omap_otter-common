@@ -1216,45 +1216,6 @@ static struct omap_hwmod_class omap54xx_mmu_hwmod_class = {
 	.sysc	= &omap54xx_mmu_sysc,
 };
 
-/* mmu_dsp */
-static struct omap_hwmod omap54xx_mmu_dsp_hwmod;
-static struct omap_hwmod_addr_space omap54xx_mmu_dsp_addrs[] = {
-	{
-		.pa_start	= 0x4a066000,
-		.pa_end		= 0x4a0660ff,
-		.flags		= ADDR_TYPE_RT
-	},
-	{ }
-};
-
-/* l4_cfg -> mmu_dsp */
-static struct omap_hwmod_ocp_if omap54xx_l4_cfg__mmu_dsp = {
-	.master		= &omap54xx_l4_cfg_hwmod,
-	.slave		= &omap54xx_mmu_dsp_hwmod,
-	.clk		= "l4_root_clk_div",
-	.addr		= omap54xx_mmu_dsp_addrs,
-	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-};
-
-/* mmu_dsp slave ports */
-static struct omap_hwmod_ocp_if *omap54xx_mmu_dsp_slaves[] = {
-	&omap54xx_l4_cfg__mmu_dsp,
-};
-
-static struct omap_hwmod omap54xx_mmu_dsp_hwmod = {
-	.name		= "mmu_dsp",
-	.class		= &omap54xx_mmu_hwmod_class,
-	.clkdm_name	= "dsp_clkdm",
-	.main_clk	= "dpll_iva_h11x2_ck",
-	.prcm = {
-		.omap4 = {
-			.context_offs = USHRT_MAX,
-		},
-	},
-	.slaves		= omap54xx_mmu_dsp_slaves,
-	.slaves_cnt	= ARRAY_SIZE(omap54xx_mmu_dsp_slaves),
-};
-
 /*
  * 'dss' class
  * display sub-system
@@ -3027,49 +2988,6 @@ static struct omap_hwmod omap54xx_intc_ipu_c1_hwmod = {
 	},
 	.slaves		= omap54xx_intc_ipu_c1_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap54xx_intc_ipu_c1_slaves),
-};
-
-/*
- * 'mmu' class
- * ipu unicache and mmu controllers
- */
-
-/* mmu_ipu */
-static struct omap_hwmod omap54xx_mmu_ipu_hwmod;
-static struct omap_hwmod_addr_space omap54xx_mmu_ipu_addrs[] = {
-	{
-		.pa_start	= 0x55080800,
-		.pa_end		= 0x55080fff,
-	},
-	{ }
-};
-
-/* l3_main_2 -> mmu_ipu */
-static struct omap_hwmod_ocp_if omap54xx_l3_main_2__mmu_ipu = {
-	.master		= &omap54xx_l3_main_2_hwmod,
-	.slave		= &omap54xx_mmu_ipu_hwmod,
-	.clk		= "l3_iclk_div",
-	.addr		= omap54xx_mmu_ipu_addrs,
-	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-};
-
-/* mmu_ipu slave ports */
-static struct omap_hwmod_ocp_if *omap54xx_mmu_ipu_slaves[] = {
-	&omap54xx_l3_main_2__mmu_ipu,
-};
-
-static struct omap_hwmod omap54xx_mmu_ipu_hwmod = {
-	.name		= "mmu_ipu",
-	.class		= &omap54xx_mmu_hwmod_class,
-	.clkdm_name	= "ipu_clkdm",
-	.main_clk	= "dpll_core_h22x2_ck",
-	.prcm = {
-		.omap4 = {
-			.context_offs = USHRT_MAX,
-		},
-	},
-	.slaves		= omap54xx_mmu_ipu_slaves,
-	.slaves_cnt	= ARRAY_SIZE(omap54xx_mmu_ipu_slaves),
 };
 
 /*
@@ -6460,7 +6378,6 @@ static __initdata struct omap_hwmod *omap54xx_hwmods[] = {
 	&omap54xx_dsp_hwmod,
 	&omap54xx_dsp_c0_hwmod,
 #endif
-	&omap54xx_mmu_dsp_hwmod,
 
 	/* dss class */
 	&omap54xx_dss_hwmod,
@@ -6509,7 +6426,6 @@ static __initdata struct omap_hwmod *omap54xx_hwmods[] = {
 	&omap54xx_ipu_c1_hwmod,
 	&omap54xx_intc_ipu_c0_hwmod,
 	&omap54xx_intc_ipu_c1_hwmod,
-	&omap54xx_mmu_ipu_hwmod,
 #endif
 
 	/* iss class */
