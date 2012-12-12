@@ -441,9 +441,9 @@ void omap4_prm_vp_clear_txdone(u8 vp_id);
  * OMAP4 access functions for voltage controller (VC) and
  * voltage proccessor (VP) in the PRM.
  */
-extern u32 omap4_prm_vcvp_read(u8 offset);
-extern void omap4_prm_vcvp_write(u32 val, u8 offset);
-extern u32 omap4_prm_vcvp_rmw(u32 mask, u32 bits, u8 offset);
+extern u32 omap5_prm_vcvp_read(u8 offset);
+extern void omap5_prm_vcvp_write(u32 val, u8 offset);
+extern u32 omap5_prm_vcvp_rmw(u32 mask, u32 bits, u8 offset);
 
 /* PRM interrupt-related functions */
 extern void omap44xx_prm_read_pending_irqs(unsigned long *events);

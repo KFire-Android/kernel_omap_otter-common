@@ -25,6 +25,7 @@
 #include "common.h"
 #include "vp.h"
 #include "prm44xx.h"
+#include "prm54xx.h"
 #include "prm-regbits-44xx.h"
 #include "prcm44xx.h"
 #include "prminst44xx.h"
@@ -140,6 +141,26 @@ u32 omap4_prm_vcvp_rmw(u32 mask, u32 bits, u8 offset)
 	return omap4_prminst_rmw_inst_reg_bits(mask, bits,
 					       OMAP4430_PRM_PARTITION,
 					       OMAP4430_PRM_DEVICE_INST,
+					       offset);
+}
+
+u32 omap5_prm_vcvp_read(u8 offset)
+{
+	return omap4_prminst_read_inst_reg(OMAP54XX_PRM_PARTITION,
+					   OMAP54XX_PRM_DEVICE_INST, offset);
+}
+
+void omap5_prm_vcvp_write(u32 val, u8 offset)
+{
+	omap4_prminst_write_inst_reg(val, OMAP54XX_PRM_PARTITION,
+				     OMAP54XX_PRM_DEVICE_INST, offset);
+}
+
+u32 omap5_prm_vcvp_rmw(u32 mask, u32 bits, u8 offset)
+{
+	return omap4_prminst_rmw_inst_reg_bits(mask, bits,
+					       OMAP54XX_PRM_PARTITION,
+					       OMAP54XX_PRM_DEVICE_INST,
 					       offset);
 }
 
