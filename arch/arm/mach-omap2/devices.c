@@ -59,7 +59,7 @@ static int __init omap_init_control(void)
 	struct omap_hwmod		*oh;
 	struct platform_device		*pdev;
 	const char			*oh_name, *name;
-	struct omap_control_data	*pdata;
+	struct omap_control_data	pdata = { 0 };
 
 	/*
 	 * To avoid code running on other OMAPs in
@@ -81,21 +81,16 @@ static int __init omap_init_control(void)
 	if (of_have_populated_dt()) {
 		/* Probe the driver using the Device Tree model */
 		pdev = omap_device_build(name, -1, oh, NULL, 0, NULL, 0, true);
-	} else { /* Probe the driver using platform data */
-		pdata = kzalloc(sizeof(*pdata), GFP_KERNEL);
-		if (!pdata) {
-			pr_err("%s: No memory for scm pdata\n", __func__);
-			return -EINVAL;
-		}
-
-		pdata->has_usb_phy = true;
-		pdata->has_bandgap = true;
+	} else {
+		/* Probe the driver using platform data */
+		pdata.has_usb_phy = true;
+		pdata.has_bandgap = true;
 		if (cpu_is_omap44xx())
-			pdata->rev = 1;
+			pdata.rev = 1;
 		else
-			pdata->rev = 2;
+			pdata.rev = 2;
 
-		pdev = omap_device_build(name, -1, oh, pdata, sizeof(*pdata),
+		pdev = omap_device_build(name, -1, oh, &pdata, sizeof(pdata),
 							NULL, 0, false);
 	}
 
