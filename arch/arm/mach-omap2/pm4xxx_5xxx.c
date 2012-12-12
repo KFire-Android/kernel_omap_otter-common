@@ -830,6 +830,9 @@ static void __init omap4_scrm_setup_timings(void)
 	 */
 	reset_delay_time = omap_pm_get_rsttime_latency();
 	if (!voltdm_for_each(_voltdm_sum_time, (void *)&reset_delay_time)) {
+		s16 dev_inst = cpu_is_omap44xx() ? OMAP4430_PRM_DEVICE_INST :
+						   OMAP54XX_PRM_DEVICE_INST;
+
 		reset_delay_time += tstart + tshut;
 		val = omap4_usec_to_val_scrm(reset_delay_time,
 					     OMAP4430_RSTTIME1_SHIFT,
@@ -837,7 +840,7 @@ static void __init omap4_scrm_setup_timings(void)
 		omap4_prminst_rmw_inst_reg_bits(OMAP4430_RSTTIME1_MASK,
 						val,
 						OMAP4430_PRM_PARTITION,
-						OMAP4430_PRM_DEVICE_INST,
+						dev_inst,
 						OMAP4_PRM_RSTTIME_OFFSET);
 	}
 
