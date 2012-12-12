@@ -55,7 +55,6 @@ static unsigned int current_target_freq;
 static unsigned int current_cooling_level;
 static unsigned int cpu_cooling_level;
 static unsigned int case_cooling_level;
-static unsigned int new_cooling_level;
 static bool omap_cpufreq_ready;
 
 static unsigned int en_therm_freq_print;
@@ -270,6 +269,7 @@ static void omap_thermal_step_freq(struct cpufreq_policy *policy,
 static int cpufreq_apply_cooling(struct thermal_dev *dev, int cooling_level)
 {
 	struct cpufreq_policy policy;
+	unsigned int new_cooling_level;
 
 	cpufreq_get_policy(&policy, 0);
 
