@@ -57,6 +57,7 @@
 #define	EHCI_INSNREG05_ULPI_EXTREGADD_SHIFT		8
 #define	EHCI_INSNREG05_ULPI_WRDATA_SHIFT		0
 #define L3INIT_HSUSBHOST_CLKCTRL			(0x4A009358)
+#define L3INIT_HSUSBTLL_CLKCTRL				(0x4A009368)
 
 /* EHCI-HSIC module requires L3 clocked @ 250MHz+ */
 #define PM_QOS_MEMORY_THROUGHPUT_USBHOST         (250 * 4 * 1000)
@@ -204,6 +205,10 @@ static int ehci_omap_hub_control(
 	unsigned long	flags;
 	int		retval = 0;
 
+	u32		runstop = 0, temp_reg, tll_reg;
+
+	tll_reg = (u32)OMAP2_L4_IO_ADDRESS(L3INIT_HSUSBTLL_CLKCTRL);
+
 	if (((wIndex & 0xff) > 0) && ((wIndex & 0xff) < OMAP3_HS_USB_PORTS) &&
 			(pdata->port_mode[wIndex-1] ==
 					OMAP_EHCI_PORT_MODE_PHY)) {
@@ -286,11 +291,56 @@ static int ehci_omap_hub_control(
 				set_bit(wIndex - 1, &ehci->port_c_suspend);
 				ehci->reset_done[wIndex - 1] = 0;
 
-				/* stop resume signaling */
-				temp = ehci_readl(ehci, status_reg);
-				ehci_writel(ehci,
-					temp & ~(PORT_RWC_BITS | PORT_RESUME),
-					status_reg);
+				/*
+				 * i640 errata WA:
+				 * To Stop Resume Signalling, it is required
+				 * to Stop the Host Controller and disable the
+				 * TLL Functional Clock.
+				 * This errata is very specific. The timing
+				 * window between clearing FPR and cutting the
+				 * clock is very critical (nanoseconds).
+				 * Clock framework cannot guarantee such timing
+				 * so direct writing to L3INIT_HSUSBTLL_CLKCTRL
+				 * register have been used instead of functions
+				 * provided by clock framework.
+				 */
+				if (cpu_is_omap44xx()
+						&& (omap_rev() < OMAP4430_REV_ES2_3)
+						&& (pdata->port_mode[wIndex - 1]
+							== OMAP_EHCI_PORT_MODE_TLL)) {
+
+					/* Stop the Host Controller */
+					runstop = ehci_readl(ehci,
+							&ehci->regs->command);
+					ehci_writel(ehci, (runstop & ~CMD_RUN),
+							&ehci->regs->command);
+					(void) ehci_readl(ehci,
+							&ehci->regs->command);
+					handshake(ehci, &ehci->regs->status,
+							STS_HALT,
+							STS_HALT,
+							2000);
+					temp_reg = __raw_readl(tll_reg);
+					temp_reg &= ~(1 << (wIndex + 7));
+
+					/* stop resume signaling */
+					temp = __raw_readl(status_reg)
+							& ~(PORT_RWC_BITS
+							| PORT_RESUME);
+					__raw_writel(temp, status_reg);
+
+					/* Disable the Channel Optional Fclk */
+					__raw_writel(temp_reg, tll_reg);
+					dmb();
+				} else {
+					/* stop resume signaling */
+					temp = ehci_readl(ehci, status_reg);
+					ehci_writel(ehci,
+						temp & ~(PORT_RWC_BITS
+								| PORT_RESUME),
+						status_reg);
+				}
+
 				clear_bit(wIndex - 1, &ehci->resuming_ports);
 
 				/*
@@ -313,6 +363,28 @@ static int ehci_omap_hub_control(
 
 				retval = handshake(ehci, status_reg,
 					   PORT_RESUME, 0, 2000 /* 2msec */);
+
+				/*
+				 * i640 errata WA (continued):
+				 * Enable the Host Controller and start the
+				 * Channel Optional Fclk since resume has
+				 * finished.
+				 */
+				if (cpu_is_omap44xx()
+						&& (omap_rev() < OMAP4430_REV_ES2_3)
+						&& (pdata->port_mode[wIndex - 1]
+							== OMAP_EHCI_PORT_MODE_TLL)) {
+					udelay(3);
+					temp_reg = omap_readl(L3INIT_HSUSBTLL_CLKCTRL);
+					omap_writel((temp_reg
+							| (1 << (wIndex + 7))),
+							L3INIT_HSUSBTLL_CLKCTRL);
+					ehci_writel(ehci, runstop,
+							&ehci->regs->command);
+					(void) ehci_readl(ehci,
+							&ehci->regs->command);
+				}
+
 				if (retval != 0) {
 					ehci_err(ehci,
 						"port %d resume error %d\n",
