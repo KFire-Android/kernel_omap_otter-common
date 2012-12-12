@@ -442,16 +442,16 @@ static void __init omap_init_mcpdm(void)
 		omap_mux_init_signal("abe_clks.abe_clks",
 				OMAP_PIN_INPUT_PULLDOWN);
 	} else if (cpu_is_omap54xx()) {
-		omap_mux_init_signal("abemcpdm_ul_data.abe_pdm_ul_data",
+		omap_mux_init_signal("abemcpdm_ul_data.abemcpdm_ul_data",
 				OMAP_PIN_INPUT_PULLDOWN);
 
-		omap_mux_init_signal("abemcpdm_dl_data.abe_pdm_dl_data",
+		omap_mux_init_signal("abemcpdm_dl_data.abemcpdm_dl_data",
 				OMAP_PIN_INPUT_PULLDOWN);
 
-		omap_mux_init_signal("abemcpdm_frame.abe_pdm_frame",
+		omap_mux_init_signal("abemcpdm_frame.abemcpdm_frame",
 				OMAP_PIN_INPUT_PULLUP);
 
-		omap_mux_init_signal("abemcpdm_lb_clk.abe_pdm_lb_clk",
+		omap_mux_init_signal("abemcpdm_lb_clk.abemcpdm_lb_clk",
 				OMAP_PIN_INPUT_PULLDOWN);
 
 		omap_mux_init_signal("abe_clks.abe_clks",

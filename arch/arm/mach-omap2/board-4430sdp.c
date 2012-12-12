@@ -59,6 +59,7 @@
 #include "common-board-devices.h"
 #include "board-44xx-blaze.h"
 #include "omap_ram_console.h"
+#include "pm.h"
 
 #define SDP4430_FB_RAM_SIZE		SZ_16M /* 1920×1080*4 * 2 */
 
@@ -1169,6 +1170,8 @@ static void __init omap_4430sdp_init(void)
 		if (status)
 			pr_err("TPS62361 initialization failed: %d\n", status);
 	}
+
+	omap_enable_smartreflex_on_init();
 }
 
 static void __init omap_4430sdp_reserve(void)

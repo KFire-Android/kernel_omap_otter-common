@@ -49,6 +49,8 @@
 #include "common.h"
 #include "control.h"
 #include "common-board-devices.h"
+#include "pm.h"
+
 #include "board-44xx-tablet.h"
 #include "omap4_ion.h"
 #include "omap_ram_console.h"
@@ -515,6 +517,8 @@ static void __init omap_tablet_init(void)
 		if (status)
 			pr_err("TPS62361 initialization failed: %d\n", status);
 	}
+
+	omap_enable_smartreflex_on_init();
 }
 
 static void __init omap_tablet_reserve(void)

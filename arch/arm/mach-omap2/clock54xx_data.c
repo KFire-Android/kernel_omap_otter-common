@@ -2674,6 +2674,7 @@ static struct clk_lookup omap54xx_clks[] = {
 	CLKDEV_INIT(NULL,	"aess_fclk",			&aess_fclk),
 	CLKDEV_INIT(NULL,	"dmic_sync_mux_ck",		&dmic_sync_mux_ck),
 	CLKDEV_INIT(NULL,	"dmic_gfclk",			&dmic_gfclk),
+	CLKDEV_INIT(NULL,	"dmic_fck",			&dmic_gfclk),
 	CLKDEV_INIT(NULL,	"fdif_fclk",			&fdif_fclk),
 	CLKDEV_INIT(NULL,	"hsi_fclk",			&hsi_fclk),
 	CLKDEV_INIT(NULL,	"mcasp_sync_mux_ck",		&mcasp_sync_mux_ck),

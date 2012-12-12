@@ -67,6 +67,10 @@ u16 pm44xx_errata;
 
 static struct powerdomain *tesla_pwrdm;
 static struct clockdomain *tesla_clkdm;
+static struct clockdomain *emif_clkdm;
+static struct clockdomain *mpuss_clkdm;
+static int staticdep_wa_i745_applied;
+
 static struct powerdomain *gpu_pd;
 static struct voltagedomain *mpu_vdd, *core_vdd, *mm_vdd;
 
@@ -79,10 +83,24 @@ static struct voltagedomain *mpu_vdd, *core_vdd, *mm_vdd;
 /*
  * Errata ID: i608: All OMAP4
  * On OMAP4, Retention-Till-Access Memory feature is not working
- * reliably and hardware recommondation is keep it disabled by
+ * reliably and hardware recommendation is keep it disabled by
  * default
  */
 #define OMAP44xx_54xx_PM_ERRATUM_RTA_i608		BIT(1)
+
+/* MPU EMIF Static Dependency Needed due to i731 erratum ID for 443x */
+#define OMAP44xx_54xx_PM_ERRATUM_MPU_EMIF_STATIC_DEP_NEEDED_i731	BIT(2)
+
+/*
+ * Dynamic Dependency cannot be permanently enabled due to i745 erratum ID
+ * for 446x/447x
+ * WA involves:
+ * Enable MPU->EMIF SD before WFI and disable while coming out of WFI.
+ * This works around system hang/lockups seen when only MPU->EMIF
+ * dynamic dependency set. Allows dynamic dependency to be used
+ * in all active use cases and get all the power savings accordingly.
+ */
+#define OMAP44xx_54xx_PM_ERRATUM_MPU_EMIF_NO_DYNDEP_IDLE_i745	BIT(3)
 
 static u8 pm44xx_54xx_errata;
 #define is_pm44xx_54xx_erratum(erratum) (pm44xx_54xx_errata & \
@@ -366,6 +384,29 @@ void omap_idle_core_notifier(int mpu_next_state, int core_next_state)
 		omap_sr_disable(core_vdd);
 		omap_sr_disable(mm_vdd);
 	}
+
+	if (is_pm44xx_54xx_erratum(MPU_EMIF_NO_DYNDEP_IDLE_i745) &&
+	    pwrdm_power_state_le(core_next_state, PWRDM_POWER_INACTIVE)) {
+		/* Configures MEMIF clockdomain in SW_WKUP */
+		if (!emif_clkdm || !mpuss_clkdm) {
+			pr_err("%s: MPU/EMIF clockdomains not found\n",
+			       __func__);
+		} else if (clkdm_wakeup(emif_clkdm)) {
+			pr_err("%s: Failed to force wakeup of %s\n",
+			       __func__, emif_clkdm->name);
+		} else {
+			/* Enable MPU-EMIF Static Dependency around WFI */
+			if (clkdm_add_wkdep(mpuss_clkdm, emif_clkdm))
+				pr_err("%s: Failed to Add wkdep %s->%s\n",
+				       __func__, mpuss_clkdm->name,
+				       emif_clkdm->name);
+			else
+				staticdep_wa_i745_applied = 1;
+
+			/* Configures MEMIF clockdomain back to HW_AUTO */
+			clkdm_allow_idle(emif_clkdm);
+		}
+	}
 }
 
 /**
@@ -408,6 +449,28 @@ void omap_enable_core_notifier(int mpu_next_state, int core_next_state)
 	if (pwrdm_power_state_lt(core_next_state, PWRDM_POWER_INACTIVE)) {
 		omap_sr_enable(core_vdd);
 		omap_sr_enable(mm_vdd);
+	}
+
+	/*
+	 * NOTE: is_pm44xx_erratum is not strictly required, but retained for
+	 * code context readability.
+	 */
+	if (is_pm44xx_54xx_erratum(MPU_EMIF_NO_DYNDEP_IDLE_i745) &&
+	    staticdep_wa_i745_applied) {
+		/* Configures MEMIF clockdomain in SW_WKUP */
+		if (!emif_clkdm || !mpuss_clkdm) {
+			pr_err("%s: MPU/EMIF clockdomains not found\n",
+			       __func__);
+		} else if (clkdm_wakeup(emif_clkdm))
+			pr_err("%s: Failed to force wakeup of %s\n",
+			       __func__, emif_clkdm->name);
+		/* Disable MPU-EMIF Static Dependency on WFI exit */
+		else if (clkdm_del_wkdep(mpuss_clkdm, emif_clkdm))
+			pr_err("%s: Failed to remove wkdep %s->%s\n",
+			       __func__, mpuss_clkdm->name,
+			       emif_clkdm->name);
+		/* Configures MEMIF clockdomain back to HW_AUTO */
+		clkdm_allow_idle(emif_clkdm);
 	}
 }
 
@@ -489,9 +552,9 @@ static void omap_default_idle(void)
 
 static inline int omap4_init_static_deps(void)
 {
-	struct clockdomain *emif_clkdm, *mpuss_clkdm, *l3_1_clkdm, *l4wkup;
+	struct clockdomain *l3_1_clkdm, *l4wkup;
 	struct clockdomain *ducati_clkdm, *l3_2_clkdm, *l4_per_clkdm;
-	int ret;
+	int ret = 0;
 	/*
 	 * The dynamic dependency between MPUSS -> MEMIF and
 	 * MPUSS -> L4_PER/L3_* and DUCATI -> L3_* doesn't work as
@@ -513,7 +576,10 @@ static inline int omap4_init_static_deps(void)
 		(!l3_2_clkdm) || (!ducati_clkdm) || (!l4_per_clkdm))
 		return -EINVAL;
 
-	ret = clkdm_add_wkdep(mpuss_clkdm, emif_clkdm);
+	/* if we cannot ever enable dynamic dependencies. */
+	if (is_pm44xx_54xx_erratum(MPU_EMIF_STATIC_DEP_NEEDED_i731))
+		ret |= clkdm_add_wkdep(mpuss_clkdm, emif_clkdm);
+
 	ret |= clkdm_add_wkdep(mpuss_clkdm, l3_1_clkdm);
 	ret |= clkdm_add_wkdep(mpuss_clkdm, l3_2_clkdm);
 	ret |= clkdm_add_wkdep(mpuss_clkdm, l4_per_clkdm);
@@ -604,10 +670,23 @@ static inline int omap5_init_static_deps(void)
 
 static void __init omap_pm_setup_errata(void)
 {
-	if (cpu_is_omap44xx())
+	if (cpu_is_omap443x())
+		/* Dynamic Dependency errata for all 443x silicons */
+		pm44xx_54xx_errata |=
+		       OMAP44xx_54xx_PM_ERRATUM_MPU_EMIF_STATIC_DEP_NEEDED_i731;
+
+	if (cpu_is_omap446x())
+		pm44xx_54xx_errata |=
+			OMAP44xx_54xx_PM_ERRATUM_MPU_EMIF_NO_DYNDEP_IDLE_i745;
+
+	if (cpu_is_omap447x())
+		pm44xx_54xx_errata |=
+			OMAP44xx_54xx_PM_ERRATUM_MPU_EMIF_NO_DYNDEP_IDLE_i745;
+
+	if (cpu_is_omap44xx()) {
 		pm44xx_54xx_errata |= OMAP44xx_54xx_PM_ERRATUM_HSI_SWAKEUP_i702;
-	if (cpu_is_omap44xx())
 		pm44xx_54xx_errata |= OMAP44xx_54xx_PM_ERRATUM_RTA_i608;
+	}
 }
 
 static void __init prcm_setup_regs(void)
@@ -860,7 +939,7 @@ static int __init omap_pm_init(void)
 	 * stability level. Hence disable voltage scaling during Low
 	 * Power states for samples which do not support it.
 	 */
-	if (!omap5_has_auto_ret()) {
+	if (cpu_is_omap54xx() && !omap5_has_auto_ret()) {
 		u32 mask = OMAP4430_VDD_MPU_I2C_DISABLE_MASK |
 				OMAP4430_VDD_CORE_I2C_DISABLE_MASK |
 				OMAP4430_VDD_IVA_I2C_DISABLE_MASK;
