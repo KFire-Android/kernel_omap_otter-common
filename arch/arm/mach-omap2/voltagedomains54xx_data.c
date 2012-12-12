@@ -134,7 +134,8 @@ void __init omap54xx_voltagedomains_init(void)
 		omap5_voltdm_mpu.vc_param = &omap5_es1_mpu_vc_data;
 		omap5_voltdm_mm.vc_param = &omap5_es1_mm_vc_data;
 		omap5_voltdm_core.vc_param = &omap5_es1_core_vc_data;
-	} else if (omap_rev() == OMAP5432_REV_ES2_0) {
+	} else if (omap_rev() == OMAP5430_REV_ES2_0 ||
+		   omap_rev() == OMAP5432_REV_ES2_0) {
 		omap5_voltdm_mpu.vc_param = &omap5_mpu_vc_data;
 		omap5_voltdm_mm.vc_param = &omap5_mm_vc_data;
 		omap5_voltdm_core.vc_param = &omap5_core_vc_data;
