@@ -4504,6 +4504,51 @@ static struct omap_hwmod_class omap54xx_ocp2scp_hwmod_class = {
 	.sysc	= &omap54xx_ocp2scp_sysc,
 };
 
+/* ocp2scp dev_attr */
+static struct resource omap54xx_usb2_phy_and_pll_addrs[] = {
+	{
+		.name		= "usb_phy",
+		.start		= 0x4a084000,
+		.end		= 0x4a08407c,
+		.flags		= IORESOURCE_MEM,
+	},
+	{ }
+};
+
+static struct resource omap54xx_usb3_phy_and_pll_addrs[] = {
+	{
+		.name		= "usb_phy_rx",
+		.start		= 0x4a084400,
+		.end		= 0x4a084480,
+		.flags		= IORESOURCE_MEM,
+	},
+	{
+		.name		= "usb_phy_tx",
+		.start		= 0x4a084800,
+		.end		= 0x4a084864,
+		.flags		= IORESOURCE_MEM,
+	},
+	{
+		.name		= "pll_ctrl",
+		.start		= 0x4a084c00,
+		.end		= 0x4a084c40,
+		.flags		= IORESOURCE_MEM,
+	},
+	{ }
+};
+
+static struct omap_ocp2scp_dev ocp2scp_dev_attr[] = {
+	{
+		.drv_name       = "omap-usb2",
+		.res		= omap54xx_usb2_phy_and_pll_addrs,
+	},
+	{
+		.drv_name       = "omap-usb3",
+		.res		= omap54xx_usb3_phy_and_pll_addrs,
+	},
+	{ }
+};
+
 /* ocp2scp1 */
 static struct omap_hwmod omap54xx_ocp2scp1_hwmod;
 static struct omap_hwmod_addr_space omap54xx_ocp2scp1_addrs[] = {
@@ -4541,6 +4586,7 @@ static struct omap_hwmod omap54xx_ocp2scp1_hwmod = {
 			.modulemode   = MODULEMODE_HWCTRL,
 		},
 	},
+	.dev_attr	= ocp2scp_dev_attr,
 	.slaves		= omap54xx_ocp2scp1_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap54xx_ocp2scp1_slaves),
 };
