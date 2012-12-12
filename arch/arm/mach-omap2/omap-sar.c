@@ -186,9 +186,10 @@ static void sar_save(struct sar_ram_entry *entry)
  * Saves SAR RAM bank 3, this contains static data and should be saved
  * only once during boot.
  */
-static void save_sar_bank3(void)
+static void __init save_sar_bank3(void)
 {
 	struct clockdomain *l4_secure_clkdm;
+	struct omap_hwmod *l3_main_3_oh;
 
 	/*
 	 * Not supported on ES1.0 silicon
@@ -201,7 +202,13 @@ static void save_sar_bank3(void)
 	l4_secure_clkdm = clkdm_lookup("l4_secure_clkdm");
 	clkdm_wakeup(l4_secure_clkdm);
 
+	omap_hwmod_setup_one("l3_main_3");
+	l3_main_3_oh = omap_hwmod_lookup("l3_main_3");
+	omap_hwmod_enable(l3_main_3_oh);
+
 	sar_save(sar_ram_layout[2]);
+
+	omap_hwmod_idle(l3_main_3_oh);
 
 	clkdm_allow_idle(l4_secure_clkdm);
 }
