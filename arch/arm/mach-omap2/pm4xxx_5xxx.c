@@ -685,6 +685,9 @@ static void __init omap_pm_setup_errata(void)
 
 static void __init prcm_setup_regs(void)
 {
+	s16 dev_inst = cpu_is_omap44xx() ? OMAP4430_PRM_DEVICE_INST :
+					   OMAP54XX_PRM_DEVICE_INST;
+
 	/*
 	 * Errata ID: i608: All OMAP4
 	 * On OMAP4, Retention-Till-Access Memory feature is not working
@@ -740,7 +743,7 @@ static void __init prcm_setup_regs(void)
 	 * domains are in RET or OFF state.
 	 */
 	omap4_prminst_write_inst_reg(0x2, OMAP4430_PRM_PARTITION,
-				     OMAP4430_PRM_DEVICE_INST,
+				     dev_inst,
 				     OMAP4_PRM_CLKREQCTRL_OFFSET);
 
 	/*
@@ -751,7 +754,7 @@ static void __init prcm_setup_regs(void)
 	 * RET state.
 	 */
 	omap4_prminst_write_inst_reg(0x3, OMAP4430_PRM_PARTITION,
-				     OMAP4430_PRM_DEVICE_INST,
+				     dev_inst,
 				     OMAP4_PRM_PWRREQCTRL_OFFSET);
 }
 
