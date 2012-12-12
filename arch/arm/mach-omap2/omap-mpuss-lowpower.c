@@ -462,6 +462,8 @@ int omap_enter_lowpower(unsigned int cpu, unsigned int power_state)
 	unsigned int save_state = 0;
 	unsigned int wakeup_cpu;
 	int ret;
+	s16 dev_inst = cpu_is_omap44xx() ? OMAP4430_PRM_DEVICE_INST :
+			   OMAP54XX_PRM_DEVICE_INST;
 
 	if (omap_rev() == OMAP4430_REV_ES1_0)
 		return -ENXIO;
@@ -521,7 +523,7 @@ int omap_enter_lowpower(unsigned int cpu, unsigned int power_state)
 		omap4_prminst_rmw_inst_reg_bits(OMAP4430_ISOOVR_EXTEND_MASK,
 				OMAP4430_ISOOVR_EXTEND_MASK,
 				OMAP4430_PRM_PARTITION,
-				OMAP4430_PRM_DEVICE_INST,
+				dev_inst,
 				OMAP4_PRM_IO_PMCTRL_OFFSET);
 	}
 
@@ -619,7 +621,7 @@ sar_save_failed:
 		omap4_prminst_rmw_inst_reg_bits(OMAP4430_ISOOVR_EXTEND_MASK,
 						0,
 						OMAP4430_PRM_PARTITION,
-						OMAP4430_PRM_DEVICE_INST,
+						dev_inst,
 						OMAP4_PRM_IO_PMCTRL_OFFSET);
 	}
 
