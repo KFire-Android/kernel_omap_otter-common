@@ -420,6 +420,9 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
 
 	pm_qos_add_request(&pdata->pm_qos_request, PM_QOS_MEMORY_THROUGHPUT,
 				PM_QOS_MEMORY_THROUGHPUT_DEFAULT_VALUE);
+
+	*pdata->usbhs_update_sar = 1;
+
 	return 0;
 
 err_add_hcd:
@@ -508,6 +511,7 @@ static int ehci_omap_bus_resume(struct usb_hcd *hcd)
 
 	pm_qos_update_request(&pdata->pm_qos_request,
 					PM_QOS_MEMORY_THROUGHPUT_USBHOST);
+	*pdata->usbhs_update_sar = 1;
 
 	return ehci_bus_resume(hcd);
 }

@@ -23,6 +23,7 @@
 #include <linux/clk.h>
 #include <linux/err.h>
 #include <linux/delay.h>
+#include <linux/gpio.h>
 #include <video/omapdss.h>
 #include <plat/omap_hwmod.h>
 #include <plat/omap_device.h>
@@ -54,6 +55,8 @@
 #define FRAMEDONE2_IRQ_SHIFT	22
 #define FRAMEDONETV_IRQ_SHIFT	24
 #define FRAMEDONE3_IRQ_SHIFT	30
+
+#define HDMI_GPIO_HPD		63	/* Hot plug pin for HDMI */
 
 /*
  * FRAMEDONE_IRQ_TIMEOUT: how long (in milliseconds) to wait during DISPC
@@ -114,6 +117,10 @@ static void __init omap4_hdmi_mux_pads(enum omap_hdmi_flags flags)
 	u32 reg;
 	u16 control_i2c_1;
 
+	omap_mux_init_signal("hdmi_hpd.hdmi_hpd",
+				OMAP_PIN_INPUT_PULLDOWN);
+	omap_mux_init_signal("gpmc_wait2.gpio_100",
+			OMAP_PIN_INPUT_PULLDOWN);
 	omap_mux_init_signal("hdmi_cec",
 			OMAP_PIN_INPUT_PULLUP);
 	omap_mux_init_signal("hdmi_ddc_scl",

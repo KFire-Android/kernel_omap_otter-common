@@ -52,11 +52,13 @@ struct ehci_hcd_omap_platform_data {
 	struct regulator		*regulator[OMAP3_HS_USB_PORTS];
 	unsigned			phy_reset:1;
 	struct pm_qos_request		pm_qos_request;
+	int				*usbhs_update_sar;
 };
 
 struct ohci_hcd_omap_platform_data {
 	enum usbhs_omap_port_mode	port_mode[OMAP3_HS_USB_PORTS];
 	unsigned			es2_compatibility:1;
+	int				*usbhs_update_sar;
 };
 
 struct usbhs_omap_platform_data {
@@ -107,6 +109,8 @@ enum musb_interface    {MUSB_INTERFACE_ULPI, MUSB_INTERFACE_UTMI};
 extern void usb_musb_init(struct omap_musb_board_data *board_data);
 
 extern void usbhs_init(const struct usbhs_omap_board_data *pdata);
+extern int omap_usbhs_update_sar(void);
+extern int omap_usbhs_disable_update_sar(void);
 
 extern int omap4430_phy_power(struct device *dev, int ID, int on);
 extern int omap4430_phy_set_clk(struct device *dev, int on);

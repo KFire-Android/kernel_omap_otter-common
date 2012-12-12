@@ -45,6 +45,7 @@ static struct usbhs_omap_platform_data		usbhs_data;
 static struct usbtll_omap_platform_data		usbtll_data;
 static struct ehci_hcd_omap_platform_data	ehci_data;
 static struct ohci_hcd_omap_platform_data	ohci_data;
+static int usbhs_update_sar;
 
 static struct omap_device_pm_latency omap_uhhtll_latency[] = {
 	  {
@@ -963,6 +964,8 @@ void __init usbhs_init(const struct usbhs_omap_board_data *pdata)
 	}
 	ehci_data.phy_reset = pdata->phy_reset;
 	ohci_data.es2_compatibility = pdata->es2_compatibility;
+	ehci_data.usbhs_update_sar = &usbhs_update_sar;
+	ohci_data.usbhs_update_sar = &usbhs_update_sar;
 	usbhs_data.ehci_data = &ehci_data;
 	usbhs_data.ohci_data = &ohci_data;
 
@@ -1007,10 +1010,33 @@ void __init usbhs_init(const struct usbhs_omap_board_data *pdata)
 		uhh_hwm->mux = setup_4430_usbhs_io_mux(pdev, pdata->port_mode);
 }
 
+int omap_usbhs_update_sar(void)
+{
+	int ret = 0;
+	if (usbhs_update_sar)
+		ret = 1;
+
+	return ret;
+}
+
+int omap_usbhs_disable_update_sar(void)
+{
+	usbhs_update_sar = 0;
+	return 0;
+}
 #else
 
 void __init usbhs_init(const struct usbhs_omap_board_data *pdata)
 {
 }
 
+int omap_usbhs_update_sar(void)
+{
+	return 0;
+}
+
+int omap_usbhs_disable_update_sar(void)
+{
+	return 0;
+}
 #endif

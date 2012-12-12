@@ -1,9 +1,7 @@
 #ifndef __OMAP_PMIC_COMMON__
 #define __OMAP_PMIC_COMMON__
 
-#ifdef CONFIG_OMAP5_SEVM_PALMAS
 #include <linux/mfd/palmas.h>
-#endif
 
 #include <linux/i2c.h>
 #include <plat/irqs.h>
