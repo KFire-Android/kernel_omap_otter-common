@@ -22,6 +22,7 @@
 
 #include "cm1_44xx.h"
 #include "cm2_44xx.h"
+#include "cm2_54xx.h"
 #include "prcm-common.h"
 
 /*

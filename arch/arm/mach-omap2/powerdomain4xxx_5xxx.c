@@ -28,6 +28,7 @@
 #include "cm-regbits-44xx.h"
 #include "prcm44xx.h"
 #include "cm2_44xx.h"
+#include "cm2_54xx.h"
 #include "cminst44xx.h"
 
 static int omap4_pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst)
@@ -309,6 +310,8 @@ static int omap5_pwrdm_disable_force_off(struct powerdomain *pwrdm)
  */
 static int omap4_pwrdm_enable_hdwr_sar(struct powerdomain *pwrdm)
 {
+	s16 inst = cpu_is_omap44xx() ? OMAP4430_CM2_L3INIT_INST :
+					OMAP54XX_CM_CORE_L3INIT_INST;
 	/*
 	 * FIXME: This should be fixed right way by moving it into HWMOD
 	 * or clock framework since sar control is moved to module level
@@ -316,12 +319,12 @@ static int omap4_pwrdm_enable_hdwr_sar(struct powerdomain *pwrdm)
 	omap4_cminst_rmw_inst_reg_bits(OMAP4430_SAR_MODE_MASK,
 				       1 << OMAP4430_SAR_MODE_SHIFT,
 				       OMAP4430_CM2_PARTITION,
-				       OMAP4430_CM2_L3INIT_INST,
+				       inst,
 				       OMAP4_CM_L3INIT_USB_HOST_CLKCTRL_OFFSET);
 	omap4_cminst_rmw_inst_reg_bits(OMAP4430_SAR_MODE_MASK,
 				       1 << OMAP4430_SAR_MODE_SHIFT,
 				       OMAP4430_CM2_PARTITION,
-				       OMAP4430_CM2_L3INIT_INST,
+				       inst,
 				       OMAP4_CM_L3INIT_USB_TLL_CLKCTRL_OFFSET);
 	return 0;
 }
@@ -335,6 +338,8 @@ static int omap4_pwrdm_enable_hdwr_sar(struct powerdomain *pwrdm)
  */
 static int omap4_pwrdm_disable_hdwr_sar(struct powerdomain *pwrdm)
 {
+	s16 inst = cpu_is_omap44xx() ? OMAP4430_CM2_L3INIT_INST :
+					OMAP54XX_CM_CORE_L3INIT_INST;
 	/*
 	 * FIXME: This should be fixed right way by moving it into HWMOD
 	 * or clock framework since sar control is moved to module level
@@ -342,12 +347,12 @@ static int omap4_pwrdm_disable_hdwr_sar(struct powerdomain *pwrdm)
 	omap4_cminst_rmw_inst_reg_bits(OMAP4430_SAR_MODE_MASK,
 				       0 << OMAP4430_SAR_MODE_SHIFT,
 				       OMAP4430_CM2_PARTITION,
-				       OMAP4430_CM2_L3INIT_INST,
+				       inst,
 				       OMAP4_CM_L3INIT_USB_HOST_CLKCTRL_OFFSET);
 	omap4_cminst_rmw_inst_reg_bits(OMAP4430_SAR_MODE_MASK,
 				       0 << OMAP4430_SAR_MODE_SHIFT,
 				       OMAP4430_CM2_PARTITION,
-				       OMAP4430_CM2_L3INIT_INST,
+				       inst,
 				       OMAP4_CM_L3INIT_USB_TLL_CLKCTRL_OFFSET);
 
 	return 0;
