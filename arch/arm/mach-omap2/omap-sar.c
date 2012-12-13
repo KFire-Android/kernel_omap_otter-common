@@ -222,6 +222,8 @@ static void __init save_sar_bank3(void)
 static int omap4_sar_not_accessible(void)
 {
 	u32 usbhost_state, usbtll_state;
+	s16 inst = cpu_is_omap44xx() ? OMAP4430_CM2_L3INIT_INST :
+		   OMAP54XX_CM_CORE_L3INIT_INST;
 
 	/*
 	 * Make sure that USB host and TLL modules are not
@@ -229,12 +231,12 @@ static int omap4_sar_not_accessible(void)
 	 * registers, otherwise this will trigger an exception.
 	 */
 	usbhost_state = omap4_cminst_read_inst_reg(OMAP4430_CM2_PARTITION,
-				OMAP4430_CM2_L3INIT_INST,
+				inst,
 				OMAP4_CM_L3INIT_USB_HOST_CLKCTRL_OFFSET);
 	usbhost_state &= (OMAP4430_STBYST_MASK | OMAP4430_IDLEST_MASK);
 
 	usbtll_state = omap4_cminst_read_inst_reg(OMAP4430_CM2_PARTITION,
-				OMAP4430_CM2_L3INIT_INST,
+				inst,
 				OMAP4_CM_L3INIT_USB_TLL_CLKCTRL_OFFSET);
 	usbtll_state &= OMAP4430_IDLEST_MASK;
 
@@ -317,11 +319,16 @@ static void omap_sar_overwrite(void)
 	}
 
 	if (sar_overwrite_data[HSUSBHOST_CLKCTRL_2_IDX].valid) {
+		s16 inst = cpu_is_omap44xx() ? OMAP4430_CM2_L3INIT_INST :
+			   OMAP54XX_CM_CORE_L3INIT_INST;
+
 		offset = sar_overwrite_data[HSUSBHOST_CLKCTRL_2_IDX].sar_offset;
 
 		/* Overwriting Phase2b data to be restored */
 		/* CM_L3INIT_USB_HOST_CLKCTRL: SAR_MODE = 0, MODULEMODE = 0 */
-		val = __raw_readl(OMAP4430_CM_L3INIT_USB_HOST_CLKCTRL);
+		val = omap4_cminst_read_inst_reg(OMAP4430_CM2_PARTITION,
+				inst,
+				OMAP4_CM_L3INIT_USB_HOST_CLKCTRL_OFFSET);
 		val &= (OMAP4430_CLKSEL_UTMI_P1_MASK |
 			OMAP4430_CLKSEL_UTMI_P2_MASK);
 		__raw_writel(val, sar_ram_base + offset);

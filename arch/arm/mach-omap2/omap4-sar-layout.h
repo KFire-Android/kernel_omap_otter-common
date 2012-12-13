@@ -13,15 +13,11 @@
 
 #include <mach/hardware.h>
 #include <mach/ctrl_module_pad_core_44xx.h>
-
-#include "cm1_44xx.h"
-#include "cm2_44xx.h"
-#include "prcm-common.h"
-
 #include <mach/hardware.h>
 
 #include "cm1_44xx.h"
 #include "cm2_44xx.h"
+#include "cm2_54xx.h"
 #include "prcm-common.h"
 
 /*

@@ -37,13 +37,7 @@
 #include "prcm44xx.h"
 #include "prm-regbits-44xx.h"
 #include "prminst44xx.h"
-
-#ifdef CONFIG_ARCH_OMAP5_ES1
-#include "prm54xx_es1.h"
-#else
 #include "prm54xx.h"
-#endif
-
 #include "scrm44xx.h"
 #include "pm.h"
 #include "voltage.h"
@@ -691,6 +685,9 @@ static void __init omap_pm_setup_errata(void)
 
 static void __init prcm_setup_regs(void)
 {
+	s16 dev_inst = cpu_is_omap44xx() ? OMAP4430_PRM_DEVICE_INST :
+					   OMAP54XX_PRM_DEVICE_INST;
+
 	/*
 	 * Errata ID: i608: All OMAP4
 	 * On OMAP4, Retention-Till-Access Memory feature is not working
@@ -746,7 +743,7 @@ static void __init prcm_setup_regs(void)
 	 * domains are in RET or OFF state.
 	 */
 	omap4_prminst_write_inst_reg(0x2, OMAP4430_PRM_PARTITION,
-				     OMAP4430_PRM_DEVICE_INST,
+				     dev_inst,
 				     OMAP4_PRM_CLKREQCTRL_OFFSET);
 
 	/*
@@ -757,7 +754,7 @@ static void __init prcm_setup_regs(void)
 	 * RET state.
 	 */
 	omap4_prminst_write_inst_reg(0x3, OMAP4430_PRM_PARTITION,
-				     OMAP4430_PRM_DEVICE_INST,
+				     dev_inst,
 				     OMAP4_PRM_PWRREQCTRL_OFFSET);
 }
 
@@ -833,6 +830,9 @@ static void __init omap4_scrm_setup_timings(void)
 	 */
 	reset_delay_time = omap_pm_get_rsttime_latency();
 	if (!voltdm_for_each(_voltdm_sum_time, (void *)&reset_delay_time)) {
+		s16 dev_inst = cpu_is_omap44xx() ? OMAP4430_PRM_DEVICE_INST :
+						   OMAP54XX_PRM_DEVICE_INST;
+
 		reset_delay_time += tstart + tshut;
 		val = omap4_usec_to_val_scrm(reset_delay_time,
 					     OMAP4430_RSTTIME1_SHIFT,
@@ -840,7 +840,7 @@ static void __init omap4_scrm_setup_timings(void)
 		omap4_prminst_rmw_inst_reg_bits(OMAP4430_RSTTIME1_MASK,
 						val,
 						OMAP4430_PRM_PARTITION,
-						OMAP4430_PRM_DEVICE_INST,
+						dev_inst,
 						OMAP4_PRM_RSTTIME_OFFSET);
 	}
 

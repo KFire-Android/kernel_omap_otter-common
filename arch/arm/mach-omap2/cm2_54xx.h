@@ -18,6 +18,15 @@
  * published by the Free Software Foundation.
  */
 
+/*
+ * __ARCH_ARM_MACH_OMAP2_CM2_54XX_H is defined in ES1.0 header.
+ * The same header guard definition will help ES2.0 header definitions
+ * not to be active for ES1.0 and vice versa.
+ */
+#ifdef CONFIG_ARCH_OMAP5_ES1
+#include "cm2_54xx_es1.h"
+#endif
+
 #ifndef __ARCH_ARM_MACH_OMAP2_CM2_54XX_H
 #define __ARCH_ARM_MACH_OMAP2_CM2_54XX_H
 
@@ -385,8 +394,10 @@
 #define OMAP54XX_CM_CUSTEFUSE_EFUSE_CTRL_CUST_CLKCTRL		OMAP54XX_CM_CORE_REGADDR(OMAP54XX_CM_CORE_CUSTEFUSE_INST, 0x0020)
 
 /* Function prototypes */
+#ifndef __ASSEMBLER__
 extern u32 omap4_cm2_read_inst_reg(s16 inst, u16 idx);
 extern void omap4_cm2_write_inst_reg(u32 val, s16 inst, u16 idx);
 extern u32 omap4_cm2_rmw_inst_reg_bits(u32 mask, u32 bits, s16 inst, s16 idx);
+#endif
 
 #endif

@@ -994,11 +994,26 @@ static void __init omap_msecure_init(void)
 
 static void __init sevm_battery_init(void)
 {
+	int err;
+
 	/* To turn on U44 (emu/gpio mux) as gpio pins have gpio5 pulled low */
 	omap_mux_init_gpio(GPIO1_WKOUT5, OMAP_PIN_OUTPUT);
-	gpio_set_value(GPIO1_WKOUT5, 0);
+	err = gpio_request_one(GPIO1_WKOUT5, GPIOF_DIR_OUT,
+			       "bat_out_gpio"__stringify(GPIO1_WKOUT5));
+	if (err < 0) {
+		pr_err("%s: Failed to request GPIO %d, error %d\n",
+		       __func__, GPIO1_WKOUT5, err);
+	} else {
+		gpio_set_value(GPIO1_WKOUT5, 0);
+	}
+
 	/* Pull up gpio163 and as input pin */
 	omap_mux_init_gpio(GPIO_CHRGR_INT, OMAP_PIN_INPUT_PULLUP);
+	err = gpio_request_one(GPIO_CHRGR_INT, GPIOF_DIR_IN,
+			       "chrgr_int_gpio" __stringify(GPIO_CHRGR_INT));
+	if (err < 0)
+		pr_err("%s: Failed to request GPIO %d, error %d\n",
+		       __func__, GPIO_CHRGR_INT, err);
 }
 
 static void __init omap_5430evm_init(void)

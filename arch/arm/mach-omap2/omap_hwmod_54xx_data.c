@@ -1095,6 +1095,14 @@ static struct omap_hwmod omap54xx_dmic_hwmod = {
  * dsp sub-system
  */
 
+/* dsp mmu attr */
+static struct omap_mmu_dev_attr omap54xx_dsp_mmu_dev_attr = {
+	.da_start = 0x0,
+	.da_end = 0xfffff000,
+	.nr_tlb_entries = 32,
+	.has_bus_err_back = 0,
+};
+
 static struct omap_hwmod_class omap54xx_dsp_hwmod_class = {
 	.name	= "dsp",
 };
@@ -1141,9 +1149,10 @@ static struct omap_hwmod omap54xx_dsp_c0_hwmod = {
 	},
 };
 
+static struct omap_hwmod_class omap54xx_mmu_hwmod_class;
 static struct omap_hwmod omap54xx_dsp_hwmod = {
 	.name		= "dsp",
-	.class		= &omap54xx_dsp_hwmod_class,
+	.class		= &omap54xx_mmu_hwmod_class,
 #ifndef CONFIG_OMAP_PM_STANDALONE
 	.flags          = HWMOD_INIT_NO_RESET,
 #endif
@@ -1160,13 +1169,16 @@ static struct omap_hwmod omap54xx_dsp_hwmod = {
 			.modulemode   = MODULEMODE_HWCTRL,
 		},
 	},
+	.dev_attr	= &omap54xx_dsp_mmu_dev_attr,
 	.slaves		= omap54xx_dsp_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap54xx_dsp_slaves),
 };
 
 /*
  * 'mmu' class
- * mmu for l3_main dsp master port
+ * The memory management unit performs virtual to physical address translation
+ * for its requestors (remote processors: i.e, dsp, ipu)
+ * Adding a separate class for that to control the mmu module separately
  */
 
 static struct omap_hwmod_class_sysconfig omap54xx_mmu_sysc = {
@@ -2802,20 +2814,16 @@ static struct omap_hwmod omap54xx_i2c5_hwmod = {
  * imaging processor unit
  */
 
-static struct omap_hwmod_class_sysconfig omap54xx_ipu_sysc = {
-	.rev_offs	= 0x0000,
-	.sysc_offs	= 0x0010,
-	.syss_offs	= 0x0014,
-	.sysc_flags	= (SYSC_HAS_AUTOIDLE | SYSC_HAS_CLOCKACTIVITY |
-			   SYSC_HAS_SIDLEMODE | SYSC_HAS_SOFTRESET |
-			   SYSS_HAS_RESET_STATUS),
-	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
-	.sysc_fields	= &omap_hwmod_sysc_type1,
+/* ipu mmu attr */
+static struct omap_mmu_dev_attr omap54xx_ipu_mmu_dev_attr = {
+	.da_start = 0x0,
+	.da_end = 0xfffff000,
+	.nr_tlb_entries = 32,
+	.has_bus_err_back = 1,
 };
 
 static struct omap_hwmod_class omap54xx_ipu_hwmod_class = {
 	.name	= "ipu",
-	.sysc	= &omap54xx_ipu_sysc,
 };
 
 /* ipu */
@@ -2891,7 +2899,7 @@ static struct omap_hwmod omap54xx_ipu_c1_hwmod = {
 
 static struct omap_hwmod omap54xx_ipu_hwmod = {
 	.name		= "ipu",
-	.class		= &omap54xx_ipu_hwmod_class,
+	.class		= &omap54xx_mmu_hwmod_class,
 	.clkdm_name	= "ipu_clkdm",
 	.mpu_irqs	= omap54xx_ipu_irqs,
 	.rst_lines	= omap54xx_ipu_resets,
@@ -2905,6 +2913,7 @@ static struct omap_hwmod omap54xx_ipu_hwmod = {
 			.modulemode   = MODULEMODE_HWCTRL,
 		},
 	},
+	.dev_attr	= &omap54xx_ipu_mmu_dev_attr,
 	.slaves		= omap54xx_ipu_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap54xx_ipu_slaves),
 };

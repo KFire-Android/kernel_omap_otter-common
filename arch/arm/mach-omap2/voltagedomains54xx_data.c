@@ -15,12 +15,7 @@
 
 #include "common.h"
 
-#ifdef CONFIG_ARCH_OMAP5_ES1
-#include "prm54xx_es1.h"
-#else
 #include "prm54xx.h"
-#endif
-
 #include "voltage.h"
 #include "omap_opp_data.h"
 #include "vc.h"
@@ -45,9 +40,9 @@ static const struct omap_vfsm_instance omap5_vdd_core_vfsm = {
 static struct voltagedomain omap5_voltdm_mpu = {
 	.name = "mpu",
 	.scalable = true,
-	.read = omap4_prm_vcvp_read,
-	.write = omap4_prm_vcvp_write,
-	.rmw = omap4_prm_vcvp_rmw,
+	.read = omap5_prm_vcvp_read,
+	.write = omap5_prm_vcvp_write,
+	.rmw = omap5_prm_vcvp_rmw,
 	.vc = &omap5_vc_mpu,
 	.vfsm = &omap5_vdd_mpu_vfsm,
 	.vp = &omap5_vp_mpu,
@@ -58,9 +53,9 @@ static struct voltagedomain omap5_voltdm_mpu = {
 static struct voltagedomain omap5_voltdm_mm = {
 	.name = "mm",
 	.scalable = true,
-	.read = omap4_prm_vcvp_read,
-	.write = omap4_prm_vcvp_write,
-	.rmw = omap4_prm_vcvp_rmw,
+	.read = omap5_prm_vcvp_read,
+	.write = omap5_prm_vcvp_write,
+	.rmw = omap5_prm_vcvp_rmw,
 	.vc = &omap5_vc_mm,
 	.vfsm = &omap5_vdd_mm_vfsm,
 	.vp = &omap5_vp_mm,
@@ -72,9 +67,9 @@ static struct voltagedomain omap5_voltdm_mm = {
 static struct voltagedomain omap5_voltdm_core = {
 	.name = "core",
 	.scalable = true,
-	.read = omap4_prm_vcvp_read,
-	.write = omap4_prm_vcvp_write,
-	.rmw = omap4_prm_vcvp_rmw,
+	.read = omap5_prm_vcvp_read,
+	.write = omap5_prm_vcvp_write,
+	.rmw = omap5_prm_vcvp_rmw,
 	.vc = &omap5_vc_core,
 	.vfsm = &omap5_vdd_core_vfsm,
 	.vp = &omap5_vp_core,

@@ -20,6 +20,7 @@
 #include "common.h"
 #include "prcm-common.h"
 #include "prm44xx.h"
+#include "prm54xx.h"
 #include "prminst44xx.h"
 #include "prm-regbits-44xx.h"
 #include "prcm44xx.h"
@@ -160,42 +161,46 @@ int omap4_prminst_deassert_hardreset(u8 shift, u8 part, s16 inst,
 void omap4_prminst_global_warm_sw_reset(void)
 {
 	u32 v;
+	s16 dev_inst = cpu_is_omap44xx() ? OMAP4430_PRM_DEVICE_INST :
+					   OMAP54XX_PRM_DEVICE_INST;
 
 	v = omap4_prminst_read_inst_reg(OMAP4430_PRM_PARTITION,
-				    OMAP4430_PRM_DEVICE_INST,
+				    dev_inst,
 				    OMAP4_PRM_RSTCTRL_OFFSET);
 	v |= OMAP4430_RST_GLOBAL_WARM_SW_MASK;
 	omap4_prminst_write_inst_reg(v, OMAP4430_PRM_PARTITION,
-				 OMAP4430_PRM_DEVICE_INST,
+				 dev_inst,
 				 OMAP4_PRM_RSTCTRL_OFFSET);
 
 	/* OCP barrier */
 	v = omap4_prminst_read_inst_reg(OMAP4430_PRM_PARTITION,
-				    OMAP4430_PRM_DEVICE_INST,
+				    dev_inst,
 				    OMAP4_PRM_RSTCTRL_OFFSET);
 }
 
 void omap4_prminst_global_cold_sw_reset(void)
 {
 	u32 v;
+	s16 dev_inst = cpu_is_omap44xx() ? OMAP4430_PRM_DEVICE_INST :
+					   OMAP54XX_PRM_DEVICE_INST;
 
 	/* If bootloader/PPA has'nt cleared, ensure it is cleared */
 	omap4_prminst_write_inst_reg(OMAP4430_GLOBAL_COLD_RST_MASK,
 				     OMAP4430_PRM_PARTITION,
-				     OMAP4430_PRM_DEVICE_INST,
+				     dev_inst,
 				     OMAP4_RM_RSTST);
 
 	v = omap4_prminst_read_inst_reg(OMAP4430_PRM_PARTITION,
-					OMAP4430_PRM_DEVICE_INST,
+					dev_inst,
 					OMAP4_RM_RSTCTRL);
 	v |= OMAP4430_RST_GLOBAL_COLD_SW_MASK;
 	omap4_prminst_write_inst_reg(v, OMAP4430_PRM_PARTITION,
-				     OMAP4430_PRM_DEVICE_INST,
+				     dev_inst,
 				     OMAP4_RM_RSTCTRL);
 
 	/* OCP barrier */
 	v = omap4_prminst_read_inst_reg(OMAP4430_PRM_PARTITION,
-					OMAP4430_PRM_DEVICE_INST,
+					dev_inst,
 					OMAP4_RM_RSTCTRL);
 
 	/*
