@@ -2814,17 +2814,6 @@ static struct omap_hwmod omap54xx_i2c5_hwmod = {
  * imaging processor unit
  */
 
-static struct omap_hwmod_class_sysconfig omap54xx_ipu_sysc = {
-	.rev_offs	= 0x0000,
-	.sysc_offs	= 0x0010,
-	.syss_offs	= 0x0014,
-	.sysc_flags	= (SYSC_HAS_AUTOIDLE | SYSC_HAS_CLOCKACTIVITY |
-			   SYSC_HAS_SIDLEMODE | SYSC_HAS_SOFTRESET |
-			   SYSS_HAS_RESET_STATUS),
-	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
-	.sysc_fields	= &omap_hwmod_sysc_type1,
-};
-
 /* ipu mmu attr */
 static struct omap_mmu_dev_attr omap54xx_ipu_mmu_dev_attr = {
 	.da_start = 0x0,
@@ -2835,7 +2824,6 @@ static struct omap_mmu_dev_attr omap54xx_ipu_mmu_dev_attr = {
 
 static struct omap_hwmod_class omap54xx_ipu_hwmod_class = {
 	.name	= "ipu",
-	.sysc	= &omap54xx_ipu_sysc,
 };
 
 /* ipu */
