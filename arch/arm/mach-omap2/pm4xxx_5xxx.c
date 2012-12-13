@@ -37,13 +37,7 @@
 #include "prcm44xx.h"
 #include "prm-regbits-44xx.h"
 #include "prminst44xx.h"
-
-#ifdef CONFIG_ARCH_OMAP5_ES1
-#include "prm54xx_es1.h"
-#else
 #include "prm54xx.h"
-#endif
-
 #include "scrm44xx.h"
 #include "pm.h"
 #include "voltage.h"

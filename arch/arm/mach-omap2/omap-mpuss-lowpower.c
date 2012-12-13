@@ -68,13 +68,12 @@
 
 #ifdef CONFIG_ARCH_OMAP5_ES1
 #include "prm-regbits-54xx_es1.h"
-#include "prm54xx_es1.h"
 #else
 #include "prm-regbits-54xx.h"
-#include "prm54xx.h"
 #endif
 
 #include "cm44xx.h"
+#include "prm54xx.h"
 
 #ifdef CONFIG_SMP
 #define NUM_DEN_MASK			0xfffff000

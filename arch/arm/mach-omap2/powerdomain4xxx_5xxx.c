@@ -22,18 +22,13 @@
 #include <plat/prcm.h>
 #include "prm2xxx_3xxx.h"
 #include "prm44xx.h"
+#include "prm54xx.h"
 #include "prminst44xx.h"
 #include "prm-regbits-44xx.h"
 #include "cm-regbits-44xx.h"
 #include "prcm44xx.h"
 #include "cm2_44xx.h"
 #include "cminst44xx.h"
-
-#ifdef CONFIG_ARCH_OMAP5_ES1
-#include "prm54xx_es1.h"
-#else
-#include "prm54xx.h"
-#endif
 
 static int omap4_pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst)
 {
