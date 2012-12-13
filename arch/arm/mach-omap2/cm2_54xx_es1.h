@@ -21,6 +21,10 @@
 #ifndef __ARCH_ARM_MACH_OMAP2_CM2_54XX_H
 #define __ARCH_ARM_MACH_OMAP2_CM2_54XX_H
 
+#ifndef CONFIG_ARCH_OMAP5_ES1
+#error "Header inclusion on ES2.0 build!!!"
+#endif
+
 /* CM2 base address */
 #define OMAP54XX_CM_CORE_BASE		0x4a008000
 

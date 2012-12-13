@@ -37,12 +37,11 @@
 
 #ifdef CONFIG_ARCH_OMAP5_ES1
 #include "cm-regbits-54xx_es1.h"
-#include "cm2_54xx_es1.h"
 #else
 #include "cm-regbits-54xx.h"
-#include "cm2_54xx.h"
 #endif
 #include "cm1_54xx.h"
+#include "cm2_54xx.h"
 
 #define MAX_DPLL_WAIT_TRIES	1000000
 #define MAX_FREQ_UPDATE_TIMEOUT  100000
