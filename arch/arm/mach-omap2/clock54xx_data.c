@@ -1466,8 +1466,10 @@ static struct clk l3instr_ts_gclk_div = {
 	.init		= &omap2_init_clksel_parent,
 	.clksel_reg	= OMAP54XX_CM_L3INSTR_CTRL_MODULE_BANDGAP_CLKCTRL,
 	.clksel_mask	= OMAP54XX_CLKSEL_24_25_MASK,
-	.ops		= &clkops_null,
-	.recalc		= &followparent_recalc,
+	.ops		= &clkops_omap2_dflt,
+	.recalc		= &omap2_clksel_recalc,
+	.round_rate	= &omap2_clksel_round_rate,
+	.set_rate	= &omap2_clksel_set_rate,
 };
 
 static const struct clksel l4_root_clk_div_div[] = {
