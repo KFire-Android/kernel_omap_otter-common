@@ -267,13 +267,15 @@ void omap44xx_prm_restore_irqen(u32 *saved_mask)
 void omap44xx_prm_reconfigure_io_chain(void)
 {
 	int i = 0;
+	s16 dev_inst = cpu_is_omap44xx() ? OMAP4430_PRM_DEVICE_INST :
+					   OMAP54XX_PRM_DEVICE_INST;
 
 	/* Trigger WUCLKIN enable */
 	omap4_prm_rmw_inst_reg_bits(OMAP4430_WUCLK_CTRL_MASK,
-			OMAP4430_WUCLK_CTRL_MASK, OMAP4430_PRM_DEVICE_INST,
+			OMAP4430_WUCLK_CTRL_MASK, dev_inst,
 			OMAP4_PRM_IO_PMCTRL_OFFSET);
 	omap_test_timeout(
-		(((omap4_prm_read_inst_reg(OMAP4430_PRM_DEVICE_INST,
+		(((omap4_prm_read_inst_reg(dev_inst,
 			OMAP4_PRM_IO_PMCTRL_OFFSET) &
 			OMAP4430_WUCLK_STATUS_MASK) >>
 			OMAP4430_WUCLK_STATUS_SHIFT) == 1),
@@ -283,9 +285,9 @@ void omap44xx_prm_reconfigure_io_chain(void)
 
 	/* Trigger WUCLKIN disable */
 	omap4_prm_rmw_inst_reg_bits(OMAP4430_WUCLK_CTRL_MASK, 0x0,
-			OMAP4430_PRM_DEVICE_INST, OMAP4_PRM_IO_PMCTRL_OFFSET);
+			dev_inst, OMAP4_PRM_IO_PMCTRL_OFFSET);
 	omap_test_timeout(
-		(((omap4_prm_read_inst_reg(OMAP4430_PRM_DEVICE_INST,
+		(((omap4_prm_read_inst_reg(dev_inst,
 			OMAP4_PRM_IO_PMCTRL_OFFSET) &
 			OMAP4430_WUCLK_STATUS_MASK) >>
 			OMAP4430_WUCLK_STATUS_SHIFT) == 0),
@@ -306,8 +308,11 @@ void omap44xx_prm_reconfigure_io_chain(void)
  */
 static void __init omap44xx_prm_enable_io_wakeup(void)
 {
+	s16 dev_inst = cpu_is_omap44xx() ? OMAP4430_PRM_DEVICE_INST :
+					   OMAP54XX_PRM_DEVICE_INST;
+
 	omap4_prm_rmw_inst_reg_bits(OMAP4430_GLOBAL_WUEN_MASK,
-			OMAP4430_GLOBAL_WUEN_MASK, OMAP4430_PRM_DEVICE_INST,
+			OMAP4430_GLOBAL_WUEN_MASK, dev_inst,
 			OMAP4_PRM_IO_PMCTRL_OFFSET);
 }
 
