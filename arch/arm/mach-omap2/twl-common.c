@@ -279,6 +279,10 @@ static struct regulator_init_data omap4_vdac_idata = {
 					| REGULATOR_MODE_STANDBY,
 		.valid_ops_mask		= REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
+		.state_mem = {
+			.disabled	= true,
+		},
+		.initial_state		= PM_SUSPEND_MEM,
 	},
 	.supply_regulator	= "V2V1",
 };
@@ -297,6 +301,10 @@ static struct regulator_init_data omap4_vaux1_idata = {
 		.valid_ops_mask	 = REGULATOR_CHANGE_VOLTAGE
 					| REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
+		.state_mem = {
+			.disabled	= true,
+		},
+		.initial_state		= PM_SUSPEND_MEM,
 	},
 	.num_consumer_supplies  = ARRAY_SIZE(omap4_vaux_supply),
 	.consumer_supplies      = omap4_vaux_supply,
@@ -312,6 +320,10 @@ static struct regulator_init_data omap4_vaux2_idata = {
 		.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE
 					| REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
+		.state_mem = {
+			.disabled	= true,
+		},
+		.initial_state		= PM_SUSPEND_MEM,
 	},
 };
 
@@ -325,6 +337,10 @@ static struct regulator_init_data omap4_vaux3_idata = {
 		.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE
 					| REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
+		.state_mem = {
+			.disabled	= true,
+		},
+		.initial_state		= PM_SUSPEND_MEM,
 	},
 };
 
@@ -343,6 +359,11 @@ static struct regulator_init_data omap4_vmmc_idata = {
 		.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE
 					| REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
+		.state_mem = {
+			.disabled	= true,
+		},
+		.initial_state		= PM_SUSPEND_MEM,
+
 	},
 	.num_consumer_supplies  = ARRAY_SIZE(omap4_vmmc_supply),
 	.consumer_supplies      = omap4_vmmc_supply,
@@ -358,6 +379,10 @@ static struct regulator_init_data omap4_vpp_idata = {
 		.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE
 					| REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
+		.state_mem = {
+			.disabled	= true,
+		},
+		.initial_state		= PM_SUSPEND_MEM,
 	},
 };
 
@@ -371,6 +396,10 @@ static struct regulator_init_data omap4_vusim_idata = {
 		.valid_ops_mask	 = REGULATOR_CHANGE_VOLTAGE
 					| REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
+		.state_mem = {
+			.disabled	= true,
+		},
+		.initial_state		= PM_SUSPEND_MEM,
 	},
 };
 
@@ -382,6 +411,10 @@ static struct regulator_init_data omap4_vana_idata = {
 					| REGULATOR_MODE_STANDBY,
 		.valid_ops_mask		= REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
+		.state_mem = {
+			.disabled	= true,
+		},
+		.initial_state		= PM_SUSPEND_MEM,
 	},
 };
 
@@ -400,6 +433,10 @@ static struct regulator_init_data omap4_vcxio_idata = {
 		.valid_ops_mask		= REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
 		.always_on		= true,
+		.state_mem = {
+			.disabled	= true,
+		},
+		.initial_state		= PM_SUSPEND_MEM,
 	},
 	.num_consumer_supplies	= ARRAY_SIZE(omap4_vcxio_supply),
 	.consumer_supplies	= omap4_vcxio_supply,
@@ -414,6 +451,10 @@ static struct regulator_init_data omap4_vusb_idata = {
 					| REGULATOR_MODE_STANDBY,
 		.valid_ops_mask		= REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
+		.state_mem = {
+			.disabled	= true,
+		},
+		.initial_state		= PM_SUSPEND_MEM,
 	},
 };
 
@@ -453,6 +494,10 @@ static struct regulator_init_data omap4_v2v1_idata = {
 					| REGULATOR_MODE_STANDBY,
 		.valid_ops_mask		= REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
+		.state_mem = {
+			.disabled	= true,
+		},
+		.initial_state		= PM_SUSPEND_MEM,
 	},
 	.num_consumer_supplies	= ARRAY_SIZE(omap4_v2v1_supply),
 	.consumer_supplies	= omap4_v2v1_supply,
@@ -473,6 +518,10 @@ static struct regulator_init_data omap4_sysen_idata = {
 	.constraints = {
 		.valid_ops_mask		= REGULATOR_CHANGE_STATUS,
 		.always_on		= true,
+		.state_mem = {
+			.disabled	= true,
+		},
+		.initial_state		= PM_SUSPEND_MEM,
 	},
 };
 
@@ -487,6 +536,10 @@ static struct regulator_init_data omap4_regen1_idata = {
 	.constraints = {
 		.valid_ops_mask		= REGULATOR_CHANGE_STATUS,
 		.always_on		= true,
+		.state_mem = {
+			.disabled	= true,
+		},
+		.initial_state		= PM_SUSPEND_MEM,
 	},
 };
 
