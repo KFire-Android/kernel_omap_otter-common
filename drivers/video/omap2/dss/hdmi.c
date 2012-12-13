@@ -121,8 +121,8 @@ int hdmi_init_display(struct omap_dss_device *dssdev)
 {
 	DSSDBG("init_display\n");
 
-	hdmi.dssdev = dssdev;
 	dss_init_hdmi_ip_ops(&hdmi.ip_data);
+	hdmi.dssdev = dssdev;
 	return 0;
 }
 

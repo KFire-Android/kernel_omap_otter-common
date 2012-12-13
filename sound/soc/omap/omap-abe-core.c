@@ -267,9 +267,10 @@ static int abe_probe(struct snd_soc_platform *platform)
 		goto err_irq;
 	}
 
-	ret = abe_opp_init_initial_opp(abe);
-	if (ret < 0)
-		goto err_opp;
+	if (abe_opp_init_initial_opp(abe) < 0) {
+		pr_err("No OPP definition for ABE");
+		abe->device_scale = NULL;
+	}
 
 	/* aess_clk has to be enabled to access hal register.
 	 * Disable the clk after it has been used.
@@ -305,8 +306,6 @@ static int abe_probe(struct snd_soc_platform *platform)
 	abe_init_debugfs(abe);
 	return ret;
 
-err_opp:
-	free_irq(abe->irq, (void *)abe);
 err_irq:
 	abe_free_fw(abe);
 	return ret;

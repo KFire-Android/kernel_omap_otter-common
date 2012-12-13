@@ -1531,6 +1531,10 @@ static void ti_hdmi_5xxx_core_audio_config(struct hdmi_ip_data *ip_data,
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_AUD_GP_CONF1, 3, 7, 0);
 	/* disable HBR */
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_AUD_GP_CONF2, 0, 0, 0);
+#ifndef CONFIG_ARCH_OMAP5_ES1
+	/* enable PCUV */
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_AUD_GP_CONF2, 1, 1, 1);
+#endif
 	/* Enable GPA FIFO full and empty mask */
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_GP_MASK, 3, 1, 0);
 	/* Set polarity of GPA FIFO empty interrupts */
@@ -1587,9 +1591,33 @@ int ti_hdmi_5xxx_audio_config(struct hdmi_ip_data *ip_data,
 
 	/* only 44.1kHz supported atm */
 	switch (iec->status[3] & IEC958_AES3_CON_FS) {
+#ifdef CONFIG_ARCH_OMAP5_ES1
 	case IEC958_AES3_CON_FS_44100:
 		fs_nr = 44100;
 		break;
+#else
+	case IEC958_AES3_CON_FS_32000:
+		fs_nr = 32000;
+		break;
+	case IEC958_AES3_CON_FS_44100:
+		fs_nr = 44100;
+		break;
+	case IEC958_AES3_CON_FS_48000:
+		fs_nr = 48000;
+		break;
+	case IEC958_AES3_CON_FS_88200:
+		fs_nr = 88200;
+		break;
+	case IEC958_AES3_CON_FS_96000:
+		fs_nr = 96000;
+		break;
+	case IEC958_AES3_CON_FS_176400:
+		fs_nr = 176400;
+		break;
+	case IEC958_AES3_CON_FS_192000:
+		fs_nr = 192000;
+		break;
+#endif
 	default:
 		return -EINVAL;
 	}
