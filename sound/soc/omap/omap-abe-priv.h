@@ -24,10 +24,16 @@
 #ifndef __OMAP_ABE_PRIV_H__
 #define __OMAP_ABE_PRIV_H__
 
+#ifdef __KERNEL__
+
+#include <sound/soc-fw.h>
+
 #include "aess/abe.h"
 #include "aess/abe_gain.h"
 #include "aess/abe_aess.h"
 #include "aess/abe_mem.h"
+
+#endif
 
 #define OMAP_ABE_FRONTEND_DAI_MEDIA		0
 #define OMAP_ABE_FRONTEND_DAI_MEDIA_CAPTURE	1
@@ -151,21 +157,61 @@
 #define OMAP_ABE_OPP_100		2
 #define OMAP_ABE_OPP_COUNT	3
 
+/* TODO: we need the names for each array memeber */
 #define OMAP_ABE_IO_RESOURCES	5
+#define OMAP_ABE_IO_DMEM 0
+#define OMAP_ABE_IO_CMEM 1
+#define OMAP_ABE_IO_SMEM 2
+#define OMAP_ABE_IO_PMEM 3
+#define OMAP_ABE_IO_AESS 4
 
-/*
- * ABE loadable coefficients.
- * The coefficient and their mixer configurations are loaded with the firmware
- * blob duing probe().
- */
+#define OMAP_ABE_EQU_AMIC	0
+#define OMAP_ABE_EQU_DL1	0
+#define OMAP_ABE_EQU_DL2L	0
+#define OMAP_ABE_EQU_DL2R	0
+#define OMAP_ABE_EQU_DMIC	0
+#define OMAP_ABE_EQU_SDT	0
 
-struct coeff_config {
-	char name[OMAP_ABE_COEFF_NAME_SIZE];
-	u32 id;
-	u32 count;
-	u32 coeff;
-	char texts[OMAP_ABE_COEFF_NUM_TEXTS][OMAP_ABE_COEFF_TEXT_SIZE];
-};
+/* TODO: combine / sort */
+#define OMAP_ABE_MIXER_DEFAULT	128
+#define OMAP_ABE_MIXER_MONO	129
+#define OMAP_ABE_MIXER_ROUTER	130
+#define OMAP_ABE_MIXER_EQU	131
+#define OMAP_ABE_MIXER_SWITCH	132
+#define OMAP_ABE_MIXER_GAIN	133
+#define OMAP_ABE_MIXER_VOLUME	134
+
+#define OMAP_CONTROL_DEFAULT \
+	SOC_CONTROL_ID(OMAP_ABE_MIXER_DEFAULT, \
+		OMAP_ABE_MIXER_DEFAULT, \
+		SOC_CONTROL_TYPE_EXT)
+#define OMAP_CONTROL_MONO \
+	SOC_CONTROL_ID(OMAP_ABE_MIXER_MONO, \
+		OMAP_ABE_MIXER_MONO, \
+		SOC_CONTROL_TYPE_VOLSW)
+#define OMAP_CONTROL_ROUTER \
+	SOC_CONTROL_ID(OMAP_ABE_MIXER_ROUTER, \
+		OMAP_ABE_MIXER_ROUTER, \
+		SOC_CONTROL_TYPE_ENUM)
+#define OMAP_CONTROL_EQU \
+	SOC_CONTROL_ID(OMAP_ABE_MIXER_EQU, \
+		OMAP_ABE_MIXER_EQU, \
+		SOC_CONTROL_TYPE_ENUM)
+#define OMAP_CONTROL_SWITCH \
+	SOC_CONTROL_ID(OMAP_ABE_MIXER_DEFAULT, \
+		OMAP_ABE_MIXER_SWITCH, \
+		SOC_CONTROL_TYPE_VOLSW)
+#define OMAP_CONTROL_GAIN \
+	SOC_CONTROL_ID(OMAP_ABE_MIXER_GAIN, \
+		OMAP_ABE_MIXER_GAIN, \
+		SOC_CONTROL_TYPE_VOLSW)
+#define OMAP_CONTROL_VOLUME \
+	SOC_CONTROL_ID(OMAP_ABE_MIXER_VOLUME, \
+		OMAP_ABE_MIXER_VOLUME, \
+		SOC_CONTROL_TYPE_VOLSW)
+
+
+#ifdef __KERNEL__
 
 /*
  * ABE Firmware Header.
@@ -173,14 +219,11 @@ struct coeff_config {
  * way we can store coefficients etc in the firmware.
  */
 struct fw_header {
-	u32 magic;			/* magic number */
-	u32 crc;			/* optional crc */
-	u32 fw_header_size;	/* payload size */
-	u32 firmware_size;	/* payload size */
-	u32 coeff_size;		/* payload size */
-	u32 coeff_version;	/* coefficent version */
-	u32 firmware_version;	/* min version of ABE firmware required */
-	u32 num_equ;		/* number of equalizers */
+	u32 version;	/* min version of ABE firmware required */
+	u32 pmem_size;
+	u32 cmem_size;
+	u32 dmem_size;
+	u32 smem_size;
 };
 
 struct abe_opp_req {
@@ -220,6 +263,10 @@ struct omap_abe_debugfs {
 	struct dentry *d_circ;
 	struct dentry *d_elem_bytes;
 	struct dentry *d_opp;
+	struct dentry *d_cmem;
+	struct dentry *d_pmem;
+	struct dentry *d_smem;
+	struct dentry *d_dmem;
 };
 
 struct omap_abe_dc_offset {
@@ -250,12 +297,20 @@ struct omap_abe_mmap {
 	int first_irq;
 };
 
+struct omap_abe_coeff {
+	int profile; /* current enabled profile */
+	int num_profiles;
+	int profile_size;
+	void *coeff_data;
+};
+
 struct omap_abe_equ {
-	s32 *equ[OMAP_ABE_MAX_EQU];
-	int profile[OMAP_ABE_MAX_EQU];
-	struct soc_enum senum[OMAP_ABE_MAX_EQU];
-	struct snd_kcontrol_new kcontrol[OMAP_ABE_MAX_EQU];
-	struct coeff_config *texts;
+	struct omap_abe_coeff dl1;
+	struct omap_abe_coeff dl2l;
+	struct omap_abe_coeff dl2r;
+	struct omap_abe_coeff sdt;
+	struct omap_abe_coeff amic;
+	struct omap_abe_coeff dmic;
 };
 
 struct omap_abe_dai {
@@ -295,11 +350,12 @@ struct omap_abe {
 	struct omap_abe_dai dai;
 	struct omap_abe_mixer mixer;
 
-	/* coefficients */
+	/* firmware */
 	struct fw_header hdr;
-	u32 *fw_header;
-	u32 *firmware;
+	u32 *fw_config;
+	u32 *fw_text;
 	const struct firmware *fw;
+	int num_equ;
 
 #ifdef CONFIG_DEBUG_FS
 	struct omap_abe_debugfs debugfs;
@@ -328,4 +384,8 @@ void omap_abe_dc_set_hf_offset(struct snd_soc_platform *platform,
 void omap_abe_set_dl1_gains(struct snd_soc_platform *platform,
 	int left, int right);
 
+
+extern const struct snd_soc_fw_kcontrol_ops abe_ops[];
+
+#endif  /* __kernel__ */
 #endif	/* End of __OMAP_MCPDM_H__ */
