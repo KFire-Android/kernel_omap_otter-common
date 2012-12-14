@@ -309,8 +309,14 @@ int omap4_prcm_freq_update(void)
 	int i = 0;
 
 	if (!l3_emif_clkdm) {
-		pr_err("%s: clockdomain lookup failed\n", __func__);
-		return -EINVAL;
+		if (cpu_is_omap44xx())
+			l3_emif_clkdm = clkdm_lookup("l3_emif_clkdm");
+		else
+			l3_emif_clkdm = clkdm_lookup("emif_clkdm");
+		if (!l3_emif_clkdm) {
+			pr_err("%s: clockdomain lookup failed\n", __func__);
+			return -EINVAL;
+		}
 	}
 
 	/* Configures MEMIF domain in SW_WKUP */

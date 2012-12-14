@@ -169,7 +169,7 @@ static const struct clksel sys_clkin_sel[] = {
 
 static struct clk sys_clkin = {
 	.name		= "sys_clkin",
-	.rate		= 38400000,
+	.rate		= 19200000,
 	.clksel		= sys_clkin_sel,
 	.init		= &omap2_init_clksel_parent,
 	.clksel_reg	= OMAP54XX_CM_CLKSEL_SYS,
