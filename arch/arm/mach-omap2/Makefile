@@ -63,7 +63,11 @@ ifeq ($(CONFIG_PM_OPP),y)
 obj-y					+= opp.o
 obj-$(CONFIG_ARCH_OMAP3)		+= opp3xxx_data.o
 obj-$(CONFIG_ARCH_OMAP4)		+= opp4xxx_data.o
+ifeq ($(CONFIG_ARCH_OMAP5_ES1),y)
+obj-$(CONFIG_ARCH_OMAP5)		+= opp5xxx_es1_data.o
+else
 obj-$(CONFIG_ARCH_OMAP5)		+= opp5xxx_data.o
+endif
 endif
 
 # Power Management

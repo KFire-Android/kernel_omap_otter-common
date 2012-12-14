@@ -150,6 +150,7 @@ extern struct omap_vdd_dep_info omap446x_vddiva_dep_info[];
 extern struct omap_vdd_dep_info omap447x_vddmpu_dep_info[];
 extern struct omap_vdd_dep_info omap447x_vddiva_dep_info[];
 
+#ifdef CONFIG_ARCH_OMAP5_ES1
 extern struct omap_volt_data omap5430_vdd_mpu_volt_data[];
 extern struct omap_volt_data omap5430_vdd_mm_volt_data[];
 extern struct omap_volt_data omap5430_vdd_core_volt_data[];
@@ -163,5 +164,13 @@ extern struct omap_volt_data omap5432_vdd_core_volt_data[];
 
 extern struct omap_vdd_dep_info omap5432_vddmpu_dep_info[];
 extern struct omap_vdd_dep_info omap5432_vddmm_dep_info[];
+#else
+extern struct omap_volt_data omap543x_vdd_mpu_volt_data[];
+extern struct omap_volt_data omap543x_vdd_mm_volt_data[];
+extern struct omap_volt_data omap543x_vdd_core_volt_data[];
+
+extern struct omap_vdd_dep_info omap543x_vddmpu_dep_info[];
+extern struct omap_vdd_dep_info omap543x_vddmm_dep_info[];
+#endif
 
 #endif		/* __ARCH_ARM_MACH_OMAP2_OMAP_OPP_DATA_H */
