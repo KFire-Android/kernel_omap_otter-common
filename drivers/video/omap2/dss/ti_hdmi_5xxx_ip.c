@@ -305,7 +305,8 @@ static inline void ctrl_core_hdmi_write_reg(u32 val)
 int ti_hdmi_5xxx_read_edid(struct hdmi_ip_data *ip_data,
 				u8 *edid, int len)
 {
-	int r, l;
+	int r, n, i;
+	int max_ext_blocks = (len / 128) - 1;
 
 	if (len < 128)
 		return -EINVAL;
@@ -330,14 +331,17 @@ int ti_hdmi_5xxx_read_edid(struct hdmi_ip_data *ip_data,
 		r = hdmi_core_ddc_edid(ip_data, edid, 0);
 		if (r)
 			return r;
+		else {
+			/*Multiblock read*/
+			n = edid[0x7e];
 
-		l = 128;
-
-		if (len >= 128 * 2 && edid[0x7e] > 0) {
-			r = hdmi_core_ddc_edid(ip_data, edid + 0x80, 1);
-			if (r)
-				return r;
-			l += 128;
+			if (n > max_ext_blocks)
+				n = max_ext_blocks;
+			for (i = 1; i <= n; i++) {
+				r = hdmi_core_ddc_edid(ip_data, edid + i*EDID_LENGTH, i);
+				if (r)
+					return r;
+			}
 		}
 		return 0;
 	}
