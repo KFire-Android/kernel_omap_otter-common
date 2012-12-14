@@ -141,8 +141,12 @@ int abe_pm_restore_context(struct omap_abe *abe)
 
 	omap_aess_write_pdmdl_offset(abe->aess, 2, abe->dc_offset.hfl, abe->dc_offset.hfr);
 
-	for (i = 0; i < abe->hdr.num_equ; i++)
-		abe_mixer_set_equ_profile(abe, i, abe->equ.profile[i]);
+	abe_mixer_set_equ_profile(abe, OMAP_AESS_CMEM_DL1_COEFS_ID, abe->equ.dl1.profile);
+	abe_mixer_set_equ_profile(abe, OMAP_AESS_CMEM_DL2_L_COEFS_ID, abe->equ.dl2l.profile);
+	abe_mixer_set_equ_profile(abe, OMAP_AESS_CMEM_DL2_R_COEFS_ID, abe->equ.dl2r.profile);
+	abe_mixer_set_equ_profile(abe, OMAP_AESS_CMEM_SDT_COEFS_ID, abe->equ.sdt.profile);
+	abe_mixer_set_equ_profile(abe, OMAP_AESS_CMEM_96_48_AMIC_COEFS_ID, abe->equ.amic.profile);
+	abe_mixer_set_equ_profile(abe, OMAP_AESS_CMEM_96_48_DMIC_COEFS_ID, abe->equ.dmic.profile);
 
 	for (i = 0; i < OMAP_ABE_NUM_MONO_MIXERS; i++)
 		abe_mixer_enable_mono(abe, MIX_DL1_MONO + i, abe->mixer.mono[i]);
@@ -226,7 +230,7 @@ int abe_pm_resume(struct snd_soc_dai *dai)
 		}
 	}
 
-	omap_aess_reload_fw(abe->aess, abe->firmware);
+	omap_aess_reload_fw(abe->aess, abe->fw_text);
 
 	switch (dai->id) {
 	case OMAP_ABE_DAI_PDM_UL:
@@ -271,8 +275,12 @@ int abe_pm_resume(struct snd_soc_dai *dai)
 
 	omap_aess_write_pdmdl_offset(abe->aess, 2, abe->dc_offset.hfl, abe->dc_offset.hfr);
 
-	for (i = 0; i < abe->hdr.num_equ; i++)
-		abe_mixer_set_equ_profile(abe, i, abe->equ.profile[i]);
+	abe_mixer_set_equ_profile(abe, OMAP_AESS_CMEM_DL1_COEFS_ID, abe->equ.dl1.profile);
+	abe_mixer_set_equ_profile(abe, OMAP_AESS_CMEM_DL2_L_COEFS_ID, abe->equ.dl2l.profile);
+	abe_mixer_set_equ_profile(abe, OMAP_AESS_CMEM_DL2_R_COEFS_ID, abe->equ.dl2r.profile);
+	abe_mixer_set_equ_profile(abe, OMAP_AESS_CMEM_SDT_COEFS_ID, abe->equ.sdt.profile);
+	abe_mixer_set_equ_profile(abe, OMAP_AESS_CMEM_96_48_AMIC_COEFS_ID, abe->equ.amic.profile);
+	abe_mixer_set_equ_profile(abe, OMAP_AESS_CMEM_96_48_DMIC_COEFS_ID, abe->equ.dmic.profile);
 
 	for (i = 0; i < OMAP_ABE_NUM_MONO_MIXERS; i++)
 		abe_mixer_enable_mono(abe, MIX_DL1_MONO + i, abe->mixer.mono[i]);
