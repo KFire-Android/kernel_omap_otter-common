@@ -1440,7 +1440,6 @@ int dwc3_gadget_run_stop(struct dwc3 *dwc, int is_on)
 			mdelay(25);
 			reg |= DWC3_DCTL_RUN_STOP;
 			dwc3_writel(dwc->regs, DWC3_DCTL, reg);
-			usb_phy_poweron(dwc->usb3_phy);
 		}
 
 		if (dwc->revision >= DWC3_REVISION_194A) {
@@ -1448,6 +1447,7 @@ int dwc3_gadget_run_stop(struct dwc3 *dwc, int is_on)
 			reg |= DWC3_DCTL_RUN_STOP;
 			dwc3_writel(dwc->regs, DWC3_DCTL, reg);
 		}
+		usb_phy_poweron(dwc->usb3_phy);
 	} else {
 		reg &= ~DWC3_DCTL_RUN_STOP;
 		dwc3_writel(dwc->regs, DWC3_DCTL, reg);
