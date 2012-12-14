@@ -1354,6 +1354,7 @@ static struct omap_hwmod omap54xx_dss_dispc_hwmod = {
 	.name		= "dss_dispc",
 	.class		= &omap54xx_dispc_hwmod_class,
 	.clkdm_name	= "dss_clkdm",
+	.flags		= HWMOD_SWSUP_SIDLE | HWMOD_SWSUP_MSTANDBY,
 	.mpu_irqs	= omap54xx_dss_dispc_irqs,
 	.sdma_reqs	= omap54xx_dss_dispc_sdma_reqs,
 	.main_clk	= "dss_dss_clk",
