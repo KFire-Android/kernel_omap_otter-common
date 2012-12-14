@@ -1129,11 +1129,22 @@ static struct omap_hwmod_rst_info omap54xx_dsp_c0_resets[] = {
 	{ .name = "dsp", .rst_shift = 0 },
 };
 
+/* dsp cfg address space */
+static struct omap_hwmod_addr_space omap54xx_dsp_addrs[] = {
+	{
+		.pa_start	= 0x4A066000,
+		.pa_end		= 0x4A0660ff,
+		.flags		= ADDR_TYPE_RT
+	},
+	{}
+};
+
 /* l4_cfg -> dsp */
 static struct omap_hwmod_ocp_if omap54xx_l4_cfg__dsp = {
 	.master		= &omap54xx_l4_cfg_hwmod,
 	.slave		= &omap54xx_dsp_hwmod,
 	.clk		= "l4_root_clk_div",
+	.addr		= omap54xx_dsp_addrs,
 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
 };
 
