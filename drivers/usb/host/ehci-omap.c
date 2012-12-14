@@ -206,7 +206,7 @@ static int ehci_omap_hub_control(
 			(pdata->port_mode[wIndex-1] ==
 					OMAP_EHCI_PORT_MODE_PHY)) {
 
-		if (cpu_is_omap443x() && typeReq == SetPortFeature &&
+		if (cpu_is_omap44xx() && typeReq == SetPortFeature &&
 				wValue == USB_PORT_FEAT_SUSPEND) {
 			/* Errata i693 workaround sequence */
 			spin_lock_irqsave(&ehci->lock, flags);
@@ -419,7 +419,7 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
 	ehci_port_power(omap_ehci, 1);
 
 	pm_qos_add_request(&pdata->pm_qos_request, PM_QOS_MEMORY_THROUGHPUT,
-				PM_QOS_MEMORY_THROUGHPUT_DEFAULT_VALUE);
+			PM_QOS_MEMORY_THROUGHPUT_USBHOST);
 
 	*pdata->usbhs_update_sar = 1;
 
