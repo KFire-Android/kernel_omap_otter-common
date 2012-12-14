@@ -137,6 +137,7 @@ struct omap_bandgap_data omap4460_data = {
 			OMAP_BANDGAP_FEATURE_TSHUT_CONFIG |
 			OMAP_BANDGAP_FEATURE_TALERT |
 			OMAP_BANDGAP_FEATURE_MODE_CONFIG |
+			OMAP_BANDGAP_FEATURE_CLK_CTRL |
 			OMAP_BANDGAP_FEATURE_COUNTER,
 	.fclock_name = "bandgap_ts_fclk",
 	.div_ck_name = "div_ts_ck",

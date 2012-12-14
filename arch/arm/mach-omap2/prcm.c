@@ -34,6 +34,7 @@
 #include "cm2xxx_3xxx.h"
 #include "prm2xxx_3xxx.h"
 #include "prm44xx.h"
+#include "prm54xx.h"
 #include "prminst44xx.h"
 #include "prm-regbits-24xx.h"
 #include "prm-regbits-44xx.h"
@@ -53,8 +54,11 @@ u32 omap_prcm_get_reset_sources(void)
 	if (cpu_is_omap24xx() || cpu_is_omap34xx())
 		return omap2_prm_read_mod_reg(WKUP_MOD, OMAP2_RM_RSTST) & 0x7f;
 	if (cpu_is_omap44xx())
-		return omap2_prm_read_mod_reg(WKUP_MOD, OMAP4_RM_RSTST) & 0x7f;
-
+		return omap4_prm_read_inst_reg(OMAP4430_PRM_DEVICE_INST,
+					       OMAP4_PRM_RSTST_OFFSET) & 0x7ff;
+	if (cpu_is_omap54xx())
+		return omap4_prm_read_inst_reg(OMAP54XX_PRM_DEVICE_INST,
+					OMAP54XX_PRM_RSTST_OFFSET) & 0x7fff;
 	return 0;
 }
 EXPORT_SYMBOL(omap_prcm_get_reset_sources);

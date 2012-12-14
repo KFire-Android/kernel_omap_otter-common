@@ -1293,6 +1293,42 @@ static void clocks_init(struct device *dev,
 /*----------------------------------------------------------------------*/
 
 
+/*
+ * twl_load_regs_setup_script() - helper to setup a one-time regs configuration
+ * @gendesc:   generic description - used with error message
+ * @sarray:    NULL terminated array of configuration values
+ *
+ * Configures TWL registers with a set of values. If any write fails,
+ * this continues and reports error.
+ */
+static void __devinit twl_load_regs_setup_script(const char *gendesc,
+			struct twl_reg_setup_array *sarray)
+{
+	int i = 0;
+	int ret1;
+
+	if (!sarray || !gendesc)
+		return;
+
+	while (sarray->desc) {
+		ret1 = twl_i2c_write_u8(sarray->mod_no,
+					sarray->val,
+					sarray->addr);
+		if (ret1)
+			pr_err("%s: %s: failed(%d), array index=%d, desc=%s, "\
+			       "mod_no=0x%02X reg=0x%02x val=0x%02x\n",
+			       __func__, gendesc, ret1, i, sarray->desc,
+			       sarray->mod_no, sarray->addr, sarray->val);
+		else
+			pr_info("%s: set (mod=0x%02X reg=0x%02x val=0x%02x):"\
+				" %s\n", gendesc,
+				sarray->mod_no, sarray->addr, sarray->val,
+				sarray->desc);
+		sarray++;
+		i++;
+	}
+}
+
 static int twl_remove(struct i2c_client *client)
 {
 	unsigned i, num_slaves;
@@ -1399,14 +1435,6 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		WARN(status < 0, "Error: reading twl_idcode register value\n");
 	}
 
-	/* load power event scripts */
-	if (twl_has_power()) {
-		if (twl_class_is_4030() && pdata->power)
-			twl4030_power_init(pdata->power);
-		if (twl_class_is_6030())
-			twl6030_power_init(pdata->power);
-	}
-
 	features = id->driver_data;
 	if (twl_class_is_6030()) {
 		if (twl_i2c_read_u8(TWL_MODULE_USB, &temp,
@@ -1416,6 +1444,14 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		}
 		if (temp == 0x32)
 			features |= TWL6032_SUBCLASS;
+	}
+
+	/* load power event scripts */
+	if (twl_has_power()) {
+		if (twl_class_is_4030() && pdata->power)
+			twl4030_power_init(pdata->power);
+		if (twl_class_is_6030())
+			twl6030_power_init(pdata->power, features);
 	}
 
 	/* Maybe init the T2 Interrupt subsystem */
@@ -1452,6 +1488,11 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
 
 	if (status)
 		status = add_children(pdata, irq_base, features);
+
+	if (status < 0)
+		goto fail;
+
+	twl_load_regs_setup_script(id->name, pdata->reg_setup_script);
 
 fail:
 	if (status < 0)

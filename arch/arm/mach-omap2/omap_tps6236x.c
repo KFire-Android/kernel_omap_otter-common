@@ -66,10 +66,6 @@
 #define REG_TPS6236X_CTRL_PD_VSEL0	BIT(6)
 #define REG_TPS6236X_CTRL_PD_VSEL1	BIT(5)
 
-/* TWL usage */
-#define TWL6030_REG_SYSEN_CFG_GRP			0xB3
-#define TWL6030_BIT_APE_GRP				BIT(0)
-
 /* Which register do we use by default? */
 static int __initdata default_reg = -1;
 
@@ -174,11 +170,86 @@ static u8 tps6236x_uv_to_vsel(unsigned long uv)
 			VOLTAGE_PFM_MODE_VAL;
 }
 
+/* Convert the ramp voltage to ramp value. */
+static u8 __init tps6236x_ramp_value(unsigned long uv)
+{
+	if (!uv)
+		return 0;
+
+	if (uv > MAX_VOLTAGE_RAMP_TPS6236X_UV) {
+		pr_err("%s: uv%ld greater than max %d\n", __func__,
+			uv, MAX_VOLTAGE_RAMP_TPS6236X_UV);
+		uv = MAX_VOLTAGE_RAMP_TPS6236X_UV;
+	}
+	return fls(MAX_VOLTAGE_RAMP_TPS6236X_UV / uv) - 1;
+}
+
+/**
+ * omap4_twl_tps62361_enable() - Enable tps chip
+ *
+ * This function enables TPS chip by associating SYSEN signal
+ * to APE resource group of TWL6030.
+ *
+ * Returns 0 on sucess, error is returned if I2C read/write fails.
+ */
+static int __init omap4_twl_tps62361_enable(struct voltagedomain *voltdm)
+{
+	int ret = 0;
+	u8 val;
+
+	/* Dont trust the bootloader. start with max, pm will set to proper */
+	val = voltdm->pmic->uv_to_vsel(voltdm->pmic->vddmax);
+	ret = omap_vc_bypass_send_i2c_msg(voltdm, voltdm->pmic->i2c_slave_addr,
+			default_reg, val);
+
+	/* Setup Ramp */
+	val = tps6236x_ramp_value(voltdm->pmic->slew_rate) <<
+		__ffs(REG_TPS6236X_RAMP_CTRL_RMP_MASK);
+	val &= REG_TPS6236X_RAMP_CTRL_RMP_MASK;
+
+	/* We would like to ramp the voltage asap */
+	val |= REG_TPS6236X_RAMP_CTRL_RAMP_PFM;
+
+	/* We would like to ramp down the voltage asap as well*/
+	val |= REG_TPS6236X_RAMP_CTRL_EN_DISC;
+
+	ret = omap_vc_bypass_send_i2c_msg(voltdm, voltdm->pmic->i2c_slave_addr,
+			REG_TPS6236X_RAMP_CTRL, val);
+	if (ret)
+		goto out;
+
+	/* Setup the internal pulls to select if needed */
+	if (pd_vsel0 != -1 || pd_vsel1 != -1) {
+		val = REG_TPS6236X_CTRL_PD_EN;
+		val |= (pd_vsel0) ? 0 : REG_TPS6236X_CTRL_PD_VSEL0;
+		val |= (pd_vsel1) ? 0 : REG_TPS6236X_CTRL_PD_VSEL1;
+		ret = omap_vc_bypass_send_i2c_msg(voltdm,
+					voltdm->pmic->i2c_slave_addr,
+					REG_TPS6236X_CTRL, val);
+		if (ret)
+			goto out;
+	}
+
+	/* Enable thermal shutdown - 0 is enable :) */
+	ret = omap_vc_bypass_send_i2c_msg(voltdm,
+				voltdm->pmic->i2c_slave_addr,
+				REG_TPS6236X_TEMP, 0x0);
+	if (ret)
+		goto out;
+
+out:
+	if (ret)
+		pr_err("%s: Error enabling TPS(%d)\n", __func__, ret);
+
+	return ret;
+}
+
 static __initdata struct omap_pmic_map omap_tps_map[] = {
 	{
 		.name = "mpu",
 		.cpu = PMIC_CPU_OMAP4460,
 		.pmic_data = &omap4_mpu_pmic,
+		.special_action = omap4_twl_tps62361_enable,
 	},
 	/* Terminator */
 	{ .name = NULL, .pmic_data = NULL},

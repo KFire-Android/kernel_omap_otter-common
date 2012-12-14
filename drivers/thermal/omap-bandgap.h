@@ -37,26 +37,6 @@
 #define OMAP4460_BGAP_STATUS_OFFSET		0x388
 #define OMAP4460_FUSE_OPP_BGAP			0x260
 
-#define OMAP5430_TEMP_SENSOR_MPU_OFFSET		0x32C
-#define OMAP5430_BGAP_CTRL_OFFSET		0x380
-#define OMAP5430_BGAP_COUNTER_MPU_OFFSET	0x39C
-#define OMAP5430_BGAP_THRESHOLD_MPU_OFFSET	0x384
-#define OMAP5430_BGAP_TSHUT_MPU_OFFSET		0x390
-#define OMAP5430_BGAP_STATUS_OFFSET		0x3A8
-#define OMAP5430_FUSE_OPP_BGAP_MPU		0x1E4
-
-#define OMAP5430_TEMP_SENSOR_GPU_OFFSET		0x330
-#define OMAP5430_BGAP_COUNTER_GPU_OFFSET	0x3A0
-#define OMAP5430_BGAP_THRESHOLD_GPU_OFFSET	0x388
-#define OMAP5430_BGAP_TSHUT_GPU_OFFSET		0x394
-#define OMAP5430_FUSE_OPP_BGAP_GPU		0x1E0
-
-#define OMAP5430_TEMP_SENSOR_CORE_OFFSET	0x334
-#define OMAP5430_BGAP_COUNTER_CORE_OFFSET	0x3A4
-#define OMAP5430_BGAP_THRESHOLD_CORE_OFFSET	0x38C
-#define OMAP5430_BGAP_TSHUT_CORE_OFFSET		0x398
-#define OMAP5430_FUSE_OPP_BGAP_CORE		0x1E8
-
 #define OMAP4460_TSHUT_HOT		900	/* 122 deg C */
 #define OMAP4460_TSHUT_COLD		895	/* 100 deg C */
 #define OMAP4460_T_HOT			800	/* 73 deg C */
@@ -72,8 +52,6 @@
 /* COBRA-BUG-175: set T_HOT to 0x3FF */
 #define OMAP54XX_ES1_0_TSHUT_HOT	1023
 
-#define OMAP5430_MPU_TSHUT_HOT		915
-#define OMAP5430_MPU_TSHUT_COLD		900
 #define OMAP5430_MPU_T_HOT		800
 #define OMAP5430_MPU_T_COLD		795
 #define OMAP5430_MPU_MAX_FREQ		1500000
@@ -83,9 +61,9 @@
 #define OMAP5430_MPU_HYST_VAL		5000
 #define OMAP5430_ADC_START_VALUE	532
 #define OMAP5430_ADC_END_VALUE		934
+#define OMAP5430_ES2_ADC_START_VALUE	540
+#define OMAP5430_ES2_ADC_END_VALUE	945
 
-#define OMAP5430_GPU_TSHUT_HOT		915
-#define OMAP5430_GPU_TSHUT_COLD		900
 #define OMAP5430_GPU_T_HOT		800
 #define OMAP5430_GPU_T_COLD		795
 #define OMAP5430_GPU_MAX_FREQ		1500000
@@ -94,8 +72,6 @@
 #define OMAP5430_GPU_MAX_TEMP		125000
 #define OMAP5430_GPU_HYST_VAL		5000
 
-#define OMAP5430_CORE_TSHUT_HOT		915
-#define OMAP5430_CORE_TSHUT_COLD	900
 #define OMAP5430_CORE_T_HOT		800
 #define OMAP5430_CORE_T_COLD		795
 #define OMAP5430_CORE_MAX_FREQ		1500000
@@ -147,6 +123,10 @@ struct temp_sensor_registers {
 	u32	bgap_mask_ctrl;
 	u32	mask_hot_mask;
 	u32	mask_cold_mask;
+	u32	mask_sidlemode_mask;
+	u32	mask_freeze_mask;
+	u32	mask_clear_mask;
+	u32	mask_clear_accum_mask;
 
 	u32	bgap_mode_ctrl;
 	u32	mode_ctrl_mask;
@@ -159,6 +139,8 @@ struct temp_sensor_registers {
 	u32	threshold_tcold_mask;
 
 	u32	tshut_threshold;
+	u32	tshut_efuse_mask;
+	u32	tshut_efuse_shift;
 	u32	tshut_hot_mask;
 	u32	tshut_cold_mask;
 
@@ -168,6 +150,12 @@ struct temp_sensor_registers {
 	u32	status_hot_mask;
 	u32	status_cold_mask;
 
+	u32	bgap_cumul_dtemp;
+	u32	ctrl_dtemp_0;
+	u32	ctrl_dtemp_1;
+	u32	ctrl_dtemp_2;
+	u32	ctrl_dtemp_3;
+	u32	ctrl_dtemp_4;
 	u32	bgap_efuse;
 };
 
@@ -246,6 +234,8 @@ struct omap_bandgap_data {
 #define OMAP_BANDGAP_FEATURE_MODE_CONFIG	(1 << 3)
 #define OMAP_BANDGAP_FEATURE_COUNTER		(1 << 4)
 #define OMAP_BANDGAP_FEATURE_POWER_SWITCH	(1 << 5)
+#define OMAP_BANDGAP_FEATURE_CLK_CTRL		(1 << 6)
+#define OMAP_BANDGAP_FEATURE_FREEZE_BIT		(1 << 7)
 #define OMAP_BANDGAP_HAS(b, f)			\
 			((b)->conf->features & OMAP_BANDGAP_FEATURE_ ## f)
 	unsigned int			features;

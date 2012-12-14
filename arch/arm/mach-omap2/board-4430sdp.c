@@ -598,6 +598,77 @@ static struct twl6040_platform_data twl6040_data = {
 	.audpwron_gpio	= 127,
 };
 
+/*
+ * Setup CFG_TRANS mode as follows:
+ * 0x00 (OFF) when in OFF state(bit offset 4)
+ * - these bits a read only, so don't touch them
+ * 0x00 (OFF) when in sleep (bit offset 2)
+ * 0x01 (PWM/PFM Auto) when in ACTive state (bit offset 0)
+ */
+#define TWL6030_REG_VCOREx_CFG_TRANS_MODE		(0x00 << 4 | \
+		TWL6030_RES_OFF_CMD << TWL6030_REG_CFG_TRANS_SLEEP_CMD_OFFSET |\
+		TWL6030_RES_AUTO_CMD << TWL6030_REG_CFG_TRANS_ACT_CMD_OFFSET)
+
+#define TWL6030_REG_VCOREx_CFG_TRANS_MODE_DESC "OFF=OFF SLEEP=OFF ACT=AUTO"
+
+/* OMAP4430 - All vcores: 1, 2 and 3 should go down with PREQ */
+static struct twl_reg_setup_array omap4430_twl6030_setup[] = {
+	{
+		.mod_no = TWL6030_MODULE_ID0,
+		.addr = TWL6030_REG_VCORE1_CFG_TRANS,
+		.val = TWL6030_REG_VCOREx_CFG_TRANS_MODE,
+		.desc = "VCORE1 " TWL6030_REG_VCOREx_CFG_TRANS_MODE_DESC,
+	},
+	{
+		.mod_no = TWL6030_MODULE_ID0,
+		.addr = TWL6030_REG_VCORE2_CFG_TRANS,
+		.val = TWL6030_REG_VCOREx_CFG_TRANS_MODE,
+		.desc = "VCORE2 " TWL6030_REG_VCOREx_CFG_TRANS_MODE_DESC,
+	},
+	{
+		.mod_no = TWL6030_MODULE_ID0,
+		.addr = TWL6030_REG_VCORE3_CFG_TRANS,
+		.val = TWL6030_REG_VCOREx_CFG_TRANS_MODE,
+		.desc = "VCORE3 " TWL6030_REG_VCOREx_CFG_TRANS_MODE_DESC,
+	},
+	{ .desc = NULL} /* TERMINATOR */
+};
+
+/* OMAP4460 - VCORE3 is unused, 1 and 2 should go down with PREQ */
+static struct twl_reg_setup_array omap4460_twl6030_setup[] = {
+	{
+		.mod_no = TWL6030_MODULE_ID0,
+		.addr = TWL6030_REG_VCORE1_CFG_TRANS,
+		.val = TWL6030_REG_VCOREx_CFG_TRANS_MODE,
+		.desc = "VCORE 1" TWL6030_REG_VCOREx_CFG_TRANS_MODE_DESC,
+	},
+	{
+		.mod_no = TWL6030_MODULE_ID0,
+		.addr = TWL6030_REG_VCORE2_CFG_TRANS,
+		.val = TWL6030_REG_VCOREx_CFG_TRANS_MODE,
+		.desc = "VCORE2 " TWL6030_REG_VCOREx_CFG_TRANS_MODE_DESC,
+	},
+	{
+		.mod_no = TWL6030_MODULE_ID0,
+		.addr = TWL6030_REG_CFG_SMPS_PD,
+		.val = 0x77,
+		.desc = "VCORE1 disable PD on shutdown",
+	},
+	{
+		.mod_no = TWL6030_MODULE_ID0,
+		.addr = TWL6030_REG_VCORE3_CFG_GRP,
+		.val = 0x00,
+		.desc = "VCORE3 - remove binding to groups",
+	},
+	{
+		.mod_no = TWL6030_MODULE_ID0,
+		.addr = TWL6030_REG_VMEM_CFG_GRP,
+		.val = 0x00,
+		.desc = "VMEM - remove binding to groups",
+	},
+	{ .desc = NULL} /* TERMINATOR */
+};
+
 static struct twl4030_platform_data sdp4430_twldata;
 
 /*
@@ -681,6 +752,13 @@ static int __init omap4_i2c_init(void)
 			TWL_COMMON_REGULATOR_SYSEN |
 			TWL_COMMON_REGULATOR_CLK32KAUDIO |
 			TWL_COMMON_REGULATOR_REGEN1);
+
+	/* Add one-time registers configuration */
+	if (cpu_is_omap443x())
+		sdp4430_twldata.reg_setup_script = omap4430_twl6030_setup;
+	else if (cpu_is_omap446x())
+		sdp4430_twldata.reg_setup_script = omap4460_twl6030_setup;
+
 	omap4_pmic_init("twl6030", &sdp4430_twldata,
 			&twl6040_data, OMAP44XX_IRQ_SYS_2N);
 	i2c_register_board_info(1, sdp4430_i2c_boardinfo,
