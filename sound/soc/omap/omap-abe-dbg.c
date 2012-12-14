@@ -264,6 +264,156 @@ static const struct file_operations omap_abe_fops = {
 	.release = abe_release_data,
 };
 
+
+static int abe_open_mem(struct inode *inode, struct file *file)
+{
+	file->private_data = inode->i_private;
+	return 0;
+}
+
+static ssize_t abe_read_mem(struct file *file, char __user *user_buf,
+			       size_t count, loff_t *ppos, void *mem, int size)
+{
+	struct omap_abe *abe = file->private_data;
+	ssize_t ret = 0;
+
+	pm_runtime_get_sync(abe->dev);
+	set_current_state(TASK_INTERRUPTIBLE);
+
+	if (*ppos >= size)
+		goto out;
+
+	if (*ppos + count > size)
+		count = size - *ppos;
+
+	if (copy_to_user(user_buf, mem + *ppos, count)) {
+		ret = -EFAULT;
+		goto out;
+	}
+	*ppos += count;
+	ret = count;
+out:
+	__set_current_state(TASK_RUNNING);
+	pm_runtime_put_sync(abe->dev);
+	return ret;
+}
+
+loff_t abe_llseek(struct file *file, loff_t off, int whence, int size)
+{
+	loff_t newpos;
+
+	switch (whence) {
+	case SEEK_SET:
+		newpos = off;
+		break;
+	case SEEK_CUR:
+		newpos = file->f_pos + off;
+		break;
+	case SEEK_END:
+		newpos = size;
+		break;
+	default: /* can't happen */
+		return -EINVAL;
+	}
+
+	if (newpos < 0)
+		return -EINVAL;
+
+	if (newpos > size)
+		newpos = size;
+
+	file->f_pos = newpos;
+	return newpos;
+}
+
+loff_t abe_llseek_cmem(struct file *file, loff_t off, int whence)
+{
+	struct omap_abe *abe = file->private_data;
+
+	return abe_llseek(file, off, whence, abe->hdr.cmem_size);
+}
+
+static ssize_t abe_read_cmem(struct file *file, char __user *user_buf,
+			       size_t count, loff_t *ppos)
+{
+	struct omap_abe *abe = file->private_data;
+
+	return abe_read_mem(file, user_buf, count, ppos,
+		abe->io_base[OMAP_ABE_IO_CMEM], abe->hdr.cmem_size);
+}
+
+static const struct file_operations omap_abe_cmem_fops = {
+	.open = abe_open_mem,
+	.read = abe_read_cmem,
+	.llseek = abe_llseek_cmem,
+};
+
+loff_t abe_llseek_pmem(struct file *file, loff_t off, int whence)
+{
+	struct omap_abe *abe = file->private_data;
+
+	return abe_llseek(file, off, whence, abe->hdr.pmem_size);
+}
+
+static ssize_t abe_read_pmem(struct file *file, char __user *user_buf,
+			       size_t count, loff_t *ppos)
+{
+	struct omap_abe *abe = file->private_data;
+
+	return abe_read_mem(file, user_buf, count, ppos,
+		abe->io_base[OMAP_ABE_IO_PMEM], abe->hdr.pmem_size);
+}
+
+static const struct file_operations omap_abe_pmem_fops = {
+	.open = abe_open_mem,
+	.read = abe_read_pmem,
+	.llseek = abe_llseek_pmem,
+};
+
+loff_t abe_llseek_smem(struct file *file, loff_t off, int whence)
+{
+	struct omap_abe *abe = file->private_data;
+
+	return abe_llseek(file, off, whence, abe->hdr.smem_size);
+}
+
+static ssize_t abe_read_smem(struct file *file, char __user *user_buf,
+			       size_t count, loff_t *ppos)
+{
+	struct omap_abe *abe = file->private_data;
+
+	return abe_read_mem(file, user_buf, count, ppos,
+		abe->io_base[OMAP_ABE_IO_SMEM], abe->hdr.smem_size);
+}
+
+static const struct file_operations omap_abe_smem_fops = {
+	.open = abe_open_mem,
+	.read = abe_read_smem,
+	.llseek = abe_llseek_smem,
+};
+
+loff_t abe_llseek_dmem(struct file *file, loff_t off, int whence)
+{
+	struct omap_abe *abe = file->private_data;
+
+	return abe_llseek(file, off, whence, abe->hdr.dmem_size);
+}
+
+static ssize_t abe_read_dmem(struct file *file, char __user *user_buf,
+			       size_t count, loff_t *ppos)
+{
+	struct omap_abe *abe = file->private_data;
+
+	return abe_read_mem(file, user_buf, count, ppos,
+		abe->io_base[OMAP_ABE_IO_DMEM], abe->hdr.dmem_size);
+}
+
+static const struct file_operations omap_abe_dmem_fops = {
+	.open = abe_open_mem,
+	.read = abe_read_dmem,
+	.llseek = abe_llseek_dmem,
+};
+
 void abe_init_debugfs(struct omap_abe *abe)
 {
 	abe->debugfs.d_root = debugfs_create_dir("omap-abe", NULL);
@@ -319,6 +469,30 @@ void abe_init_debugfs(struct omap_abe *abe)
 						 &abe->opp.level);
 	if (!abe->debugfs.d_opp)
 		dev_err(abe->dev, "Failed to create OPP level debugfs file\n");
+
+	abe->debugfs.d_pmem = debugfs_create_file("pmem", 0644,
+						 abe->debugfs.d_root,
+						 abe, &omap_abe_pmem_fops);
+	if (!abe->debugfs.d_pmem)
+		dev_err(abe->dev, "Failed to create PMEM debugfs file\n");
+
+	abe->debugfs.d_smem = debugfs_create_file("smem", 0644,
+						 abe->debugfs.d_root,
+						 abe, &omap_abe_smem_fops);
+	if (!abe->debugfs.d_smem)
+		dev_err(abe->dev, "Failed to create SMEM debugfs file\n");
+
+	abe->debugfs.d_dmem = debugfs_create_file("dmem", 0644,
+						 abe->debugfs.d_root,
+						 abe, &omap_abe_dmem_fops);
+	if (!abe->debugfs.d_dmem)
+		dev_err(abe->dev, "Failed to create DMEM debugfs file\n");
+
+	abe->debugfs.d_cmem = debugfs_create_file("cmem", 0644,
+						 abe->debugfs.d_root,
+						 abe, &omap_abe_cmem_fops);
+	if (!abe->debugfs.d_cmem)
+		dev_err(abe->dev, "Failed to create CMEM debugfs file\n");
 
 	init_waitqueue_head(&abe->debugfs.wait);
 }
