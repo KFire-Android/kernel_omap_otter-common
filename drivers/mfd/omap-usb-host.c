@@ -81,10 +81,12 @@
 
 /* Values of UHH_REVISION - Note: these are not given in the TRM */
 #define OMAP_USBHS_REV1		0x00000010	/* OMAP3 */
-#define OMAP_USBHS_REV2		0x50700100	/* OMAP4 */
+#define OMAP_USBHS_REV2		0x50700100	/* OMAP4/OMAP5 ES1 */
+#define OMAP_USBHS_REV3		0x50700101	/* OMAP5 ES2 */
 
 #define is_omap_usbhs_rev1(x)	(x->usbhs_rev == OMAP_USBHS_REV1)
-#define is_omap_usbhs_rev2(x)	(x->usbhs_rev == OMAP_USBHS_REV2)
+#define is_omap_usbhs_rev2(x)	\
+	(x->usbhs_rev == OMAP_USBHS_REV2 || x->usbhs_rev == OMAP_USBHS_REV3)
 
 #define is_ehci_phy_mode(x)	(x == OMAP_EHCI_PORT_MODE_PHY)
 #define is_ehci_tll_mode(x)	(x == OMAP_EHCI_PORT_MODE_TLL)
