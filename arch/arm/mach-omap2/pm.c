@@ -525,9 +525,9 @@ static void __init omap5_init_voltages(void)
 	if (!cpu_is_omap54xx())
 		return;
 
-	omap_set_init_opp("mpu", "dpll_mpu_ck", "mpu");
+	omap_set_init_opp("mpu", "virt_dpll_mpu_ck", "mpu");
 	omap_set_init_opp("core", "virt_l3_ck", "l3_main_1");
-	omap_set_init_opp("mm", "dpll_iva_h12x2_ck", "iva");
+	omap_set_init_opp("mm", "virt_dpll_iva_ck", "iva");
 }
 
 /* Interface to the memory throughput class of the PM QoS framework */
