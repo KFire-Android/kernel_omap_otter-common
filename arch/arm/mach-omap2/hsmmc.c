@@ -480,6 +480,18 @@ static u32 __init omap_hsmmc_si_spec_caps(struct omap2_hsmmc_info *c)
 	return caps;
 }
 
+static u32 __init omap_hsmmc_si_spec_caps2(struct omap2_hsmmc_info *c)
+{
+	u32 caps2 = 0;
+	if (cpu_is_omap54xx()) {
+		if (c->mmc == 2) {
+			if (omap_rev() == OMAP5430_REV_ES2_0)
+				caps2 |= MMC_CAP2_HS200_1_8V_SDR;
+		}
+	}
+	return caps2;
+}
+
 static int __init omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
 					struct omap_mmc_platform_data *mmc)
 {
@@ -502,6 +514,7 @@ static int __init omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
 	mmc->nr_slots = 1;
 	mmc->slots[0].caps = c->caps;
 	mmc->slots[0].caps |= omap_hsmmc_si_spec_caps(c);
+	mmc->slots[0].caps2 |= omap_hsmmc_si_spec_caps2(c);
 	mmc->slots[0].pm_caps = c->pm_caps;
 	mmc->slots[0].internal_clock = !c->ext_clock;
 	mmc->dma_mask = 0xffffffff;
