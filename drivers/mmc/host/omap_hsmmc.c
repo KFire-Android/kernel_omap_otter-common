@@ -2086,6 +2086,16 @@ static int omap_execute_tuning(struct mmc_host *mmc, u32 opcode)
 	dll |= DLL_SWT;
 	OMAP_HSMMC_WRITE(host->base, DLL, dll);
 
+	/* HACK: Toshiba EMMC HS200 part is not responding
+	 * to CMD21. Debug with Toshiba on-going. This issue
+	 * is more of protocol handling issue than a silicon
+	 * issue. This hack must be removed after debug with
+	 * Toshiba.
+	 * Temp Fix: We hard code the DLL delay for receive
+	 * sampling clock and bypass tuning command CMD21
+	 */
+	if (opcode == MMC_SEND_TUNING_BLOCK_HS200)
+		goto manual_tuning;
 	/*
 	 * As per the Host Controller spec v3.00, tuning command
 	 * generates Buffer Read Ready interrupt, so enable that.
@@ -2165,6 +2175,11 @@ static int omap_execute_tuning(struct mmc_host *mmc, u32 opcode)
 	}
 
 	if (ac12 & AC12_SCLK_SEL) {
+manual_tuning:
+		if (opcode == MMC_SEND_TUNING_BLOCK_HS200)
+			count = 16;
+		else
+			count = 2 * (max_index + (max_window >> 1));
 		dll = OMAP_HSMMC_READ(host->base, DLL);
 		dll &= ~DLL_SWT;
 		OMAP_HSMMC_WRITE(host->base, DLL, dll);
