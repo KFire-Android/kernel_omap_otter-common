@@ -1377,6 +1377,7 @@ void omap_bandgap_prepare_for_idle(void)
 	if (!g_bg_ptr)
 		return;
 
+	omap_bandgap_power(g_bg_ptr, false);
 	if (OMAP_BANDGAP_HAS(g_bg_ptr, CLK_CTRL))
 		clk_disable(g_bg_ptr->fclock);
 
@@ -1402,6 +1403,8 @@ void omap_bandgap_resume_after_idle(void)
 	if (g_bg_ptr->bg_clk_idle) {
 		if (OMAP_BANDGAP_HAS(g_bg_ptr, CLK_CTRL))
 			clk_enable(g_bg_ptr->fclock);
+
+		omap_bandgap_power(g_bg_ptr, true);
 		/*
 		 * Since the clocks are gated, the temperature reading
 		 * is not correct. Hence force the single read to get the
