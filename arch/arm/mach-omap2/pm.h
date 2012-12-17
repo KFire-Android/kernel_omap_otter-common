@@ -212,6 +212,8 @@ static inline void omap_pm_setup_rsttime_latency(u32 rsttime_latency) {};
 static inline u32 omap_pm_get_rsttime_latency(void) { return 0; }
 #endif
 
+extern int omap_trim_configure(void);
+
 #ifdef CONFIG_PM
 extern bool omap_pm_is_ready_status;
 /**

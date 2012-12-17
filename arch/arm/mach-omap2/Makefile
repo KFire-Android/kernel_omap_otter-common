@@ -205,6 +205,10 @@ obj-$(CONFIG_ARCH_OMAP3)		+= omap_l3_smx.o
 obj-$(CONFIG_ARCH_OMAP4)		+= omap_l3_noc.o
 obj-$(CONFIG_ARCH_OMAP5)                += omap_l3_noc.o
 
+# trim quirks
+obj-$(CONFIG_ARCH_OMAP4)		+= omap_trim_quirks.o
+obj-$(CONFIG_ARCH_OMAP5)		+= omap_trim_quirks.o
+
 obj-$(CONFIG_OMAP_MBOX_FWK)		+= mailbox_mach.o
 mailbox_mach-objs			:= mailbox.o
 

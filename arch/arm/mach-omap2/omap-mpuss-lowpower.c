@@ -588,6 +588,8 @@ int omap_enter_lowpower(unsigned int cpu, unsigned int power_state)
 abort_suspend:
 	if (save_state == 3 &&
 	    pwrdm_read_prev_pwrst(core_pd) == PWRDM_POWER_OFF) {
+		/* Reconfigure the trim settings as well */
+		omap_trim_configure();
 		omap4_dpll_resume_off();
 		omap4_cm_resume_off();
 #ifdef CONFIG_PM_DEBUG
