@@ -279,6 +279,7 @@ static struct regulator_init_data omap4_vdac_idata = {
 					| REGULATOR_MODE_STANDBY,
 		.valid_ops_mask		= REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
+		.always_on		= true,
 		.state_mem = {
 			.disabled	= true,
 		},
@@ -411,6 +412,7 @@ static struct regulator_init_data omap4_vana_idata = {
 					| REGULATOR_MODE_STANDBY,
 		.valid_ops_mask		= REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
+		.always_on		= true,
 		.state_mem = {
 			.disabled	= true,
 		},
@@ -461,6 +463,7 @@ static struct regulator_init_data omap4_vusb_idata = {
 static struct regulator_init_data omap4_clk32kg_idata = {
 	.constraints = {
 		.valid_ops_mask		= REGULATOR_CHANGE_STATUS,
+		.always_on		= true,
 	},
 };
 
@@ -498,6 +501,7 @@ static struct regulator_init_data omap4_v2v1_idata = {
 					| REGULATOR_MODE_STANDBY,
 		.valid_ops_mask		= REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
+		.always_on		= true,
 		.state_mem = {
 			.disabled	= true,
 		},
