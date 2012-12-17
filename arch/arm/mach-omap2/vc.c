@@ -858,7 +858,7 @@ void __init omap_vc_init_channel(struct voltagedomain *voltdm)
 	on_vsel = omap_vc_calc_vsel(voltdm, voltdm->vc_param->on);
 	onlp_vsel = omap_vc_calc_vsel(voltdm, voltdm->vc_param->onlp);
 	ret_vsel = omap_vc_calc_vsel(voltdm, voltdm->vc_param->ret);
-	off_vsel = omap_vc_calc_vsel(voltdm, voltdm->vc_param->off);
+	off_vsel = voltdm->pmic->uv_to_vsel(voltdm->vc_param->off);
 	vc->setup_voltage_common =
 	       (ret_vsel << vc->common->cmd_ret_shift) |
 	       (off_vsel << vc->common->cmd_off_shift);
