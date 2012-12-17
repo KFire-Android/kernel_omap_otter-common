@@ -848,7 +848,11 @@ void hdmi_wp_video_config_timing(struct hdmi_ip_data *ip_data,
 
 	timing_h |= FLD_VAL(timings->hbp, 31, 20);
 	timing_h |= FLD_VAL(timings->hfp, 19, 8);
-	timing_h |= FLD_VAL(timings->hsw, 7, 0);
+	if ((omap_rev() == OMAP5430_REV_ES2_0) ||
+		(omap_rev() == OMAP5432_REV_ES2_0))
+		timing_h |= FLD_VAL(timings->hsw - 1, 7, 0);
+	else
+		timing_h |= FLD_VAL(timings->hsw, 7, 0);
 	hdmi_write_reg(hdmi_wp_base(ip_data), HDMI_WP_VIDEO_TIMING_H, timing_h);
 
 	timing_v |= FLD_VAL(timings->vbp, 31, 20);
