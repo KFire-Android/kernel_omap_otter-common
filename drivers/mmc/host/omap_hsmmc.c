@@ -2637,6 +2637,8 @@ static int __devinit omap_hsmmc_probe(struct platform_device *pdev)
 	if (mmc_slot(host).nonremovable)
 		mmc->caps |= MMC_CAP_NONREMOVABLE;
 
+	mmc->caps2 |= mmc_slot(host).caps2;
+
 	mmc->pm_caps = mmc_slot(host).pm_caps;
 
 	mmc->caps |= MMC_CAP_DRIVER_TYPE_A | MMC_CAP_DRIVER_TYPE_C |
