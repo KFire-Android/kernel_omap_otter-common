@@ -399,7 +399,7 @@ static inline void omap_init_dmic(void) {}
 		defined(CONFIG_SND_OMAP_SOC_OMAP_HDMI_MODULE)
 
 static struct platform_device omap_hdmi_audio = {
-	.name	= "omap-hdmi-audio",
+	.name	= "omap-hdmi-audio-card",
 	.id	= -1,
 };
 
@@ -414,7 +414,7 @@ static void __init omap_init_hdmi_audio(void)
 		return;
 	}
 
-	pdev = omap_device_build("omap-hdmi-audio-dai",
+	pdev = omap_device_build("omap-hdmi-audio",
 		-1, oh, NULL, 0, NULL, 0, 0);
 	WARN(IS_ERR(pdev),
 	     "Can't build omap_device for omap-hdmi-audio-dai.\n");
