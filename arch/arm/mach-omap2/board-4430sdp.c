@@ -29,6 +29,7 @@
 #include <linux/leds.h>
 #include <linux/leds_pwm.h>
 #include <linux/platform_data/omap4-keypad.h>
+#include <linux/platform_data/thermistor_sensor.h>
 
 #include <mach/hardware.h>
 #include <asm/hardware/gic.h>
@@ -312,6 +313,21 @@ static struct platform_device sdp4430_leds_pwm = {
 	.id	= -1,
 	.dev	= {
 		.platform_data = &sdp4430_pwm_data,
+	},
+};
+
+static struct thermistor_pdata thermistor_device_data = {
+	.name = "thermistor_sensor",
+	.slope = 1142,
+	.offset = -393,
+	.domain = "pcb",
+};
+
+static struct platform_device thermistor = {
+	.name   =       "thermistor",
+	.id     =       -1,
+	.dev    = {
+		.platform_data = &thermistor_device_data,
 	},
 };
 
@@ -1250,6 +1266,9 @@ static void __init omap_4430sdp_init(void)
 	}
 
 	omap_enable_smartreflex_on_init();
+	if (cpu_is_omap446x())
+		platform_device_register(&thermistor);
+
 }
 
 static void __init omap_4430sdp_reserve(void)

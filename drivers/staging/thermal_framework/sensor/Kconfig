@@ -3,35 +3,39 @@
 #
 config TMP102_SENSOR
 	bool "TMP102 temp sensor support"
-	depends on THERMAL_FRAMEWORK && I2C
+	depends on OMAP_THERMAL && I2C
 	help
 	  Enabling this config will give support for the tmp102
 	  temp sensor.
 
 config TMP006_SENSOR
 	bool "TMP006 temp sensor support"
-	depends on THERMAL_FRAMEWORK && OMAP_THERMAL && I2C
+	depends on OMAP_THERMAL && I2C
 	help
 	  Enabling this config will give support for the tmp006
 	  temp sensor.
 
-config OMAP5_THERMAL
-	bool "Texas Instruments OMAP5 thermal support"
-	depends on OMAP_BANDGAP
-	depends on ARCH_OMAP5
-	depends on THERMAL_FRAMEWORK
+config OMAP_DIE_TEMP_SENSOR
+	bool "Texas Instruments OMAP4+ on-die sensor support"
+	depends on OMAP_BANDGAP && OMAP_THERMAL
 	help
 	  If you say yes here you get thermal support for the Texas Instruments
-	  OMAP5 SoC family. The current chip supported are:
-	  - OMAP5430
+	  OMAP4+ SoC family. The current chip supported are:
+	  - OMAP4460, OMAP4470, OMAP5430
 
 	  This includes alert interrupts generation and also the TSHUT
 	  support.
 
+config THERMISTOR_SENSOR
+	bool "OMAP Thermistor sensor support"
+	depends on OMAP_THERMAL && TWL6030_GPADC
+	help
+	  Enabling this config will give support for the thermistor
+	  temp sensor for the OMAP platform.
+
 config CASE_TEMP_SENSOR
 	bool "Case temp sensor support"
-	depends on THERMAL_FRAMEWORK && OMAP_THERMAL
+	depends on THERMAL_FRAMEWORK
 	help
 	  Enabling this config will give support for the case
 	  temp sensor for the OMAP platform.
-

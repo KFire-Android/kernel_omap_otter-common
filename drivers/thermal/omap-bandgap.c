@@ -903,7 +903,10 @@ struct omap_bandgap *omap_bandgap_platform_build(struct platform_device *pdev)
 	switch (pdata->rev) {
 #ifdef CONFIG_OMAP4_BG_TEMP_SENSOR_DATA
 	case 1:
-		bg_ptr->conf = (void *)&omap4460_data;
+		if (cpu_is_omap447x())
+			bg_ptr->conf = (void *)&omap4470_data;
+		else
+			bg_ptr->conf = (void *)&omap4460_data;
 		break;
 #endif
 #ifdef CONFIG_OMAP5_BG_TEMP_SENSOR_DATA
@@ -1390,12 +1393,17 @@ void omap_bandgap_resume_after_idle(void)
 static const struct of_device_id of_omap_bandgap_match[] = {
 #ifdef CONFIG_OMAP4_BG_TEMP_SENSOR_DATA
 	/*
-	 * TODO: Add support to 4430, 4470
+	 * TODO: Add support to 4430
 	 */
 	{
 		.compatible = "ti,omap4460-bandgap",
 		.data = (void *)&omap4460_data,
 	},
+	{
+		.compatible = "ti,omap4470-bandgap",
+		.data = (void *)&omap4470_data,
+	},
+
 #endif
 #ifdef CONFIG_OMAP5_BG_TEMP_SENSOR_DATA
 	{

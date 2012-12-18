@@ -271,8 +271,10 @@ void *omap_bandgap_get_sensor_data(struct omap_bandgap *bg_ptr, int id);
 
 #ifdef CONFIG_OMAP4_BG_TEMP_SENSOR_DATA
 extern struct omap_bandgap_data omap4460_data;
+extern struct omap_bandgap_data omap4470_data;
 #else
 #define omap4460_data					NULL
+#define omap4470_data					NULL
 #endif
 
 #ifdef CONFIG_OMAP5_BG_TEMP_SENSOR_DATA
@@ -281,24 +283,24 @@ extern struct omap_bandgap_data omap5430_data;
 #define omap5430_data					NULL
 #endif
 
-#ifdef CONFIG_OMAP5_THERMAL
-int omap5_thermal_expose_sensor(struct omap_bandgap *bg_ptr, int id,
+#ifdef CONFIG_OMAP_DIE_TEMP_SENSOR
+int omap_thermal_expose_sensor(struct omap_bandgap *bg_ptr, int id,
 					char *domain);
-int omap5_thermal_report_temperature(struct omap_bandgap *bg_ptr, int id);
-int omap5_thermal_remove_sensor(struct omap_bandgap *bg_ptr, int id);
+int omap_thermal_report_temperature(struct omap_bandgap *bg_ptr, int id);
+int omap_thermal_remove_sensor(struct omap_bandgap *bg_ptr, int id);
 #else
-static inline int omap5_thermal_expose_sensor(struct omap_bandgap *bg_ptr,
+static inline int omap_thermal_expose_sensor(struct omap_bandgap *bg_ptr,
 						int id, char *domain)
 {
 	return 0;
 }
 static
-inline int omap5_thermal_report_temperature(struct omap_bandgap *bg_ptr, int id)
+inline int omap_thermal_report_temperature(struct omap_bandgap *bg_ptr, int id)
 {
 	return 0;
 }
 static
-inline int omap5_thermal_remove_sensor(struct omap_bandgap *bg_ptr, int id)
+inline int omap_thermal_remove_sensor(struct omap_bandgap *bg_ptr, int id)
 {
 	return 0;
 }
