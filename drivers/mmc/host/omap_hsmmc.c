@@ -2240,6 +2240,9 @@ static int omap_start_signal_voltage_switch(struct mmc_host *mmc,
 		return 0;
 	}
 
+	if (mmc_slot(host).clk_pull_up)
+		mmc_slot(host).clk_pull_up(host->dev, host->slot_id, false);
+
 	value = OMAP_HSMMC_READ(host->base, CON);
 	OMAP_HSMMC_WRITE(host->base, CON, (value | PADEN));
 
@@ -2281,6 +2284,9 @@ static int omap_start_signal_voltage_switch(struct mmc_host *mmc,
 						 1, VDD_165_195);
 		dev_dbg(mmc_dev(host->mmc), "i/o voltage switch to 1.8v\n\n");
 	}
+
+	if (mmc_slot(host).clk_pull_up)
+		mmc_slot(host).clk_pull_up(host->dev, host->slot_id, true);
 
 	value = OMAP_HSMMC_READ(host->base, CON);
 	OMAP_HSMMC_WRITE(host->base, CON, (value | CLKEXTFREE));
