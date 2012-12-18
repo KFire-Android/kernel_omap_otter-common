@@ -224,6 +224,9 @@ static inline void __iomem *omap4_get_scu_base(void)
 
 extern void __init gic_init_irq(void);
 extern void gic_dist_disable(void);
+extern void gic_dist_enable(void);
+extern bool gic_dist_disabled(void);
+extern void gic_timer_retrigger(void);
 extern u32 gic_readl(u32 offset, u8 idx);
 extern void omap_smc1(u32 fn, u32 arg);
 extern void __iomem *omap4_get_sar_ram_base(void);
