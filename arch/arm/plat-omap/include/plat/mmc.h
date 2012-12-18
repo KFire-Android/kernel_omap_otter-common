@@ -164,6 +164,11 @@ struct omap_mmc_platform_data {
 		/* Call back after enabling / disabling regulators */
 		void (*after_set_reg)(struct device *dev, int slot,
 				      int power_on, int vdd);
+		/* Data and callback to enable clk pull up/down */
+		struct omap_mux_partition *p_mmc_clk;
+		struct omap_mux *mux_mmc_clk;
+		void (*clk_pull_up)(struct device *dev, int slot, bool pull_up);
+
 		/* if we have special card, init it using this callback */
 		void (*init_card)(struct mmc_card *card);
 
