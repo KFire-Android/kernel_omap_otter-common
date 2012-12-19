@@ -734,6 +734,12 @@ static void __init omap_vc_i2c_init(struct voltagedomain *voltdm)
 		return;
 	}
 
+	/*
+	 * Dont depend on bootloader settings OR defaults, start with a blank
+	 * slate
+	 */
+	voltdm->write(0x0, vc->common->i2c_cfg_reg);
+
 	i2c_high_speed = voltdm->pmic->i2c_high_speed;
 	if (i2c_high_speed)
 		voltdm->rmw(vc->common->i2c_cfg_hsen_mask,
