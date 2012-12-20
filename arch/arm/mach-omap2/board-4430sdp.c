@@ -485,6 +485,7 @@ static struct omap2_hsmmc_info mmc[] = {
 		.nonremovable   = true,
 		.ocr_mask	= MMC_VDD_29_30,
 		.no_off_init	= true,
+		.built_in	= true,
 	},
 	{
 		.mmc		= 1,
