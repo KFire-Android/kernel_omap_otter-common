@@ -62,28 +62,24 @@ struct omap_volt_data omap543x_vdd_mm_volt_data[] = {
 	OMAP5_VOLT_DATA_DEFINE(0, 0, 0, 0, 0, 0),
 };
 
-#define OMAP54XX_VDD_CORE_OPP_LOW		 880000
 #define OMAP54XX_VDD_CORE_OPP_NOM		1040000
 
 struct omap_volt_data omap543x_vdd_core_volt_data[] = {
-	VOLT_DATA_DEFINE(OMAP54XX_VDD_CORE_OPP_LOW, OMAP54XX_CONTROL_FUSE_CORE_OPP_LOW, 0xf4, 0x0c, OMAP_ABB_NO_LDO),
 	VOLT_DATA_DEFINE(OMAP54XX_VDD_CORE_OPP_NOM, OMAP54XX_CONTROL_FUSE_CORE_OPP_NOM, 0xf9, 0x16, OMAP_ABB_NO_LDO),
 	VOLT_DATA_DEFINE(0, 0, 0, 0, 0),
 };
 
 /* Dependency of domains are as follows for OMAP543x (OPP based):
  *	MPU	IVA	CORE
- *	50	50	50+ (*)
+ *	50	50	100
  *	50	100+	100
  *	100+	50	100
  *	100+	100+	100
- * NOTE:
- * (*) On OMAP5432, core OPP50 is disabled, so this dependency is ignored.
  */
 
 /* OMAP 5430 MPU Core VDD dependency table */
 static struct omap_vdd_dep_volt omap543x_vdd_mpu_core_dep_data[] = {
-	{.main_vdd_volt = OMAP54XX_VDD_MPU_OPP_LOW, .dep_vdd_volt = OMAP54XX_VDD_CORE_OPP_LOW},
+	{.main_vdd_volt = OMAP54XX_VDD_MPU_OPP_LOW, .dep_vdd_volt = OMAP54XX_VDD_CORE_OPP_NOM},
 	{.main_vdd_volt = OMAP54XX_VDD_MPU_OPP_NOM, .dep_vdd_volt = OMAP54XX_VDD_CORE_OPP_NOM},
 	{.main_vdd_volt = OMAP54XX_VDD_MPU_OPP_HIGH, .dep_vdd_volt = OMAP54XX_VDD_CORE_OPP_NOM},
 	{.main_vdd_volt = OMAP54XX_VDD_MPU_OPP_SB, .dep_vdd_volt = OMAP54XX_VDD_CORE_OPP_NOM},
@@ -99,7 +95,7 @@ struct omap_vdd_dep_info omap543x_vddmpu_dep_info[] = {
 
 /* OMAP 5430 MPU IVA VDD dependency table */
 static struct omap_vdd_dep_volt omap543x_vdd_mm_core_dep_data[] = {
-	{.main_vdd_volt = OMAP54XX_VDD_MM_OPP_LOW, .dep_vdd_volt = OMAP54XX_VDD_CORE_OPP_LOW},
+	{.main_vdd_volt = OMAP54XX_VDD_MM_OPP_LOW, .dep_vdd_volt = OMAP54XX_VDD_CORE_OPP_NOM},
 	{.main_vdd_volt = OMAP54XX_VDD_MM_OPP_NOM, .dep_vdd_volt = OMAP54XX_VDD_CORE_OPP_NOM},
 	{.main_vdd_volt = OMAP54XX_VDD_MM_OPP_OD, .dep_vdd_volt = OMAP54XX_VDD_CORE_OPP_NOM},
 };
@@ -186,33 +182,21 @@ static struct omap_opp_def omap543x_opp_def_list[] = {
 	/* MPU OPP4 - OPP-SPEEDBIN */
 	OPP_INITIALIZER(&mpu_dev_info, false, 1699200000, OMAP54XX_VDD_MPU_OPP_SB),
 
-	/* L3 OPP1 - OPPLOW */
-	OPP_INITIALIZER(&l3_dev_info, true, 132960000, OMAP54XX_VDD_CORE_OPP_LOW),
 	/* L3 OPP2 - OPPNOM */
 	OPP_INITIALIZER(&l3_dev_info, true, 265920000, OMAP54XX_VDD_CORE_OPP_NOM),
 
-	/* HSI OPP1 - OPPLOW */
-	OPP_INITIALIZER(&hsi_dev_info, true, 96000000, OMAP54XX_VDD_CORE_OPP_LOW),
 	/* HSI OPP2 - OPPNOM */
 	OPP_INITIALIZER(&hsi_dev_info, true, 192000000, OMAP54XX_VDD_CORE_OPP_NOM),
 
-	/* CORE_IPU_ISS_BOOST_CLK OPP1 - OPPLOW */
-	OPP_INITIALIZER(&ipu_dev_info, true, 212700000, OMAP54XX_VDD_CORE_OPP_LOW),
 	/* CORE_IPU_ISS_BOOST_CLK OPP2 - OPPNOM */
 	OPP_INITIALIZER(&ipu_dev_info, true, 425500000, OMAP54XX_VDD_CORE_OPP_NOM),
 
-	/* CORE_ISS_MAIN_CLK OPP1 - OPPLOW */
-	OPP_INITIALIZER(&iss_dev_info, true, 152000000, OMAP54XX_VDD_CORE_OPP_LOW),
 	/* CORE_ISS_MAIN_CLK OPP2 - OPPNOM */
 	OPP_INITIALIZER(&iss_dev_info, true, 303900000, OMAP54XX_VDD_CORE_OPP_NOM),
 
-	/* FDIF OPP1 - OPPLOW */
-	OPP_INITIALIZER(&fdif_dev_info, true, 128000000, OMAP54XX_VDD_CORE_OPP_LOW),
 	/* FDIF OPP2 - OPPNOM */
 	OPP_INITIALIZER(&fdif_dev_info, true, 256000000, OMAP54XX_VDD_CORE_OPP_NOM),
 
-	/* ABE OPP1 - OPPLOW */
-	OPP_INITIALIZER(&abe_dev_info, true, 98304000, OMAP54XX_VDD_CORE_OPP_LOW),
 	/* ABE OPP2 - OPPNOM */
 	OPP_INITIALIZER(&abe_dev_info, true, 196608000, OMAP54XX_VDD_CORE_OPP_NOM),
 
@@ -239,7 +223,9 @@ static struct omap_opp_def omap543x_opp_def_list[] = {
 	OPP_INITIALIZER(&gpu_dev_info, true, 531840000, OMAP54XX_VDD_MM_OPP_OD),
 };
 
-static int __init opp_def_list_modify_opp(struct omap_opp_def *list,
+/* OPP table modification function for use as needed */
+static int __init __maybe_unused opp_def_list_modify_opp(
+					  struct omap_opp_def *list,
 					  unsigned int size,
 					  struct device_info *dev_info,
 					  unsigned long opp_freq, bool state)
@@ -273,34 +259,6 @@ int __init omap5_opp_init(void)
 	 * XXX: NOTE: OPP_HIGH is supported on all samples now
 	 * TBD: support for runtime enable of MPU OPP_SB
 	 */
-
-	/* Disable OPP_LOW for 5432 */
-	if (omap_rev() >= OMAP5432_REV_ES2_0) {
-		opp_def_list_modify_opp(omap543x_opp_def_list,
-					ARRAY_SIZE(omap543x_opp_def_list),
-					&l3_dev_info, 132960000, false);
-
-		opp_def_list_modify_opp(omap543x_opp_def_list,
-					ARRAY_SIZE(omap543x_opp_def_list),
-					&hsi_dev_info, 96000000, false);
-
-		opp_def_list_modify_opp(omap543x_opp_def_list,
-					ARRAY_SIZE(omap543x_opp_def_list),
-					&ipu_dev_info, 212700000, false);
-
-		opp_def_list_modify_opp(omap543x_opp_def_list,
-					ARRAY_SIZE(omap543x_opp_def_list),
-					&iss_dev_info, 152000000, false);
-
-		opp_def_list_modify_opp(omap543x_opp_def_list,
-					ARRAY_SIZE(omap543x_opp_def_list),
-					&fdif_dev_info, 128000000, false);
-
-		opp_def_list_modify_opp(omap543x_opp_def_list,
-					ARRAY_SIZE(omap543x_opp_def_list),
-					&abe_dev_info, 98304000, false);
-
-	}
 
 	r = omap_init_opp_table(omap543x_opp_def_list,
 				ARRAY_SIZE(omap543x_opp_def_list));
