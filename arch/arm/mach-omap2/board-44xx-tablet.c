@@ -41,6 +41,7 @@
 #include <asm/mach/map.h>
 
 #include <mach/hardware.h>
+#include <mach/omap-secure.h>
 
 #include <plat/drm.h>
 #include <plat/board.h>
@@ -700,6 +701,7 @@ static void __init omap_tablet_reserve(void)
 			OMAP_RAM_CONSOLE_SIZE_DEFAULT);
 	omap_rproc_reserve_cma(RPROC_CMA_OMAP4);
 	omap4_ion_init();
+	omap4_secure_workspace_addr_default();
 	omap_reserve();
 }
 
