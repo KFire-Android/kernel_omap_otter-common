@@ -262,6 +262,8 @@ static irqreturn_t twl6030_usb_irq(int irq, void *_twl)
 						     event, &charger_type);
 		} else {
 			if (twl->prev_status != OMAP_MUSB_UNKNOWN) {
+				if (twl->prev_status == OMAP_MUSB_VBUS_OFF)
+					return IRQ_HANDLED;
 				status = OMAP_MUSB_VBUS_OFF;
 				event = USB_EVENT_NONE;
 				omap_musb_mailbox(status);

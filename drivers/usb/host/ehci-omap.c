@@ -197,10 +197,12 @@ static int ehci_omap_hub_control(
 	struct device *dev = hcd->self.controller;
 	struct ehci_hcd_omap_platform_data *pdata = dev->platform_data;
 	struct ehci_hcd	*ehci = hcd_to_ehci(hcd);
+	int		ports = HCS_N_PORTS(ehci->hcs_params);
 	u32 __iomem	*status_reg = &ehci->regs->port_status[
 				(wIndex & 0xff) - 1];
-	u32		temp;
+	u32		temp, status;
 	unsigned long	flags;
+	int		retval = 0;
 
 	if (((wIndex & 0xff) > 0) && ((wIndex & 0xff) < OMAP3_HS_USB_PORTS) &&
 			(pdata->port_mode[wIndex-1] ==
@@ -258,6 +260,75 @@ static int ehci_omap_hub_control(
 			spin_unlock_irqrestore(&ehci->lock, flags);
 			return 0;
 		}
+	}
+
+	if ((typeReq == GetPortStatus) && !(!wIndex || wIndex > ports)) {
+		spin_lock_irqsave(&ehci->lock, flags);
+		status = 0;
+		temp = ehci_readl(ehci, status_reg);
+
+		/* whoever resumes must GetPortStatus to complete it!! */
+		if (temp & PORT_RESUME) {
+
+			/* Remote Wakeup received? */
+			if (!ehci->reset_done[wIndex - 1]) {
+				/* resume signaling for 20 msec */
+				ehci->reset_done[wIndex - 1] = jiffies
+						+ msecs_to_jiffies(20);
+				/* check the port again */
+				mod_timer(&ehci_to_hcd(ehci)->rh_timer,
+						ehci->reset_done[wIndex - 1]);
+
+			/* resume completed? */
+			} else if (time_after_eq(jiffies,
+					ehci->reset_done[wIndex - 1])) {
+				clear_bit(wIndex - 1, &ehci->suspended_ports);
+				set_bit(wIndex - 1, &ehci->port_c_suspend);
+				ehci->reset_done[wIndex - 1] = 0;
+
+				/* stop resume signaling */
+				temp = ehci_readl(ehci, status_reg);
+				ehci_writel(ehci,
+					temp & ~(PORT_RWC_BITS | PORT_RESUME),
+					status_reg);
+				clear_bit(wIndex - 1, &ehci->resuming_ports);
+
+				/*
+				 * i701 errata WA:
+				 * Manually send the "switch to HS" command
+				 * to the PHY (write 0x40 to function_control
+				 * register thanks to INSNREG05_ULPI register)
+				 * right after the "stop drive K" (that is
+				 * clear PORTSC[6]:FPR).
+				 */
+				if ((cpu_is_omap44xx() || (cpu_is_omap543x()
+						&& ((omap_rev()
+							== OMAP5430_REV_ES1_0)
+						|| omap_rev() ==
+							OMAP5432_REV_ES1_0)))
+						&& (pdata->port_mode[wIndex - 1]
+						   == OMAP_EHCI_PORT_MODE_PHY))
+					omap_ehci_ulpi_write(hcd, wIndex, 0x40,
+							0x4, 20);
+
+				retval = handshake(ehci, status_reg,
+					   PORT_RESUME, 0, 2000 /* 2msec */);
+				if (retval != 0) {
+					ehci_err(ehci,
+						"port %d resume error %d\n",
+						wIndex, retval);
+					/* "stall" on error */
+					retval = -EPIPE;
+					spin_unlock_irqrestore(&ehci->lock,
+							flags);
+					return retval;
+				}
+				temp &= ~(PORT_SUSPEND|PORT_RESUME|(3<<10));
+			}
+			temp &= ~PORT_RESUME;
+			ehci_writel(ehci, temp, status_reg);
+		}
+		spin_unlock_irqrestore(&ehci->lock, flags);
 	}
 
 	return ehci_hub_control(hcd, typeReq, wValue, wIndex, buf, wLength);
