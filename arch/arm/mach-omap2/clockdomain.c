@@ -23,9 +23,8 @@
 #include <linux/limits.h>
 #include <linux/err.h>
 #include <linux/clk-provider.h>
-
+#include <linux/seq_file.h>
 #include <linux/io.h>
-
 #include <linux/bitops.h>
 
 #include "soc.h"
@@ -1295,3 +1294,18 @@ int clkdm_hwmod_disable(struct clockdomain *clkdm, struct omap_hwmod *oh)
 	return 0;
 }
 
+
+/* Clockdomain debugfs functions */
+
+int clkdm_dbg_show_counter(struct clockdomain *clkdm, void *seq_file)
+{
+	struct seq_file *s = (struct seq_file *)seq_file;
+
+	if (!clkdm->flags)
+		return 0;
+
+	seq_printf(s, "%s->%s (%d)\n", clkdm->name, clkdm->pwrdm.ptr->name,
+		   clkdm->usecount);
+
+	return 0;
+}

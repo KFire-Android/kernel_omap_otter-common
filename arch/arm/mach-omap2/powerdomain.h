@@ -276,4 +276,8 @@ extern struct powerdomain gfx_omap2_pwrdm;
 extern void pwrdm_lock(struct powerdomain *pwrdm);
 extern void pwrdm_unlock(struct powerdomain *pwrdm);
 
+/* Debugfs functions */
+extern int pwrdm_dbg_show_counter(struct powerdomain *pwrdm, void *seq_file);
+extern int pwrdm_dbg_show_timer(struct powerdomain *pwrdm, void *seq_file);
+
 #endif

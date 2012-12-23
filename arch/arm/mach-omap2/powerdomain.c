@@ -8,6 +8,10 @@
  * Added OMAP4 specific support by Abhijit Pagare <abhijitpagare@ti.com>
  * State counting code by Tero Kristo <tero.kristo@nokia.com>
  *
+ * Contains some code previously from mach-omap2/pm-debug.c, which was:
+ * Copyright (C) 2005 Texas Instruments, Inc.
+ * Copyright (C) 2006-2008 Nokia Corporation
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
@@ -21,6 +25,7 @@
 #include <linux/string.h>
 #include <linux/spinlock.h>
 #include <linux/sched.h>
+#include <linux/seq_file.h>
 
 #include <trace/events/power.h>
 
@@ -1447,3 +1452,83 @@ bool pwrdm_supports_fpwrst(struct powerdomain *pwrdm, u8 fpwrst)
 
 	return true;
 }
+
+/* Powerdomain debugfs-related functions */
+
+/**
+ * pwrdm_dbg_show_counter - generate debugfs data for the pwrdm pwrst counters
+ * @pwrdm: struct powerdomain * to generate debugfs data for
+ * @seq_file: struct seq_file * to write data to
+ *
+ * Dump the powerdomain @pwrdm's power state counters (and current
+ * power state) to the seq_file @seq_file.  Currently called by the
+ * mach-omap2/pm-debug.c code.  Returns 0.
+ */
+int pwrdm_dbg_show_counter(struct powerdomain *pwrdm, void *seq_file)
+{
+	struct seq_file *s = (struct seq_file *)seq_file;
+	int i;
+	u8 curr_fpwrst;
+
+	if (!_pwrdm_pwrst_can_change(pwrdm))
+		return 0;
+
+	pwrdm_lock(pwrdm);
+
+	curr_fpwrst = _pwrdm_read_fpwrst(pwrdm);
+	if (pwrdm->fpwrst != curr_fpwrst)
+		pr_err("pwrdm state mismatch(%s) %s != %s\n",
+		       pwrdm->name,
+		       pwrdm_convert_fpwrst_to_name(pwrdm->fpwrst),
+		       pwrdm_convert_fpwrst_to_name(curr_fpwrst));
+
+	seq_printf(s, "%s (%s)", pwrdm->name,
+		   pwrdm_convert_fpwrst_to_name(pwrdm->fpwrst));
+	for (i = PWRDM_FPWRST_OFFSET; i < PWRDM_MAX_FUNC_PWRSTS; i++)
+		seq_printf(s, ",%s:%d", pwrdm_convert_fpwrst_to_name(i),
+			   pwrdm->fpwrst_counter[i - PWRDM_FPWRST_OFFSET]);
+
+	seq_printf(s, "\n");
+
+	pwrdm_unlock(pwrdm);
+
+	return 0;
+}
+
+/**
+ * pwrdm_dbg_show_timer - generate debugfs data for the pwrdm pwrst timers
+ * @pwrdm: struct powerdomain * to generate debugfs data for
+ * @seq_file: struct seq_file * to write data to
+ *
+ * Dump the powerdomain @pwrdm's power state residency duration timings
+ * to the seq_file @seq_file.  Currently called by the mach-omap2/pm-debug.c
+ * code.  Returns 0.
+ */
+int pwrdm_dbg_show_timer(struct powerdomain *pwrdm, void *seq_file)
+{
+#ifdef CONFIG_PM_DEBUG
+	struct seq_file *s = (struct seq_file *)seq_file;
+	int i;
+
+	if (!_pwrdm_pwrst_can_change(pwrdm))
+		return 0;
+
+	pwrdm_lock(pwrdm);
+
+	pwrdm_state_switch_nolock(pwrdm);
+
+	seq_printf(s, "%s (%s)", pwrdm->name,
+		   pwrdm_convert_fpwrst_to_name(pwrdm->fpwrst));
+
+	for (i = 0; i < PWRDM_FPWRSTS_COUNT; i++)
+		seq_printf(s, ",%s:%lld",
+			   pwrdm_convert_fpwrst_to_name(i + PWRDM_FPWRST_OFFSET),
+			   pwrdm->fpwrst_timer[i]);
+
+	seq_printf(s, "\n");
+
+	pwrdm_unlock(pwrdm);
+#endif
+	return 0;
+}
+

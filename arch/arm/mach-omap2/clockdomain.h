@@ -229,4 +229,6 @@ extern struct clkdm_dep gfx_24xx_wkdeps[];
 extern struct clkdm_dep dsp_24xx_wkdeps[];
 extern struct clockdomain wkup_common_clkdm;
 
+extern int clkdm_dbg_show_counter(struct clockdomain *clkdm, void *seq_file);
+
 #endif
