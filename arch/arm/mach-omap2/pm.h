@@ -59,12 +59,6 @@ extern u32 enable_off_mode;
 #define enable_off_mode 0
 #endif
 
-#if defined(CONFIG_PM_DEBUG) && defined(CONFIG_DEBUG_FS)
-extern void pm_dbg_update_time(struct powerdomain *pwrdm, int prev);
-#else
-#define pm_dbg_update_time(pwrdm, prev) do {} while (0);
-#endif /* CONFIG_PM_DEBUG */
-
 /* 24xx */
 extern void omap24xx_idle_loop_suspend(void);
 extern unsigned int omap24xx_idle_loop_suspend_sz;

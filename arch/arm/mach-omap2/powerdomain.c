@@ -20,6 +20,8 @@
 #include <linux/errno.h>
 #include <linux/string.h>
 #include <linux/spinlock.h>
+#include <linux/sched.h>
+
 #include <trace/events/power.h>
 
 #include "cm2xxx_3xxx.h"
@@ -126,6 +128,9 @@ static int _pwrdm_register(struct powerdomain *pwrdm)
 	arch_pwrdm->pwrdm_wait_transition(pwrdm);
 	pwrdm->fpwrst = pwrdm_read_fpwrst(pwrdm);
 	pwrdm->fpwrst_counter[pwrdm->fpwrst - PWRDM_FPWRST_OFFSET] = 1;
+#ifdef CONFIG_PM_DEBUG
+	pwrdm->timer = sched_clock();
+#endif
 
 	return 0;
 }
@@ -579,6 +584,21 @@ static int _pwrdm_set_mem_retst(struct powerdomain *pwrdm, u8 bank, u8 pwrst)
 	return ret;
 }
 
+/* XXX prev is wrong type */
+/* XXX is sched_clock() correct to use here? */
+/* Update timer for previous state */
+static void _pwrdm_update_pwrst_time(struct powerdomain *pwrdm, int prev)
+{
+#ifdef CONFIG_PM_DEBUG
+	s64 t;
+
+	t = sched_clock();
+
+	pwrdm->fpwrst_timer[prev - PWRDM_FPWRST_OFFSET] += t - pwrdm->timer;
+
+	pwrdm->timer = t;
+#endif
+}
 
 /* XXX Caller must hold pwrdm->_lock */
 static int _pwrdm_state_switch(struct powerdomain *pwrdm, int flag)
@@ -617,7 +637,7 @@ static int _pwrdm_state_switch(struct powerdomain *pwrdm, int flag)
 	if (fpwrst != prev)
 		pwrdm->fpwrst_counter[fpwrst - PWRDM_FPWRST_OFFSET]++;
 
-	pm_dbg_update_time(pwrdm, prev);
+	_pwrdm_update_pwrst_time(pwrdm, prev);
 
 	pwrdm->fpwrst = fpwrst;
 

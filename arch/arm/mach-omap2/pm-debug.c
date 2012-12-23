@@ -52,21 +52,6 @@ enum {
 	DEBUG_FILE_TIMERS,
 };
 
-void pm_dbg_update_time(struct powerdomain *pwrdm, int prev)
-{
-	s64 t;
-
-	if (!pm_dbg_init_done)
-		return ;
-
-	/* Update timer for previous state */
-	t = sched_clock();
-
-	pwrdm->fpwrst_timer[prev - PWRDM_FPWRST_OFFSET] += t - pwrdm->timer;
-
-	pwrdm->timer = t;
-}
-
 static int clkdm_dbg_show_counter(struct clockdomain *clkdm, void *user)
 {
 	struct seq_file *s = (struct seq_file *)user;
@@ -196,16 +181,7 @@ DEFINE_SIMPLE_ATTRIBUTE(pwrdm_suspend_fops, pwrdm_suspend_get,
 
 static int __init pwrdms_setup(struct powerdomain *pwrdm, void *dir)
 {
-	int i;
-	s64 t;
 	struct dentry *d;
-
-	t = sched_clock();
-
-	for (i = 0; i < PWRDM_FPWRSTS_COUNT; i++)
-		pwrdm->fpwrst_timer[i] = 0;
-
-	pwrdm->timer = t;
 
 	if (strncmp(pwrdm->name, "dpll", 4) == 0)
 		return 0;
