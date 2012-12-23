@@ -40,11 +40,6 @@
 
 #define PWRDM_TRACE_STATES_FLAG	(1<<31)
 
-enum {
-	PWRDM_STATE_NOW = 0,
-	PWRDM_STATE_PREV,
-};
-
 /* Types of sleep_switch used in pwrdm_set_fpwrst() */
 #define ALREADYACTIVE_SWITCH		0
 #define FORCEWAKEUP_SWITCH		1
@@ -600,60 +595,97 @@ static void _pwrdm_update_pwrst_time(struct powerdomain *pwrdm, int prev)
 #endif
 }
 
-/* XXX Caller must hold pwrdm->_lock */
-static int _pwrdm_state_switch(struct powerdomain *pwrdm, int flag)
+/**
+ * _pwrdm_state_switch - record powerdomain usage data; track power state
+ * (before powerdomain state transition)
+ * @pwrdm: struct powerdomain * to observe
+ *
+ * If the powerdomain @pwrdm's current power state is not what we last
+ * observed it to be, then increment the counter for that power state.
+ * This is used to track context loss events, and for debugging.  Also
+ * if CONFIG_PM_DEBUG=y, track the amount of time the powerdomain has
+ * spent in the current power state.  Caller must hold pwrdm->_lock.
+ * Intended to be called immediately before the powerdomain's power
+ * state is likely to change.  XXX Note that the counts and durations
+ * observed by this function may be inaccurate.  Powerdomains can
+ * transition power states automatically, without the kernel being
+ * involved -- for example, a device can DMA data from memory while
+ * the MPU is asleep.  This function does not attempt to account for
+ * that.  XXX It may be possible to skip this function completely if
+ * PM debugging is not needed and off-mode and OSWR is disabled (e.g.,
+ * no context loss events).  No return value.
+ */
+static void _pwrdm_state_switch(struct powerdomain *pwrdm)
 {
-	int prev, next, fpwrst, trace_state = 0;
-
-	if (pwrdm == NULL)
-		return -EINVAL;
+	int fpwrst;
 
 	fpwrst = _pwrdm_read_fpwrst(pwrdm);
-
-	switch (flag) {
-	case PWRDM_STATE_NOW:
-		prev = pwrdm->fpwrst;
-		break;
-	case PWRDM_STATE_PREV:
-		prev = _pwrdm_read_prev_fpwrst(pwrdm);
-		if (pwrdm->fpwrst != prev)
-			pwrdm->fpwrst_counter[prev - PWRDM_FPWRST_OFFSET]++;
-		/*
-		 * If the power domain did not hit the desired state,
-		 * generate a trace event with both the desired and hit states
-		 */
-		next = _pwrdm_read_next_fpwrst(pwrdm);
-		if (next != prev) {
-			trace_state = (PWRDM_TRACE_STATES_FLAG | next << 8 |
-				       prev);
-			trace_power_domain_target(pwrdm->name, trace_state,
-						  smp_processor_id());
-		}
-		break;
-	default:
-		return -EINVAL;
-	}
-
-	if (fpwrst != prev)
+	if (fpwrst != pwrdm->fpwrst)
 		pwrdm->fpwrst_counter[fpwrst - PWRDM_FPWRST_OFFSET]++;
 
-	_pwrdm_update_pwrst_time(pwrdm, prev);
+	_pwrdm_update_pwrst_time(pwrdm, pwrdm->fpwrst);
 
 	pwrdm->fpwrst = fpwrst;
-
-	return 0;
 }
 
 static int _pwrdm_pre_transition_cb(struct powerdomain *pwrdm, void *unused)
 {
 	pwrdm_clear_all_prev_pwrst(pwrdm);
-	_pwrdm_state_switch(pwrdm, PWRDM_STATE_NOW);
+	_pwrdm_state_switch(pwrdm);
 	return 0;
 }
 
+/**
+ * _pwrdm_post_transition_cb - record powerdomain usage data; track power state
+ * (after powerdomain power state transition)
+ * @pwrdm: struct powerdomain * to observe
+ *
+ * If the powerdomain @pwrdm's previous power state doesn't match our
+ * recollection of the powerdomain's current power state, then
+ * increment the counter for the previous power state.  And if the
+ * powerdomain's previous power state doesn't match the current power
+ * state, increment the counter for the current power state.  This
+ * function is used to track context loss events, and for debugging.
+ * Also if CONFIG_PM_DEBUG=y, track the approximate amount of time the
+ * powerdomain has spent in the previous power state.  Caller must
+ * hold pwrdm->_lock.  XXX Note that the counts and durations observed
+ * by this function may be inaccurate.  Powerdomains can transition
+ * power states automatically, without the kernel being involved --
+ * for example, a device can DMA data from memory while the MPU is
+ * asleep.  This function does not attempt to account for that.  XXX
+ * It may be possible to skip this function completely if PM debugging
+ * is not needed and off-mode and OSWR is disabled (e.g., no context
+ * loss events).  No return value.
+ */
 static int _pwrdm_post_transition_cb(struct powerdomain *pwrdm, void *unused)
 {
-	_pwrdm_state_switch(pwrdm, PWRDM_STATE_PREV);
+	int prev, next, fpwrst;
+	int trace_state = 0;
+
+	prev = _pwrdm_read_prev_fpwrst(pwrdm);
+	if (pwrdm->fpwrst != prev)
+		pwrdm->fpwrst_counter[prev - PWRDM_FPWRST_OFFSET]++;
+
+	_pwrdm_update_pwrst_time(pwrdm, prev);
+
+	/*
+	 * If the power domain did not hit the desired state,
+	 * generate a trace event with both the desired and hit states
+	 */
+	next = _pwrdm_read_next_fpwrst(pwrdm);
+	if (next != prev) {
+		trace_state = (PWRDM_TRACE_STATES_FLAG | next << 8 |
+			       prev);
+		trace_power_domain_target(pwrdm->name, trace_state,
+					  smp_processor_id());
+	}
+
+	fpwrst = _pwrdm_read_fpwrst(pwrdm);
+	if (fpwrst != prev)
+		pwrdm->fpwrst_counter[fpwrst - PWRDM_FPWRST_OFFSET]++;
+
+	pwrdm->fpwrst = fpwrst;
+
 	return 0;
 }
 
@@ -1055,7 +1087,7 @@ int pwrdm_state_switch_nolock(struct powerdomain *pwrdm)
 
 	ret = arch_pwrdm->pwrdm_wait_transition(pwrdm);
 	if (!ret)
-		ret = _pwrdm_state_switch(pwrdm, PWRDM_STATE_NOW);
+		_pwrdm_state_switch(pwrdm);
 
 	return ret;
 }
