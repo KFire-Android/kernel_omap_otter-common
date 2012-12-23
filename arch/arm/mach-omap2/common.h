@@ -238,14 +238,13 @@ extern void omap5_secondary_startup(void);
 
 #if defined(CONFIG_SMP) && defined(CONFIG_PM)
 extern int omap4_mpuss_init(void);
-extern int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state);
+extern int omap4_mpuss_enter_lowpower(unsigned int cpu, u8 fpwrst);
 extern int omap4_finish_suspend(unsigned long cpu_state);
 extern void omap4_cpu_resume(void);
-extern int omap4_hotplug_cpu(unsigned int cpu, unsigned int power_state);
+extern int omap4_mpuss_hotplug_cpu(unsigned int cpu, u8 fpwrst);
 extern u32 omap4_mpuss_read_prev_context_state(void);
 #else
-static inline int omap4_enter_lowpower(unsigned int cpu,
-					unsigned int power_state)
+static inline int omap4_mpuss_enter_lowpower(unsigned int cpu, u8 fpwrst)
 {
 	cpu_do_idle();
 	return 0;

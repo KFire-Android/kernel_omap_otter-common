@@ -26,10 +26,9 @@
 
 struct power_state {
 	struct powerdomain *pwrdm;
-	u32 next_state;
+	u8 next_fpwrst;
 #ifdef CONFIG_SUSPEND
-	u32 saved_state;
-	u32 saved_logic_state;
+	u8 saved_fpwrst;
 #endif
 	struct list_head node;
 };
@@ -40,20 +39,19 @@ static LIST_HEAD(pwrst_list);
 static int omap4_pm_suspend(void)
 {
 	struct power_state *pwrst;
-	int state, ret = 0;
+	int prev_fpwrst;
+	int ret = 0;
 	u32 cpu_id = smp_processor_id();
 
+	/* XXX Seems like these two loops could be combined into one loop? */
+
 	/* Save current powerdomain state */
-	list_for_each_entry(pwrst, &pwrst_list, node) {
-		pwrst->saved_state = pwrdm_read_next_pwrst(pwrst->pwrdm);
-		pwrst->saved_logic_state = pwrdm_read_logic_retst(pwrst->pwrdm);
-	}
+	list_for_each_entry(pwrst, &pwrst_list, node)
+		pwrst->saved_fpwrst = pwrdm_read_next_fpwrst(pwrst->pwrdm);
 
 	/* Set targeted power domain states by suspend */
-	list_for_each_entry(pwrst, &pwrst_list, node) {
-		omap_set_pwrdm_state(pwrst->pwrdm, pwrst->next_state);
-		pwrdm_set_logic_retst(pwrst->pwrdm, PWRDM_POWER_OFF);
-	}
+	list_for_each_entry(pwrst, &pwrst_list, node)
+		WARN_ON(pwrdm_set_fpwrst(pwrst->pwrdm, pwrst->next_fpwrst));
 
 	/*
 	 * For MPUSS to hit power domain retention(CSWR or OSWR),
@@ -64,18 +62,20 @@ static int omap4_pm_suspend(void)
 	 * domain CSWR is not supported by hardware.
 	 * More details can be found in OMAP4430 TRM section 4.3.4.2.
 	 */
-	omap4_enter_lowpower(cpu_id, PWRDM_POWER_OFF);
+	omap4_mpuss_enter_lowpower(cpu_id, PWRDM_FUNC_PWRST_OFF);
 
 	/* Restore next powerdomain state */
 	list_for_each_entry(pwrst, &pwrst_list, node) {
-		state = pwrdm_read_prev_pwrst(pwrst->pwrdm);
-		if (state > pwrst->next_state) {
-			pr_info("Powerdomain (%s) didn't enter target state %d\n",
-				pwrst->pwrdm->name, pwrst->next_state);
+		prev_fpwrst = pwrdm_read_prev_fpwrst(pwrst->pwrdm);
+		/* XXX test below should be != */
+		if (prev_fpwrst > pwrst->next_fpwrst) {
+			pr_info("Powerdomain (%s) didn't enter target state %s - entered state %s instead\n",
+				pwrst->pwrdm->name,
+				pwrdm_convert_fpwrst_to_name(pwrst->next_fpwrst),
+				pwrdm_convert_fpwrst_to_name(prev_fpwrst));
 			ret = -1;
 		}
-		omap_set_pwrdm_state(pwrst->pwrdm, pwrst->saved_state);
-		pwrdm_set_logic_retst(pwrst->pwrdm, pwrst->saved_logic_state);
+		WARN_ON(pwrdm_set_fpwrst(pwrst->pwrdm, pwrst->saved_fpwrst));
 	}
 	if (ret)
 		pr_crit("Could not enter target state in pm_suspend\n");
@@ -106,10 +106,10 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
 		return -ENOMEM;
 
 	pwrst->pwrdm = pwrdm;
-	pwrst->next_state = PWRDM_POWER_RET;
+	pwrst->next_fpwrst = PWRDM_FUNC_PWRST_CSWR;
 	list_add(&pwrst->node, &pwrst_list);
 
-	return omap_set_pwrdm_state(pwrst->pwrdm, pwrst->next_state);
+	return WARN_ON(pwrdm_set_fpwrst(pwrst->pwrdm, pwrst->next_fpwrst));
 }
 
 /**
