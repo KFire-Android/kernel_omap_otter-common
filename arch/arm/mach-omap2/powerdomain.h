@@ -1,7 +1,7 @@
 /*
  * OMAP2/3/4 powerdomain control
  *
- * Copyright (C) 2007-2008, 2010 Texas Instruments, Inc.
+ * Copyright (C) 2007-2008, 2010-2012 Texas Instruments, Inc.
  * Copyright (C) 2007-2011 Nokia Corporation
  *
  * Paul Walmsley
@@ -22,6 +22,29 @@
 #include <linux/spinlock.h>
 
 #include "voltage.h"
+
+/*
+ * PWRDM_FPWRST_OFFSET: offset of the first functional power state
+ * from 0.  This offset can be subtracted from the functional power
+ * state macros to produce offsets suitable for array indices, for
+ * example.  The intention behind the addition of this offset is to
+ * prevent functional power states from accidentally being confused
+ * with the low-level, hardware power states.
+ */
+#define PWRDM_FPWRST_OFFSET		0x80
+
+/*
+ * Powerdomain functional power states, used by the external API functions
+ * These must match the order and names in _fpwrst_names[]
+ */
+enum pwrdm_func_state {
+	PWRDM_FUNC_PWRST_OFF		= PWRDM_FPWRST_OFFSET,
+	PWRDM_FUNC_PWRST_OSWR,
+	PWRDM_FUNC_PWRST_CSWR,
+	PWRDM_FUNC_PWRST_INACTIVE,
+	PWRDM_FUNC_PWRST_ON,
+	PWRDM_MAX_FUNC_PWRSTS		/* Last value, used as the max value */
+};
 
 /* Powerdomain basic power states */
 #define PWRDM_POWER_OFF		0x0
@@ -237,6 +260,14 @@ int pwrdm_get_context_loss_count(struct powerdomain *pwrdm);
 bool pwrdm_can_ever_lose_context(struct powerdomain *pwrdm);
 
 extern int omap_set_pwrdm_state(struct powerdomain *pwrdm, u8 state);
+
+extern const char *pwrdm_convert_fpwrst_to_name(u8 fpwrst);
+extern int pwrdm_set_next_fpwrst(struct powerdomain *pwrdm, u8 fpwrst);
+extern int pwrdm_read_next_fpwrst(struct powerdomain *pwrdm);
+extern int pwrdm_set_fpwrst(struct powerdomain *pwrdm,
+			    enum pwrdm_func_state fpwrst);
+extern int pwrdm_read_fpwrst(struct powerdomain *pwrdm);
+extern int pwrdm_read_prev_fpwrst(struct powerdomain *pwrdm);
 
 extern void omap242x_powerdomains_init(void);
 extern void omap243x_powerdomains_init(void);
