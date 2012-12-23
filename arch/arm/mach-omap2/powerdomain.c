@@ -960,13 +960,8 @@ int pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst)
 	pr_debug("powerdomain: %s: setting next powerstate to %0x\n",
 		 pwrdm->name, pwrst);
 
-	if (arch_pwrdm && arch_pwrdm->pwrdm_set_next_pwrst) {
-		/* Trace the pwrdm desired target state */
-		trace_power_domain_target(pwrdm->name, pwrst,
-					  smp_processor_id());
-		/* Program the pwrdm desired target state */
+	if (arch_pwrdm && arch_pwrdm->pwrdm_set_next_pwrst)
 		ret = arch_pwrdm->pwrdm_set_next_pwrst(pwrdm, pwrst);
-	}
 
 	return ret;
 }
@@ -1606,6 +1601,9 @@ int pwrdm_set_next_fpwrst(struct powerdomain *pwrdm, u8 fpwrst)
 	pr_debug("%s: set fpwrst %0x to pwrdm %s\n", __func__, fpwrst,
 		 pwrdm->name);
 
+	/* Trace the pwrdm desired target state */
+	trace_power_domain_target(pwrdm->name, fpwrst, smp_processor_id());
+
 	pwrdm_lock(pwrdm);
 	ret = _set_logic_retst_and_pwrdm_pwrst(pwrdm, logic, pwrst);
 	pwrdm_unlock(pwrdm);
@@ -1692,6 +1690,10 @@ int pwrdm_set_fpwrst(struct powerdomain *pwrdm, enum pwrdm_func_state fpwrst)
 	next_fpwrst = _pwrdm_read_next_fpwrst(pwrdm);
 	if (next_fpwrst == fpwrst)
 		goto psf_out;
+
+	/* Trace the pwrdm desired target state */
+	trace_power_domain_target(pwrdm->name, next_fpwrst,
+				  smp_processor_id());
 
 	sleep_switch = _pwrdm_save_clkdm_state_and_activate(pwrdm, pwrst,
 							    &hwsup);
