@@ -53,6 +53,8 @@ struct omap3_idle_statedata {
  */
 #define OMAP_CPUIDLE_CX_NO_CLKDM_IDLE		BIT(0)
 
+static struct powerdomain *mpu_pd, *core_pd, *per_pd, *cam_pd;
+
 /*
  * Prevent PER OFF if CORE is not in RETention or OFF as this would
  * disable PER wakeups completely.
