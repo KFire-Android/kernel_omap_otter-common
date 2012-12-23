@@ -56,9 +56,9 @@ u16 pm34xx_errata;
 
 struct power_state {
 	struct powerdomain *pwrdm;
-	u32 next_state;
+	u8 next_fpwrst;
 #ifdef CONFIG_SUSPEND
-	u32 saved_state;
+	u8 saved_fpwrst;
 #endif
 	struct list_head node;
 };
@@ -111,24 +111,26 @@ static void omap3_core_restore_context(void)
 static void omap3_save_secure_ram_context(void)
 {
 	u32 ret;
-	int mpu_next_state = pwrdm_read_next_pwrst(mpu_pwrdm);
+	int mpu_next_fpwrst;
 
-	if (omap_type() != OMAP2_DEVICE_TYPE_GP) {
-		/*
-		 * MPU next state must be set to POWER_ON temporarily,
-		 * otherwise the WFI executed inside the ROM code
-		 * will hang the system.
-		 */
-		pwrdm_set_next_pwrst(mpu_pwrdm, PWRDM_POWER_ON);
-		ret = _omap_save_secure_sram((u32 *)
-				__pa(omap3_secure_ram_storage));
-		pwrdm_set_next_pwrst(mpu_pwrdm, mpu_next_state);
-		/* Following is for error tracking, it should not happen */
-		if (ret) {
-			pr_err("save_secure_sram() returns %08x\n", ret);
-			while (1)
-				;
-		}
+	if (omap_type() == OMAP2_DEVICE_TYPE_GP)
+		return;
+
+	/*
+	 * MPU next state must be set to POWER_ON temporarily,
+	 * otherwise the WFI executed inside the ROM code will hang
+	 * the system.
+	 */
+	mpu_next_fpwrst = pwrdm_read_next_fpwrst(mpu_pwrdm);
+	pwrdm_set_next_fpwrst(mpu_pwrdm, PWRDM_FUNC_PWRST_ON);
+	ret = _omap_save_secure_sram((u32 *)__pa(omap3_secure_ram_storage));
+	pwrdm_set_next_fpwrst(mpu_pwrdm, mpu_next_fpwrst);
+	/* Following is for error tracking, it should not happen */
+	/* XXX This needs to be converted to a BUG() or removed */
+	if (ret) {
+		pr_err("save_secure_sram() returns %08x\n", ret);
+		while (1)
+			;
 	}
 }
 
@@ -241,21 +243,20 @@ void omap_sram_idle(void)
 	/* save_state = 2 => Only L2 lost */
 	/* save_state = 3 => L1, L2 and logic lost */
 	int save_state = 0;
-	int mpu_next_state = PWRDM_POWER_ON;
-	int per_next_state = PWRDM_POWER_ON;
-	int core_next_state = PWRDM_POWER_ON;
-	int per_going_off;
-	int core_prev_state;
+	int mpu_next_fpwrst, per_next_fpwrst, core_next_fpwrst;
+	int per_going_off, core_prev_fpwrst;
 	u32 sdrc_pwr = 0;
 
-	mpu_next_state = pwrdm_read_next_pwrst(mpu_pwrdm);
-	switch (mpu_next_state) {
-	case PWRDM_POWER_ON:
-	case PWRDM_POWER_RET:
+	mpu_next_fpwrst = pwrdm_read_next_fpwrst(mpu_pwrdm);
+	switch (mpu_next_fpwrst) {
+	case PWRDM_FUNC_PWRST_ON:
+	case PWRDM_FUNC_PWRST_CSWR:
+	case PWRDM_FUNC_PWRST_INACTIVE:
 		/* No need to save context */
 		save_state = 0;
 		break;
-	case PWRDM_POWER_OFF:
+	case PWRDM_FUNC_PWRST_OSWR: /* XXX accurate? */
+	case PWRDM_FUNC_PWRST_OFF:
 		save_state = 3;
 		break;
 	default:
@@ -265,33 +266,34 @@ void omap_sram_idle(void)
 	}
 
 	/* NEON control */
-	if (pwrdm_read_pwrst(neon_pwrdm) == PWRDM_POWER_ON)
-		pwrdm_set_next_pwrst(neon_pwrdm, mpu_next_state);
+	if (pwrdm_read_fpwrst(neon_pwrdm) == PWRDM_FUNC_PWRST_ON)
+		WARN_ON(pwrdm_set_next_fpwrst(neon_pwrdm, mpu_next_fpwrst));
 
-	/* Enable IO-PAD and IO-CHAIN wakeups */
-	per_next_state = pwrdm_read_next_pwrst(per_pwrdm);
-	core_next_state = pwrdm_read_next_pwrst(core_pwrdm);
+	per_next_fpwrst = pwrdm_read_next_fpwrst(per_pwrdm);
+	core_next_fpwrst = pwrdm_read_next_fpwrst(core_pwrdm);
 
 	pwrdm_pre_transition(NULL);
 
 	/* PER */
-	if (per_next_state < PWRDM_POWER_ON) {
-		per_going_off = (per_next_state == PWRDM_POWER_OFF) ? 1 : 0;
+	if (per_next_fpwrst != PWRDM_FUNC_PWRST_ON &&
+	    per_next_fpwrst != PWRDM_FUNC_PWRST_INACTIVE) {
+		per_going_off =
+			(per_next_fpwrst == PWRDM_FUNC_PWRST_OFF) ? 1 : 0;
 		omap2_gpio_prepare_for_idle(per_going_off);
 	}
 
 	/* CORE */
-	if (core_next_state < PWRDM_POWER_ON) {
-		if (core_next_state == PWRDM_POWER_OFF) {
-			omap3_core_save_context();
-			omap3_cm_save_context();
-		}
+	/* XXX Does the context save need to happen for OSWR? */
+	if (core_next_fpwrst == PWRDM_FUNC_PWRST_OFF ||
+	    core_next_fpwrst == PWRDM_FUNC_PWRST_OSWR) {
+		omap3_core_save_context();
+		omap3_cm_save_context();
 	}
 
 	omap3_intc_prepare_idle();
 
 	/*
-	 * On EMU/HS devices ROM code restores a SRDC value
+	 * On EMU/HS devices ROM code restores a SDRC value
 	 * from scratchpad which has automatic self refresh on timeout
 	 * of AUTO_CNT = 1 enabled. This takes care of erratum ID i443.
 	 * Hence store/restore the SDRC_POWER register here.
@@ -299,7 +301,7 @@ void omap_sram_idle(void)
 	if (cpu_is_omap3430() && omap_rev() >= OMAP3430_REV_ES3_0 &&
 	    (omap_type() == OMAP2_DEVICE_TYPE_EMU ||
 	     omap_type() == OMAP2_DEVICE_TYPE_SEC) &&
-	    core_next_state == PWRDM_POWER_OFF)
+	    core_next_fpwrst == PWRDM_FUNC_PWRST_OFF)
 		sdrc_pwr = sdrc_read_reg(SDRC_POWER);
 
 	/*
@@ -318,29 +320,32 @@ void omap_sram_idle(void)
 	if (cpu_is_omap3430() && omap_rev() >= OMAP3430_REV_ES3_0 &&
 	    (omap_type() == OMAP2_DEVICE_TYPE_EMU ||
 	     omap_type() == OMAP2_DEVICE_TYPE_SEC) &&
-	    core_next_state == PWRDM_POWER_OFF)
+	    core_next_fpwrst == PWRDM_FUNC_PWRST_OFF)
 		sdrc_write_reg(sdrc_pwr, SDRC_POWER);
 
 	/* CORE */
-	if (core_next_state < PWRDM_POWER_ON) {
-		core_prev_state = pwrdm_read_prev_pwrst(core_pwrdm);
-		if (core_prev_state == PWRDM_POWER_OFF) {
+	if (core_next_fpwrst != PWRDM_FUNC_PWRST_ON &&
+	    core_next_fpwrst != PWRDM_FUNC_PWRST_INACTIVE) {
+		core_prev_fpwrst = pwrdm_read_prev_fpwrst(core_pwrdm);
+		if (core_prev_fpwrst == PWRDM_FUNC_PWRST_OFF ||
+		    core_prev_fpwrst == PWRDM_FUNC_PWRST_OSWR) {
 			omap3_core_restore_context();
 			omap3_cm_restore_context();
 			omap3_sram_restore_context();
 			omap2_sms_restore_context();
 		}
-		if (core_next_state == PWRDM_POWER_OFF)
+		if (core_next_fpwrst == PWRDM_FUNC_PWRST_OFF)
 			omap2_prm_clear_mod_reg_bits(OMAP3430_AUTO_OFF_MASK,
-					       OMAP3430_GR_MOD,
-					       OMAP3_PRM_VOLTCTRL_OFFSET);
+						     OMAP3430_GR_MOD,
+						     OMAP3_PRM_VOLTCTRL_OFFSET);
 	}
 	omap3_intc_resume_idle();
 
 	pwrdm_post_transition(NULL);
 
 	/* PER */
-	if (per_next_state < PWRDM_POWER_ON)
+	if (per_next_fpwrst != PWRDM_FUNC_PWRST_ON &&
+	    per_next_fpwrst != PWRDM_FUNC_PWRST_INACTIVE)
 		omap2_gpio_resume_after_idle();
 }
 
@@ -367,14 +372,15 @@ out:
 static int omap3_pm_suspend(void)
 {
 	struct power_state *pwrst;
-	int state, ret = 0;
+	int prev_fpwrst;
+	int ret = 0;
 
 	/* Read current next_pwrsts */
 	list_for_each_entry(pwrst, &pwrst_list, node)
-		pwrst->saved_state = pwrdm_read_next_pwrst(pwrst->pwrdm);
+		pwrst->saved_fpwrst = pwrdm_read_next_fpwrst(pwrst->pwrdm);
 	/* Set ones wanted by suspend */
 	list_for_each_entry(pwrst, &pwrst_list, node) {
-		if (omap_set_pwrdm_state(pwrst->pwrdm, pwrst->next_state))
+		if (pwrdm_set_fpwrst(pwrst->pwrdm, pwrst->next_fpwrst))
 			goto restore;
 		if (pwrdm_clear_all_prev_pwrst(pwrst->pwrdm))
 			goto restore;
@@ -387,13 +393,15 @@ static int omap3_pm_suspend(void)
 restore:
 	/* Restore next_pwrsts */
 	list_for_each_entry(pwrst, &pwrst_list, node) {
-		state = pwrdm_read_prev_pwrst(pwrst->pwrdm);
-		if (state > pwrst->next_state) {
-			pr_info("Powerdomain (%s) didn't enter target state %d\n",
-				pwrst->pwrdm->name, pwrst->next_state);
+		prev_fpwrst = pwrdm_read_prev_fpwrst(pwrst->pwrdm);
+		if (prev_fpwrst > pwrst->next_fpwrst) {
+			pr_info("Powerdomain %s didn't enter target state %s - entered state %s instead\n",
+				pwrst->pwrdm->name,
+				pwrdm_convert_fpwrst_to_name(pwrst->next_fpwrst),
+				pwrdm_convert_fpwrst_to_name(prev_fpwrst));
 			ret = -1;
 		}
-		omap_set_pwrdm_state(pwrst->pwrdm, pwrst->saved_state);
+		WARN_ON(pwrdm_set_fpwrst(pwrst->pwrdm, pwrst->saved_fpwrst));
 	}
 	if (ret)
 		pr_err("Could not enter target state in pm_suspend\n");
@@ -562,24 +570,21 @@ static void __init prcm_setup_regs(void)
 void omap3_pm_off_mode_enable(int enable)
 {
 	struct power_state *pwrst;
-	u32 state;
+	u8 fpwrst;
 
-	if (enable)
-		state = PWRDM_POWER_OFF;
-	else
-		state = PWRDM_POWER_RET;
+	fpwrst = (enable) ? PWRDM_FUNC_PWRST_OFF : PWRDM_FUNC_PWRST_CSWR;
 
 	list_for_each_entry(pwrst, &pwrst_list, node) {
 		if (IS_PM34XX_ERRATUM(PM_SDRC_WAKEUP_ERRATUM_i583) &&
-				pwrst->pwrdm == core_pwrdm &&
-				state == PWRDM_POWER_OFF) {
-			pwrst->next_state = PWRDM_POWER_RET;
+		    pwrst->pwrdm == core_pwrdm &&
+		    fpwrst == PWRDM_FUNC_PWRST_OFF) {
+			pwrst->next_fpwrst = PWRDM_FUNC_PWRST_CSWR;
 			pr_warn("%s: Core OFF disabled due to errata i583\n",
 				__func__);
 		} else {
-			pwrst->next_state = state;
+			pwrst->next_fpwrst = fpwrst;
 		}
-		omap_set_pwrdm_state(pwrst->pwrdm, pwrst->next_state);
+		WARN_ON(pwrdm_set_fpwrst(pwrst->pwrdm, pwrst->next_fpwrst));
 	}
 }
 
@@ -587,20 +592,19 @@ int omap3_pm_get_suspend_state(struct powerdomain *pwrdm)
 {
 	struct power_state *pwrst;
 
-	list_for_each_entry(pwrst, &pwrst_list, node) {
+	list_for_each_entry(pwrst, &pwrst_list, node)
 		if (pwrst->pwrdm == pwrdm)
-			return pwrst->next_state;
-	}
+			return pwrst->next_fpwrst;
 	return -EINVAL;
 }
 
-int omap3_pm_set_suspend_state(struct powerdomain *pwrdm, int state)
+int omap3_pm_set_suspend_state(struct powerdomain *pwrdm, u8 fpwrst)
 {
 	struct power_state *pwrst;
 
 	list_for_each_entry(pwrst, &pwrst_list, node) {
 		if (pwrst->pwrdm == pwrdm) {
-			pwrst->next_state = state;
+			pwrst->next_fpwrst = fpwrst;
 			return 0;
 		}
 	}
@@ -618,13 +622,13 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
 	if (!pwrst)
 		return -ENOMEM;
 	pwrst->pwrdm = pwrdm;
-	pwrst->next_state = PWRDM_POWER_RET;
+	pwrst->next_fpwrst = PWRDM_FUNC_PWRST_CSWR;
 	list_add(&pwrst->node, &pwrst_list);
 
 	if (pwrdm_has_hdwr_sar(pwrdm))
 		pwrdm_enable_hdwr_sar(pwrdm);
 
-	return omap_set_pwrdm_state(pwrst->pwrdm, pwrst->next_state);
+	return WARN_ON(pwrdm_set_fpwrst(pwrst->pwrdm, pwrst->next_fpwrst));
 }
 
 /*

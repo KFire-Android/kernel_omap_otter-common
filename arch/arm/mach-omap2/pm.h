@@ -51,7 +51,7 @@ static inline int omap4_opp_init(void)
 #endif
 
 extern int omap3_pm_get_suspend_state(struct powerdomain *pwrdm);
-extern int omap3_pm_set_suspend_state(struct powerdomain *pwrdm, int state);
+extern int omap3_pm_set_suspend_state(struct powerdomain *pwrdm, u8 fpwrst);
 
 #ifdef CONFIG_PM_DEBUG
 extern u32 enable_off_mode;
