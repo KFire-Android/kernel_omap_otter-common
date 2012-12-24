@@ -512,6 +512,15 @@ config OMAP_PM_STANDALONE
 	  THIS MUST BE DISABLED on production devices and is purely intended
 	  to work with minimal debug environment.
 
+config OMAP_REBOOT_REASON
+	depends on ARCH_OMAP4 || ARCH_OMAP5
+	bool "Save reboot reason"
+	default n
+	help
+	  Let bootloader to know when their platform do a reboot. The boot
+	  reason is written to SAR memory that is retained across reboots.
+	  Then bootloader cat read it. Bootloader should be updated accordingly.
+
 endmenu
 
 endif
