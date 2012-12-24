@@ -424,12 +424,6 @@ static struct i2c_board_info __initdata tablet_i2c_boardinfo[] = {
 	},
 };
 
-static struct i2c_board_info __initdata tablet_i2c_3_boardinfo[] = {
-	{
-		I2C_BOARD_INFO("tmp105", 0x48),
-	},
-};
-
 /* TMP102 PCB Temperature sensor close to OMAP
  * values for .slope and .offset are taken from OMAP5 structure,
  * as TMP102 sensor was not used by domains other then CPU
