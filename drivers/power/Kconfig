@@ -104,6 +104,23 @@ config BATTERY_PMU
 	  Say Y here to expose battery information on Apple machines
 	  through the generic battery class.
 
+config TWL6030_BCI_BATTERY
+	tristate "OMAP TWL6030 BCI Battery driver"
+	depends on TWL4030_CORE && TWL6030_GPADC
+	help
+	  Support for OMAP TWL6030 BCI Battery driver.
+	  This driver can give support for TWL6030 Battery Charge Interface.
+	  It interacts with BQ2415x charger and
+	  supports USB and AC charging and fuel gauging.
+
+config CHARGER_BQ2415x
+	tristate "BQ2415x charger"
+	help
+	  Say Y to enable support for BQ24156 battery charger.
+	  It enables battery charging via AC.
+	  By default it interacts with TWL603x via I2C and supports
+	  up to 1500mA charge current.
+
 config BATTERY_OLPC
 	tristate "One Laptop Per Child battery"
 	depends on X86_32 && OLPC

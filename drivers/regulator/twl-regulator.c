@@ -1328,6 +1328,7 @@ static int __devinit twlreg_probe(struct platform_device *pdev)
 	struct regulator_dev		*rdev;
 	struct twl_regulator_driver_data	*drvdata;
 	const struct of_device_id	*match;
+	u32 twl_errata = 0;
 
 	match = of_match_device(twl_of_match, &pdev->dev);
 	if (match) {
@@ -1359,6 +1360,7 @@ static int __devinit twlreg_probe(struct platform_device *pdev)
 	if (drvdata) {
 		/* copy the driver data into regulator data */
 		info->features = drvdata->features;
+		twl_errata = drvdata->errata;
 		info->data = drvdata->data;
 		info->set_voltage = drvdata->set_voltage;
 		info->get_voltage = drvdata->get_voltage;
@@ -1404,6 +1406,14 @@ static int __devinit twlreg_probe(struct platform_device *pdev)
 			info->flags |= SMPS_EXTENDED_EN;
 		if (twl_get_smps_offset() & SMPS_MULTOFFSET_VIO)
 			info->flags |= SMPS_OFFSET_EN;
+		break;
+	case TWL6030_REG_SYSEN:
+	case TWL6032_REG_LDO6:
+	case TWL6032_REG_LDOLN:
+		if (twl_errata & TWL6032_ERRATA_LDO_MUST_BE_ALWAYS_ON) {
+			c->state_mem.enabled = true;
+			c->state_mem.disabled = false;
+		}
 		break;
 	}
 

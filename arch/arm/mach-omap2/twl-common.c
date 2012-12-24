@@ -271,6 +271,30 @@ static struct twl4030_madc_platform_data omap4_madc_pdata = {
 	.irq_line = -1,
 };
 
+static int omap4_batt_table[] = {
+	/* adc code for temperature in degree C */
+	929, 925, /* -2 ,-1 */
+	920, 917, 912, 908, 904, 899, 895, 890, 885, 880, /* 00 - 09 */
+	875, 869, 864, 858, 853, 847, 841, 835, 829, 823, /* 10 - 19 */
+	816, 810, 804, 797, 790, 783, 776, 769, 762, 755, /* 20 - 29 */
+	748, 740, 732, 725, 718, 710, 703, 695, 687, 679, /* 30 - 39 */
+	671, 663, 655, 647, 639, 631, 623, 615, 607, 599, /* 40 - 49 */
+	591, 583, 575, 567, 559, 551, 543, 535, 527, 519, /* 50 - 59 */
+	511, 504, 496 /* 60 - 62 */
+};
+
+static struct twl4030_bci_platform_data omap4_bci_pdata = {
+	.monitoring_interval		= 10,
+	.max_charger_currentmA		= 1500,
+	.max_charger_voltagemV		= 4560,
+	.max_bat_voltagemV		= 4200,
+	.low_bat_voltagemV		= 3300,
+	.max_battery_capacity		= 4000,
+	.battery_tmp_tbl		= omap4_batt_table,
+	.tblsize			= ARRAY_SIZE(omap4_batt_table),
+	.sense_resistor_mohm		= 10,
+};
+
 static struct regulator_init_data omap4_vdac_idata = {
 	.constraints = {
 		.min_uV			= 1800000,
@@ -279,6 +303,11 @@ static struct regulator_init_data omap4_vdac_idata = {
 					| REGULATOR_MODE_STANDBY,
 		.valid_ops_mask		= REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
+		.always_on		= true,
+		.state_mem = {
+			.disabled	= true,
+		},
+		.initial_state		= PM_SUSPEND_MEM,
 	},
 	.supply_regulator	= "V2V1",
 };
@@ -297,6 +326,10 @@ static struct regulator_init_data omap4_vaux1_idata = {
 		.valid_ops_mask	 = REGULATOR_CHANGE_VOLTAGE
 					| REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
+		.state_mem = {
+			.disabled	= true,
+		},
+		.initial_state		= PM_SUSPEND_MEM,
 	},
 	.num_consumer_supplies  = ARRAY_SIZE(omap4_vaux_supply),
 	.consumer_supplies      = omap4_vaux_supply,
@@ -312,6 +345,10 @@ static struct regulator_init_data omap4_vaux2_idata = {
 		.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE
 					| REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
+		.state_mem = {
+			.disabled	= true,
+		},
+		.initial_state		= PM_SUSPEND_MEM,
 	},
 };
 
@@ -325,6 +362,10 @@ static struct regulator_init_data omap4_vaux3_idata = {
 		.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE
 					| REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
+		.state_mem = {
+			.disabled	= true,
+		},
+		.initial_state		= PM_SUSPEND_MEM,
 	},
 };
 
@@ -343,6 +384,11 @@ static struct regulator_init_data omap4_vmmc_idata = {
 		.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE
 					| REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
+		.state_mem = {
+			.disabled	= true,
+		},
+		.initial_state		= PM_SUSPEND_MEM,
+
 	},
 	.num_consumer_supplies  = ARRAY_SIZE(omap4_vmmc_supply),
 	.consumer_supplies      = omap4_vmmc_supply,
@@ -358,6 +404,10 @@ static struct regulator_init_data omap4_vpp_idata = {
 		.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE
 					| REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
+		.state_mem = {
+			.disabled	= true,
+		},
+		.initial_state		= PM_SUSPEND_MEM,
 	},
 };
 
@@ -371,6 +421,10 @@ static struct regulator_init_data omap4_vusim_idata = {
 		.valid_ops_mask	 = REGULATOR_CHANGE_VOLTAGE
 					| REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
+		.state_mem = {
+			.disabled	= true,
+		},
+		.initial_state		= PM_SUSPEND_MEM,
 	},
 };
 
@@ -382,6 +436,11 @@ static struct regulator_init_data omap4_vana_idata = {
 					| REGULATOR_MODE_STANDBY,
 		.valid_ops_mask		= REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
+		.always_on		= true,
+		.state_mem = {
+			.disabled	= true,
+		},
+		.initial_state		= PM_SUSPEND_MEM,
 	},
 };
 
@@ -400,6 +459,10 @@ static struct regulator_init_data omap4_vcxio_idata = {
 		.valid_ops_mask		= REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
 		.always_on		= true,
+		.state_mem = {
+			.disabled	= true,
+		},
+		.initial_state		= PM_SUSPEND_MEM,
 	},
 	.num_consumer_supplies	= ARRAY_SIZE(omap4_vcxio_supply),
 	.consumer_supplies	= omap4_vcxio_supply,
@@ -414,6 +477,10 @@ static struct regulator_init_data omap4_vusb_idata = {
 					| REGULATOR_MODE_STANDBY,
 		.valid_ops_mask		= REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
+		.state_mem = {
+			.disabled	= true,
+		},
+		.initial_state		= PM_SUSPEND_MEM,
 	},
 };
 
@@ -437,6 +504,10 @@ static struct regulator_init_data omap4_v1v8_idata = {
 		.valid_ops_mask		= REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
 		.always_on		= true,
+		.state_mem = {
+			.enabled	= true,
+		},
+		.initial_state		= PM_SUSPEND_MEM,
 	},
 	.num_consumer_supplies	= ARRAY_SIZE(omap4_v1v8_supply),
 	.consumer_supplies	= omap4_v1v8_supply,
@@ -454,6 +525,11 @@ static struct regulator_init_data omap4_v2v1_idata = {
 					| REGULATOR_MODE_STANDBY,
 		.valid_ops_mask		= REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
+		.always_on		= true,
+		.state_mem = {
+			.disabled	= true,
+		},
+		.initial_state		= PM_SUSPEND_MEM,
 	},
 	.num_consumer_supplies	= ARRAY_SIZE(omap4_v2v1_supply),
 	.consumer_supplies	= omap4_v2v1_supply,
@@ -474,6 +550,10 @@ static struct regulator_init_data omap4_sysen_idata = {
 	.constraints = {
 		.valid_ops_mask		= REGULATOR_CHANGE_STATUS,
 		.always_on		= true,
+		.state_mem = {
+			.disabled	= true,
+		},
+		.initial_state		= PM_SUSPEND_MEM,
 	},
 };
 
@@ -488,6 +568,10 @@ static struct regulator_init_data omap4_regen1_idata = {
 	.constraints = {
 		.valid_ops_mask		= REGULATOR_CHANGE_STATUS,
 		.always_on		= true,
+		.state_mem = {
+			.disabled	= true,
+		},
+		.initial_state		= PM_SUSPEND_MEM,
 	},
 };
 
@@ -502,6 +586,9 @@ void __init omap4_pmic_get_config(struct twl4030_platform_data *pmic_data,
 	/* Common platform data configurations */
 	if (pdata_flags & TWL_COMMON_PDATA_USB && !pmic_data->usb)
 		pmic_data->usb = &omap4_usb_pdata;
+
+	if (pdata_flags & TWL_COMMON_PDATA_BCI && !pmic_data->bci)
+		pmic_data->bci = &omap4_bci_pdata;
 
 	if (pdata_flags & TWL_COMMON_PDATA_MADC && !pmic_data->madc)
 		pmic_data->madc = &omap4_madc_pdata;

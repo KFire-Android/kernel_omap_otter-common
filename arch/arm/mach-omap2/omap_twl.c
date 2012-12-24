@@ -37,6 +37,7 @@
 #define TWL6030_VCORE2_SR_CMD_REG	0x5C
 #define TWL6030_VCORE3_SR_VOLT_REG	0x61
 #define TWL6030_VCORE3_SR_CMD_REG	0x62
+#define TWL6030_SMPS_OFFSET_REG	0xB0
 
 /* TWL6032 */
 #define TWL6032_SRI2C_SLAVE_ADDR	0x12
@@ -47,8 +48,19 @@
 #define TWL6032_SMPS2_SR_VOLT_REG	0x5B
 #define TWL6032_SMPS2_SR_CMD_REG	0x5C
 
-static bool is_offset_valid;
-static u8 smps_offset;
+#define TWL603x_SMPS_OFFSET_RW_ACCESS_MASK	BIT(7)
+#define TWL603x_SMPS1_OFFSET_EN_MASK		BIT(3)
+#define TWL603x_SMPS_OFFSET_EN_ALL_MASK	0x7F
+
+
+enum {
+	SMPS_OFFSET_UNINITIALIZED,
+	SMPS_OFFSET_DISABLED,
+	SMPS_OFFSET_ENABLED
+};
+
+static int smps_offset_state = SMPS_OFFSET_UNINITIALIZED;
+
 /*
  * Flag to ensure Smartreflex bit in TWL
  * being cleared in board file is not overwritten.
@@ -75,18 +87,16 @@ static unsigned long twl6030_vsel_to_uv(const u8 vsel)
 	 * In TWL6030 depending on the value of SMPS_OFFSET
 	 * efuse register the voltage range supported in
 	 * standard mode can be either between 0.6V - 1.3V or
-	 * 0.7V - 1.4V. In TWL6030 ES1.0 SMPS_OFFSET efuse
-	 * is programmed to all 0's where as starting from
-	 * TWL6030 ES1.1 the efuse is programmed to 1
+	 * 0.7V - 1.4V. We should know the current state of
+	 * SMPS_OFFSET before performing any conversations.
 	 */
-	if (!is_offset_valid) {
-		twl_i2c_read_u8(TWL6030_MODULE_ID0, &smps_offset,
-				REG_SMPS_OFFSET);
-		is_offset_valid = true;
-	}
+	if (SMPS_OFFSET_UNINITIALIZED == smps_offset_state)
+		pr_err("%s: smps offset is not initialized\n", __func__);
 
+	/* Special case for 0 voltage */
 	if (!vsel)
 		return 0;
+
 	/*
 	 * There is no specific formula for voltage to vsel
 	 * conversion above 1.3V. There are special hardcoded
@@ -97,7 +107,7 @@ static unsigned long twl6030_vsel_to_uv(const u8 vsel)
 	if (vsel == 0x3A)
 		return 1350000;
 
-	if (smps_offset & 0x8)
+	if (SMPS_OFFSET_ENABLED == smps_offset_state)
 		return ((((vsel - 1) * 1266) + 70900)) * 10;
 	else
 		return ((((vsel - 1) * 1266) + 60770)) * 10;
@@ -109,18 +119,16 @@ static u8 twl6030_uv_to_vsel(unsigned long uv)
 	 * In TWL6030 depending on the value of SMPS_OFFSET
 	 * efuse register the voltage range supported in
 	 * standard mode can be either between 0.6V - 1.3V or
-	 * 0.7V - 1.4V. In TWL6030 ES1.0 SMPS_OFFSET efuse
-	 * is programmed to all 0's where as starting from
-	 * TWL6030 ES1.1 the efuse is programmed to 1
+	 * 0.7V - 1.4V. We should know the current state of
+	 * SMPS_OFFSET before performing any conversations.
 	 */
-	if (!is_offset_valid) {
-		twl_i2c_read_u8(TWL6030_MODULE_ID0, &smps_offset,
-				REG_SMPS_OFFSET);
-		is_offset_valid = true;
-	}
+	if (SMPS_OFFSET_UNINITIALIZED == smps_offset_state)
+		pr_err("%s: smps offset is not initialized\n", __func__);
 
+	/* Special case for 0 voltage */
 	if (!uv)
 		return 0x00;
+
 	/*
 	 * There is no specific formula for voltage to vsel
 	 * conversion above 1.3V. There are special hardcoded
@@ -136,10 +144,95 @@ static u8 twl6030_uv_to_vsel(unsigned long uv)
 		return 0x39;
 	}
 
-	if (smps_offset & 0x8)
+	if (SMPS_OFFSET_ENABLED == smps_offset_state)
 		return DIV_ROUND_UP(uv - 709000, 12660) + 1;
 	else
 		return DIV_ROUND_UP(uv - 607700, 12660) + 1;
+}
+
+static int twl603x_set_offset(struct voltagedomain *vd)
+{
+	u8 smps_offset_val;
+	int r;
+
+	/*
+	 * In TWL6030 depending on the value of SMPS_OFFSET efuse register
+	 * the voltage range supported in standard mode can be either
+	 * between 0.6V - 1.3V or 0.7V - 1.4V.
+	 * In TWL6030 ES1.0 SMPS_OFFSET efuse is programmed to all 0's where as
+	 * starting from TWL6030 ES1.1 the efuse is programmed to 1.
+	 * At this point of execution there is no way to identify TWL type,
+	 * so use SMPS1/VCORE1 only to identify if SMPS_OFFSET enabled or not
+	 * for on both TWL6030/TWL6032 and assume that if SMPS_OFFSET is
+	 * enabled for SMPS1/VCORE1 then it's enabled for all SMPS regulators.
+	 */
+	if (SMPS_OFFSET_UNINITIALIZED != smps_offset_state)
+		/* already configured */
+		return 0;
+
+	r = twl_i2c_read_u8(TWL_MODULE_PM_RECEIVER, &smps_offset_val,
+			TWL6030_SMPS_OFFSET_REG);
+	if (r) {
+		WARN(1, "%s: No SMPS OFFSET value=??? " \
+			"read failed %d, max val might be wrong\n",
+			__func__, r);
+		/* Nothing we can do */
+		return r;
+	}
+
+	/* Check if SMPS offset already set */
+	if ((smps_offset_val & TWL603x_SMPS1_OFFSET_EN_MASK) ==
+	     TWL603x_SMPS1_OFFSET_EN_MASK) {
+		smps_offset_state = SMPS_OFFSET_ENABLED;
+		return 0;
+	}
+
+	smps_offset_state = SMPS_OFFSET_DISABLED;
+
+	/* Check if TWL firmware lets us write */
+	if (!(smps_offset_val & TWL603x_SMPS_OFFSET_RW_ACCESS_MASK)) {
+		WARN(1, "%s: No SMPS OFFSET value=0x%02x " \
+			"update not possible, max val might be wrong\n",
+			__func__, smps_offset_val);
+		/* Nothing we can do */
+		return -EACCES;
+	}
+
+	/* Attempt to set offset for all */
+	r = twl_i2c_write_u8(TWL_MODULE_PM_RECEIVER,
+			     TWL603x_SMPS_OFFSET_RW_ACCESS_MASK |
+			     TWL603x_SMPS_OFFSET_EN_ALL_MASK,
+			     TWL6030_SMPS_OFFSET_REG);
+	if (r) {
+		WARN(1, "%s: No SMPS OFFSET value=0x%02x " \
+			"update failed %d, max val might be wrong\n",
+			__func__, smps_offset_val, r);
+		/* Nothing we can do */
+		return r;
+	}
+
+	/* Check if SMPS offset now set */
+	r = twl_i2c_read_u8(TWL_MODULE_PM_RECEIVER, &smps_offset_val,
+			TWL6030_SMPS_OFFSET_REG);
+	if (r) {
+		WARN(1, "%s: No SMPS OFFSET value=0x%02x " \
+			"check(r=%d) failed, max val might be wrong\n",
+			__func__, smps_offset_val, r);
+		/* Nothing we can do */
+		return r;
+	}
+
+	if (!(smps_offset_val & TWL603x_SMPS1_OFFSET_EN_MASK)) {
+		WARN(1, "%s: No SMPS OFFSET value=0x%02x " \
+			"check failed (r!=w), max val might be wrong\n",
+			__func__, smps_offset_val);
+		/* Nothing we can do */
+		return -EFAULT;
+	}
+
+	smps_offset_state = SMPS_OFFSET_ENABLED;
+
+	return 0;
 }
 
 static struct omap_voltdm_pmic twl4030_vdd1_pmic = {
@@ -181,8 +274,8 @@ static struct omap_voltdm_pmic twl6030_vcore1_pmic = {
 	.vp_erroroffset		= OMAP4_VP_CONFIG_ERROROFFSET,
 	.vp_vstepmin		= OMAP4_VP_VSTEPMIN_VSTEPMIN,
 	.vp_vstepmax		= OMAP4_VP_VSTEPMAX_VSTEPMAX,
-	.vddmin			= 0,
-	.vddmax			= 2100000,
+	.vddmin			= 709000,
+	.vddmax			= 1418000,
 	.vp_timeout_us		= OMAP4_VP_VLIMITTO_TIMEOUT_US,
 	.i2c_slave_addr		= TWL6030_SRI2C_SLAVE_ADDR,
 	.volt_reg_addr		= TWL6030_VCORE1_SR_VOLT_REG,
@@ -203,8 +296,8 @@ static struct omap_voltdm_pmic twl6030_vcore2_pmic = {
 	.vp_erroroffset		= OMAP4_VP_CONFIG_ERROROFFSET,
 	.vp_vstepmin		= OMAP4_VP_VSTEPMIN_VSTEPMIN,
 	.vp_vstepmax		= OMAP4_VP_VSTEPMAX_VSTEPMAX,
-	.vddmin			= 0,
-	.vddmax			= 2100000,
+	.vddmin			= 709000,
+	.vddmax			= 1418000,
 	.vp_timeout_us		= OMAP4_VP_VLIMITTO_TIMEOUT_US,
 	.i2c_slave_addr		= TWL6030_SRI2C_SLAVE_ADDR,
 	.volt_reg_addr		= TWL6030_VCORE2_SR_VOLT_REG,
@@ -225,8 +318,8 @@ static struct omap_voltdm_pmic twl6030_vcore3_pmic = {
 	.vp_erroroffset		= OMAP4_VP_CONFIG_ERROROFFSET,
 	.vp_vstepmin		= OMAP4_VP_VSTEPMIN_VSTEPMIN,
 	.vp_vstepmax		= OMAP4_VP_VSTEPMAX_VSTEPMAX,
-	.vddmin			= 0,
-	.vddmax			= 2100000,
+	.vddmin			= 709000,
+	.vddmax			= 1418000,
 	.vp_timeout_us		= OMAP4_VP_VLIMITTO_TIMEOUT_US,
 	.i2c_slave_addr		= TWL6030_SRI2C_SLAVE_ADDR,
 	.volt_reg_addr		= TWL6030_VCORE3_SR_VOLT_REG,
@@ -247,8 +340,8 @@ static struct omap_voltdm_pmic twl6032_smps1_pmic = {
 	.vp_erroroffset		= OMAP4_VP_CONFIG_ERROROFFSET,
 	.vp_vstepmin		= OMAP4_VP_VSTEPMIN_VSTEPMIN,
 	.vp_vstepmax		= OMAP4_VP_VSTEPMAX_VSTEPMAX,
-	.vddmin			= 0,
-	.vddmax			= 2100000,
+	.vddmin			= 709000,
+	.vddmax			= 1418000,
 	.vp_timeout_us		= OMAP4_VP_VLIMITTO_TIMEOUT_US,
 	.i2c_slave_addr		= TWL6032_SRI2C_SLAVE_ADDR,
 	.volt_reg_addr		= TWL6032_SMPS1_SR_VOLT_REG,
@@ -269,8 +362,8 @@ static struct omap_voltdm_pmic twl6032_smps2_pmic = {
 	.vp_erroroffset		= OMAP4_VP_CONFIG_ERROROFFSET,
 	.vp_vstepmin		= OMAP4_VP_VSTEPMIN_VSTEPMIN,
 	.vp_vstepmax		= OMAP4_VP_VSTEPMAX_VSTEPMAX,
-	.vddmin			= 0,
-	.vddmax			= 2100000,
+	.vddmin			= 709000,
+	.vddmax			= 1418000,
 	.vp_timeout_us		= OMAP4_VP_VLIMITTO_TIMEOUT_US,
 	.i2c_slave_addr		= TWL6032_SRI2C_SLAVE_ADDR,
 	.volt_reg_addr		= TWL6032_SMPS2_SR_VOLT_REG,
@@ -291,8 +384,8 @@ static struct omap_voltdm_pmic twl6032_smps5_pmic = {
 	.vp_erroroffset		= OMAP4_VP_CONFIG_ERROROFFSET,
 	.vp_vstepmin		= OMAP4_VP_VSTEPMIN_VSTEPMIN,
 	.vp_vstepmax		= OMAP4_VP_VSTEPMAX_VSTEPMAX,
-	.vddmin			= 0,
-	.vddmax			= 2100000,
+	.vddmin			= 709000,
+	.vddmax			= 1418000,
 	.vp_timeout_us		= OMAP4_VP_VLIMITTO_TIMEOUT_US,
 	.i2c_slave_addr		= TWL6032_SRI2C_SLAVE_ADDR,
 	.volt_reg_addr		= TWL6032_SMPS5_SR_VOLT_REG,
@@ -341,11 +434,13 @@ static __initdata struct omap_pmic_map omap_twl_map[] = {
 		.name = "mpu",
 		.cpu = PMIC_CPU_OMAP4430,
 		.pmic_data = &twl6030_vcore1_pmic,
+		.special_action = twl603x_set_offset,
 	},
 	{
 		.name = "mpu",
 		.cpu = PMIC_CPU_OMAP4470,
 		.pmic_data = &twl6032_smps1_pmic,
+		.special_action = twl603x_set_offset,
 	},
 	{
 		.name = "core",
@@ -356,6 +451,7 @@ static __initdata struct omap_pmic_map omap_twl_map[] = {
 		.name = "core",
 		.cpu = PMIC_CPU_OMAP4460,
 		.pmic_data = &twl6030_vcore1_pmic,
+		.special_action = twl603x_set_offset,
 	},
 	{
 		.name = "core",
