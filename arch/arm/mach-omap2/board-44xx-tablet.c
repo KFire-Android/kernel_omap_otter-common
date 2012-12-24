@@ -193,6 +193,7 @@ static struct omap2_hsmmc_info mmc[] = {
 		.gpio_wp	= -EINVAL,
 		.nonremovable   = true,
 		.ocr_mask	= MMC_VDD_29_30,
+		.built_in	= 1,
 		.no_off_init	= true,
 	},
 	{
