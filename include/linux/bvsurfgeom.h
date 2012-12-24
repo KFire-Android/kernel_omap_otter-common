@@ -35,9 +35,6 @@ struct bvsurfgeom {
 					   paletteformat; only valid when
 					   format includes BVFMTDEF_LUT;
 					   number of entries is 2^bpp. */
-	long physstride;		/* distance from one pixel to the
-					   pixel immediately below it in
-					   physical address space */
 };
 
 #endif /* BVSURFGEOM_H */
