@@ -58,7 +58,12 @@ static int omap_bandgap_power(struct omap_bandgap *bg_ptr, bool on)
 		tsr = bg_ptr->conf->sensors[i].registers;
 		r |= omap_control_readl(cdev, tsr->temp_sensor_ctrl, &ctrl);
 		ctrl &= ~tsr->bgap_tempsoff_mask;
-		ctrl |= on << __ffs(tsr->bgap_tempsoff_mask);
+		/* For OMAP4460/70 the TEMPSOFF bit must be set
+		 * to '1' each time before Bandgap clocks are gated.
+		 * The power switching procedure is described in
+		 * OMAP4460 TRM section 18.4.10 (19.4.10 for OMAP4470).
+		 */
+		ctrl |= !on << __ffs(tsr->bgap_tempsoff_mask);
 
 		/* write BGAP_TEMPSOFF should be reset to 0 */
 		r |= omap_control_writel(cdev, ctrl, tsr->temp_sensor_ctrl);
