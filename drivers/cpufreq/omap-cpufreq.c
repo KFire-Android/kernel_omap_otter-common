@@ -26,6 +26,7 @@
 #include <linux/cpu.h>
 #include <linux/module.h>
 #include <linux/thermal_framework.h>
+#include <linux/omap4_duty_cycle.h>
 
 #include <asm/smp_plat.h>
 #include <asm/cpu.h>
@@ -54,7 +55,6 @@ static unsigned int current_target_freq;
 static unsigned int current_cooling_level;
 static unsigned int cpu_cooling_level;
 static unsigned int case_cooling_level;
-static unsigned int new_cooling_level;
 static bool omap_cpufreq_ready;
 
 static unsigned int en_therm_freq_print;
@@ -269,12 +269,13 @@ static void omap_thermal_step_freq(struct cpufreq_policy *policy,
 static int cpufreq_apply_cooling(struct thermal_dev *dev, int cooling_level)
 {
 	struct cpufreq_policy policy;
+	unsigned int new_cooling_level;
 
 	cpufreq_get_policy(&policy, 0);
 
 	mutex_lock(&omap_cpufreq_lock);
 
-	if (!strcmp(dev->domain_name, "case")) {
+	if (dev && !strcmp(dev->domain_name, "case")) {
 		int tmp;
 
 		tmp = cooling_level - case_subzone_number;
@@ -357,6 +358,67 @@ static int __init omap_cpufreq_cooling_init(void)
 static void __exit omap_cpufreq_cooling_exit(void)
 {
 }
+#endif
+
+#ifdef CONFIG_OMAP4_DUTY_CYCLE
+/*
+ * duty_cycle_apply_cooling: set the max thermal
+ * @param max: max cpu frequency allowed by duty cycle
+ *
+ * The maximum cpu frequency will be readjusted based on the required
+ * max frequency
+*/
+static int duty_cycle_apply_cooling(struct thermal_dev *dev, int max)
+{
+	unsigned int cur;
+	struct cpufreq_policy policy;
+
+	pr_debug("%s: setting max to %i\n", __func__, max);
+
+	if (!omap_cpufreq_ready)
+		return 0;
+
+	cpufreq_get_policy(&policy, 0);
+
+	mutex_lock(&omap_cpufreq_lock);
+
+	if (max_thermal == max) {
+		pr_warn("%s: not throttling\n", __func__);
+		goto out;
+	}
+
+	max_thermal = max;
+
+	cur = omap_getspeed(0);
+	omap_cpufreq_scale(&policy, current_target_freq, cur,
+			   CPUFREQ_RELATION_L);
+
+out:
+	mutex_unlock(&omap_cpufreq_lock);
+
+	return 0;
+}
+
+static struct duty_cycle_dev duty_dev = {
+	.cool_device = duty_cycle_apply_cooling,
+};
+
+static int __init omap_duty_cooling_init(void)
+{
+	return duty_cooling_dev_register(&duty_dev);
+}
+
+static void __exit omap_duty_cooling_exit(void)
+{
+	duty_cooling_dev_unregister();
+}
+
+
+#else
+
+static int __init omap_duty_cooling_init(void) { return 0; }
+static void __exit omap_duty_cooling_exit(void) { }
+
 #endif
 
 static int __cpuinit omap_cpu_init(struct cpufreq_policy *policy)
@@ -480,12 +542,20 @@ static int __init omap_cpufreq_init(void)
 	if (!ret)
 		ret = omap_cpufreq_cooling_init();
 
+	if (!ret) {
+		ret = omap_duty_cooling_init();
+		if (ret)
+			pr_warn("%s: omap_duty_cooling_init failed\n",
+				__func__);
+	}
+
 	return ret;
 }
 
 static void __exit omap_cpufreq_exit(void)
 {
 	omap_cpufreq_cooling_exit();
+	omap_duty_cooling_exit();
 	cpufreq_unregister_driver(&omap_driver);
 }
 

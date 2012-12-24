@@ -851,10 +851,10 @@ static struct i2c_board_info __initdata omap5evm_i2c_1_boardinfo[] = {
 
 /* TMP102 PCB Temperature sensor close to OMAP */
 static struct tmp102_platform_data tmp102_omap_info = {
-	.slope = 470,
-	.slope_cpu = 378,
-	.offset = -1272,
-	.offset_cpu = -154,
+	.slope_cpu = 470,
+	.slope = 378,
+	.offset_cpu = -1272,
+	.offset = -154,
 	.domain = "pcb", /* for hotspot extrapolation */
 };
 

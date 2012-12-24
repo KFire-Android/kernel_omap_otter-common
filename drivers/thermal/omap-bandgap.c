@@ -1008,6 +1008,7 @@ int __devinit omap_bandgap_probe(struct platform_device *pdev)
 	struct device *cdev = pdev->dev.parent;
 	struct omap_bandgap *bg_ptr;
 	int clk_rate, ret = 0, i;
+	u32 val;
 
 	if (!cdev) {
 		dev_err(&pdev->dev, "no omap control ref in our parent\n");
@@ -1051,7 +1052,6 @@ int __devinit omap_bandgap_probe(struct platform_device *pdev)
 	bg_ptr->conv_table = bg_ptr->conf->conv_table;
 	for (i = 0; i < bg_ptr->conf->sensor_count; i++) {
 		struct temp_sensor_registers *tsr;
-		u32 val;
 
 		tsr = bg_ptr->conf->sensors[i].registers;
 		/*
@@ -1108,13 +1108,29 @@ int __devinit omap_bandgap_probe(struct platform_device *pdev)
 
 	for (i = 0; i < bg_ptr->conf->sensor_count; i++) {
 		struct temp_sensor_data *ts_data;
+		struct temp_sensor_registers *tsr;
 
 		ts_data = bg_ptr->conf->sensors[i].ts_data;
+		tsr = bg_ptr->conf->sensors[i].registers;
 
 		if (OMAP_BANDGAP_HAS(bg_ptr, TALERT))
 			temp_sensor_init_talert_thresholds(bg_ptr, i,
 							   ts_data->t_hot,
 							   ts_data->t_cold);
+		/*
+		 * For OMAP4470 TSHUT values can be written by Bootloader, so
+		 * need to prevent multiple writing to one time writable
+		 * register, assuming that no one wrote zero into it before.
+		 */
+		if (cpu_is_omap447x()) {
+			ret = omap_control_readl(cdev, tsr->tshut_threshold,
+						 &val);
+			if ((val & tsr->tshut_hot_mask) ||
+			    (val & tsr->tshut_cold_mask) || ret)
+				bg_ptr->conf->features &=
+					     ~OMAP_BANDGAP_FEATURE_TSHUT_CONFIG;
+		}
+
 		if (OMAP_BANDGAP_HAS(bg_ptr, TSHUT_CONFIG)) {
 			/*
 			 * On OMAP54xx ES2.0, TSHUT values are loaded from
@@ -1140,6 +1156,15 @@ int __devinit omap_bandgap_probe(struct platform_device *pdev)
 							ts_data->tshut_hot);
 			temp_sensor_configure_tshut_cold(bg_ptr, i,
 							 ts_data->tshut_cold);
+
+			/*
+			 * Ensure that for OMAP4470 TSHUT is configured
+			 * only once
+			 */
+			if (cpu_is_omap447x())
+				bg_ptr->conf->features &=
+					     ~OMAP_BANDGAP_FEATURE_TSHUT_CONFIG;
+
 		}
 	}
 

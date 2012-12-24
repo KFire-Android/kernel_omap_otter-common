@@ -23,6 +23,7 @@
 #include <linux/hwspinlock.h>
 #include <linux/i2c/twl.h>
 #include <linux/i2c/bq2415x.h>
+#include <linux/i2c/tmp102.h>
 #include <linux/mfd/twl6040.h>
 #include <linux/gpio_keys.h>
 #include <linux/regulator/machine.h>
@@ -54,6 +55,7 @@
 #include <linux/platform_data/omap-abe-twl6040.h>
 #include "omap4_ion.h"
 #include <linux/leds-omap4430sdp-display.h>
+#include <linux/omap4_duty_cycle_governor.h>
 
 #include "mux.h"
 #include "hsmmc.h"
@@ -243,6 +245,32 @@ static struct omap_board_data keypad_data = {
 	.pads	 		= keypad_pads,
 	.pads_cnt       	= ARRAY_SIZE(keypad_pads),
 };
+
+#ifdef CONFIG_OMAP4_DUTY_CYCLE_GOVERNOR
+
+static struct pcb_section omap4_duty_governor_pcb_sections[] = {
+	{
+		.pcb_temp_level			= DUTY_GOVERNOR_DEFAULT_TEMP,
+		.max_opp			= 1200000,
+		.duty_cycle_enabled		= true,
+		.tduty_params = {
+			.nitro_rate		= 1200000,
+			.cooling_rate		= 1008000,
+			.nitro_interval		= 20000,
+			.nitro_percentage	= 24,
+		},
+	},
+};
+
+static void init_duty_governor(void)
+{
+	omap4_duty_pcb_section_reg(omap4_duty_governor_pcb_sections,
+				   ARRAY_SIZE
+				   (omap4_duty_governor_pcb_sections));
+}
+#else
+static void init_duty_governor(void){}
+#endif /*CONFIG_OMAP4_DUTY_CYCLE*/
 
 static struct gpio_led sdp4430_gpio_leds[] = {
 	{
@@ -725,6 +753,25 @@ static struct i2c_board_info __initdata sdp4430_i2c_boardinfo[] = {
 	},
 };
 
+/* TMP102 PCB Temperature sensor close to OMAP
+ * values for .slope and .offset are taken from OMAP5 structure,
+ * as TMP102 sensor was not used by domains other then CPU
+ */
+static struct tmp102_platform_data tmp102_omap_info = {
+	.slope = 470,
+	.slope_cpu = 1063,
+	.offset = -1272,
+	.offset_cpu = -477,
+	.domain = "pcb", /* for hotspot extrapolation */
+};
+
+static struct i2c_board_info __initdata sdp4430_i2c_4_tmp102_boardinfo[] = {
+	{
+			I2C_BOARD_INFO("tmp102_temp_sensor", 0x48),
+			.platform_data = &tmp102_omap_info,
+	},
+};
+
 static void __init omap_i2c_hwspinlock_init(int bus_id, int spinlock_id,
 				struct omap_i2c_bus_board_data *pdata)
 {
@@ -792,6 +839,11 @@ static int __init omap4_i2c_init(void)
 	i2c_register_board_info(1, sdp4430_i2c_boardinfo,
 				ARRAY_SIZE(sdp4430_i2c_boardinfo));
 	omap_register_i2c_bus(2, 400, NULL, 0);
+
+	if (cpu_is_omap447x())
+		i2c_register_board_info(4, sdp4430_i2c_4_tmp102_boardinfo,
+					ARRAY_SIZE
+					(sdp4430_i2c_4_tmp102_boardinfo));
 
 	/*
 	 * This will allow unused regulator to be shutdown. This flag
@@ -1277,6 +1329,7 @@ static void __init omap_4430sdp_init(void)
 	omap_4430sdp_display_init();
 	blaze_keypad_init();
 
+	init_duty_governor();
 	if (cpu_is_omap446x()) {
 		/* Vsel0 = gpio, vsel1 = gnd */
 		status = omap_tps6236x_board_setup(true, TPS62361_GPIO, -1,
