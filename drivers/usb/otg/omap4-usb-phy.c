@@ -174,18 +174,19 @@ int omap_usb_charger_detect(struct device *dev)
 	u32 usb2phycore = 0, chargertype = 0;
 
 	/* enable charger detection and restart it */
-	omap_control_readl(dev, CONTROL_USB2PHYCORE, &usb2phycore);
+	omap_control_core_pad_readl(dev, CONTROL_USB2PHYCORE, &usb2phycore);
 	usb2phycore &= ~USB2PHY_DISCHGDET;
 	usb2phycore |= USB2PHY_RESTARTCHGDET;
-	omap_control_writel(dev, usb2phycore, CONTROL_USB2PHYCORE);
+	omap_control_core_pad_writel(dev, usb2phycore, CONTROL_USB2PHYCORE);
 	mdelay(2);
-	omap_control_readl(dev, CONTROL_USB2PHYCORE, &usb2phycore);
+	omap_control_core_pad_readl(dev, CONTROL_USB2PHYCORE, &usb2phycore);
 	usb2phycore &= ~USB2PHY_RESTARTCHGDET;
-	omap_control_writel(dev, usb2phycore, CONTROL_USB2PHYCORE);
+	omap_control_core_pad_writel(dev, usb2phycore, CONTROL_USB2PHYCORE);
 
 	timeout = jiffies + msecs_to_jiffies(CHARGER_DET_TIMEOUT);
 	do {
-		omap_control_readl(dev, CONTROL_USB2PHYCORE, &usb2phycore);
+		omap_control_core_pad_readl(dev, CONTROL_USB2PHYCORE,
+					    &usb2phycore);
 		if (usb2phycore & (USB2PHY_CHGDETECTED|USB2PHY_CHGDETDONE)) {
 			pr_info("usb charger type detection protocol completed");
 			break;
@@ -230,9 +231,9 @@ int omap_usb_charger_detect(struct device *dev)
 	}
 
 	/* After detection process disable charger detection */
-	omap_control_readl(dev, CONTROL_USB2PHYCORE, &usb2phycore);
+	omap_control_core_pad_readl(dev, CONTROL_USB2PHYCORE, &usb2phycore);
 	usb2phycore |= USB2PHY_DISCHGDET;
-	omap_control_writel(dev, usb2phycore, CONTROL_USB2PHYCORE);
+	omap_control_core_pad_writel(dev, usb2phycore, CONTROL_USB2PHYCORE);
 
 	return charger;
 }
@@ -243,13 +244,17 @@ void omap_usb_charger_enable(struct device *dev, bool on)
 	u32 usb2phycore = 0;
 
 	if (on) {
-		omap_control_readl(dev, CONTROL_USB2PHYCORE, &usb2phycore);
+		omap_control_core_pad_readl(dev, CONTROL_USB2PHYCORE,
+					    &usb2phycore);
 		usb2phycore &= ~USB2PHY_DISCHGDET;
-		omap_control_writel(dev, usb2phycore, CONTROL_USB2PHYCORE);
+		omap_control_core_pad_writel(dev, usb2phycore,
+					     CONTROL_USB2PHYCORE);
 	} else {
-		omap_control_readl(dev, CONTROL_USB2PHYCORE, &usb2phycore);
+		omap_control_core_pad_readl(dev, CONTROL_USB2PHYCORE,
+					    &usb2phycore);
 		usb2phycore |= USB2PHY_DISCHGDET;
-		omap_control_writel(dev, usb2phycore, CONTROL_USB2PHYCORE);
+		omap_control_core_pad_writel(dev, usb2phycore,
+					     CONTROL_USB2PHYCORE);
 	}
 }
 EXPORT_SYMBOL_GPL(omap_usb_charger_enable);
