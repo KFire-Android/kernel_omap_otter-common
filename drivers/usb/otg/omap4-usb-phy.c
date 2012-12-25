@@ -273,7 +273,7 @@ static struct platform_driver omap_usb_phy_driver = {
 	.probe = omap_usb_phy_probe,
 	.remove = __devexit_p(omap_usb_phy_remove),
 	.driver = {
-			.name	= "omap4-usb-phy",
+			.name	= "omap-control-usb",
 			.owner	= THIS_MODULE,
 			.of_match_table	= of_omap_usb_phy_match,
 	},
