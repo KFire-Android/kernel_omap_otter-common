@@ -8,6 +8,7 @@
 #include <linux/usb/musb.h>
 #include <plat/board.h>
 #include <linux/pm_qos.h>
+#include <plat/io.h>
 
 #define OMAP3_HS_USB_PORTS	3
 
@@ -128,6 +129,7 @@ extern int omap_tll_disable(void);
 #define OMAP2_L4_IO_OFFSET	0xb2000000
 #define OMAP2_L4_IO_ADDRESS(pa)	IOMEM((pa) + OMAP2_L4_IO_OFFSET)
 
+#if 0
 static inline u8 omap_readb(u32 pa)
 {
 	return __raw_readb(OMAP2_L4_IO_ADDRESS(pa));
@@ -158,6 +160,7 @@ static inline void omap_writel(u32 v, u32 pa)
 {
 	__raw_writel(v, OMAP2_L4_IO_ADDRESS(pa));
 }
+#endif
 
 #endif
 
