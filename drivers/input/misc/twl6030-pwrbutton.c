@@ -40,6 +40,12 @@
 
 static int was_suspend;
 
+struct twl6030_pwr_button {
+  struct input_dev *input_dev;
+  struct device    *dev;
+  int report_key;
+};
+
 static irqreturn_t powerbutton_irq(int irq, void *_pwr)
 {
 	struct twl6030_pwr_button *pwr = _pwr;
