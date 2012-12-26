@@ -417,16 +417,20 @@ static bool omap_hwmod_mux_scan_wakeups(struct omap_hwmod_mux_info *hmux,
 		if (!(val & OMAP_WAKEUP_EVENT))
 			continue;
 
-		/* Clear the WAKEUPEVENT bit */
-		omap_mux_write(pad->partition, val & ~OMAP_WAKEUP_EN,
-			       pad->mux->reg_offset);
-		omap_hwmod_reconfigure_io_chain();
+		if (cpu_is_omap54xx()) {
+			/* Clear the WAKEUPEVENT bit */
+			omap_mux_write(pad->partition, val & ~OMAP_WAKEUP_EN,
+				       pad->mux->reg_offset);
+			omap_hwmod_reconfigure_io_chain();
 
-		/* Enable back the WAKEUPENABLE bit */
-		val = omap_mux_read(pad->partition, pad->mux->reg_offset);
-		val |= OMAP_WAKEUP_EN;
-		omap_mux_write(pad->partition, val, pad->mux->reg_offset);
-		omap_hwmod_reconfigure_io_chain();
+			/* Enable back the WAKEUPENABLE bit */
+			val = omap_mux_read(pad->partition,
+					pad->mux->reg_offset);
+			val |= OMAP_WAKEUP_EN;
+			omap_mux_write(pad->partition, val,
+					pad->mux->reg_offset);
+			omap_hwmod_reconfigure_io_chain();
+		}
 
 		if (hmux->wakeup_handler && hmux->wakeup_handler[i]) {
 			hmux->wakeup_handler[i](hmux);
@@ -476,6 +480,10 @@ static irqreturn_t omap_hwmod_mux_handle_irq(int irq, void *unused)
 {
 	omap_hwmod_for_each(_omap_hwmod_mux_handle_irq, NULL);
 	omap2_gpio_trigger_wakeup_irqs();
+
+	if (cpu_is_omap44xx())
+		omap_hwmod_reconfigure_io_chain();
+
 	return IRQ_HANDLED;
 }
 
