@@ -128,6 +128,36 @@ static void omap2_gp_timer_set_mode(enum clock_event_mode mode,
 	}
 }
 
+static void omap_clkevt_suspend(struct clock_event_device *unused)
+{
+	char name[10];
+	struct omap_hwmod *oh;
+
+	sprintf(name, "timer%d", clkev.id);
+	oh = omap_hwmod_lookup(name);
+	if (!oh)
+		return;
+
+	__omap_dm_timer_stop(&clkev, 1, clkev.rate);
+	omap_hwmod_idle(oh);
+}
+
+static void omap_clkevt_resume(struct clock_event_device *unused)
+{
+	char name[10];
+	struct omap_hwmod *oh;
+
+	sprintf(name, "timer%d", clkev.id);
+	oh = omap_hwmod_lookup(name);
+	if (!oh)
+		return;
+
+	omap_hwmod_enable(oh);
+	__omap_dm_timer_load_start(&clkev,
+			OMAP_TIMER_CTRL_ST | OMAP_TIMER_CTRL_AR, 0, 1);
+	__omap_dm_timer_int_enable(&clkev, OMAP_TIMER_INT_OVERFLOW);
+}
+
 static struct clock_event_device clockevent_gpt = {
 	.name		= "gp_timer",
 	.features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
@@ -135,6 +165,8 @@ static struct clock_event_device clockevent_gpt = {
 	.rating		= 300,
 	.set_next_event	= omap2_gp_timer_set_next_event,
 	.set_mode	= omap2_gp_timer_set_mode,
+	.suspend	= omap_clkevt_suspend,
+	.resume		= omap_clkevt_resume,
 };
 
 static struct property device_disabled = {
@@ -319,6 +351,7 @@ static void __init omap2_gp_clockevent_init(int gptimer_id,
 	int res;
 
 	clkev.errata = omap_dm_timer_get_errata();
+	clkev.id = gptimer_id;
 
 	/*
 	 * For clock-event timers we never read the timer counter and
