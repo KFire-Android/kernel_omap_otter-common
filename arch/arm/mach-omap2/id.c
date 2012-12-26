@@ -351,6 +351,11 @@ void __init omap5xxx_check_features(void)
 		omap_features |= OMAP5_HAS_AUTO_RET;
 		omap_features |= OMAP5_HAS_AVS;
 	}
+
+	/* Enable Auto-ret for all OMAP5 ES2+ chips */
+	if ((omap_rev() != OMAP5430_REV_ES1_0) &&
+	    (omap_rev() != OMAP5432_REV_ES1_0))
+		omap_features |= OMAP5_HAS_AUTO_RET;
 }
 
 void __init ti81xx_check_features(void)
@@ -644,6 +649,9 @@ void __init omap5xxx_check_revision(void)
 		switch (rev) {
 		case 0:
 			omap_revision = OMAP5430_REV_ES1_0;
+			/* Fix ES2.0 wrongly efused samples ID detection */
+			if (read_cpuid_id() == 0x412FC0F2)
+				omap_revision = OMAP5430_REV_ES2_0;
 			break;
 		case 1:
 		/* FALLTHROUGH */

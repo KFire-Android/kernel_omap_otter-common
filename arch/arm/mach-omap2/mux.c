@@ -119,6 +119,9 @@ static int __init omap_mux_mode_gpio(struct omap_mux_partition *partition,
 
 #ifdef CONFIG_OMAP_MUX
 
+static struct omap_mux *sys_nirq1_mux;
+static struct omap_mux *sys_nirq2_mux;
+
 static char *omap_mux_options;
 
 static int __init _omap_mux_init_gpio(struct omap_mux_partition *partition,
@@ -486,6 +489,26 @@ static int _omap_hwmod_mux_handle_irq(struct omap_hwmod *oh, void *data)
 }
 
 /**
+ *  omap_process_sysnirq_interrupts - Process SYS_NIRQ1 and SYS_NIRQ2 wakeup
+ * irqs
+ *
+ * HACK: Check SYS_NIRQ1 and SYS_NIRQ2 wakeup flags.
+ * If one of those flags (or both) is set then call
+ * omap_hwmod_reconfigure_io_chain() function to clear I/O chain
+ * wakeups and reconfigure chain
+ */
+void omap_process_sysnirq_interrupts(void)
+{
+	bool sys_nirq1_int, sys_nirq2_int;
+
+	sys_nirq1_int = omap_mux_get_wakeupstatus(sys_nirq1_mux);
+	sys_nirq2_int = omap_mux_get_wakeupstatus(sys_nirq2_mux);
+
+	if (sys_nirq1_int || sys_nirq2_int)
+		omap_hwmod_reconfigure_io_chain();
+}
+
+/**
  * omap_hwmod_mux_handle_irq - Process pad wakeup irqs.
  *
  * Calls a function for each registered omap_hwmod to check
@@ -495,6 +518,7 @@ static irqreturn_t omap_hwmod_mux_handle_irq(int irq, void *unused)
 {
 	omap_hwmod_for_each(_omap_hwmod_mux_handle_irq, NULL);
 	omap2_gpio_trigger_wakeup_irqs();
+	omap_process_sysnirq_interrupts();
 	return IRQ_HANDLED;
 }
 
@@ -1251,6 +1275,9 @@ int __init omap_mux_init(const char *name, u32 flags,
 			 struct omap_ball *package_balls)
 {
 	struct omap_mux_partition *partition;
+#ifdef CONFIG_OMAP_MUX
+	struct omap_mux_partition *foundpartition;
+#endif
 
 	partition = kzalloc(sizeof(struct omap_mux_partition), GFP_KERNEL);
 	if (!partition)
@@ -1277,6 +1304,15 @@ int __init omap_mux_init(const char *name, u32 flags,
 
 	omap_mux_init_package(superset, package_subset, package_balls);
 	omap_mux_init_list(partition, superset);
+#ifdef CONFIG_OMAP_MUX
+	if (!sys_nirq1_mux)
+		omap_mux_get_by_name("sys_nirq1.sys_nirq1", &foundpartition,
+				     &sys_nirq1_mux);
+
+	if (!sys_nirq2_mux)
+		omap_mux_get_by_name("sys_nirq2.sys_nirq2", &foundpartition,
+				     &sys_nirq2_mux);
+#endif
 	omap_mux_init_signals(partition, board_mux);
 
 	return 0;

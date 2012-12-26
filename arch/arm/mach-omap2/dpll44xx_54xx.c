@@ -34,16 +34,9 @@
 #include "prcm44xx.h"
 #include "cminst44xx.h"
 #include "cm44xx.h"
-
-#ifdef CONFIG_ARCH_OMAP5_ES1
-#include "cm-regbits-54xx_es1.h"
-#include "cm1_54xx_es1.h"
-#include "cm2_54xx_es1.h"
-#else
-#include "cm-regbits-54xx.h"
 #include "cm1_54xx.h"
 #include "cm2_54xx.h"
-#endif
+#include "cm-regbits-54xx.h"
 
 #define MAX_DPLL_WAIT_TRIES	1000000
 #define MAX_FREQ_UPDATE_TIMEOUT  100000
@@ -316,8 +309,14 @@ int omap4_prcm_freq_update(void)
 	int i = 0;
 
 	if (!l3_emif_clkdm) {
-		pr_err("%s: clockdomain lookup failed\n", __func__);
-		return -EINVAL;
+		if (cpu_is_omap44xx())
+			l3_emif_clkdm = clkdm_lookup("l3_emif_clkdm");
+		else
+			l3_emif_clkdm = clkdm_lookup("emif_clkdm");
+		if (!l3_emif_clkdm) {
+			pr_err("%s: clockdomain lookup failed\n", __func__);
+			return -EINVAL;
+		}
 	}
 
 	/* Configures MEMIF domain in SW_WKUP */
@@ -634,39 +633,36 @@ int omap5_mpu_dpll_set_rate(struct clk *clk, unsigned long rate)
 	if (!clk->parent->set_rate)
 		return -EINVAL;
 
+	if (rate > clk->rate)
+		omap5_mpu_dpll_update_children(rate);
+
+	dpll_rate = omap2_get_dpll_rate(clk->parent);
+	if (rate == dpll_rate)
+		return 0;
 	/*
 	 * On OMAP5430, to obtain MPU DPLL frequency higher
 	 * than 1.4GHz, DCC (Duty Cycle Correction) needs to
 	 * be enabled.
 	 * And needs to be kept disabled for <= 1.4 Ghz.
 	 */
-	dpll_rate = omap2_get_dpll_rate(clk->parent);
-	v = __raw_readl(dd->mult_div1_reg);
 	if (rate <= OMAP_1_4GHz) {
-		if (rate == dpll_rate)
-			return 0;
 		/* If DCC is enabled, disable it */
+		v = __raw_readl(dd->mult_div1_reg);
 		if (v & OMAP54XX_DCC_EN_MASK) {
 			v &= ~OMAP54XX_DCC_EN_MASK;
 			__raw_writel(v, dd->mult_div1_reg);
 		}
+
 		clk->parent->set_rate(clk->parent, rate);
 	} else {
-		/*
-		 * On OMAP54530, the MPU clk for frequencies higher than 1.4Ghz
-		 * is sourced from CLKOUTX2_M3, instead of CLKOUT_M2, while
-		 * value of M3 is fixed to 1. Hence for frequencies higher
-		 * than 1 Ghz, lock the DPLL at half the rate so the
-		 * CLKOUTX2_M3 then matches the requested rate.
-		 */
-		if (rate == dpll_rate/2)
-			return 0;
+		clk->parent->set_rate(clk->parent, rate);
+
+		v = __raw_readl(dd->mult_div1_reg);
 		v |= OMAP54XX_DCC_EN_MASK;
 		__raw_writel(v, dd->mult_div1_reg);
-		clk->parent->set_rate(clk->parent, rate/2);
 	}
 
-	if (rate != clk->rate)
+	if (rate < clk->rate)
 		omap5_mpu_dpll_update_children(rate);
 	clk->rate = rate;
 
@@ -687,7 +683,6 @@ long omap5_mpu_dpll_round_rate(struct clk *clk, unsigned long rate)
 unsigned long omap5_mpu_dpll_recalc(struct clk *clk)
 {
 	struct dpll_data *dd;
-	u32 v;
 
 	if (!clk || !clk->parent)
 		return -EINVAL;
@@ -697,11 +692,7 @@ unsigned long omap5_mpu_dpll_recalc(struct clk *clk)
 	if (!dd)
 		return -EINVAL;
 
-	v = __raw_readl(dd->mult_div1_reg);
-	if (v & OMAP54XX_DCC_EN_MASK)
-		return omap2_get_dpll_rate(clk->parent) * 2;
-	else
-		return omap2_get_dpll_rate(clk->parent);
+	return omap2_get_dpll_rate(clk->parent);
 }
 
 /* Supported only on OMAP4 */

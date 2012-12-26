@@ -169,7 +169,7 @@ static const struct clksel sys_clkin_sel[] = {
 
 static struct clk sys_clkin = {
 	.name		= "sys_clkin",
-	.rate		= 38400000,
+	.rate		= 19200000,
 	.clksel		= sys_clkin_sel,
 	.init		= &omap2_init_clksel_parent,
 	.clksel_reg	= OMAP54XX_CM_CLKSEL_SYS,
@@ -1466,8 +1466,10 @@ static struct clk l3instr_ts_gclk_div = {
 	.init		= &omap2_init_clksel_parent,
 	.clksel_reg	= OMAP54XX_CM_L3INSTR_CTRL_MODULE_BANDGAP_CLKCTRL,
 	.clksel_mask	= OMAP54XX_CLKSEL_24_25_MASK,
-	.ops		= &clkops_null,
-	.recalc		= &followparent_recalc,
+	.ops		= &clkops_omap2_dflt,
+	.recalc		= &omap2_clksel_recalc,
+	.round_rate	= &omap2_clksel_round_rate,
+	.set_rate	= &omap2_clksel_set_rate,
 };
 
 static const struct clksel l4_root_clk_div_div[] = {
@@ -2674,6 +2676,7 @@ static struct clk_lookup omap54xx_clks[] = {
 	CLKDEV_INIT(NULL,	"aess_fclk",			&aess_fclk),
 	CLKDEV_INIT(NULL,	"dmic_sync_mux_ck",		&dmic_sync_mux_ck),
 	CLKDEV_INIT(NULL,	"dmic_gfclk",			&dmic_gfclk),
+	CLKDEV_INIT(NULL,	"dmic_fck",			&dmic_gfclk),
 	CLKDEV_INIT(NULL,	"fdif_fclk",			&fdif_fclk),
 	CLKDEV_INIT(NULL,	"hsi_fclk",			&hsi_fclk),
 	CLKDEV_INIT(NULL,	"mcasp_sync_mux_ck",		&mcasp_sync_mux_ck),

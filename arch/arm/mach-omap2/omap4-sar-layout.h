@@ -13,15 +13,11 @@
 
 #include <mach/hardware.h>
 #include <mach/ctrl_module_pad_core_44xx.h>
-
-#include "cm1_44xx.h"
-#include "cm2_44xx.h"
-#include "prcm-common.h"
-
 #include <mach/hardware.h>
 
 #include "cm1_44xx.h"
 #include "cm2_44xx.h"
+#include "cm2_54xx.h"
 #include "prcm-common.h"
 
 /*
@@ -52,6 +48,9 @@
 #define SAR_BANK4_OFFSET		0x3000
 
 /* Scratch pad memory offsets from SAR_BANK1 */
+#define OMAP4_REBOOT_REASON_OFFSET		0xa0c
+#define OMAP5_REBOOT_REASON_OFFSET		0xfe0
+#define OMAP_REBOOT_REASON_SIZE			0xf
 #define SCU_OFFSET0				0xf08
 #define SCU_OFFSET1				0xf0c
 #define OMAP_TYPE_OFFSET			0xf18
@@ -65,8 +64,13 @@
 /* CPUx Wakeup Non-Secure Physical Address offsets in SAR_BANK3 */
 #define CPU0_WAKEUP_NS_PA_ADDR_OFFSET		0xa04
 #define CPU1_WAKEUP_NS_PA_ADDR_OFFSET		0xa08
+#ifdef CONFIG_ARCH_OMAP5_ES1
 #define OMAP5_CPU0_WAKEUP_NS_PA_ADDR_OFFSET	0xd44
 #define OMAP5_CPU1_WAKEUP_NS_PA_ADDR_OFFSET	0xd48
+#else
+#define OMAP5_CPU0_WAKEUP_NS_PA_ADDR_OFFSET	0xe00
+#define OMAP5_CPU1_WAKEUP_NS_PA_ADDR_OFFSET	0xe04
+#endif
 
 #define SAR_BACKUP_STATUS_OFFSET		(SAR_BANK3_OFFSET + 0x500)
 #define SAR_SECURE_RAM_SIZE_OFFSET		(SAR_BANK3_OFFSET + 0x504)

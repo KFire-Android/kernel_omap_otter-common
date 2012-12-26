@@ -15,12 +15,7 @@
 
 #include "common.h"
 
-#ifdef CONFIG_ARCH_OMAP5_ES1
-#include "prm54xx_es1.h"
-#else
 #include "prm54xx.h"
-#endif
-
 #include "voltage.h"
 #include "omap_opp_data.h"
 #include "vc.h"
@@ -45,9 +40,9 @@ static const struct omap_vfsm_instance omap5_vdd_core_vfsm = {
 static struct voltagedomain omap5_voltdm_mpu = {
 	.name = "mpu",
 	.scalable = true,
-	.read = omap4_prm_vcvp_read,
-	.write = omap4_prm_vcvp_write,
-	.rmw = omap4_prm_vcvp_rmw,
+	.read = omap5_prm_vcvp_read,
+	.write = omap5_prm_vcvp_write,
+	.rmw = omap5_prm_vcvp_rmw,
 	.vc = &omap5_vc_mpu,
 	.vfsm = &omap5_vdd_mpu_vfsm,
 	.vp = &omap5_vp_mpu,
@@ -58,9 +53,9 @@ static struct voltagedomain omap5_voltdm_mpu = {
 static struct voltagedomain omap5_voltdm_mm = {
 	.name = "mm",
 	.scalable = true,
-	.read = omap4_prm_vcvp_read,
-	.write = omap4_prm_vcvp_write,
-	.rmw = omap4_prm_vcvp_rmw,
+	.read = omap5_prm_vcvp_read,
+	.write = omap5_prm_vcvp_write,
+	.rmw = omap5_prm_vcvp_rmw,
 	.vc = &omap5_vc_mm,
 	.vfsm = &omap5_vdd_mm_vfsm,
 	.vp = &omap5_vp_mm,
@@ -72,9 +67,9 @@ static struct voltagedomain omap5_voltdm_mm = {
 static struct voltagedomain omap5_voltdm_core = {
 	.name = "core",
 	.scalable = true,
-	.read = omap4_prm_vcvp_read,
-	.write = omap4_prm_vcvp_write,
-	.rmw = omap4_prm_vcvp_rmw,
+	.read = omap5_prm_vcvp_read,
+	.write = omap5_prm_vcvp_write,
+	.rmw = omap5_prm_vcvp_rmw,
 	.vc = &omap5_vc_core,
 	.vfsm = &omap5_vdd_core_vfsm,
 	.vp = &omap5_vp_core,
@@ -105,6 +100,7 @@ void __init omap54xx_voltagedomains_init(void)
 	 * for the currently-running IC
 	 */
 #ifdef CONFIG_PM_OPP
+#ifdef CONFIG_ARCH_OMAP5_ES1
 	if (omap_rev() == OMAP5430_REV_ES1_0) {
 		omap5_voltdm_mpu.volt_data = omap5430_vdd_mpu_volt_data;
 		omap5_voltdm_mpu.dep_vdd_info = omap5430_vddmpu_dep_info;
@@ -113,8 +109,7 @@ void __init omap54xx_voltagedomains_init(void)
 		omap5_voltdm_mm.dep_vdd_info = omap5430_vddmm_dep_info;
 
 		omap5_voltdm_core.volt_data = omap5430_vdd_core_volt_data;
-	} else if (omap_rev() == OMAP5432_REV_ES1_0 ||
-		   omap_rev() == OMAP5432_REV_ES2_0) {
+	} else if (omap_rev() == OMAP5432_REV_ES1_0) {
 		omap5_voltdm_mpu.volt_data = omap5432_vdd_mpu_volt_data;
 		omap5_voltdm_mpu.dep_vdd_info = omap5432_vddmpu_dep_info;
 
@@ -123,6 +118,15 @@ void __init omap54xx_voltagedomains_init(void)
 
 		omap5_voltdm_core.volt_data = omap5432_vdd_core_volt_data;
 	}
+#else
+	omap5_voltdm_mpu.volt_data = omap543x_vdd_mpu_volt_data;
+	omap5_voltdm_mpu.dep_vdd_info = omap543x_vddmpu_dep_info;
+
+	omap5_voltdm_mm.volt_data = omap543x_vdd_mm_volt_data;
+	omap5_voltdm_mm.dep_vdd_info = omap543x_vddmm_dep_info;
+
+	omap5_voltdm_core.volt_data = omap543x_vdd_core_volt_data;
+#endif	/* CONFIG_ARCH_OMAP5_ES1 */
 #endif
 
 	omap5_voltdm_mpu.vp_param = &omap5_mpu_vp_data;
@@ -134,7 +138,8 @@ void __init omap54xx_voltagedomains_init(void)
 		omap5_voltdm_mpu.vc_param = &omap5_es1_mpu_vc_data;
 		omap5_voltdm_mm.vc_param = &omap5_es1_mm_vc_data;
 		omap5_voltdm_core.vc_param = &omap5_es1_core_vc_data;
-	} else if (omap_rev() == OMAP5432_REV_ES2_0) {
+	} else if (omap_rev() == OMAP5430_REV_ES2_0 ||
+		   omap_rev() == OMAP5432_REV_ES2_0) {
 		omap5_voltdm_mpu.vc_param = &omap5_mpu_vc_data;
 		omap5_voltdm_mm.vc_param = &omap5_mm_vc_data;
 		omap5_voltdm_core.vc_param = &omap5_core_vc_data;

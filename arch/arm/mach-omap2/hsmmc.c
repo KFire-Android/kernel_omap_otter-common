@@ -212,6 +212,27 @@ static void omap5_es2_after_set_reg(struct device *dev, int slot,
 	}
 }
 
+/* Enable clock pull up or clock pull down */
+static void omap5_clk_pull_up(struct device *dev, int slot, bool up)
+{
+	struct omap_mmc_platform_data *mmc = dev->platform_data;
+	struct omap_mux_partition *p_mmc_clk = mmc->slots[0].p_mmc_clk;
+	struct omap_mux *mux_mmc_clk = mmc->slots[0].mux_mmc_clk;
+	u16 r_sdcard_clk = 0;
+
+	if ((!p_mmc_clk) || (!mux_mmc_clk)) {
+		printk(KERN_ERR "Unable to get SD Card Mux reference\n");
+		return;
+	}
+	r_sdcard_clk = omap_mux_read(p_mmc_clk, mux_mmc_clk->reg_offset);
+	if (up)
+		r_sdcard_clk |= (0x1 << 4);
+	else
+		r_sdcard_clk &= ~(0x1 << 4);
+
+	omap_mux_write(p_mmc_clk, r_sdcard_clk, mux_mmc_clk->reg_offset);
+}
+
 static void hsmmc2_select_input_clk_src(struct omap_mmc_platform_data *mmc)
 {
 	u32 reg;
@@ -480,6 +501,18 @@ static u32 __init omap_hsmmc_si_spec_caps(struct omap2_hsmmc_info *c)
 	return caps;
 }
 
+static u32 __init omap_hsmmc_si_spec_caps2(struct omap2_hsmmc_info *c)
+{
+	u32 caps2 = 0;
+	if (cpu_is_omap54xx()) {
+		if (c->mmc == 2) {
+			if (omap_rev() == OMAP5430_REV_ES2_0)
+				caps2 |= MMC_CAP2_HS200_1_8V_SDR;
+		}
+	}
+	return caps2;
+}
+
 static int __init omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
 					struct omap_mmc_platform_data *mmc)
 {
@@ -502,6 +535,7 @@ static int __init omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
 	mmc->nr_slots = 1;
 	mmc->slots[0].caps = c->caps;
 	mmc->slots[0].caps |= omap_hsmmc_si_spec_caps(c);
+	mmc->slots[0].caps2 |= omap_hsmmc_si_spec_caps2(c);
 	mmc->slots[0].pm_caps = c->pm_caps;
 	mmc->slots[0].internal_clock = !c->ext_clock;
 	mmc->dma_mask = 0xffffffff;
@@ -598,6 +632,10 @@ static int __init omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
 					mmc->slots[0].after_set_reg =
 						omap4_hsmmc1_after_set_reg;
 				}
+				omap_mux_get_by_name("sdcard_clk",
+						&mmc->slots[0].p_mmc_clk,
+						&mmc->slots[0].mux_mmc_clk);
+				mmc->slots[0].clk_pull_up = omap5_clk_pull_up;
 			} else if (cpu_is_omap44xx()) {
 				mmc->slots[0].before_set_reg =
 						omap4_hsmmc1_before_set_reg;

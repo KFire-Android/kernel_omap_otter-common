@@ -26,14 +26,8 @@
 
 #include "pm.h"
 #include "prm44xx.h"
-
-#ifdef CONFIG_ARCH_OMAP5_ES1
-#include "prm54xx_es1.h"
-#include "prm-regbits-54xx_es1.h"
-#else
 #include "prm54xx.h"
 #include "prm-regbits-54xx.h"
-#endif
 
 #include "voltage.h"
 

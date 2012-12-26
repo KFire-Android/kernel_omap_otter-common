@@ -121,8 +121,8 @@ int hdmi_init_display(struct omap_dss_device *dssdev)
 {
 	DSSDBG("init_display\n");
 
-	hdmi.dssdev = dssdev;
 	dss_init_hdmi_ip_ops(&hdmi.ip_data);
+	hdmi.dssdev = dssdev;
 	return 0;
 }
 
@@ -342,7 +342,7 @@ static void hdmi_compute_pll(struct omap_dss_device *dssdev, int phy,
 			pi->regm2 = HDMI_DEFAULT_REGM2;
 		} else if (cpu_is_omap54xx()) {
 			if (phy <= 50000)
-				pi->regm2 = 2;
+				pi->regm2 = 5;
 			else
 				pi->regm2 = 1;
 		}

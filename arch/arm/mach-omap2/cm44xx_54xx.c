@@ -24,15 +24,10 @@
 #include "cm44xx.h"
 #include "cm1_44xx.h"
 #include "cm2_44xx.h"
+#include "cm2_54xx.h"
 #include "cminst44xx.h"
 #include "prcm44xx.h"
 #include "cm-regbits-44xx.h"
-
-#ifdef CONFIG_ARCH_OMAP5_ES1
-#include "cm2_54xx_es1.h"
-#else
-#include "cm2_54xx.h"
-#endif
 
 /* CM1 hardware module low-level functions */
 

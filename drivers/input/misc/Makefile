@@ -55,6 +55,7 @@ obj-$(CONFIG_INPUT_SPARCSPKR)		+= sparcspkr.o
 obj-$(CONFIG_INPUT_TWL4030_PWRBUTTON)	+= twl4030-pwrbutton.o
 obj-$(CONFIG_INPUT_TWL6030_PWRBUTTON)  += twl6030-pwrbutton.o
 obj-$(CONFIG_INPUT_PALMAS_PWRBUTTON)	+= palmas-pwrbutton.o
+obj-$(CONFIG_INPUT_TWL6030_PWRBUTTON)	+= twl6030-pwrbutton.o
 obj-$(CONFIG_INPUT_TWL4030_VIBRA)	+= twl4030-vibra.o
 obj-$(CONFIG_INPUT_TWL6040_VIBRA)	+= twl6040-vibra.o
 obj-$(CONFIG_INPUT_UINPUT)		+= uinput.o

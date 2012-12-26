@@ -331,10 +331,14 @@ static __devinit int omap_hdmi_probe(struct platform_device *pdev)
 		omap_hdmi_dai.playback.rates = OMAP4_HDMI_RATES;
 		omap_hdmi_dai.playback.formats = OMAP4_HDMI_FORMATS;
 		omap_hdmi_dai.playback.channels_max	= 8;
-	} else { /* OMAP5 ES1.0 */
+	} else { /* OMAP5 */
 		omap_hdmi_dai.playback.rates = OMAP5_HDMI_RATES;
 		omap_hdmi_dai.playback.formats = OMAP5_HDMI_FORMATS;
+#ifdef CONFIG_ARCH_OMAP5_ES1
+		omap_hdmi_dai.playback.channels_max	= 8;
+#else
 		omap_hdmi_dai.playback.channels_max	= 2;
+#endif
 	}
 	ret = snd_soc_register_dai(&pdev->dev, &omap_hdmi_dai);
 

@@ -14,6 +14,8 @@
 #include <plat/omap-serial.h>
 #include "mux.h"
 
+#define DEFAULT_UART_AUTOSUSPEND_DELAY	3000	/* Runtime autosuspend (msecs)*/
+
 /*
  *  UART: Tablet platform data
  */
@@ -99,7 +101,7 @@ static struct omap_uart_port_info uart2_info __initdata = {
 	.dma_rx_buf_size = 4096,
 	.dma_rx_poll_rate = 1,
 	.dma_rx_timeout = 3 * HZ,
-	.autosuspend_timeout = -1,
+	.autosuspend_timeout = DEFAULT_UART_AUTOSUSPEND_DELAY,
 };
 
 static struct omap_uart_port_info uart3_info __initdata = {
@@ -107,7 +109,7 @@ static struct omap_uart_port_info uart3_info __initdata = {
 	.dma_rx_buf_size = 4096,
 	.dma_rx_poll_rate = 1,
 	.dma_rx_timeout = 3 * HZ,
-	.autosuspend_timeout = -1,
+	.autosuspend_timeout = DEFAULT_UART_AUTOSUSPEND_DELAY,
 };
 
 static struct omap_uart_port_info uart4_info __initdata = {
@@ -115,7 +117,7 @@ static struct omap_uart_port_info uart4_info __initdata = {
 	.dma_rx_buf_size = 4096,
 	.dma_rx_poll_rate = 1,
 	.dma_rx_timeout = 3 * HZ,
-	.autosuspend_timeout = -1,
+	.autosuspend_timeout = DEFAULT_UART_AUTOSUSPEND_DELAY,
 };
 
 /*

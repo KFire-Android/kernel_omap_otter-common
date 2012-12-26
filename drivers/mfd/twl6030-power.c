@@ -22,6 +22,11 @@
 
 #include <asm/mach-types.h>
 
+#define PREQ_RES_ASS_A		0
+#define PREQ_RES_ASS_B		1
+#define PREQ_RES_ASS_C		2
+#define PREQ_RES_ASS_REG_CNT	9
+
 #define VREG_GRP		0
 #define MSK_TRANSITION_APP_SHIFT	0x5
 
@@ -40,6 +45,29 @@ struct twl6030_resource_map {
 	u8 base_addr;
 	u8 group;
 };
+
+/**
+ * struct twl6032_resource_map - describe the resource mapping for TWL6032
+ * @name:	name of the resource
+ * @res_id:	resource ID
+ * @reg_type:	type of the Resources Assignment register:
+ *	0: PREQx_RES_ASS_A register
+ *	1: PREQx_RES_ASS_B register
+ *	2: PREQx_RES_ASS_C register
+ * @group:	resource control group
+ * @mask:	bit mask of the resource in PREQx_RES_ASS_x registers
+ */
+struct twl6032_resource_map {
+	char *name;
+	u8 res_id;
+	u8 reg_type;
+	u8 group;
+	u8 mask;
+};
+
+#define TWL6032_RES_DATA(ID, NAME, REG_TYPE, GROUP, MASK) \
+		{.res_id = ID, .name = NAME, .reg_type = REG_TYPE,\
+		.group = GROUP, .mask = MASK}
 
 /* list of all s/w modifiable resources in TWL6030 */
 static __devinitdata struct twl6030_resource_map twl6030_res_map[] = {
@@ -76,6 +104,33 @@ static __devinitdata struct twl6030_resource_map twl6030_res_map[] = {
 /* VBATMIN_HI cannot be modified */
 /* RC6MHZ cannot be modified */
 /* TEMP cannot be modified */
+};
+
+/* list of all s/w modifiable resources in TWL6032 */
+static __devinitdata struct twl6032_resource_map twl6032_res_map[] = {
+/* PREQx_RES_ASS_A register resources */
+TWL6032_RES_DATA(RES_LDOUSB, "VUSB", PREQ_RES_ASS_A, DEV_GRP_P1, BIT(5)),
+TWL6032_RES_DATA(RES_SMPS5, "SMPS5", PREQ_RES_ASS_A, DEV_GRP_P1, BIT(4)),
+TWL6032_RES_DATA(RES_SMPS4, "SMPS4", PREQ_RES_ASS_A, DEV_GRP_P1, BIT(3)),
+TWL6032_RES_DATA(RES_SMPS3, "SMPS3", PREQ_RES_ASS_A, DEV_GRP_P1, BIT(2)),
+TWL6032_RES_DATA(RES_SMPS2, "SMPS2", PREQ_RES_ASS_A, DEV_GRP_P1, BIT(1)),
+TWL6032_RES_DATA(RES_SMPS1, "SMPS1", PREQ_RES_ASS_A, DEV_GRP_P1, BIT(0)),
+/* PREQx_RES_ASS_B register resources */
+TWL6032_RES_DATA(RES_LDOLN, "LDOLN", PREQ_RES_ASS_B, DEV_GRP_P1, BIT(7)),
+TWL6032_RES_DATA(RES_LDO7, "LDO7", PREQ_RES_ASS_B, DEV_GRP_P1, BIT(6)),
+TWL6032_RES_DATA(RES_LDO6, "LDO6", PREQ_RES_ASS_B, DEV_GRP_P1, BIT(5)),
+TWL6032_RES_DATA(RES_LDO5, "LDO5", PREQ_RES_ASS_B, DEV_GRP_P1, BIT(4)),
+TWL6032_RES_DATA(RES_LDO4, "LDO4", PREQ_RES_ASS_B, DEV_GRP_P1, BIT(3)),
+TWL6032_RES_DATA(RES_LDO3, "LDO3", PREQ_RES_ASS_B, DEV_GRP_P1, BIT(2)),
+TWL6032_RES_DATA(RES_LDO2, "LDO2", PREQ_RES_ASS_B, DEV_GRP_P1, BIT(1)),
+TWL6032_RES_DATA(RES_LDO1, "LDO1", PREQ_RES_ASS_B, DEV_GRP_P1, BIT(0)),
+/* PREQx_RES_ASS_C register resources */
+TWL6032_RES_DATA(RES_VSYSMIN_HI, "VSYSMIN_HI", PREQ_RES_ASS_C, DEV_GRP_P1, BIT(5)),
+TWL6032_RES_DATA(RES_32KCLKG, "32KCLKG", PREQ_RES_ASS_C, DEV_GRP_P1, BIT(4)),
+TWL6032_RES_DATA(RES_32KCLKAUDIO, "32KCLKAUDIO", PREQ_RES_ASS_C, DEV_GRP_P1, BIT(3)),
+TWL6032_RES_DATA(RES_SYSEN, "SYSEN", PREQ_RES_ASS_C, DEV_GRP_P1, BIT(2)),
+TWL6032_RES_DATA(RES_REGEN2, "REGEN2", PREQ_RES_ASS_C, DEV_GRP_P1, BIT(1)),
+TWL6032_RES_DATA(RES_REGEN, "REGEN1", PREQ_RES_ASS_C, DEV_GRP_P1, BIT(0)),
 };
 
 static __devinitdata struct twl4030_system_config twl6030_sys_config[] = {
@@ -116,7 +171,7 @@ static __devinit void twl6030_process_system_config(void)
 			 * On error resetting to 0, so that all the process
 			 * groups are kept active.
 			 */
-			dev_on_group = 0;
+			dev_on_group = DEV_GRP_NULL;
 		} else {
 			/*
 			 * Unmapped processor groups are disabled by writing
@@ -173,6 +228,37 @@ static __devinit void twl6030_program_map(void)
 	}
 }
 
+static __devinit void twl6032_program_map(void)
+{
+	struct twl6032_resource_map *res = twl6032_res_map;
+	int r, i;
+	u8 grp, val[1 + PREQ_RES_ASS_REG_CNT] = {0};
+	/**
+	 * val array structure:
+	 * val[0]: address byte for twl_i2c_write
+	 * val[1]-val[3]: PREQ1_RES_ASS_A-PREQ1_RES_ASS_C Registers
+	 * val[4]-val[6]: PREQ2_RES_ASS_A-PREQ2_RES_ASS_C Registers
+	 * val[7]-val[9]: PREQ3_RES_ASS_A-PREQ3_RES_ASS_C Registers
+	 */
+
+	/* fill array according to the resource bit fields
+	 * in PMIC registers */
+	for (i = 0; i < ARRAY_SIZE(twl6032_res_map); i++) {
+		for (grp = 0; grp < DEV_GRP_CNT; grp++)
+			/* map back from generic device id to TWL6032 mask */
+			val[1 + grp * DEV_GRP_CNT + res->reg_type] |=
+				(res->group & BIT(grp)) ? res->mask : 0;
+		res++;
+	}
+
+	/* load full array to PMIC registers */
+	r = twl_i2c_write(TWL6030_MODULE_ID0, &val[0],
+		TWL6032_PREQ1_RES_ASS_A, PREQ_RES_ASS_REG_CNT);
+	if (r)
+		pr_err("%s: Error(%d) programming TWL6032 PREQ Assignment Registers {start addr=0x%02x}\n",
+		       __func__, r, TWL6032_PREQ1_RES_ASS_A);
+}
+
 static __devinit void twl6030_update_system_map
 			(struct twl4030_system_config *sys_list)
 {
@@ -217,6 +303,30 @@ static __devinit void twl6030_update_map(struct twl4030_resconfig *res_list)
 	}
 }
 
+static __devinit void twl6032_update_map(struct twl4030_resconfig *res_list)
+{
+	int i, res_idx = 0;
+	struct twl6032_resource_map *res;
+
+	while (res_list->resource != TWL4030_RESCONFIG_UNDEF) {
+		res = twl6032_res_map;
+		for (i = 0; i < ARRAY_SIZE(twl6032_res_map); i++) {
+			if (res->res_id == res_list->resource) {
+				res->group = res_list->devgroup &
+					(DEV_GRP_P1 | DEV_GRP_P2 | DEV_GRP_P3);
+				break;
+			}
+			res++;
+		}
+
+		if (i == ARRAY_SIZE(twl6032_res_map)) {
+			pr_err("%s: in platform_data resource index %d, cannot find match for resource 0x%02x. NO Update!\n",
+			       __func__, res_idx, res_list->resource);
+		}
+		res_list++;
+		res_idx++;
+	}
+}
 
 static int twl6030_power_notifier_cb(struct notifier_block *notifier,
 					unsigned long pm_event,  void *unused)
@@ -245,7 +355,8 @@ static struct notifier_block twl6030_power_pm_notifier = {
  * @power_data:	power resource map to update (OPTIONAL) - use this if a resource
  *		is used by other devices other than APP (DEV_GRP_P1)
  */
-void __devinit twl6030_power_init(struct twl4030_power_data *power_data)
+void __devinit twl6030_power_init(struct twl4030_power_data *power_data,
+		unsigned long features)
 {
 	int r;
 
@@ -256,15 +367,22 @@ void __devinit twl6030_power_init(struct twl4030_power_data *power_data)
 		return;
 	}
 
-	if (power_data && power_data->resource_config)
-		twl6030_update_map(power_data->resource_config);
+	if (power_data && power_data->resource_config) {
+		if (features & TWL6032_SUBCLASS)
+			twl6032_update_map(power_data->resource_config);
+		else
+			twl6030_update_map(power_data->resource_config);
+	}
 
 	if (power_data && power_data->sys_config)
 		twl6030_update_system_map(power_data->sys_config);
 
 	twl6030_process_system_config();
 
-	twl6030_program_map();
+	if (features & TWL6032_SUBCLASS)
+		twl6032_program_map();
+	else
+		twl6030_program_map();
 
 	r = register_pm_notifier(&twl6030_power_pm_notifier);
 	if (r)

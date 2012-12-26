@@ -334,6 +334,18 @@ static void txstate(struct musb *musb, struct musb_request *req)
 		return;
 	}
 
+	/*
+	 * the dma might have been nuked asynchronously from the irq handler.
+	 * nuke() cancelled the dma, but the interrupt might already
+	 * have been pending but held off by the spinlock.  nuke() sets
+	 * dma to NULL so if we don't check here, we'll crash when
+	 * computing request_size.
+	 */
+	if (musb_ep->dma == NULL) {
+		dev_dbg(musb->controller, "dma cancelled...\n");
+		return;
+	}
+
 	/* read TXCSR before */
 	csr = musb_readw(epio, MUSB_TXCSR);
 
@@ -1757,7 +1769,8 @@ static int musb_gadget_pullup(struct usb_gadget *gadget, int is_on)
 err:
 	spin_unlock_irqrestore(&musb->lock, flags);
 
-	pm_runtime_put(musb->controller);
+	pm_runtime_mark_last_busy(musb->controller);
+	pm_runtime_put_autosuspend(musb->controller);
 
 	return ret;
 }

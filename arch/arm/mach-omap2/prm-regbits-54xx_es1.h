@@ -21,6 +21,10 @@
 #ifndef __ARCH_ARM_MACH_OMAP2_PRM_REGBITS_54XX_H
 #define __ARCH_ARM_MACH_OMAP2_PRM_REGBITS_54XX_H
 
+#ifndef CONFIG_ARCH_OMAP5_ES1
+#error "Header inclusion on ES2.0 build!!!"
+#endif
+
 /* Used by PRM_SLDO_CORE_SETUP, PRM_SLDO_MM_SETUP, PRM_SLDO_MPU_SETUP */
 #define OMAP54XX_ABBOFF_ACT_SHIFT						1
 #define OMAP54XX_ABBOFF_ACT_MASK						(1 << 1)

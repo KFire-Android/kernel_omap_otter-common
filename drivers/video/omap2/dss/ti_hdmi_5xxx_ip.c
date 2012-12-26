@@ -230,6 +230,11 @@ static void hdmi_core_ddc_init(struct hdmi_ip_data *ip_data)
 {
 	void __iomem *core_i2cm_base = hdmi_core_i2cm_base(ip_data);
 
+	/* SDA vs SCL delay*/
+	if ((omap_rev() == OMAP5430_REV_ES2_0) ||
+		(omap_rev() == OMAP5432_REV_ES2_0))
+		REG_FLD_MOD(core_i2cm_base, HDMI_CORE_SDA_HOLD_ADDR, 0x19, 7, 0);
+
 	/*Mask the interrupts*/
 	REG_FLD_MOD(core_i2cm_base, HDMI_CORE_I2CM_CTLINT, 0x0, 2, 2);
 	REG_FLD_MOD(core_i2cm_base, HDMI_CORE_I2CM_CTLINT, 0x0, 6, 6);
@@ -300,7 +305,8 @@ static inline void ctrl_core_hdmi_write_reg(u32 val)
 int ti_hdmi_5xxx_read_edid(struct hdmi_ip_data *ip_data,
 				u8 *edid, int len)
 {
-	int r, l;
+	int r, n, i;
+	int max_ext_blocks = (len / 128) - 1;
 
 	if (len < 128)
 		return -EINVAL;
@@ -320,20 +326,22 @@ int ti_hdmi_5xxx_read_edid(struct hdmi_ip_data *ip_data,
 
 		return r;
 	} else {
-
 		hdmi_core_ddc_init(ip_data);
 
 		r = hdmi_core_ddc_edid(ip_data, edid, 0);
 		if (r)
 			return r;
+		else {
+			/*Multiblock read*/
+			n = edid[0x7e];
 
-		l = 128;
-
-		if (len >= 128 * 2 && edid[0x7e] > 0) {
-			r = hdmi_core_ddc_edid(ip_data, edid + 0x80, 1);
-			if (r)
-				return r;
-			l += 128;
+			if (n > max_ext_blocks)
+				n = max_ext_blocks;
+			for (i = 1; i <= n; i++) {
+				r = hdmi_core_ddc_edid(ip_data, edid + i*EDID_LENGTH, i);
+				if (r)
+					return r;
+			}
 		}
 		return 0;
 	}
@@ -409,9 +417,14 @@ static void hdmi_core_init(struct hdmi_core_vid_config *video_cfg,
 	/* video core */
 	video_cfg->data_enable_pol = 1; /* It is always 1*/
 	video_cfg->v_fc_config.timings = cfg->timings;
-	video_cfg->hblank = cfg->timings.right_margin +
+	if ((omap_rev() == OMAP5430_REV_ES2_0) ||
+		(omap_rev() == OMAP5432_REV_ES2_0)) {
+		video_cfg->hblank = cfg->timings.right_margin +
+			cfg->timings.left_margin + cfg->timings.hsync_len - 1;
+	} else {
+		video_cfg->hblank = cfg->timings.right_margin +
 			cfg->timings.left_margin + cfg->timings.hsync_len;
-
+	}
 	video_cfg->vblank_osc = 0; /* Always 0 - need to confirm */
 	video_cfg->vblank = cfg->timings.vsync_len +
 			cfg->timings.lower_margin + cfg->timings.upper_margin;
@@ -545,8 +558,14 @@ static void hdmi_core_video_config(struct hdmi_ip_data *ip_data,
 	/* set horizontal sync pulse width */
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_HSYNCINWIDTH1,
 			(cfg->v_fc_config.timings.hsync_len >> 8), 1, 0);
-	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_HSYNCINWIDTH0,
+	if ((omap_rev() == OMAP5430_REV_ES2_0) ||
+		(omap_rev() == OMAP5432_REV_ES2_0)) {
+		REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_HSYNCINWIDTH0,
+			((cfg->v_fc_config.timings.hsync_len - 1) & 0xFF), 7, 0);
+	} else {
+		REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_HSYNCINWIDTH0,
 			(cfg->v_fc_config.timings.hsync_len & 0xFF), 7, 0);
+	}
 
 	/*  set vertical sync pulse width */
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_VSYNCINWIDTH,
@@ -1531,6 +1550,10 @@ static void ti_hdmi_5xxx_core_audio_config(struct hdmi_ip_data *ip_data,
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_AUD_GP_CONF1, 3, 7, 0);
 	/* disable HBR */
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_AUD_GP_CONF2, 0, 0, 0);
+#ifndef CONFIG_ARCH_OMAP5_ES1
+	/* enable PCUV */
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_AUD_GP_CONF2, 1, 1, 1);
+#endif
 	/* Enable GPA FIFO full and empty mask */
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_GP_MASK, 3, 1, 0);
 	/* Set polarity of GPA FIFO empty interrupts */
@@ -1587,9 +1610,33 @@ int ti_hdmi_5xxx_audio_config(struct hdmi_ip_data *ip_data,
 
 	/* only 44.1kHz supported atm */
 	switch (iec->status[3] & IEC958_AES3_CON_FS) {
+#ifdef CONFIG_ARCH_OMAP5_ES1
 	case IEC958_AES3_CON_FS_44100:
 		fs_nr = 44100;
 		break;
+#else
+	case IEC958_AES3_CON_FS_32000:
+		fs_nr = 32000;
+		break;
+	case IEC958_AES3_CON_FS_44100:
+		fs_nr = 44100;
+		break;
+	case IEC958_AES3_CON_FS_48000:
+		fs_nr = 48000;
+		break;
+	case IEC958_AES3_CON_FS_88200:
+		fs_nr = 88200;
+		break;
+	case IEC958_AES3_CON_FS_96000:
+		fs_nr = 96000;
+		break;
+	case IEC958_AES3_CON_FS_176400:
+		fs_nr = 176400;
+		break;
+	case IEC958_AES3_CON_FS_192000:
+		fs_nr = 192000;
+		break;
+#endif
 	default:
 		return -EINVAL;
 	}

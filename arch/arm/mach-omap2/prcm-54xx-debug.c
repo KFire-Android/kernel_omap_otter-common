@@ -33,21 +33,11 @@
  */
 #include "prcm44xx.h"
 #include "cm44xx.h" /* OMAP4_CM_CLKSTCTRL */
-
-#ifdef CONFIG_ARCH_OMAP5_ES1
-#include "cm1_54xx_es1.h"
-#include "cm2_54xx_es1.h"
-#include "cm-regbits-54xx_es1.h"
-#include "prm-regbits-54xx_es1.h"
-#include "prm54xx_es1.h"
-#else
 #include "cm1_54xx.h"
 #include "cm2_54xx.h"
 #include "cm-regbits-54xx.h"
-#include "prm-regbits-54xx.h"
 #include "prm54xx.h"
-#endif
-
+#include "prm-regbits-54xx.h"
 #include "cminst44xx.h"
 #include "prcm_mpu54xx.h"
 #include "powerdomain.h"

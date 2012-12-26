@@ -70,8 +70,8 @@ static struct voltagedomain omap4_voltdm_iva = {
 	.vc = &omap4_vc_iva,
 	.vfsm = &omap4_vdd_iva_vfsm,
 	.vp = &omap4_vp_iva,
-	/* disable auto_ret for mm domain due to known issues */
-	.auto_ret = false,
+	/* IVA AUTO RET relaxed workaround allows to enable auto_ret */
+	.auto_ret = true,
 	.abb = &omap4_abb_iva,
 };
 

@@ -175,9 +175,9 @@ static int tmp102_report_slope(struct thermal_dev *tdev, const char *dom_name)
 	struct tmp102_temp_sensor *tmp102 = i2c_get_clientdata(client);
 
 	if (!strcmp(dom_name, "cpu"))
-		return tmp102->slope;
-	else
 		return tmp102->slope_cpu;
+	else
+		return tmp102->slope;
 }
 
 static int tmp102_report_offset(struct thermal_dev *tdev, const char *dom_name)
@@ -186,9 +186,9 @@ static int tmp102_report_offset(struct thermal_dev *tdev, const char *dom_name)
 	struct tmp102_temp_sensor *tmp102 = i2c_get_clientdata(client);
 
 	if (!strcmp(dom_name, "cpu"))
-		return tmp102->offset;
-	else
 		return tmp102->offset_cpu;
+	else
+		return tmp102->offset;
 }
 
 static struct thermal_dev_ops tmp102_temp_sensor_ops = {

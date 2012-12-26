@@ -38,56 +38,42 @@
 #define PWR_PWRON_IRQ (1 << 0)
 #define STS_HW_CONDITIONS 0x21
 
-struct twl6030_pwr_button {
-	struct input_dev *input_dev;
-	struct device		*dev;
-	int report_key;
-};
-
-static inline int twl6030_readb(struct twl6030_pwr_button *twl,
-		u8 module, u8 address)
-{
-	u8 data = 0;
-	int ret = 0;
-
-	ret = twl_i2c_read_u8(module, &data, address);
-	if (ret >= 0)
-		ret = data;
-	else
-		dev_dbg(twl->dev,
-			"TWL6030:readb[0x%x,0x%x] Error %d\n",
-					module, address, ret);
-
-	return ret;
-}
-
-static inline int twl6030_writeb(struct twl6030_pwr_button *twl, u8 module,
-						u8 data, u8 address)
-{
-	int ret = 0;
-
-	ret = twl_i2c_write_u8(module, data, address);
-	if (ret < 0)
-		dev_dbg(twl->dev,
-			"TWL6030:Write[0x%x] Error %d\n", address, ret);
-	return ret;
-}
+static int was_suspend;
 
 static irqreturn_t powerbutton_irq(int irq, void *_pwr)
 {
 	struct twl6030_pwr_button *pwr = _pwr;
-	int hw_state;
+	char hw_state;
 	int pwr_val;
-	static int prev_hw_state = 0xFFFF;
+	int ret = 0;
+	static int prev_pwr_val = 0xFFFF;
 	static int push_release_flag;
 
-	hw_state = twl6030_readb(pwr, TWL6030_MODULE_ID0, STS_HW_CONDITIONS);
+	ret = twl_i2c_read_u8(TWL6030_MODULE_ID0, &hw_state, STS_HW_CONDITIONS);
+	if (IS_ERR_VALUE(ret))
+		dev_dbg(pwr->dev, "TWL6030:readb[0x%x,0x%x] Error %d\n",
+			TWL6030_MODULE_ID0, STS_HW_CONDITIONS, ret);
+
 	pwr_val = !(hw_state & PWR_PWRON_IRQ);
-	if ((prev_hw_state != pwr_val) && (prev_hw_state != 0xFFFF)) {
+	if ((prev_pwr_val != pwr_val)) {
+		/*
+		 * we can loose press key after suspend, but it
+		 * always press, so rewrite on press. The up will
+		 * be generated from twl shadow register
+		 */
+		if (was_suspend) {
+			was_suspend = 0;
+			pwr_val = 1;
+		}
 		push_release_flag = 0;
 		input_report_key(pwr->input_dev, pwr->report_key, pwr_val);
 		input_sync(pwr->input_dev);
 	} else if (!push_release_flag) {
+		/*
+		 * We got the same value twice.
+		 * It means we have lost one interrupt,
+		 * so additional key event have to be emulated.
+		 */
 		push_release_flag = 1;
 		input_report_key(pwr->input_dev, pwr->report_key, !pwr_val);
 		input_sync(pwr->input_dev);
@@ -96,11 +82,11 @@ static irqreturn_t powerbutton_irq(int irq, void *_pwr)
 
 		input_report_key(pwr->input_dev, pwr->report_key, pwr_val);
 		input_sync(pwr->input_dev);
-	} else
+	} else {
 		push_release_flag = 0;
+	}
 
-	prev_hw_state = pwr_val;
-
+	prev_pwr_val = pwr_val;
 	return IRQ_HANDLED;
 }
 
@@ -133,15 +119,15 @@ static int __devinit twl6030_pwrbutton_probe(struct platform_device *pdev)
 	pwr_button->input_dev->dev.parent = &pdev->dev;
 
 	err = request_threaded_irq(irq, NULL, powerbutton_irq,
-			IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING,
-			"twl6030_pwrbutton", pwr_button);
-	if (err < 0) {
+				   IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING,
+				   "twl6030_pwrbutton", pwr_button);
+	if (IS_ERR_VALUE(err)) {
 		dev_dbg(&pdev->dev, "Can't get IRQ for pwrbutton: %d\n", err);
 		goto free_input_dev;
 	}
 
 	err = input_register_device(pwr_button->input_dev);
-	if (err) {
+	if (IS_ERR_VALUE(err)) {
 		dev_dbg(&pdev->dev, "Can't register power button: %d\n", err);
 		goto free_irq;
 	}
@@ -150,7 +136,6 @@ static int __devinit twl6030_pwrbutton_probe(struct platform_device *pdev)
 	twl6030_interrupt_unmask(0x01, REG_INT_MSK_STS_A);
 
 	platform_set_drvdata(pdev, pwr_button);
-
 	return 0;
 
 free_irq:
@@ -173,12 +158,24 @@ static int __devexit twl6030_pwrbutton_remove(struct platform_device *pdev)
 	return 0;
 }
 
+/* need to fix long press key after suspend */
+static int pwrbutton_suspend(struct device *dev)
+{
+	was_suspend = 1;
+	return 0;
+}
+
+static const struct dev_pm_ops pwrbutton_pm_ops = {
+	.suspend	 = pwrbutton_suspend,
+};
+
 struct platform_driver twl6030_pwrbutton_driver = {
 	.probe		= twl6030_pwrbutton_probe,
 	.remove		= __devexit_p(twl6030_pwrbutton_remove),
 	.driver		= {
 		.name	= "twl6030_pwrbutton",
 		.owner	= THIS_MODULE,
+		.pm	= &pwrbutton_pm_ops,
 	},
 };
 

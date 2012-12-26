@@ -21,6 +21,10 @@
 #ifndef __ARCH_ARM_MACH_OMAP2_CM2_54XX_H
 #define __ARCH_ARM_MACH_OMAP2_CM2_54XX_H
 
+#ifndef CONFIG_ARCH_OMAP5_ES1
+#error "Header inclusion on ES2.0 build!!!"
+#endif
+
 /* CM2 base address */
 #define OMAP54XX_CM_CORE_BASE		0x4a008000
 
@@ -389,8 +393,10 @@
 #define OMAP54XX_CM_CUSTEFUSE_EFUSE_CTRL_CUST_CLKCTRL		OMAP54XX_CM_CORE_REGADDR(OMAP54XX_CM_CORE_CUSTEFUSE_INST, 0x0020)
 
 /* Function prototypes */
+#ifndef __ASSEMBLER__
 extern u32 omap4_cm2_read_inst_reg(s16 inst, u16 idx);
 extern void omap4_cm2_write_inst_reg(u32 val, s16 inst, u16 idx);
 extern u32 omap4_cm2_rmw_inst_reg_bits(u32 mask, u32 bits, s16 inst, s16 idx);
+#endif
 
 #endif

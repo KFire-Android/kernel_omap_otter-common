@@ -131,7 +131,10 @@
 #define twl_has_codec()	false
 #endif
 
-#if defined(CONFIG_CHARGER_TWL4030) || defined(CONFIG_CHARGER_TWL4030_MODULE)
+#if defined(CONFIG_CHARGER_TWL4030) || \
+	defined(CONFIG_CHARGER_TWL4030_MODULE) || \
+	defined(CONFIG_TWL6030_BCI_BATTERY) || \
+	defined(CONFIG_TWL6030_BCI_BATTERY_MODULE)
 #define twl_has_bci()	true
 #else
 #define twl_has_bci()	false
@@ -152,12 +155,13 @@
 #define twl_has_pwrbutton()	false
 #endif
 
-#if defined(CONFIG_INPUT_TWL6030_PWRBUTTON) \
-	|| defined(CONFIG_INPUT_TWL6030_PWRBUTTON_MODULE)
+#if defined(CONFIG_INPUT_TWL6030_PWRBUTTON) || \
+defined(CONFIG_INPUT_TWL6030_PWRBUTTON_MODULE)
 #define twl6030_has_pwrbutton()        true
 #else
 #define twl6030_has_pwrbutton()        false
 #endif
+
 
 #define SUB_CHIP_ID0 0
 #define SUB_CHIP_ID1 1
@@ -281,6 +285,8 @@
 
 
 /*----------------------------------------------------------------------*/
+/* Bit mask of implemented erratums and WAs */
+static u32 twl_errata;
 
 /* is driver active, bound to a chip? */
 static bool inuse;
@@ -691,9 +697,11 @@ add_regulator_linked(int num, struct regulator_init_data *pdata,
 		/* If we have existing drv_data, just add the flags */
 		struct twl_regulator_driver_data *tmp;
 		tmp = pdata->driver_data;
+		tmp->errata |= twl_errata;
 		tmp->features |= features;
 	} else {
 		/* add new driver data struct, used only during init */
+		drv_data.errata = twl_errata;
 		drv_data.features = features;
 		drv_data.set_voltage = NULL;
 		drv_data.get_voltage = NULL;
@@ -786,6 +794,16 @@ add_children(struct twl4030_platform_data *pdata, unsigned irq_base,
 				true, irq_base + KEYPAD_INTR_OFFSET, 0);
 		if (IS_ERR(child))
 			return PTR_ERR(child);
+	}
+
+	if (twl_has_bci() && pdata->bci && (features & TWL6030_CLASS)) {
+			pdata->bci->errata = twl_errata;
+			pdata->bci->features = features;
+			child = add_child(1, "twl6030_bci",
+					pdata->bci, sizeof(*pdata->bci),
+					false,
+					irq_base + CHARGER_INTR_OFFSET,
+					irq_base + CHARGERFAULT_INTR_OFFSET);
 	}
 
 	if (twl_has_madc() && pdata->madc) {
@@ -1159,7 +1177,7 @@ add_children(struct twl4030_platform_data *pdata, unsigned irq_base,
 			return PTR_ERR(child);
 
 		child = add_regulator(TWL6030_REG_REGEN1,
-				pdata->sysen, features);
+				pdata->regen1, features);
 		if (IS_ERR(child))
 			return PTR_ERR(child);
 
@@ -1235,7 +1253,8 @@ add_children(struct twl4030_platform_data *pdata, unsigned irq_base,
 	}
 
 	if (twl_has_bci() && pdata->bci &&
-			!(features & (TPS_SUBSET | TWL5031))) {
+	    !(features & (TPS_SUBSET | TWL5031)) && \
+	    !(features & TWL6030_CLASS)) {
 		child = add_child(3, "twl4030_bci",
 				pdata->bci, sizeof(*pdata->bci), false,
 				/* irq0 = CHG_PRES, irq1 = BCI */
@@ -1415,9 +1434,43 @@ static void create_twl_proc_files(void)
 }
 
 
-/*----------------------------------------------------------------------*/
+/*
+ * twl_load_regs_setup_script() - helper to setup a one-time regs configuration
+ * @gendesc:   generic description - used with error message
+ * @sarray:    NULL terminated array of configuration values
+ *
+ * Configures TWL registers with a set of values. If any write fails,
+ * this continues and reports error.
+ */
+static void __devinit twl_load_regs_setup_script(const char *gendesc,
+			struct twl_reg_setup_array *sarray)
+{
+	int i = 0;
+	int ret1;
 
-static int __devexit twl_remove(struct i2c_client *client)
+	if (!sarray || !gendesc)
+		return;
+
+	while (sarray->desc) {
+		ret1 = twl_i2c_write_u8(sarray->mod_no,
+					sarray->val,
+					sarray->addr);
+		if (ret1)
+			pr_err("%s: %s: failed(%d), array index=%d, desc=%s, "\
+			       "mod_no=0x%02X reg=0x%02x val=0x%02x\n",
+			       __func__, gendesc, ret1, i, sarray->desc,
+			       sarray->mod_no, sarray->addr, sarray->val);
+		else
+			pr_info("%s: set (mod=0x%02X reg=0x%02x val=0x%02x):"\
+				" %s\n", gendesc,
+				sarray->mod_no, sarray->addr, sarray->val,
+				sarray->desc);
+		sarray++;
+		i++;
+	}
+}
+
+static int twl_remove(struct i2c_client *client)
 {
 	unsigned i, num_slaves;
 	int status;
@@ -1442,6 +1495,72 @@ static int __devexit twl_remove(struct i2c_client *client)
 	}
 	inuse = false;
 	return 0;
+}
+
+static void __devinit twl_setup_errata(int features)
+{
+	u8 eepromrev_reg = TWL6030_REG_EPROM_REV;
+	u8 eepromrev = 0, twlrev = 0;
+	int err;
+	char *twl_id = "twl6030";
+
+	if (!twl_class_is_6030())
+		return;
+
+	if (features & TWL6032_SUBCLASS) {
+		eepromrev_reg = TWL6032_REG_EPROM_REV;
+		twl_id = "twl6032";
+	}
+
+	err = twl_i2c_read_u8(TWL6030_MODULE_ID2, &eepromrev, eepromrev_reg);
+	if (err) {
+		pr_err("twl-core: unable to read REG_EPROM_REV -%d\n", err);
+		return;
+	}
+
+	err = twl_i2c_read_u8(TWL6030_MODULE_ID2, &twlrev,
+			      TWL6030_REG_JTAGVERNUM);
+	if (err) {
+		pr_err("twl-core: unable to read JTAGVERNUM -%d\n", err);
+		return;
+	}
+
+	pr_info("twl_core: detected %s rev.%u eepromrev.%u\n",
+		twl_id, twlrev, eepromrev);
+
+	/* Put errata detection code here */
+
+	if (features & TWL6032_SUBCLASS) {
+		/*
+		 * For TWL6032 revision < ES1.1 with EEPROM
+		 * revision < rev56.0 LDO6 and LDOLN must be
+		 * always ON because of the hardware bug in the TWL6032.
+		 * If LDO6 or LDOLN is always on then SYSEN must be
+		 * always on.
+		 * For TWL6032 revision >= ES1.1 with EEPROM
+		 * revision >= rev56.0 those LDOs can be off in
+		 * sleep-mode.
+		 */
+		if ((eepromrev < 56) && (twlrev < 1)) {
+			WARN(1, "This TWL6032 is an older revision that does" \
+				" not support full PM functionality\n");
+			twl_errata |= TWL6032_ERRATA_LDO_MUST_BE_ALWAYS_ON;
+		}
+		/*
+		 * Errata ProDB00119490 present only in the TWL6032 ES1.1
+		 */
+		if (twlrev == 1)
+			twl_errata |= TWL6032_ERRATA_DB00119490;
+	} else {
+		/*
+		 * Errata ProDB00112620 present only in the TWL6030 ES2.1
+		 * Errata ProDB00110684 present only in the TWL6030 ES2.1
+		 */
+		if (twlrev == 2) {
+			twl_errata |= TWL6030_ERRATA_DB00112620;
+			twl_errata |= TWL6030_ERRATA_DB00110684;
+		}
+	}
 }
 
 /* NOTE: This driver only handles a single twl4030/tps659x0 chip */
@@ -1524,14 +1643,6 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		WARN(status < 0, "Error: reading twl_idcode register value\n");
 	}
 
-	/* load power event scripts */
-	if (twl_has_power()) {
-		if (twl_class_is_4030() && pdata->power)
-			twl4030_power_init(pdata->power);
-		if (twl_class_is_6030())
-			twl6030_power_init(pdata->power);
-	}
-
 	features = id->driver_data;
 	if (twl_class_is_6030()) {
 		if (twl_i2c_read_u8(TWL_MODULE_USB, &temp,
@@ -1541,6 +1652,16 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		}
 		if (temp == 0x32)
 			features |= TWL6032_SUBCLASS;
+	}
+
+	twl_setup_errata(features);
+
+	/* load power event scripts */
+	if (twl_has_power()) {
+		if (twl_class_is_4030() && pdata->power)
+			twl4030_power_init(pdata->power);
+		if (twl_class_is_6030())
+			twl6030_power_init(pdata->power, features);
 	}
 
 	/* Maybe init the T2 Interrupt subsystem */
@@ -1620,6 +1741,11 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
 
 	if (status)
 		status = add_children(pdata, irq_base, features);
+
+	if (status < 0)
+		goto fail;
+
+	twl_load_regs_setup_script(id->name, pdata->reg_setup_script);
 
 fail:
 	if (status < 0)

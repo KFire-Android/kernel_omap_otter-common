@@ -251,6 +251,10 @@ static inline int twl6030_mmc_card_detect(struct device *dev, int slot)
 #define REG_START_CONDITION         0x0
 #define REG_STS_HW_CONDITIONS       0x2
 
+int twl6030_register_notifier(struct notifier_block *nb,
+			      unsigned int events);
+int twl6030_unregister_notifier(struct notifier_block *nb,
+				unsigned int events);
 /*
  * GPIO Block Register offsets (use TWL4030_MODULE_GPIO)
  */
@@ -502,6 +506,36 @@ static inline int twl6030_mmc_card_detect(struct device *dev, int slot)
 
 #define VBATMIN_VLOW_EN				0x21
 
+/*
+* PMC Slave SMPS Register Map (use TWL6030_MODULE_ID0)
+*/
+#define TWL6030_REG_VCORE1_CFG_GRP		0x52
+#define TWL6030_REG_VCORE1_CFG_TRANS		0x53
+#define TWL6030_REG_VCORE2_CFG_GRP		0x58
+#define TWL6030_REG_VCORE2_CFG_TRANS		0x59
+#define TWL6030_REG_VCORE3_CFG_GRP		0x5e
+#define TWL6030_REG_VCORE3_CFG_TRANS		0x5f
+
+#define TWL6030_REG_VMEM_CFG_GRP		0x64
+
+#define TWL6030_REG_CFG_TRANS_OFF_CMD_OFFSET	0x4
+#define TWL6030_REG_CFG_TRANS_SLEEP_CMD_OFFSET	0x2
+#define TWL6030_REG_CFG_TRANS_ACT_CMD_OFFSET	0x0
+
+/*
+* PMC Pull-Up / Pull-Down / High-Z Register Map (use TWL6030_MODULE_ID0)
+*/
+#define TWL6030_REG_CFG_SMPS_PD		0xF6
+
+/*
+* Test Register Map (use TWL6030_MODULE_ID2)
+*/
+/* silicon version number */
+#define TWL6030_REG_JTAGVERNUM		0x87
+/* EPROM revision number register */
+#define TWL6030_REG_EPROM_REV		0xd7
+#define TWL6032_REG_EPROM_REV		0xdf
+
 /*----------------------------------------------------------------------*/
 
 /* Power bus message definitions */
@@ -518,6 +552,7 @@ static inline int twl6030_mmc_card_detect(struct device *dev, int slot)
 #define DEV_GRP_P1		0x1	/* P1: all OMAP devices */
 #define DEV_GRP_P2		0x2	/* P2: all Modem devices */
 #define DEV_GRP_P3		0x4	/* P3: all peripheral devices */
+#define DEV_GRP_CNT		3
 
 /* Resource groups */
 #define RES_GRP_RES		0x0	/* Reserved */
@@ -538,6 +573,12 @@ static inline int twl6030_mmc_card_detect(struct device *dev, int slot)
 #define RES_STATE_ACTIVE	0xE
 #define RES_STATE_SLEEP		0x8
 #define RES_STATE_OFF		0x0
+
+/* TWL6030 Resource power state commands */
+#define TWL6030_RES_OFF_CMD		0x0
+#define TWL6030_RES_AUTO_CMD		0x1
+#define TWL6030_RES_FORCE_PWM_CMD	0x3
+#define TWL6030_RES_CMD_MASK		0x3
 
 /* Power resources */
 
@@ -593,8 +634,24 @@ static inline int twl6030_mmc_card_detect(struct device *dev, int slot)
 #define RES_RC6MHZ		45
 #define RES_TEMP		46
 
-#define TOTAL_RESOURCES		46
+/* 6032 extra resources */
+#define RES_LDOUSB		47
+#define RES_SMPS5		48
+#define RES_SMPS4		49
+#define RES_SMPS3		50
+#define RES_SMPS2		51
+#define RES_SMPS1		52
+#define RES_LDOLN		53
+#define RES_LDO7		54
+#define RES_LDO6		55
+#define RES_LDO5		56
+#define RES_LDO4		57
+#define RES_LDO3		58
+#define RES_LDO2		59
+#define RES_LDO1		60
+#define RES_VSYSMIN_HI		61
 
+#define TOTAL_RESOURCES		61
 /*
  * Power Bus Message Format ... these can be sent individually by Linux,
  * but are usually part of downloaded scripts that are run when various
@@ -630,6 +687,23 @@ struct twl4030_clock_init_data {
 struct twl4030_bci_platform_data {
 	int *battery_tmp_tbl;
 	unsigned int tblsize;
+
+	unsigned int monitoring_interval;
+
+	unsigned int max_charger_currentmA;
+	unsigned int max_charger_voltagemV;
+	unsigned int termination_currentmA;
+	unsigned int max_battery_capacity;
+
+	unsigned int max_bat_voltagemV;
+	unsigned int low_bat_voltagemV;
+
+	unsigned int sense_resistor_mohm;
+
+	/* twl6032 */
+	unsigned long features;
+
+	unsigned int errata;
 };
 
 /* TWL4030_GPIO_MAX (18) GPIOs, with interrupts */
@@ -748,9 +822,11 @@ static inline void twl4030_power_off(void) { }
 #endif
 
 #ifdef CONFIG_TWL6030_POWER
-extern void twl6030_power_init(struct twl4030_power_data *power_data);
+extern void twl6030_power_init(struct twl4030_power_data *power_data,\
+					unsigned long features);
 #else
-extern inline void twl6030_power_init(struct twl4030_power_data *power_data) { }
+extern inline void twl6030_power_init(struct twl4030_power_data *power_data,\
+					unsigned long features) { }
 #endif
 
 struct twl4030_codec_data {
@@ -776,6 +852,24 @@ struct twl4030_audio_data {
 	int audpwron_gpio;	/* audio power-on gpio */
 	int naudint_irq;	/* audio interrupt */
 	unsigned int irq_base;
+};
+
+/**
+ * struct twl_reg_setup_array - NULL terminated array giving configuration
+ * @mod_no:    TWL Module id
+ * @addr:      reg address to write to
+ * @val:       value to write with
+ * @desc:      description of this reg for error printing
+ *             NOTE: a NULL pointer in this indicates end of array.
+ *
+ * TWL one-time registers configuration which will be applied at the end of TWL
+ * initialization.
+ */
+struct twl_reg_setup_array {
+	u8 mod_no;
+	u8 addr;
+	u8 val;
+	char *desc;
 };
 
 struct twl4030_platform_data {
@@ -840,6 +934,9 @@ struct twl4030_platform_data {
 
 	/* TWL6032 external SMPS regulators */
 	struct regulator_init_data		*ext_v2v1;
+
+	/* Common one-time registers configuration */
+	struct twl_reg_setup_array		*reg_setup_script;
 };
 
 struct twl_regulator_driver_data {
@@ -847,6 +944,7 @@ struct twl_regulator_driver_data {
 	int		(*get_voltage)(void *data);
 	void		*data;
 	unsigned long	features;
+	u32		errata;
 };
 
 /*----------------------------------------------------------------------*/
@@ -954,4 +1052,13 @@ static inline int twl4030charger_usb_en(int enable) { return 0; }
 #define TWL6032_REG_EXT_V2V1	64
 
 #define PHOENIX_MSK_TRANSITION      0x20
+
+#define TWL6032_ERRATA_LDO_MUST_BE_ALWAYS_ON	(1 << 3)
+
+#define TWL6032_PREQ1_RES_ASS_A	0xd7
+
+#define TWL6032_ERRATA_DB00119490	(1 << 0)
+#define TWL6030_ERRATA_DB00112620	(1 << 1)
+#define TWL6030_ERRATA_DB00110684	(1 << 2)
+
 #endif /* End of __TWL4030_H */

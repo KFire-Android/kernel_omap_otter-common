@@ -56,7 +56,7 @@ config OMAP4_BG_TEMP_SENSOR_DATA
 config OMAP5_BG_TEMP_SENSOR_DATA
 	bool "Texas Instruments OMAP5 thermal support"
 	depends on OMAP_BANDGAP
-	depends on ARCH_OMAP5
+	depends on ARCH_OMAP5 || ARCH_OMAP5_ES1
 	help
 	  If you say yes here you get thermal support for the Texas Instruments
 	  OMAP5 SoC family. The current chip supported are:

@@ -106,4 +106,18 @@ static inline void omap_usb_writel(const void __iomem *addr, unsigned offset,
 	__raw_writel(data, addr + offset);
 }
 
+#if defined(CONFIG_TWL6030_USB)
+int twl6030_usb_register_notifier(struct notifier_block *nb);
+int twl6030_usb_unregister_notifier(struct notifier_block *nb);
+#else
+static inline int twl6030_usb_register_notifier(struct notifier_block *nb)
+{
+	return -EINVAL;
+}
+static inline int twl6030_usb_unregister_notifier(struct notifier_block *nb)
+{
+	return -EINVAL;
+}
+#endif
+
 #endif /* __DRIVERS_OMAP_USB_H */

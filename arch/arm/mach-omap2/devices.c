@@ -59,7 +59,7 @@ static int __init omap_init_control(void)
 	struct omap_hwmod		*oh;
 	struct platform_device		*pdev;
 	const char			*oh_name, *name;
-	struct omap_control_data	*pdata;
+	struct omap_control_data	pdata = { 0 };
 
 	/*
 	 * To avoid code running on other OMAPs in
@@ -81,21 +81,16 @@ static int __init omap_init_control(void)
 	if (of_have_populated_dt()) {
 		/* Probe the driver using the Device Tree model */
 		pdev = omap_device_build(name, -1, oh, NULL, 0, NULL, 0, true);
-	} else { /* Probe the driver using platform data */
-		pdata = kzalloc(sizeof(*pdata), GFP_KERNEL);
-		if (!pdata) {
-			pr_err("%s: No memory for scm pdata\n", __func__);
-			return -EINVAL;
-		}
-
-		pdata->has_usb_phy = true;
-		pdata->has_bandgap = true;
+	} else {
+		/* Probe the driver using platform data */
+		pdata.has_usb_phy = true;
+		pdata.has_bandgap = true;
 		if (cpu_is_omap44xx())
-			pdata->rev = 1;
+			pdata.rev = 1;
 		else
-			pdata->rev = 2;
+			pdata.rev = 2;
 
-		pdev = omap_device_build(name, -1, oh, pdata, sizeof(*pdata),
+		pdev = omap_device_build(name, -1, oh, &pdata, sizeof(pdata),
 							NULL, 0, false);
 	}
 
@@ -446,16 +441,16 @@ static void __init omap_init_mcpdm(void)
 		omap_mux_init_signal("abe_clks.abe_clks",
 				OMAP_PIN_INPUT_PULLDOWN);
 	} else if (cpu_is_omap54xx()) {
-		omap_mux_init_signal("abemcpdm_ul_data.abe_pdm_ul_data",
+		omap_mux_init_signal("abemcpdm_ul_data.abemcpdm_ul_data",
 				OMAP_PIN_INPUT_PULLDOWN);
 
-		omap_mux_init_signal("abemcpdm_dl_data.abe_pdm_dl_data",
+		omap_mux_init_signal("abemcpdm_dl_data.abemcpdm_dl_data",
 				OMAP_PIN_INPUT_PULLDOWN);
 
-		omap_mux_init_signal("abemcpdm_frame.abe_pdm_frame",
+		omap_mux_init_signal("abemcpdm_frame.abemcpdm_frame",
 				OMAP_PIN_INPUT_PULLUP);
 
-		omap_mux_init_signal("abemcpdm_lb_clk.abe_pdm_lb_clk",
+		omap_mux_init_signal("abemcpdm_lb_clk.abemcpdm_lb_clk",
 				OMAP_PIN_INPUT_PULLDOWN);
 
 		omap_mux_init_signal("abe_clks.abe_clks",

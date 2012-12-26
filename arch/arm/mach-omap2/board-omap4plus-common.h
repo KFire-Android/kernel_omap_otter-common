@@ -17,6 +17,6 @@
 #ifndef _MACH_OMAP_BOARD_OMAP4PLUS_H
 #define _MACH_OMAP_BOARD_OMAP4PLUS_H
 
-extern int __init omap4plus_connectivity_init(int board_type);
+extern int __init omap4plus_connectivity_init(void);
 
 #endif

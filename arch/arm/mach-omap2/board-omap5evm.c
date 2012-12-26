@@ -851,10 +851,10 @@ static struct i2c_board_info __initdata omap5evm_i2c_1_boardinfo[] = {
 
 /* TMP102 PCB Temperature sensor close to OMAP */
 static struct tmp102_platform_data tmp102_omap_info = {
-	.slope = 470,
-	.slope_cpu = 378,
-	.offset = -1272,
-	.offset_cpu = -154,
+	.slope_cpu = 470,
+	.slope = 378,
+	.offset_cpu = -1272,
+	.offset = -154,
 	.domain = "pcb", /* for hotspot extrapolation */
 };
 
@@ -994,11 +994,26 @@ static void __init omap_msecure_init(void)
 
 static void __init sevm_battery_init(void)
 {
+	int err;
+
 	/* To turn on U44 (emu/gpio mux) as gpio pins have gpio5 pulled low */
 	omap_mux_init_gpio(GPIO1_WKOUT5, OMAP_PIN_OUTPUT);
-	gpio_set_value(GPIO1_WKOUT5, 0);
+	err = gpio_request_one(GPIO1_WKOUT5, GPIOF_DIR_OUT,
+			       "bat_out_gpio"__stringify(GPIO1_WKOUT5));
+	if (err < 0) {
+		pr_err("%s: Failed to request GPIO %d, error %d\n",
+		       __func__, GPIO1_WKOUT5, err);
+	} else {
+		gpio_set_value(GPIO1_WKOUT5, 0);
+	}
+
 	/* Pull up gpio163 and as input pin */
 	omap_mux_init_gpio(GPIO_CHRGR_INT, OMAP_PIN_INPUT_PULLUP);
+	err = gpio_request_one(GPIO_CHRGR_INT, GPIOF_DIR_IN,
+			       "chrgr_int_gpio" __stringify(GPIO_CHRGR_INT));
+	if (err < 0)
+		pr_err("%s: Failed to request GPIO %d, error %d\n",
+		       __func__, GPIO_CHRGR_INT, err);
 }
 
 static void __init omap_5430evm_init(void)
@@ -1021,6 +1036,7 @@ static void __init omap_5430evm_init(void)
 #endif
 	omap5_mux_init(board_mux, NULL, OMAP_PACKAGE_CBL);
 	omap_sdrc_init(NULL, NULL);
+	omap_init_board_version(BOARD_MAKE_VERSION(BOARD_OMAP5_SEVM, 0));
 	omap_create_board_props();
 	omap_5430evm_i2c_init();
 	omap_msecure_init();
@@ -1048,7 +1064,7 @@ static void __init omap_5430evm_init(void)
 	/* TODO: Once the board identification is passed in from the
 	 * bootloader pass in the HACK board ID to the conn board file
 	*/
-	omap4plus_connectivity_init(OMAP5_SEVM_BOARD_ID);
+	omap4plus_connectivity_init();
 	omap_hsmmc_init(mmc);
 	usb_dwc3_init();
 	platform_add_devices(omap5evm_devices, ARRAY_SIZE(omap5evm_devices));

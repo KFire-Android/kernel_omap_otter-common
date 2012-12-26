@@ -256,12 +256,14 @@ int __init sevm_touch_init(void)
 {
 	gpio_request(OMAP5_TOUCH_RESET, "atmel reset");
 
-	/* HACK:There is a GPIO glitch on 5430 ES1.0 that does not
+	/*
+	 * HACK: There is a GPIO glitch on 5430 ES1.0 and ES2.0 that does not
 	 * allow proper use of the hw reset mechanism through
 	 * suspend/resume or even with early suspend.  So for now
-	 * fall back to the sw reset mechanism for the IC until ES2.0
+	 * fall back to the sw reset mechanism for the IC on ES1.0 and ES2.0
 	 */
-	if (omap_rev() == OMAP5430_REV_ES1_0)
+	if (omap_rev() == OMAP5430_REV_ES1_0 ||
+				omap_rev() == OMAP5430_REV_ES2_0)
 		atmel_mxt224_ts_platform_data.hw_reset = NULL;
 
 	i2c_register_board_info(4, sevm_i2c_bus4_touch_info,

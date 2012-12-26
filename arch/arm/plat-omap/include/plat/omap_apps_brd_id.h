@@ -25,25 +25,38 @@
 
 #define OMAP4_PANDA		0xFF
 #define OMAP4_BLAZE		0x10
-#define OMAP4_TABLET_1_0	2143001
-#define OMAP4_TABLET_1_1	2143002
-#define OMAP4_TABLET_1_2	2143003
-#define OMAP4_TABLET_2_0	2158001
-#define OMAP4_TABLET_2_1	2158002
-#define OMAP4_TABLET_2_1_1	2158003
 
-#define OMAP4_PANDA_ID		0
-#define OMAP4_BLAZE_ID		1
-#define OMAP4_TABLET_1_0_ID	2
-#define OMAP4_TABLET_1_1_ID	3
-#define OMAP4_TABLET_1_2_ID	4
-#define OMAP4_TABLET_2_0_ID	5
-#define OMAP4_TABLET_2_1_ID	6
-#define OMAP4_TABLET_2_1_1_ID	7
-#define OMAP4_MAX_ID	(OMAP4_TABLET_2_1_1_ID + 1)
+/* Board class */
+#define BOARD_OMAP4_PANDA	0x2170
+#define BOARD_OMAP4_BLAZE	0x9012
+#define BOARD_OMAP4_TABLET1	0x2143
+#define BOARD_OMAP4_TABLET2	0x2158
+#define BOARD_OMAP5_SEVM	0x2600
+#define BOARD_OMAP5_SEVM2	0x2601
+#define BOARD_OMAP5_SEVM3	0x2624
+#define BOARD_OMAP5_UEVM	0x2617
+#define BOARD_OMAP5_UEVM2	0x2628
+#define BOARD_OMAP5_TEVM	0x2820
 
-int omap_get_board_version(void);
-int omap_get_board_id(void);
-int omap_init_board_version(int forced_rev);
-bool omap_is_board_version(int req_board_version);
+#define BOARD_CLASS_MASK	0xFFFF
+#define BOARD_CLASS_OFF		12
+#define BOARD_REV_MASK		0xFFF
+#define BOARD_NAME_MAX_SIZE	16
+
+#define BOARD_GET_CLASS(a)	((a >> BOARD_CLASS_OFF) & BOARD_CLASS_MASK)
+#define BOARD_GET_REV(a)	(a & BOARD_REV_MASK)
+#define BOARD_MAKE_VERSION(class, rev) \
+			(((class & BOARD_CLASS_MASK) << BOARD_CLASS_OFF) |\
+			(rev & BOARD_REV_MASK))
+
+int  __init omap_init_board_version(int forced_rev);
 void __init omap_create_board_props(void);
+int omap_get_board_class(void);
+int omap_get_board_revision(void);
+int omap_get_board_version(void);
+
+const char *omap_get_board_name(void);
+
+bool omap_is_board_class(int req_class);
+bool omap_is_board_revision(int req_rev);
+bool omap_is_board_version(int req_board_version);

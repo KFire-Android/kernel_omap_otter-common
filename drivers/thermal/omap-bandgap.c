@@ -67,13 +67,47 @@ static int omap_bandgap_power(struct omap_bandgap *bg_ptr, bool on)
 	return r;
 }
 
+static u32 omap_bandgap_read_temp(struct omap_bandgap *bg_ptr, int id)
+{
+	struct device *cdev = bg_ptr->dev->parent;
+	struct temp_sensor_registers *tsr;
+	int r;
+	u32 temp, ctrl, reg;
+
+	tsr = bg_ptr->conf->sensors[id].registers;
+	reg = tsr->temp_sensor_ctrl;
+
+	if (OMAP_BANDGAP_HAS(bg_ptr, FREEZE_BIT)) {
+		omap_control_readl(cdev, tsr->bgap_mask_ctrl, &ctrl);
+		ctrl |= tsr->mask_freeze_mask;
+		omap_control_writel(cdev, ctrl, tsr->bgap_mask_ctrl);
+		/*
+		 * In case we cannot read from cur_dtemp / dtemp_0,
+		 * then we read from the last valid temp read
+		 */
+		reg = tsr->ctrl_dtemp_1;
+	}
+
+	/* read temperature */
+	r = omap_control_readl(cdev, reg, &temp);
+	temp &= tsr->bgap_dtemp_mask;
+
+	if (OMAP_BANDGAP_HAS(bg_ptr, FREEZE_BIT)) {
+		omap_control_readl(cdev, tsr->bgap_mask_ctrl, &ctrl);
+		ctrl &= ~tsr->mask_freeze_mask;
+		omap_control_writel(cdev, ctrl, tsr->bgap_mask_ctrl);
+	}
+
+	return temp;
+}
+
 /* This is the Talert handler. Call it only if HAS(TALERT) is set */
 static irqreturn_t talert_irq_handler(int irq, void *data)
 {
 	struct omap_bandgap *bg_ptr = data;
 	struct device *cdev = bg_ptr->dev->parent;
 	struct temp_sensor_registers *tsr;
-	u32 t_hot = 0, t_cold = 0, temp, ctrl;
+	u32 t_hot = 0, t_cold = 0, ctrl;
 	int i, r;
 
 	bg_ptr = data;
@@ -115,10 +149,6 @@ static irqreturn_t talert_irq_handler(int irq, void *data)
 			"%s: IRQ from %s sensor: hotevent %d coldevent %d\n",
 			__func__, bg_ptr->conf->sensors[i].domain,
 			t_hot, t_cold);
-
-		/* read temperature */
-		r = omap_control_readl(cdev, tsr->temp_sensor_ctrl, &temp);
-		temp &= tsr->bgap_dtemp_mask;
 
 		/* report temperature to whom may concern */
 		if (bg_ptr->conf->report_temperature)
@@ -186,12 +216,12 @@ static int temp_sensor_unmask_interrupts(struct omap_bandgap *bg_ptr, int id,
 	u32 temp, reg_val;
 	int err;
 
-	/* Read the current on die temperature */
 	tsr = bg_ptr->conf->sensors[id].registers;
-	err = omap_control_readl(cdev, tsr->temp_sensor_ctrl, &temp);
-	temp &= tsr->bgap_dtemp_mask;
+	err = omap_control_readl(cdev, tsr->bgap_mask_ctrl, &reg_val);
 
-	err |= omap_control_readl(cdev, tsr->bgap_mask_ctrl, &reg_val);
+	/* Read the current on die temperature */
+	temp = omap_bandgap_read_temp(bg_ptr, id);
+
 	if (temp < t_hot)
 		reg_val |= tsr->mask_hot_mask;
 	else
@@ -683,12 +713,15 @@ int omap_bandgap_read_temperature(struct omap_bandgap *bg_ptr, int id,
 
 	tsr = bg_ptr->conf->sensors[id].registers;
 	cdev = bg_ptr->dev->parent;
-	ret = omap_control_readl(cdev, tsr->temp_sensor_ctrl, &temp);
-	temp &= tsr->bgap_dtemp_mask;
+	mutex_lock(&bg_ptr->bg_mutex);
+	temp = omap_bandgap_read_temp(bg_ptr, id);
+	mutex_unlock(&bg_ptr->bg_mutex);
 
 	ret |= adc_to_temp_conversion(bg_ptr, id, temp, &temp);
-	if (ret)
+	if (ret) {
+		dump_stack();
 		return -EIO;
+	}
 
 	*temperature = temp;
 
@@ -754,12 +787,11 @@ omap_bandgap_force_single_read(struct omap_bandgap *bg_ptr, int id)
 	temp |= 1 << __ffs(tsr->bgap_soc_mask);
 	omap_control_writel(cdev, temp, tsr->temp_sensor_ctrl);
 	/* Wait until DTEMP is updated */
-	err |= omap_control_readl(cdev, tsr->temp_sensor_ctrl, &temp);
-	temp &= (tsr->bgap_dtemp_mask);
-	while ((temp == 0) && --counter) {
-		err |= omap_control_readl(cdev, tsr->temp_sensor_ctrl, &temp);
-		temp &= (tsr->bgap_dtemp_mask);
-	}
+	temp = omap_bandgap_read_temp(bg_ptr, id);
+
+	while ((temp == 0) && --counter)
+		temp = omap_bandgap_read_temp(bg_ptr, id);
+
 	/* Start of Conversion = 0 */
 	err |= omap_control_readl(cdev, tsr->temp_sensor_ctrl, &temp);
 	temp &= ~(1 << __ffs(tsr->bgap_soc_mask));
@@ -871,7 +903,10 @@ struct omap_bandgap *omap_bandgap_platform_build(struct platform_device *pdev)
 	switch (pdata->rev) {
 #ifdef CONFIG_OMAP4_BG_TEMP_SENSOR_DATA
 	case 1:
-		bg_ptr->conf = (void *)&omap4460_data;
+		if (cpu_is_omap447x())
+			bg_ptr->conf = (void *)&omap4470_data;
+		else
+			bg_ptr->conf = (void *)&omap4460_data;
 		break;
 #endif
 #ifdef CONFIG_OMAP5_BG_TEMP_SENSOR_DATA
@@ -973,6 +1008,7 @@ int __devinit omap_bandgap_probe(struct platform_device *pdev)
 	struct device *cdev = pdev->dev.parent;
 	struct omap_bandgap *bg_ptr;
 	int clk_rate, ret = 0, i;
+	u32 val;
 
 	if (!cdev) {
 		dev_err(&pdev->dev, "no omap control ref in our parent\n");
@@ -1016,7 +1052,6 @@ int __devinit omap_bandgap_probe(struct platform_device *pdev)
 	bg_ptr->conv_table = bg_ptr->conf->conv_table;
 	for (i = 0; i < bg_ptr->conf->sensor_count; i++) {
 		struct temp_sensor_registers *tsr;
-		u32 val;
 
 		tsr = bg_ptr->conf->sensors[i].registers;
 		/*
@@ -1056,7 +1091,9 @@ int __devinit omap_bandgap_probe(struct platform_device *pdev)
 	}
 
 	bg_ptr->clk_rate = clk_rate;
-	clk_enable(bg_ptr->fclock);
+	if (OMAP_BANDGAP_HAS(bg_ptr, CLK_CTRL))
+		clk_enable(bg_ptr->fclock);
+
 
 	mutex_init(&bg_ptr->bg_mutex);
 	bg_ptr->dev = &pdev->dev;
@@ -1071,18 +1108,63 @@ int __devinit omap_bandgap_probe(struct platform_device *pdev)
 
 	for (i = 0; i < bg_ptr->conf->sensor_count; i++) {
 		struct temp_sensor_data *ts_data;
+		struct temp_sensor_registers *tsr;
 
 		ts_data = bg_ptr->conf->sensors[i].ts_data;
+		tsr = bg_ptr->conf->sensors[i].registers;
 
 		if (OMAP_BANDGAP_HAS(bg_ptr, TALERT))
 			temp_sensor_init_talert_thresholds(bg_ptr, i,
 							   ts_data->t_hot,
 							   ts_data->t_cold);
+		/*
+		 * For OMAP4470 TSHUT values can be written by Bootloader, so
+		 * need to prevent multiple writing to one time writable
+		 * register, assuming that no one wrote zero into it before.
+		 */
+		if (cpu_is_omap447x()) {
+			ret = omap_control_readl(cdev, tsr->tshut_threshold,
+						 &val);
+			if ((val & tsr->tshut_hot_mask) ||
+			    (val & tsr->tshut_cold_mask) || ret)
+				bg_ptr->conf->features &=
+					     ~OMAP_BANDGAP_FEATURE_TSHUT_CONFIG;
+		}
+
 		if (OMAP_BANDGAP_HAS(bg_ptr, TSHUT_CONFIG)) {
+			/*
+			 * On OMAP54xx ES2.0, TSHUT values are loaded from
+			 * e-fuse. To override the e-fuse value, need to set
+			 * MUXCTRL bit(31) to 1.
+			 * Older TRM (ver J) has this bit information. Later TRM
+			 * shows this bit as reserved. This code need re-visit
+			 * after the wakeup since SW control will be disabled
+			 * in production devices.
+			 */
+			if (cpu_is_omap543x() &&
+			    (omap_rev() != OMAP5430_REV_ES1_0) &&
+			    (omap_rev() != OMAP5432_REV_ES1_0)) {
+				struct temp_sensor_registers *tsr;
+				tsr = bg_ptr->conf->sensors[i].registers;
+
+				omap_control_writel(cdev,
+						(1 << tsr->tshut_efuse_shift),
+						tsr->tshut_threshold);
+			}
+
 			temp_sensor_configure_tshut_hot(bg_ptr, i,
 							ts_data->tshut_hot);
 			temp_sensor_configure_tshut_cold(bg_ptr, i,
 							 ts_data->tshut_cold);
+
+			/*
+			 * Ensure that for OMAP4470 TSHUT is configured
+			 * only once
+			 */
+			if (cpu_is_omap447x())
+				bg_ptr->conf->features &=
+					     ~OMAP_BANDGAP_FEATURE_TSHUT_CONFIG;
+
 		}
 	}
 
@@ -1123,7 +1205,8 @@ int __devinit omap_bandgap_probe(struct platform_device *pdev)
 	return 0;
 
 put_clks:
-	clk_disable(bg_ptr->fclock);
+	if (OMAP_BANDGAP_HAS(bg_ptr, CLK_CTRL))
+		clk_disable(bg_ptr->fclock);
 	clk_put(bg_ptr->fclock);
 	clk_put(bg_ptr->div_clk);
 free_irqs:
@@ -1148,7 +1231,8 @@ int __devexit omap_bandgap_remove(struct platform_device *pdev)
 
 	omap_bandgap_power(bg_ptr, false);
 
-	clk_disable(bg_ptr->fclock);
+	if (OMAP_BANDGAP_HAS(bg_ptr, CLK_CTRL))
+		clk_disable(bg_ptr->fclock);
 	clk_put(bg_ptr->fclock);
 	clk_put(bg_ptr->div_clk);
 	if (OMAP_BANDGAP_HAS(bg_ptr, TALERT))
@@ -1250,7 +1334,9 @@ static int omap_bandgap_suspend(struct device *dev)
 
 	err = omap_bandgap_save_ctxt(bg_ptr);
 	omap_bandgap_power(bg_ptr, false);
-	clk_disable(bg_ptr->fclock);
+
+	if (OMAP_BANDGAP_HAS(bg_ptr, CLK_CTRL))
+		clk_disable(bg_ptr->fclock);
 
 	return err;
 }
@@ -1259,7 +1345,9 @@ static int omap_bandgap_resume(struct device *dev)
 {
 	struct omap_bandgap *bg_ptr = dev_get_drvdata(dev);
 
-	clk_enable(bg_ptr->fclock);
+	if (OMAP_BANDGAP_HAS(bg_ptr, CLK_CTRL))
+		clk_enable(bg_ptr->fclock);
+
 	omap_bandgap_power(bg_ptr, true);
 
 	return omap_bandgap_restore_ctxt(bg_ptr);
@@ -1286,7 +1374,9 @@ void omap_bandgap_prepare_for_idle(void)
 	if (!g_bg_ptr)
 		return;
 
-	clk_disable(g_bg_ptr->fclock);
+	if (OMAP_BANDGAP_HAS(g_bg_ptr, CLK_CTRL))
+		clk_disable(g_bg_ptr->fclock);
+
 	g_bg_ptr->bg_clk_idle = true;
 
 }
@@ -1307,7 +1397,8 @@ void omap_bandgap_resume_after_idle(void)
 
 	/* Enable clock for sensor, if it was disabled during idle */
 	if (g_bg_ptr->bg_clk_idle) {
-		clk_enable(g_bg_ptr->fclock);
+		if (OMAP_BANDGAP_HAS(g_bg_ptr, CLK_CTRL))
+			clk_enable(g_bg_ptr->fclock);
 		/*
 		 * Since the clocks are gated, the temperature reading
 		 * is not correct. Hence force the single read to get the
@@ -1327,12 +1418,17 @@ void omap_bandgap_resume_after_idle(void)
 static const struct of_device_id of_omap_bandgap_match[] = {
 #ifdef CONFIG_OMAP4_BG_TEMP_SENSOR_DATA
 	/*
-	 * TODO: Add support to 4430, 4470
+	 * TODO: Add support to 4430
 	 */
 	{
 		.compatible = "ti,omap4460-bandgap",
 		.data = (void *)&omap4460_data,
 	},
+	{
+		.compatible = "ti,omap4470-bandgap",
+		.data = (void *)&omap4470_data,
+	},
+
 #endif
 #ifdef CONFIG_OMAP5_BG_TEMP_SENSOR_DATA
 	{

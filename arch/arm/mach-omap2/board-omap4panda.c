@@ -355,6 +355,8 @@ static int __init omap4_panda_i2c_init(void)
 
 #ifdef CONFIG_OMAP_MUX
 static struct omap_board_mux board_mux[] __initdata = {
+	OMAP4_MUX(SYS_NIRQ1, OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP |
+				OMAP_PIN_OFF_WAKEUPENABLE),
 	/* WLAN IRQ - GPIO 53 */
 	OMAP4_MUX(GPMC_NCS3, OMAP_MUX_MODE3 | OMAP_PIN_INPUT),
 	/* WLAN POWER ENABLE - GPIO 43 */

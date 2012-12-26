@@ -391,7 +391,6 @@ config MACH_OMAP_4430SDP
 	select OMAP_TPS6236X
 	select TWL6030_GPADC
 	select CDC_TCXO
-	select TWL6040_VIB
 
 config MACH_OMAP_4430_KC1
 	bool "OMAP 4430 KC1 board"
@@ -418,7 +417,6 @@ config MACH_OMAP_BLAZE
 	select OMAP_TPS6236X
 	select TWL6030_GPADC
 	select CDC_TCXO
-	select TWL6040_VIB
 
 config MACH_OMAP4_PANDA
 	bool "OMAP4 Panda Board"
@@ -547,6 +545,15 @@ config OMAP_PM_STANDALONE
 	  dsp, iva, abe, aess, dmic, gpu, ipu, mcpdm, sata.
 	  THIS MUST BE DISABLED on production devices and is purely intended
 	  to work with minimal debug environment.
+
+config OMAP_REBOOT_REASON
+	depends on ARCH_OMAP4 || ARCH_OMAP5
+	bool "Save reboot reason"
+	default n
+	help
+	  Let bootloader to know when their platform do a reboot. The boot
+	  reason is written to SAR memory that is retained across reboots.
+	  Then bootloader cat read it. Bootloader should be updated accordingly.
 
 endmenu
 

@@ -54,12 +54,22 @@
 
 #define OMAP_UART_DMA_CH_FREE	-1
 
+/*
+ * (Errata i659) - From OMAP4430 ES 2.0 onwards set
+ * tx_threshold while using UART in DMA Mode
+ * and ensure tx_threshold + tx_trigger <= 63
+ */
+#define OMAP_UART_SET_DMA_TX_THRESHOLD	BIT(2)
+/* Setting TX Threshold Level to 62 */
+#define OMAP_UART_TX_FIFO_THR_LVL	0x3E
+
 #define OMAP_MAX_HSUART_PORTS	6
 
 #define MSR_SAVE_FLAGS		UART_MSR_ANY_DELTA
 
 #define UART_ERRATA_i202_MDR1_ACCESS	BIT(0)
 #define UART_ERRATA_i291_DMA_FORCEIDLE	BIT(1)
+#define UART_ERRATA_i659_TX_THR		BIT(2)
 
 #define OMAP_UART_TX_WAKEUP_EN	BIT(7)
 

@@ -3,7 +3,7 @@
 #
 config OMAP_DIE_GOVERNOR
 	bool "OMAP On Die thermal governor support"
-	depends on THERMAL_FRAMEWORK && OMAP_THERMAL
+	depends on OMAP_THERMAL
 	help
 	  This is the governor for the OMAP4 and OMAP5 On-Die
 	  temperature sensors.
@@ -12,7 +12,7 @@ config OMAP_DIE_GOVERNOR
 
 config CASE_TEMP_GOVERNOR
 	bool "Case thermal governor support"
-	depends on THERMAL_FRAMEWORK && OMAP_THERMAL
+	depends on OMAP_THERMAL
 	help
 	  This is the governor for the Case temperature sensor.
 	  This governer will institute the policy to call specific

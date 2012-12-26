@@ -861,6 +861,13 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
 
 	up->scr |= OMAP_UART_SCR_RX_TRIG_GRANU1_MASK;
 	if (up->use_dma) {
+		if (up->errata & UART_ERRATA_i659_TX_THR) {
+			serial_out(up, UART_OMAP_MDR3,
+				   OMAP_UART_SET_DMA_TX_THRESHOLD);
+			serial_out(up, UART_OMAP_TX_DMA_THRESHOLD,
+				   OMAP_UART_TX_FIFO_THR_LVL);
+		}
+
 		serial_out(up, UART_TI752_TLR, 0);
 		up->scr |= UART_FCR_TRIGGER_4;
 	}
@@ -1472,7 +1479,8 @@ static void __devinit omap_serial_fill_features_erratas(struct uart_omap_port *u
 		up->features |= OMAP_UART_WER_HAS_TX_WAKEUP;
 		break;
 	case OMAP_UART_REV_63:
-		up->errata |= UART_ERRATA_i202_MDR1_ACCESS;
+		up->errata |= (UART_ERRATA_i202_MDR1_ACCESS |
+				UART_ERRATA_i659_TX_THR);
 		up->features |= OMAP_UART_WER_HAS_TX_WAKEUP;
 		break;
 	default:
@@ -1716,6 +1724,16 @@ static void serial_omap_restore_context(struct uart_omap_port *up)
 	serial_out(up, UART_OMAP_SCR, up->scr);
 	serial_out(up, UART_EFR, up->efr);
 	serial_out(up, UART_LCR, up->lcr);
+	if (up->use_dma) {
+		if (up->errata & UART_ERRATA_i659_TX_THR) {
+			serial_out(up, UART_OMAP_MDR3,
+				   OMAP_UART_SET_DMA_TX_THRESHOLD);
+			serial_out(up, UART_OMAP_TX_DMA_THRESHOLD,
+				   OMAP_UART_TX_FIFO_THR_LVL);
+		}
+
+		serial_out(up, UART_TI752_TLR, 0);
+	}
 	if (up->errata & UART_ERRATA_i202_MDR1_ACCESS)
 		serial_omap_mdr1_errataset(up, up->mdr1);
 	else

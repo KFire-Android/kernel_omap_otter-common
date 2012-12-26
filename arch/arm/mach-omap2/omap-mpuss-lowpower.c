@@ -65,16 +65,9 @@
 #include "prm-regbits-44xx.h"
 
 #include "prcm_mpu54xx.h"
-
-#ifdef CONFIG_ARCH_OMAP5_ES1
-#include "prm-regbits-54xx_es1.h"
-#include "prm54xx_es1.h"
-#else
-#include "prm-regbits-54xx.h"
-#include "prm54xx.h"
-#endif
-
 #include "cm44xx.h"
+#include "prm54xx.h"
+#include "prm-regbits-54xx.h"
 
 #ifdef CONFIG_SMP
 #define NUM_DEN_MASK			0xfffff000
@@ -474,6 +467,8 @@ int omap_enter_lowpower(unsigned int cpu, unsigned int power_state)
 	unsigned int save_state = 0;
 	unsigned int wakeup_cpu;
 	int ret;
+	s16 dev_inst = cpu_is_omap44xx() ? OMAP4430_PRM_DEVICE_INST :
+			   OMAP54XX_PRM_DEVICE_INST;
 
 	if (omap_rev() == OMAP4430_REV_ES1_0)
 		return -ENXIO;
@@ -533,7 +528,7 @@ int omap_enter_lowpower(unsigned int cpu, unsigned int power_state)
 		omap4_prminst_rmw_inst_reg_bits(OMAP4430_ISOOVR_EXTEND_MASK,
 				OMAP4430_ISOOVR_EXTEND_MASK,
 				OMAP4430_PRM_PARTITION,
-				OMAP4430_PRM_DEVICE_INST,
+				dev_inst,
 				OMAP4_PRM_IO_PMCTRL_OFFSET);
 	}
 
@@ -598,6 +593,8 @@ int omap_enter_lowpower(unsigned int cpu, unsigned int power_state)
 abort_suspend:
 	if (save_state == 3 &&
 	    pwrdm_read_prev_pwrst(core_pd) == PWRDM_POWER_OFF) {
+		/* Reconfigure the trim settings as well */
+		omap_trim_configure();
 		omap4_dpll_resume_off();
 		omap4_cm_resume_off();
 #ifdef CONFIG_PM_DEBUG
@@ -634,7 +631,7 @@ sar_save_failed:
 		omap4_prminst_rmw_inst_reg_bits(OMAP4430_ISOOVR_EXTEND_MASK,
 						0,
 						OMAP4430_PRM_PARTITION,
-						OMAP4430_PRM_DEVICE_INST,
+						dev_inst,
 						OMAP4_PRM_IO_PMCTRL_OFFSET);
 	}
 

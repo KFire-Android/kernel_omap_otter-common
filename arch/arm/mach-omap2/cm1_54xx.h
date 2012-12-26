@@ -19,6 +19,15 @@
  *
  */
 
+/*
+ * __ARCH_ARM_MACH_OMAP2_CM1_54XX_H is defined in ES1.0 header.
+ * The same header guard definition will help ES2.0 header definitions
+ * not to be active for ES1.0 and vice versa.
+ */
+#ifdef CONFIG_ARCH_OMAP5_ES1
+#include "cm1_54xx_es1.h"
+#endif
+
 #ifndef __ARCH_ARM_MACH_OMAP2_CM1_54XX_H
 #define __ARCH_ARM_MACH_OMAP2_CM1_54XX_H
 

@@ -311,6 +311,90 @@ int omap_vc_bypass_scale(struct voltagedomain *voltdm,
 	return 0;
 }
 
+static int omap_vc_bypass_send_value(struct voltagedomain *voltdm,
+		struct omap_vc_channel *vc, u8 sa, u8 reg, u32 data)
+{
+	u32 loop_cnt = 0, retries_cnt = 0;
+	u32 vc_valid, vc_bypass_val_reg, vc_bypass_value;
+
+	if (IS_ERR_OR_NULL(vc->common)) {
+		pr_err("%s voldm=%s bad value for vc->common\n",
+				__func__, voltdm->name);
+		return -EINVAL;
+	}
+
+	vc_valid = vc->common->valid;
+	vc_bypass_val_reg = vc->common->bypass_val_reg;
+	vc_bypass_value = (data << vc->common->data_shift) |
+		(reg << vc->common->regaddr_shift) |
+		(sa << vc->common->slaveaddr_shift);
+
+	voltdm->write(vc_bypass_value, vc_bypass_val_reg);
+	voltdm->write(vc_bypass_value | vc_valid, vc_bypass_val_reg);
+
+	vc_bypass_value = voltdm->read(vc_bypass_val_reg);
+	/*
+	 * Loop till the bypass command is acknowledged from the SMPS.
+	 * NOTE: This is legacy code. The loop count and retry count needs
+	 * to be revisited.
+	 */
+	while (vc_bypass_value & vc_valid) {
+		loop_cnt++;
+
+		if (retries_cnt > 10) {
+			pr_warning("%s: Retry count exceeded\n", __func__);
+			return -ETIMEDOUT;
+		}
+
+		if (loop_cnt > 50) {
+			retries_cnt++;
+			loop_cnt = 0;
+			udelay(10);
+		}
+		vc_bypass_value = voltdm->read(vc_bypass_val_reg);
+	}
+
+	return 0;
+
+}
+
+/**
+ * omap_vc_bypass_send_i2c_msg() - Function to control PMIC registers over SRI2C
+ * @voltdm:	voltage domain
+ * @slave_addr:	slave address of the device.
+ * @reg_addr:	register address to access
+ * @data:	what do we want to write there
+ *
+ * Many simpler PMICs with a single I2C interface still have configuration
+ * registers that may need population. Typical being slew rate configurations
+ * thermal shutdown configuration etc. When these PMICs are hooked on I2C_SR,
+ * this function allows these configuration registers to be accessed.
+ *
+ * WARNING: Though this could be used for voltage register configurations over
+ * I2C_SR, DONOT use it for that purpose, all the Voltage controller's internal
+ * information is bypassed using this function and must be used judiciously.
+ */
+int omap_vc_bypass_send_i2c_msg(struct voltagedomain *voltdm, u8 slave_addr,
+				u8 reg_addr, u8 data)
+{
+	struct omap_vc_channel *vc;
+
+	if (IS_ERR_OR_NULL(voltdm)) {
+		pr_err("%s bad voldm\n", __func__);
+		return -EINVAL;
+	}
+
+	vc = voltdm->vc;
+	if (IS_ERR_OR_NULL(vc)) {
+		pr_err("%s voldm=%s bad vc\n", __func__, voltdm->name);
+		return -EINVAL;
+	}
+
+	return omap_vc_bypass_send_value(voltdm, vc, slave_addr,
+					reg_addr, data);
+}
+
+
 /* Set oscillator setup time for omap3 */
 static void omap3_set_clksetup(u32 usec, struct voltagedomain *voltdm)
 {
@@ -650,6 +734,12 @@ static void __init omap_vc_i2c_init(struct voltagedomain *voltdm)
 		return;
 	}
 
+	/*
+	 * Dont depend on bootloader settings OR defaults, start with a blank
+	 * slate
+	 */
+	voltdm->write(0x0, vc->common->i2c_cfg_reg);
+
 	i2c_high_speed = voltdm->pmic->i2c_high_speed;
 	if (i2c_high_speed)
 		voltdm->rmw(vc->common->i2c_cfg_hsen_mask,
@@ -768,7 +858,7 @@ void __init omap_vc_init_channel(struct voltagedomain *voltdm)
 	on_vsel = omap_vc_calc_vsel(voltdm, voltdm->vc_param->on);
 	onlp_vsel = omap_vc_calc_vsel(voltdm, voltdm->vc_param->onlp);
 	ret_vsel = omap_vc_calc_vsel(voltdm, voltdm->vc_param->ret);
-	off_vsel = omap_vc_calc_vsel(voltdm, voltdm->vc_param->off);
+	off_vsel = voltdm->pmic->uv_to_vsel(voltdm->vc_param->off);
 	vc->setup_voltage_common =
 	       (ret_vsel << vc->common->cmd_ret_shift) |
 	       (off_vsel << vc->common->cmd_off_shift);

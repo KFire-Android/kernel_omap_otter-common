@@ -23,13 +23,8 @@
 
 #include <plat/common.h>
 
-#ifdef CONFIG_ARCH_OMAP5_ES1
-#include "prm54xx_es1.h"
-#include "prm-regbits-54xx_es1.h"
-#else
 #include "prm54xx.h"
 #include "prm-regbits-54xx.h"
-#endif
 
 #include "voltage.h"
 
@@ -138,7 +133,11 @@ struct omap_vc_param omap5_mpu_vc_data = {
 	.on			= OMAP5_ON_VOLTAGE_MPU_UV,
 	.onlp			= OMAP5_ONLP_VOLTAGE_MPU_UV,
 	.ret			= OMAP5_RET_VOLTAGE_UV,
+#ifdef CONFIG_ARCH_OMAP5_ES1
 	.off			= OMAP5_RET_VOLTAGE_UV,
+#else
+	.off			= OMAP5_OFF_VOLTAGE_UV,
+#endif
 };
 
 struct omap_vc_param omap5_mm_vc_data = {
