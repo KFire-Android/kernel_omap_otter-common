@@ -629,8 +629,8 @@ OMAP_SYS_TIMER(3_gp, gptimer);
 #endif /* CONFIG_ARCH_OMAP3 */
 
 #ifdef CONFIG_SOC_AM33XX
-OMAP_SYS_GP_TIMER_INIT(3_am33xx, 1, OMAP4_MPU_SOURCE, "ti,timer-alwon",
-		       2, OMAP4_MPU_SOURCE);
+OMAP_SYS_GP_TIMER_INIT(3_am33xx, 2, OMAP4_MPU_SOURCE, "ti,timer-non-wkup",
+		       1, OMAP4_MPU_SOURCE);
 OMAP_SYS_TIMER(3_am33xx, gptimer);
 #endif /* CONFIG_SOC_AM33XX */
 

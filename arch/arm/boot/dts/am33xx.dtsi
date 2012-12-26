@@ -251,6 +251,7 @@
 			reg = <0x48040000 0x400>;
 			interrupts = <68>;
 			ti,hwmods = "timer2";
+			ti,timer-non-wkup;
 		};
 
 		timer3: timer@48042000 {
