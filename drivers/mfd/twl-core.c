@@ -885,7 +885,9 @@ add_children(struct twl4030_platform_data *pdata, unsigned irq_base,
 	}
 	if (twl_has_usb() && pdata->usb && twl_class_is_6030()) {
 
-		static struct regulator_consumer_supply usb3v3;
+		static struct regulator_consumer_supply usb3v3 = {
+			.supply = "vusb",
+		};
 		int regulator;
 
 		if (twl_has_regulator()) {
@@ -899,13 +901,10 @@ add_children(struct twl4030_platform_data *pdata, unsigned irq_base,
 					| REGULATOR_CHANGE_STATUS,
 			};
 
-			if (features & TWL6032_SUBCLASS) {
-				usb3v3.supply =	"ldousb";
+			if (features & TWL6032_SUBCLASS)
 				regulator = TWL6032_REG_LDOUSB;
-			} else {
-				usb3v3.supply = "vusb";
+			else
 				regulator = TWL6030_REG_VUSB;
-			}
 			child = add_regulator_linked(regulator, &usb_fixed,
 							&usb3v3, 1,
 							features);
