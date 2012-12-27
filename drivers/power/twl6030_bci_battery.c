@@ -566,6 +566,7 @@ static int twl6030_get_gpadc_conversion(struct twl6030_bci_device_info *di,
 	req.method = TWL6030_GPADC_SW2;
 	req.active = 0;
 	req.func_cb = NULL;
+	req.type = TWL6030_GPADC_WAIT;
 	ret = twl6030_gpadc_conversion(&req);
 	if (ret < 0)
 		return ret;
@@ -1802,6 +1803,7 @@ static void twl6030_bci_battery_work(struct work_struct *work)
 
 	req.active = 0;
 	req.func_cb = NULL;
+	req.type = TWL6030_GPADC_WAIT;
 	ret = twl6030_gpadc_conversion(&req);
 
 	schedule_delayed_work(&di->twl6030_bci_monitor_work,
