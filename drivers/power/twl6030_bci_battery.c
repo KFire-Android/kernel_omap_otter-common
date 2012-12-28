@@ -2798,17 +2798,17 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 	ret = twl_i2c_write_u8(TWL6030_MODULE_CHARGER, MBAT_TEMP,
 			CONTROLLER_INT_MASK);
 	if (ret)
-		goto bk_batt_failed;
+		goto i2c_reg_failed;
 
 	ret = twl_i2c_write_u8(TWL6030_MODULE_CHARGER, MASK_MCHARGERUSB_THMREG,
 						CHARGERUSB_INT_MASK);
 	if (ret)
-		goto bk_batt_failed;
+		goto i2c_reg_failed;
 
 	ret = twl_i2c_read_u8(TWL6030_MODULE_CHARGER, &controller_stat,
 		CONTROLLER_STAT1);
 	if (ret)
-		goto bk_batt_failed;
+		goto i2c_reg_failed;
 
 	di->stat1 = controller_stat;
 	di->charger_outcurrentmA = di->platform_data->max_charger_currentmA;
@@ -2853,7 +2853,7 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 	di->boot_capacity_mAh = di->max_battery_capacity * di->capacity / 100;
 	ret = twl_i2c_read_u8(TWL6030_MODULE_ID0, &hw_state, STS_HW_CONDITIONS);
 	if (ret)
-		goto  bk_batt_failed;
+		goto  i2c_reg_failed;
 
 	if (!is_battery_present(di)) {
 		if (!(hw_state & STS_USB_ID)) {
@@ -2861,13 +2861,13 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 			ret = twl_i2c_read_u8(TWL6030_MODULE_CHARGER,
 					&chargerusb_ctrl1, CHARGERUSB_CTRL1);
 			if (ret)
-				goto  bk_batt_failed;
+				goto  i2c_reg_failed;
 
 			chargerusb_ctrl1 |= HZ_MODE;
 			ret = twl_i2c_write_u8(TWL6030_MODULE_CHARGER,
 					 chargerusb_ctrl1, CHARGERUSB_CTRL1);
 			if (ret)
-				goto  bk_batt_failed;
+				goto  i2c_reg_failed;
 		}
 	} else if (!di->use_hw_charger) {
 		if (controller_stat & VAC_DET) {
@@ -2931,8 +2931,10 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 				 REG_INT_MSK_STS_C);
 
 	ret = sysfs_create_group(&pdev->dev.kobj, &twl6030_bci_attr_group);
-	if (ret)
+	if (ret) {
 		dev_dbg(&pdev->dev, "could not create sysfs files\n");
+		goto i2c_reg_failed;
+	}
 
 	schedule_delayed_work(&di->twl6030_bci_monitor_work, 0);
 
@@ -2940,8 +2942,9 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 
 	return 0;
 
+i2c_reg_failed:
+	power_supply_unregister(&di->bk_bat);
 bk_batt_failed:
-	cancel_delayed_work_sync(&di->twl6030_bci_monitor_work);
 	power_supply_unregister(&di->ac);
 ac_failed:
 	power_supply_unregister(&di->usb);
