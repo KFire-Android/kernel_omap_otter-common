@@ -428,6 +428,7 @@ void OMAPLFBDoBlits(OMAPLFB_DEVINFO *psDevInfo, PDC_MEM_INFO *ppsMemInfos, struc
 			entry->bp.src1geom->virtstride = OMAPLFB_CLRBUFF_SZ;
 			entry->bp.src1.desc = &entry->src1desc;
 			entry->bp.src1.desc->virtaddr = psPVRFBInfo->pvClearBuffer;
+			entry->bp.src1.desc->length = OMAPLFB_CLRBUFF_SZ;
 		}
 		else if (meminfo_ix & HWC_BLT_DESC_FLAG)
 		{

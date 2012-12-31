@@ -135,7 +135,8 @@ int __init tablet_button_init(void)
 {
 	if (omap_is_board_version(OMAP4_TABLET_2_0) ||
 		omap_is_board_version(OMAP4_TABLET_2_1) ||
-		omap_is_board_version(OMAP4_TABLET_2_1_1)) {
+		omap_is_board_version(OMAP4_TABLET_2_1_1) ||
+		omap_is_board_version(OMAP4_TABLET_2_1_2)) {
 
 		omap_mux_init_gpio(TABLET2_GREEN_DBG2_LED_GPIO,
 			OMAP_MUX_MODE3 | OMAP_PIN_OUTPUT);

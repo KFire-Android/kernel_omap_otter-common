@@ -265,10 +265,8 @@ static int hdmi_panel_resume(struct omap_dss_device *dssdev)
 
 	mutex_lock(&hdmi.hdmi_lock);
 
-	if (dssdev->state != OMAP_DSS_DISPLAY_SUSPENDED) {
-		r = -EINVAL;
+	if (dssdev->state != OMAP_DSS_DISPLAY_SUSPENDED)
 		goto err;
-	}
 
 	dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
 err:

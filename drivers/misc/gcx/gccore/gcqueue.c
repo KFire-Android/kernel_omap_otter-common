@@ -790,7 +790,16 @@ static int gccmdthread(void *_gccorecontext)
 				GCDBG(GCZONE_THREAD, "thread timedout.\n");
 
 			if (gcqueue->gcmoterminator == NULL) {
+				GCDBG(GCZONE_THREAD, "no work scheduled.\n");
+
+				if (!list_empty(&gcqueue->queue))
+					GCERR("queue is not empty.\n");
+
 				gcqueue->suspend = false;
+
+				/* Set timeout to infinity. */
+				timeout = MAX_SCHEDULE_TIMEOUT;
+
 				GCUNLOCK(&gcqueue->queuelock);
 				continue;
 			}
@@ -823,8 +832,8 @@ static int gccmdthread(void *_gccorecontext)
 							link);
 
 				if (!list_empty(&headcmdbuf->events)) {
-					/* found events, there must be
-					 * pending interrupts */
+					/* Found events, there must be
+					 * pending interrupts. */
 					break;
 				}
 
@@ -835,7 +844,7 @@ static int gccmdthread(void *_gccorecontext)
 
 			if (!list_empty(&gcqueue->queue)) {
 				GCDBG(GCZONE_THREAD,
-					"aborting shutdown to process events\n");
+				      "aborting shutdown to process events\n");
 				GCUNLOCK(&gcqueue->queuelock);
 				continue;
 			}

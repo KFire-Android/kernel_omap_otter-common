@@ -16,6 +16,7 @@
 #include <linux/seq_file.h>
 #include <linux/module.h>
 #include <linux/uaccess.h>
+#include <linux/delay.h>
 #include <linux/gcx.h>
 #include <linux/gccore.h>
 #include "gcmain.h"
@@ -73,7 +74,7 @@ void gc_debug_cache_gpu_id(void)
 	g_gcGpuId.chipDate = gc_read_reg(GC_CHIP_DATE_Address);
 	g_gcGpuId.chipTime = gc_read_reg(GC_CHIP_TIME_Address);
 	g_gcGpuId.chipFeatures = gc_read_reg(GC_FEATURES_Address);
-	g_gcGpuId.chipMinorFeatures = gc_read_reg(GC_MINOR_FEATURES0_Address);
+	g_gcGpuId.chipMinorFeatures = gc_read_reg(GC_FEATURES0_Address);
 	g_gcGpuId.valid = 1;
 }
 
@@ -571,6 +572,32 @@ static const struct file_operations gc_debug_fops_log_reset = {
 
 /*****************************************************************************/
 
+static int gc_debug_show_cur_freq(struct seq_file *s, void *data)
+{
+	unsigned mhz = gcpwr_get_speed();
+	if (mhz)
+		seq_printf(s, "cur freq: %d mhz\n", mhz);
+	else
+		seq_printf(s, "unable to read cur freq\n");
+
+	return 0;
+}
+
+static int gc_debug_open_cur_freq(struct inode *inode, struct file *file)
+{
+	return single_open(file, gc_debug_show_cur_freq, 0);
+}
+
+static const struct file_operations gc_debug_fops_cur_freq = {
+	.open    = gc_debug_open_cur_freq,
+	.write   = NULL,
+	.read    = seq_read,
+	.llseek  = seq_lseek,
+	.release = single_release,
+};
+
+/*****************************************************************************/
+
 void gc_debug_init(void)
 {
 	struct dentry *logDir;
@@ -589,6 +616,8 @@ void gc_debug_init(void)
 			    &gc_debug_fops_gpu_last_error);
 	debugfs_create_bool("cache_status_every_irq", 0664, debug_root,
 			    &gc_cache_status_every_irq);
+	debugfs_create_file("cur_freq", 0664, debug_root, NULL,
+			    &gc_debug_fops_cur_freq);
 
 	logDir = debugfs_create_dir("log", debug_root);
 	if (!logDir)

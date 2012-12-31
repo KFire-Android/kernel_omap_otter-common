@@ -66,6 +66,9 @@
 /* Specifies spacing for thread messages. */
 #define GC_THREAD_INDENT	0
 
+/* Print the timestamp. */
+#define GC_SHOW_TIME		1
+
 /* When set to non-zero, specifies how many prints are accumulated in the
  * buffer before the buffer is flushed. */
 #define GC_SHOW_DUMP_LINE	1
@@ -88,16 +91,6 @@
  * Miscellaneous macros.
  */
 
-#define GC_PTR2INT(p) \
-( \
-	(unsigned int) (p) \
-)
-
-#define GC_ALIGN(n, align) \
-( \
-	((n) + ((align) - 1)) & ~((align) - 1) \
-)
-
 #define GC_PTRALIGNMENT(p, alignment) \
 ( \
 	GC_ALIGN(GC_PTR2INT(p), alignment) - GC_PTR2INT(p) \
@@ -118,6 +111,10 @@
 #else
 #define GC_VERIFY_ENABLE(filter, zone) \
 	(g_initdone && ((filter == NULL) || ((filter->zone & zone) != 0)))
+#endif
+
+#if GC_SHOW_TIME
+#define GC_TIME_FORMAT "[%5ld.%10ld] "
 #endif
 
 #if GC_SHOW_DUMP_LINE
@@ -155,12 +152,16 @@ struct itemstring {
 	enum itemtype itemtype;
 	int indent;
 
-#if GC_SHOW_PID
-	struct task_struct *task;
+#if GC_SHOW_TIME
+	struct timespec timestamp;
 #endif
 
 #if GC_SHOW_DUMP_LINE
 	unsigned int dumpline;
+#endif
+
+#if GC_SHOW_PID
+	struct task_struct *task;
 #endif
 
 	const char *message;
@@ -376,6 +377,13 @@ static void gc_print_string(struct seq_file *s, struct itemstring *str)
 	int len = 0;
 	char buffer[GC_MAXSTR_LENGTH];
 
+#if GC_SHOW_TIME
+	len += snprintf(buffer + len, sizeof(buffer) - len - GC_EOL_RESERVE,
+			GC_TIME_FORMAT,
+			str->timestamp.tv_sec,
+			str->timestamp.tv_nsec);
+#endif
+
 #if GC_SHOW_DUMP_LINE
 	len += snprintf(buffer + len, sizeof(buffer) - len - GC_EOL_RESERVE,
 			GC_DUMPLINE_FORMAT, str->dumpline);
@@ -494,7 +502,7 @@ static void gc_print_command(struct seq_file *s, struct itembuffer *item,
 
 		switch (command) {
 		case GCREG_COMMAND_OPCODE_LOAD_STATE:
-			count = (data32[i] >> 16) & 0x3F;
+			count = (data32[i] >> 16) & 0x3FF;
 			addr = data32[i] & 0xFFFF;
 			GC_PRINTK(s, "%s  0x%08X: 0x%08X  STATE(0x%04X, %d)\n",
 				  buffer, item->gpuaddr + (i << 2),
@@ -1148,12 +1156,16 @@ static void gc_append_string(struct buffout *buffout,
 	item->messagedata = *(va_list *) &messagedata;
 	item->datasize = itemstring->datasize;
 
-#if GC_SHOW_PID
-	item->task = itemstring->task;
+#if GC_SHOW_TIME
+	item->timestamp = itemstring->timestamp;
 #endif
 
 #if GC_SHOW_DUMP_LINE
 	item->dumpline = itemstring->dumpline;
+#endif
+
+#if GC_SHOW_PID
+	item->task = itemstring->task;
 #endif
 
 	/* Copy argument value. */
@@ -1258,12 +1270,16 @@ static void gc_print(struct buffout *buffout, unsigned int argsize,
 	itemstring.messagedata = args;
 	itemstring.datasize = argsize;
 
-#if GC_SHOW_PID
-	itemstring.task = threadinfo->task;
+#if GC_SHOW_TIME
+	ktime_get_ts(&itemstring.timestamp);
 #endif
 
 #if GC_SHOW_DUMP_LINE
 	itemstring.dumpline = ++buffout->dumpline;
+#endif
+
+#if GC_SHOW_PID
+	itemstring.task = threadinfo->task;
 #endif
 
 	/* Print the message. */
@@ -1936,18 +1952,18 @@ int gc_parse_command_buffer(unsigned int *buffer, unsigned int size,
 					break;
 
 				case gcregSrcOriginRegAddrs:
-					info->src[0].rect.l
+					info->src[0].rect.left
 						= buffer[i] & 0xFFFF;
 
-					info->src[0].rect.t
+					info->src[0].rect.top
 						= (buffer[i] >> 16) & 0xFFFF;
 					break;
 
 				case gcregSrcSizeRegAddrs:
-					info->src[0].rect.r
+					info->src[0].rect.right
 						= buffer[i] & 0xFFFF;
 
-					info->src[0].rect.b
+					info->src[0].rect.bottom
 						= (buffer[i] >> 16) & 0xFFFF;
 					break;
 
@@ -2007,10 +2023,10 @@ int gc_parse_command_buffer(unsigned int *buffer, unsigned int size,
 				case gcregBlock4SrcOriginRegAddrs + 2:
 				case gcregBlock4SrcOriginRegAddrs + 3:
 					index = addr & 3;
-					info->src[index].rect.l
+					info->src[index].rect.left
 						= buffer[i] & 0xFFFF;
 
-					info->src[index].rect.t
+					info->src[index].rect.top
 						= (buffer[i] >> 16) & 0xFFFF;
 					break;
 
@@ -2019,10 +2035,10 @@ int gc_parse_command_buffer(unsigned int *buffer, unsigned int size,
 				case gcregBlock4SrcSizeRegAddrs + 2:
 				case gcregBlock4SrcSizeRegAddrs + 3:
 					index = addr & 3;
-					info->src[index].rect.r
+					info->src[index].rect.right
 						= buffer[i] & 0xFFFF;
 
-					info->src[index].rect.b
+					info->src[index].rect.bottom
 						= (buffer[i] >> 16) & 0xFFFF;
 					break;
 
@@ -2051,15 +2067,15 @@ int gc_parse_command_buffer(unsigned int *buffer, unsigned int size,
 			i += 2;
 
 			for (j = 0; j < info->dst.rectcount; j += 1) {
-				info->dst.rect[j].l
+				info->dst.rect[j].left
 						= buffer[i] & 0xFFFF;
-				info->dst.rect[j].t
+				info->dst.rect[j].top
 						= (buffer[i] >> 16) & 0xFFFF;
 				i += 1;
 
-				info->dst.rect[j].r
+				info->dst.rect[j].right
 						= buffer[i] & 0xFFFF;
-				info->dst.rect[j].b
+				info->dst.rect[j].bottom
 						= (buffer[i] >> 16) & 0xFFFF;
 				i += 1;
 			}
