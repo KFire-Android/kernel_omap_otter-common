@@ -570,6 +570,13 @@ void __init am33xx_init_early(void)
 	omap_hwmod_init_postsetup();
 	am33xx_clk_init();
 }
+
+void __init am33xx_init_late(void)
+{
+	omap_mux_late_init();
+	omap2_common_pm_late_init();
+	am33xx_pm_init();
+}
 #endif
 
 #ifdef CONFIG_ARCH_OMAP4
