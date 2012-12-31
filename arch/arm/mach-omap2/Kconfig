@@ -114,9 +114,11 @@ config SOC_AM33XX
 	bool "AM33XX support"
 	default y
 	select ARM_CPU_SUSPEND if PM
-	select CPU_V7
-	select MULTI_IRQ_HANDLER
 	select COMMON_CLK
+	select CPU_V7
+	select MAILBOX if PM
+	select MULTI_IRQ_HANDLER
+	select OMAP2PLUS_MBOX if PM
 
 config OMAP_PACKAGE_ZAF
        bool
