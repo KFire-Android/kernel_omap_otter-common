@@ -24,8 +24,8 @@
 #include <linux/module.h>
 #include <linux/list.h>
 #include <linux/spinlock.h>
+#include <linux/ti_emif.h>
 #include <memory/jedec_ddr.h>
-#include "emif.h"
 #include "of_memory.h"
 
 /**
