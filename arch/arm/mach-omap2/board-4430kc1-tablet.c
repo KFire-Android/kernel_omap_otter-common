@@ -721,15 +721,6 @@ static int __init omap4_i2c_init(void)
 }
 
 
-static void otter_set_osc_timings(void) {
-	/* Device Oscilator
-	* tstart = 2ms + 2ms = 4ms.
-	* tshut = Not defined in oscillator data sheet so setting to 1us
-	*/
-	omap_pm_setup_oscillator(4000, 1);
-}
-
-
 static void __init omap4_display_init(void)
 {
 	void __iomem *phymux_base = NULL;
@@ -921,7 +912,6 @@ struct ddr_device_info lpddr2_elpida_2G_S4_x1_info = {
 
 static void __init omap_kc1_init(void)
 {
-	int sd_density;
 	int package = OMAP_PACKAGE_CBS;
 
 	quanta_boardids();
@@ -941,7 +931,7 @@ static void __init omap_kc1_init(void)
 
 	omap4_mux_init(board_mux, NULL, package);
 	omap_create_board_props();
-//	otter_set_osc_timings();
+
 	omap4_i2c_init();
 	enable_rtc_gpio();
 
