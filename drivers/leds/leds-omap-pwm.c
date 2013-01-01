@@ -9,6 +9,7 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
 */
+#define	DEBUG
 
 #include <linux/kernel.h>
 #include <linux/init.h>
@@ -17,16 +18,18 @@
 #include <linux/leds.h>
 #include <linux/ctype.h>
 #include <linux/sched.h>
-#include <linux/slab.h>
+#include <linux/clk.h>
 #include <asm/delay.h>
 #include <plat/board.h>
 #include <plat/dmtimer.h>
-#include <linux/clk.h>
+#include <linux/slab.h>
+#include <linux/delay.h>
 #include <linux/module.h>
+
+#define MAX_GPTIMER_ID		12
 
 struct omap_pwm_led {
 	struct led_classdev cdev;
-	struct work_struct work;
 	struct omap_pwm_led_platform_data *pdata;
 	struct omap_dm_timer *intensity_timer;
 	struct omap_dm_timer *blink_timer;
@@ -45,11 +48,6 @@ static inline struct omap_pwm_led *cdev_to_omap_pwm_led(struct led_classdev *led
 	return container_of(led_cdev, struct omap_pwm_led, cdev);
 }
 
-static inline struct omap_pwm_led *work_to_omap_pwm_led(struct work_struct *work)
-{
-	return container_of(work, struct omap_pwm_led, work);
-}
-
 static void omap_pwm_led_set_blink(struct omap_pwm_led *led)
 {
 	if (!led->powered)
@@ -59,7 +57,7 @@ static void omap_pwm_led_set_blink(struct omap_pwm_led *led)
 		unsigned long load_reg, cmp_reg;
 
 		load_reg = 32768 * (led->on_period + led->off_period) / 1000;
-		cmp_reg = 32768 * led->on_period / 1000;
+		cmp_reg = 32768 * (led->on_period) / 1000;
 
 		omap_dm_timer_stop(led->blink_timer);
 		omap_dm_timer_set_load(led->blink_timer, 1, -load_reg);
@@ -75,99 +73,150 @@ static void omap_pwm_led_set_blink(struct omap_pwm_led *led)
 	}
 }
 
+static void omap_pwm_led_pad_enable(struct omap_pwm_led *led)
+{
+	if (led->pdata->set_pad)
+		led->pdata->set_pad(led->pdata, 1);
+}
+
+static void omap_pwm_led_pad_disable(struct omap_pwm_led *led)
+{
+	if (led->pdata->set_pad)
+		led->pdata->set_pad(led->pdata, 0);
+}
+
 static void omap_pwm_led_power_on(struct omap_pwm_led *led)
 {
+	u32 val;
+	u32 period;
+	struct clk *timer_fclk;
+	pr_debug("%s: start \n",__func__);
 	if (led->powered)
 		return;
 	led->powered = 1;
 
+	pr_debug("%s: brightness: %i\n", 
+			__func__, led->brightness);
+	
 	/* Select clock */
-	omap_dm_timer_enable(led->intensity_timer);
 	omap_dm_timer_set_source(led->intensity_timer, OMAP_TIMER_SRC_SYS_CLK);
-	omap_dm_timer_set_prescaler(led->intensity_timer, 0);
 
 	/* Turn voltage on */
-	if (led->pdata->set_power )
+	if (led->pdata->set_power != NULL)
 		led->pdata->set_power(led->pdata, 1);
 
+	/* explicitly enable the timer, saves some SAR later */
+	omap_dm_timer_enable(led->intensity_timer);
+	omap_dm_timer_start(led->intensity_timer);
+
+	omap_dm_timer_set_pwm(led->intensity_timer, led->pdata->invert ? 1 : 0, 1,
+		      OMAP_TIMER_TRIGGER_OVERFLOW_AND_COMPARE);
+
+	timer_fclk = omap_dm_timer_get_fclk(led->intensity_timer);
+	period = clk_get_rate(timer_fclk) / 128;
+
+	val = 0xFFFFFFFF+1-period;
+	omap_dm_timer_set_load(led->intensity_timer, 1, val);
+	
 	/* Enable PWM timers */
-	if (led->blink_timer ) {
-		omap_dm_timer_enable(led->blink_timer);
+	if (led->blink_timer != NULL) {
 		omap_dm_timer_set_source(led->blink_timer,
 					 OMAP_TIMER_SRC_32_KHZ);
 		omap_pwm_led_set_blink(led);
 	}
-
-	omap_dm_timer_set_load(led->intensity_timer, 1, 0xffffff00);
+	pr_debug("%s: end \n",__func__);
 }
 
 static void omap_pwm_led_power_off(struct omap_pwm_led *led)
 {
-	int st;
+	
 
 	if (!led->powered)
 		return;
 	led->powered = 0;
 
-	/* Everything off */
-	omap_dm_timer_enable(led->intensity_timer);
-	st = omap_dm_timer_stop(led->intensity_timer);
-	if (st)
-		pr_err("cannot stop PWM timer: error %d\n", st);
-	omap_dm_timer_disable(led->intensity_timer);
-
-	if (led->blink_timer) {
-		omap_dm_timer_stop(led->blink_timer);
-		omap_dm_timer_disable(led->blink_timer);
-	}
-
-	if (led->pdata->set_power)
+	pr_debug("%s: brightness = %i\n", 
+			__func__, led->brightness);
+	
+	if (led->pdata->set_power != NULL)
 		led->pdata->set_power(led->pdata, 0);
+
+	/* Everything off */
+	omap_dm_timer_stop(led->intensity_timer);
+
+	if (led->blink_timer != NULL)
+		omap_dm_timer_stop(led->blink_timer);
+	pr_debug("%s: end \n",__func__);
+}
+
+static void pwm_set_speed(struct omap_dm_timer *gpt,
+		int frequency, int duty_cycle)
+{
+	u32 val;
+	u32 period;
+	struct clk *timer_fclk;
+
+	/* and you will have an overflow in 1 sec         */
+	/* so,                              */
+	/* freq_timer     -> 1s             */
+	/* carrier_period -> 1/carrier_freq */
+	/* => carrier_period = freq_timer/carrier_freq */
+
+	timer_fclk = omap_dm_timer_get_fclk(gpt);
+	period = clk_get_rate(timer_fclk) / frequency;
+
+	val = 0xFFFFFFFF+1-(period*duty_cycle/256);
+	omap_dm_timer_set_match(gpt, 1, val);
 }
 
 static void omap_pwm_led_set_pwm_cycle(struct omap_pwm_led *led, int cycle)
 {
-	int n;
+	int pwm_frequency = 10000;
+	
+	pr_debug("%s: cycle: %i\n", 
+			__func__, cycle);
+	
+	if (led->pdata->bkl_max)
+		cycle = ( (cycle * led->pdata->bkl_max ) / 255);
+	
+	if (cycle < led->pdata->bkl_min)
+		cycle = led->pdata->bkl_min;
 
-	if (cycle == 0)
-		n = 0xff;
-	else
-		n = cycle - 1;
+	if (led->pdata->bkl_freq)
+		pwm_frequency = led->pdata->bkl_freq;
 
-	if (cycle == LED_FULL) {
-		omap_dm_timer_start(led->intensity_timer);
-		omap_dm_timer_set_pwm(led->intensity_timer, 1, 1,
-				      OMAP_TIMER_TRIGGER_OVERFLOW_AND_COMPARE);
-		omap_dm_timer_set_match(led->intensity_timer, 1,
-					0xffffff00);
-	} else {
-		omap_dm_timer_start(led->intensity_timer);
-		omap_dm_timer_set_pwm(led->intensity_timer, 0, 1,
-				      OMAP_TIMER_TRIGGER_OVERFLOW_AND_COMPARE);
-		omap_dm_timer_set_match(led->intensity_timer, 1,
-					(0xffffff00) | cycle);
-	}
+	if (cycle != LED_FULL)
+		pwm_set_speed(led->intensity_timer, pwm_frequency, 256-cycle);
 }
 
 static void omap_pwm_led_set(struct led_classdev *led_cdev,
-				enum led_brightness value)
+			     enum led_brightness value)
 {
 	struct omap_pwm_led *led = cdev_to_omap_pwm_led(led_cdev);
+
+	pr_debug("%s: brightness value = %i\n", __func__, value);
+
 	if (led->brightness != value) {
+		if (led->brightness < led->pdata->bkl_min ||
+			led_cdev->flags & LED_SUSPENDED) {
+			/* LED currently OFF */
+			if (value >= led->pdata->bkl_min) {
+				omap_pwm_led_power_on(led);
+				omap_pwm_led_set_pwm_cycle(led, value);
+				omap_pwm_led_pad_enable(led);
+			}
+		} else {
+			/* just set the new cycle */
+			omap_pwm_led_set_pwm_cycle(led, value);
+		}
+			
+		if (value < led->pdata->bkl_min && led->brightness >= led->pdata->bkl_min) {
+			/* LED now suspended */
+			omap_pwm_led_pad_disable(led);
+			// omap_pwm_led_set_pwm_cycle(led, value);
+			omap_pwm_led_power_off(led);
+		}
 		led->brightness = value;
-		schedule_work(&led->work);
-	}
-}
-
-static void omap_pwm_led_work(struct work_struct *work)
-{
-	struct omap_pwm_led *led = work_to_omap_pwm_led(work);
-
-	if (led->brightness != LED_OFF) {
-		omap_pwm_led_power_on(led);
-		omap_pwm_led_set_pwm_cycle(led, led->brightness);
-	} else {
-		omap_pwm_led_power_off(led);
 	}
 }
 
@@ -250,6 +299,12 @@ static int omap_pwm_led_probe(struct platform_device *pdev)
 	struct omap_pwm_led *led;
 	int ret;
 
+	if (pdata->intensity_timer < 1 || pdata->intensity_timer > MAX_GPTIMER_ID)
+		return -EINVAL;
+
+	if (pdata->blink_timer != 0 || pdata->blink_timer > MAX_GPTIMER_ID)
+		return -EINVAL;
+
 	led = kzalloc(sizeof(struct omap_pwm_led), GFP_KERNEL);
 	if (led == NULL) {
 		dev_err(&pdev->dev, "No memory for device\n");
@@ -258,12 +313,10 @@ static int omap_pwm_led_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, led);
 	led->cdev.brightness_set = omap_pwm_led_set;
-	led->cdev.max_brightness = LED_FULL;
-	led->cdev.brightness = pdata->def_brightness;
-	led->cdev.default_trigger = NULL;
+	led->cdev.default_trigger = pdata->default_trigger;
 	led->cdev.name = pdata->name;
 	led->pdata = pdata;
-	INIT_WORK(&led->work, omap_pwm_led_work);
+	led->brightness = LED_OFF;
 
 	dev_info(&pdev->dev, "OMAP PWM LED (%s) at GP timer %d/%d\n",
 		 pdata->name, pdata->intensity_timer, pdata->blink_timer);
@@ -282,7 +335,10 @@ static int omap_pwm_led_probe(struct platform_device *pdev)
 		ret = -ENODEV;
 		goto error_intensity;
 	}
-	//omap_dm_timer_disable(led->intensity_timer);
+
+	if (led->pdata->invert)
+		omap_dm_timer_set_pwm(led->intensity_timer, 1, 1,
+				      OMAP_TIMER_TRIGGER_OVERFLOW_AND_COMPARE);
 
 	if (pdata->blink_timer != 0) {
 		led->blink_timer = omap_dm_timer_request_specific(pdata->blink_timer);
@@ -291,8 +347,6 @@ static int omap_pwm_led_probe(struct platform_device *pdev)
 			ret = -ENODEV;
 			goto error_blink1;
 		}
-		omap_dm_timer_disable(led->blink_timer);
-
 		ret = device_create_file(led->cdev.dev,
 					       &dev_attr_on_period);
 		if(ret)
@@ -305,11 +359,8 @@ static int omap_pwm_led_probe(struct platform_device *pdev)
 
 	}
 
-#if 0
-	if (led->cdev.brightness) {
-		omap_pwm_led_set(&led->cdev, led->cdev.brightness);
-	}
-#endif
+	if(pdata->def_brightness)
+		omap_pwm_led_set(&led->cdev, pdata->def_brightness);
 
 	return 0;
 
@@ -351,18 +402,18 @@ static int omap_pwm_led_suspend(struct platform_device *pdev, pm_message_t state
 {
 	struct omap_pwm_led *led = pdev_to_omap_pwm_led(pdev);
 
-	flush_work(&led->work);
-	pr_debug("%s: work flushed\n", __func__);
+	pr_debug("%s: brightness: %i\n", __func__,
+			led->brightness);
 	led_classdev_suspend(&led->cdev);
-	clk_disable(led->intensity_timer->fclk);
-	pr_debug("%s: suspend complete\n", __func__);
 	return 0;
 }
 
 static int omap_pwm_led_resume(struct platform_device *pdev)
 {
 	struct omap_pwm_led *led = pdev_to_omap_pwm_led(pdev);
-	clk_enable(led->intensity_timer->fclk);
+
+	pr_debug("%s: brightness: %i\n", __func__,
+			led->brightness);
 	led_classdev_resume(&led->cdev);
 	return 0;
 }

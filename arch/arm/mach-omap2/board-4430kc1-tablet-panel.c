@@ -54,6 +54,7 @@
 #define LED_PWM2OFF			0x04
 #define TWL6030_TOGGLE3			0x92
 
+#define DEFAULT_BACKLIGHT_BRIGHTNESS	105
 
 static struct omap_dss_device tablet_lcd_device = {
 	.clocks		= {
@@ -163,9 +164,14 @@ static struct platform_device sdp4430_keypad_led = {
 };
 
 static struct omap_pwm_led_platform_data kc1_led_data = {
-	.name		 = "lcd-backlight",
+	.name 		 = "lcd-backlight",
+	.default_trigger  = "backlight",
 	.intensity_timer = 10,
-	.def_brightness	 = 0x7F,
+	.bkl_max    = 254,
+	.bkl_min    = 5,
+	.bkl_freq    = 128*2,
+	.invert     = 0,
+	.def_brightness	 = DEFAULT_BACKLIGHT_BRIGHTNESS,
 };
 
 static struct platform_device kc1_led_device = {
@@ -220,8 +226,8 @@ void __init omap4_kc1_display_init(void)
 
 	spi_register_board_info(tablet_spi_board_info,	ARRAY_SIZE(tablet_spi_board_info));
 
-	omap_mux_enable_wkup("sys_nirq1");
-	omap_mux_enable_wkup("sys_nirq2");
+//	omap_mux_enable_wkup("sys_nirq1");
+//	omap_mux_enable_wkup("sys_nirq2");
 
 	platform_add_devices(sdp4430_panel_devices, ARRAY_SIZE(sdp4430_panel_devices));
 	omap_display_init(&sdp4430_dss_data);
