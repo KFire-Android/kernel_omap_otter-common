@@ -160,6 +160,10 @@ static struct temp_sensor_data omap5430_mpu_temp_sensor_data = {
 	.adc_end_val = OMAP5430_ADC_END_VALUE,
 	.update_int1 = 1000,
 	.update_int2 = 2000,
+	.stats_en = 1,
+	.avg_number = 20,
+	.avg_period = 100,
+	.safe_temp_trend = 50,
 };
 
 /* Thresholds and limits for OMAP5430 GPU temperature sensor */
@@ -177,6 +181,10 @@ static struct temp_sensor_data omap5430_gpu_temp_sensor_data = {
 	.adc_end_val = OMAP5430_ADC_END_VALUE,
 	.update_int1 = 1000,
 	.update_int2 = 2000,
+	.stats_en = 1,
+	.avg_number = 20,
+	.avg_period = 100,
+	.safe_temp_trend = 50,
 };
 
 /* Thresholds and limits for OMAP5430 CORE temperature sensor */
@@ -194,6 +202,10 @@ static struct temp_sensor_data omap5430_core_temp_sensor_data = {
 	.adc_end_val = OMAP5430_ADC_END_VALUE,
 	.update_int1 = 1000,
 	.update_int2 = 2000,
+	.stats_en = 1,
+	.avg_number = 20,
+	.avg_period = 100,
+	.safe_temp_trend = 50,
 };
 
 /*
