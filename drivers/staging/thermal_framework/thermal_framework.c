@@ -23,10 +23,15 @@
 #include <linux/err.h>
 #include <linux/slab.h>
 #include <linux/seq_file.h>
+#include <linux/suspend.h>
 #include <linux/debugfs.h>
 #include <linux/uaccess.h>
 
 #include <linux/thermal_framework.h>
+
+#define delta_T_over_delta_t(c, l, t)			\
+	(((c) - (l)) / (t))
+	/* mC / ms */
 
 static LIST_HEAD(thermal_domain_list);
 static DEFINE_MUTEX(thermal_domain_list_lock);
@@ -92,6 +97,19 @@ static int thermal_debug_show_domain(struct seq_file *s, void *data)
 		mutex_lock(&thermal_domain_list_lock);
 		thermal_device_call(domain->temp_sensor, debug_report, s);
 		mutex_unlock(&thermal_domain_list_lock);
+	}
+	seq_printf(s, "Statistics:\n");
+	if (domain->temp_sensor && domain->temp_sensor->stats) {
+		seq_printf(s, "\t\tAverage is: %d\n",
+				domain->temp_sensor->stats->avg);
+		seq_printf(s, "\t\tTrend is: %d\n",
+				domain->temp_sensor->stats->trend);
+		if (domain->temp_sensor->stats->is_stable)
+			seq_printf(s, "\t\tTemperature is stabilized\n");
+		else
+			seq_printf(s, "\t\tTemperature is not stabilized\n");
+	} else {
+		seq_printf(s, "Statistics not Enabled:\n");
 	}
 	seq_printf(s, "Governor:\n");
 	if (domain->governor) {
@@ -300,6 +318,83 @@ static int sensor_set_temperature(void *data, u64 val)
 DEFINE_SIMPLE_ATTRIBUTE(sensor_temp_fops, sensor_get_temperature,
 			sensor_set_temperature, "%lld\n");
 
+static int report_delay_get(void *data, u64 *val)
+{
+	struct thermal_dev *temp_sensor = (struct thermal_dev *)data;
+
+	*val = temp_sensor->stats->avg_period;
+
+	return 0;
+}
+
+static int report_delay_set(void *data, u64 val)
+{
+	struct thermal_dev *temp_sensor = (struct thermal_dev *)data;
+
+	if (val < MAX_AVG_PERIOD) {
+		mutex_lock(&temp_sensor->stats->stats_mutex);
+		temp_sensor->stats->avg_period = val;
+		mutex_unlock(&temp_sensor->stats->stats_mutex);
+	} else {
+		pr_warn("delay greater than max avg period\n");
+	}
+
+	return 0;
+}
+DEFINE_SIMPLE_ATTRIBUTE(report_delay_fops, report_delay_get,
+						report_delay_set, "%llu\n");
+
+static int average_number_get(void *data, u64 *val)
+{
+	struct thermal_dev *temp_sensor = (struct thermal_dev *)data;
+
+	*val = temp_sensor->stats->avg_num;
+
+	return 0;
+}
+
+static int average_number_set(void *data, u64 val)
+{
+	struct thermal_dev *temp_sensor = (struct thermal_dev *)data;
+
+	if (val <= AVERAGE_NUMBER) {
+		mutex_lock(&temp_sensor->stats->stats_mutex);
+		temp_sensor->stats->avg_num = val;
+		temp_sensor->stats->sample_index = 0;
+		temp_sensor->stats->window_sum = 0;
+		temp_sensor->stats->acc_is_valid = 0;
+		mutex_unlock(&temp_sensor->stats->stats_mutex);
+	} else {
+		pr_warn("Average number assgined greater than MAX\n");
+	}
+
+	return 0;
+}
+DEFINE_SIMPLE_ATTRIBUTE(average_number_fops, average_number_get,
+						average_number_set, "%llu\n");
+
+static int safe_temp_trend_get(void *data, u64 *val)
+{
+	struct thermal_dev *temp_sensor = (struct thermal_dev *)data;
+
+	*val = temp_sensor->stats->safe_temp_trend;
+
+	return 0;
+}
+
+static int safe_temp_trend_set(void *data, u64 val)
+{
+	struct thermal_dev *temp_sensor = (struct thermal_dev *)data;
+
+	mutex_lock(&temp_sensor->stats->stats_mutex);
+	temp_sensor->stats->safe_temp_trend = (int)val;
+	mutex_unlock(&temp_sensor->stats->stats_mutex);
+
+	return 0;
+}
+DEFINE_SIMPLE_ATTRIBUTE(safe_temp_trend_fops, safe_temp_trend_get,
+				safe_temp_trend_set, "%llu\n");
+
 static void thermal_debug_register_device(struct thermal_dev *tdev)
 {
 	struct dentry *d;
@@ -435,6 +530,28 @@ out:
 	return ret;
 }
 EXPORT_SYMBOL_GPL(thermal_sensor_set_temp);
+
+static int thermal_pm_notifier_cb(struct notifier_block *notifier,
+				unsigned long pm_event,  void *unused)
+{
+	struct stats_thermal *stats = container_of(notifier, struct
+						stats_thermal, pm_notifier);
+
+	switch (pm_event) {
+	case PM_SUSPEND_PREPARE:
+		cancel_delayed_work_sync(&stats->avg_sensor_temp_work);
+		break;
+	case PM_POST_SUSPEND:
+		schedule_work(&stats->avg_sensor_temp_work.work);
+		break;
+	}
+
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block thermal_pm_notifier = {
+	.notifier_call = thermal_pm_notifier_cb,
+};
 
 /*
  * thermal_get_slope() - External API for the sensor driver to
@@ -633,11 +750,327 @@ int thermal_check_domain(const char *domain_name)
 	return ret;
 }
 
+static void thermal_average_sensor_temperature(struct stats_thermal *stats)
+{
+	int i, ret, tmp, temp;
+
+	if (stats == NULL)
+		return;
+
+	ret = thermal_request_temp(stats->temp_sensor);
+
+	if (ret < 0)
+		return;
+
+	temp = ret;
+
+	mutex_lock(&stats->stats_mutex);
+	if (stats->sample_index >= stats->avg_num ||
+			stats->sample_index >= AVERAGE_NUMBER) {
+		stats->acc_is_valid = 1;
+		stats->sample_index = 0;
+	}
+
+	tmp = stats->sensor_temp_table[stats->sample_index];
+
+	stats->sensor_temp_table[stats->sample_index++] = ret;
+	stats->window_sum += ret;
+	if (stats->acc_is_valid) {
+		stats->window_sum -= tmp;
+		tmp = stats->avg_num;
+	} else {
+		tmp = stats->sample_index;
+	}
+
+	for (i = 0; i < stats->avg_num; i++) {
+		pr_debug("sensor_temp_table[%d] = %d\n", i,
+			stats->sensor_temp_table[i]);
+	}
+
+	stats->avg = (stats->window_sum / tmp);
+
+	mutex_unlock(&stats->stats_mutex);
+
+	if (!stats->trending_enabled)
+		goto report;
+
+	tmp = stats->sample_index - 1;
+	mutex_lock(&stats->stats_mutex);
+	if (tmp != 0) {
+		stats->trend =
+			delta_T_over_delta_t(stats->sensor_temp_table[tmp],
+			stats->sensor_temp_table[tmp - 1], stats->avg_period);
+	} else {
+		/* Case of first ever temperature reading can be detected here
+		 * So we do not compute trend since we have only on reading.
+		 */
+		if (!stats->acc_is_valid)
+			goto report;
+		stats->trend = delta_T_over_delta_t(stats->sensor_temp_table[0],
+				stats->sensor_temp_table[stats->avg_num - 1],
+				stats->avg_period);
+	}
+
+	if (stats->trend < stats->safe_temp_trend &&
+				stats->trend > -stats->safe_temp_trend) {
+		stats->stable_cnt++;
+	} else {
+		stats->is_stable = 0;
+		stats->stable_cnt = 0;
+	}
+
+	if (stats->stable_cnt >= STABLE_TREND_COUNT) {
+		stats->stable_cnt = STABLE_TREND_COUNT;
+		stats->is_stable = 1;
+	}
+
+	mutex_unlock(&stats->stats_mutex);
+report:
+
+	pr_debug("%s: averaging %s temp %d. avg %d stable %d trend %d\n",
+			__func__, stats->temp_sensor->domain_name,
+			temp, stats->avg, stats->is_stable, stats->trend);
+
+	/** Report temperature so as to update the governor
+	 *  With the latest reading.
+	 */
+	ret = thermal_sensor_set_temp(stats->temp_sensor);
+}
+
+static void thermal_average_sensor_temperature_work_fn(struct work_struct *work)
+{
+	struct stats_thermal *stats =
+				container_of(work, struct stats_thermal,
+				avg_sensor_temp_work.work);
+
+	thermal_average_sensor_temperature(stats);
+
+	schedule_delayed_work(&stats->avg_sensor_temp_work,
+		msecs_to_jiffies(stats->avg_period));
+}
+
+int thermal_init_stats(struct thermal_dev *tdev, uint avg_period,
+				uint avg_num, int safe_temp_trend)
+{
+	tdev->stats = kzalloc(sizeof(struct stats_thermal), GFP_KERNEL);
+	if (!tdev->stats)
+		return -ENOMEM;
+
+	tdev->stats->name = tdev->domain_name;
+	tdev->stats->avg_period = avg_period;
+	tdev->stats->avg_num = avg_num;
+	tdev->stats->temp_sensor = tdev;
+	tdev->stats->safe_temp_trend = safe_temp_trend;
+	tdev->stats->stable_cnt = STABLE_TREND_COUNT;
+	tdev->stats->is_stable = 1;
+	tdev->stats->pm_notifier = thermal_pm_notifier;
+	mutex_init(&tdev->stats->stats_mutex);
+	INIT_DELAYED_WORK(&tdev->stats->avg_sensor_temp_work,
+			thermal_average_sensor_temperature_work_fn);
+
+	if (register_pm_notifier(&tdev->stats->pm_notifier))
+		pr_err("%s:stats pm registration failed!\n",
+							__func__);
+
+	schedule_work(&tdev->stats->
+			avg_sensor_temp_work.work);
+	tdev->stats->accumulation_enabled = 1;
+#ifdef CONFIG_THERMAL_FRAMEWORK_DEBUG
+	(void) debugfs_create_file("report_delay_ms",
+		S_IRUGO | S_IWUSR, tdev->debug_dentry, tdev,
+		&report_delay_fops);
+	(void) debugfs_create_file("average_number",
+		S_IRUGO | S_IWUSR, tdev->debug_dentry, tdev,
+		&average_number_fops);
+	(void) debugfs_create_file("safe_temp_trend",
+		S_IRUGO | S_IWUSR, tdev->debug_dentry, tdev,
+		&safe_temp_trend_fops);
+#endif
+	return 0;
+}
+EXPORT_SYMBOL_GPL(thermal_init_stats);
+
 /**
- * thermal_lookup_temp() - Requests the thermal sensor to report it's current
- *			    temperature to the governor.
+ * thermal_check_temp_stability() - Check for temperature stability
  *
- * @tdev: The agent requesting the updated temperature.
+ * @tdev: The thermal device
+ * Returns the value of is_stable of the stats structure.
+ */
+
+int thermal_check_temp_stability(struct thermal_dev *tdev)
+{
+	if (tdev && tdev->stats)
+		return tdev->stats->is_stable;
+	else
+		return -ENODEV;
+}
+EXPORT_SYMBOL_GPL(thermal_check_temp_stability);
+
+/**
+ * thermal_enable_trend() - Enable the temperature trending.
+ *
+ * @domain_name: a char pointer to the domain name to look up.
+ *
+ * Returns the slope of the current found domain.
+ * ENODEV if the temperature sensor does not exist.
+ * EOPNOTSUPP if the temperature sensor does not support this API.
+ */
+int thermal_enable_trend(const char *name)
+{
+	int ret = -ENODEV;
+	struct thermal_domain *domain;
+	struct thermal_dev *tdev;
+
+	domain = thermal_domain_find(name);
+	if (!domain) {
+		pr_err("%s: %s is a non existing domain\n", __func__, name);
+		return ret;
+	}
+
+	tdev = domain->temp_sensor;
+
+	if (!tdev)
+		return ret;
+
+	mutex_lock(&thermal_domain_list_lock);
+	tdev->stats->trending_enabled = true;
+	mutex_unlock(&thermal_domain_list_lock);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(thermal_enable_trend);
+
+/**
+ * thermal_lookup_trend() - Requests the thermal FW to report current
+ *			    trend of a domain.
+ *
+ * @name: The domain Name.
+ *
+ * Returns the current temperature of the current domain.
+ * ENODEV if the temperature sensor does not exist.
+ */
+int thermal_lookup_trend(const char *name)
+{
+	struct thermal_domain *thermal_domain;
+	int ret = -ENODEV;
+
+	thermal_domain = thermal_domain_find(name);
+	if (!thermal_domain) {
+		pr_err("%s: %s is a non existing domain\n", __func__, name);
+		return ret;
+	}
+
+	if (thermal_domain->temp_sensor->stats &&
+		thermal_domain->temp_sensor->stats->trending_enabled)
+		return thermal_domain->temp_sensor->stats->trend;
+	else
+		return -EOPNOTSUPP;
+}
+EXPORT_SYMBOL_GPL(thermal_lookup_trend);
+
+/**
+ * thermal_enable_avg() - Enable the averaging of temperatures from a
+ *			  particular sensor.
+ *
+ * @domain_name: a char pointer to the domain name to look up.
+ *
+ * Returns the slope of the current found domain.
+ * ENODEV if the temperature sensor does not exist.
+ * EOPNOTSUPP if the temperature sensor does not support this API.
+ */
+int thermal_enable_avg(const char *name)
+{
+	int ret = -ENODEV;
+	struct thermal_domain *domain;
+	struct thermal_dev *tdev;
+
+	domain = thermal_domain_find(name);
+	if (!domain) {
+		pr_err("%s: %s is a non existing domain\n", __func__, name);
+		return ret;
+	}
+
+	tdev = domain->temp_sensor;
+
+	if (!tdev)
+		return ret;
+
+	mutex_lock(&thermal_domain_list_lock);
+	tdev->stats->avg_enabled = true;
+	mutex_unlock(&thermal_domain_list_lock);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(thermal_enable_avg);
+
+/**
+ * thermal_lookup_avg() - Requests the thermal FW to report current
+ *			    avergae of a domain to the governor.
+ *
+ * @name: The domain Name.
+ *
+ * Returns the current temperature of the current domain.
+ * ENODEV if the temperature sensor does not exist.
+ */
+int thermal_lookup_avg(const char *name)
+{
+	struct thermal_domain *thermal_domain;
+	int ret = -ENODEV;
+
+	thermal_domain = thermal_domain_find(name);
+	if (!thermal_domain) {
+		pr_err("%s: %s is a non existing domain\n", __func__, name);
+		return ret;
+	}
+
+	if (thermal_domain->temp_sensor->stats &&
+			thermal_domain->temp_sensor->stats->acc_is_valid)
+		return thermal_domain->temp_sensor->stats->avg;
+	else
+		return -EOPNOTSUPP;
+}
+EXPORT_SYMBOL_GPL(thermal_lookup_avg);
+
+int thermal_set_avg_period(struct thermal_dev *temp_sensor, int rate)
+{
+	if (!temp_sensor || !temp_sensor->stats) {
+		pr_warn("Stats Not enabled %s\n", __func__);
+		return -ENODEV;
+	}
+
+	if (rate < MAX_AVG_PERIOD) {
+		mutex_lock(&temp_sensor->stats->stats_mutex);
+		temp_sensor->stats->avg_period = rate;
+		mutex_unlock(&temp_sensor->stats->stats_mutex);
+	} else {
+		pr_warn("delay greater than max avg period\n");
+	}
+
+	return 0;
+}
+
+static int thermal_lookup_stats_temp(struct stats_thermal *stats)
+{
+	int tmp;
+
+	mutex_lock(&stats->stats_mutex);
+	if (stats->sample_index != 0)
+		tmp = stats->sensor_temp_table[stats->sample_index - 1];
+	else
+		tmp = stats->sensor_temp_table[stats->avg_num];
+	mutex_unlock(&stats->stats_mutex);
+
+	return tmp;
+}
+
+/**
+ * thermal_lookup_temp() - Requests the current
+ *			   temperature of a domain. If the statistics are
+ *			   enabled then gives the temperature from the latest
+ *			   reading of the history table else will do an actual
+ *			   read from the sensor.
+ *
+ * @name: The name of the domain for the which the reuest has been made.
  *
  * Returns the current temperature of the current domain.
  * ENODEV if the temperature sensor does not exist.
@@ -651,6 +1084,11 @@ int thermal_lookup_temp(const char *name)
 	if (!thermal_domain) {
 		pr_err("%s: %s is a non existing domain\n", __func__, name);
 		return ret;
+	}
+
+	if (thermal_domain->temp_sensor->stats) {
+		struct stats_thermal *stat = thermal_domain->temp_sensor->stats;
+		return thermal_lookup_stats_temp(stat);
 	}
 
 	ret = thermal_device_call(thermal_domain->temp_sensor, report_temp);

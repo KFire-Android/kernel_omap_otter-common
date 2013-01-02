@@ -1202,6 +1202,7 @@ int __devinit omap_bandgap_probe(struct platform_device *pdev)
 
 	g_bg_ptr = bg_ptr;
 	g_bg_ptr->bg_clk_idle = false;
+
 	return 0;
 
 put_clks:

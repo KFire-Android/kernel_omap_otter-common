@@ -176,6 +176,11 @@ struct temp_sensor_data {
 	u32	adc_end_val;
 	u32	update_int1;
 	u32	update_int2;
+	u32	stats_en;
+	u32	avg_number;
+	u32	avg_period;
+	u32	safe_temp_trend;
+	u32	stable_cnt;
 };
 
 /**

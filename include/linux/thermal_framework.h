@@ -21,6 +21,10 @@
 #include <linux/seq_file.h>
 #include <linux/dcache.h>
 
+#define AVERAGE_NUMBER 20
+#define MAX_AVG_PERIOD 5000
+#define STABLE_TREND_COUNT 10
+
 struct thermal_dev;
 struct thermal_domain;
 
@@ -78,6 +82,53 @@ struct thermal_cooling_action {
 };
 
 /**
+ * struct stats_thermal - Structure containing themal statistics of a domain.
+ * @name: The name of the domain.
+ * @avg: Average temperature of a domain.
+ * @avg_period: Time gap between 2 consecutive readings
+ * @sensor_temp_table: Table containing the latest AVERAGE_NUMBER readings.
+ * @current_temp: Current temperature of the domain.
+ * @acc_is_valid: Flag set to true only when AVERAGE_NUMBER number of readings
+			are taken.
+ * @avg_enabled: Flag whic tells if averaging feature is enabled or not.
+ * @avg_num: Number of samples to be considered for average computation.
+ * @trend: Trend of the particular domain.
+ * @trending_enabled: Flag that shows if trending is enabled.
+ * @safe_temp_trend: Trend threshold for a particular domain.
+ * @stable_cnt: Count which tells the number of stable trends.
+ * @is_stable: Flag which tells if the domain temperature is stable.
+ * @accumulation_enabled: Flag which tells if accumulation is enabled.
+ * @sample_index: The current array index in the sensor_temp_table array.
+ * @window_sum: Sum of all elements in the array sensor_temp_table.
+ * @temp_sensor: Pointer to temp_sensor of the domain.
+ * @avg_sensor_temp_work: delayed_work structure for the stats computation.
+ * @pm_notifier: pm notofier to start and stop the work function.
+ */
+
+struct stats_thermal {
+	const char			*name;
+	int				avg;
+	int				avg_period;
+	int				sensor_temp_table[AVERAGE_NUMBER];
+	int				current_temp;
+	bool				acc_is_valid;
+	int				avg_enabled;
+	uint				avg_num;
+	int				trend;
+	bool				trending_enabled;
+	int				safe_temp_trend;
+	int				stable_cnt;
+	bool				is_stable;
+	bool				accumulation_enabled;
+	int				sample_index;
+	int				window_sum;
+	struct mutex			stats_mutex; /* Mutex for stats */
+	struct thermal_dev		*temp_sensor;
+	struct delayed_work		avg_sensor_temp_work;
+	struct notifier_block		pm_notifier;
+};
+
+/**
  * struct thermal_dev  - Structure for each thermal device.
  * @name: The name of the device that is registering to the framework
  * @domain_name: The temperature domain that the thermal device represents
@@ -99,7 +150,9 @@ struct thermal_dev {
 	int		slope;
 	int		constant;
 	int		sen_id;
-	struct thermal_domain   *domain;
+	int		stable_cnt;
+	struct thermal_domain	*domain;
+	struct stats_thermal	*stats;
 	struct dentry *debug_dentry;
 	/* for serializing sensor.ops manipulations and temp injection */
 	struct mutex	mutex;
@@ -158,18 +211,25 @@ extern int thermal_insert_cooling_action(struct thermal_dev *tdev,
 					 unsigned int priority,
 					 unsigned int reduction);
 extern int thermal_request_temp(struct thermal_dev *tdev);
+extern int thermal_check_temp_stability(struct thermal_dev *tdev);
+extern int thermal_enable_avg(const char *domain_name);
+extern int thermal_enable_trend(const char *domain_name);
 extern int thermal_lookup_temp(const char *domain_name);
+extern int thermal_lookup_avg(const char *domain_name);
+extern int thermal_lookup_trend(const char *domain_name);
 extern int thermal_lookup_slope(const char *domain_name, const char *rel);
 extern int thermal_lookup_offset(const char *domain_name, const char *rel);
 extern int thermal_sensor_set_temp(struct thermal_dev *tdev);
 extern int thermal_get_slope(struct thermal_dev *tdev, const char *rel);
 extern int thermal_get_offset(struct thermal_dev *tdev, const char *rel);
-
+extern int thermal_set_avg_period(struct thermal_dev *temp_sensor, int rate);
 /* Registration and unregistration calls for the thermal devices */
 extern int thermal_sensor_dev_register(struct thermal_dev *tdev);
 extern void thermal_sensor_dev_unregister(struct thermal_dev *tdev);
 extern int thermal_cooling_dev_register(struct thermal_dev *tdev);
 extern void thermal_cooling_dev_unregister(struct thermal_dev *tdev);
+extern int thermal_init_stats(struct thermal_dev *tdev, uint avg_period,
+			uint avg_num, int safe_temp_trend);
 extern int thermal_governor_dev_register(struct thermal_dev *tdev);
 extern void thermal_governor_dev_unregister(struct thermal_dev *tdev);
 extern int thermal_check_domain(const char *domain_name);
@@ -184,7 +244,37 @@ static inline int thermal_request_temp(struct thermal_dev *tdev)
 {
 	return 0;
 }
+static inline int thermal_check_temp_stability(struct thermal_dev *tdev)
+{
+	return 0;
+}
+static int thermal_init_stats(struct thermal_dev *tdev, uint avg_period,
+			uint avg_num, int safe_temp_trend)
+{
+	return 0;
+}
+static inline int thermal_enable_avg(const char *domain_name)
+{
+	return 0;
+}
+static inline int thermal_enable_trend(const char *domain_name)
+{
+	return 0;
+}
+static inline int thermal_set_avg_period(struct thermal_dev *temp_sensor,
+						int rate)
+{
+	return 0;
+}
 static inline int thermal_lookup_temp(const char *domain_name)
+{
+	return 0;
+}
+static inline int thermal_lookup_avg(const char *domain_name)
+{
+	return 0;
+}
+static inline int thermal_lookup_trend(const char *domain_name);
 {
 	return 0;
 }
