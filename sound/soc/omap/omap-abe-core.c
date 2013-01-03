@@ -36,7 +36,7 @@
 
 #include <sound/soc.h>
 #include <plat/cpu.h>
-#include <plat/omap-pm.h>
+#include "../../../arch/arm/mach-omap2/omap-pm.h"
 
 #include "omap-abe-priv.h"
 
