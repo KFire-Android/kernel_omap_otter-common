@@ -404,7 +404,6 @@ static OMAPLFB_BOOL OMAPLFBValidateUpdateMode(OMAPLFB_UPDATE_MODE eMode)
 	return OMAPLFB_FALSE;
 }
 
-#if !defined(OMAP_FB_UPDATE_MODE)
 static enum OMAP_UPDATE_MODE OMAPLFBToUpdateMode(OMAPLFB_UPDATE_MODE eMode)
 {
 	switch(eMode)
@@ -421,7 +420,6 @@ static enum OMAP_UPDATE_MODE OMAPLFBToUpdateMode(OMAPLFB_UPDATE_MODE eMode)
 
 	return -1;
 }
-#endif
 
 #if defined(DEBUG)
 static const char *OMAPLFBUpdateModeToString(OMAPLFB_UPDATE_MODE eMode)
@@ -443,7 +441,6 @@ static const char *OMAPLFBUpdateModeToString(OMAPLFB_UPDATE_MODE eMode)
 	return "Unknown Update Mode";
 }
 
-#if !defined(OMAP_FB_UPDATE_MODE)
 static const char *OMAPLFBDSSUpdateModeToString(enum OMAP_UPDATE_MODE eMode)
 {
 	if (!OMAPLFBValidUpdateMode(eMode))
@@ -453,7 +450,6 @@ static const char *OMAPLFBDSSUpdateModeToString(enum OMAP_UPDATE_MODE eMode)
 
 	return OMAPLFBUpdateModeToString(OMAPLFBFromUpdateMode(eMode));
 }
-#endif
 
 void OMAPLFBPrintInfo(OMAPLFB_DEVINFO *psDevInfo)
 {
@@ -601,6 +597,7 @@ OMAPLFB_UPDATE_MODE OMAPLFBGetUpdateMode(OMAPLFB_DEVINFO *psDevInfo)
 
 OMAPLFB_BOOL OMAPLFBSetUpdateMode(OMAPLFB_DEVINFO *psDevInfo, OMAPLFB_UPDATE_MODE eMode)
 {
+	enum OMAP_UPDATE_MODE eUpdateMode;
 	int res;
 
 	if (!OMAPLFBValidateUpdateMode(eMode))
@@ -609,11 +606,14 @@ OMAPLFB_BOOL OMAPLFBSetUpdateMode(OMAPLFB_DEVINFO *psDevInfo, OMAPLFB_UPDATE_MOD
 			return OMAPLFB_FALSE;
 	}
 
-	res = omapfb_set_update_mode(psDevInfo->psLINFBInfo, eMode);
+	res = omapfb_set_update_mode(psDevInfo->psLINFBInfo, eUpdateMode);
 
 	if (res != 0)
 	{
-		DEBUG_PRINTK((KERN_WARNING DRIVER_PREFIX ": %s: Device %u: set_update_mode (%s) failed (%d)\n", __FUNCTION__, psDevInfo->uiFBDevID, OMAPLFBUpdateModeToString(eMode), res));
+		DEBUG_PRINTK((KERN_WARNING DRIVER_PREFIX \
+		": %s: Device %u: set_update_mode (%s) failed (%d)\n", __func__,
+				psDevInfo->uiFBDevID,
+				OMAPLFBUpdateModeToString(eUpdateMode), res));
 	}
 
 	return (res == 0);
