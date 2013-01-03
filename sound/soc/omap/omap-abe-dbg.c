@@ -29,8 +29,8 @@
 #include <linux/dma-mapping.h>
 #include <linux/debugfs.h>
 
-#include <plat/dma.h>
-#include <plat/dma-44xx.h>
+#include <linux/omap-dma.h>
+#define OMAP44XX_DMA_ABE_REQ_7			108
 
 #include <sound/soc.h>
 
