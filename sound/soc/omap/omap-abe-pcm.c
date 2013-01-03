@@ -25,8 +25,15 @@
 
 #include <linux/delay.h>
 
-#include <plat/dma.h>
-#include <plat/dma-44xx.h>
+#include <linux/omap-dma.h>
+#define OMAP44XX_DMA_ABE_REQ_0			101
+#define OMAP44XX_DMA_ABE_REQ_1			102
+#define OMAP44XX_DMA_ABE_REQ_2			103
+#define OMAP44XX_DMA_ABE_REQ_3			104
+#define OMAP44XX_DMA_ABE_REQ_4			105
+#define OMAP44XX_DMA_ABE_REQ_5			106
+#define OMAP44XX_DMA_ABE_REQ_6			107
+#define OMAP44XX_DMA_ABE_REQ_7			108
 
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
