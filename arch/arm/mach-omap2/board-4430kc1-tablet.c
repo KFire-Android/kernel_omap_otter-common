@@ -47,6 +47,7 @@
 //#include <mach/lpddr2-elpida.h>
 //#include <mach/dmm.h>
 #include <mach/omap4_ion.h>
+#include <mach/omap-secure.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
@@ -1010,7 +1011,7 @@ static void __init omap_4430sdp_reserve(void)
 #endif
 
 	/* do the static reservations first */
-	memblock_remove(PHYS_ADDR_SMC_MEM, PHYS_ADDR_SMC_SIZE);
+	omap_secure_set_secure_workspace_addr(omap_smc_addr(), omap_smc_size())
 // TODO: FIX LATER
 #if 0
 	memblock_remove(PHYS_ADDR_DUCATI_MEM, PHYS_ADDR_DUCATI_SIZE);
