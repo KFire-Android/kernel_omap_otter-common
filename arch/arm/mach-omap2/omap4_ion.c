@@ -83,7 +83,7 @@ static struct omap_ion_platform_data omap4_ion_pdata = {
 };
 
 static struct platform_device omap4_ion_device = {
-	.name = "ion-omap4",
+	.name = "ion-omap",
 	.id = -1,
 	.dev = {
 		.platform_data = &omap4_ion_data,
