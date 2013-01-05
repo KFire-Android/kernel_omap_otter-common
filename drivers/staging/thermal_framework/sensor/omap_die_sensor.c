@@ -365,5 +365,24 @@ int omap_thermal_expose_sensor(struct omap_bandgap *bg_ptr, int id,
 		return ret;
 	}
 
+	if (data->bg_ptr->conf->sensors[id].ts_data->stats_en) {
+		thermal_init_stats(&data->therm_fw,
+		data->bg_ptr->conf->sensors[id].ts_data->avg_period,
+		data->bg_ptr->conf->sensors[id].ts_data->avg_number,
+		data->bg_ptr->conf->sensors[id].ts_data->safe_temp_trend);
+	} else {
+		return 0;
+	}
+
+	if (bg_ptr->conf->sensors[id].ts_data->stats_en) {
+		domain = bg_ptr->conf->sensors[id].domain;
+		if (thermal_enable_avg(domain))
+			pr_warn("thermal_enable_avg for domain %s failed\n",
+				domain);
+		if (thermal_enable_trend(domain))
+			pr_warn("thermal_enable_trend for domain %s failed\n",
+			domain);
+	}
+
 	return 0;
 }
