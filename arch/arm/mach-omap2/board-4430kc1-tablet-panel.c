@@ -169,7 +169,7 @@ static struct omap_pwm_led_platform_data kc1_led_data = {
 	.intensity_timer = 10,
 	.bkl_max    = 254,
 	.bkl_min    = 5,
-	.bkl_freq    = 128*2,
+	.bkl_freq    = 128,
 	.invert     = 0,
 	.def_brightness	 = DEFAULT_BACKLIGHT_BRIGHTNESS,
 };
