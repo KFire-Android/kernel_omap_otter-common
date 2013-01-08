@@ -307,9 +307,10 @@ static int abe_probe(struct snd_soc_platform *platform)
 	}
 
 	ret = abe_opp_init_initial_opp(abe);
-	if (ret < 0)
-		goto err_opp;
-
+	if (ret < 0) {
+		dev_info(platform->dev, "No OPP definition\n");
+		ret = 0;
+	}
 	/* aess_clk has to be enabled to access hal register.
 	 * Disable the clk after it has been used.
 	 */
@@ -372,6 +373,8 @@ static struct snd_soc_platform_driver omap_aess_platform = {
 	.stream_event	= abe_opp_stream_event,
 };
 
+void driver_deferred_probe_trigger(void);
+
 static void abe_fw_ready(const struct firmware *fw, void *context)
 {
 	struct platform_device *pdev = (struct platform_device *)context;
@@ -394,6 +397,8 @@ static void abe_fw_ready(const struct firmware *fw, void *context)
 		snd_soc_unregister_platform(&pdev->dev);
 		release_firmware(fw);
 	}
+	driver_deferred_probe_trigger();
+
 }
 
 static int abe_engine_probe(struct platform_device *pdev)
