@@ -280,25 +280,6 @@ static int omap4_pwrdm_wait_transition(struct powerdomain *pwrdm)
 	return 0;
 }
 
-/* FIXME: Need to autogenerate below macro */
-#define OMAP5_FOCRE_OFF_SHIFT				7
-
-static int omap5_pwrdm_enable_force_off(struct powerdomain *pwrdm)
-{
-	omap4_prminst_rmw_inst_reg_bits(0, 1 << OMAP5_FOCRE_OFF_SHIFT,
-		pwrdm->prcm_partition, pwrdm->prcm_offs, OMAP4_PM_PWSTCTRL);
-
-	return 0;
-}
-
-static int omap5_pwrdm_disable_force_off(struct powerdomain *pwrdm)
-{
-	omap4_prminst_rmw_inst_reg_bits(1 << OMAP5_FOCRE_OFF_SHIFT, 0,
-		pwrdm->prcm_partition, pwrdm->prcm_offs, OMAP4_PM_PWSTCTRL);
-
-	return 0;
-}
-
 /**
  * omap4_pwrdm_enable_hdwr_sar - enable hardware save / restore for pwrdm
  * @pwrdm: struct powerdomain * to enable HW SAR for
@@ -494,8 +475,6 @@ struct pwrdm_ops omap5_pwrdm_operations = {
 	.pwrdm_enable_hdwr_sar	= omap4_pwrdm_enable_hdwr_sar,
 	.pwrdm_disable_hdwr_sar	= omap4_pwrdm_disable_hdwr_sar,
 	.pwrdm_lost_context_rff = omap4_pwrdm_lost_context_rff,
-	.pwrdm_enable_force_off	= omap5_pwrdm_enable_force_off,
-	.pwrdm_disable_force_off	= omap5_pwrdm_disable_force_off,
 	.pwrdm_enable_off	= omap4_device_set_next_state_off,
 	.pwrdm_read_next_off	= omap4_device_read_next_state_off,
 };

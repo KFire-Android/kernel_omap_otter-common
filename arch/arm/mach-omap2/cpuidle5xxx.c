@@ -152,9 +152,6 @@ static int omap5_enter_couple_idle(struct cpuidle_device *dev,
 
 	cpu_pm_enter();
 
-	if (dev->cpu)
-		pwrdm_enable_force_off(cpu_pd[1]);
-
 	if (dev->cpu == 0) {
 		omap_set_pwrdm_state(mpu_pd, cx->mpu_state);
 		omap_set_pwrdm_state(core_pd, cx->core_state);
@@ -176,9 +173,6 @@ static int omap5_enter_couple_idle(struct cpuidle_device *dev,
 		clkdm_wakeup(cpu_clkdm[1]);
 		clkdm_allow_idle(cpu_clkdm[1]);
 	}
-
-	if (dev->cpu)
-		pwrdm_disable_force_off(cpu_pd[1]);
 
 	cpu_pm_exit();
 

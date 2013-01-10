@@ -68,13 +68,6 @@
  * without waking up the powerdomain
  */
 #define PWRDM_HAS_LOWPOWERSTATECHANGE	(1 << 2)
-/*
- * Supported only on CPU power domains to take care of Cortex-A15 based
- * design limitation. All the CPUs in a cluster transitions to low power
- * state together and not individually with wfi. Force OFF mode fix that
- * limitation and let CPU individually hit OFF mode.
- */
-#define PWRDM_HAS_FORCE_OFF		(1 << 3)
 
 /*
  * Number of memory banks that are power-controllable.	On OMAP4430, the
@@ -188,8 +181,6 @@ struct pwrdm_wkup_constraints_entry {
  * @pwrdm_disable_hdwr_sar: Disable Hardware Save-Restore feature for a pd
  * @pwrdm_set_lowpwrstchange: Enable pd transitions from a shallow to deep sleep
  * @pwrdm_wait_transition: Wait for a pd state transition to complete
- * @pwrdm_enable_force_off: Enable force off transition feature for the pd
- * @pwrdm_disable_force_off: Disable force off transition feature for the pd
  * @pwrdm_lost_context_rff: Check if pd has lost RFF context (entered off)
  * @pwrdm_lost_context_rff: Check if pd has lost RFF context (omap4+ device off)
  * @pwrdm_enable_off: Extra off mode enable for pd (omap4+ device off)
@@ -214,8 +205,6 @@ struct pwrdm_ops {
 	int	(*pwrdm_disable_hdwr_sar)(struct powerdomain *pwrdm);
 	int	(*pwrdm_set_lowpwrstchange)(struct powerdomain *pwrdm);
 	int	(*pwrdm_wait_transition)(struct powerdomain *pwrdm);
-	int	(*pwrdm_enable_force_off)(struct powerdomain *pwrdm);
-	int	(*pwrdm_disable_force_off)(struct powerdomain *pwrdm);
 	bool	(*pwrdm_lost_context_rff)(struct powerdomain *pwrdm);
 	void	(*pwrdm_enable_off)(bool enable);
 	bool	(*pwrdm_read_next_off)(void);
@@ -272,8 +261,6 @@ int pwrdm_wakeuplat_remove_constraint(struct powerdomain *pwrdm, void *cookie);
 
 int pwrdm_get_context_loss_count(struct powerdomain *pwrdm);
 bool pwrdm_can_ever_lose_context(struct powerdomain *pwrdm);
-int pwrdm_enable_force_off(struct powerdomain *pwrdm);
-int pwrdm_disable_force_off(struct powerdomain *pwrdm);
 
 int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 state);
 extern void omap242x_powerdomains_init(void);
