@@ -719,12 +719,12 @@ static __initdata struct emif_device_details emif_devices_1g_2cs = {
 	.cs0_device = &lpddr2_elpida_2G_S4_dev,
 	.cs1_device = &lpddr2_elpida_2G_S4_dev
 };
-#endif
-
+#else
 static struct emif_device_details __initdata emif_devices_512m = {
 	.cs0_device = &lpddr2_elpida_2G_S4_dev,
 	.cs1_device = NULL
 };
+#endif
 
 static void enable_rtc_gpio(void){
 	/* To access twl registers we enable gpio6
@@ -848,15 +848,15 @@ static void __init omap_kc1_init(void)
 
 	omap4_mux_init(board_mux, board_wkup_mux, package);
 
-#if 1
-	omap_emif_setup_device_details(&emif_devices_512m, &emif_devices_512m);
-#else
+#if defined(CONFIG_OTTER2)
 	sd_density = omap_sdram_density();
 	if (sd_density == 0x14) {
 		omap_emif_setup_device_details(&emif_devices_1g_2cs, &emif_devices_1g_2cs);
 	}else {
 		omap_emif_setup_device_details(&emif_devices_1g_1cs, &emif_devices_1g_1cs);
 	}
+#else
+	omap_emif_setup_device_details(&emif_devices_512m, &emif_devices_512m);
 #endif
 
 	omap_board_config = sdp4430_config;
