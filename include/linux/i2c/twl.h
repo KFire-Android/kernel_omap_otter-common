@@ -72,7 +72,8 @@
 #define TWL4030_MODULE_RTC		0x16
 #define TWL4030_MODULE_SECURED_REG	0x17
 #define TWL6032_MODULE_CHARGER		0x18
-#define TWL6030_MODULE_SLAVE_RES	0x19
+#define TWL6030_MODULE_PM_MISC		0x19
+#define TWL6030_MODULE_SLAVE_RES	0x20
 
 #define TWL_MODULE_USB		TWL4030_MODULE_USB
 #define TWL_MODULE_AUDIO_VOICE	TWL4030_MODULE_AUDIO_VOICE
@@ -817,6 +818,14 @@ struct twl4030_audio_data {
 	unsigned int irq_base;
 };
 
+struct twl6030_thermal_data {
+	u8 hotdie_cfg;
+#define TWL6030_HOTDIE_117C 0x00
+#define TWL6030_HOTDIE_121C 0x01
+#define TWL6030_HOTDIE_125C 0x02
+#define TWL6030_HOTDIE_130C 0x03
+};
+
 /**
  * struct twl_reg_setup_array - NULL terminated array giving configuration
  * @mod_no:    TWL Module id
@@ -897,6 +906,9 @@ struct twl4030_platform_data {
 
 	/* TWL6032 external SMPS regulators */
 	struct regulator_init_data		*ext_v2v1;
+
+	/* TWL6030 thermal monitoring configuration */
+	struct twl6030_thermal_data		*thermal;
 
 	/* Common one-time registers configuration */
 	struct twl_reg_setup_array		*reg_setup_script;
