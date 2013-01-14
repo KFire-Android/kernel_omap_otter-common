@@ -23,5 +23,5 @@ int __init tablet_display_init(void);
 int __init tablet_touch_init(void);
 int __init tablet_sensor_init(void);
 int __init tablet_button_init(void);
-
+void tablet_android_display_setup(void);
 #endif
