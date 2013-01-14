@@ -663,6 +663,10 @@ static struct regulator_init_data omap4_regen1_idata = {
 	},
 };
 
+static struct twl6030_thermal_data omap4_thermal_pdata = {
+	.hotdie_cfg = TWL6030_HOTDIE_130C,
+};
+
 void __init omap4_pmic_get_config(struct twl4030_platform_data *pmic_data,
 				  u32 pdata_flags, u32 regulators_flags)
 {
@@ -680,6 +684,9 @@ void __init omap4_pmic_get_config(struct twl4030_platform_data *pmic_data,
 
 	if (pdata_flags & TWL_COMMON_PDATA_MADC && !pmic_data->madc)
 		pmic_data->madc = &omap4_madc_pdata;
+
+	if (pdata_flags & TWL_COMMON_PDATA_THERMAL && !pmic_data->thermal)
+		pmic_data->thermal = &omap4_thermal_pdata;
 
 	/* Common regulator configurations */
 	if (regulators_flags & TWL_COMMON_REGULATOR_VDAC) {
