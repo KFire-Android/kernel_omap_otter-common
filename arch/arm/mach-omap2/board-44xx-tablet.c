@@ -865,6 +865,7 @@ static void __init omap_tablet_reserve(void)
 	omap_ram_console_init(OMAP_RAM_CONSOLE_START_DEFAULT,
 			OMAP_RAM_CONSOLE_SIZE_DEFAULT);
 	omap_rproc_reserve_cma(RPROC_CMA_OMAP4);
+	tablet_android_display_setup();
 	omap4_ion_init();
 	omap4_secure_workspace_addr_default();
 	omap_reserve();
