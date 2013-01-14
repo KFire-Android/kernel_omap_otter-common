@@ -6060,8 +6060,8 @@ static struct omap_hwmod omap44xx_emif2_hwmod = {
 	.clkdm_name	= "l3_emif_clkdm",
 	.prcm		= {
 		.omap4 = {
-			.clkctrl_offs = OMAP4_CM_MEMIF_EMIF_1_CLKCTRL_OFFSET,
-			.context_offs = OMAP4_RM_MEMIF_EMIF_1_CONTEXT_OFFSET,
+			.clkctrl_offs = OMAP4_CM_MEMIF_EMIF_2_CLKCTRL_OFFSET,
+			.context_offs = OMAP4_RM_MEMIF_EMIF_2_CONTEXT_OFFSET,
 			.modulemode   = MODULEMODE_HWCTRL,
 		}
 	},
