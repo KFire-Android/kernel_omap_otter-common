@@ -835,16 +835,6 @@ add_children(struct twl4030_platform_data *pdata, unsigned long features,
 		static struct regulator_consumer_supply usb3v3;
 		int regulator;
 		if (twl_has_regulator()) {
-			/* this is a template that gets copied */
-			struct regulator_init_data usb_fixed = {
-				.constraints.valid_modes_mask =
-					REGULATOR_MODE_NORMAL
-					| REGULATOR_MODE_STANDBY,
-				.constraints.valid_ops_mask =
-					REGULATOR_CHANGE_MODE
-					| REGULATOR_CHANGE_STATUS,
-			};
-
 			if (features & TWL6032_SUBCLASS) {
 				usb3v3.supply =	"ldousb";
 				regulator = TWL6032_REG_LDOUSB;
@@ -856,7 +846,7 @@ add_children(struct twl4030_platform_data *pdata, unsigned long features,
 				usb3v3.supply = "vusb";
 				regulator = TWL6030_REG_VUSB;
 				child = add_regulator_linked(regulator,
-							     &usb_fixed, //pdata->vusb,
+							     pdata->vusb,
 							     &usb3v3, 1,
 							     features);
 			}
