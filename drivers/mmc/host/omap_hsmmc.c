@@ -172,6 +172,7 @@
 
 #define MMC_AUTOSUSPEND_DELAY	100
 #define MMC_TIMEOUT_MS		20
+#define MMC_FSM_RESET_US	100
 #define MAX_PHASE_DELAY		0x7F
 #define DRIVER_NAME		"omap_hsmmc"
 
@@ -1185,17 +1186,11 @@ static inline void omap_hsmmc_dbg_report_irq(struct omap_hsmmc_host *host,
 static inline void omap_hsmmc_reset_controller_fsm(struct omap_hsmmc_host *host,
 						   unsigned long bit)
 {
-	unsigned long i = 0;
-	unsigned long limit = (loops_per_jiffy *
-				msecs_to_jiffies(MMC_TIMEOUT_MS));
+	int i = 0;
+	int limit = DIV_ROUND_UP(MMC_FSM_RESET_US, 10);
 
 	OMAP_HSMMC_WRITE(host->base, SYSCTL,
 			 OMAP_HSMMC_READ(host->base, SYSCTL) | bit);
-
-	/*
-	 * OMAP4 ES2 and greater has an updated reset logic.
-	 * Monitor a 0->1 transition first
-	 */
 	if (host->errata & OMAP_HSMMC_ERRATA_FSMR) {
 		while ((!(OMAP_HSMMC_READ(host->base, SYSCTL) & bit))
 					&& (i++ < limit))
