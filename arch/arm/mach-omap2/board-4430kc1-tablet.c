@@ -333,10 +333,11 @@ static struct i2c_board_info __initdata sdp4430_i2c_boardinfo[] = {
 	},
 #endif
 #ifdef CONFIG_SUMMIT_SMB347_Q
-	{
-		I2C_BOARD_INFO("summit_smb347", 0x6),
-		.irq = OMAP_GPIO_IRQ(OMAP4_CHARGER_IRQ),
-	},
+#ifdef CONFIG_OTTER2
+	{ I2C_BOARD_INFO("summit_smb347", 0x5F), .irq = OMAP_GPIO_IRQ(OMAP4_CHARGER_IRQ), },
+#else
+	{ I2C_BOARD_INFO("summit_smb347", 0x6), .irq = OMAP_GPIO_IRQ(OMAP4_CHARGER_IRQ), },
+#endif
 #endif    
 };
 
@@ -386,7 +387,11 @@ static struct i2c_board_info __initdata sdp4430_i2c_4_boardinfo_c1c[] = {
 
 static struct i2c_board_info __initdata sdp4430_i2c_4_boardinfo_dvt[] = {
 #ifdef CONFIG_SUMMIT_SMB347_Q
+#ifdef CONFIG_OTTER2
+	{ I2C_BOARD_INFO("summit_smb347", 0x5F), .irq = OMAP_GPIO_IRQ(OMAP4_CHARGER_IRQ), },
+#else
 	{ I2C_BOARD_INFO("summit_smb347", 0x6), .irq = OMAP_GPIO_IRQ(OMAP4_CHARGER_IRQ), },
+#endif
 #endif    
 /* Added for STK ALS*/
 	{ I2C_BOARD_INFO("stk_als22x7_addr1", 0x20>>1), },
@@ -402,7 +407,11 @@ static struct i2c_board_info __initdata sdp4430_i2c_4_boardinfo_dvt[] = {
 
 static struct i2c_board_info __initdata sdp4430_i2c_4_boardinfo_pvt[] = {
 #ifdef CONFIG_SUMMIT_SMB347_Q
+#ifdef CONFIG_OTTER2
+	{ I2C_BOARD_INFO("summit_smb347", 0x5F), .irq = OMAP_GPIO_IRQ(OMAP4_CHARGER_IRQ), },
+#else
 	{ I2C_BOARD_INFO("summit_smb347", 0x6), .irq = OMAP_GPIO_IRQ(OMAP4_CHARGER_IRQ), },
+#endif
 #endif    
 /* Added for STK ALS*/
 	{ I2C_BOARD_INFO("stk_als22x7_addr1", 0x20>>1), },
