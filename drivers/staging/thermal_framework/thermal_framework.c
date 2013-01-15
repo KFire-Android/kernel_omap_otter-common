@@ -789,13 +789,10 @@ static void thermal_average_sensor_temperature(struct stats_thermal *stats)
 
 	stats->avg = (stats->window_sum / tmp);
 
-	mutex_unlock(&stats->stats_mutex);
-
 	if (!stats->trending_enabled)
 		goto report;
 
 	tmp = stats->sample_index - 1;
-	mutex_lock(&stats->stats_mutex);
 	if (tmp != 0) {
 		stats->trend =
 			delta_T_over_delta_t(stats->sensor_temp_table[tmp],
@@ -824,9 +821,9 @@ static void thermal_average_sensor_temperature(struct stats_thermal *stats)
 		stats->is_stable = 1;
 	}
 
-	mutex_unlock(&stats->stats_mutex);
-report:
 
+report:
+	mutex_unlock(&stats->stats_mutex);
 	pr_debug("%s: averaging %s temp %d. avg %d stable %d trend %d\n",
 			__func__, stats->temp_sensor->domain_name,
 			temp, stats->avg, stats->is_stable, stats->trend);
