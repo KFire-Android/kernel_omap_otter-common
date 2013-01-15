@@ -130,8 +130,19 @@ static struct tc358765_board_data tablet_dsi_panel = {
 	.clrsipo	= 0x3,
 	.lv_is		= 0x1,
 	.lv_nd		= 0x6,
-	.vtgen		= 0x1,
-	.vsdelay	= 0xf,
+	.evtmode	= 0x1,
+	.vsdelay	= 0xf02,
+};
+
+struct omap_video_timings tablet_dispc_timings = {
+	.x_res = 1280,
+	.y_res = 800,
+	.hfp = 243,
+	.hsw = 9,
+	.hbp = 20,
+	.vfp = 6,
+	.vsw = 2,
+	.vbp = 4,
 };
 
 static struct omap_dss_device tablet_lcd_device = {
@@ -179,10 +190,10 @@ static struct omap_dss_device tablet_lcd_device = {
 		.timings = {
 			.x_res		= 1280,
 			.y_res		= 800,
-			.pixel_clock	= 65183,
-			.hfp		= 10,
-			.hsw		= 20,
-			.hbp		= 10,
+			.pixel_clock	= 63530,
+			.hfp		= 6,
+			.hsw		= 12,
+			.hbp		= 6,
 			.vfp		= 4,
 			.vsw		= 4,
 			.vbp		= 4,
@@ -190,10 +201,10 @@ static struct omap_dss_device tablet_lcd_device = {
 		.dsi_mode = OMAP_DSS_DSI_VIDEO_MODE,
 		.dsi_vm_data = {
 				.hsa			= 0,
-				.hfp			= 6,
-				.hbp			= 21,
-				.vsa			= 4,
-				.vfp			= 4,
+				.hfp			= 4,
+				.hbp			= 3,
+				.vsa			= 2,
+				.vfp			= 6,
 				.vbp			= 4,
 
 				.vp_de_pol		= true,
@@ -221,6 +232,7 @@ static struct omap_dss_device tablet_lcd_device = {
 	.channel = OMAP_DSS_CHANNEL_LCD,
 	.platform_enable = NULL,
 	.platform_disable = NULL,
+	.dispc_timings = &tablet_dispc_timings,
 };
 
 static int tablet_panel_enable_hdmi(struct omap_dss_device *dssdev)
