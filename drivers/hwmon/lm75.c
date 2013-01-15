@@ -27,6 +27,8 @@
 #include <linux/hwmon-sysfs.h>
 #include <linux/err.h>
 #include <linux/mutex.h>
+#include <linux/thermal_framework.h>
+#include <linux/platform_data/lm75_platform_data.h>
 #include "lm75.h"
 
 
@@ -71,6 +73,7 @@ struct lm75_data {
 	struct device		*hwmon_dev;
 	struct mutex		update_lock;
 	u8			orig_conf;
+	struct thermal_dev	*therm_dev;
 	char			valid;		/* !=0 if registers are valid */
 	unsigned long		last_updated;	/* In jiffies */
 	u16			temp[3];	/* Register values,
@@ -140,6 +143,76 @@ static const struct attribute_group lm75_group = {
 	.attrs = lm75_attributes,
 };
 
+#ifdef CONFIG_THERMAL_FRAMEWORK
+static int lm75_get_temp(struct thermal_dev *tdev)
+{
+	struct lm75_data *data = lm75_update_device(tdev->dev);
+
+	if (IS_ERR_OR_NULL(data)) {
+		dev_dbg(tdev->dev, "failed to update temperature\n");
+		return PTR_ERR(data);
+	}
+
+	tdev->current_temp = LM75_TEMP_FROM_REG(data->temp[0]);
+	return tdev->current_temp;
+}
+
+static struct thermal_dev_ops lm75_thermal_ops = {
+	.report_temp = lm75_get_temp,
+};
+
+static int lm75_thermal_init(struct i2c_client *client)
+{
+	int status;
+	struct lm75_platform_data *pdata;
+	struct lm75_data *data = i2c_get_clientdata(client);
+
+	pdata = dev_get_platdata(&client->dev);
+	if (!pdata) {
+		dev_err(&client->dev, "%s: Invalid platform data\n", __func__);
+		status = -EINVAL;
+		goto exit;
+	}
+
+	data->therm_dev = kzalloc(sizeof(struct thermal_dev), GFP_KERNEL);
+	if (data->therm_dev) {
+		data->therm_dev->name = "lm75";
+		data->therm_dev->domain_name = pdata->domain;
+
+		data->therm_dev->dev = &client->dev;
+		data->therm_dev->dev_ops = &lm75_thermal_ops;
+		status = thermal_sensor_dev_register(data->therm_dev);
+		if (status)
+			goto exit_therm_dev_free;
+
+		if (pdata->stats_enable) {
+			thermal_init_stats(data->therm_dev,
+					   pdata->average_period,
+					   pdata->average_number,
+					   pdata->safe_temp_trend);
+			thermal_enable_avg(data->therm_dev->domain_name);
+		}
+	} else {
+		status = -ENOMEM;
+		goto exit;
+	}
+
+	return 0;
+
+exit_therm_dev_free:
+	kfree(data->therm_dev);
+	data->therm_dev = NULL;
+exit:
+	return status;
+}
+
+#else
+static int lm75_thermal_init(struct i2c_client *client)
+{
+	return 0;
+}
+#endif
+
 /*-----------------------------------------------------------------------*/
 
 /* device probe and removal */
@@ -194,6 +267,8 @@ lm75_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		goto exit_remove;
 	}
 
+	lm75_thermal_init(client);
+
 	dev_info(&client->dev, "%s: sensor '%s'\n",
 		 dev_name(data->hwmon_dev), client->name);
 
@@ -209,6 +284,11 @@ exit_free:
 static int lm75_remove(struct i2c_client *client)
 {
 	struct lm75_data *data = i2c_get_clientdata(client);
+
+	if (data->therm_dev) {
+		thermal_sensor_dev_unregister(data->therm_dev);
+		kfree(data->therm_dev);
+	}
 
 	hwmon_device_unregister(data->hwmon_dev);
 	sysfs_remove_group(&client->dev.kobj, &lm75_group);
