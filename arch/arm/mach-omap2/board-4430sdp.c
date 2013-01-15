@@ -32,6 +32,7 @@
 #include <linux/leds_pwm.h>
 #include <linux/platform_data/omap4-keypad.h>
 #include <linux/platform_data/thermistor_sensor.h>
+#include <linux/platform_data/lm75_platform_data.h>
 
 #include <mach/hardware.h>
 #include <asm/hardware/gic.h>
@@ -741,9 +742,17 @@ static struct i2c_board_info __initdata sdp4430_i2c_boardinfo[] = {
 	},
 };
 
+static struct lm75_platform_data lm75_pdata = {
+	.domain = "case",
+	.stats_enable = 1,
+	.average_period = 2000,
+	.average_number = 20,
+};
+
 static struct i2c_board_info __initdata sdp4430_i2c_3_boardinfo[] = {
 	{
 		I2C_BOARD_INFO("tmp105", 0x48),
+		.platform_data = &lm75_pdata,
 	},
 	{
 		I2C_BOARD_INFO("bh1780", 0x29),

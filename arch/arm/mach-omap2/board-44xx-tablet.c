@@ -33,6 +33,7 @@
 #include <linux/leds_pwm.h>
 #include <linux/platform_data/omap-abe-twl6040.h>
 #include <linux/platform_data/thermistor_sensor.h>
+#include <linux/platform_data/lm75_platform_data.h>
 #include <linux/leds-omap4430sdp-display.h>
 #include <linux/omap4_duty_cycle_governor.h>
 
@@ -570,9 +571,17 @@ static struct i2c_board_info __initdata tablet_i2c_boardinfo[] = {
 	},
 };
 
+static struct lm75_platform_data lm75_pdata = {
+	.domain = "case",
+	.stats_enable = 1,
+	.average_period = 2000,
+	.average_number = 20,
+};
+
 static struct i2c_board_info __initdata tablet_i2c_3_boardinfo[] = {
 	{
 		I2C_BOARD_INFO("tmp105", 0x48),
+		.platform_data = &lm75_pdata,
 	},
 };
 
