@@ -1133,8 +1133,16 @@ void dispc_ovl_compute_fifo_thresholds(enum omap_plane plane,
 		*fifo_low = ovl_fifo_size - burst_size * 2;
 		*fifo_high = total_fifo_size - burst_size;
 	} else {
-		*fifo_low = ovl_fifo_size - burst_size;
-		*fifo_high = total_fifo_size - buf_unit;
+		if (cpu_is_omap44xx()) {
+			/* optimization of power consumption for OMAP4 */
+			*fifo_low = (ovl_fifo_size / 2);
+			*fifo_high = total_fifo_size - buf_unit;
+		} else {
+			/* TODO: which should be the numbers for OMAP5?
+			 * Set safest values for now */
+			*fifo_low = ovl_fifo_size - burst_size;
+			*fifo_high = total_fifo_size - buf_unit;
+		}
 	}
 }
 
