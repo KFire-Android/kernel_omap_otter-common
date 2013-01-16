@@ -172,7 +172,7 @@ static struct device_info gpu_dev_info = {
 	.voltdm_name	= "mm",
 };
 
-static struct omap_opp_def __initdata omap543x_opp_def_list[] = {
+static struct omap_opp_def omap543x_opp_def_list[] = {
 	/* MPU OPP1 - OPPLOW */
 	OPP_INITIALIZER(&mpu_dev_info, true, 499200000, OMAP54XX_VDD_MPU_OPP_LOW),
 	/*
@@ -262,7 +262,7 @@ static int __init opp_def_list_modify_opp(struct omap_opp_def *list,
 /**
  * omap5_opp_init() - initialize omap4 opp table
  */
-static int __init omap5_opp_init(void)
+int __init omap5_opp_init(void)
 {
 	int r = -ENODEV;
 
@@ -307,4 +307,3 @@ static int __init omap5_opp_init(void)
 
 	return r;
 }
-device_initcall(omap5_opp_init);

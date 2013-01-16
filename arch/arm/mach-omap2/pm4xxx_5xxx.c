@@ -1023,15 +1023,14 @@ static void __init omap4_scrm_setup_timings(void)
 }
 
 /**
- * omap_pm_init - Init routine for OMAP4 PM
+ * omap4_pm_init - Init routine for OMAP4+ PM
  *
  * Initializes all powerdomain and clockdomain target states
  * and all PRCM settings.
  */
-static int __init omap_pm_init(void)
+int __init omap4_pm_init(void)
 {
-	int ret, i;
-	char *init_devices[] = {"mpu", "iva"};
+	int ret;
 	struct voltagedomain *mpu_voltdm;
 
 	if (!(cpu_is_omap44xx() || cpu_is_omap54xx()))
@@ -1210,6 +1209,20 @@ static int __init omap_pm_init(void)
 	if (!gpu_pd)
 		pr_err("%s: Unable to get GPU power domain\n", __func__);
 
+err2:
+	return ret;
+}
+
+/**
+ * omap4_set_processor_device_opp - set processor device opp
+ *
+ * Initializes all processor devices to the right OPP.
+ */
+void __init omap4_set_processor_device_opp(void)
+{
+	int ret, i;
+	char *init_devices[] = {"mpu", "iva"};
+
 	/* Setup the scales for every init device appropriately */
 	for (i = 0; i < ARRAY_SIZE(init_devices); i++) {
 		struct omap_hwmod *oh = omap_hwmod_lookup(init_devices[i]);
@@ -1239,7 +1252,15 @@ static int __init omap_pm_init(void)
 			/* Continue to next device */
 		}
 	}
+}
 
+/**
+ * omap4_init_cpuidle - initialize omap cpuidle driver
+ *
+ * Initialize omap cpuidle driver.
+ */
+void __init omap4_init_cpuidle(void)
+{
 	if (cpu_is_omap44xx()) {
 		/* Overwrite the default arch_idle() */
 		arm_pm_idle = omap_default_idle;
@@ -1247,8 +1268,4 @@ static int __init omap_pm_init(void)
 	} else if (cpu_is_omap54xx()) {
 		omap5_idle_init();
 	}
-
-err2:
-	return ret;
 }
-late_initcall(omap_pm_init);

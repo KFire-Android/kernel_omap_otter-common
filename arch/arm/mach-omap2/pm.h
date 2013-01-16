@@ -62,12 +62,17 @@ extern u32 omap4_device_off_counter;
 #if defined(CONFIG_PM_OPP)
 extern int omap3_opp_init(void);
 extern int omap4_opp_init(void);
+extern int omap5_opp_init(void);
 #else
 static inline int omap3_opp_init(void)
 {
 	return -EINVAL;
 }
 static inline int omap4_opp_init(void)
+{
+	return -EINVAL;
+}
+static inline int omap5_opp_init(void)
 {
 	return -EINVAL;
 }
@@ -200,6 +205,10 @@ extern void omap_pm_setup_oscillator_voltage_ramp_time(u32 tstart, u32 tshut);
 extern void omap_pm_get_oscillator_voltage_ramp_time(u32 *tstart, u32 *tshut);
 extern void omap_pm_setup_rsttime_latency(u32 rsttime_latency);
 extern u32 omap_pm_get_rsttime_latency(void);
+extern int __init omap4_pm_init(void);
+extern void __init omap4_set_processor_device_opp(void);
+extern void __init omap4_init_cpuidle(void);
+
 
 #else
 static inline void omap_pm_setup_oscillator(u32 tstart, u32 tshut) { }
@@ -210,6 +219,14 @@ static inline void omap_pm_get_oscillator_voltage_ramp_time(
 	u32 *tstart, u32 *tshut) { }
 static inline void omap_pm_setup_rsttime_latency(u32 rsttime_latency) {};
 static inline u32 omap_pm_get_rsttime_latency(void) { return 0; }
+extern inline int omap4_pm_init(void)
+{
+	return 0;
+}
+
+extern inline void omap4_set_processor_device_opp(void) { }
+extern inline void omap4_init_cpuidle() { }
+
 #endif
 
 extern int omap_trim_configure(void);
