@@ -124,6 +124,8 @@ struct clksel {
  * @autoidle_mask: mask of the DPLL autoidle mode bitfield in @autoidle_reg
  * @freqsel_mask: mask of the DPLL jitter correction bitfield in @control_reg
  * @idlest_mask: mask of the DPLL idle status bitfield in @idlest_reg
+ * @dcc_mask: mask of the DCC enable bit in @mult_div1_reg
+ * @dcc_rate: minimum rate, on which DCC must be used
  * @auto_recal_bit: bitshift of the driftguard enable bit in @control_reg
  * @recal_en_bit: bitshift of the PRM_IRQENABLE_* bit for recalibration IRQs
  * @recal_st_bit: bitshift of the PRM_IRQSTATUS_* bit for recalibration IRQs
@@ -166,6 +168,8 @@ struct dpll_data {
 	u32			idlest_mask;
 	u32			dco_mask;
 	u32			sddiv_mask;
+	u32			dcc_mask;
+	unsigned long		dcc_rate;
 	u8			auto_recal_bit;
 	u8			recal_en_bit;
 	u8			recal_st_bit;
