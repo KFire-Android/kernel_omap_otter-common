@@ -618,52 +618,22 @@ static void omap5_mpu_dpll_update_children(unsigned long rate)
 
 int omap5_mpu_dpll_set_rate(struct clk *clk, unsigned long rate)
 {
-	struct dpll_data *dd;
-	u32 v;
 	unsigned long dpll_rate;
 
-	if (!clk || !rate || !clk->parent)
-		return -EINVAL;
-
-	dd = clk->parent->dpll_data;
-
-	if (!dd)
-		return -EINVAL;
-
-	if (!clk->parent->set_rate)
+	if (!clk || !rate || !clk->parent ||
+	    !clk->parent->set_rate || !clk->parent->dpll_data)
 		return -EINVAL;
 
 	if (rate > clk->rate)
 		omap5_mpu_dpll_update_children(rate);
 
 	dpll_rate = omap2_get_dpll_rate(clk->parent);
-	if (rate == dpll_rate)
-		return 0;
-	/*
-	 * On OMAP5430, to obtain MPU DPLL frequency higher
-	 * than 1.4GHz, DCC (Duty Cycle Correction) needs to
-	 * be enabled.
-	 * And needs to be kept disabled for <= 1.4 Ghz.
-	 */
-	if (rate <= OMAP_1_4GHz) {
-		/* If DCC is enabled, disable it */
-		v = __raw_readl(dd->mult_div1_reg);
-		if (v & OMAP54XX_DCC_EN_MASK) {
-			v &= ~OMAP54XX_DCC_EN_MASK;
-			__raw_writel(v, dd->mult_div1_reg);
-		}
-
+	if (rate != dpll_rate)
 		clk->parent->set_rate(clk->parent, rate);
-	} else {
-		clk->parent->set_rate(clk->parent, rate);
-
-		v = __raw_readl(dd->mult_div1_reg);
-		v |= OMAP54XX_DCC_EN_MASK;
-		__raw_writel(v, dd->mult_div1_reg);
-	}
 
 	if (rate < clk->rate)
 		omap5_mpu_dpll_update_children(rate);
+
 	clk->rate = rate;
 
 	return 0;
@@ -682,14 +652,7 @@ long omap5_mpu_dpll_round_rate(struct clk *clk, unsigned long rate)
 
 unsigned long omap5_mpu_dpll_recalc(struct clk *clk)
 {
-	struct dpll_data *dd;
-
-	if (!clk || !clk->parent)
-		return -EINVAL;
-
-	dd = clk->parent->dpll_data;
-
-	if (!dd)
+	if (!clk || !clk->parent || !clk->parent->dpll_data)
 		return -EINVAL;
 
 	return omap2_get_dpll_rate(clk->parent);
