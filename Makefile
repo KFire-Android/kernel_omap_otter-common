@@ -957,7 +957,11 @@ modules_prepare: prepare scripts
 
 # Target to install modules
 PHONY += modules_install
+ifeq ($(ARCH), arm)
+modules_install: _modinst_ _modinst_post dtbs
+else
 modules_install: _modinst_ _modinst_post
+endif
 
 PHONY += _modinst_
 _modinst_:
@@ -972,6 +976,10 @@ _modinst_:
 	@cp -f $(objtree)/modules.order $(MODLIB)/
 	@cp -f $(objtree)/modules.builtin $(MODLIB)/
 	$(Q)$(MAKE) -f $(srctree)/scripts/Makefile.modinst
+ifeq ($(ARCH), arm)
+	@mkdir -p $(INSTALL_FW_PATH)/device-tree
+	@cp $(objtree)/arch/arm/boot/dts/*.dtb $(INSTALL_FW_PATH)/device-tree/
+endif
 
 # This depmod is only for convenience to give the initial
 # boot a modules.dep even before / is mounted read-write.  However the
