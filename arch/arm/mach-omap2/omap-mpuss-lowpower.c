@@ -563,10 +563,6 @@ int omap_enter_lowpower(unsigned int cpu, unsigned int power_state)
 	else
 		omap_pm_ops.finish_suspend(save_state);
 
-
-	if (save_state == 3)
-		omap_wakeupgen_check_interrupts("At Resume");
-
 	if (omap_mpuss_read_prev_context_state()) {
 		restore_ivahd_tesla_regs();
 		restore_l3instr_regs();
