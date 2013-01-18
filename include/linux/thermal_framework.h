@@ -248,8 +248,8 @@ static inline int thermal_check_temp_stability(struct thermal_dev *tdev)
 {
 	return 0;
 }
-static int thermal_init_stats(struct thermal_dev *tdev, uint avg_period,
-			uint avg_num, int safe_temp_trend)
+static inline int thermal_init_stats(struct thermal_dev *tdev, uint avg_period,
+				     uint avg_num, int safe_temp_trend)
 {
 	return 0;
 }
@@ -274,7 +274,7 @@ static inline int thermal_lookup_avg(const char *domain_name)
 {
 	return 0;
 }
-static inline int thermal_lookup_trend(const char *domain_name);
+static inline int thermal_lookup_trend(const char *domain_name)
 {
 	return 0;
 }
