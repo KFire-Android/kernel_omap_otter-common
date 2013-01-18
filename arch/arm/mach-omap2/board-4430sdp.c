@@ -1343,6 +1343,7 @@ static void __init omap_4430sdp_init(void)
 	omap4_ehci_ohci_init();
 	usb_musb_init(&musb_board_data);
 
+	omap4plus_connectivity_init();
 	status = omap_ethernet_init();
 	if (status) {
 		pr_err("Ethernet initialization failed: %d\n", status);
