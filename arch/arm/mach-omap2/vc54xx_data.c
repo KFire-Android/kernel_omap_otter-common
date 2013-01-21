@@ -128,16 +128,17 @@ struct omap_vc_param omap5_es1_core_vc_data = {
 	.off			= OMAP5_OFF_VOLTAGE_UV,
 };
 
+/* NOTE: default voltages are for OPP_NOM */
 struct omap_vc_param omap5_mpu_vc_data = {
-	.on			= 1220000,
-	.onlp			= 1220000,
+	.on			= 1060000,
+	.onlp			= 1060000,
 	.ret			= 700000,
 	.off			= 0,
 };
 
 struct omap_vc_param omap5_mm_vc_data = {
-	.on			= 1040000,
-	.onlp			= 1040000,
+	.on			= 1025000,
+	.onlp			= 1025000,
 	.ret			= 700000,
 	.off			= 0,
 };
@@ -145,6 +146,6 @@ struct omap_vc_param omap5_mm_vc_data = {
 struct omap_vc_param omap5_core_vc_data = {
 	.on			= 1040000,
 	.onlp			= 1040000,
-	.ret			= 700000,
+	.ret			= 810000,
 	.off			= 0,
 };
