@@ -104,7 +104,6 @@ struct omap_vc_channel omap5_vc_core = {
 #define OMAP5_ON_VOLTAGE_MPU_UV			1220000
 #define OMAP5_ONLP_VOLTAGE_MPU_UV		1220000
 #define OMAP5_ES1_RET_VOLTAGE_UV		800000
-#define OMAP5_RET_VOLTAGE_UV			700000
 #define OMAP5_OFF_VOLTAGE_UV			0
 
 struct omap_vc_param omap5_es1_mpu_vc_data = {
@@ -130,22 +129,22 @@ struct omap_vc_param omap5_es1_core_vc_data = {
 };
 
 struct omap_vc_param omap5_mpu_vc_data = {
-	.on			= OMAP5_ON_VOLTAGE_MPU_UV,
-	.onlp			= OMAP5_ONLP_VOLTAGE_MPU_UV,
-	.ret			= OMAP5_RET_VOLTAGE_UV,
-	.off			= OMAP5_OFF_VOLTAGE_UV,
+	.on			= 1220000,
+	.onlp			= 1220000,
+	.ret			= 700000,
+	.off			= 0,
 };
 
 struct omap_vc_param omap5_mm_vc_data = {
-	.on			= OMAP5_ON_VOLTAGE_UV,
-	.onlp			= OMAP5_ONLP_VOLTAGE_UV,
-	.ret			= OMAP5_RET_VOLTAGE_UV,
-	.off			= OMAP5_OFF_VOLTAGE_UV,
+	.on			= 1040000,
+	.onlp			= 1040000,
+	.ret			= 700000,
+	.off			= 0,
 };
 
 struct omap_vc_param omap5_core_vc_data = {
-	.on			= OMAP5_ON_VOLTAGE_UV,
-	.onlp			= OMAP5_ONLP_VOLTAGE_UV,
-	.ret			= OMAP5_RET_VOLTAGE_UV,
-	.off			= OMAP5_OFF_VOLTAGE_UV,
+	.on			= 1040000,
+	.onlp			= 1040000,
+	.ret			= 700000,
+	.off			= 0,
 };
