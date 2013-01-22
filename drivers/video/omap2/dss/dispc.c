@@ -2560,7 +2560,8 @@ int dispc_setup_wb(struct writeback_cache_data *wb)
 				color_mode, wb->rotation_type);
 
 	/* Force 1D tiled mode */
-	if (cpu_is_omap54xx() && (omap_rev() == OMAP5430_REV_ES2_0))
+	if (cpu_is_omap54xx() && (omap_rev() == OMAP5430_REV_ES2_0 ||
+				  omap_rev() == OMAP5432_REV_ES2_0))
 		dispc_ovl_set_1d_tiled_mode(plane, wb->force_1d);
 
 	dispc_ovl_set_row_inc(plane, row_inc);
