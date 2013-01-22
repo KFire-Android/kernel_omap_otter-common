@@ -113,6 +113,7 @@ void omap_reserve_secure_workspace_addr(void);
  */
 #define OMAP5_SECURE_WORKSPACE_BASE	0xBFA00000
 #define OMAP5_SECURE_WORKSPACE_SIZE	(6 * SZ_1M)
+
 /**
  * omap5_secure_workspace_addr_default() - set default OMAP5 SMC address and size
  *
@@ -124,6 +125,27 @@ static inline void omap5_secure_workspace_addr_default(void)
 {
 	omap_secure_set_secure_workspace_addr(OMAP5_SECURE_WORKSPACE_BASE,
 					      OMAP5_SECURE_WORKSPACE_SIZE);
+}
+
+/*
+ * OMAP4 defaults assume atleast 1GB availability
+ * For platforms that do not meet this need or use modified PPA
+ * different from TI defaults, override from board file
+ */
+#define OMAP4_SECURE_WORKSPACE_BASE	0xBFD00000
+#define OMAP4_SECURE_WORKSPACE_SIZE	(3 * SZ_1M)
+
+/**
+ * omap4_secure_workspace_addr_default() - set default OMAP4 SMC address and size
+ *
+ * cpu_is_omapXYZ() macros dont work in reserve due to bad init sequence in OMAP
+ * framework (works only after io and early inits are called). So SoC specific
+ * APIs to help board files... :(
+ */
+static inline void omap4_secure_workspace_addr_default(void)
+{
+	omap_secure_set_secure_workspace_addr(OMAP4_SECURE_WORKSPACE_BASE,
+					      OMAP4_SECURE_WORKSPACE_SIZE);
 }
 
 #endif /* __ASSEMBLER__ */

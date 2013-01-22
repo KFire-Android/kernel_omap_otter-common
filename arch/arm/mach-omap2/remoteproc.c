@@ -26,6 +26,7 @@
 #include <plat/remoteproc.h>
 #include <plat/iommu.h>
 #include <plat/omap-pm.h>
+#include <plat/dvfs.h>
 
 #include "cm1_44xx.h"
 #include "cm2_44xx.h"
@@ -286,6 +287,8 @@ static int __init omap_rproc_init(void)
 			put_device(&pdev->dev);
 			continue;
 		}
+
+		omap_opp_register(&pdev->dev, oh_name);
 	}
 
 	return ret;

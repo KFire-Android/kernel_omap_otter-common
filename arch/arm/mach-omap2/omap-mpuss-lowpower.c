@@ -191,19 +191,6 @@ static inline void clear_cpu_prev_pwrst(unsigned int cpu_id)
 }
 
 /*
- * Enable/disable the CPUx powerdomain FORCE OFF mode.
- */
-static inline void set_cpu_force_off(unsigned int cpu_id, bool on)
-{
-	struct omap4_cpu_pm_info *pm_info = &per_cpu(omap4_pm_info, cpu_id);
-
-	if (on)
-		pwrdm_enable_force_off(pm_info->pwrdm);
-	else
-		pwrdm_disable_force_off(pm_info->pwrdm);
-}
-
-/*
  * Store the SCU power status value to scratchpad memory
  */
 static void scu_pwrst_prepare(unsigned int cpu_id, unsigned int cpu_state)
@@ -664,10 +651,6 @@ int __cpuinit omap_hotplug_cpu(unsigned int cpu, unsigned int power_state)
 	 * techniques instead of force_off. So, leave the #if 0
 	 * here to go back to force_off if that eventually works.
 	 */
-#if 0
-	/* Enable FORCE OFF mode if supported */
-	set_cpu_force_off(cpu, 1);
-#endif
 
 	/* Decrease mpu / core usecounts to indicate we are entering idle */
 	omap_dec_mpu_core_pwrdm_usecount();
@@ -678,11 +661,6 @@ int __cpuinit omap_hotplug_cpu(unsigned int cpu, unsigned int power_state)
 	 * omap_secondary_startup().
 	 */
 	omap_pm_ops.finish_suspend(cpu_state);
-
-#if 0
-	/* Clear FORCE OFF mode if supported */
-	set_cpu_force_off(cpu, 0);
-#endif
 
 	set_cpu_next_pwrst(cpu, PWRDM_POWER_ON);
 	return 0;

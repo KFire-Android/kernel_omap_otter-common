@@ -41,6 +41,7 @@
 #include "clock3xxx.h"
 #include "clock44xx.h"
 #include "clock54xx.h"
+#include "pm.h"
 
 #ifdef CONFIG_OMAP_SO_MAP_FORCE
 #define OMAP_IO_MAP_TYPE	MT_MEMORY_SO
@@ -532,6 +533,7 @@ void __init omap4430_init_early(void)
 	omap44xx_hwmod_init();
 	omap_hwmod_init_postsetup();
 	omap4xxx_clk_init();
+	omap4_opp_init();
 }
 #endif
 
@@ -554,6 +556,7 @@ void __init omap_5430evm_init_early(void)
 	omap54xx_hwmod_init();
 	omap_hwmod_init_postsetup();
 	omap5xxx_clk_init();
+	omap5_opp_init();
 }
 #endif
 

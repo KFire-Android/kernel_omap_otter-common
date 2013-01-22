@@ -381,6 +381,7 @@ int __init omap4plus_connectivity_init(void)
 		idata = &omap5_wilink_init_data;
 		idata->wifi_gpio_irq = OMAP5_GPIO_WIFI_PANDA5_IRQ;
 		break;
+	case BOARD_OMAP4_BLAZE:
 	case BOARD_OMAP4_TABLET1:
 	case BOARD_OMAP4_TABLET2:
 		idata = &omap4_wilink_init_data;

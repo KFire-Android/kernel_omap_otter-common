@@ -1010,7 +1010,8 @@ void dss_features_init(void)
 	else if (cpu_is_omap54xx() && ((omap_rev() == OMAP5430_REV_ES1_0) ||
 		(omap_rev() == OMAP5432_REV_ES1_0)))
 		omap_current_dss_features = &omap5_dss_features;
-	else if (cpu_is_omap54xx() && (omap_rev() == OMAP5430_REV_ES2_0))
+	else if (cpu_is_omap54xx() && (omap_rev() == OMAP5430_REV_ES2_0 ||
+					omap_rev() == OMAP5432_REV_ES2_0))
 		omap_current_dss_features = &omap5_es2_0_dss_features;
 	else
 		DSSWARN("Unsupported OMAP version");

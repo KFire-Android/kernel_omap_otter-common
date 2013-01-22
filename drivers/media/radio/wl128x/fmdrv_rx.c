@@ -217,10 +217,30 @@ int fm_rx_seek(struct fmdev *fmdev, u32 seek_upward,
 
 		fmdbg("Complete Scan results\n");
 		memset(fmdev->rx.stat_found, 0, sizeof(fmdev->rx.stat_found));
-		for (i = 0; i < no_stations; i++) {
-			fmdev->rx.stat_found[i] = (u32) ((chnl_found[i] * 50) +
-					fmdev->rx.region.bot_freq);
-			fmdbg("channel[%d]-%d\n", i+1, fmdev->rx.stat_found[i]);
+		if (fmdev->rx.region.fm_band == FM_BAND_RUSSIAN) {
+			for (i = 0; i < no_stations; i++) {
+				fmdev->rx.stat_found[i] =
+						(u32) ((chnl_found[i] * 10) +
+						fmdev->rx.region.bot_freq);
+				fmdbg("channel[%d]-%d\n",
+						i+1, fmdev->rx.stat_found[i]);
+			}
+		} else if (fmdev->rx.region.fm_band == FM_BAND_WEATHER) {
+			for (i = 0; i < no_stations; i++) {
+				fmdev->rx.stat_found[i] =
+						(u32) ((chnl_found[i] * 25) +
+						fmdev->rx.region.bot_freq);
+				fmdbg("channel[%d]-%d\n",
+						i+1, fmdev->rx.stat_found[i]);
+			}
+		} else {
+			for (i = 0; i < no_stations; i++) {
+				fmdev->rx.stat_found[i] =
+						(u32) ((chnl_found[i] * 50) +
+						fmdev->rx.region.bot_freq);
+				fmdbg("channel[%d]-%d\n",
+						i+1, fmdev->rx.stat_found[i]);
+			}
 		}
 
 		/* Re-enable default FM interrupts */

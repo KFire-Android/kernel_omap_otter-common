@@ -95,6 +95,7 @@
 #include <plat/omap_device.h>
 #include <plat/omap_hwmod.h>
 #include <plat/clock.h>
+#include <plat/dvfs.h>
 
 /* These parameters are passed to _omap_device_{de,}activate() */
 #define USE_WAKEUP_LAT			0
@@ -754,6 +755,8 @@ struct platform_device __init *omap_device_build_ss(const char *pdev_name, int p
 		ret = omap_device_register(pdev);
 	if (ret)
 		goto odbs_exit2;
+
+	omap_opp_register(&pdev->dev, ohs[0]->name);
 
 	return pdev;
 

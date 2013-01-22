@@ -2710,44 +2710,10 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 	if (ret)
 		goto temp_setup_fail;
 
-	/* request charger fault interruption choosing between sw/hw mode */
-	irq = platform_get_irq(pdev, 1);
-	if (!di->use_hw_charger)
-		ret = request_threaded_irq(irq, NULL,
-				twl6030charger_fault_interrupt,
-				0, "twl_bci_fault", di);
-	else
-		ret = request_threaded_irq(irq, NULL,
-				twl6032charger_fault_interrupt_hw,
-				0, "twl_bci_fault", di);
-
-	if (ret) {
-		dev_dbg(&pdev->dev, "could not request irq %d, status %d\n",
-			irq, ret);
-		goto temp_setup_fail;
-	}
-
-	/* request charger ctrl interruption choosing between sw/hw mode */
-	irq = platform_get_irq(pdev, 0);
-	if (!di->use_hw_charger)
-		ret = request_threaded_irq(irq, NULL,
-				twl6030charger_ctrl_interrupt,
-				0, "twl_bci_ctrl", di);
-	else
-		ret = request_threaded_irq(irq, NULL,
-				twl6032charger_ctrl_interrupt_hw,
-				0, "twl_bci_ctrl", di);
-
-	if (ret) {
-		dev_dbg(&pdev->dev, "could not request irq %d, status %d\n",
-			irq, ret);
-		goto chg_irq_fail;
-	}
-
 	ret = power_supply_register(&pdev->dev, &di->bat);
 	if (ret) {
 		dev_dbg(&pdev->dev, "failed to register main battery\n");
-		goto batt_failed;
+		goto temp_setup_fail;
 	}
 
 	ret = power_supply_register(&pdev->dev, &di->usb);
@@ -2798,17 +2764,17 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 	ret = twl_i2c_write_u8(TWL6030_MODULE_CHARGER, MBAT_TEMP,
 			CONTROLLER_INT_MASK);
 	if (ret)
-		goto bk_batt_failed;
+		goto i2c_reg_failed;
 
 	ret = twl_i2c_write_u8(TWL6030_MODULE_CHARGER, MASK_MCHARGERUSB_THMREG,
 						CHARGERUSB_INT_MASK);
 	if (ret)
-		goto bk_batt_failed;
+		goto i2c_reg_failed;
 
 	ret = twl_i2c_read_u8(TWL6030_MODULE_CHARGER, &controller_stat,
 		CONTROLLER_STAT1);
 	if (ret)
-		goto bk_batt_failed;
+		goto i2c_reg_failed;
 
 	di->stat1 = controller_stat;
 	di->charger_outcurrentmA = di->platform_data->max_charger_currentmA;
@@ -2853,7 +2819,7 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 	di->boot_capacity_mAh = di->max_battery_capacity * di->capacity / 100;
 	ret = twl_i2c_read_u8(TWL6030_MODULE_ID0, &hw_state, STS_HW_CONDITIONS);
 	if (ret)
-		goto  bk_batt_failed;
+		goto  i2c_reg_failed;
 
 	if (!is_battery_present(di)) {
 		if (!(hw_state & STS_USB_ID)) {
@@ -2861,13 +2827,13 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 			ret = twl_i2c_read_u8(TWL6030_MODULE_CHARGER,
 					&chargerusb_ctrl1, CHARGERUSB_CTRL1);
 			if (ret)
-				goto  bk_batt_failed;
+				goto  i2c_reg_failed;
 
 			chargerusb_ctrl1 |= HZ_MODE;
 			ret = twl_i2c_write_u8(TWL6030_MODULE_CHARGER,
 					 chargerusb_ctrl1, CHARGERUSB_CTRL1);
 			if (ret)
-				goto  bk_batt_failed;
+				goto  i2c_reg_failed;
 		}
 	} else if (!di->use_hw_charger) {
 		if (controller_stat & VAC_DET) {
@@ -2921,18 +2887,54 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 	if (ret)
 		dev_dbg(&pdev->dev, "Backup Bat charging setup failed\n");
 
-	twl6030_interrupt_unmask(TWL6030_CHARGER_CTRL_INT_MASK,
-				 REG_INT_MSK_LINE_C);
-	twl6030_interrupt_unmask(TWL6030_CHARGER_CTRL_INT_MASK,
-				 REG_INT_MSK_STS_C);
-	twl6030_interrupt_unmask(TWL6030_CHARGER_FAULT_INT_MASK,
-				 REG_INT_MSK_LINE_C);
-	twl6030_interrupt_unmask(TWL6030_CHARGER_FAULT_INT_MASK,
-				 REG_INT_MSK_STS_C);
-
 	ret = sysfs_create_group(&pdev->dev.kobj, &twl6030_bci_attr_group);
-	if (ret)
+	if (ret) {
 		dev_dbg(&pdev->dev, "could not create sysfs files\n");
+		goto i2c_reg_failed;
+	}
+
+	/* request charger fault interruption choosing between sw/hw mode */
+	irq = platform_get_irq(pdev, 1);
+	if (!di->use_hw_charger)
+		ret = request_threaded_irq(irq, NULL,
+				twl6030charger_fault_interrupt,
+				0, "twl_bci_fault", di);
+	else
+		ret = request_threaded_irq(irq, NULL,
+				twl6032charger_fault_interrupt_hw,
+				0, "twl_bci_fault", di);
+
+	if (ret) {
+		dev_dbg(&pdev->dev, "could not request irq %d, status %d\n",
+			irq, ret);
+		goto fault_irq_failed;
+	}
+
+	/* request charger ctrl interruption choosing between sw/hw mode */
+	irq = platform_get_irq(pdev, 0);
+	if (!di->use_hw_charger)
+		ret = request_threaded_irq(irq, NULL,
+				twl6030charger_ctrl_interrupt,
+				0, "twl_bci_ctrl", di);
+	else
+		ret = request_threaded_irq(irq, NULL,
+				twl6032charger_ctrl_interrupt_hw,
+				0, "twl_bci_ctrl", di);
+
+	if (ret) {
+		dev_dbg(&pdev->dev, "could not request irq %d, status %d\n",
+			irq, ret);
+		goto chg_irq_failed;
+	}
+
+	twl6030_interrupt_unmask(TWL6030_CHARGER_CTRL_INT_MASK,
+				 REG_INT_MSK_LINE_C);
+	twl6030_interrupt_unmask(TWL6030_CHARGER_CTRL_INT_MASK,
+				 REG_INT_MSK_STS_C);
+	twl6030_interrupt_unmask(TWL6030_CHARGER_FAULT_INT_MASK,
+				 REG_INT_MSK_LINE_C);
+	twl6030_interrupt_unmask(TWL6030_CHARGER_FAULT_INT_MASK,
+				 REG_INT_MSK_STS_C);
 
 	schedule_delayed_work(&di->twl6030_bci_monitor_work, 0);
 
@@ -2940,18 +2942,19 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 
 	return 0;
 
+chg_irq_failed:
+	irq = platform_get_irq(pdev, 1);
+	free_irq(irq, di);
+fault_irq_failed:
+	sysfs_remove_group(&pdev->dev.kobj, &twl6030_bci_attr_group);
+i2c_reg_failed:
+	power_supply_unregister(&di->bk_bat);
 bk_batt_failed:
-	cancel_delayed_work_sync(&di->twl6030_bci_monitor_work);
 	power_supply_unregister(&di->ac);
 ac_failed:
 	power_supply_unregister(&di->usb);
 usb_failed:
 	power_supply_unregister(&di->bat);
-batt_failed:
-	free_irq(irq, di);
-chg_irq_fail:
-	irq = platform_get_irq(pdev, 1);
-	free_irq(irq, di);
 temp_setup_fail:
 	platform_set_drvdata(pdev, NULL);
 	kfree(di);

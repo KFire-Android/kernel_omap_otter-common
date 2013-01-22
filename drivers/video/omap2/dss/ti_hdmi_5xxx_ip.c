@@ -1474,20 +1474,32 @@ static void ti_hdmi_5xxx_core_audio_config(struct hdmi_ip_data *ip_data,
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_AUD_CTS3,
 		cfg->cts >> 16, 3, 0);
 
-	/* Layout of Audio Sample Packets: 2-channel */
-	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_AUDSCONF, cfg->layout, 0, 0);
+	/* Layout of Audio Sample Packets: 2-channel or multichannels */
+	if (cfg->layout == HDMI_AUDIO_LAYOUT_2CH)
+		REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_AUDSCONF, 0, 0, 0);
+	else
+		REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_AUDSCONF, 1, 0, 0);
 
 	/* Configure IEC-609580 Validity bits */
 	/* Channel 0 is valid */
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_AUDSV, 0, 0, 0);
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_AUDSV, 0, 4, 4);
-	/* Channels 1, 2, 3 are not valid */
-	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_AUDSV, 1, 1, 1);
-	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_AUDSV, 1, 5, 5);
-	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_AUDSV, 1, 2, 2);
-	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_AUDSV, 1, 6, 6);
-	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_AUDSV, 1, 3, 3);
-	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_AUDSV, 1, 7, 7);
+
+	if (cfg->layout == HDMI_AUDIO_LAYOUT_2CH)
+		val = 1;
+	else
+		val = 0;
+
+	/* Channels 1, 2 setting */
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_AUDSV, val, 1, 1);
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_AUDSV, val, 5, 5);
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_AUDSV, val, 2, 2);
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_AUDSV, val, 6, 6);
+	/* Channel 3 setting */
+	if (cfg->layout == HDMI_AUDIO_LAYOUT_6CH)
+		val = 1;
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_AUDSV, val, 3, 3);
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_AUDSV, val, 7, 7);
 
 	/* Configure IEC-60958 User bits */
 	/* TODO: should be set by user. */
@@ -1544,12 +1556,29 @@ static void ti_hdmi_5xxx_core_audio_config(struct hdmi_ip_data *ip_data,
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_AUD_INT, 3, 3, 2);
 
 	/* Configure GPA */
+#ifdef CONFIG_ARCH_OMAP5_ES1
 	/* select HBR/SPDIF interfaces */
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_AUD_CONF0, 0, 5, 5);
 	/* enable two channels in GPA */
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_AUD_GP_CONF1, 3, 7, 0);
+#else
+	/* select HBR/SPDIF interfaces */
+	if (cfg->layout == HDMI_AUDIO_LAYOUT_2CH) {
+		/* select HBR/SPDIF interfaces */
+		REG_FLD_MOD(core_sys_base, HDMI_CORE_AUD_CONF0, 0, 5, 5);
+		/* enable two channels in GPA */
+		REG_FLD_MOD(core_sys_base, HDMI_CORE_AUD_GP_CONF1, 3, 7, 0);
+	} else {
+		/* select HBR/SPDIF interfaces */
+		REG_FLD_MOD(core_sys_base, HDMI_CORE_AUD_CONF0, 0, 5, 5);
+		/* enable two channels in GPA */
+		REG_FLD_MOD(core_sys_base, HDMI_CORE_AUD_GP_CONF1, 0xFF, 7, 0);
+	}
+#endif
+
 	/* disable HBR */
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_AUD_GP_CONF2, 0, 0, 0);
+
 #ifndef CONFIG_ARCH_OMAP5_ES1
 	/* enable PCUV */
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_AUD_GP_CONF2, 1, 1, 1);
@@ -1648,12 +1677,20 @@ int ti_hdmi_5xxx_audio_config(struct hdmi_ip_data *ip_data,
 	/* Audio channels settings */
 	channel_count = (aud_if->db1_ct_cc & CEA861_AUDIO_INFOFRAME_DB1CC) + 1;
 
+#ifdef CONFIG_ARCH_OMAP5_ES1
 	/* only 2 channels supported atm */
 	if (channel_count != 2)
 		return -EINVAL;
 
 	core.layout = HDMI_AUDIO_LAYOUT_2CH;
-
+#else
+	if (channel_count == 2)
+		core.layout = HDMI_AUDIO_LAYOUT_2CH;
+	else if (channel_count == 6)
+		core.layout = HDMI_AUDIO_LAYOUT_6CH;
+	else
+		core.layout = HDMI_AUDIO_LAYOUT_8CH;
+#endif
 	/* DMA settings */
 	if (word_length_16b)
 		audio_dma.transfer_size = 0x10;

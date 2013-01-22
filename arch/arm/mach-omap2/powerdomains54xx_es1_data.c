@@ -171,7 +171,6 @@ static struct powerdomain cpu1_54xx_pwrdm = {
 	.pwrsts_mem_on	= {
 		[0] = PWRSTS_ON,	/* cpu1_l1 */
 	},
-	.flags		  = PWRDM_HAS_FORCE_OFF,
 	.wakeup_lat = {
 		/* CPUIdle and suspend controls this explicitly */
 		[PWRDM_POWER_OFF] = UNSUP_STATE,

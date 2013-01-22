@@ -41,6 +41,7 @@
 #include <asm/mach/map.h>
 
 #include <mach/hardware.h>
+#include <mach/omap-secure.h>
 
 #include <plat/drm.h>
 #include <plat/board.h>
@@ -536,11 +537,32 @@ static int __init omap4_i2c_init(void)
 
 #ifdef CONFIG_OMAP_MUX
 static struct omap_board_mux board_mux[] __initdata = {
-	OMAP4_MUX(USBB2_ULPITLL_CLK, OMAP_MUX_MODE3 | OMAP_PIN_OUTPUT),
-	OMAP4_MUX(SYS_NIRQ2, OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP |
-				OMAP_PIN_OFF_WAKEUPENABLE),
-	OMAP4_MUX(SYS_NIRQ1, OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP |
-				OMAP_PIN_OFF_WAKEUPENABLE),
+	OMAP4_MUX(USBB2_ULPITLL_CLK, OMAP_MUX_MODE3 | OMAP_PIN_OUTPUT
+					| OMAP_PULL_ENA),
+	OMAP4_MUX(SYS_NIRQ2, OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP
+					| OMAP_PIN_OFF_WAKEUPENABLE),
+	OMAP4_MUX(SYS_NIRQ1, OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP
+					| OMAP_PIN_OFF_WAKEUPENABLE),
+
+	/* IO optimization pdpu and offmode settings to reduce leakage */
+	OMAP4_MUX(GPMC_A17, OMAP_MUX_MODE3 | OMAP_INPUT_EN),
+	OMAP4_MUX(GPMC_NBE1, OMAP_MUX_MODE3 | OMAP_PIN_OUTPUT),
+	OMAP4_MUX(GPMC_NCS4, OMAP_MUX_MODE3 | OMAP_INPUT_EN),
+	OMAP4_MUX(GPMC_NCS5, OMAP_MUX_MODE3 | OMAP_PULL_ENA | OMAP_PULL_UP
+					| OMAP_OFF_EN | OMAP_OFF_PULL_EN),
+	OMAP4_MUX(GPMC_NCS7, OMAP_MUX_MODE3 | OMAP_INPUT_EN),
+	OMAP4_MUX(GPMC_NBE1, OMAP_MUX_MODE3 | OMAP_PULL_ENA | OMAP_PULL_UP
+					| OMAP_OFF_EN | OMAP_OFF_PULL_EN),
+	OMAP4_MUX(GPMC_WAIT0, OMAP_MUX_MODE3 | OMAP_INPUT_EN),
+	OMAP4_MUX(GPMC_NOE, OMAP_MUX_MODE1 | OMAP_INPUT_EN),
+	OMAP4_MUX(MCSPI1_CS1, OMAP_MUX_MODE3 | OMAP_PULL_ENA | OMAP_PULL_UP
+					| OMAP_OFF_EN | OMAP_OFF_PULL_EN),
+	OMAP4_MUX(MCSPI1_CS2, OMAP_MUX_MODE3 | OMAP_PULL_ENA | OMAP_PULL_UP
+					| OMAP_OFF_EN | OMAP_OFF_PULL_EN),
+	OMAP4_MUX(SDMMC5_CLK, OMAP_MUX_MODE0 | OMAP_INPUT_EN | OMAP_OFF_EN
+					| OMAP_OFF_PULL_EN),
+	OMAP4_MUX(GPMC_NCS1, OMAP_MUX_MODE3 | OMAP_INPUT_EN | OMAP_WAKEUP_EN),
+	OMAP4_MUX(GPMC_A24, OMAP_MUX_MODE3 | OMAP_INPUT_EN | OMAP_WAKEUP_EN),
 	{ .reg_offset = OMAP_MUX_TERMINATOR },
 };
 
@@ -623,6 +645,17 @@ static struct platform_device thermistor = {
 		},
 };
 
+#if defined(CONFIG_TI_EMIF) || defined(CONFIG_TI_EMIF_MODULE)
+static struct __devinitdata emif_custom_configs custom_configs = {
+	.mask	= EMIF_CUSTOM_CONFIG_LPMODE,
+	.lpmode	= EMIF_LP_MODE_SELF_REFRESH,
+	.lpmode_timeout_performance = 512,
+	.lpmode_timeout_power = 512,
+	/* only at OPP100 should we use performance value */
+	.lpmode_freq_threshold = 400000000,
+};
+#endif
+
 static void __init omap_tablet_init(void)
 {
 	int status;
@@ -633,20 +666,20 @@ static void __init omap_tablet_init(void)
 		omap_emif_set_device_details(1, &lpddr2_elpida_4G_S4_info,
 				lpddr2_elpida_4G_S4_timings,
 				ARRAY_SIZE(lpddr2_elpida_4G_S4_timings),
-				&lpddr2_elpida_S4_min_tck, NULL);
+				&lpddr2_elpida_S4_min_tck, &custom_configs);
 		omap_emif_set_device_details(2, &lpddr2_elpida_4G_S4_info,
 				lpddr2_elpida_4G_S4_timings,
 				ARRAY_SIZE(lpddr2_elpida_4G_S4_timings),
-				&lpddr2_elpida_S4_min_tck, NULL);
+				&lpddr2_elpida_S4_min_tck, &custom_configs);
 	} else {
 		omap_emif_set_device_details(1, &lpddr2_elpida_2G_S4_x2_info,
 				lpddr2_elpida_2G_S4_timings,
 				ARRAY_SIZE(lpddr2_elpida_2G_S4_timings),
-				&lpddr2_elpida_S4_min_tck, NULL);
+				&lpddr2_elpida_S4_min_tck, &custom_configs);
 		omap_emif_set_device_details(2, &lpddr2_elpida_2G_S4_x2_info,
 				lpddr2_elpida_2G_S4_timings,
 				ARRAY_SIZE(lpddr2_elpida_2G_S4_timings),
-				&lpddr2_elpida_S4_min_tck, NULL);
+				&lpddr2_elpida_S4_min_tck, &custom_configs);
 	}
 #endif
 
@@ -700,6 +733,7 @@ static void __init omap_tablet_reserve(void)
 			OMAP_RAM_CONSOLE_SIZE_DEFAULT);
 	omap_rproc_reserve_cma(RPROC_CMA_OMAP4);
 	omap4_ion_init();
+	omap4_secure_workspace_addr_default();
 	omap_reserve();
 }
 

@@ -356,6 +356,7 @@ void __init omap5xxx_check_features(void)
 	if ((omap_rev() != OMAP5430_REV_ES1_0) &&
 	    (omap_rev() != OMAP5432_REV_ES1_0))
 		omap_features |= OMAP5_HAS_AUTO_RET;
+		omap_features |= OMAP5_HAS_AVS;
 }
 
 void __init ti81xx_check_features(void)

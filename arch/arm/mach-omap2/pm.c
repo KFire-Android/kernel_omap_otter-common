@@ -34,6 +34,7 @@
 #include "pm.h"
 #include "twl-common.h"
 #include "abb.h"
+#include "omap_opp_data.h"
 
 static struct device *l3_dev;
 static struct powerdomain *core_pd;
@@ -627,14 +628,11 @@ static int __init omap2_common_pm_init(void)
 		omap2_init_processor_devices();
 	omap_pm_if_init();
 
-	/* Register to the throughput class of PM QoS */
-	omap2_pm_qos_tput_init();
-
 	return 0;
 }
 postcore_initcall(omap2_common_pm_init);
 
-static int __init omap2_common_pm_late_init(void)
+static int __init omap2_common_pm_subsys_init(void)
 {
 	/*
 	 * In the case of DT, the PMIC and SR initialization will be done using
@@ -642,7 +640,8 @@ static int __init omap2_common_pm_late_init(void)
 	 * Disable this part if a DT blob is available.
 	 */
 	if (of_have_populated_dt())
-		return 0;
+		goto next;
+
 
 	/* Init the voltage layer */
 	omap_pmic_late_init();
@@ -656,13 +655,26 @@ static int __init omap2_common_pm_late_init(void)
 	/* Smartreflex device init */
 	omap_devinit_smartreflex();
 
-	omap_pm_is_ready_status = true;
-	/* let the other CPU know as well */
-	smp_wmb();
+next:
+	/* Register to the throughput class of PM QoS */
+	omap2_pm_qos_tput_init();
 
 #ifdef CONFIG_SUSPEND
 	suspend_set_ops(&omap_pm_ops);
 #endif
+
+	/* Initialize Core PM */
+	omap4_pm_init();
+
+	set_device_opp();
+
+	omap_pm_is_ready_status = true;
+	/* let the other CPU know as well */
+	smp_wmb();
+
+	omap4_set_processor_device_opp();
+
+	omap4_init_cpuidle();
 
 	core_pd = pwrdm_lookup("core_pwrdm");
 	if (!core_pd) {
@@ -672,4 +684,4 @@ static int __init omap2_common_pm_late_init(void)
 
 	return 0;
 }
-late_initcall(omap2_common_pm_late_init);
+subsys_initcall_sync(omap2_common_pm_subsys_init);

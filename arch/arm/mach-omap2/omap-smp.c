@@ -157,7 +157,6 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
 		clkdm_wakeup(cpu1_clkdm);
 		clkdm_allow_idle(cpu1_clkdm);
 		pwrdm_set_next_pwrst(cpu1_pwrdm, PWRDM_POWER_ON);
-		pwrdm_disable_force_off(cpu1_pwrdm);
 
 		if (IS_PM44XX_ERRATUM(PM_OMAP4_ROM_SMP_BOOT_ERRATUM_xxx)) {
 			while (gic_dist_disabled()) {

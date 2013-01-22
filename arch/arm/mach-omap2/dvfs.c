@@ -1030,9 +1030,9 @@ static const struct file_operations debugdvfs_fops = {
 	.release = single_release,
 };
 
-static struct dentry __initdata *dvfsdebugfs_dir;
+static struct dentry *dvfsdebugfs_dir;
 
-static void __init dvfs_dbg_init(struct omap_vdd_dvfs_info *dvfs_info)
+static void dvfs_dbg_init(struct omap_vdd_dvfs_info *dvfs_info)
 {
 	struct dentry *ddir;
 
@@ -1277,9 +1277,9 @@ static int _vset(void *data, u64 val)
 
 DEFINE_SIMPLE_ATTRIBUTE(dvfs_verify_lock_fops, _vget, _vset, "%llu\n");
 
-static struct dentry __initdata *dvfs_verify_debugfs_dir;
+static struct dentry *dvfs_verify_debugfs_dir;
 
-static void __init dvfs_verify_dbg_init(struct device *dev,
+static void dvfs_verify_dbg_init(struct device *dev,
 			char *voltdm_name, char *clk_name)
 {
 	struct dentry *ddir;
@@ -1371,7 +1371,7 @@ static inline void dvfs_verify_dbg_init(struct device *dev,
  *
  * Returns 0 on success.
  */
-int __init omap_dvfs_register_device(struct device *dev, char *voltdm_name,
+int omap_dvfs_register_device(struct device *dev, char *voltdm_name,
 		char *clk_name)
 {
 	struct omap_vdd_dev_list *temp_dev;
@@ -1379,7 +1379,7 @@ int __init omap_dvfs_register_device(struct device *dev, char *voltdm_name,
 	struct clk *clk = NULL;
 	struct voltagedomain *voltdm;
 	int ret = 0;
-	static __initdata bool qos_create;
+	static bool qos_create;
 
 	if (!voltdm_name) {
 		dev_err(dev, "%s: Bad voltdm name!\n", __func__);
