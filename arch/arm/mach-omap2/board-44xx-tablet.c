@@ -1030,11 +1030,18 @@ static void __init omap_tablet_reserve(void)
 	omap_reserve();
 }
 
+static void __init omap_tablet_init_early(void)
+{
+	omap4430_init_early();
+	if (cpu_is_omap446x())
+		omap_tps6236x_gpio_no_reset_wa(TPS62361_GPIO, -1, 32);
+}
+
 MACHINE_START(OMAP_BLAZE, "OMAP44XX Tablet board")
 	.atag_offset	= 0x100,
 	.reserve	= omap_tablet_reserve,
 	.map_io		= omap4_map_io,
-	.init_early	= omap4430_init_early,
+	.init_early	= omap_tablet_init_early,
 	.init_irq	= gic_init_irq,
 	.handle_irq	= gic_handle_irq,
 	.init_machine	= omap_tablet_init,
