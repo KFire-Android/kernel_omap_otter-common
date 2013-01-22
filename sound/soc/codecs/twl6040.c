@@ -1392,8 +1392,8 @@ hfirq_err:
 	free_irq(priv->plug_irq, codec);
 plugirq_err:
 	switch_dev_unregister(&jack->sdev);
-	wake_lock_destroy(&priv->wake_lock);
 sdev_err:
+	wake_lock_destroy(&priv->wake_lock);
 	destroy_workqueue(priv->workqueue);
 work_err:
 	kfree(priv);
