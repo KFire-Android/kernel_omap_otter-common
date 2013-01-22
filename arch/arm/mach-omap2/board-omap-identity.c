@@ -217,8 +217,20 @@ int __init omap_init_board_version(int forced_rev)
 {
 	int i = 0, hex = 0, dec = system_rev;
 
-	if (forced_rev)
-		dec = forced_rev;
+	if (forced_rev) {
+		hex = dec = forced_rev;
+	} else {
+		/*
+		 * Converting to heximal value,
+		 * e.g. dec:2170003 became a 0x2170003,
+		 * this make check process more easy and quick
+		 */
+		do {
+			hex |= dec%10 << i*4;
+			i++;
+		} while (dec /= 10);
+		dec = system_rev;
+	}
 
 	switch (dec) {
 	/*
@@ -234,17 +246,6 @@ int __init omap_init_board_version(int forced_rev)
 		omap_board.rev_mod = (BOARD_OMAP4_BLAZE << BOARD_CLASS_OFF);
 		break;
 	default:
-		/*
-		 * Converting to heximal value,
-		 * e.g. dec:2170003 became a 0x2170003,
-		 * this make check process more easy and quick
-		 */
-		do {
-			hex |= dec%10 << i*4;
-			i++;
-		} while (dec /= 10);
-
-		i = 0;
 		omap_board.class = hex >> BOARD_CLASS_OFF;
 		omap_board.rev_mod = hex;
 		omap_board.rev = BOARD_GET_REV(hex);
