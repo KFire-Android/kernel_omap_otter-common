@@ -661,6 +661,8 @@ static int __init hdmi_init_of(void)
 int __init omapdss_init_of(void)
 {
 	int r;
+	struct platform_device *pdev;
+	struct device_node *node;
 	enum omapdss_version ver;
 
 	static struct omap_dss_board_info board_data = {
@@ -678,6 +680,23 @@ int __init omapdss_init_of(void)
 	}
 
 	board_data.version = ver;
+
+	/* find the main dss node  */
+	node = of_find_node_by_name(NULL, "dss");
+	if (!node)
+		return 0;
+
+	pdev = of_find_device_by_node(node);
+	if (!pdev) {
+		pr_err("Cannot find dss platform device\n");
+		return -EINVAL;
+	}
+
+	r = of_platform_populate(node, NULL, NULL, &pdev->dev);
+	if (r) {
+		pr_err("Failed to populate dss devices\n");
+		return -EINVAL;
+	}
 
 	omap_display_device.dev.platform_data = &board_data;
 
