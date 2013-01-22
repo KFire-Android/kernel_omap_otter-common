@@ -200,11 +200,15 @@ struct twl6040_vibra_data {
 	int vddvibr_uV;			/* VDDVIBR volt, set 0 for fixed reg */
 };
 
+struct twl6040;
+
 struct twl6040_platform_data {
 	int audpwron_gpio;	/* audio power-on gpio */
 	unsigned int irq_base;
 	int (*set_pll_input)(int pll_id, int enable);
 	int (*pdm_ul_errata)(void);
+	int (*platform_init)(struct twl6040 *twl6040);
+	int (*platform_exit)(struct twl6040 *twl6040);
 
 	struct twl6040_codec_data *codec;
 	struct twl6040_vibra_data *vibra;
