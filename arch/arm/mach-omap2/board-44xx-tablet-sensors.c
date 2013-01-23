@@ -24,6 +24,7 @@
 #include <linux/i2c/bma180.h>
 #include <linux/i2c/tsl2771.h>
 #include <linux/i2c/mpu3050.h>
+#include <linux/platform_data/lm75_platform_data.h>
 
 #include <plat/i2c.h>
 
@@ -122,9 +123,17 @@ static struct mpu3050gyro_platform_data mpu3050_platform_data = {
 };
 /* MPU3050 Gyro End */
 
+static struct lm75_platform_data lm75_pdata = {
+	.domain = "case",
+	.stats_enable = 1,
+	.average_period = 2000,
+	.average_number = 20,
+};
+
 static struct i2c_board_info __initdata blaze_tablet_i2c_bus3_sensor_info[] = {
 	{
 		I2C_BOARD_INFO("tmp105", 0x48),
+		.platform_data = &lm75_pdata,
 	},
 };
 
