@@ -685,9 +685,20 @@ skip_ovl_set:
 		wb = omap_dss_get_wb(0);
 		wb->get_wb_info(wb, &wb_info);
 
-		if (wb_info.mode == OMAP_WB_MEM2MEM_MODE &&
-			wb_info.enabled)
+		if (wb_info.enabled) {
+			mutex_lock(&wb->lock);
+			wb->wb_done.sync_id = d->sync_id;
+			wb->wb_done.is_done = false;
+
+			if (wb_info.mode == OMAP_WB_MEM2MEM_MODE)
+				wb->wb_done.vsync_active = false;
+			else if (wb_info.mode == OMAP_WB_CAPTURE_MODE) {
+				wb->wb_done.vsync_active = true;
+				wb->wb_done.vsync_count = 0;
+			}
 			wb->register_framedone(wb);
+			mutex_unlock(&wb->lock);
+		}
 	}
 
 	mutex_lock(&mtx);

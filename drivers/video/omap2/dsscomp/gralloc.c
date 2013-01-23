@@ -287,6 +287,8 @@ int dsscomp_gralloc_queue(struct dsscomp_setup_dispc_data *d,
 		mgr = cdev->mgrs[ch];
 
 		comp[ch] = dsscomp_new(mgr);
+		/*HACK: identify each comp to use with WFD invalidation WA*/
+		comp[ch]->frm.sync_id = d->sync_id;
 		if (IS_ERR(comp[ch])) {
 			comp[ch] = NULL;
 			dev_warn(DEV(cdev), "failed to get composition on %s\n",
