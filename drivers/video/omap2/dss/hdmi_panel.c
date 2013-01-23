@@ -190,7 +190,8 @@ static void hdmi_panel_audio_disable(struct omap_dss_device *dssdev)
 
 	spin_lock_irqsave(&hdmi.audio_lock, flags);
 
-	hdmi_audio_disable();
+	if (dssdev->state != OMAP_DSS_DISPLAY_DISABLED)
+		hdmi_audio_disable();
 
 	dssdev->audio_state = OMAP_DSS_AUDIO_DISABLED;
 
