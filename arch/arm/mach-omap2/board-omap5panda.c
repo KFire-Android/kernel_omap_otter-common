@@ -473,15 +473,33 @@ static struct regulator_init_data omap5_ldo3 = {
 	},
 };
 
+static struct regulator_consumer_supply omap5_dss_phy_supply[] = {
+	REGULATOR_SUPPLY("vdds_dsi", "omapdss"),
+	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dsi.0"),
+	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dsi.1"),
+	REGULATOR_SUPPLY("vdds_hdmi", "omapdss_hdmi"),
+};
+
+
 static struct regulator_init_data omap5_ldo4 = {
 	.constraints = {
+#ifdef CONFIG_ARCH_OMAP5_ES1
 		.min_uV			= 2200000,
 		.max_uV			= 2200000,
+#else
+		.min_uV			= 1500000,
+		.max_uV			= 1500000,
+		.apply_uV		= 1,
+#endif
 		.valid_modes_mask	= REGULATOR_MODE_NORMAL
 					| REGULATOR_MODE_STANDBY,
 		.valid_ops_mask		= REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
 	},
+#ifndef CONFIG_ARCH_OMAP5_ES1
+	.num_consumer_supplies	= ARRAY_SIZE(omap5_dss_phy_supply),
+	.consumer_supplies	= omap5_dss_phy_supply,
+#endif
 };
 
 static struct regulator_init_data omap5_ldo5 = {
@@ -506,13 +524,6 @@ static struct regulator_init_data omap5_ldo6 = {
 	},
 };
 
-static struct regulator_consumer_supply omap5_dss_phy_supply[] = {
-	REGULATOR_SUPPLY("vdds_dsi", "omapdss"),
-	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dsi.0"),
-	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dsi.1"),
-	REGULATOR_SUPPLY("vdds_hdmi", "omapdss_hdmi"),
-};
-
 static struct regulator_init_data omap5_ldo7 = {
 	.constraints = {
 		.min_uV			= 1500000,
@@ -521,10 +532,14 @@ static struct regulator_init_data omap5_ldo7 = {
 					| REGULATOR_MODE_STANDBY,
 		.valid_ops_mask		= REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
+#ifdef CONFIG_ARCH_OMAP5_ES1
 		.apply_uV		= 1,
+#endif
 	},
+#ifdef CONFIG_ARCH_OMAP5_ES1
 	.num_consumer_supplies	= ARRAY_SIZE(omap5_dss_phy_supply),
 	.consumer_supplies	= omap5_dss_phy_supply,
+#endif
 };
 
 static struct regulator_init_data omap5_ldo8 = {
