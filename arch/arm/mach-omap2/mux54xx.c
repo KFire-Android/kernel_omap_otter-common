@@ -1112,6 +1112,44 @@ static struct omap_mux __initdata omap5_5432es1_core_subset[] = {
 	{ .reg_offset = OMAP_MUX_TERMINATOR },
 };
 
+#endif
+
+/*
+ * Core subset for OMAP5432 ES2.0 (ES1.0 + UART1)
+ */
+static struct omap_mux __initdata omap5_5432es2_core_subset[] = {
+	_OMAP5_MUXENTRY_SAFE(HSI1_ACREADY,	64),
+	_OMAP5_MUXENTRY_SAFE(HSI1_CAREADY,	65),
+	_OMAP5_MUXENTRY_SAFE(HSI1_ACWAKE,	66),
+	_OMAP5_MUXENTRY_SAFE(HSI1_CAWAKE,	67),
+	_OMAP5_MUXENTRY_SAFE(HSI1_ACFLAG,	68),
+	_OMAP5_MUXENTRY_SAFE(HSI1_ACDATA,	69),
+	_OMAP5_MUXENTRY_SAFE(HSI1_CAFLAG,	70),
+	_OMAP5_MUXENTRY_SAFE(HSI1_CADATA,	71),
+	_OMAP5_MUXENTRY_SAFE(UART1_TX,		72),
+	_OMAP5_MUXENTRY_SAFE(UART1_CTS,		73),
+	_OMAP5_MUXENTRY_SAFE(UART1_RX,		74),
+	_OMAP5_MUXENTRY_SAFE(UART1_RTS,		75),
+	_OMAP5_MUXENTRY_SAFE(USBB1_HSIC_STROBE,	92),
+	_OMAP5_MUXENTRY_SAFE(USBB1_HSIC_DATA,	93),
+	_OMAP5_MUXENTRY(UART6_RTS, 152, "uart6_rts", "sys_ndmareq0", NULL,
+			"sdio5_data0", "usbb2_mm_txse0", "usbd0_ulpiphy_stp",
+			"gpio5_152", "safe_mode"),
+	_OMAP5_MUXENTRY(TIMER11_PWM_EVT, 227, "timer11_pwm_evt", NULL,
+			"uart1_tx", "cpi_data12", NULL, "hw_dbg26",
+			"gpio8_227", "safe_mode"),
+	_OMAP5_MUXENTRY(TIMER5_PWM_EVT, 228, "timer5_pwm_evt", NULL,
+			"uart1_cts", "cpi_data13", NULL, NULL,
+			"gpio8_228", "safe_mode"),
+	_OMAP5_MUXENTRY(TIMER6_PWM_EVT, 229, "timer6_pwm_evt", NULL,
+			"uart1_rx", "cpi_data14", NULL, NULL,
+			"gpio8_229", "safe_mode"),
+	_OMAP5_MUXENTRY(TIMER8_PWM_EVT, 230, "timer8_pwm_evt", NULL,
+			"uart1_rts", "cpi_data15", NULL, "hw_dbg27",
+			"gpio8_230", "safe_mode"),
+	{ .reg_offset = OMAP_MUX_TERMINATOR },
+};
+
 /*
  * Wake-up subset for OMAP5432 ES1.0
  */
@@ -1121,7 +1159,6 @@ static struct omap_mux __initdata omap5_5432_wkup_subset[] = {
 	_OMAP5_MUXENTRY_SAFE(FREF_CLK2_OUT, 10),
 	{ .reg_offset = OMAP_MUX_TERMINATOR },
 };
-#endif
 
 int __init omap5_mux_init(struct omap_board_mux *board_subset,
 	struct omap_board_mux *board_wkup_subset, int flags)
@@ -1144,6 +1181,11 @@ int __init omap5_mux_init(struct omap_board_mux *board_subset,
 		wkup_subset = omap5_5432_wkup_subset;
 		break;
 #endif
+	case OMAP5432_REV_ES2_0:
+		pr_debug("%s: OMAP5432 ES2.0 mux\n", __func__);
+		core_subset = omap5_5432es2_core_subset;
+		wkup_subset = omap5_5432_wkup_subset;
+		break;
 	default:
 		pr_err("mux: Unknown omap package, mux disabled\n");
 		return -EINVAL;
