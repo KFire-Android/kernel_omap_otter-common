@@ -20,6 +20,7 @@
 #include <linux/pinctrl/machine.h>
 #include <linux/platform_data/omap4-keypad.h>
 #include <linux/platform_data/omap_ocp2scp.h>
+#include <linux/platform_data/mailbox-omap.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/map.h>
@@ -290,14 +291,24 @@ static inline void __init omap_init_mbox(void)
 {
 	struct omap_hwmod *oh;
 	struct platform_device *pdev;
+	struct omap_mbox_pdata *pdata;
+	u32 pdata_len;
 
 	oh = omap_hwmod_lookup("mailbox");
 	if (!oh) {
 		pr_err("%s: unable to find hwmod\n", __func__);
 		return;
 	}
+	if (!oh->dev_attr) {
+		pr_err("%s: hwmod doesn't have valid attrs\n", __func__);
+		return;
+	}
 
-	pdev = omap_device_build("omap-mailbox", -1, oh, NULL, 0, NULL, 0, 0);
+	pdata = (struct omap_mbox_pdata *)oh->dev_attr;
+	pdata_len = (pdata->info_cnt * (sizeof(struct omap_mbox_dev_info))) +
+			(2 * sizeof(u32));
+	pdev = omap_device_build("omap-mailbox", -1, oh, pdata, pdata_len,
+								NULL, 0, 0);
 	WARN(IS_ERR(pdev), "%s: could not build device, err %ld\n",
 						__func__, PTR_ERR(pdev));
 }
