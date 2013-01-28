@@ -50,3 +50,7 @@ obj-y				+= carma/
 obj-$(CONFIG_USB_SWITCH_FSA9480) += fsa9480.o
 obj-$(CONFIG_ALTERA_STAPL)	+=altera-stapl/
 obj-$(CONFIG_INTEL_MEI)		+= mei/
+obj-$(CONFIG_GCCORE)		+= gcx/gccore/
+obj-$(CONFIG_GCBV)		+= gcx/gcbv/
+obj-$(CONFIG_GCIOCTL)		+= gcx/gcioctl/
+obj-$(CONFIG_CACHE2DMANAGER)	+= cache-2dmanager/
