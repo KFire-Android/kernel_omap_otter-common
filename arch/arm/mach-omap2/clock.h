@@ -82,7 +82,7 @@ void __init omap2_clk_disable_clkdm_control(void);
 
 /* clkt_clksel.c public functions */
 u32 omap2_clksel_round_rate_div(struct clk *clk, unsigned long target_rate,
-				u32 *new_div);
+				u32 *new_div, u32 *new_mul);
 void omap2_init_clksel_parent(struct clk *clk);
 unsigned long omap2_clksel_recalc(struct clk *clk);
 long omap2_clksel_round_rate(struct clk *clk, unsigned long target_rate);

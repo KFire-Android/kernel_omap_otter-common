@@ -49,7 +49,7 @@
  */
 int omap3_core_dpll_m2_set_rate(struct clk *clk, unsigned long rate)
 {
-	u32 new_div = 0;
+	u32 new_div = 0, new_mul = 0;
 	u32 unlock_dll = 0;
 	u32 c;
 	unsigned long validrate, sdrcrate, _mpurate;
@@ -60,7 +60,7 @@ int omap3_core_dpll_m2_set_rate(struct clk *clk, unsigned long rate)
 	if (!clk || !rate)
 		return -EINVAL;
 
-	validrate = omap2_clksel_round_rate_div(clk, rate, &new_div);
+	validrate = omap2_clksel_round_rate_div(clk, rate, &new_div, &new_mul);
 	if (validrate != rate)
 		return -EINVAL;
 
