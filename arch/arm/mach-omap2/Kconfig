@@ -395,8 +395,12 @@ config MACH_OMAP_4430_KC1
 	select OMAP_REBOOT_REASON
 	select REGULATOR_FIXED_VOLTAGE
 
+config OTTER
+	bool "Use Subtype Otter settings"
+	depends on MACH_OMAP_4430_KC1
+
 config OTTER2
-	bool "Use 2nd-gen KFire (otter2) settings"
+	bool "Use Subtype Otter2 settings"
 	depends on MACH_OMAP_4430_KC1
 
 config MACH_OMAP4_PANDA
