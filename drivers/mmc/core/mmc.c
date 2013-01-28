@@ -18,18 +18,22 @@
 #include <linux/mmc/mmc.h>
 
 //qvx_emmc
+#ifdef CONFIG_OTTER
 #include <linux/scatterlist.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
+#endif
 
 #include "core.h"
 #include "bus.h"
 #include "mmc_ops.h"
 #include "sd_ops.h"
 
+#ifdef CONFIG_OTTER
 #define EMMC		1
 static int RW_OFFSET;
 static int RW_SHIFT;
+#endif
 
 static const unsigned int tran_exp[] = {
 	10000,		100000,		1000000,	10000000,
@@ -1243,7 +1247,9 @@ static int mmc_read_ext_csd(struct mmc_card *card, u8 *ext_csd)
 		 * card has the Enhanced area enabled.  If so, export enhanced
 		 * area offset and size to user by adding sysfs interface.
 		 */
+#ifdef CONFIG_OTTER
 		card->ext_csd.raw_partition_support = ext_csd[EXT_CSD_PARTITION_SUPPORT];
+#endif
 		if ((ext_csd[EXT_CSD_PARTITION_SUPPORT] & 0x2) &&
 		    (ext_csd[EXT_CSD_PARTITION_ATTRIBUTE] & 0x1)) {
 			u8 hc_erase_grp_sz =
@@ -1289,8 +1295,9 @@ static int mmc_read_ext_csd(struct mmc_card *card, u8 *ext_csd)
 
 	if (card->ext_csd.rev >= 5)
 		card->ext_csd.rel_param = ext_csd[EXT_CSD_WR_REL_PARAM];
-
+#ifdef CONFIG_OTTER
 	card->ext_csd.raw_erased_mem_count = ext_csd[EXT_CSD_ERASED_MEM_CONT];
+#endif
 	if (ext_csd[EXT_CSD_ERASED_MEM_CONT])
 		card->erased_byte = 0xFF;
 	else
@@ -1369,6 +1376,7 @@ out:
 }
 
 
+#ifdef CONFIG_OTTER
 static bool mmc_write_bp1(struct mmc_card *card, int partition, int offset, const char* data)
 {
 	struct mmc_request mrq;
@@ -1904,6 +1912,7 @@ static ssize_t set_shift(struct device *dev, struct device_attribute *attr,
 	//printk("<ker> set shift 0x%x, %d \n",RW_SHIFT,RW_SHIFT);
 	return sizeof(RW_SHIFT);
 }
+#endif
 
 MMC_DEV_ATTR(cid, "%08x%08x%08x%08x\n", card->raw_cid[0], card->raw_cid[1],
 	card->raw_cid[2], card->raw_cid[3]);
@@ -1921,9 +1930,9 @@ MMC_DEV_ATTR(serial, "0x%08x\n", card->cid.serial);
 MMC_DEV_ATTR(enhanced_area_offset, "%llu\n",
 		card->ext_csd.enhanced_area_offset);
 MMC_DEV_ATTR(enhanced_area_size, "%u\n", card->ext_csd.enhanced_area_size);
+MMC_DEV_ATTR(density, "0x%08x\n",card->ext_csd.sectors);
 
 #if EMMC 
-MMC_DEV_ATTR(density, "0x%08x\n",card->ext_csd.sectors);
 //static DEVICE_ATTR(extcsd, S_IRUGO | S_IWUSR, get_emmc_extcsd, NULL);
 //boot partiton 2 
 static DEVICE_ATTR(offset, 0666, get_offset, set_offset);
@@ -1948,8 +1957,8 @@ static struct attribute *mmc_std_attrs[] = {
 	&dev_attr_serial.attr,
 	&dev_attr_enhanced_area_offset.attr,
 	&dev_attr_enhanced_area_size.attr,
-#if EMMC 
 	&dev_attr_density.attr,
+#if EMMC 
 	&dev_attr_bp2.attr,
 	&dev_attr_offset.attr,
 	&dev_attr_bp1.attr,
@@ -2396,7 +2405,11 @@ static int mmc_sleep(struct mmc_host *host)
 
         //If Manufacturer ID is Samsung (0x15), bypass Sleep command transmission as Samsung EMMC goes automatically in sleep mode (HW feature)	
 	if(card->cid.manfid == 0x15)
-	return 0;
+		return 0;
+
+	/* Workaround for Hynix (0x90) */
+	if (card->cid.manfid == 0x90)
+		return 0;
 
 	if (card && card->ext_csd.rev >= 3) {
 		err = mmc_card_sleepawake(host, 1);
@@ -2415,7 +2428,11 @@ static int mmc_awake(struct mmc_host *host)
 
 	//If Manufacturer ID is Samsung (0x15), bypass Sleep command transmission as Samsung EMMC goes automatically in awake mode(HW feature)	
 	if(card->cid.manfid == 0x15)
-	return 0;
+		return 0;
+
+	/* Workaround for Hynix (0x90) */
+	if (card->cid.manfid == 0x90)
+		return 0;
 
 	if (card && card->ext_csd.rev >= 3) {
 		err = mmc_card_sleepawake(host, 0);
