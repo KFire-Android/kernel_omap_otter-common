@@ -85,6 +85,9 @@ struct dispc_features {
 
 	/* no DISPC_IRQ_FRAMEDONETV on this SoC */
 	bool no_framedone_tv:1;
+
+	/* revert to the OMAP4 mechanism of DISPC Smart Standby operation */
+	bool standby_workaround:1;
 };
 
 #define DISPC_MAX_NR_FIFOS 5
@@ -3466,6 +3469,9 @@ static void _omap_dispc_initial_config(void)
 	dispc_configure_burst_sizes();
 
 	dispc_ovl_enable_zorder_planes();
+
+	if (dispc.feat->standby_workaround)
+		REG_FLD_MOD(DISPC_MSTANDBY_CTRL, 1, 0, 0);
 }
 
 static const struct dispc_features omap24xx_dispc_feats __initconst = {
@@ -3551,6 +3557,7 @@ static const struct dispc_features omap54xx_dispc_feats __initconst = {
 	.calc_core_clk		=	calc_core_clk_44xx,
 	.num_fifos		=	5,
 	.gfx_fifo_workaround	=	true,
+	.standby_workaround	=	true,
 };
 
 static int __init dispc_init_features(struct platform_device *pdev)
