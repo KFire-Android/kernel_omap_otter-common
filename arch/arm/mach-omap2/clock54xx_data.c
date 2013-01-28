@@ -484,6 +484,7 @@ static const struct clksel_rate div63_1to63_rates[] = {
 
 static const struct clksel dpll_core_h21x2_div[] = {
 	{ .parent = &dpll_core_x2_ck, .rates = div63_1to63_rates },
+	{ .parent = &dpll_core_ck, .rates = div31_1to31_rates },
 	{ .parent = NULL },
 };
 
@@ -560,7 +561,7 @@ static struct clk dpll_core_h13x2_ck = {
 
 static struct clk dpll_core_h14x2_ck = {
 	.name		= "dpll_core_h14x2_ck",
-	.parent		= &dpll_core_x2_ck,
+	.parent         = &dpll_core_ck,
 	.clksel		= dpll_core_h21x2_div,
 	.clksel_reg	= OMAP54XX_CM_DIV_H14_DPLL_CORE,
 	.clksel_mask	= OMAP54XX_DIVHS_MASK,
