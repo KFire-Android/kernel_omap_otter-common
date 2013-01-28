@@ -58,3 +58,8 @@ obj-$(CONFIG_OMAP_OCP2SCP)	+= omap-ocp2scp.o
 obj-$(CONFIG_OMAP_SEVM_DOCK)	+= sevm_dock_station.o
 obj-$(CONFIG_TWL6040_VIB)	+= twl6040-vib.o
 obj-$(CONFIG_CDC_TCXO)		+= cdc_tcxo.o
+obj-$(CONFIG_GCCORE)		+= gcx/gccore/
+obj-$(CONFIG_GCBV)		+= gcx/gcbv/
+obj-$(CONFIG_GCIOCTL)		+= gcx/gcioctl/
+obj-$(CONFIG_CACHE2DMANAGER)	+= cache-2dmanager/
+
