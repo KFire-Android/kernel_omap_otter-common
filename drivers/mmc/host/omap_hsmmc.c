@@ -2873,7 +2873,7 @@ static void omap_hsmmc_shutdown(struct platform_device *pdev)
 
 	/* MMC spec gives 800ms min for card housekeeping.
 	   Leave it on the safe side */
-	msleep(1000);
+	msleep(1600);
 }
 
 static struct dev_pm_ops omap_hsmmc_dev_pm_ops = {
