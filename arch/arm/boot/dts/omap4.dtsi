@@ -119,7 +119,7 @@
 		};
 
 		dss {
-			compatible = "ti,omap4-dss", "simple-bus";
+			compatible = "ti,omap4-dss";
 			ti,hwmods = "dss_core";
 			#address-cells = <1>;
 			#size-cells = <0>;
@@ -151,7 +151,7 @@
 			};
 
 			hdmi: hdmi {
-				compatible = "ti,omap4-hdmi";
+				compatible = "ti,omap4-hdmi", "simple-bus";
 				ti,hwmods = "dss_hdmi";
 				vdda_hdmi_dac-supply = <&vdac>;
 				video-source = <1>;
