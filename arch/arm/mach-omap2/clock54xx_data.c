@@ -559,10 +559,51 @@ static struct clk dpll_core_h13x2_ck = {
 	.set_rate	= &omap2_clksel_set_rate,
 };
 
+static const struct clksel_rate div32_1to32_rates[] = {
+	{ .div = 1, .val = 1, .flags = RATE_IN_54XX },
+	{ .div = 2, .val = 2, .flags = RATE_IN_54XX },
+	/* following divider is not really 2 but 2.5 */
+	{ .div = 2, .val = 63, .mul = 5, .flags = RATE_IN_54XX },
+	{ .div = 3, .val = 3, .flags = RATE_IN_54XX },
+	{ .div = 4, .val = 4, .flags = RATE_IN_54XX },
+	{ .div = 5, .val = 5, .flags = RATE_IN_54XX },
+	{ .div = 6, .val = 6, .flags = RATE_IN_54XX },
+	{ .div = 7, .val = 7, .flags = RATE_IN_54XX },
+	{ .div = 8, .val = 8, .flags = RATE_IN_54XX },
+	{ .div = 9, .val = 9, .flags = RATE_IN_54XX },
+	{ .div = 10, .val = 10, .flags = RATE_IN_54XX },
+	{ .div = 11, .val = 11, .flags = RATE_IN_54XX },
+	{ .div = 12, .val = 12, .flags = RATE_IN_54XX },
+	{ .div = 13, .val = 13, .flags = RATE_IN_54XX },
+	{ .div = 14, .val = 14, .flags = RATE_IN_54XX },
+	{ .div = 15, .val = 15, .flags = RATE_IN_54XX },
+	{ .div = 16, .val = 16, .flags = RATE_IN_54XX },
+	{ .div = 17, .val = 17, .flags = RATE_IN_54XX },
+	{ .div = 18, .val = 18, .flags = RATE_IN_54XX },
+	{ .div = 19, .val = 19, .flags = RATE_IN_54XX },
+	{ .div = 20, .val = 20, .flags = RATE_IN_54XX },
+	{ .div = 21, .val = 21, .flags = RATE_IN_54XX },
+	{ .div = 22, .val = 22, .flags = RATE_IN_54XX },
+	{ .div = 23, .val = 23, .flags = RATE_IN_54XX },
+	{ .div = 24, .val = 24, .flags = RATE_IN_54XX },
+	{ .div = 25, .val = 25, .flags = RATE_IN_54XX },
+	{ .div = 26, .val = 26, .flags = RATE_IN_54XX },
+	{ .div = 27, .val = 27, .flags = RATE_IN_54XX },
+	{ .div = 28, .val = 28, .flags = RATE_IN_54XX },
+	{ .div = 29, .val = 29, .flags = RATE_IN_54XX },
+	{ .div = 30, .val = 30, .flags = RATE_IN_54XX },
+	{ .div = 31, .val = 31, .flags = RATE_IN_54XX },
+	{ .div = 0 },
+};
+
+static const struct clksel dpll_core_h14x2_div[] = {
+	{ .parent = &dpll_core_ck, .rates = div32_1to32_rates },
+	{ .parent = NULL },
+};
 static struct clk dpll_core_h14x2_ck = {
 	.name		= "dpll_core_h14x2_ck",
 	.parent         = &dpll_core_ck,
-	.clksel		= dpll_core_h21x2_div,
+	.clksel		= dpll_core_h14x2_div,
 	.clksel_reg	= OMAP54XX_CM_DIV_H14_DPLL_CORE,
 	.clksel_mask	= OMAP54XX_DIVHS_MASK,
 	.ops		= &clkops_omap4_dpllmx_ops,
