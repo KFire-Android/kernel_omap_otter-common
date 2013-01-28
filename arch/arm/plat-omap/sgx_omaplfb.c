@@ -37,6 +37,11 @@ static struct sgx_omaplfb_config omaplfb_config[OMAPLFB_NUM_DEV] = {
 	{
 	.tiler2d_buffers = 2,
 	.swap_chain_length = 2,
+	},
+	{
+	.tiler2d_buffers = 0,
+	.vram_buffers = 2,
+	.swap_chain_length = 2,
 	}
 };
 
