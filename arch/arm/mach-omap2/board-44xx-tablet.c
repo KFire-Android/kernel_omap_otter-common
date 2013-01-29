@@ -32,6 +32,7 @@
 #include <linux/regulator/fixed.h>
 #include <linux/platform_data/omap-abe-twl6040.h>
 #include <linux/platform_data/thermistor_sensor.h>
+#include <linux/platform_data/lm75_platform_data.h>
 #include <linux/leds-omap4430sdp-display.h>
 #include <linux/omap4_duty_cycle_governor.h>
 

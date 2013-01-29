@@ -32,6 +32,7 @@
 #include <linux/leds_pwm.h>
 #include <linux/platform_data/omap4-keypad.h>
 #include <linux/platform_data/thermistor_sensor.h>
+#include <linux/platform_data/lm75_platform_data.h>
 
 #include <mach/hardware.h>
 #include <asm/hardware/gic.h>
