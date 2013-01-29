@@ -405,6 +405,10 @@ static int irq_notifier(struct notifier_block *self, unsigned long cmd,	void *v)
 		if (omap_type() == OMAP2_DEVICE_TYPE_GP)
 			irq_sar_clear();
 		break;
+	case CPU_PM_EXIT:
+		if (!is_idle_task(current))
+			omap_wakeupgen_check_interrupts("At Resume");
+		break;
 	}
 	return NOTIFY_OK;
 }
