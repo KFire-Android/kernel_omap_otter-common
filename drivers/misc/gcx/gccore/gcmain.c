@@ -687,7 +687,7 @@ void gc_map(struct gcimap *gcimap, bool fromuser)
 	} else {
 		mem.base = 0;
 		mem.offset = gcimap->buf.offset;
-		mem.pages = gcimap->pagearray;
+		mem.pages = (pte_t *)gcimap->pagearray;
 
 		GCDBG(GCZONE_MAPPING, "  pagearray = 0x%08X\n",
 		      (unsigned int) gcimap->pagearray);
