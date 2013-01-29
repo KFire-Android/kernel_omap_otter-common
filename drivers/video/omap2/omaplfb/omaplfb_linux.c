@@ -606,6 +606,7 @@ OMAPLFB_BOOL OMAPLFBSetUpdateMode(OMAPLFB_DEVINFO *psDevInfo, OMAPLFB_UPDATE_MOD
 			return OMAPLFB_FALSE;
 	}
 
+	eUpdateMode = OMAPLFBToUpdateMode(eMode);
 	res = omapfb_set_update_mode(psDevInfo->psLINFBInfo, eUpdateMode);
 
 	if (res != 0)

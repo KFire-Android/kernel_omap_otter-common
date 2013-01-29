@@ -252,7 +252,7 @@ static enum gcerror virt2phys(unsigned int logical, pte_t *physical)
 		return GCERR_MMU_PAGE_BAD;
 
 	/* Get the pointer to the entry in PMD for the address. */
-	pmd = pmd_offset(pgd, logical);
+	pmd = pmd_offset((pud_t *)pgd, logical);
 	if (pmd_none(*pmd) || pmd_bad(*pmd))
 		return GCERR_MMU_PAGE_BAD;
 
