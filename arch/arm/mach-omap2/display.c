@@ -416,6 +416,37 @@ int __init omap_display_init(struct omap_dss_board_info *board_data)
 		}
 	}
 
+	/* Create devices for HDMI audio drivers */
+	for (i = 0; i < board_data->num_devices; i++) {
+		struct platform_device *au_pdev;
+		struct omap_dss_device *dssdev = board_data->devices[i];
+		bool card_created = false;
+
+		if (dssdev->type != OMAP_DISPLAY_TYPE_HDMI)
+			continue;
+
+		/* We need only one device for the audio card */
+		if (card_created == false) {
+			au_pdev = create_simple_dss_pdev("omap-hdmi-audio-card",
+							 -1, NULL, 0, dss_pdev);
+			if (IS_ERR(au_pdev)) {
+				pr_err("Could not build platform_device for omap-hdmi-audio-card\n");
+				return PTR_ERR(au_pdev);
+			}
+			card_created = true;
+		}
+
+		/* One device for each HDMI connector in the board */
+		au_pdev = create_simple_dss_pdev("hdmi-audio-codec",
+						  dssdev->dev.id,
+						  NULL, 0, dss_pdev);
+		if (IS_ERR(au_pdev)) {
+			pr_err("Could not build platform_device for hdmi-audio-codec\n");
+			return PTR_ERR(au_pdev);
+		}
+
+	}
+
 	return 0;
 }
 
