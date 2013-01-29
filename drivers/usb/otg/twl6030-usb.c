@@ -71,6 +71,10 @@
 #define TWL6030_CFG_LDO_PD2		0xF5
 #define TWL6030_BACKUP_REG		0xFA
 
+/* bits in MISC2 Register */
+#define VUSB_IN_PMID			BIT(3)
+#define VUSB_IN_VBAT			BIT(4)
+
 #define STS_HW_CONDITIONS		0x21
 
 /* In module TWL6030_MODULE_PM_MASTER */
@@ -170,25 +174,27 @@ static int twl6030_start_srp(struct phy_companion *comparator)
 	return 0;
 }
 
+static void twl6030_enable_ldo_input_supply(struct twl6030_usb *twl,
+		bool enable)
+{
+	u8 misc2_data = 0;
+
+	misc2_data = twl6030_readb(twl, TWL6030_MODULE_ID0, TWL6030_MISC2);
+	misc2_data &= ~(VUSB_IN_PMID | VUSB_IN_VBAT);
+	if (enable)
+		misc2_data |= VUSB_IN_VBAT;
+	twl6030_writeb(twl, TWL6030_MODULE_ID0, misc2_data, TWL6030_MISC2);
+}
+
 static int twl6030_usb_ldo_init(struct twl6030_usb *twl)
 {
-	char *regulator_name;
-
-	if (twl->features & TWL6032_SUBCLASS)
-		regulator_name = "ldousb";
-	else
-		regulator_name = "vusb";
-
 	/* Set to OTG_REV 1.3 and turn on the ID_WAKEUP_COMP */
 	twl6030_writeb(twl, TWL6030_MODULE_ID0 , 0x1, TWL6030_BACKUP_REG);
 
 	/* Program CFG_LDO_PD2 register and set VUSB bit */
 	twl6030_writeb(twl, TWL6030_MODULE_ID0 , 0x1, TWL6030_CFG_LDO_PD2);
 
-	/* Program MISC2 register and set bit VUSB_IN_VBAT */
-	twl6030_writeb(twl, TWL6030_MODULE_ID0 , 0x10, TWL6030_MISC2);
-
-	twl->usb3v3 = regulator_get(twl->dev, regulator_name);
+	twl->usb3v3 = regulator_get(twl->dev, "vusb");
 	if (IS_ERR(twl->usb3v3))
 		return -ENODEV;
 
@@ -200,6 +206,10 @@ static int twl6030_usb_ldo_init(struct twl6030_usb *twl)
 	 * and the ID comparators
 	 */
 	twl6030_writeb(twl, TWL_MODULE_USB, 0x14, USB_ID_CTRL_SET);
+
+	/* Disable LDO before disabling his input supply */
+	regulator_force_disable(twl->usb3v3);
+	twl6030_enable_ldo_input_supply(twl, false);
 
 	return 0;
 }
@@ -248,6 +258,7 @@ static irqreturn_t twl6030_usb_irq(int irq, void *_twl)
 		if (vbus_state & VBUS_DET) {
 			if (twl->prev_status == OMAP_MUSB_VBUS_VALID)
 				return IRQ_HANDLED;
+			twl6030_enable_ldo_input_supply(twl, true);
 			regulator_enable(twl->usb3v3);
 			charger_type = omap_usb2_charger_detect(
 					&twl->comparator);
@@ -272,6 +283,8 @@ static irqreturn_t twl6030_usb_irq(int irq, void *_twl)
 							     &charger_type);
 				if (twl->asleep) {
 					regulator_disable(twl->usb3v3);
+					twl6030_enable_ldo_input_supply(twl,
+									false);
 					twl->asleep = 0;
 				}
 			}
@@ -293,6 +306,7 @@ static irqreturn_t twl6030_usbotg_irq(int irq, void *_twl)
 
 	if (hw_state & STS_USB_ID) {
 
+		twl6030_enable_ldo_input_supply(twl, true);
 		regulator_enable(twl->usb3v3);
 		twl->asleep = 1;
 		twl6030_writeb(twl, TWL_MODULE_USB, 0x1, USB_ID_INT_EN_HI_CLR);

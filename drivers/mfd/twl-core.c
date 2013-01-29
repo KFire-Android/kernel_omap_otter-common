@@ -883,60 +883,33 @@ add_children(struct twl4030_platform_data *pdata, unsigned irq_base,
 			usb3v1.dev_name = dev_name(child);
 		}
 	}
-	if (twl_has_usb() && pdata->usb && twl_class_is_6030()) {
 
-		static struct regulator_consumer_supply usb3v3;
-		int regulator;
-
+	if (twl_class_is_6030()) {
 		if (twl_has_regulator()) {
-			/* this is a template that gets copied */
-			struct regulator_init_data usb_fixed = {
-				.constraints.valid_modes_mask =
-					REGULATOR_MODE_NORMAL
-					| REGULATOR_MODE_STANDBY,
-				.constraints.valid_ops_mask =
-					REGULATOR_CHANGE_MODE
-					| REGULATOR_CHANGE_STATUS,
-			};
+			if (features & TWL6032_SUBCLASS)
+				child = add_regulator(TWL6032_REG_LDOUSB,
+						      pdata->ldousb, features);
+			else
+				child = add_regulator(TWL6030_REG_VUSB,
+						      pdata->vusb, features);
 
-			if (features & TWL6032_SUBCLASS) {
-				usb3v3.supply =	"ldousb";
-				regulator = TWL6032_REG_LDOUSB;
-			} else {
-				usb3v3.supply = "vusb";
-				regulator = TWL6030_REG_VUSB;
-			}
-			child = add_regulator_linked(regulator, &usb_fixed,
-							&usb3v3, 1,
-							features);
 			if (IS_ERR(child))
 				return PTR_ERR(child);
 		}
 
-		pdata->usb->features = features;
+		if (twl_has_usb() && pdata->usb) {
+			pdata->usb->features = features;
 
-		child = add_child(0, "twl6030_usb",
-			pdata->usb, sizeof(*pdata->usb),
-			true,
-			/* irq1 = VBUS_PRES, irq0 = USB ID */
-			irq_base + USBOTG_INTR_OFFSET,
-			irq_base + USB_PRES_INTR_OFFSET);
-
-		if (IS_ERR(child))
-			return PTR_ERR(child);
-		/* we need to connect regulators to this transceiver */
-		if (twl_has_regulator() && child)
-			usb3v3.dev_name = dev_name(child);
-	} else if (twl_has_regulator() && twl_class_is_6030()) {
-		if (features & TWL6032_SUBCLASS)
-			child = add_regulator(TWL6032_REG_LDOUSB,
-						pdata->ldousb, features);
-		else
-			child = add_regulator(TWL6030_REG_VUSB,
-						pdata->vusb, features);
+			child = add_child(0, "twl6030_usb",
+					  pdata->usb, sizeof(*pdata->usb),
+					  true,
+					  /* irq1 = VBUS_PRES, irq0 = USB ID */
+					  irq_base + USBOTG_INTR_OFFSET,
+					  irq_base + USB_PRES_INTR_OFFSET);
 
 			if (IS_ERR(child))
-					return PTR_ERR(child);
+				return PTR_ERR(child);
+		}
 	}
 
 	if (twl_has_watchdog() && twl_class_is_4030()) {

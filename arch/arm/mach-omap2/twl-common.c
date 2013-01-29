@@ -551,6 +551,10 @@ static struct regulator_init_data omap4_vcxio_idata = {
 	.supply_regulator	= "V2V1",
 };
 
+static struct regulator_consumer_supply omap4_vusb_supply[] = {
+		REGULATOR_SUPPLY("vusb", "twl6030_usb"),
+};
+
 static struct regulator_init_data omap4_vusb_idata = {
 	.constraints = {
 		.min_uV			= 3300000,
@@ -564,6 +568,8 @@ static struct regulator_init_data omap4_vusb_idata = {
 		},
 		.initial_state		= PM_SUSPEND_MEM,
 	},
+	.num_consumer_supplies	= ARRAY_SIZE(omap4_vusb_supply),
+	.consumer_supplies	= omap4_vusb_supply,
 };
 
 static struct regulator_init_data omap4_clk32kg_idata = {
