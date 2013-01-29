@@ -358,6 +358,37 @@
 #define AM33XX_CONTROL_STATUS_SYSBOOT1_WIDTH		0x2
 #define AM33XX_CONTROL_STATUS_SYSBOOT1_MASK		(0x3 << 22)
 
+#define AM33XX_DDR_IO_CTRL		0x0E04
+#define AM33XX_VTP0_CTRL_REG		0x0E0C
+
+/* AM33XX VTP0_CTRL_REG bits */
+#define AM33XX_VTP_CTRL_START_EN	(1 << 0)
+#define AM33XX_VTP_CTRL_LOCK_EN		(1 << 4)
+#define AM33XX_VTP_CTRL_READY		(1 << 5)
+#define AM33XX_VTP_CTRL_ENABLE		(1 << 6)
+
+/* AM33XX M3_TXEV_EOI register */
+#define AM33XX_CONTROL_M3_TXEV_EOI	0x1324
+
+#define AM33XX_M3_TXEV_ACK		(0x1 << 0)
+#define AM33XX_M3_TXEV_ENABLE		(0x0 << 0)
+
+/* AM33XX IPC message registers */
+#define AM33XX_CONTROL_IPC_MSG_REG0	0x1328
+#define AM33XX_CONTROL_IPC_MSG_REG1	0x132C
+#define AM33XX_CONTROL_IPC_MSG_REG2	0x1330
+#define AM33XX_CONTROL_IPC_MSG_REG3	0x1334
+#define AM33XX_CONTROL_IPC_MSG_REG4	0x1338
+#define AM33XX_CONTROL_IPC_MSG_REG5	0x133C
+#define AM33XX_CONTROL_IPC_MSG_REG6	0x1340
+#define AM33XX_CONTROL_IPC_MSG_REG7	0x1344
+
+#define AM33XX_DDR_CMD0_IOCTRL		0x1404
+#define AM33XX_DDR_CMD1_IOCTRL		0x1408
+#define AM33XX_DDR_CMD2_IOCTRL		0x140C
+#define AM33XX_DDR_DATA0_IOCTRL		0x1440
+#define AM33XX_DDR_DATA1_IOCTRL		0x1444
+
 /* CONTROL OMAP STATUS register to identify OMAP3 features */
 #define OMAP3_CONTROL_OMAP_STATUS	0x044c
 
@@ -417,6 +448,16 @@ extern void omap3630_ctrl_disable_rta(void);
 extern int omap3_ctrl_save_padconf(void);
 extern void omap2_set_globals_control(void __iomem *ctrl,
 				      void __iomem *ctrl_pad);
+struct am33xx_ipc_data {
+	u32 resume_addr;
+	u32 param1;
+	u32 param2;
+	u32 sleep_mode;
+};
+extern void am33xx_wkup_m3_ipc_cmd(struct am33xx_ipc_data *data);
+extern void am33xx_txev_eoi(void);
+extern void am33xx_txev_enable(void);
+
 #else
 #define omap_ctrl_base_get()		0
 #define omap_ctrl_readb(x)		0
