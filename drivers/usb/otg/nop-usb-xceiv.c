@@ -34,13 +34,15 @@
 #include <linux/slab.h>
 #include <linux/clk.h>
 #include <linux/regulator/consumer.h>
+#include <linux/of.h>
 
 struct nop_usb_xceiv {
-	struct usb_phy		phy;
-	struct device		*dev;
-	struct clk		*clk;
-	struct regulator	*vcc;
-	struct regulator	*reset;
+	struct usb_phy phy;
+	struct device *dev;
+	struct clk *clk;
+	struct regulator *vcc;
+	struct regulator *reset;
+	u32 clk_rate;
 };
 
 static struct platform_device *pd;
@@ -140,6 +142,7 @@ static int nop_set_host(struct usb_otg *otg, struct usb_bus *host)
 
 static int nop_usb_xceiv_probe(struct platform_device *pdev)
 {
+	struct device *dev = &pdev->dev;
 	struct nop_usb_xceiv_platform_data *pdata = pdev->dev.platform_data;
 	struct nop_usb_xceiv	*nop;
 	enum usb_phy_type	type = USB_PHY_TYPE_USB2;
@@ -153,8 +156,17 @@ static int nop_usb_xceiv_probe(struct platform_device *pdev)
 	if (!nop->phy.otg)
 		return -ENOMEM;
 
-	if (pdata)
+	if (dev->of_node) {
+		struct device_node *node = dev->of_node;
+		u32 clk_rate;
+
+		if (!of_property_read_u32(node, "clock-frequency", &clk_rate))
+			nop->clk_rate = clk_rate;
+
+	} else if (pdata) {
 		type = pdata->type;
+		nop->clk_rate = pdata->clk_rate;
+	}
 
 	nop->clk = devm_clk_get(&pdev->dev, "main_clk");
 	if (IS_ERR(nop->clk)) {
@@ -162,8 +174,8 @@ static int nop_usb_xceiv_probe(struct platform_device *pdev)
 					PTR_ERR(nop->clk));
 	}
 
-	if (!IS_ERR(nop->clk) && pdata && pdata->clk_rate) {
-		err = clk_set_rate(nop->clk, pdata->clk_rate);
+	if (!IS_ERR(nop->clk) && nop->clk_rate) {
+		err = clk_set_rate(nop->clk, nop->clk_rate);
 		if (err) {
 			dev_err(&pdev->dev, "Error setting clock rate\n");
 			return err;
@@ -236,12 +248,20 @@ static int nop_usb_xceiv_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static const struct of_device_id nop_xceiv_dt_ids[] = {
+	{ .compatible = "usb-nop-xceiv" },
+	{ }
+};
+
+MODULE_DEVICE_TABLE(of, nop_xceiv_dt_ids);
+
 static struct platform_driver nop_usb_xceiv_driver = {
 	.probe		= nop_usb_xceiv_probe,
 	.remove		= nop_usb_xceiv_remove,
 	.driver		= {
 		.name	= "nop_usb_xceiv",
 		.owner	= THIS_MODULE,
+		.of_match_table = of_match_ptr(nop_xceiv_dt_ids),
 	},
 };
 
