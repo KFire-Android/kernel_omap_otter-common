@@ -350,10 +350,10 @@ static int __init sata_phy_init(struct device *dev)
 	}
 	spdata = pdata->priv;
 	ocp2scpdev = spdata->dev_attr;
-	spdata->ref_clk = clk_get(dev, "ref_clk");
+	spdata->ref_clk = clk_get(dev, "sata_ref_clk");
 	if (IS_ERR(spdata->ref_clk)) {
 		ret = PTR_ERR(spdata->ref_clk);
-		dev_err(dev, "ref_clk failed:%d\n", ret);
+		dev_err(dev, "sata_ref_clk failed:%d\n", ret);
 		return ret;
 	}
 
