@@ -13,17 +13,18 @@
 #include <linux/interrupt.h>
 #include <linux/platform_device.h>
 #include <linux/io.h>
-#include <plat/mailbox.h>
 
-#define MAILBOX_ARM2DSP1		0x00
-#define MAILBOX_ARM2DSP1b		0x04
-#define MAILBOX_DSP2ARM1		0x08
-#define MAILBOX_DSP2ARM1b		0x0c
-#define MAILBOX_DSP2ARM2		0x10
-#define MAILBOX_DSP2ARM2b		0x14
-#define MAILBOX_ARM2DSP1_Flag		0x18
-#define MAILBOX_DSP2ARM1_Flag		0x1c
-#define MAILBOX_DSP2ARM2_Flag		0x20
+#include "mailbox_internal.h"
+
+#define MAILBOX_ARM2DSP1               0x00
+#define MAILBOX_ARM2DSP1b              0x04
+#define MAILBOX_DSP2ARM1               0x08
+#define MAILBOX_DSP2ARM1b              0x0c
+#define MAILBOX_DSP2ARM2               0x10
+#define MAILBOX_DSP2ARM2b              0x14
+#define MAILBOX_ARM2DSP1_Flag          0x18
+#define MAILBOX_DSP2ARM1_Flag          0x1c
+#define MAILBOX_DSP2ARM2_Flag          0x20
 
 static void __iomem *mbox_base;
 
@@ -108,14 +109,14 @@ omap1_mbox_is_irq(struct omap_mbox *mbox, omap_mbox_type_t irq)
 }
 
 static struct omap_mbox_ops omap1_mbox_ops = {
-	.type		= OMAP_MBOX_TYPE1,
-	.fifo_read	= omap1_mbox_fifo_read,
-	.fifo_write	= omap1_mbox_fifo_write,
-	.fifo_empty	= omap1_mbox_fifo_empty,
-	.fifo_full	= omap1_mbox_fifo_full,
-	.enable_irq	= omap1_mbox_enable_irq,
-	.disable_irq	= omap1_mbox_disable_irq,
-	.is_irq		= omap1_mbox_is_irq,
+	.type           = OMAP_MBOX_TYPE1,
+	.fifo_read      = omap1_mbox_fifo_read,
+	.fifo_write     = omap1_mbox_fifo_write,
+	.fifo_empty     = omap1_mbox_fifo_empty,
+	.fifo_full      = omap1_mbox_fifo_full,
+	.enable_irq     = omap1_mbox_enable_irq,
+	.disable_irq    = omap1_mbox_disable_irq,
+	.is_irq         = omap1_mbox_is_irq,
 };
 
 /* FIXME: the following struct should be created automatically by the user id */
@@ -123,21 +124,21 @@ static struct omap_mbox_ops omap1_mbox_ops = {
 /* DSP */
 static struct omap_mbox1_priv omap1_mbox_dsp_priv = {
 	.tx_fifo = {
-		.cmd	= MAILBOX_ARM2DSP1b,
-		.data	= MAILBOX_ARM2DSP1,
-		.flag	= MAILBOX_ARM2DSP1_Flag,
+		.cmd    = MAILBOX_ARM2DSP1b,
+		.data   = MAILBOX_ARM2DSP1,
+		.flag   = MAILBOX_ARM2DSP1_Flag,
 	},
 	.rx_fifo = {
-		.cmd	= MAILBOX_DSP2ARM1b,
-		.data	= MAILBOX_DSP2ARM1,
-		.flag	= MAILBOX_DSP2ARM1_Flag,
+		.cmd    = MAILBOX_DSP2ARM1b,
+		.data   = MAILBOX_DSP2ARM1,
+		.flag   = MAILBOX_DSP2ARM1_Flag,
 	},
 };
 
 static struct omap_mbox mbox_dsp_info = {
-	.name	= "dsp",
-	.ops	= &omap1_mbox_ops,
-	.priv	= &omap1_mbox_dsp_priv,
+	.name   = "dsp",
+	.ops    = &omap1_mbox_ops,
+	.priv   = &omap1_mbox_dsp_priv,
 };
 
 static struct omap_mbox *omap1_mboxes[] = { &mbox_dsp_info, NULL };

@@ -19,7 +19,7 @@
 #include <linux/pm_runtime.h>
 #include <linux/platform_data/mailbox-omap.h>
 
-#include <plat/mailbox.h>
+#include "mailbox_internal.h"
 
 #define MAILBOX_REVISION		0x000
 #define MAILBOX_MESSAGE(m)		(0x040 + 4 * (m))
@@ -63,7 +63,7 @@ struct omap_mbox2_priv {
 };
 
 static void omap2_mbox_enable_irq(struct omap_mbox *mbox,
-				  omap_mbox_type_t irq);
+		omap_mbox_type_t irq);
 
 static inline unsigned int mbox_read_reg(size_t ofs)
 {
@@ -185,7 +185,7 @@ static void omap2_mbox_save_ctx(struct omap_mbox *mbox)
 		p->ctx[i] = mbox_read_reg(i * sizeof(u32));
 
 		dev_dbg(mbox->dev, "%s: [%02x] %08x\n", __func__,
-			i, p->ctx[i]);
+				i, p->ctx[i]);
 	}
 }
 
@@ -203,24 +203,24 @@ static void omap2_mbox_restore_ctx(struct omap_mbox *mbox)
 		mbox_write_reg(p->ctx[i], i * sizeof(u32));
 
 		dev_dbg(mbox->dev, "%s: [%02x] %08x\n", __func__,
-			i, p->ctx[i]);
+				i, p->ctx[i]);
 	}
 }
 
 static struct omap_mbox_ops omap2_mbox_ops = {
-	.type		= OMAP_MBOX_TYPE2,
-	.startup	= omap2_mbox_startup,
-	.shutdown	= omap2_mbox_shutdown,
-	.fifo_read	= omap2_mbox_fifo_read,
-	.fifo_write	= omap2_mbox_fifo_write,
-	.fifo_empty	= omap2_mbox_fifo_empty,
-	.fifo_full	= omap2_mbox_fifo_full,
-	.enable_irq	= omap2_mbox_enable_irq,
-	.disable_irq	= omap2_mbox_disable_irq,
-	.ack_irq	= omap2_mbox_ack_irq,
-	.is_irq		= omap2_mbox_is_irq,
-	.save_ctx	= omap2_mbox_save_ctx,
-	.restore_ctx	= omap2_mbox_restore_ctx,
+	.type           = OMAP_MBOX_TYPE2,
+	.startup        = omap2_mbox_startup,
+	.shutdown       = omap2_mbox_shutdown,
+	.fifo_read      = omap2_mbox_fifo_read,
+	.fifo_write     = omap2_mbox_fifo_write,
+	.fifo_empty     = omap2_mbox_fifo_empty,
+	.fifo_full      = omap2_mbox_fifo_full,
+	.enable_irq     = omap2_mbox_enable_irq,
+	.disable_irq    = omap2_mbox_disable_irq,
+	.ack_irq        = omap2_mbox_ack_irq,
+	.is_irq         = omap2_mbox_is_irq,
+	.save_ctx       = omap2_mbox_save_ctx,
+	.restore_ctx    = omap2_mbox_restore_ctx,
 };
 
 static int omap2_mbox_probe(struct platform_device *pdev)
@@ -323,9 +323,9 @@ static int omap2_mbox_remove(struct platform_device *pdev)
 }
 
 static struct platform_driver omap2_mbox_driver = {
-	.probe = omap2_mbox_probe,
-	.remove = omap2_mbox_remove,
-	.driver = {
+	.probe	= omap2_mbox_probe,
+	.remove	= omap2_mbox_remove,
+	.driver	= {
 		.name = "omap-mailbox",
 	},
 };
