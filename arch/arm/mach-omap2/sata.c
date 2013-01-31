@@ -481,10 +481,12 @@ void __init omap_sata_init(void)
 	}
 
 	hwmod[1] = omap_hwmod_lookup(OMAP_OCP2SCP3_HWMODNAME);
-	if (hwmod[1])
+	if (hwmod[1]) {
 		oh_cnt++;
-	else
+	} else {
 		pr_err("Could not look up %s\n", OMAP_OCP2SCP3_HWMODNAME);
+		return;
+	}
 
 	omap_sata_data.dev_attr = (struct omap_ocp2scp_dev *)hwmod[1]->dev_attr;
 	sata_pdata.priv = &omap_sata_data;
