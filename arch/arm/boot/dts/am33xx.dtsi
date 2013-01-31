@@ -397,6 +397,7 @@
 			compatible = "ti,am3353-wkup-m3";
 			reg = <0x44d00000 0x4000	/* M3 UMEM */
 			       0x44d80000 0x2000>;	/* M3 DMEM */
+			interrupts = <78>;
 			ti,hwmods = "wkup_m3";
 		};
 	};
