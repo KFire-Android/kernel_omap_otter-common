@@ -20,13 +20,15 @@
 #include <linux/kernel.h>
 #include <linux/device.h>
 #include <linux/platform_device.h>
+#include <linux/platform_data/omap_ocp2scp.h>
 #include <linux/pm_runtime.h>
-#include <linux/omap_ocp2scp.h>
-#include <plat/omap_device.h>
 #include <linux/dma-mapping.h>
 #include <linux/ahci_platform.h>
 #include <linux/clk.h>
 #include <plat/sata.h>
+
+#include "omap_device.h"
+#include "soc.h"
 
 #define OMAP_SATA_HWMODNAME	"sata"
 #define OMAP_OCP2SCP3_HWMODNAME	"ocp2scp3"
@@ -466,7 +468,7 @@ void __init omap_sata_init(void)
 	int			oh_cnt = 1;
 
 	/* For now sata init works only for omap5 */
-	if (!cpu_is_omap54xx())
+	if (!soc_is_omap54xx())
 		return;
 
 	sata_pdata.init		= omap_ahci_plat_init;
