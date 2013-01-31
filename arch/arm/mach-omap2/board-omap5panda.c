@@ -824,37 +824,6 @@ static void __init omap_msecure_init(void)
 			GPIO_MSECURE, err);
 }
 
-/* Display DVI */
-#define PANDA_DVI_TFP410_POWER_DOWN_GPIO	0
-
-static int omap5_panda_enable_dvi(struct omap_dss_device *dssdev)
-{
-	gpio_set_value(dssdev->reset_gpio, 1);
-	return 0;
-}
-
-static void omap5_panda_disable_dvi(struct omap_dss_device *dssdev)
-{
-	gpio_set_value(dssdev->reset_gpio, 0);
-}
-
-/* Using generic display panel */
-static struct panel_generic_dpi_data omap5_dvi_panel = {
-	.name			= "generic_720p",
-	.platform_enable	= omap5_panda_enable_dvi,
-	.platform_disable	= omap5_panda_disable_dvi,
-};
-
-static struct omap_dss_device omap5_panda_dvi_device = {
-	.type			= OMAP_DISPLAY_TYPE_DPI,
-	.name			= "dvi",
-	.driver_name		= "generic_dpi_panel",
-	.data			= &omap5_dvi_panel,
-	.phy.dpi.data_lines	= 24,
-	.reset_gpio		= PANDA_DVI_TFP410_POWER_DOWN_GPIO,
-	.channel		= OMAP_DSS_CHANNEL_LCD2,
-};
-
 static struct omap_dss_hdmi_data omap5panda_hdmi_data = {
         .hpd_gpio = HDMI_GPIO_HPD,
 };
@@ -880,14 +849,13 @@ static struct omap_dss_device omap5panda_hdmi_device = {
 };
 
 static struct omap_dss_device *omap5panda_dss_devices[] = {
-	&omap5_panda_dvi_device,
 	&omap5panda_hdmi_device,
 };
 
 static struct omap_dss_board_info panda5_dss_data = {
 	.num_devices	= ARRAY_SIZE(omap5panda_dss_devices),
 	.devices	= omap5panda_dss_devices,
-	.default_device	= &omap5_panda_dvi_device,
+	.default_device	= &omap5panda_hdmi_device,
 };
 
 static void omap5panda_hdmi_init(void)
