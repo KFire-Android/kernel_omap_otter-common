@@ -303,6 +303,7 @@ static void sr_set_regfields(struct omap_sr *sr)
 
 static void sr_start_vddautocomp(struct omap_sr *sr)
 {
+	int r;
 	if (!sr_class || !(sr_class->enable) || !(sr_class->configure)) {
 		dev_warn(&sr->pdev->dev,
 			 "%s: smartreflex class driver not registered\n",
@@ -320,8 +321,16 @@ static void sr_start_vddautocomp(struct omap_sr *sr)
 		return;
 	}
 
-	if (!sr_class->enable(sr))
+	r = sr_class->enable(sr);
+	if  (!r) {
 		sr->autocomp_active = true;
+	} else {
+		dev_warn(&sr->pdev->dev, "%s: SmartReflex Enable failed(%d), "
+			"autocomp(AVS) disabled for domain!\n", __func__, r);
+		WARN_ONCE(r, "AVS has to be autodisabled!\n");
+		if (sr_class->deinit)
+			sr_class->deinit(sr, sr_class->class_priv_data);
+	}
 	mutex_unlock(&omap_dvfs_lock);
 }
 
@@ -1009,6 +1018,7 @@ bool omap_sr_is_enabled(struct voltagedomain *voltdm)
 void omap_sr_enable(struct voltagedomain *voltdm)
 {
 	struct omap_sr *sr;
+	int r;
 
 	if (!atomic_read(&sr_driver_ready))
 		return;
@@ -1029,7 +1039,15 @@ void omap_sr_enable(struct voltagedomain *voltdm)
 		return;
 	}
 
-	sr_class->enable(sr);
+	r = sr_class->enable(sr);
+	if  (r) {
+		dev_warn(&sr->pdev->dev, "%s: smartreflex Enable failed(%d), "
+			"autocomp(AVS) disabled for domain!\n", __func__, r);
+		WARN_ONCE(r, "AVS has to be autodisabled!\n");
+		sr->autocomp_active = false;
+		if (sr_class->deinit)
+			sr_class->deinit(sr, sr_class->class_priv_data);
+	}
 }
 
 /**
