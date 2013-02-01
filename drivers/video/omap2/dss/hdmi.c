@@ -521,7 +521,7 @@ static void hdmi_compute_pll(struct omap_dss_device *dssdev, int phy,
 			break;
 		case OMAPDSS_VER_OMAP5:
 			if (phy <= 50000)
-				pi->regm2 = 2;
+				pi->regm2 = 5;
 			else
 				pi->regm2 = 1;
 			break;
