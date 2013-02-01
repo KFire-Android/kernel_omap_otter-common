@@ -566,7 +566,7 @@ static int omap2430_runtime_suspend(struct device *dev)
 	if (musb) {
 		musb->context.otg_interfsel = musb_readl(musb->mregs,
 				OTG_INTERFSEL);
-
+		musb_writel(musb->mregs, OTG_INTERFSEL, ULPI_12PIN);
 		omap2430_low_level_exit(musb);
 		usb_phy_set_suspend(musb->xceiv, 1);
 	}
