@@ -160,6 +160,11 @@ defined(CONFIG_INPUT_TWL6030_PWRBUTTON_MODULE)
 #define twl6030_has_pwrbutton()        false
 #endif
 
+#if defined(CONFIG_TWL6030_THERMAL) || defined(CONFIG_TWL6030_THERMAL_MODULE)
+#define twl_has_thermal()	true
+#else
+#define twl_has_thermal()	false
+#endif
 
 #define SUB_CHIP_ID0 0
 #define SUB_CHIP_ID1 1
@@ -363,6 +368,7 @@ static struct twl_mapping twl6030_map[] = {
 	{ SUB_CHIP_ID0, TWL6030_BASEADD_RTC },
 	{ SUB_CHIP_ID0, TWL6030_BASEADD_MEM },
 	{ SUB_CHIP_ID1, TWL6032_BASEADD_CHARGER },
+	{ SUB_CHIP_ID0, TWL6030_BASEADD_PM_MISC },
 };
 
 /*----------------------------------------------------------------------*/
@@ -937,6 +943,15 @@ add_children(struct twl4030_platform_data *pdata, unsigned irq_base,
 		child = add_child(sub_chip_id, "twl4030-audio",
 				pdata->audio, sizeof(*pdata->audio),
 				false, 0, 0);
+		if (IS_ERR(child))
+			return PTR_ERR(child);
+	}
+
+	if (twl_class_is_6030() && twl_has_thermal()) {
+		sub_chip_id = twl_map[TWL6030_MODULE_PM_MISC].sid;
+		child = add_child(sub_chip_id, "twl6030_thermal",
+				  pdata->thermal, sizeof(*pdata->thermal),
+				  false, irq_base + HOTDIE_INTR_OFFSET, 0);
 		if (IS_ERR(child))
 			return PTR_ERR(child);
 	}
