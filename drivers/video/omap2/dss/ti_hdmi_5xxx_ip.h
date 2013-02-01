@@ -272,6 +272,7 @@
 #define HDMI_CORE_I2CM_FS_SCL_HCNT_0_ADDR	0x15808
 #define HDMI_CORE_I2CM_FS_SCL_LCNT_1_ADDR	0x1580C
 #define HDMI_CORE_I2CM_FS_SCL_LCNT_0_ADDR	0x15810
+#define HDMI_CORE_I2CM_SDA_HOLD_ADDR		0x15814
 
 struct hdmi_core_vid_config	{
 	struct hdmi_config  v_fc_config;

@@ -104,6 +104,8 @@ static void hdmi_core_ddc_init(struct hdmi_ip_data *ip_data)
 {
 	void __iomem *core_sys_base = hdmi_core_sys_base(ip_data);
 
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_SDA_HOLD_ADDR, 0x19, 7, 0);
+
 	/*Mask the interrupts*/
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_CTLINT, 0x0, 2, 2);
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_CTLINT, 0x0, 6, 6);
