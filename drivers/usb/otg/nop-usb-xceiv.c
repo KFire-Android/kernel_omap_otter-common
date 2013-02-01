@@ -43,6 +43,8 @@ struct nop_usb_xceiv {
 	struct regulator *vcc;
 	struct regulator *reset;
 	u32 clk_rate;
+	unsigned int needs_vcc:1;
+	unsigned int needs_reset:1;
 };
 
 static struct platform_device *pd;
@@ -163,9 +165,14 @@ static int nop_usb_xceiv_probe(struct platform_device *pdev)
 		if (!of_property_read_u32(node, "clock-frequency", &clk_rate))
 			nop->clk_rate = clk_rate;
 
+		nop->needs_vcc = of_property_read_bool(node, "vcc-supply");
+		nop->needs_reset = of_property_read_bool(node, "reset-supply");
+
 	} else if (pdata) {
 		type = pdata->type;
 		nop->clk_rate = pdata->clk_rate;
+		nop->needs_vcc = pdata->needs_vcc;
+		nop->needs_reset = pdata->needs_reset;
 	}
 
 	nop->clk = devm_clk_get(&pdev->dev, "main_clk");
@@ -194,12 +201,16 @@ static int nop_usb_xceiv_probe(struct platform_device *pdev)
 	if (IS_ERR(nop->vcc)) {
 		dev_dbg(&pdev->dev, "Error getting vcc regulator: %ld\n",
 					PTR_ERR(nop->vcc));
+		if (nop->needs_vcc)
+			return -EPROBE_DEFER;
 	}
 
 	nop->reset = devm_regulator_get(&pdev->dev, "reset");
 	if (IS_ERR(nop->reset)) {
 		dev_dbg(&pdev->dev, "Error getting reset regulator: %ld\n",
 					PTR_ERR(nop->reset));
+		if (nop->needs_reset)
+			return -EPROBE_DEFER;
 	}
 
 	nop->dev		= &pdev->dev;
