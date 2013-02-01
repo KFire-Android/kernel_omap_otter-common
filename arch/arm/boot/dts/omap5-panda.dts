@@ -184,8 +184,8 @@
 	dss_hdmi_pins: pinmux_dss_hdmi_pins {
 		pinctrl-single,pins = <
 			0x0fc 0x118	/* hdmi_cec.hdmi_cec INPUT PULLUP | MODE 0 */
-			0x100 0x118	/* hdmi_scl.hdmi_scl INPUT PULLUP | MODE 0 */
-			0x102 0x118	/* hdmi_sda.hdmi_sda INPUT PULLUP | MODE 0 */
+			0x100 0x100	/* hdmi_scl.hdmi_scl INPUT | MODE 0 */
+			0x102 0x100	/* hdmi_sda.hdmi_sda INPUT | MODE 0 */
 		>;
 	};
 
