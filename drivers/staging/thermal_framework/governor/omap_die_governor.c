@@ -314,7 +314,7 @@ static signed hotspot_temp_to_sensor_temp(struct omap_governor *omap_gov,
 }
 
 static int omap_enter_zone(struct omap_governor *omap_gov,
-				struct omap_thermal_zone *zone,
+				int current_zone,
 				bool in_new_zone,
 				bool set_cooling_level,
 				struct list_head *cooling_list, int cpu_temp,
@@ -324,6 +324,7 @@ static int omap_enter_zone(struct omap_governor *omap_gov,
 	int temp_lower;
 	int temp_cool_level;
 
+	struct omap_thermal_zone *zone = &omap_gov->zones[current_zone-1];
 	omap_gov->trend =
 		thermal_lookup_trend(omap_gov->temp_sensor->domain_name);
 	omap_gov->bursting = omap_gov->trend > zone->max_trend;
@@ -344,8 +345,23 @@ static int omap_enter_zone(struct omap_governor *omap_gov,
 		return 0;
 
 	if (omap_gov->is_stable) {
-		if (omap_gov->cooling_level > 0)
+		if ((omap_gov->cooling_level > 0) &&
+		    (current_zone != CRITICAL_ZONE)) {
+			pr_debug("%s temperature stabilized unthrottling\n",
+				 __func__);
 			temp_cool_level--;
+			/*
+			 * As there is a dependency between cooling level and
+			 * critical subzone (e.g.
+			 * 1st subzone = 1st cooling level,
+			 * 2nd subzone = 2nd cooling level, ....), we need to
+			 * decrement critical_zone_reached when decrementing
+			 * cooling level, so that this dependency won't be
+			 * broken.
+			 */
+			if (omap_gov->critical_zone_reached)
+				omap_gov->critical_zone_reached--;
+		}
 	}
 
 	if (list_empty(cooling_list)) {
@@ -504,9 +520,8 @@ static int omap_thermal_manager(struct omap_governor *omap_gov,
 		}
 		omap_gov->prev_zone = zone;
 
-		omap_enter_zone(omap_gov, therm_zone, in_new_zone,
-				set_cooling_level, cooling_list, cpu_temp,
-				inter_zone_thot);
+		omap_enter_zone(omap_gov, zone, in_new_zone, set_cooling_level,
+				cooling_list, cpu_temp, inter_zone_thot);
 	}
 
 	return zone;
