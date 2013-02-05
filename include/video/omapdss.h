@@ -772,6 +772,8 @@ struct omap_dss_device {
 	void (*platform_disable)(struct omap_dss_device *dssdev);
 	int (*set_backlight)(struct omap_dss_device *dssdev, int level);
 	int (*get_backlight)(struct omap_dss_device *dssdev);
+
+	struct omap_video_timings *dispc_timings;
 };
 
 struct omap_dss_hdmi_data
