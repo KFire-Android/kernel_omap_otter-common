@@ -120,4 +120,4 @@ error:
 	pr_err("init_emif_timings failed\n");
 	return -1;
 }
-device_initcall(init_emif_timings);
+subsys_initcall(init_emif_timings);
