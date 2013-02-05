@@ -19,6 +19,8 @@
 #include <asm/hardware/gic.h>
 #include <asm/mach/arch.h>
 
+#include <plat/sata.h>
+
 #include "common.h"
 #include "common-board-devices.h"
 #include "dss-common.h"
@@ -50,6 +52,8 @@ static void __init omap_generic_init(void)
 		omap4_panda_display_init_of();
 	else if (of_machine_is_compatible("ti,omap4-sdp"))
 		omap_4430sdp_display_init_of();
+	else if (of_machine_is_compatible("ti,omap5"))
+		omap_sata_init();
 }
 
 #ifdef CONFIG_SOC_OMAP2420

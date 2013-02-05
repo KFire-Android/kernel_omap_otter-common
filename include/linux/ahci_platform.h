@@ -28,6 +28,7 @@ struct ahci_platform_data {
 	const struct ata_port_info *ata_port_info;
 	unsigned int force_port_map;
 	unsigned int mask_port_map;
+	void *priv;
 };
 
 #endif /* _AHCI_PLATFORM_H */
