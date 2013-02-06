@@ -94,7 +94,10 @@ static int hdcp_wq_start_authentication(void)
 	}
 
 	ip_data = get_hdmi_ip_data();
-	ip_data->ops->hdcp_enable(ip_data);
+	if (ip_data->ops->hdcp_enable)
+		ip_data->ops->hdcp_enable(ip_data);
+	else
+		status = -EINVAL;
 
 	hdmi_runtime_put();
 	return status;
@@ -104,16 +107,21 @@ static void hdcp_work_queue(struct work_struct *work)
 {
 	struct hdcp_worker_data *d = container_of(work, typeof(*d), dwork.work);
 	int state = atomic_read(&d->state);
+	int ret = 0;
 
 	HDCP_DBG("hdcp_work_queue() start\n");
 	switch (state) {
 	case HDCP_STATE_STEP1:
-		hdcp_wq_start_authentication();
+		ret = hdcp_wq_start_authentication();
 	break;
 	case HDCP_STATE_STEP2:
-		hdcp_step2_authenticate_repeater(HDCP_EVENT_STEP2);
+		ret = hdcp_step2_authenticate_repeater(HDCP_EVENT_STEP2);
 	break;
 	}
+
+	if (ret)
+		HDCP_ERR("authentication failed");
+
 	HDCP_DBG("hdcp_work_queue() - END\n");
 }
 
