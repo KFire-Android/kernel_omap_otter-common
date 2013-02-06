@@ -2912,6 +2912,7 @@ static struct omap_hwmod_class_sysconfig omap54xx_timer_1ms_sysc = {
 	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
 			   SIDLE_SMART_WKUP),
 	.sysc_fields	= &omap_hwmod_sysc_type2,
+	.clockact	= CLOCKACT_TEST_ICLK,
 };
 
 static struct omap_hwmod_class omap54xx_timer_1ms_hwmod_class = {
@@ -2945,6 +2946,7 @@ static struct omap_hwmod omap54xx_timer1_hwmod = {
 	.class		= &omap54xx_timer_1ms_hwmod_class,
 	.clkdm_name	= "wkupaon_clkdm",
 	.mpu_irqs	= omap54xx_timer1_irqs,
+	.flags		= HWMOD_SET_DEFAULT_CLOCKACT,
 	.main_clk	= "timer1_gfclk_mux",
 	.prcm = {
 		.omap4 = {
@@ -2966,6 +2968,7 @@ static struct omap_hwmod omap54xx_timer2_hwmod = {
 	.class		= &omap54xx_timer_1ms_hwmod_class,
 	.clkdm_name	= "l4per_clkdm",
 	.mpu_irqs	= omap54xx_timer2_irqs,
+	.flags		= HWMOD_SET_DEFAULT_CLOCKACT,
 	.main_clk	= "timer2_gfclk_mux",
 	.prcm = {
 		.omap4 = {
@@ -3134,6 +3137,7 @@ static struct omap_hwmod omap54xx_timer10_hwmod = {
 	.class		= &omap54xx_timer_1ms_hwmod_class,
 	.clkdm_name	= "l4per_clkdm",
 	.mpu_irqs	= omap54xx_timer10_irqs,
+	.flags		= HWMOD_SET_DEFAULT_CLOCKACT,
 	.main_clk	= "timer10_gfclk_mux",
 	.prcm = {
 		.omap4 = {
