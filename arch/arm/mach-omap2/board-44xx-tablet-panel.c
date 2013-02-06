@@ -22,7 +22,6 @@
 
 #include <plat/board.h>
 #include <plat/vram.h>
-#include <plat/android-display.h>
 
 #include <video/omapdss.h>
 #include <video/omap-panel-tc358765.h>
@@ -265,42 +264,10 @@ static struct omap_dss_device *tablet_dss_devices[] = {
 	&tablet_hdmi_device,
 };
 
-static struct omap_dss_device *dss_devices_hdmi_default_display[] = {
-	&tablet_hdmi_device,
-};
-
-static struct dsscomp_platform_data dsscomp_config_hdmi_display = {
-	.tiler1d_slotsz = (SZ_16M + SZ_2M + SZ_8M + SZ_1M),
-};
-
-static struct sgx_omaplfb_config omaplfb_config_hdmi_default_display[] = {
-	{
-		.vram_buffers = 2,
-		.swap_chain_length = 2,
-	}
-};
-
-static struct sgx_omaplfb_platform_data omaplfb_plat_data_hdmi_default_display = {
-	.num_configs = ARRAY_SIZE(omaplfb_config_hdmi_default_display),
-	.configs = omaplfb_config_hdmi_default_display,
-};
-
 static struct omap_dss_board_info tablet_dss_data = {
 	.num_devices	= ARRAY_SIZE(tablet_dss_devices),
 	.devices	= tablet_dss_devices,
 	.default_device	= &tablet_lcd_device,
-};
-
-static struct omap_dss_board_info tablet_dss_data_hdmi_default_display = {
-	.num_devices    = ARRAY_SIZE(dss_devices_hdmi_default_display),
-	.devices        = dss_devices_hdmi_default_display,
-	.default_device = &tablet_hdmi_device,
-};
-
-static struct omapfb_platform_data tablet_fb_pdata = {
-	.mem_desc = {
-		.region_cnt = 1,
-	},
 };
 
 static void tablet_hdmi_init(void)
@@ -345,21 +312,6 @@ static struct i2c_board_info __initdata omap4xx_i2c_bus2_d2l_info[] = {
 	},
 };
 
-void tablet_android_display_setup(void)
-{
-	if (omap_android_display_is_default(&tablet_hdmi_device))
-		omap_android_display_setup(
-			&tablet_dss_data_hdmi_default_display,
-			&dsscomp_config_hdmi_display,
-			&omaplfb_plat_data_hdmi_default_display,
-			&tablet_fb_pdata);
-	else
-		omap_android_display_setup(&tablet_dss_data,
-			NULL,
-			NULL,
-			&tablet_fb_pdata);
-}
-
 int __init tablet_display_init(void)
 {
 	omap_mux_init_signal("fref_clk4_out.fref_clk4_out",
@@ -368,12 +320,8 @@ int __init tablet_display_init(void)
 	platform_device_register(&tablet_disp_led);
 	tablet_lcd_init();
 
-	omapfb_set_platform_data(&tablet_fb_pdata);
 	omap_vram_set_sdram_vram(TABLET_FB_RAM_SIZE, 0);
-	if (omap_android_display_is_default(&tablet_hdmi_device))
-		omap_display_init(&tablet_dss_data_hdmi_default_display);
-	else
-		omap_display_init(&tablet_dss_data);
+	omap_display_init(&tablet_dss_data);
 
 	tablet_hdmi_init();
 
