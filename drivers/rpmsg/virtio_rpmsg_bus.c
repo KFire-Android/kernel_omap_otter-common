@@ -1027,8 +1027,12 @@ static int rpmsg_probe(struct virtio_device *vdev)
 		}
 	}
 
-	/* tell the remote processor it can start sending messages */
-	virtqueue_kick(vrp->rvq);
+	/*
+	 * FIXME (if needed): the below virtqueue_kick is commented out
+	 * to help with supporting the non-SMP boot of IPU processors, which
+	 * is non-standard for 3.4 and upstream kernels.
+	 */
+	/* virtqueue_kick(vrp->rvq); */
 
 	dev_info(&vdev->dev, "rpmsg host is online\n");
 
