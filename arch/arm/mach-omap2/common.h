@@ -110,6 +110,8 @@ void am35xx_init_late(void);
 void ti81xx_init_late(void);
 void omap5_init_late(void);
 int omap2_common_pm_late_init(void);
+void dra7xx_init_early(void);
+void dra7xx_init_late(void);
 
 #if defined(CONFIG_SOC_OMAP2420) || defined(CONFIG_SOC_OMAP2430)
 void omap2xxx_restart(char mode, const char *cmd);
@@ -135,7 +137,8 @@ static inline void omap3xxx_restart(char mode, const char *cmd)
 }
 #endif
 
-#if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5)
+#if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5) || \
+	defined(CONFIG_SOC_DRA7XX)
 void omap44xx_restart(char mode, const char *cmd);
 #else
 static inline void omap44xx_restart(char mode, const char *cmd)

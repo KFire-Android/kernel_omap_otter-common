@@ -94,6 +94,14 @@
 # endif
 #endif
 
+#ifdef CONFIG_SOC_DRA7XX
+# ifdef OMAP_NAME
+#  undef MULTI_OMAP2
+#  define MULTI_OMAP2
+# else
+#  define OMAP_NAME DRA7XX
+# endif
+#endif
 /*
  * Omap device type i.e. EMU/HS/TST/GP/BAD
  */

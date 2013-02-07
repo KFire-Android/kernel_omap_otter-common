@@ -108,6 +108,16 @@ static void __init omap_detect_sram(void)
 			omap_sram_size = OMAP5_SRAM_SIZE; /* 128KB */
 			omap_sram_size -= OMAP5_SRAM_HS_RESERVE;
 			omap_sram_start += OMAP5_SRAM_HS_RESERVE;
+		} else if (soc_is_dra7xx()) {
+			omap_sram_start = OMAP4_SRAM_START_PA;
+			omap_sram_size = DRA7XX_SRAM_SIZE; /* 512KB */
+			/*
+			 * Fix me:
+			 * The reservation size might change based on
+			 * the PPA requirements.
+			 */
+			omap_sram_size -= OMAP5_SRAM_HS_RESERVE;
+			omap_sram_start += OMAP5_SRAM_HS_RESERVE;
 		} else {
 			omap_sram_start = OMAP2_SRAM_PUB_PA;
 			omap_sram_size = 0x800; /* 2K */
@@ -127,6 +137,11 @@ static void __init omap_detect_sram(void)
 		} else if (soc_is_omap54xx()) {
 			omap_sram_start = OMAP4_SRAM_START_PA;
 			omap_sram_size = OMAP5_SRAM_SIZE; /* 128KB */
+			omap_sram_size -= OMAP5_SRAM_GP_RESERVE;
+			omap_sram_start += OMAP5_SRAM_GP_RESERVE;
+		} else if (soc_is_dra7xx()) {
+			omap_sram_start = OMAP4_SRAM_START_PA;
+			omap_sram_size = DRA7XX_SRAM_SIZE; /* 512KB */
 			omap_sram_size -= OMAP5_SRAM_GP_RESERVE;
 			omap_sram_start += OMAP5_SRAM_GP_RESERVE;
 		} else {
