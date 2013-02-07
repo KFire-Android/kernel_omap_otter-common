@@ -118,8 +118,6 @@ struct twl6030_usb {
 
 static BLOCKING_NOTIFIER_HEAD(notifier_list);
 
-static struct phy_companion	*comparator;
-
 #define	comparator_to_twl(x) container_of((x), struct twl6030_usb, comparator)
 /*-------------------------------------------------------------------------*/
 
@@ -386,9 +384,8 @@ static int __devinit twl6030_usb_probe(struct platform_device *pdev)
 
 	twl->comparator.set_vbus	= twl6030_set_vbus;
 	twl->comparator.start_srp	= twl6030_start_srp;
-	comparator			= &twl->comparator;
 
-	omap_usb2_set_comparator(comparator);
+	omap_usb2_set_comparator(&twl->comparator);
 
 	/* init spinlock for workqueue */
 	spin_lock_init(&twl->lock);
