@@ -1044,8 +1044,15 @@ static struct omap_hwmod_irq_info omap44xx_ctrl_module_core_irqs[] = {
 
 static struct omap_hwmod_addr_space omap44xx_ctrl_module_core_addrs[] = {
 	{
+		.name		= "omap_control_core_core",
 		.pa_start	= 0x4a002000,
-		.pa_end		= 0x4a0027ff,
+		.pa_end		= 0x4a002fff,
+		.flags		= ADDR_TYPE_RT
+	},
+	{
+		.name		= "omap_control_core_pad",
+		.pa_start	= 0x4a100000,
+		.pa_end		= 0x4a100fff,
 		.flags		= ADDR_TYPE_RT
 	},
 	{ }
@@ -1068,7 +1075,7 @@ static struct omap_hwmod_ocp_if *omap44xx_ctrl_module_core_slaves[] = {
 static struct omap_hwmod omap44xx_ctrl_module_core_hwmod = {
 	.name		= "ctrl_module_core",
 	.class		= &omap44xx_ctrl_module_hwmod_class,
-	.clkdm_name	= "ducati_clkdm",
+	.clkdm_name	= "l4_cfg_clkdm",
 	.mpu_irqs	= omap44xx_ctrl_module_core_irqs,
 	.slaves		= omap44xx_ctrl_module_core_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap44xx_ctrl_module_core_slaves),
