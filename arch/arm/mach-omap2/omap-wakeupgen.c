@@ -50,7 +50,7 @@ static DEFINE_SPINLOCK(wakeupgen_lock);
 static unsigned int irq_target_cpu[MAX_IRQS];
 static unsigned int irq_banks = MAX_NR_REG_BANKS;
 static unsigned int max_irqs = MAX_IRQS;
-static unsigned int omap_secure_apis;
+static unsigned int omap_secure_apis, secure_api_index;
 
 /*
  * Static helper functions.
@@ -315,7 +315,7 @@ static void irq_sar_clear(void)
 static void irq_save_secure_context(void)
 {
 	u32 ret;
-	ret = omap_secure_dispatcher(OMAP4_HAL_SAVEGIC_INDEX,
+	ret = omap_secure_dispatcher(secure_api_index,
 				FLAG_START_CRITICAL,
 				0, 0, 0, 0, 0);
 	if (ret != API_HAL_RET_VALUE_OK)
@@ -377,9 +377,7 @@ static struct notifier_block irq_notifier_block = {
 
 static void __init irq_pm_init(void)
 {
-	/* FIXME: Remove this when MPU OSWR support is added */
-	if (!soc_is_omap54xx())
-		cpu_pm_register_notifier(&irq_notifier_block);
+	cpu_pm_register_notifier(&irq_notifier_block);
 }
 #else
 static void __init irq_pm_init(void)
@@ -420,6 +418,9 @@ int __init omap_wakeupgen_init(void)
 		irq_banks = OMAP4_NR_BANKS;
 		max_irqs = OMAP4_NR_IRQS;
 		omap_secure_apis = 1;
+		secure_api_index = OMAP4_HAL_SAVEGIC_INDEX;
+	} else if (soc_is_omap54xx()) {
+		secure_api_index = OMAP5_HAL_SAVEGIC_INDEX;
 	}
 
 	/* Clear all IRQ bitmasks at wakeupGen level */

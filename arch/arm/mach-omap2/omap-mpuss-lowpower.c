@@ -82,6 +82,7 @@ struct cpu_pm_ops {
 extern int omap4_finish_suspend(unsigned long cpu_state);
 extern void omap4_cpu_resume(void);
 extern int omap5_finish_suspend(unsigned long cpu_state);
+extern void omap5_cpu_resume(void);
 
 static DEFINE_PER_CPU(struct omap4_cpu_pm_info, omap4_pm_info);
 static struct powerdomain *mpuss_pd;
@@ -459,6 +460,7 @@ int __init omap4_mpuss_init(void)
 	} else if (soc_is_omap54xx()) {
 		omap_pm_ops.finish_suspend = omap5_finish_suspend;
 		omap_pm_ops.hotplug_restart = omap5_secondary_startup;
+		omap_pm_ops.resume = omap5_cpu_resume;
 		cpu_context_offset = OMAP54XX_RM_CPU0_CPU0_CONTEXT_OFFSET;
 		enable_mercury_retention_mode();
 	}
