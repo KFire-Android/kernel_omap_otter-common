@@ -20,7 +20,6 @@
 #include <linux/smp.h>
 #include <linux/io.h>
 
-#include <asm/cacheflush.h>
 #include <asm/hardware/gic.h>
 #include <asm/smp_scu.h>
 
@@ -102,9 +101,6 @@ static int __cpuinit omap4_boot_secondary(unsigned int cpu, struct task_struct *
 		omap_modify_auxcoreboot0(0x200, 0xfffffdff);
 	else
 		__raw_writel(0x20, base + OMAP_AUX_CORE_BOOT_0);
-
-	flush_cache_all();
-	smp_wmb();
 
 	if (!cpu1_clkdm)
 		cpu1_clkdm = clkdm_lookup("mpu1_clkdm");
