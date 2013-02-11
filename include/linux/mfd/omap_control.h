@@ -28,13 +28,15 @@
 /**
  * struct system control module - scm device structure
  * @dev: device pointer
- * @base: Base of the temp I/O
+ * @base: Base of the temp I/O for core partition
+ * @base_pad: Base of the temp I/O for pad partition
  * @reglock: protect omap_control structure
  * @use_count: track API users
  */
 struct omap_control {
 	struct device		*dev;
 	void __iomem		*base;
+	void __iomem		*base_pad;
 	/* protect this data structure and register access */
 	spinlock_t		reglock;
 	int			use_count;
@@ -77,6 +79,8 @@ static inline void omap_bandgap_resume_after_idle(void){ }
 #ifdef CONFIG_MFD_OMAP_CONTROL
 extern int omap_control_readl(struct device *dev, u32 reg, u32 *val);
 extern int omap_control_writel(struct device *dev, u32 val, u32 reg);
+extern int omap_control_core_pad_readl(struct device *dev, u32 reg, u32 *val);
+extern int omap_control_core_pad_writel(struct device *dev, u32 val, u32 reg);
 extern struct device *omap_control_get(void);
 extern void omap_control_put(struct device *dev);
 #else
@@ -86,6 +90,18 @@ static inline int omap_control_readl(struct device *dev, u32 reg, u32 *val)
 }
 
 static inline int omap_control_writel(struct device *dev, u32 val, u32 reg)
+{
+	return 0;
+}
+
+static inline int omap_control_core_pad_readl(struct device *dev,
+					      u32 reg, u32 *val)
+{
+	return 0;
+}
+
+static inline int omap_control_core_pad_writel(struct device *dev,
+					       u32 val, u32 reg)
 {
 	return 0;
 }

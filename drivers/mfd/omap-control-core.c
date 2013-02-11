@@ -34,7 +34,9 @@
 static struct omap_control *omap_control_module;
 
 /**
- * omap_control_readl: Read a single omap control module register.
+ * omap_control_readl: Read a single omap control module register
+ * for general core partition.
+ * TODO: should be renamed to omap_control_core_readl
  *
  * @dev: device to read from.
  * @reg: register to read.
@@ -56,7 +58,32 @@ int omap_control_readl(struct device *dev, u32 reg, u32 *val)
 EXPORT_SYMBOL_GPL(omap_control_readl);
 
 /**
- * omap_control_writel: Write a single omap control module register.
+ * omap_control_core_pad_readl: Read a single omap control module register
+ * for core pad partition.
+ *
+ * @dev: device to read from.
+ * @reg: register to read.
+ * @val: output with register value.
+ *
+ * returns 0 on success or -EINVAL in case struct device is invalid.
+ */
+int omap_control_core_pad_readl(struct device *dev, u32 reg, u32 *val)
+{
+	struct omap_control *omap_control = dev_get_drvdata(dev);
+
+	if (!omap_control)
+		return -EINVAL;
+
+	*val = __raw_readl(omap_control->base_pad + reg);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(omap_control_core_pad_readl);
+
+/**
+ * omap_control_writel: Write a single omap control module register
+ * for general core partition.
+ * TODO: should be renamed to omap_control_core_writel
  *
  * @dev: device to read from.
  * @val: value to write.
@@ -78,6 +105,31 @@ int omap_control_writel(struct device *dev, u32 val, u32 reg)
 	return 0;
 }
 EXPORT_SYMBOL_GPL(omap_control_writel);
+
+/**
+ * omap_control_core_pad_writel: Write a single omap control module register
+ * for core pad partition.
+ *
+ * @dev: device to read from.
+ * @val: value to write.
+ * @reg: register to write to.
+ *
+ * returns 0 on success or -EINVAL in case struct device is invalid.
+ */
+int omap_control_core_pad_writel(struct device *dev, u32 val, u32 reg)
+{
+	struct omap_control *omap_control = dev_get_drvdata(dev);
+
+	if (!omap_control)
+		return -EINVAL;
+
+	spin_lock(&omap_control->reglock);
+	__raw_writel(val, omap_control->base_pad + reg);
+	spin_unlock(&omap_control->reglock);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(omap_control_core_pad_writel);
 
 /**
  * omap_control_get: returns the control module device pinter
@@ -233,17 +285,30 @@ static int __devinit omap_control_probe(struct platform_device *pdev)
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!res) {
-		dev_err(dev, "missing memory base resource\n");
+		dev_err(dev, "missing core memory base resource\n");
 		return -EINVAL;
 	}
 
 	base = devm_request_and_ioremap(dev, res);
 	if (!base) {
-		dev_err(dev, "ioremap failed\n");
+		dev_err(dev, "ioremap failed for resource %s\n", res->name);
 		return -EADDRNOTAVAIL;
 	}
-
 	omap_control->base = base;
+
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+	if (!res) {
+		dev_err(dev, "missing pad memory base resource\n");
+		return -EINVAL;
+	}
+
+	base = devm_request_and_ioremap(dev, res);
+	if (!base) {
+		dev_err(dev, "ioremap failed for resource %s\n", res->name);
+		return -EADDRNOTAVAIL;
+	}
+	omap_control->base_pad = base;
+
 	omap_control->dev = dev;
 	spin_lock_init(&omap_control->reglock);
 
