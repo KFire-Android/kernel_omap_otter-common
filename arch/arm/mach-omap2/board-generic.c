@@ -15,6 +15,9 @@
 #include <linux/of_irq.h>
 #include <linux/of_platform.h>
 #include <linux/irqdomain.h>
+#include <linux/clk.h>
+#include <linux/string.h>
+#include <linux/slab.h>
 
 #include <asm/hardware/gic.h>
 #include <asm/mach/arch.h>
@@ -36,11 +39,75 @@ static struct of_device_id omap_dt_match_table[] __initdata = {
 	{ }
 };
 
+static int __init omap_create_clk_alias(struct device_node *np)
+{
+	int ret = 0;
+	const char *s, *alias;
+	char *clk_id;
+	struct device_node *dev_np;
+	struct platform_device *pdev;
+
+	of_property_read_string(np, "clock-name", &s);
+	if (!s) {
+		pr_err("%s: couldn't find clock-name property in node %s\n",
+				__func__, np->name);
+		return -ENODEV;
+	}
+
+	clk_id = kstrdup(s, GFP_KERNEL);
+	if (!clk_id)
+		return -ENOMEM;
+
+	dev_np = of_parse_phandle(np, "device", 0);
+	if (!dev_np) {
+		pr_err("%s: couldn't find device phandle for \'%s\'\n",
+				__func__, clk_id);
+		ret = -ENODEV;
+		goto exit;
+	}
+
+	pdev = of_find_device_by_node(dev_np);
+	if (!pdev) {
+		pr_err("%s: couldn't find device for clock \'%s\'\n",
+				__func__, clk_id);
+		ret = -ENODEV;
+		goto exit;
+	}
+
+	ret = of_property_read_string(np, "clock-alias", &alias);
+	if (ret) {
+		pr_err("%s: couldn't find alias for clock \'%s\'\n",
+				__func__, clk_id);
+		ret = -ENODEV;
+		goto exit;
+	}
+
+	ret = clk_add_alias(alias, dev_name(&pdev->dev), clk_id, NULL);
+	if (ret) {
+		pr_err("%s: couldn't add alias \'%s\' to clock \'%s\'\n",
+				__func__, alias, clk_id);
+		ret = -ENODEV;
+		goto exit;
+	}
+
+exit:
+	kfree(clk_id);
+	return ret;
+}
+
 static void __init omap_generic_init(void)
 {
+	struct device_node *np;
+
 	omap_sdrc_init(NULL, NULL);
 
 	of_platform_populate(NULL, omap_dt_match_table, NULL, NULL);
+
+	/* create clock aliases based on 'clock_alias' nodes */
+	for_each_node_by_name(np, "clock_alias") {
+		omap_create_clk_alias(np);
+		of_node_put(np);
+	}
 
 	/*
 	 * HACK: call display setup code for selected boards to enable omapdss.
