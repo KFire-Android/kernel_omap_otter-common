@@ -86,6 +86,13 @@
 		reset-supply = <&hsusb1_reset>;
 		vcc-supply = <&hsusb1_power>;
 	};
+
+	/* hsusb1_phy is clocked by FREF_CLK3 i.e. auxclk3 */
+	clock_alias {
+		clock-name = "auxclk3_ck";
+		clock-alias = "main_clk";
+		device = <&hsusb1_phy>;
+	};
 };
 
 &omap4_pmx_core {
