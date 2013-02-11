@@ -208,17 +208,14 @@ static int sr_classp5_start_hw_loop(struct omap_sr *sr)
 /**
  * sr_classp5_stop_hw_loop()
  * @sr:		SmartReflex for which we stop calibration
- * @is_volt_reset:	Reset voltage or not
  *
  * Stops hardware calibration
  */
-static void sr_classp5_stop_hw_loop(struct omap_sr *sr, bool is_volt_reset)
+static void sr_classp5_stop_hw_loop(struct omap_sr *sr)
 {
 	sr_disable_errgen(sr);
 	omap_vp_disable(sr->voltdm);
 	sr_disable(sr);
-	if (is_volt_reset)
-		voltdm_reset(sr->voltdm);
 }
 
 /**
@@ -399,7 +396,7 @@ stop_sampling:
 
 	/* Fall through to close up common stuff */
 done_calib:
-	sr_classp5_stop_hw_loop(sr, false);
+	sr_classp5_stop_hw_loop(sr);
 
 	pmic = voltdm->pmic;
 
@@ -739,16 +736,16 @@ static int sr_classp5_disable(struct omap_sr *sr, int is_volt_reset)
 		return 0;
 
 	if (work_data->work_active) {
-		/* if volt reset and work is active, we dont allow this */
-		if (is_volt_reset)
-			return -EBUSY;
 		/* flag work is dead and remove the old work */
 		work_data->work_active = false;
 		cancel_delayed_work_sync(&work_data->work);
 		sr_notifier_control(sr, false);
 	}
 
-	sr_classp5_stop_hw_loop(sr, is_volt_reset);
+	sr_classp5_stop_hw_loop(sr);
+
+	if (is_volt_reset)
+		voltdm_reset(sr->voltdm);
 
 	/* Cancelled SR, so no more need to keep request */
 	pm_qos_update_request(&work_data->qos, PM_QOS_DEFAULT_VALUE);
