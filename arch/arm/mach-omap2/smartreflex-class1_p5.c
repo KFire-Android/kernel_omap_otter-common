@@ -954,10 +954,19 @@ static int sr_classp5_resume(struct omap_sr *sr)
 	 * that calibration work was not completed after recalibration work
 	 * (not scheduled at all or cancelled due to suspend), so reschedule
 	 * it here.
+	 * We need to lock here, because on another CPU DVFS can scale at
+	 * the same time, and we may have double work scheduling
+	 * - CPU1 starts DVF scaling -> disable SR
+	 * - CPU0 starts resuming -> schedule calibration, while SR is disabled
+	 *   from CPU1
+	 * - CPU1 ends scaling -> enable SR and see that calibration is already
+	 *   active
 	 */
+	mutex_lock(&omap_dvfs_lock);
 	volt_data = omap_voltage_get_curr_vdata(sr->voltdm);
 	if (!volt_data->volt_calibrated)
 		sr_classp5_calibration_schedule(sr);
+	mutex_unlock(&omap_dvfs_lock);
 
 	return 0;
 }
