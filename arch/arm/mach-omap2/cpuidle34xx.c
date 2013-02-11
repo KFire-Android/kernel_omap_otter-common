@@ -82,8 +82,6 @@ static int __omap3_enter_idle(struct cpuidle_device *dev,
 	struct omap3_idle_statedata *cx = &omap3_idle_data[index];
 	u32 mpu_state = cx->mpu_state, core_state = cx->core_state;
 
-	local_fiq_disable();
-
 	pwrdm_set_next_pwrst(mpu_pd, mpu_state);
 	pwrdm_set_next_pwrst(core_pd, core_state);
 
@@ -120,8 +118,6 @@ static int __omap3_enter_idle(struct cpuidle_device *dev,
 	}
 
 return_sleep_time:
-
-	local_fiq_enable();
 
 	return index;
 }
