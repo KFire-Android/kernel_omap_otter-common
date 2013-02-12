@@ -2092,11 +2092,18 @@ static int omapfb_create_framebuffers(struct omapfb2_device *fbdev)
 	DBG("fb_infos allocated\n");
 
 	/* assign overlays for the fbs */
-	for (i = 0; i < min(fbdev->num_fbs, fbdev->num_overlays); i++) {
+	for (i = 0; i < min3(fbdev->num_fbs, fbdev->num_overlays,
+				fbdev->num_managers); i++) {
 		struct omapfb_info *ofbi = FB2OFB(fbdev->fbs[i]);
-
+		struct omap_overlay_manager *mgr = fbdev->managers[i];
 		ofbi->overlays[0] = fbdev->overlays[i];
 		ofbi->num_overlays = 1;
+		if (mgr->output) {
+			ofbi->overlays[0]->unset_manager(ofbi->overlays[0]);
+			ofbi->overlays[0]->set_manager(ofbi->overlays[0], mgr);
+			DBG("ofbi%d assigned dev %s",
+						ofbi->id, mgr->name);
+		}
 	}
 
 	/* allocate fb memories */
