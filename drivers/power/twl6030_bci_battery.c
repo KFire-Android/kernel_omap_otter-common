@@ -772,7 +772,7 @@ err:
 
 static void twl6030_start_usb_charger(struct twl6030_bci_device_info *di)
 {
-	if (di->cell.cc)
+	if (di->cell.full)
 		return;
 
 	if (!delayed_work_pending(&di->twl6030_watchdog_work))
@@ -812,7 +812,7 @@ static void twl6030_start_ac_charger(struct twl6030_bci_device_info *di)
 	long int events;
 	int ret;
 
-	if (di->cell.cc)
+	if (di->cell.full)
 		return;
 
 	if (!is_battery_present(di)) {
@@ -1728,7 +1728,7 @@ static int capacity_changed(struct twl6030_bci_device_info *di)
 
 	/* Stop the charger */
 	if ((di->charge_status == POWER_SUPPLY_STATUS_CHARGING) &&
-	    di->cell.cc)
+	    di->cell.full)
 		twl6030_stop_charger(di);
 
 	/* Gas gauge requested CC autocalibration */
