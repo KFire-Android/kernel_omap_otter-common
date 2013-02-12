@@ -1742,6 +1742,8 @@ static int capacity_changed(struct twl6030_bci_device_info *di)
 	/* Battery state changes needs to be sent to the OS */
 	if (di->cell.updated) {
 		di->cell.updated = 0;
+		if (di->charge_status != POWER_SUPPLY_STATUS_CHARGING)
+			di->charge_status = twl6030_get_discharge_status(di);
 		return 1;
 	}
 
