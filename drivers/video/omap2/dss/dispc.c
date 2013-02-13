@@ -1062,7 +1062,12 @@ static u32 dispc_ovl_get_fifo_size(enum omap_plane plane)
 
 static void dispc_ovl_set_mflag_attribute(enum dispc_mflag_ctrl ctrl)
 {
-	dispc_write_reg(DISPC_GLOBAL_MFLAG, ctrl);
+	REG_FLD_MOD(DISPC_GLOBAL_MFLAG, ctrl, 1, 0);
+}
+
+static void dispc_ovl_set_mflag_start(enum dispc_mflag_start start)
+{
+	REG_FLD_MOD(DISPC_GLOBAL_MFLAG, start, 2, 2);
 }
 
 void dispc_ovl_set_global_mflag(enum omap_plane plane, bool mflag)
@@ -1079,7 +1084,13 @@ void dispc_ovl_set_global_mflag(enum omap_plane plane, bool mflag)
 		bit = 14;
 	 else
 		bit = 23;
+
 	 REG_FLD_MOD(DISPC_OVL_ATTRIBUTES(plane), mflag, bit, bit);
+
+	 dispc_ovl_set_mflag_attribute(DISPC_MFLAG_CTRL_ENABLE);
+	 /* Allows the mflag signal to start at the beginning of each
+	  * frame even if the DMA buffer is empty */
+	 dispc_ovl_set_mflag_start(DISPC_MFLAG_START_ENABLE);
 
 	 fifosize = dispc_ovl_get_fifo_size(plane);
 	 /* As per the simultaion team suggestion, below thesholds are set:
@@ -2331,8 +2342,10 @@ skip_errata:
 	if (ovl->caps & OMAP_DSS_OVL_CAP_FORCE_1D)
 		dispc_ovl_set_1d_tiled_mode(plane, oi->force_1d);
 
-	if (dss_has_feature(FEAT_MFLAG))
+	if (dss_has_feature(FEAT_MFLAG)) {
+		oi->mflag_en = true;
 		dispc_ovl_set_global_mflag(ovl->id, oi->mflag_en);
+	}
 
 	dispc_ovl_set_row_inc(plane, row_inc);
 	dispc_ovl_set_pix_inc(plane, pix_inc);
@@ -4044,9 +4057,6 @@ static void _omap_dispc_initial_config(void)
 	dispc_configure_burst_sizes();
 
 	dispc_ovl_enable_zorder_planes();
-
-	if (dss_has_feature(FEAT_MFLAG))
-		dispc_ovl_set_mflag_attribute(DISPC_MFLAG_CTRL_ENABLE);
 }
 
 /* DISPC HW IP initialisation */
