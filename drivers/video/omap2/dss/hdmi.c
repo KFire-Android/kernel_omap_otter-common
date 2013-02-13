@@ -288,6 +288,8 @@ u8 *hdmi_read_valid_edid(void)
 	ret = hdmi.ip_data.ops->read_edid(&hdmi.ip_data, hdmi.edid,
 						  HDMI_EDID_MAX_LENGTH);
 
+	hdmi_runtime_put();
+
 	for (i = 0; i < HDMI_EDID_MAX_LENGTH; i += 16)
 		DSSDBG("edid[%03x] = %02x %02x %02x %02x %02x %02x %02x %02x "\
 			"%02x %02x %02x %02x %02x %02x %02x %02x\n", i,
@@ -307,8 +309,6 @@ u8 *hdmi_read_valid_edid(void)
 		return NULL;
 	}
 	hdmi.edid_set = true;
-
-	hdmi_runtime_put();
 
 	return hdmi.edid;
 }
