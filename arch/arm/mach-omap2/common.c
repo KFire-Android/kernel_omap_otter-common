@@ -15,6 +15,7 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/platform_data/dsp-omap.h>
+#include <linux/platform_data/remoteproc-omap.h>
 
 #include "common.h"
 #include "omap-secure.h"
@@ -26,6 +27,12 @@
 int __weak omap_secure_ram_reserve_memblock(void)
 {
 	return 0;
+}
+
+void __init omap4_reserve(void)
+{
+	omap_rproc_reserve_cma();
+	omap_reserve();
 }
 
 void __init omap_reserve(void)

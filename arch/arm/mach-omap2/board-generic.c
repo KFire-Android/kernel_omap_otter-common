@@ -152,7 +152,7 @@ static const char *omap4_boards_compat[] __initdata = {
 };
 
 DT_MACHINE_START(OMAP4_DT, "Generic OMAP4 (Flattened Device Tree)")
-	.reserve	= omap_reserve,
+	.reserve	= omap4_reserve,
 	.smp		= smp_ops(omap4_smp_ops),
 	.map_io		= omap4_map_io,
 	.init_early	= omap4430_init_early,
