@@ -91,6 +91,9 @@
 #define is_ehci_tll_mode(x)	(x == OMAP_EHCI_PORT_MODE_TLL)
 #define is_ehci_hsic_mode(x)	(x == OMAP_EHCI_PORT_MODE_HSIC)
 
+/* only PHY and UNUSED modes don't need TLL */
+#define omap_usb_mode_needs_tll(x)	((x) != OMAP_USBHS_PORT_MODE_UNUSED &&\
+					 (x) != OMAP_EHCI_PORT_MODE_PHY)
 
 struct usbhs_hcd_omap {
 	int				nports;
@@ -321,15 +324,18 @@ static int usbhs_runtime_resume(struct device *dev)
 	struct usbhs_hcd_omap		*omap = dev_get_drvdata(dev);
 	struct usbhs_omap_platform_data	*pdata = omap->pdata;
 	int i, r;
+	bool needs_tll = false;
 
 	dev_dbg(dev, "usbhs_runtime_resume\n");
-
-	omap_tll_enable(pdata);
 
 	if (!IS_ERR(omap->ehci_logic_fck))
 		clk_enable(omap->ehci_logic_fck);
 
 	for (i = 0; i < omap->nports; i++) {
+
+		if (omap_usb_mode_needs_tll(pdata->port_mode[i]))
+			needs_tll = true;
+
 		switch (pdata->port_mode[i]) {
 		case OMAP_EHCI_PORT_MODE_HSIC:
 			if (!IS_ERR(omap->hsic60m_clk[i])) {
@@ -366,6 +372,9 @@ static int usbhs_runtime_resume(struct device *dev)
 		}
 	}
 
+	if (needs_tll)
+		omap_tll_enable(pdata);
+
 	return 0;
 }
 
@@ -374,10 +383,15 @@ static int usbhs_runtime_suspend(struct device *dev)
 	struct usbhs_hcd_omap		*omap = dev_get_drvdata(dev);
 	struct usbhs_omap_platform_data	*pdata = omap->pdata;
 	int i;
+	bool needed_tll = false;
 
 	dev_dbg(dev, "usbhs_runtime_suspend\n");
 
 	for (i = 0; i < omap->nports; i++) {
+
+		if (omap_usb_mode_needs_tll(pdata->port_mode[i]))
+			needed_tll = true;
+
 		switch (pdata->port_mode[i]) {
 		case OMAP_EHCI_PORT_MODE_HSIC:
 			if (!IS_ERR(omap->hsic60m_clk[i]))
@@ -399,7 +413,8 @@ static int usbhs_runtime_suspend(struct device *dev)
 	if (!IS_ERR(omap->ehci_logic_fck))
 		clk_disable(omap->ehci_logic_fck);
 
-	omap_tll_disable(pdata);
+	if (needed_tll)
+		omap_tll_disable(pdata);
 
 	return 0;
 }
