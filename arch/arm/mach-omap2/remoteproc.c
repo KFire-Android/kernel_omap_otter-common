@@ -61,11 +61,16 @@ struct omap_rproc_pdev_data {
  * XXX: Adjust these values depending on your firmware needs.
  * Placing these in Kconfig is not worth the complexity.
  */
-#define OMAP_RPROC_CMA_BASE_IPU		(0x99000000)
-#define OMAP_RPROC_CMA_BASE_DSP		(0x98800000)
+#define OMAP5_RPROC_CMA_BASE_IPU	(0x95800000)
+#define OMAP5_RPROC_CMA_BASE_DSP	(0x95000000)
+
+#define OMAP4_RPROC_CMA_BASE_IPU	(0x99000000)
+#define OMAP4_RPROC_CMA_BASE_DSP	(0x98800000)
 
 #define OMAP_RPROC_CMA_SIZE_DSP		(0x800000)
-#define OMAP_RPROC_CMA_SIZE_IPU		(0x7000000)
+
+#define OMAP4_RPROC_CMA_SIZE_IPU	(0x7000000)
+#define OMAP5_RPROC_CMA_SIZE_IPU	(0xA400000)
 
 /*
  * The order of the timers (if there are more) here should be
@@ -146,7 +151,7 @@ static struct omap_rproc_pdev_data omap4_rproc_pdev_data[] = {
 		.enabled = 1,
 #endif
 		.pdev = &omap4_dsp,
-		.cma_addr = OMAP_RPROC_CMA_BASE_DSP,
+		.cma_addr = OMAP4_RPROC_CMA_BASE_DSP,
 		.cma_size = OMAP_RPROC_CMA_SIZE_DSP,
 	},
 	{
@@ -154,8 +159,8 @@ static struct omap_rproc_pdev_data omap4_rproc_pdev_data[] = {
 		.enabled = 1,
 #endif
 		.pdev = &omap4_ipu,
-		.cma_addr = OMAP_RPROC_CMA_BASE_IPU,
-		.cma_size = OMAP_RPROC_CMA_SIZE_IPU,
+		.cma_addr = OMAP4_RPROC_CMA_BASE_IPU,
+		.cma_size = OMAP4_RPROC_CMA_SIZE_IPU,
 	},
 };
 
@@ -165,7 +170,7 @@ static struct omap_rproc_pdev_data omap5_rproc_pdev_data[] = {
 		.enabled = 1,
 #endif
 		.pdev = &omap4_dsp,
-		.cma_addr = OMAP_RPROC_CMA_BASE_DSP,
+		.cma_addr = OMAP5_RPROC_CMA_BASE_DSP,
 		.cma_size = OMAP_RPROC_CMA_SIZE_DSP,
 	},
 	{
@@ -173,8 +178,8 @@ static struct omap_rproc_pdev_data omap5_rproc_pdev_data[] = {
 		.enabled = 1,
 #endif
 		.pdev = &omap4_ipu,
-		.cma_addr = OMAP_RPROC_CMA_BASE_IPU,
-		.cma_size = OMAP_RPROC_CMA_SIZE_IPU,
+		.cma_addr = OMAP5_RPROC_CMA_BASE_IPU,
+		.cma_size = OMAP5_RPROC_CMA_SIZE_IPU,
 	},
 };
 
