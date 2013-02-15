@@ -31,7 +31,7 @@ int __weak omap_secure_ram_reserve_memblock(void)
 
 void __init omap4_reserve(void)
 {
-	omap_rproc_reserve_cma();
+	omap_rproc_reserve_cma(RPROC_CMA_OMAP4);
 	omap_reserve();
 }
 

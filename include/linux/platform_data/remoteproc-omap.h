@@ -66,14 +66,20 @@ struct omap_rproc_pdata {
 
 #if defined(CONFIG_OMAP_REMOTEPROC) || defined(CONFIG_OMAP_REMOTEPROC_MODULE)
 
-void __init omap_rproc_reserve_cma(void);
+void __init omap_rproc_reserve_cma(int platform_type);
 
 #else
 
-static inline void __init omap_rproc_reserve_cma(void)
+static inline void __init omap_rproc_reserve_cma(int platform_type)
 {
 }
 
 #endif
+
+/*
+ * SoC/Platform identifier definitions, to be used for picking up
+ * the appropriate SoC-specific CMA memory size and locations.
+ */
+#define RPROC_CMA_OMAP4		1
 
 #endif /* _PLAT_REMOTEPROC_H */

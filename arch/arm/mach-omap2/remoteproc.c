@@ -341,6 +341,7 @@ static int omap_rproc_disable_timers(struct platform_device *pdev,
 
 /**
  * omap_rproc_reserve_cma - reserve CMA pools
+ * @platform_type: SoC identifier
  *
  * This function reserves the CMA pools for each of the remoteproc
  * devices at boot time. This function needs to be called from the
@@ -350,11 +351,19 @@ static int omap_rproc_disable_timers(struct platform_device *pdev,
  * The CMA pool information is gathered from the corresponding
  * omap_rproc_pdev_data definitions.
  */
-void __init omap_rproc_reserve_cma(void)
+void __init omap_rproc_reserve_cma(int platform_type)
 {
-	struct omap_rproc_pdev_data *rproc_pdev_data = omap4_rproc_pdev_data;
-	int rproc_size = ARRAY_SIZE(omap4_rproc_pdev_data);
+	struct omap_rproc_pdev_data *rproc_pdev_data = NULL;
+	int rproc_size = 0;
 	int i, ret;
+
+	if (platform_type == RPROC_CMA_OMAP4) {
+		rproc_pdev_data = omap4_rproc_pdev_data;
+		rproc_size = ARRAY_SIZE(omap4_rproc_pdev_data);
+	} else {
+		pr_err("incompatible machine");
+		return;
+	}
 
 	for (i = 0; i < rproc_size; i++) {
 		struct platform_device *pdev = rproc_pdev_data[i].pdev;
