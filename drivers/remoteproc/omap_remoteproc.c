@@ -81,6 +81,10 @@ static int omap_rproc_mbox_callback(struct notifier_block *this,
 		dev_info(dev, "received echo reply from %s\n", name);
 		break;
 	default:
+		if (msg_data >= RP_MBOX_END_MSG) {
+			dev_err(dev, "dropping unknown message %x", msg_data);
+			return NOTIFY_DONE;
+		}
 		/* msg contains the index of the triggered vring */
 		if (rproc_vq_interrupt(oproc->rproc, msg_data) == IRQ_NONE)
 			dev_dbg(dev, "no message was found in vqid %d\n",
