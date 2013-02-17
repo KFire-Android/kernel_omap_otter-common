@@ -494,9 +494,9 @@ int cpdma_ctlr_int_ctrl(struct cpdma_ctlr *ctlr, bool enable)
 }
 EXPORT_SYMBOL_GPL(cpdma_ctlr_int_ctrl);
 
-void cpdma_ctlr_eoi(struct cpdma_ctlr *ctlr)
+void cpdma_ctlr_eoi(struct cpdma_ctlr *ctlr, u32 value)
 {
-	dma_reg_write(ctlr, CPDMA_MACEOIVECTOR, 0);
+	dma_reg_write(ctlr, CPDMA_MACEOIVECTOR, value);
 }
 EXPORT_SYMBOL_GPL(cpdma_ctlr_eoi);
 
