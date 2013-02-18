@@ -73,4 +73,4 @@ static int __init sr_class3_init(void)
 	pr_info("SmartReflex Class3 initialized\n");
 	return sr_register_class(&class3_data);
 }
-device_initcall(sr_class3_init);
+subsys_initcall(sr_class3_init);
