@@ -451,6 +451,9 @@ struct omap_hwmod_omap4_prcm {
  *     enabled.  This prevents the hwmod code from being able to
  *     enable and reset the IP block early.  XXX Eventually it should
  *     be possible to query the clock framework for this information.
+ * HWMOD_SWSUP_SIDLE_ACT: omap_hwmod code should manually bring the module out of
+ *     idle, but rely on smart-idle to the put it back in idle, so the wakeups
+ *     are still functional (Only known case for now is UART)
  */
 #define HWMOD_SWSUP_SIDLE			(1 << 0)
 #define HWMOD_SWSUP_MSTANDBY			(1 << 1)
@@ -462,6 +465,7 @@ struct omap_hwmod_omap4_prcm {
 #define HWMOD_CONTROL_OPT_CLKS_IN_RESET		(1 << 7)
 #define HWMOD_16BIT_REG				(1 << 8)
 #define HWMOD_EXT_OPT_MAIN_CLK			(1 << 9)
+#define HWMOD_SWSUP_SIDLE_ACT			(1 << 10)
 
 /*
  * omap_hwmod._int_flags definitions
