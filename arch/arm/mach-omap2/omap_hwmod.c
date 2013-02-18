@@ -1362,8 +1362,6 @@ static void _enable_sysc(struct omap_hwmod *oh)
 		if (oh->flags & HWMOD_SWSUP_MSTANDBY) {
 			idlemode = HWMOD_IDLEMODE_NO;
 		} else {
-			if (sf & SYSC_HAS_ENAWAKEUP)
-				_enable_wakeup(oh, &v);
 			if (oh->class->sysc->idlemodes & MSTANDBY_SMART_WKUP)
 				idlemode = HWMOD_IDLEMODE_SMART_WKUP;
 			else
@@ -1381,9 +1379,7 @@ static void _enable_sysc(struct omap_hwmod *oh)
 	    (sf & SYSC_HAS_CLOCKACTIVITY))
 		_set_clockactivity(oh, oh->class->sysc->clockact, &v);
 
-	/* If slave is in SMARTIDLE, also enable wakeup */
-	if ((sf & SYSC_HAS_SIDLEMODE) && !(oh->flags & HWMOD_SWSUP_SIDLE))
-		_enable_wakeup(oh, &v);
+	_enable_wakeup(oh, &v);
 
 	_write_sysconfig(v, oh);
 
@@ -1435,8 +1431,6 @@ static void _idle_sysc(struct omap_hwmod *oh)
 		if (oh->flags & HWMOD_SWSUP_MSTANDBY) {
 			idlemode = HWMOD_IDLEMODE_FORCE;
 		} else {
-			if (sf & SYSC_HAS_ENAWAKEUP)
-				_enable_wakeup(oh, &v);
 			if (oh->class->sysc->idlemodes & MSTANDBY_SMART_WKUP)
 				idlemode = HWMOD_IDLEMODE_SMART_WKUP;
 			else
@@ -1445,9 +1439,7 @@ static void _idle_sysc(struct omap_hwmod *oh)
 		_set_master_standbymode(oh, idlemode, &v);
 	}
 
-	/* If slave is in SMARTIDLE, also enable wakeup */
-	if ((sf & SYSC_HAS_SIDLEMODE) && !(oh->flags & HWMOD_SWSUP_SIDLE))
-		_enable_wakeup(oh, &v);
+	_enable_wakeup(oh, &v);
 
 	_write_sysconfig(v, oh);
 }
@@ -3764,17 +3756,8 @@ int omap_hwmod_del_initiator_dep(struct omap_hwmod *oh,
 int omap_hwmod_enable_wakeup(struct omap_hwmod *oh)
 {
 	unsigned long flags;
-	u32 v;
 
 	spin_lock_irqsave(&oh->_lock, flags);
-
-	if (oh->class->sysc &&
-	    (oh->class->sysc->sysc_flags & SYSC_HAS_ENAWAKEUP)) {
-		v = oh->_sysc_cache;
-		_enable_wakeup(oh, &v);
-		_write_sysconfig(v, oh);
-	}
-
 	_set_idle_ioring_wakeup(oh, true);
 	spin_unlock_irqrestore(&oh->_lock, flags);
 
