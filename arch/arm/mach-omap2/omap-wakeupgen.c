@@ -452,6 +452,19 @@ bool omap_wakeupgen_check_interrupts(char *report_string)
 
 	for (i = 0; i < spi_irq_banks - 1; i++) {
 		gica = gic_readl(GIC_DIST_PENDING_SET, i + 1);
+
+		/*
+		 * HACK: On OMAP4 GP devices 8th (secure) interrupt
+		 * is constantly pending and thus preventing suspend.
+		 * The source of this interrupt is CONTROL_CORE_SEC_STATUS
+		 * register. This register can't be cleared on GP device
+		 * because it is accessible for write only from secure
+		 * privileged mode. So just ignore 8th interrupt in this check.
+		 */
+		if (i == 0 && cpu_is_omap44xx() &&
+		    (omap_type() == OMAP2_DEVICE_TYPE_GP))
+			gica &= ~(1 << 8);
+
 		wakea_c0 = wakeupgen_readl(i, 0);
 		wakea_c1 = wakeupgen_readl(i, 1);
 
