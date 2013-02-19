@@ -313,12 +313,10 @@ static void sr_start_vddautocomp(struct omap_sr *sr)
 	}
 
 	/* Pause DVFS from interfering with our operations */
-	mutex_lock(&omap_dvfs_lock);
 	if (sr_class->init &&
 	    sr_class->init(sr, sr_class->class_priv_data)) {
 		dev_err(&sr->pdev->dev,
 			"%s: SRClass initialization failed\n", __func__);
-		mutex_unlock(&omap_dvfs_lock);
 		return;
 	}
 
@@ -332,7 +330,6 @@ static void sr_start_vddautocomp(struct omap_sr *sr)
 		if (sr_class->deinit)
 			sr_class->deinit(sr, sr_class->class_priv_data);
 	}
-	mutex_unlock(&omap_dvfs_lock);
 }
 
 static void sr_stop_vddautocomp(struct omap_sr *sr)
@@ -346,7 +343,6 @@ static void sr_stop_vddautocomp(struct omap_sr *sr)
 
 	if (sr->autocomp_active) {
 		/* Pause DVFS from interfering with our operations */
-		mutex_lock(&omap_dvfs_lock);
 		sr_class->disable(sr, 1);
 		if (sr_class->deinit &&
 		    sr_class->deinit(sr,
@@ -356,7 +352,6 @@ static void sr_stop_vddautocomp(struct omap_sr *sr)
 				__func__, sr->srid);
 		}
 		sr->autocomp_active = false;
-		mutex_unlock(&omap_dvfs_lock);
 	}
 }
 
@@ -1141,10 +1136,12 @@ static int omap_sr_autocomp_store(void *data, u64 val)
 
 	/* control enable/disable only if there is a delta in value */
 	if (sr_info->autocomp_active != val) {
+		mutex_lock(&omap_dvfs_lock);
 		if (!val)
 			sr_stop_vddautocomp(sr_info);
 		else
 			sr_start_vddautocomp(sr_info);
+		mutex_unlock(&omap_dvfs_lock);
 	}
 
 	return 0;
@@ -1326,6 +1323,8 @@ skip_lvt:
 	pm_runtime_enable(&pdev->dev);
 	pm_runtime_irq_safe(&pdev->dev);
 
+	mutex_lock(&omap_dvfs_lock);
+
 	list_add(&sr_info->node, &sr_list);
 
 	/*
@@ -1333,6 +1332,8 @@ skip_lvt:
 	 */
 	if (pdata->enable_on_init)
 		sr_start_vddautocomp(sr_info);
+
+	mutex_unlock(&omap_dvfs_lock);
 
 	dev_info(&pdev->dev, "%s: SmartReflex driver initialized\n", __func__);
 	return ret;
@@ -1361,13 +1362,15 @@ static int __devexit omap_sr_remove(struct platform_device *pdev)
 		return PTR_ERR(sr_info);
 	}
 
-	if (sr_info->autocomp_active)
-		sr_stop_vddautocomp(sr_info);
+	mutex_lock(&omap_dvfs_lock);
+	sr_stop_vddautocomp(sr_info);
+	list_del(&sr_info->node);
+	mutex_unlock(&omap_dvfs_lock);
+
 	if (sr_info->dbg_dir)
 		debugfs_remove_recursive(sr_info->dbg_dir);
 
 	pm_runtime_disable(&pdev->dev);
-	list_del(&sr_info->node);
 	kfree(sr_info->name);
 
 	return 0;
@@ -1390,8 +1393,10 @@ static void __devexit omap_sr_shutdown(struct platform_device *pdev)
 		return;
 	}
 
-	if (sr_info->autocomp_active)
-		sr_stop_vddautocomp(sr_info);
+	mutex_lock(&omap_dvfs_lock);
+	sr_stop_vddautocomp(sr_info);
+	list_del(&sr_info->node);
+	mutex_unlock(&omap_dvfs_lock);
 
 	return;
 }
