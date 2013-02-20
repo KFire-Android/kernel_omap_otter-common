@@ -702,6 +702,18 @@ static int sr_classp5_enable(struct omap_sr *sr)
 		return -ENODATA;
 	}
 
+	/*
+	 * We are resuming from OFF - enable clocks manually to allow OFF-mode.
+	 * Clocks will be disabled at "complete" stage by PM Core
+	 */
+	if (sr->suspended) {
+		if (!volt_data->volt_calibrated || work_data->work_active)
+			/* !!! Should never ever be here !!!*/
+			WARN(true, "Trying to resume with invalid AVS state\n");
+		else
+			sr->ops->get(sr);
+	}
+
 	/* We donot expect work item to be active here */
 	WARN_ON(work_data->work_active);
 
@@ -772,8 +784,14 @@ static int sr_classp5_disable(struct omap_sr *sr, int is_volt_reset)
 	}
 
 	/* need to do rest of code ONLY if required */
-	if (volt_data->volt_calibrated && !work_data->work_active)
+	if (volt_data->volt_calibrated && !work_data->work_active) {
+		/*
+		 * We are going OFF - disable clocks manually to allow OFF-mode.
+		 */
+		if (sr->suspended)
+			sr->ops->put(sr);
 		return 0;
+	}
 
 	if (work_data->work_active) {
 		/* flag work is dead and remove the old work */
@@ -787,8 +805,17 @@ static int sr_classp5_disable(struct omap_sr *sr, int is_volt_reset)
 	if (is_volt_reset)
 		voltdm_reset(sr->voltdm);
 
-	/* Cancelled SR, so no more need to keep request */
+	/* Canceled SR, so no more need to keep request */
 	pm_qos_update_request(&work_data->qos, PM_QOS_DEFAULT_VALUE);
+
+	/*
+	 * We are going OFF - disable clocks manually to allow OFF-mode.
+	 */
+	if (sr->suspended) {
+		/* !!! Should never ever be here - no guarantee to recover !!!*/
+		WARN(true, "Trying to go OFF with invalid AVS state\n");
+		sr->ops->put(sr);
+	}
 
 	return 0;
 }
@@ -906,100 +933,109 @@ static int sr_classp5_deinit(struct omap_sr *sr, void *class_priv_data)
 }
 
 /**
- * sr_classp5_suspend() - class suspend handler
+ * sr_classp5_suspend_noirq() - class suspend_noirq handler
  * @sr:	SmartReflex module which is moving to suspend
  *
- * The purpose of suspend handler is to make sure that Calibration
- * and Recalibration works are cancelled before moving to OFF mode.
+ * The purpose of suspend_noirq handler is to make sure that Calibration
+ * works are canceled before moving to OFF mode.
  * Otherwise these works may be executed at any moment, trigger
  * SmartReflex and race with CPU Idle notifiers. As result - system
  * will crash
  */
-static int sr_classp5_suspend(struct omap_sr *sr)
+static int sr_classp5_suspend_noirq(struct omap_sr *sr)
 {
-	void **voltdm_cdata = NULL;
-	struct sr_classp5_calib_data *calib_data = NULL;
+	struct sr_classp5_calib_data *work_data;
+	struct omap_volt_data *volt_data;
+	struct voltagedomain *voltdm;
+	int ret = 0;
 
 	if (IS_ERR_OR_NULL(sr)) {
 		pr_err("%s: bad parameters!\n", __func__);
 		return -EINVAL;
 	}
 
-	voltdm_cdata = &sr->voltdm_cdata;
-	if (IS_ERR_OR_NULL(voltdm_cdata)) {
-		pr_err("%s: bad parameters!\n", __func__);
+	work_data = (struct sr_classp5_calib_data *)sr->voltdm_cdata;
+	if (IS_ERR_OR_NULL(work_data)) {
+		pr_err("%s: bad work data %s\n", __func__, sr->name);
 		return -EINVAL;
 	}
 
-	if (IS_ERR_OR_NULL(*voltdm_cdata)) {
-		pr_err("%s: ooopps.. class not initialized for %s! bug??\n",
-		       __func__, sr->name);
-		return -EINVAL;
-	}
-
-	calib_data = (struct sr_classp5_calib_data *)*voltdm_cdata;
-
 	/*
-	 * If Calibration work acquires lock
-	 * OFF mode should be cancelled
+	 * At suspend_noirq the code isn't needed to be protected by
+	 * omap_dvfs_lock, but - Let's be paranoid (may have smth on other CPUx)
 	 */
-	if (!mutex_trylock(&omap_dvfs_lock)) {
-		pr_warn("%s: %s Can't acquire dvfs lock, abort suspend\n",
-			__func__, sr->name);
-		return -EBUSY;
-	}
+	mutex_lock(&omap_dvfs_lock);
 
-	/*
-	 * Handle situation when Calibration started, but lock is
-	 * released. It means calibration is collecting samples
-	 * at this moment of time. OFF mode should be cancelled
+	/* Check if calibration is active at this moment if yes -
+	 * abort suspend.
 	 */
-	if (calib_data->work_active) {
+	if (work_data->work_active) {
 		pr_warn("%s: %s Calibration is active, abort suspend\n",
 			__func__, sr->name);
-		mutex_unlock(&omap_dvfs_lock);
-		return -EBUSY;
+		ret = -EBUSY;
+		goto finish_suspend;
 	}
 
-	/* Ensure, that works are cancelled */
-	cancel_delayed_work_sync(&calib_data->work);
-	calib_data->num_calib_triggers = 0;
-	calib_data->work_active = false;
-	pr_debug("%s: %s Calibration works cancelled\n", __func__, sr->name);
+	/*
+	 * Check if current voltage is calibrated if no -
+	 * abort suspend.
+	 */
+	voltdm = sr->voltdm;
+	volt_data = omap_voltage_get_curr_vdata(voltdm);
+	if (IS_ERR_OR_NULL(volt_data)) {
+		pr_warning("%s: Voltage data is NULL. Cannot disable %s\n",
+			   __func__, sr->name);
+		ret = -ENODATA;
+		goto finish_suspend;
+	}
 
+	if (!volt_data->volt_calibrated) {
+		pr_warn("%s: %s Calibration hasn't been done, abort suspend\n",
+			__func__, sr->name);
+		ret = -EBUSY;
+		goto finish_suspend;
+	}
+
+	/* Let's be paranoid - cancel Calibration work manually */
+	cancel_delayed_work_sync(&work_data->work);
+	work_data->work_active = false;
+
+finish_suspend:
 	mutex_unlock(&omap_dvfs_lock);
-	return 0;
+	return ret;
 }
 
 /**
- * sr_classp5_resume() - class resume handler
+ * sr_classp5_resume_noirq() - class resume_noirq handler
  * @sr:	SmartReflex module which is moving to resume
  *
  * The main purpose of resume handler is to
- * reschedule calibration work if the resume has been started with uncalibrated
- * voltage.
+ * reschedule calibration work if the resume has been started with
+ * un-calibrated voltage.
  */
-static int sr_classp5_resume(struct omap_sr *sr)
+static int sr_classp5_resume_noirq(struct omap_sr *sr)
 {
 	struct omap_volt_data *volt_data;
 
 	/*
-	 * If we resume from suspend and voltage is not calibrated, it means
-	 * that calibration work was not completed after recalibration work
-	 * (not scheduled at all or cancelled due to suspend), so reschedule
-	 * it here.
-	 * We need to lock here, because on another CPU DVFS can scale at
-	 * the same time, and we may have double work scheduling
-	 * - CPU1 starts DVF scaling -> disable SR
-	 * - CPU0 starts resuming -> schedule calibration, while SR is disabled
-	 *   from CPU1
-	 * - CPU1 ends scaling -> enable SR and see that calibration is already
-	 *   active
-	 */
+	* If we resume from suspend and voltage is not calibrated, it means
+	* that calibration work was not completed after re-calibration work
+	* (not scheduled at all or canceled due to suspend or un-calibrated
+	* OPP was selected while suspending/resuming), so reschedule
+	* it here.
+	*
+	* At this stage the code isn't needed to be protected by
+	* omap_dvfs_lock, but - Let's be paranoid (may have smth on other CPUx)
+	*
+	* More over, we shouldn't be here in case if voltage is un-calibrated
+	* voltage, so produce warning.
+	*/
 	mutex_lock(&omap_dvfs_lock);
 	volt_data = omap_voltage_get_curr_vdata(sr->voltdm);
-	if (!volt_data->volt_calibrated)
+	if (!volt_data->volt_calibrated) {
 		sr_classp5_calibration_schedule(sr);
+		WARN(true, "sr_classp5: Resume with un-calibrated voltage\n");
+	}
 	mutex_unlock(&omap_dvfs_lock);
 
 	return 0;
@@ -1014,8 +1050,8 @@ static struct omap_sr_class_data classp5_data = {
 	.deinit = sr_classp5_deinit,
 	.notify = sr_classp5_notify,
 	.class_type = SR_CLASS1P5,
-	.suspend = sr_classp5_suspend,
-	.resume = sr_classp5_resume,
+	.suspend_noirq = sr_classp5_suspend_noirq,
+	.resume_noirq = sr_classp5_resume_noirq,
 	/*
 	 * trigger for bound - this tells VP that SR has a voltage
 	 * change. we should try and ensure transdone is set before reading

@@ -270,6 +270,12 @@ struct omap_smartreflex_dev_attr {
  * @disable:		API to disable a particular class smartreflex.
  * @init:		API to do class specific initialization (optional)
  * @deinit:		API to do class specific deinitialization (optional)
+ * @suspend		Smartreflex class specific system suspend "suspend"
+ *			stage callback (optional)
+ * @suspend_noirq	Smartreflex class specific system suspend
+ *			"suspend_noirq" stage callback (optional)
+ * @resume_noirq	Smartreflex class specific system resume "resume_noirq"
+ *			stage callback (optional)
  * @configure:		API to configure a particular class smartreflex.
  * @notify:		API to notify the class driver about an event in SR.
  *			Not needed for class3.
@@ -285,7 +291,8 @@ struct omap_sr_class_data {
 	int (*init)(struct omap_sr *sr, void *class_priv_data);
 	int (*deinit)(struct omap_sr *sr, void *class_priv_data);
 	int (*suspend)(struct omap_sr *sr);
-	int (*resume)(struct omap_sr *sr);
+	int (*suspend_noirq)(struct omap_sr *sr);
+	int (*resume_noirq)(struct omap_sr *sr);
 	int (*configure)(struct omap_sr *sr);
 	int (*notify)(struct omap_sr *sr, u32 status);
 	u8 notify_flags;
