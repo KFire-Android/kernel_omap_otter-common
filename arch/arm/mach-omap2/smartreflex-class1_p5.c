@@ -13,6 +13,7 @@
 #include <linux/delay.h>
 #include <linux/pm_qos.h>
 #include <linux/sched.h>
+#include <linux/suspend.h>
 #include <linux/power/smartreflex.h>
 #include <plat/cpu.h>
 #include <plat/dvfs.h>
@@ -448,6 +449,7 @@ done_calib:
 static struct delayed_work recal_work;
 static struct pm_qos_request recal_qos;
 static unsigned long next_recal_time;
+static bool recal_scheduled;
 
 /**
  * sr_classp5_voltdm_recal() - Helper routine to reset calibration.
@@ -530,6 +532,81 @@ static void sr_classp5_recal_work(struct work_struct *work)
 	mutex_unlock(&omap_dvfs_lock);
 }
 
+static void sr_classp5_recal_cleanup(void)
+{
+	if (!recal_scheduled)
+		return;
+
+	cancel_delayed_work_sync(&recal_work);
+	recal_scheduled = false;
+	pr_debug("%s: Re-calibration work canceled\n", __func__);
+}
+
+
+static void sr_classp5_recal_resume(void)
+{
+	unsigned long delay, now_time = jiffies;
+
+	if (recal_scheduled)
+		return;
+
+	if (time_before(now_time, next_recal_time))
+		delay = next_recal_time - now_time;
+	else
+		delay = 0;
+
+	pr_debug("%s: Recalibration work rescheduled to delay of %d msec",
+		 __func__, jiffies_to_msecs(delay));
+
+	/* Reschedule recalibration work on each resume */
+	schedule_delayed_work(&recal_work, delay);
+	recal_scheduled = true;
+
+	return;
+}
+
+static int sr_classp5_recal_sleep_pm_callback(struct notifier_block *nfb,
+						    unsigned long action,
+						    void *ignored)
+{
+	switch (action) {
+	case PM_HIBERNATION_PREPARE:
+	case PM_SUSPEND_PREPARE:
+		/*
+		 * Need to make sure that re-calibration works
+		 * is canceled before moving to Suspend mode.
+		 * Otherwise this work may be executed at any moment, trigger
+		 * SmartReflex and race with DVFS and MPUSS CPU Idle notifiers.
+		 * As result - system will crash
+		 */
+		mutex_lock(&omap_dvfs_lock);
+		sr_classp5_recal_cleanup();
+		mutex_unlock(&omap_dvfs_lock);
+		return NOTIFY_OK;
+
+	case PM_POST_HIBERNATION:
+	case PM_POST_SUSPEND:
+		/*
+		 * Reschedule re-calibration work, which was canceled
+		 * during suspend preparation
+		 */
+		sr_classp5_recal_resume();
+		return NOTIFY_OK;
+	}
+
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block sr_classp5_recal_sleep_pm_notifier = {
+	.notifier_call = sr_classp5_recal_sleep_pm_callback,
+	.priority = 0,
+};
+
+static void __init sr_classp5_recal_register_sleep_pm_notifier(void)
+{
+	register_pm_notifier(&sr_classp5_recal_sleep_pm_notifier);
+}
+
 static void sr_classp5_recal_init(void)
 {
 	unsigned long delay;
@@ -539,50 +616,13 @@ static void sr_classp5_recal_init(void)
 	delay = msecs_to_jiffies(CONFIG_OMAP_SR_CLASS1_P5_RECALIBRATION_DELAY);
 	schedule_delayed_work(&recal_work, delay);
 	next_recal_time = jiffies + delay;
+	sr_classp5_recal_register_sleep_pm_notifier();
+	recal_scheduled = true;
 	pr_info("SmartReflex Recalibration delay = %dms\n",
 		CONFIG_OMAP_SR_CLASS1_P5_RECALIBRATION_DELAY);
 }
-
-static void sr_classp5_recal_cleanup(void)
-{
-	cancel_delayed_work_sync(&recal_work);
-}
-
-static inline void sr_classp5_recal_suspend(struct omap_sr *sr)
-{
-	sr_classp5_recal_cleanup();
-}
-
-static void sr_classp5_recal_resume(struct omap_sr *sr)
-{
-	unsigned long delay, now_time = jiffies;
-
-	if (time_before(now_time, next_recal_time))
-		delay = next_recal_time - now_time;
-	else
-		delay = 0;
-
-	pr_debug("%s %s Recalibration work rescheduled to delay of %d msec",
-		 __func__, sr->name, jiffies_to_msecs(delay));
-
-	/* Reschedule recalibration work on each resume */
-	schedule_delayed_work(&recal_work, delay);
-	return;
-}
 #else
-static inline void sr_classp5_recal_cleanup(void)
-{
-}
-
 static inline void sr_classp5_recal_init(void)
-{
-}
-
-static inline void sr_classp5_recal_suspend(struct omap_sr *sr)
-{
-}
-
-static inline void sr_classp5_recal_resume(struct omap_sr *sr)
 {
 }
 #endif			/* CONFIG_OMAP_SR_CLASS1_P5_RECALIBRATION_DELAY */
@@ -900,7 +940,7 @@ static int sr_classp5_suspend(struct omap_sr *sr)
 	calib_data = (struct sr_classp5_calib_data *)*voltdm_cdata;
 
 	/*
-	 * If Calibration or Recalibration work acquires lock
+	 * If Calibration work acquires lock
 	 * OFF mode should be cancelled
 	 */
 	if (!mutex_trylock(&omap_dvfs_lock)) {
@@ -921,8 +961,7 @@ static int sr_classp5_suspend(struct omap_sr *sr)
 		return -EBUSY;
 	}
 
-	/* Ensure, that both works are cancelled */
-	sr_classp5_recal_suspend(sr);
+	/* Ensure, that works are cancelled */
 	cancel_delayed_work_sync(&calib_data->work);
 	calib_data->num_calib_triggers = 0;
 	calib_data->work_active = false;
@@ -937,14 +976,12 @@ static int sr_classp5_suspend(struct omap_sr *sr)
  * @sr:	SmartReflex module which is moving to resume
  *
  * The main purpose of resume handler is to
- * reschedule recalibration work, which was cancelled
- * in suspend handler
+ * reschedule calibration work if the resume has been started with uncalibrated
+ * voltage.
  */
 static int sr_classp5_resume(struct omap_sr *sr)
 {
 	struct omap_volt_data *volt_data;
-
-	sr_classp5_recal_resume(sr);
 
 	/*
 	 * If we resume from suspend and voltage is not calibrated, it means
