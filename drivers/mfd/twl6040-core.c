@@ -779,6 +779,15 @@ static int __devinit twl6040_probe(struct i2c_client *client,
 		children++;
 	}
 
+	if (pdata->platform_init) {
+		ret = pdata->platform_init(twl6040);
+		if (ret < 0) {
+			dev_err(&client->dev, "Failed to init platform dependent code: %d\n",
+				ret);
+			goto plat_init_err;
+		}
+	}
+
 	if (children) {
 		ret = mfd_add_devices(&client->dev, -1, twl6040->cells,
 				      children, NULL, 0);
@@ -793,6 +802,9 @@ static int __devinit twl6040_probe(struct i2c_client *client,
 	return 0;
 
 mfd_err:
+	if (pdata->platform_exit)
+		pdata->platform_exit(twl6040);
+plat_init_err:
 	free_irq(twl6040->irq_base + TWL6040_IRQ_READY, twl6040);
 irq_err:
 	twl6040_irq_exit(twl6040);
@@ -813,6 +825,10 @@ err:
 static int __devexit twl6040_remove(struct i2c_client *client)
 {
 	struct twl6040 *twl6040 = i2c_get_clientdata(client);
+	struct twl6040_platform_data *pdata = client->dev.platform_data;
+
+	if (pdata->platform_exit)
+		pdata->platform_exit(twl6040);
 
 	if (twl6040->power_count)
 		twl6040_power(twl6040, 0);

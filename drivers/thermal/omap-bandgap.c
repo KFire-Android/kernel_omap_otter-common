@@ -58,7 +58,12 @@ static int omap_bandgap_power(struct omap_bandgap *bg_ptr, bool on)
 		tsr = bg_ptr->conf->sensors[i].registers;
 		r |= omap_control_readl(cdev, tsr->temp_sensor_ctrl, &ctrl);
 		ctrl &= ~tsr->bgap_tempsoff_mask;
-		ctrl |= on << __ffs(tsr->bgap_tempsoff_mask);
+		/* For OMAP4460/70 the TEMPSOFF bit must be set
+		 * to '1' each time before Bandgap clocks are gated.
+		 * The power switching procedure is described in
+		 * OMAP4460 TRM section 18.4.10 (19.4.10 for OMAP4470).
+		 */
+		ctrl |= !on << __ffs(tsr->bgap_tempsoff_mask);
 
 		/* write BGAP_TEMPSOFF should be reset to 0 */
 		r |= omap_control_writel(cdev, ctrl, tsr->temp_sensor_ctrl);
@@ -1377,6 +1382,7 @@ void omap_bandgap_prepare_for_idle(void)
 	if (!g_bg_ptr)
 		return;
 
+	omap_bandgap_power(g_bg_ptr, false);
 	if (OMAP_BANDGAP_HAS(g_bg_ptr, CLK_CTRL))
 		clk_disable(g_bg_ptr->fclock);
 
@@ -1402,6 +1408,8 @@ void omap_bandgap_resume_after_idle(void)
 	if (g_bg_ptr->bg_clk_idle) {
 		if (OMAP_BANDGAP_HAS(g_bg_ptr, CLK_CTRL))
 			clk_enable(g_bg_ptr->fclock);
+
+		omap_bandgap_power(g_bg_ptr, true);
 		/*
 		 * Since the clocks are gated, the temperature reading
 		 * is not correct. Hence force the single read to get the

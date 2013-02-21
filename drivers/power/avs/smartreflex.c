@@ -886,37 +886,9 @@ void sr_disable(struct omap_sr *sr)
 	sr->ops->put(sr);
 }
 
-/**
- * sr_notifier_control() - control the notifier mechanism
- * @sr:                SR module to be configured.
- * @enable:	true to enable notifiers and false to disable the same
- *
- * SR modules allow an MCU interrupt mechanism that vary based on the IP
- * revision, we allow the system to generate interrupt if the class driver
- * has capability to handle the same. it is upto the class driver to ensure
- * the proper sequencing and handling for a clean implementation. returns
- * 0 if all goes fine, else returns failure results
- */
-int sr_notifier_control(struct omap_sr *sr, bool enable)
+static int sr_configure_interrupts(struct omap_sr *sr, bool enable)
 {
 	u32 value = 0;
-
-	if (!sr) {
-		pr_warning("%s: sr corresponding to domain not found\n",
-			   __func__);
-		return -EINVAL;
-	}
-	if (!sr->autocomp_active)
-		return -EINVAL;
-
-	/* If I could never register an ISR, why bother?? */
-	if (!(sr_class && sr_class->notify && sr_class->notify_flags &&
-	      sr->irq)) {
-		dev_warn(&sr->pdev->dev,
-			 "%s: unable to setup IRQ without handling mechanism\n",
-			 __func__);
-		return -EINVAL;
-	}
 
 	switch (sr->ip_type) {
 	case SR_TYPE_V1:
@@ -926,8 +898,8 @@ int sr_notifier_control(struct omap_sr *sr, bool enable)
 		value = notifier_to_irqen_v2(sr_class->notify_flags);
 		break;
 	default:
-		 dev_warn(&sr->pdev->dev, "%s: unknown type of sr??\n",
-			  __func__);
+		dev_warn(&sr->pdev->dev, "%s: unknown type of sr??\n",
+			 __func__);
 		return -EINVAL;
 	}
 
@@ -945,11 +917,47 @@ int sr_notifier_control(struct omap_sr *sr, bool enable)
 		break;
 	}
 
+	return 0;
+}
+
+/**
+ * sr_notifier_control() - control the notifier mechanism
+ * @sr:                SR module to be configured.
+ * @enable:	true to enable notifiers and false to disable the same
+ *
+ * SR modules allow an MCU interrupt mechanism that vary based on the IP
+ * revision, we allow the system to generate interrupt if the class driver
+ * has capability to handle the same. it is upto the class driver to ensure
+ * the proper sequencing and handling for a clean implementation. returns
+ * 0 if all goes fine, else returns failure results
+ */
+int sr_notifier_control(struct omap_sr *sr, bool enable)
+{
+	if (!sr) {
+		pr_warning("%s: sr corresponding to domain not found\n",
+			   __func__);
+		return -EINVAL;
+	}
+	if (!sr->autocomp_active)
+		return -EINVAL;
+
+	/* If I could never register an ISR, why bother?? */
+	if (!(sr_class && sr_class->notify && sr_class->notify_flags &&
+	      sr->irq)) {
+		dev_warn(&sr->pdev->dev,
+			 "%s: unable to setup IRQ without handling mechanism\n",
+			 __func__);
+		return -EINVAL;
+	}
+
 	if (enable != sr->irq_enabled) {
-		if (enable)
+		if (enable) {
+			sr_configure_interrupts(sr, true);
 			enable_irq(sr->irq);
-		else
+		} else {
 			disable_irq(sr->irq);
+			sr_configure_interrupts(sr, false);
+		}
 		sr->irq_enabled = enable;
 	}
 
