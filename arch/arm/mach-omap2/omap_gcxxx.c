@@ -67,8 +67,10 @@ int __init gcxxx_init(void)
 	const char *oh_name = "bb2d";
 	const char *dev_name = "gccore";
 
-	if (!cpu_is_omap447x())
+	if (!omap_has_gc320()) {
+		dev_err(&pdev->dev, "gcxxx_int failed. gcx hardware is not present\n");
 		return retval;
+	}
 
 	/*
 	 * Hwmod lookup will fail in case our platform doesn't support the
