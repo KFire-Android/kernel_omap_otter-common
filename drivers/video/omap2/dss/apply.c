@@ -841,7 +841,6 @@ static void dss_wb_write_regs(void)
 static void dss_wb_ovl_enable(void)
 {
 	struct writeback_cache_data *wbc;
-	struct ovl_priv_data *op = NULL;
 	struct omap_overlay *ovl;
 	const int num_ovls = dss_feat_get_num_ovls();
 	int i;
@@ -895,11 +894,10 @@ static void dss_wb_ovl_enable(void)
 				 * source pipe is switched off. */
 				for (i = 0; i < num_ovls; ++i) {
 					ovl = omap_dss_get_overlay(i);
-					if (ovl)
-						op = get_ovl_priv(ovl);
-					if (op && (int)op->channel ==
-						(int)wbc->source &&
-						!op->enabled) {
+
+					if ((int)ovl->manager->id ==
+						(int)wbc->source) {
+						dispc_ovl_enable(i, false);
 						dispc_setup_wb_source(
 							OMAP_DSS_GFX + i);
 						dispc_set_wb_channel_out(i);
