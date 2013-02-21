@@ -770,10 +770,10 @@ skip_ovl_set:
 	 * WB. In this case manager apply operation is skipped and we need to
 	 * update caches and to invoke callback functions to free the buffers.
 	 */
-	if (!m2m_mgr_mode && wb_info.mode == OMAP_WB_MEM2MEM_MODE &&
-			(int)wb_info.source == (int)mgr->id && mgr->device &&
-			mgr->device->state != OMAP_DSS_DISPLAY_ACTIVE &&
-							comp->must_apply) {
+	if (wb_info.mode == OMAP_WB_MEM2MEM_MODE &&
+		(int)wb_info.source == (int)mgr->id && mgr->device &&
+		mgr->device->state != OMAP_DSS_DISPLAY_ACTIVE &&
+		comp->must_apply && comp->blank) {
 		mgr->blank(mgr, true);
 		goto done;
 	}
