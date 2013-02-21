@@ -56,6 +56,16 @@ static inline int mbox_empty(struct mailbox *mbox)
 {
 	return mbox->ops->empty(mbox);
 }
+static inline int mbox_needs_flush(struct mailbox *mbox)
+{
+	return (mbox->ops->needs_flush ? mbox->ops->needs_flush(mbox) : 0);
+}
+static inline void mbox_fifo_readback(struct mailbox *mbox,
+					struct mailbox_msg *msg)
+{
+	if (mbox->ops->readback)
+		mbox->ops->readback(mbox, msg);
+}
 
 /* Mailbox IRQ handle functions */
 static inline void ack_mbox_irq(struct mailbox *mbox, mailbox_irq_t irq)
@@ -109,6 +119,32 @@ out:
 	return ret;
 }
 EXPORT_SYMBOL(mailbox_msg_send);
+
+/*
+ * Empty the Tx FIFO by reading back the messages. This function
+ * is mainly for usecases where the receiver is capable of
+ * receiving the interrupt, but does not have access to the
+ * mailbox registers.
+ *
+ * Returns the no. of messages read back
+ */
+int mailbox_empty_tx(struct mailbox *mbox)
+{
+	int ret = 0;
+	struct mailbox_msg msg;
+
+	while (mbox_needs_flush(mbox)) {
+		mbox_fifo_readback(mbox, &msg);
+		ret++;
+	}
+
+	/* no more messages in the fifo, clear IRQ source */
+	if (ret)
+		ack_mbox_irq(mbox, IRQ_RX);
+
+	return ret;
+}
+EXPORT_SYMBOL(mailbox_empty_tx);
 
 #define TRANSFER_TIMEOUT 30000 /* Becomes ~3s timeout */
 

@@ -129,6 +129,22 @@ static int omap2_mbox_fifo_full(struct mailbox *mbox)
 	return mbox_read_reg(fifo->fifo_stat);
 }
 
+static int omap2_mbox_needs_flush(struct mailbox *mbox)
+{
+	struct omap_mbox2_priv *priv = mbox->priv;
+	struct omap_mbox2_fifo *fifo = &priv->tx_fifo;
+	return mbox_read_reg(fifo->msg_stat);
+}
+
+static void omap2_mbox_fifo_readback(struct mailbox *mbox,
+					struct mailbox_msg *msg)
+{
+	struct omap_mbox2_priv *priv = mbox->priv;
+	struct omap_mbox2_fifo *fifo = &priv->tx_fifo;
+	priv->data = mbox_read_reg(fifo->msg);
+	MAILBOX_FILL_MSG((*msg), 0, priv->data, 0);
+}
+
 static int ompa2_mbox_poll_for_space(struct mailbox *mbox)
 {
 	if (omap2_mbox_fifo_full(mbox))
@@ -227,6 +243,8 @@ static struct mailbox_ops omap2_mbox_ops = {
 	.read           = omap2_mbox_fifo_read,
 	.write          = omap2_mbox_fifo_write,
 	.empty          = omap2_mbox_fifo_empty,
+	.needs_flush	= omap2_mbox_needs_flush,
+	.readback	= omap2_mbox_fifo_readback,
 	.poll_for_space = ompa2_mbox_poll_for_space,
 	.enable_irq     = omap2_mbox_enable_irq,
 	.disable_irq    = omap2_mbox_disable_irq,
@@ -270,6 +288,7 @@ static int omap2_mbox_probe(struct platform_device *pdev)
 		}
 		priv->tx_fifo.msg = MAILBOX_MESSAGE(info->tx_id);
 		priv->tx_fifo.fifo_stat = MAILBOX_FIFOSTATUS(info->tx_id);
+		priv->tx_fifo.msg_stat = MAILBOX_MSGSTATUS(info->tx_id);
 		priv->rx_fifo.msg =  MAILBOX_MESSAGE(info->rx_id);
 		priv->rx_fifo.msg_stat =  MAILBOX_MSGSTATUS(info->rx_id);
 		priv->notfull_bit = MAILBOX_IRQ_NOTFULL(info->tx_id);

@@ -31,6 +31,7 @@ int mailbox_msg_send(struct mailbox *, struct mailbox_msg *msg);
 struct mailbox_msg *mailbox_msg_send_receive_no_irq(struct mailbox *,
 		struct mailbox_msg *msg);
 int mailbox_msg_send_no_irq(struct mailbox *, struct mailbox_msg *msg);
+int mailbox_empty_tx(struct mailbox *mbox);
 
 struct mailbox *mailbox_get(const char *, struct notifier_block *nb);
 void mailbox_put(struct mailbox *mbox, struct notifier_block *nb);
