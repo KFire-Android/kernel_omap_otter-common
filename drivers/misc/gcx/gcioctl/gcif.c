@@ -945,10 +945,12 @@ static struct device *dev_object;
 
 static int dev_open(struct inode *inode, struct file *file)
 {
-	if (cpu_is_omap447x())
+	if (omap_has_gc320()) {
 		return 0;
-	else
+	} else {
+		GCERR("dev_open failed. gcx hardware is not present\n");
 		return -1;
+	}
 }
 
 static int dev_release(struct inode *inode, struct file *file)

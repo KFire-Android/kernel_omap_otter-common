@@ -245,8 +245,10 @@ static int __init mod_init(void)
 	bv_init();
 
 	/* Assign BV function parameters only if SoC contains a GC core */
-	if (cpu_is_omap447x())
+	if (omap_has_gc320())
 		gcbv_assign();
+	else
+		GCERR("gcx hardware is not present\n");
 
 	return 0;
 }

@@ -988,8 +988,8 @@ static int gc_init(struct gccorecontext *gccorecontext)
 	GCENTER(GCZONE_INIT);
 
 	/* check if hardware is available */
-	if (!cpu_is_omap447x()) {
-		GCDBG(GCZONE_INIT, "gcx hardware is not present\n");
+	if (!omap_has_gc320()) {
+		GCERR("gc_init failed. gcx hardware is not present\n");
 		goto exit;
 	}
 
@@ -1046,7 +1046,7 @@ static void gc_exit(struct gccorecontext *gccorecontext)
 {
 	GCENTER(GCZONE_INIT);
 
-	if (cpu_is_omap447x()) {
+	if (omap_has_gc320()) {
 		/* Stop command queue thread. */
 		gcqueue_stop(gccorecontext);
 
