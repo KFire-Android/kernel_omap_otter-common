@@ -712,6 +712,7 @@ static struct omap_hwmod_addr_space omap54xx_bb2d_addrs[] = {
 	{
 		.pa_start	= 0x59000000,
 		.pa_end		= 0x590007ff,
+		.flags      = ADDR_TYPE_RT
 	},
 	{ }
 };
