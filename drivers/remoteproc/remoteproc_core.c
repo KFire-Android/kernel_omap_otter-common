@@ -194,6 +194,7 @@ int rproc_alloc_vring(struct rproc_vdev *rvdev, int i)
 	struct rproc *rproc = rvdev->rproc;
 	struct device *dev = &rproc->dev;
 	struct rproc_vring *rvring = &rvdev->vring[i];
+	struct fw_rsc_vdev *rsc;
 	dma_addr_t dma;
 	void *va;
 	int ret, size, notifyid;
@@ -209,7 +210,6 @@ int rproc_alloc_vring(struct rproc_vdev *rvdev, int i)
 	/*
 	 * Allocate non-cacheable memory for the vring. In the future
 	 * this call will also configure the IOMMU for us
-	 * TODO: let the rproc know the da of this vring
 	 */
 	va = dma_alloc_coherent(dev->parent, size, &dma, GFP_KERNEL);
 	if (!va) {
@@ -220,7 +220,6 @@ int rproc_alloc_vring(struct rproc_vdev *rvdev, int i)
 	/*
 	 * Assign an rproc-wide unique index for this vring
 	 * TODO: assign a notifyid for rvdev updates as well
-	 * TODO: let the rproc know the notifyid of this vring
 	 * TODO: support predefined notifyids (via resource table)
 	 */
 	ret = idr_get_new(&rproc->notifyids, rvring, &notifyid);
@@ -237,6 +236,15 @@ int rproc_alloc_vring(struct rproc_vdev *rvdev, int i)
 	rvring->dma = dma;
 	rvring->notifyid = notifyid;
 
+	/*
+	 * Let the rproc know the notifyid and da of this vring.
+	 * Not all platforms use dma_alloc_coherent to automatically
+	 * set up the iommu. In this case the device address (da) will
+	 * hold the physical address and not the device address.
+	 */
+	rsc = (void *)rproc->table_ptr + rvdev->rsc_offset;
+	rsc->vring[i].da = dma;
+	rsc->vring[i].notifyid = notifyid;
 	return 0;
 }
 
@@ -275,9 +283,16 @@ void rproc_free_vring(struct rproc_vring *rvring)
 {
 	int size = PAGE_ALIGN(vring_size(rvring->len, rvring->align));
 	struct rproc *rproc = rvring->rvdev->rproc;
+	int idx = rvring->rvdev->vring - rvring;
+	struct fw_rsc_vdev *rsc;
 
 	dma_free_coherent(rproc->dev.parent, size, rvring->va, rvring->dma);
 	idr_remove(&rproc->notifyids, rvring->notifyid);
+
+	/* reset resource entry info */
+	rsc = (void *)rproc->table_ptr + rvring->rvdev->rsc_offset;
+	rsc->vring[idx].da = 0;
+	rsc->vring[idx].notifyid = -1;
 }
 
 /**
