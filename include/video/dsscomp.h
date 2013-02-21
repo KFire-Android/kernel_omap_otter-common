@@ -733,5 +733,5 @@ struct dsscomp_platform_info {
 #define DSSCIOC_QUERY_PLATFORM	_IOR('O', 135, struct dsscomp_platform_info)
 
 /*HACK: used as temporary solution to wait for writeback frame to complete */
-#define DSSCIOC_WB_DONE		_IOW('O', 136, u32)
+#define DSSCIOC_WB_DONE		_IOW('O', 136, __u32)
 #endif
