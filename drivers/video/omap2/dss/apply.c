@@ -617,8 +617,15 @@ static void dss_ovl_write_regs(struct omap_overlay *ovl)
 
 	ilace = ovl->manager->device->type == OMAP_DISPLAY_TYPE_VENC;
 
-	r = dispc_scaling_decision(ovl->id, oi, op->channel,
-						&x_decim, &y_decim, &five_taps);
+	if (m2m_with_mgr || m2m_with_ovl) {
+		/* do not calculate a pixel clock and decimation for WB */
+		x_decim = 1;
+		y_decim = 1;
+		five_taps = true;
+		r = 0;
+	} else
+		r = dispc_scaling_decision(ovl->id, oi, op->channel,
+					&x_decim, &y_decim, &five_taps);
 
 	r = r ? : dispc_ovl_setup(ovl->id, oi, ilace,
 			replication, x_decim, y_decim, five_taps,
