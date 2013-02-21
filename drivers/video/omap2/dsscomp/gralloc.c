@@ -350,7 +350,7 @@ int dsscomp_gralloc_queue(struct dsscomp_setup_dispc_data *d,
 		/* copy prior overlay to avoid mapping layers twice to 1D */
 		if (oi->addressing == OMAP_DSS_BUFADDR_OVL_IX) {
 			unsigned int j = oi->ba;
-			if (j >= i) {
+			if (j >= i || !d->ovls[j].cfg.enabled) {
 				WARN(1, "Invalid clone layer (%u)", j);
 				goto skip_buffer;
 			}
