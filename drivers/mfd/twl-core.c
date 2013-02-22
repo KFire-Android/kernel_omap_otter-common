@@ -1523,7 +1523,8 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	inuse = true;
 
 	/* setup clock framework */
-	clocks_init(&client->dev, pdata->clock);
+	if (twl_class_is_4030())
+		clocks_init(&client->dev, pdata->clock);
 
 	/* read TWL IDCODE Register */
 	if (twl_id == TWL4030_CLASS_ID) {
