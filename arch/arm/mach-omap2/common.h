@@ -281,5 +281,10 @@ extern void omap_reserve(void);
 struct omap_hwmod;
 extern int omap_dss_reset(struct omap_hwmod *);
 
+/* AXI ERROR DEFINES */
+#define AXI_L2_ERROR (1 << 30)
+#define AXI_ASYNC_ERROR (1 << 29)
+#define AXI_ERROR (AXI_L2_ERROR | AXI_ASYNC_ERROR)
+
 #endif /* __ASSEMBLER__ */
 #endif /* __ARCH_ARM_MACH_OMAP2PLUS_COMMON_H */
