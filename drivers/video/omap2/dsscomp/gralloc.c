@@ -525,7 +525,10 @@ static void dsscomp_early_suspend(struct early_suspend *h)
 	/*dsscomp_gralloc_queue() expects all blanking mgrs set up in comp */
 	for (mgr_ix = 0 ; mgr_ix < cdev->num_mgrs ; mgr_ix++) {
 		struct omap_dss_device *dssdev = cdev->mgrs[mgr_ix]->device;
-		if (dssdev && dssdev->state == OMAP_DSS_DISPLAY_ACTIVE) {
+		/* need to push the composition with all managers
+		   including disabled ones. WB works with an inactive manager
+		   and requires freeing of the prev composition too */
+		if (dssdev) {
 			d.num_mgrs++;
 			d.mgrs[mgr_ix].ix = mgr_ix;
 		}
