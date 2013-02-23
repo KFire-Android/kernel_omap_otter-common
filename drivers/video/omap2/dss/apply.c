@@ -1370,10 +1370,12 @@ int omap_dss_mgr_apply(struct omap_overlay_manager *mgr)
 		goto done;
 	}
 
-	r = dss_check_settings_apply(mgr, mgr->device);
-	if (r) {
-		DSSERR("failed to apply settings: illegal configuration.\n");
-		goto done;
+	if (!info.wb_only) {
+		r = dss_check_settings_apply(mgr, mgr->device);
+		if (r) {
+			DSSERR("failed to apply: illegal configuration.\n");
+			goto done;
+		}
 	}
 
 	/* Configure overlays */
