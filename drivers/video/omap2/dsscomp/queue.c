@@ -742,7 +742,7 @@ skip_ovl_set:
 			}
 		}
 
-		if (wb_apply && wb_info.mode == OMAP_WB_MEM2MEM_MODE) {
+		if (!r && wb_apply && wb_info.mode == OMAP_WB_MEM2MEM_MODE) {
 			r = mgr->wb_apply(mgr, cdev->wb_ovl);
 			if (r)
 				dev_err(DEV(cdev),
