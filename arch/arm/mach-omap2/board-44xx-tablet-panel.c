@@ -272,11 +272,26 @@ static struct omap_dss_device *dss_devices_hdmi_default_display[] = {
 /* Allocate ( 18 + 9 ) MB for TILER1D slot size for WUXGA panel, total of
  * 54 MB of TILER1D
  */
+static struct dsscomp_platform_data dsscomp_config_tablet = {
+	.tiler1d_slotsz = SZ_16M,
+};
+
 static struct dsscomp_platform_data dsscomp_config_hdmi_display = {
 	.tiler1d_slotsz = (SZ_16M + SZ_2M + SZ_8M + SZ_1M),
 };
 
 /* HACK: use 2 devices, as expected by DDK */
+static struct sgx_omaplfb_config omaplfb_config_tablet[] = {
+	{
+		.tiler2d_buffers = 2,
+		.swap_chain_length = 2,
+	},
+	{
+		.vram_buffers = 2,
+		.swap_chain_length = 2,
+	},
+};
+
 static struct sgx_omaplfb_config omaplfb_config_hdmi_default_display[] = {
 	{
 		.vram_buffers = 2,
@@ -286,6 +301,11 @@ static struct sgx_omaplfb_config omaplfb_config_hdmi_default_display[] = {
 		.vram_buffers = 2,
 		.swap_chain_length = 2,
 	}
+};
+
+static struct sgx_omaplfb_platform_data omaplfb_plat_data_tablet = {
+	.num_configs = ARRAY_SIZE(omaplfb_config_tablet),
+	.configs = omaplfb_config_tablet,
 };
 
 static struct sgx_omaplfb_platform_data omaplfb_plat_data_hdmi_default_display = {
@@ -307,7 +327,7 @@ static struct omap_dss_board_info tablet_dss_data_hdmi_default_display = {
 
 static struct omapfb_platform_data tablet_fb_pdata = {
 	.mem_desc = {
-		.region_cnt = 1,
+		.region_cnt = ARRAY_SIZE(omaplfb_config_tablet),
 	},
 };
 
@@ -363,8 +383,8 @@ void __init tablet_android_display_setup(void)
 			&tablet_fb_pdata);
 	else
 		omap_android_display_setup(&tablet_dss_data,
-			NULL,
-			NULL,
+			&dsscomp_config_tablet,
+			&omaplfb_plat_data_tablet,
 			&tablet_fb_pdata);
 }
 
