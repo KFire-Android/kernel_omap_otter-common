@@ -486,9 +486,28 @@ static int ilitek_i2c_process_and_report(void) {
 				org_x = (int)buf[1 + (i * 4)] + ((int)buf[2 + (i * 4)] * 256);
 				org_y = (int)buf[3 + (i * 4)] + ((int)buf[4 + (i * 4)] * 256);
 
-				x1 = (i2c.max_y - org_y);
+#ifdef CONFIG_TOUCHSCREEN_ILITEK_SWAP_XY
+				x1 = org_y;
 				y1 = org_x;
-
+#else
+				x1 = org_x;
+				y1 = org_y;
+#endif
+#ifdef CONFIG_TOUCHSCREEN_ILITEK_SWAP_XY
+#ifdef CONFIG_TOUCHSCREEN_ILITEK_FLIP_X
+				y1 = (i2c.max_y - y1);
+#endif
+#ifdef CONFIG_TOUCHSCREEN_ILITEK_FLIP_Y
+				x1 = (i2c.max_x - x1);
+#endif
+#else
+#ifdef CONFIG_TOUCHSCREEN_ILITEK_FLIP_X
+				x1 = (i2c.max_x - x1);
+#endif
+#ifdef CONFIG_TOUCHSCREEN_ILITEK_FLIP_Y
+				y1 = (i2c.max_y - y1);
+#endif
+#endif
 				// Workaround for wiping from right to left when device is rotated
 				if (x1 == 0) x1++;
 				if (y1 == 0) y1++;
@@ -513,8 +532,28 @@ static int ilitek_i2c_process_and_report(void) {
 				org_x = (int)buf[1 + (i * 4)] + ((int)buf[2 + (i * 4)] * 256);
 				org_y = (int)buf[3 + (i * 4)] + ((int)buf[4 + (i * 4)] * 256);
 
-				x2 = (i2c.max_y - org_y);
+#ifdef CONFIG_TOUCHSCREEN_ILITEK_SWAP_XY
+				x2 = org_y;
 				y2 = org_x;
+#else
+				x2 = org_x;
+				y2 = org_y;
+#endif
+#ifdef CONFIG_TOUCHSCREEN_ILITEK_SWAP_XY
+#ifdef CONFIG_TOUCHSCREEN_ILITEK_FLIP_X
+				y2 = (i2c.max_y - y2);
+#endif
+#ifdef CONFIG_TOUCHSCREEN_ILITEK_FLIP_Y
+				x2 = (i2c.max_x - x2);
+#endif
+#else
+#ifdef CONFIG_TOUCHSCREEN_ILITEK_FLIP_X
+				x2 = (i2c.max_x - x2);
+#endif
+#ifdef CONFIG_TOUCHSCREEN_ILITEK_FLIP_Y
+				y2 = (i2c.max_y - y2);
+#endif
+#endif
 
 				if ((i2c.last_touch2_x != x2) || (i2c.last_touch2_y != y2))
 					changed = true;
@@ -808,12 +847,21 @@ ilitek_i2c_read_tp_info(
                 i2c.max_btn = buf[7];
         }
 	// calculate the resolution for x and y direction
+#ifdef CONFIG_TOUCHSCREEN_ILITEK_SWAP_XY
+        i2c.max_y = buf[0];
+        i2c.max_y+= ((int)buf[1]) * 256;
+        i2c.max_x = buf[2];
+        i2c.max_x+= ((int)buf[3]) * 256;
+        i2c.y_ch = buf[4];
+        i2c.x_ch = buf[5];
+#else
         i2c.max_x = buf[0];
         i2c.max_x+= ((int)buf[1]) * 256;
         i2c.max_y = buf[2];
         i2c.max_y+= ((int)buf[3]) * 256;
         i2c.x_ch = buf[4];
         i2c.y_ch = buf[5];
+#endif
         printk(ILITEK_DEBUG_LEVEL "%s, max_x: %d, max_y: %d, ch_x: %d, ch_y: %d\n", 
 		__func__, i2c.max_x, i2c.max_y, i2c.x_ch, i2c.y_ch);
         printk(ILITEK_DEBUG_LEVEL "%s, max_tp: %d, max_btn: %d\n", __func__, i2c.max_tp, i2c.max_btn);
@@ -857,7 +905,7 @@ ilitek_i2c_register_device(
 			printk(ILITEK_ERROR_LEVEL "%s, allocate input device, error\n", __func__);
 			return -1;
 		}
-		ilitek_set_input_param(i2c.input_dev, i2c.max_tp, i2c.max_y, i2c.max_x);
+		ilitek_set_input_param(i2c.input_dev, i2c.max_tp, i2c.max_x, i2c.max_y);
         	ret = input_register_device(i2c.input_dev);
         	if(ret){
                		printk(ILITEK_ERROR_LEVEL "%s, register input device, error\n", __func__);
