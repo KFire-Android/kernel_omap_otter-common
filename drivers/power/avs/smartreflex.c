@@ -1450,6 +1450,8 @@ static int sr_suspend_noirq(struct device *dev)
 	if (sr_info->suspended)
 		return 0;
 
+	omap_dvfs_suspend(true);
+
 	if (sr_class->suspend_noirq)
 		ret = sr_class->suspend_noirq(sr_info);
 
@@ -1457,6 +1459,8 @@ static int sr_suspend_noirq(struct device *dev)
 		sr_info->suspended =  true;
 		/* Flag the same info to the other CPUs */
 		smp_wmb();
+	} else {
+		omap_dvfs_suspend(false);
 	}
 
 	return ret;
@@ -1494,6 +1498,8 @@ static int sr_resume_noirq(struct device *dev)
 		/* Flag the same info to the other CPUs */
 		smp_wmb();
 	}
+
+	omap_dvfs_suspend(false);
 
 	return ret;
 }

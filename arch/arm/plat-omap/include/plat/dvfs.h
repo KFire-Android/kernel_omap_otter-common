@@ -26,6 +26,7 @@ static inline bool omap_dvfs_is_any_dev_scaling(void)
 	return mutex_is_locked(&omap_dvfs_lock);
 }
 int omap_opp_register(struct device *dev, const char *hwmod_name);
+void omap_dvfs_suspend(bool suspend);
 
 #else
 static inline int omap_dvfs_register_device(struct device *dev,
@@ -42,5 +43,6 @@ static inline bool omap_dvfs_is_any_dev_scaling(void)
 {
 	return false;
 }
+void omap_dvfs_suspend(bool suspend) {}
 #endif
 #endif
