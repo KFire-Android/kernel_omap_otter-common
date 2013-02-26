@@ -82,6 +82,7 @@ config SOC_OMAP5
 	select CPU_V7
 	select HAVE_SMP
 	select COMMON_CLK
+	select ARCH_NEEDS_CPU_IDLE_COUPLED
 
 comment "OMAP Core Type"
 	depends on ARCH_OMAP2

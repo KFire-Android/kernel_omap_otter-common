@@ -50,7 +50,7 @@ static DEFINE_SPINLOCK(wakeupgen_lock);
 static unsigned int irq_target_cpu[MAX_IRQS];
 static unsigned int irq_banks = MAX_NR_REG_BANKS;
 static unsigned int max_irqs = MAX_IRQS;
-static unsigned int omap_secure_apis;
+static unsigned int omap_secure_apis, secure_api_index;
 
 /*
  * Static helper functions.
@@ -315,7 +315,7 @@ static void irq_sar_clear(void)
 static void irq_save_secure_context(void)
 {
 	u32 ret;
-	ret = omap_secure_dispatcher(OMAP4_HAL_SAVEGIC_INDEX,
+	ret = omap_secure_dispatcher(secure_api_index,
 				FLAG_START_CRITICAL,
 				0, 0, 0, 0, 0);
 	if (ret != API_HAL_RET_VALUE_OK)
@@ -377,9 +377,7 @@ static struct notifier_block irq_notifier_block = {
 
 static void __init irq_pm_init(void)
 {
-	/* FIXME: Remove this when MPU OSWR support is added */
-	if (!soc_is_omap54xx())
-		cpu_pm_register_notifier(&irq_notifier_block);
+	cpu_pm_register_notifier(&irq_notifier_block);
 }
 #else
 static void __init irq_pm_init(void)
@@ -403,6 +401,7 @@ int __init omap_wakeupgen_init(void)
 {
 	int i;
 	unsigned int boot_cpu = smp_processor_id();
+	u32 val;
 
 	/* Not supported on OMAP4 ES1.0 silicon */
 	if (omap_rev() == OMAP4430_REV_ES1_0) {
@@ -419,6 +418,9 @@ int __init omap_wakeupgen_init(void)
 		irq_banks = OMAP4_NR_BANKS;
 		max_irqs = OMAP4_NR_IRQS;
 		omap_secure_apis = 1;
+		secure_api_index = OMAP4_HAL_SAVEGIC_INDEX;
+	} else if (soc_is_omap54xx()) {
+		secure_api_index = OMAP5_HAL_SAVEGIC_INDEX;
 	}
 
 	/* Clear all IRQ bitmasks at wakeupGen level */
@@ -443,6 +445,19 @@ int __init omap_wakeupgen_init(void)
 	/* Associate all the IRQs to boot CPU like GIC init does. */
 	for (i = 0; i < max_irqs; i++)
 		irq_target_cpu[i] = boot_cpu;
+
+	/*
+	 * Enables OMAP5 ES2 PM Mode using ES2_PM_MODE in AMBA_IF_MODE
+	 * 0x0:	ES1 behavior, CPU cores would enter and exit OFF mode together.
+	 * 0x1:	ES2 behavior, CPU cores are allowed to enter/exit OFF mode
+	 * independently.
+	 * This needs to be set one time thanks to always ON domain.
+	 */
+	if (soc_is_omap54xx()) {
+		val = __raw_readl(wakeupgen_base + OMAP_AMBA_IF_MODE);
+		val |= BIT(5);
+		omap_smc1(OMAP5_MON_AMBA_IF_INDEX, val);
+	}
 
 	irq_hotplug_init();
 	irq_pm_init();

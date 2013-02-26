@@ -32,14 +32,14 @@ obj-$(CONFIG_SOC_HAS_OMAP2_SDRC)	+= sdrc.o
 obj-$(CONFIG_SMP)			+= omap-smp.o omap-headsmp.o
 obj-$(CONFIG_HOTPLUG_CPU)		+= omap-hotplug.o
 omap-4-5-common				=  omap4-common.o omap-wakeupgen.o \
-					   sleep44xx.o
+					   sleep_omap4plus.o
 obj-$(CONFIG_ARCH_OMAP4)		+= $(omap-4-5-common)
 obj-$(CONFIG_SOC_OMAP5)			+= $(omap-4-5-common)
 
 plus_sec := $(call as-instr,.arch_extension sec,+sec)
 AFLAGS_omap-headsmp.o			:=-Wa,-march=armv7-a$(plus_sec)
 AFLAGS_omap-smc.o			:=-Wa,-march=armv7-a$(plus_sec)
-AFLAGS_sleep44xx.o			:=-Wa,-march=armv7-a$(plus_sec)
+AFLAGS_sleep_omap4plus.o		:=-Wa,-march=armv7-a$(plus_sec)
 
 # Functions loaded to SRAM
 obj-$(CONFIG_SOC_OMAP2420)		+= sram242x.o
@@ -76,11 +76,12 @@ endif
 obj-$(CONFIG_OMAP_PM_NOOP)		+= omap-pm-noop.o
 
 ifeq ($(CONFIG_PM),y)
+omap4plus-common-pm			=  omap-mpuss-lowpower.o pm_omap4plus.o
 obj-$(CONFIG_ARCH_OMAP2)		+= pm24xx.o
 obj-$(CONFIG_ARCH_OMAP2)		+= sleep24xx.o
 obj-$(CONFIG_ARCH_OMAP3)		+= pm34xx.o sleep34xx.o
-obj-$(CONFIG_ARCH_OMAP4)		+= pm44xx.o omap-mpuss-lowpower.o
-obj-$(CONFIG_SOC_OMAP5)			+= omap-mpuss-lowpower.o
+obj-$(CONFIG_ARCH_OMAP4)		+= $(omap4plus-common-pm)
+obj-$(CONFIG_SOC_OMAP5)			+= $(omap4plus-common-pm)
 obj-$(CONFIG_PM_DEBUG)			+= pm-debug.o
 
 obj-$(CONFIG_POWER_AVS_OMAP)		+= sr_device.o
@@ -96,8 +97,10 @@ endif
 endif
 
 ifeq ($(CONFIG_CPU_IDLE),y)
+omap4plus-common-idle			= cpuidle_omap4plus.o
 obj-$(CONFIG_ARCH_OMAP3)                += cpuidle34xx.o
-obj-$(CONFIG_ARCH_OMAP4)                += cpuidle44xx.o
+obj-$(CONFIG_ARCH_OMAP4)		+= $(omap4plus-common-idle)
+obj-$(CONFIG_SOC_OMAP5)			+= $(omap4plus-common-idle)
 endif
 
 # PRCM
