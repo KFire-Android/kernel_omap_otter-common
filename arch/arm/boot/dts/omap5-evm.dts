@@ -38,6 +38,32 @@
 			&mcbsp2_pins
 	>;
 
+	mmc1_pins: pinmux_mmc1_pins {
+		pinctrl-single,pins = <
+			0x1a2 0x118	/* sdcard_clk.sdcard_clk INPUT PULLUP | MODE0 */
+			0x1a4 0x118	/* sdcard_cmd.sdcard_cmd INPUT PULLUP | MODE0 */
+			0x1a6 0x118	/* sdcard_data2.sdcard_data2 INPUT PULLUP | MODE0 */
+			0x1a8 0x118	/* sdcard_data3.sdcard_data3 INPUT PULLUP | MODE0 */
+			0x1aa 0x118	/* sdcard_data0.sdcard_data0 INPUT PULLUP | MODE0 */
+			0x1ac 0x118	/* sdcard_data1.sdcard_data1 INPUT PULLUP | MODE0 */
+		>;
+	};
+
+	mmc2_pins: pinmux_mmc2_pins {
+		pinctrl-single,pins = <
+			0x0 0x118	/* emmc_clk.emmc_clk INPUT PULLUP | MODE0 */
+			0x2 0x118	/* emmc_cmd.emmc_cmd INPUT PULLUP | MODE0 */
+			0x4 0x118	/* emmc_data0.emmc_data0 INPUT PULLUP | MODE0 */
+			0x6 0x118	/* emmc_data1.emmc_data1 INPUT PULLUP | MODE0 */
+			0x8 0x118	/* emmc_data2.emmc_data2 INPUT PULLUP | MODE0 */
+			0xa 0x118	/* emmc_data3.emmc_data3 INPUT PULLUP | MODE0 */
+			0xc 0x118	/* emmc_data4.emmc_data4 INPUT PULLUP | MODE0 */
+			0xe 0x118	/* emmc_data5.emmc_data5 INPUT PULLUP | MODE0 */
+			0x10 0x118	/* emmc_data6.emmc_data6 INPUT PULLUP | MODE0 */
+			0x12 0x118	/* emmc_data7.emmc_data7 INPUT PULLUP | MODE0 */
+		>;
+	};
+
 	twl6040_pins: pinmux_twl6040_pins {
 		pinctrl-single,pins = <
 			0x18a 0x6	/* perslimbus2_clock.gpio5_145 OUTPUT | MODE6 */
@@ -83,11 +109,15 @@
 };
 
 &mmc1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&mmc1_pins>;
 	vmmc-supply = <&vmmcsd_fixed>;
 	bus-width = <4>;
 };
 
 &mmc2 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&mmc2_pins>;
 	vmmc-supply = <&vmmcsd_fixed>;
 	bus-width = <8>;
 	ti,non-removable;
