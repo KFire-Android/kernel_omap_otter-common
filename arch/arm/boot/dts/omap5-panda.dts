@@ -8,7 +8,21 @@
 /include/ "omap5-evm.dts"
 
 /* card detect gpio is different for mmc1 / micro sd card slot */
+&mmc1_pins {
+		pinctrl-single,pins = <
+			0x1a2 0x118	/* sdcard_clk.sdcard_clk INPUT PULLUP | MODE0 */
+			0x1a4 0x118	/* sdcard_cmd.sdcard_cmd INPUT PULLUP | MODE0 */
+			0x1a6 0x118	/* sdcard_data2.sdcard_data2 INPUT PULLUP | MODE0 */
+			0x1a8 0x118	/* sdcard_data3.sdcard_data3 INPUT PULLUP | MODE0 */
+			0x1aa 0x118	/* sdcard_data0.sdcard_data0 INPUT PULLUP | MODE0 */
+			0x1ac 0x118	/* sdcard_data1.sdcard_data1 INPUT PULLUP | MODE0 */
+			0x194 0x106	/* uart6_rts.gpio5_152 INPUT | MODE6 */
+		>;
+	};
+
 &mmc1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&mmc1_pins>;
 	vmmc-supply = <&vmmcsd_fixed>;
 	bus-width = <4>;
 	cd-gpios = <&gpio5 24 0>; /* gpio 152 */
