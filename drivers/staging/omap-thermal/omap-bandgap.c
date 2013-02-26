@@ -946,7 +946,7 @@ int omap_bandgap_probe(struct platform_device *pdev)
 
 	bg_ptr->clk_rate = clk_rate;
 	if (OMAP_BANDGAP_HAS(bg_ptr, CLK_CTRL))
-		clk_enable(bg_ptr->fclock);
+		clk_prepare_enable(bg_ptr->fclock);
 
 
 	mutex_init(&bg_ptr->bg_mutex);
@@ -1016,7 +1016,7 @@ int omap_bandgap_probe(struct platform_device *pdev)
 
 disable_clk:
 	if (OMAP_BANDGAP_HAS(bg_ptr, CLK_CTRL))
-		clk_disable(bg_ptr->fclock);
+		clk_disable_unprepare(bg_ptr->fclock);
 put_clks:
 	clk_put(bg_ptr->fclock);
 	clk_put(bg_ptr->div_clk);
@@ -1047,7 +1047,7 @@ int omap_bandgap_remove(struct platform_device *pdev)
 	omap_bandgap_power(bg_ptr, false);
 
 	if (OMAP_BANDGAP_HAS(bg_ptr, CLK_CTRL))
-		clk_disable(bg_ptr->fclock);
+		clk_disable_unprepare(bg_ptr->fclock);
 	clk_put(bg_ptr->fclock);
 	clk_put(bg_ptr->div_clk);
 
@@ -1146,7 +1146,7 @@ static int omap_bandgap_suspend(struct device *dev)
 	omap_bandgap_power(bg_ptr, false);
 
 	if (OMAP_BANDGAP_HAS(bg_ptr, CLK_CTRL))
-		clk_disable(bg_ptr->fclock);
+		clk_disable_unprepare(bg_ptr->fclock);
 
 	return err;
 }
@@ -1156,7 +1156,7 @@ static int omap_bandgap_resume(struct device *dev)
 	struct omap_bandgap *bg_ptr = dev_get_drvdata(dev);
 
 	if (OMAP_BANDGAP_HAS(bg_ptr, CLK_CTRL))
-		clk_enable(bg_ptr->fclock);
+		clk_prepare_enable(bg_ptr->fclock);
 
 	omap_bandgap_power(bg_ptr, true);
 
