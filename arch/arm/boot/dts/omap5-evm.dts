@@ -113,6 +113,7 @@
 	pinctrl-0 = <&mmc1_pins>;
 	vmmc-supply = <&vmmcsd_fixed>;
 	bus-width = <4>;
+	cd-gpios = <&gpio3 3 0>; /* gpio 67 */
 };
 
 &mmc2 {
