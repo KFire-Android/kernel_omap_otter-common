@@ -327,14 +327,8 @@ int dsscomp_gralloc_queue(struct dsscomp_setup_dispc_data *d,
 		struct dss2_ovl_info *oi = d->ovls + i;
 		u32 size;
 		int j;
-		ch = oi->cfg.mgr_ix;
-
-		/* skip overlays on compositions we could not create */
-		if (!comp[ch])
-			continue;
-
 		for (j = 0; j < d->num_mgrs; j++)
-			if (d->mgrs[j].ix == ch) {
+			if (d->mgrs[j].ix == oi->cfg.mgr_ix) {
 				/* swap red & blue if requested */
 				if (d->mgrs[j].swap_rb)
 					swap_rb_in_ovl_info(d->ovls + i);
@@ -347,6 +341,10 @@ int dsscomp_gralloc_queue(struct dsscomp_setup_dispc_data *d,
 			continue;
 		}
 
+		/* skip overlays on compositions we could not create */
+		ch = channels[j];
+		if (!comp[ch])
+			continue;
 		/* copy prior overlay to avoid mapping layers twice to 1D */
 		if (oi->addressing == OMAP_DSS_BUFADDR_OVL_IX) {
 			unsigned int j = oi->ba;
