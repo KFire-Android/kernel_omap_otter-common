@@ -20,6 +20,7 @@
 #include <linux/of_irq.h>
 #include <linux/of_platform.h>
 #include <linux/export.h>
+#include <linux/of_address.h>
 
 #include <asm/hardware/gic.h>
 #include <asm/hardware/cache-l2x0.h>
@@ -261,8 +262,28 @@ static struct of_device_id irq_match[] __initdata = {
 	{ }
 };
 
+static struct of_device_id twd_match[] __initdata = {
+	{ .compatible = "arm,cortex-a9-twd-timer", },
+	{ }
+};
+
 void __init omap_gic_of_init(void)
 {
+	struct device_node *np;
+
+	/* Extract GIC distributor and TWD bases for OMAP4460 ROM Errata WA */
+	if (!cpu_is_omap446x())
+		goto skip_errata_init;
+
+	np = of_find_matching_node(NULL, irq_match);
+	gic_dist_base_addr = of_iomap(np, 0);
+	WARN_ON(!gic_dist_base_addr);
+
+	np = of_find_matching_node(NULL, twd_match);
+	twd_base = of_iomap(np, 0);
+	WARN_ON(!twd_base);
+
+skip_errata_init:
 	omap_wakeupgen_init();
 	of_irq_init(irq_match);
 }
