@@ -1,0 +1,15 @@
+/*
+ * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ */
+/include/ "omap5-evm.dts"
+
+/* card detect gpio is different for mmc1 / micro sd card slot */
+&mmc1 {
+	vmmc-supply = <&vmmcsd_fixed>;
+	bus-width = <4>;
+	cd-gpios = <&gpio5 24 0>; /* gpio 152 */
+};
