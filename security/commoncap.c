@@ -30,9 +30,9 @@
 #include <linux/user_namespace.h>
 #include <linux/personality.h>
 
-#ifdef CONFIG_ANDROID_PARANOID_NETWORK
+//#ifdef CONFIG_ANDROID_PARANOID_NETWORK
 #include <linux/android_aid.h>
-#endif
+//#endif
 
 /*
  * If a non-root user executes a setuid-root binary in
