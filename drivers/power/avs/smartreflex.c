@@ -27,6 +27,7 @@
 #include <linux/slab.h>
 #include <linux/pm_runtime.h>
 #include <linux/power/smartreflex.h>
+#include <linux/sched.h>
 #include <plat/voltage.h>
 #include <plat/dvfs.h>
 
@@ -40,7 +41,6 @@ static LIST_HEAD(sr_list);
 static struct omap_sr_class_data *sr_class;
 static struct omap_sr_pmic_data *sr_pmic_data;
 static struct dentry		*sr_dbg_dir;
-static atomic_t sr_driver_ready;
 
 static inline void sr_write_reg(struct omap_sr *sr, unsigned offset, u32 value)
 {
@@ -954,9 +954,6 @@ bool omap_sr_is_enabled(struct voltagedomain *voltdm)
 {
 	struct omap_sr *sr;
 
-	if (!atomic_read(&sr_driver_ready))
-		return false;
-
 	sr = _sr_lookup(voltdm);
 	if (IS_ERR(sr)) {
 		pr_warning("%s: omap_sr struct for voltdm not found\n",
@@ -980,9 +977,6 @@ void omap_sr_enable(struct voltagedomain *voltdm)
 {
 	struct omap_sr *sr;
 	int r;
-
-	if (!atomic_read(&sr_driver_ready))
-		return;
 
 	sr = _sr_lookup(voltdm);
 	if (IS_ERR(sr)) {
@@ -1026,9 +1020,6 @@ void omap_sr_disable(struct voltagedomain *voltdm)
 {
 	struct omap_sr *sr;
 
-	if (!atomic_read(&sr_driver_ready))
-		return;
-
 	sr = _sr_lookup(voltdm);
 	if (IS_ERR(sr)) {
 		pr_warning("%s: omap_sr struct for voltdm not found\n",
@@ -1062,9 +1053,6 @@ void omap_sr_disable(struct voltagedomain *voltdm)
 void omap_sr_disable_reset_volt(struct voltagedomain *voltdm)
 {
 	struct omap_sr *sr;
-
-	if (!atomic_read(&sr_driver_ready))
-		return;
 
 	sr = _sr_lookup(voltdm);
 	if (IS_ERR(sr)) {
@@ -1514,15 +1502,12 @@ static int __init sr_init(void)
 		return ret;
 	}
 
-	atomic_set(&sr_driver_ready, 1);
-
 	return 0;
 }
 subsys_initcall(sr_init);
 
 static void __exit sr_exit(void)
 {
-	atomic_set(&sr_driver_ready, 0);
 	if (sr_dbg_dir)
 		debugfs_remove_recursive(sr_dbg_dir);
 	platform_driver_unregister(&smartreflex_driver);
