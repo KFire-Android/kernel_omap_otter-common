@@ -301,9 +301,7 @@ static int mcbsp_be_hw_params_fixup(struct snd_soc_pcm_runtime *rtd,
 	switch (be_id) {
 	case OMAP_ABE_DAI_BT_VX:
 		channels->min = 2;
-		rate->min = rate->max = 16000;
-		if (machine_is_omap_4430sdp() || machine_is_omap_tabletblaze())
-			rate->min = rate->max = 8000;
+		rate->min = rate->max = 8000;
 		break;
 	case OMAP_ABE_DAI_MM_FM:
 		channels->min = 2;
