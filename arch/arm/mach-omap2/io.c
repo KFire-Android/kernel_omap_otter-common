@@ -38,6 +38,7 @@
 #include "clock2xxx.h"
 #include "clock3xxx.h"
 #include "clock44xx.h"
+#include "clock54xx.h"
 #include "omap-pm.h"
 #include "sdrc.h"
 #include "control.h"
@@ -235,9 +236,9 @@ static struct map_desc omap44xx_io_desc[] __initdata = {
 	},
 #ifdef CONFIG_OMAP4_ERRATA_I688
 	{
-		.virtual	= OMAP4_SRAM_VA,
-		.pfn		= __phys_to_pfn(OMAP4_SRAM_PA),
-		.length		= PAGE_SIZE,
+		.virtual	= OMAP4_ERRATA_I688_SRAM_VA,
+		.pfn		= __phys_to_pfn(OMAP4_ERRATA_I688_SRAM_PA),
+		.length		= OMAP4_ERRATA_I688_SIZE,
 		.type		= MT_MEMORY_SO,
 	},
 #endif
@@ -271,6 +272,14 @@ static struct map_desc omap54xx_io_desc[] __initdata = {
 		.length		= L4_PER_54XX_SIZE,
 		.type		= MT_DEVICE,
 	},
+#ifdef CONFIG_OMAP4_ERRATA_I688
+	{
+		.virtual	= OMAP5_ERRATA_I688_SRAM_VA,
+		.pfn		= __phys_to_pfn(OMAP5_ERRATA_I688_SRAM_PA),
+		.length		= OMAP4_ERRATA_I688_SIZE,
+		.type		= MT_MEMORY_SO,
+	},
+#endif
 };
 #endif
 
@@ -323,6 +332,7 @@ void __init omap4_map_io(void)
 void __init omap5_map_io(void)
 {
 	iotable_init(omap54xx_io_desc, ARRAY_SIZE(omap54xx_io_desc));
+	omap_barriers_init();
 }
 #endif
 /*
@@ -618,7 +628,23 @@ void __init omap5_init_early(void)
 	omap2_set_globals_prcm_mpu(OMAP2_L4_IO_ADDRESS(OMAP54XX_PRCM_MPU_BASE));
 	omap_prm_base_init();
 	omap_cm_base_init();
+	omap44xx_prm_init();
 	omap5xxx_check_revision();
+	omap54xx_voltagedomains_init();
+	omap54xx_powerdomains_init();
+	omap54xx_clockdomains_init();
+	omap54xx_hwmod_init();
+	omap_hwmod_init_postsetup();
+	omap5xxx_clk_init();
+
+}
+
+void __init omap5_init_late(void)
+{
+	omap_mux_late_init();
+	omap2_common_pm_late_init();
+	omap4_pm_init();
+	omap2_clk_enable_autoidle_all();
 }
 #endif
 
