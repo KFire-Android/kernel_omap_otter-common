@@ -1006,4 +1006,4 @@ static int __init sr_classp5_driver_init(void)
 	}
 	return ret;
 }
-device_initcall(sr_classp5_driver_init);
+subsys_initcall(sr_classp5_driver_init);

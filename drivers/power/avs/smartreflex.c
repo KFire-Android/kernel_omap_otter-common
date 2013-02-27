@@ -1195,7 +1195,7 @@ static int omap_sr_autocomp_store(void *data, u64 val)
 DEFINE_SIMPLE_ATTRIBUTE(pm_sr_fops, omap_sr_autocomp_show,
 			omap_sr_autocomp_store, "%llu\n");
 
-static int __init omap_sr_probe(struct platform_device *pdev)
+static int __devinit omap_sr_probe(struct platform_device *pdev)
 {
 	struct omap_sr *sr_info;
 	struct omap_sr_data *pdata = pdev->dev.platform_data;
@@ -1502,7 +1502,8 @@ static int sr_resume(struct device *dev)
 static SIMPLE_DEV_PM_OPS(sr_omap_dev_pm_ops, sr_suspend, sr_resume);
 
 static struct platform_driver smartreflex_driver = {
-	.remove         = __devexit_p(omap_sr_remove),
+	.probe		= omap_sr_probe,
+	.remove		= __devexit_p(omap_sr_remove),
 	.shutdown	= __devexit_p(omap_sr_shutdown),
 	.driver		= {
 		.name	= "smartreflex",
@@ -1532,7 +1533,7 @@ static int __init sr_init(void)
 		return	PTR_ERR(sr_dbg_dir);
 	}
 
-	ret = platform_driver_probe(&smartreflex_driver, omap_sr_probe);
+	ret = platform_driver_register(&smartreflex_driver);
 	if (ret) {
 		pr_err("%s: platform driver register failed for SR\n",
 		       __func__);
@@ -1543,7 +1544,7 @@ static int __init sr_init(void)
 
 	return 0;
 }
-late_initcall(sr_init);
+subsys_initcall(sr_init);
 
 static void __exit sr_exit(void)
 {
