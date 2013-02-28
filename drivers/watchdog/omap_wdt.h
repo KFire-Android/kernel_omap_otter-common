@@ -43,6 +43,7 @@
 #define OMAP_WATCHDOG_WIRQSTAT		(0x58)
 #define OMAP_WATCHDOG_WIRQENSET	(0x5c)
 #define OMAP_WATCHDOG_WIRQENCLR	(0x60)
+#define OMAP_WATCHDOG_WIRQWAKEEN	(0x64)
 
 /* Using the prescaler, the OMAP watchdog could go for many
  * months before firing.  These limits work without scaling,
