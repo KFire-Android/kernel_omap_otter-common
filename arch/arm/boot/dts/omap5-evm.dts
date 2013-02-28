@@ -89,6 +89,7 @@
 			&dmic_pins
 			&mcbsp1_pins
 			&mcbsp2_pins
+			&lg4591_pins
 	>;
 
 	twl6040_pins: pinmux_twl6040_pins {
@@ -133,6 +134,13 @@
 			0x15a 0x100	/* abemcbsp2_clkx.abemcbsp2_clkx INPUT | MODE0 */
 		>;
 	};
+
+	lg4591_pins: pinmux_lg4591_pins {
+		pinctrl-single,pins = <
+			0xf2 0x8	/* perslimbus2_clock.gpio6_183 OUTPUT PULLDOWN | MODE0 */
+		>;
+	};
+
 };
 
 &mmc1 {
@@ -232,3 +240,27 @@
 
 /include/ "palmas.dtsi"
 /include/ "twl6040.dtsi"
+
+&dsi1 {
+	lcd {
+		compatible = "ti,lg4591";
+
+		lanes = <
+			0       /* clk + */
+			1       /* clk - */
+			2       /* data1 + */
+			3       /* data1 - */
+			4       /* data2 + */
+			5       /* data2 - */
+			6       /* data3 + */
+			7       /* data3 - */
+			8       /* data4 + */
+			9       /* data4 - */
+		>;
+
+		vdds_foo-supply = <&ldo2_reg>;
+
+		gpios = <&gpio6 23 0>;	/* 183, reset */
+	};
+};
+
