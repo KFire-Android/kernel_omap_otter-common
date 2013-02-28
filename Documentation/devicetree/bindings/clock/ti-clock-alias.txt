@@ -1,0 +1,26 @@
+* Clock alias provision for TI OMAP2+ boards
+
+This binding allows the board's device tree file to specify a clock name,
+device phandle and clock alias so that that clock can be associated
+to the device with the alias.
+
+This is required in cases where an external device is clocked by an
+OMAP generated clock and needs to be assocated to it.
+
+NOTE: The node's name should be clock_alias
+
+Required properties
+- clock-name: The clock identifier string. Should be one of the
+  clock ids defined in OMAP common clock data.
+- clock-alias: A string specifying the alias that must be created to the clock.
+- device: A phandle to the device this clock should be associated to.
+
+e.g. On the OMAP4 Panda board, the USB PHY device is clocked by the
+FREF_CLK3 (auxclk3_ck) from the OMAP. The PHY driver expexts the clock to
+be named "main_clk". This binding can be provided like so
+
+clock_alias {
+	clock-name = "auxclk3_ck";
+	clock-alias = "main_clk";
+	device = <&hsusb1_phy>;
+};
