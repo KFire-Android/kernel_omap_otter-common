@@ -530,7 +530,7 @@ static int dsscomp_apply(struct dsscomp *comp)
 			 * comp - set M2M flag. It is needed to release
 			 * clocks after WB M2M mode torned off.
 			 */
-			if (!oi->cfg.enabled && wb_info.enabled &&
+			if (!oi->cfg.enabled &&
 					(int)wb_info.source == (int)mgr->id &&
 					wb_info.mode == OMAP_WB_MEM2MEM_MODE)
 				m2m_mgr_mode = true;
