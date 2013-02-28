@@ -169,8 +169,11 @@ static int omap_wdt_start(struct watchdog_device *wdog)
 	omap_wdt_reload(wdev); /* trigger loading of new timeout value */
 
 	/* Enable delay interrupt */
-	if (kernelpet && wdev->irq)
+	if (kernelpet && wdev->irq) {
 		__raw_writel(0x2, base + OMAP_WATCHDOG_WIRQENSET);
+		__raw_writel(0x2, base + OMAP_WATCHDOG_WIRQWAKEEN);
+	}
+
 	omap_wdt_enable(wdev);
 
 	mutex_unlock(&wdev->lock);
