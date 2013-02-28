@@ -534,5 +534,45 @@
 			interrupts = <0 80 0x4>;
 			ti,hwmods = "wd_timer2";
 		};
+
+		dss {
+			compatible = "ti,omap4-dss", "simple-bus";
+			ti,hwmods = "dss_core";
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			dispc {
+				compatible = "ti,omap4-dispc";
+				ti,hwmods = "dss_dispc";
+			};
+
+			dpi: dpi {
+				compatible = "ti,omap4-dpi";
+				video-source = <2>;
+			};
+
+			dsi1: dsi@1 {
+				compatible = "ti,omap4-dsi";
+				ti,hwmods = "dss_dsi1_a";
+				reg = <0>;
+				vdds_dsi-supply = <&ldo7_reg>;
+				video-source = <0>;
+			};
+
+			dsi2: dsi@2 {
+				compatible = "ti,omap4-dsi";
+				ti,hwmods = "dss_dsi1_c";
+				reg = <1>;
+				vdds_dsi-supply = <&ldo7_reg>;
+				video-source = <2>;
+			};
+
+			hdmi: hdmi {
+				compatible = "ti,omap4-hdmi";
+				ti,hwmods = "dss_hdmi";
+				vdda_hdmi_dac-supply = <&ldo7_reg>;
+				video-source = <1>;
+			};
+		};
 	};
 };
