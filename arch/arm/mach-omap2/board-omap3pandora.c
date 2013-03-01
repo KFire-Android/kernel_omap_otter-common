@@ -24,7 +24,6 @@
 #include <linux/spi/spi.h>
 #include <linux/regulator/machine.h>
 #include <linux/regulator/fixed.h>
-#include <linux/usb/phy.h>
 #include <linux/i2c/twl.h>
 #include <linux/wl12xx.h>
 #include <linux/mtd/partitions.h>
@@ -37,6 +36,7 @@
 #include <linux/mmc/host.h>
 #include <linux/mmc/card.h>
 #include <linux/regulator/fixed.h>
+#include <linux/usb/phy.h>
 #include <linux/platform_data/spi-omap2-mcspi.h>
 
 #include <asm/mach-types.h>
@@ -638,6 +638,7 @@ static void __init omap3pandora_init(void)
 
 	/* PHY on HSUSB Port 2 i.e. index 1 */
 	usb_bind_phy("ehci-omap.0", 1, "nop_usb_xceiv.2");
+	usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
 
 	usb_musb_init(NULL);
 	gpmc_nand_init(&pandora_nand_data, NULL);

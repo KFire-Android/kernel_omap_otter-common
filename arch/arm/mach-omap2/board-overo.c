@@ -538,6 +538,7 @@ static void __init overo_init(void)
 	board_nand_init(overo_nand_partitions,
 			ARRAY_SIZE(overo_nand_partitions), NAND_CS, 0, NULL);
 	platform_add_devices(overo_devices, ARRAY_SIZE(overo_devices));
+	usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
 	usb_musb_init(NULL);
 
 	/* PHY on HSUSB Port 2 i.e. index 1 */

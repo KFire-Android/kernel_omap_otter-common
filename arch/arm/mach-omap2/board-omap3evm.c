@@ -771,6 +771,7 @@ static void __init omap3_evm_init(void)
 	}
 
 	platform_add_devices(omap3evm_devices, ARRAY_SIZE(omap3evm_devices));
+	usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
 	usb_musb_init(&musb_board_data);
 
 	/* PHY on HSUSB Port 2 i.e. index 1 */

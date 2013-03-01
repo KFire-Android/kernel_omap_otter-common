@@ -809,6 +809,7 @@ static void __init cm_t3x_common_init(void)
 	cm_t35_init_display();
 	omap_twl4030_audio_init("cm-t3x");
 
+	usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
 	usb_musb_init(NULL);
 	cm_t35_init_usbh();
 	cm_t35_init_camera();
