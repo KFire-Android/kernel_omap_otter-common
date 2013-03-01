@@ -588,7 +588,7 @@ static void __init omap3_beagle_init(void)
 	omap_sdrc_init(mt46h32m32lf6_sdrc_params,
 				  mt46h32m32lf6_sdrc_params);
 
-	usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
+	usb_bind_phy("musb-hdrc.1.auto", 0, "twl4030_usb");
 	usb_musb_init(NULL);
 
 	/* PHY on HSUSB Port 2 i.e. index 1 */
