@@ -94,6 +94,7 @@
 
 #define BOOST_MODE_OFF_MASK		0x00
 #define BOOST_MODE_ON_MASK		0x40
+#define BOOST_MODE_STATE_MASK		0x60
 
 #define CONTROLLER_STAT1		0x03
 #define	VBUS_DET			BIT(2)
@@ -394,10 +395,29 @@ static int twl6030_set_vbus(struct phy_companion *comparator, bool enabled)
 {
 	struct twl6030_usb *twl = comparator_to_twl(comparator);
 
-	twl->vbus_enable = enabled;
-	schedule_work(&twl->set_vbus_work);
+	if (twl->vbus_enable != enabled) {
+		twl->vbus_enable = enabled;
+		schedule_work(&twl->set_vbus_work);
+	}
 
 	return 0;
+}
+
+static void twl6030_get_vbus(struct twl6030_usb *twl)
+{
+	u8 ctrl1_data;
+
+	/*
+	 * Read CHARGERUSB_CTRL1 register and set vbus_enable flag
+	 * if BOOST mode for OTG purpose is enabled and USB charger
+	 * is not in high-impedance mode on VBUS.
+	 */
+	ctrl1_data = twl6030_readb(twl, TWL_MODULE_MAIN_CHARGE,
+				   CHARGERUSB_CTRL1);
+	if ((ctrl1_data & BOOST_MODE_STATE_MASK) == BOOST_MODE_ON_MASK)
+		twl->vbus_enable = true;
+	else
+		twl->vbus_enable = false;
 }
 
 static int __devinit twl6030_usb_probe(struct platform_device *pdev)
@@ -433,6 +453,8 @@ static int __devinit twl6030_usb_probe(struct platform_device *pdev)
 		kfree(twl);
 		return err;
 	}
+
+	twl6030_get_vbus(twl);
 
 	platform_set_drvdata(pdev, twl);
 	if (device_create_file(&pdev->dev, &dev_attr_vbus))
