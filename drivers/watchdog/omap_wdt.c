@@ -43,6 +43,7 @@
 #include <linux/pm_runtime.h>
 #include <linux/interrupt.h>
 #include <linux/platform_data/omap-wd-timer.h>
+#include <linux/of.h>
 
 #include "omap_wdt.h"
 
@@ -50,6 +51,7 @@ static unsigned timer_margin;
 module_param(timer_margin, uint, 0);
 MODULE_PARM_DESC(timer_margin, "initial watchdog timeout (in seconds)");
 
+static int hw_pet;
 static int kernelpet = 1;
 module_param(kernelpet, int, 0);
 MODULE_PARM_DESC(kernelpet, "pet watchdog in kernel via irq");
@@ -201,6 +203,11 @@ static int omap_wdt_ping(struct watchdog_device *wdog)
 {
 	struct omap_wdt_dev *wdev = watchdog_get_drvdata(wdog);
 
+	if (hw_pet) {
+		pr_info("Hw ping is enabled,Skipping userspace ping\n");
+		return 0;
+	}
+
 	mutex_lock(&wdev->lock);
 	omap_wdt_reload(wdev);
 	mutex_unlock(&wdev->lock);
@@ -244,6 +251,7 @@ static int omap_wdt_probe(struct platform_device *pdev)
 	struct watchdog_device *omap_wdt;
 	struct resource *res, *mem, *res_irq;
 	struct omap_wdt_dev *wdev;
+	struct device_node *np_wdt = pdev->dev.of_node;
 	u32 rs;
 	int ret;
 
@@ -275,12 +283,21 @@ static int omap_wdt_probe(struct platform_device *pdev)
 	if (!wdev->base)
 		return -ENOMEM;
 
-	res_irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
-	if (res_irq) {
-		ret = request_irq(res_irq->start, omap_wdt_interrupt, 0,
-				  dev_name(&pdev->dev), omap_wdt);
+	if (of_device_is_compatible(np_wdt, "ti,omap3-wdt")) {
+		hw_pet = 0;
+		kernelpet = hw_pet;
+	} else if (of_device_is_compatible(np_wdt, "ti,omap4-wdt")) {
+		hw_pet = kernelpet;
+	}
 
-		wdev->irq = res_irq->start;
+	if (kernelpet) {
+		res_irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+		if (res_irq) {
+			ret = request_irq(res_irq->start, omap_wdt_interrupt,
+					  0, dev_name(&pdev->dev), omap_wdt);
+
+			wdev->irq = res_irq->start;
+		}
 	}
 
 	omap_wdt->info	      = &omap_wdt_info;
@@ -398,7 +415,8 @@ static int omap_wdt_resume(struct platform_device *pdev)
 #endif
 
 static const struct of_device_id omap_wdt_of_match[] = {
-	{ .compatible = "ti,omap3-wdt", },
+	{ .compatible = "ti,omap3-wdt" },
+	{ .compatible = "ti,omap4-wdt" },
 	{},
 };
 MODULE_DEVICE_TABLE(of, omap_wdt_of_match);
