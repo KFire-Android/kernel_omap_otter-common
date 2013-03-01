@@ -398,7 +398,7 @@ config OMAP3_SDRC_AC_TIMING
 
 config OMAP4_ERRATA_I688
 	bool "OMAP4 errata: Async Bridge Corruption"
-	depends on ARCH_OMAP4
+	depends on ARCH_OMAP4 || SOC_OMAP5
 	select ARCH_HAS_BARRIERS
 	help
 	  If a data is stalled inside asynchronous bridge because of back
@@ -417,6 +417,20 @@ config OMAP4_ERRATA_I688
 	  In MPU case, L3 T2ASYNC FIFO and DDR T2ASYNC FIFO needs to be drained.
 	  IO barrier ensure that there is no synchronisation loss on initiators
 	  operating on both interconnect port simultaneously.
+
+config OMAP4_HS_SECURE_SRAM_SIZE
+	int "Secure SRAM Resized size for OMAP4 HS devices in KB"
+	depends on ARCH_OMAP4
+	default 52
+	help
+	  resized secure SRAM size for OMAP4
+
+config OMAP5_HS_SECURE_SRAM_SIZE
+	int "Secure SRAM Resized size for OMAP5 HS devices in KB"
+	depends on ARCH_OMAP5
+	default 120
+	help
+	  resized secure SRAM size for OMAP5
 endmenu
 
 endif
