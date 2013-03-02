@@ -255,6 +255,14 @@ static int dwc3_omap_remove_core(struct device *dev, void *c)
 	return 0;
 }
 
+static u64 dwc3_omap_dma_mask = DMA_BIT_MASK(32);
+
+static int dwc3_omap_set_dmamask(struct device *dev, void *c)
+{
+	dev->dma_mask = &dwc3_omap_dma_mask;
+	return 0;
+}
+
 static int dwc3_omap_probe(struct platform_device *pdev)
 {
 	struct device_node	*node = pdev->dev.of_node;
@@ -381,6 +389,8 @@ static int dwc3_omap_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "failed to create dwc3 core\n");
 		return ret;
 	}
+
+	device_for_each_child(&pdev->dev, NULL, dwc3_omap_set_dmamask);
 
 	return 0;
 }
