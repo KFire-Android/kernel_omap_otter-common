@@ -661,6 +661,7 @@ static void __init omap_3430sdp_init(void)
 
 	platform_add_devices(sdp3430_devices, ARRAY_SIZE(sdp3430_devices));
 
+	usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
 	usb_musb_init(NULL);
 	board_smc91x_init();
 	board_flash_init(sdp_flash_partitions, chip_sel_3430, 0);
