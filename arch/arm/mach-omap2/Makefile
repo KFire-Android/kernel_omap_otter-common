@@ -304,3 +304,7 @@ emac-$(CONFIG_TI_DAVINCI_EMAC)		:= am35xx-emac.o
 obj-y					+= $(emac-m) $(emac-y)
 
 obj-y					+= common-board-devices.o twl-common.o dss-common.o
+
+# Serial ATA support
+s-ata-$(CONFIG_SATA_AHCI_PLATFORM)	:= sata.o
+obj-$(CONFIG_SOC_OMAP5) 		+= $(s-ata-m) $(s-ata-y)

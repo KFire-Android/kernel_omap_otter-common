@@ -287,7 +287,9 @@ static int ahci_resume(struct device *dev)
 	struct ahci_platform_data *pdata = dev_get_platdata(dev);
 	struct ata_host *host = dev_get_drvdata(dev);
 	struct ahci_host_priv *hpriv = host->private_data;
-	int rc;
+	struct ata_link *link;
+	unsigned int class;
+	int rc, i;
 
 	if (!IS_ERR(hpriv->clk)) {
 		rc = clk_prepare_enable(hpriv->clk);
@@ -309,6 +311,37 @@ static int ahci_resume(struct device *dev)
 			goto disable_unprepare_clk;
 
 		ahci_init_controller(host);
+
+		/*
+		 * Do a reset for OMAP5
+		 * This step is specific to OMAP5 ES1.0 as OMAPS00265590
+		 * and the hw bug CDDS id: COBRA-1.0BUG00044
+		 *
+		 * Bug Description:
+		 * ----------------
+		 * If SATA dpll unlocked during suspend, then during resume,
+		 * we may encounter 2 different problems:
+		 * 1. OOB communication is taking place, but we have no D2H
+		 * FIS returned by the device. Port 0 TFD register contains
+		 * 0x80. In this case the device keeps sending X_RDY, but the
+		 * host does not acknowledge with R_RDY and sends SYNC instead
+		 * (relevant screenshot attached).
+		 * 2. D2H FIS returned containing status 0x50, TFD contains
+		 * 0x150, but when we send the IDENTIFY_DEVICE command we get
+		 * 0x1D0 in TFD, without any FIS having been actually sent on
+		 * the bus. In this case there is only SYNC continued (implied
+		 * SYNC after CONT) on the bus from both sides.
+		 *
+		 * Workaround:
+		 * Issue a software reset (two ATA commands in succession)
+		 * to the device before IDENTIFY_DEVICE.
+		 */
+		for (i = 0; i < host->n_ports; i++) {
+			ahci_port_resume(host->ports[i]);
+			link = &host->ports[i]->link;
+			ahci_do_softreset(link, &class,  sata_srst_pmp(link),
+					  1000, ahci_check_ready);
+		}
 	}
 
 	ata_host_resume(host);
