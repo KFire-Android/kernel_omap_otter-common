@@ -261,6 +261,7 @@ struct twl6040 {
 	u8 irq_masks_cache;
 };
 
+#if defined(CONFIG_TWL6040_CORE)
 int twl6040_reg_read(struct twl6040 *twl6040, unsigned int reg);
 int twl6040_reg_write(struct twl6040 *twl6040, unsigned int reg,
 		      u8 val);
@@ -283,5 +284,56 @@ static inline int twl6040_get_revid(struct twl6040 *twl6040)
 	return twl6040->rev;
 }
 
+#else
+static inline int twl6040_reg_read(struct twl6040 *twl6040, unsigned int reg)
+{
+	return -EINVAL;
+}
+static inline int twl6040_reg_write(struct twl6040 *twl6040, unsigned int reg,
+				    u8 val)
+{
+	return -EINVAL;
+}
+static inline int twl6040_set_bits(struct twl6040 *twl6040, unsigned int reg,
+				   u8 mask)
+{
+	return -EINVAL;
+}
+static inline int twl6040_clear_bits(struct twl6040 *twl6040, unsigned int reg,
+				     u8 mask)
+{
+	return -EINVAL;
+}
+static inline int twl6040_power(struct twl6040 *twl6040, int on)
+{
+	return -EINVAL;
+}
+static inline int twl6040_set_pll(struct twl6040 *twl6040, int pll_id,
+				  unsigned int freq_in, unsigned int freq_out)
+{
+	return -EINVAL;
+}
+static inline int twl6040_get_pll(struct twl6040 *twl6040)
+{
+	return -EINVAL;
+}
+static inline unsigned int twl6040_get_sysclk(struct twl6040 *twl6040)
+{
+	return 0;
+}
+static inline int twl6040_irq_init(struct twl6040 *twl6040)
+{
+	return -EINVAL;
+}
+static inline void twl6040_irq_exit(struct twl6040 *twl6040) { }
+static inline int twl6040_get_vibralr_status(struct twl6040 *twl6040)
+{
+	return 0;
+}
+static inline int twl6040_get_revid(struct twl6040 *twl6040)
+{
+	return 0;
+}
+#endif
 
 #endif  /* End of __TWL6040_CODEC_H__ */
