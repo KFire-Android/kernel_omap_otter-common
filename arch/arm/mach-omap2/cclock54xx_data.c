@@ -809,9 +809,29 @@ DEFINE_CLK_GATE(dss_dss_clk, "dpll_per_h12x2_ck", &dpll_per_h12x2_ck, 0x0,
 		OMAP54XX_CM_DSS_DSS_CLKCTRL, OMAP54XX_OPTFCLKEN_DSSCLK_SHIFT,
 		0x0, NULL);
 
-DEFINE_CLK_GATE(dss_sys_clk, "dss_syc_gfclk_div", &dss_syc_gfclk_div, 0x0,
-		OMAP54XX_CM_DSS_DSS_CLKCTRL, OMAP54XX_OPTFCLKEN_SYS_CLK_SHIFT,
-		0x0, NULL);
+static const struct clk_ops dss_sys_clk_ops = {
+	.enable		= &omap2_dflt_clk_enable,
+	.disable	= &omap2_dflt_clk_disable,
+	.is_enabled	= &omap2_dflt_clk_is_enabled,
+	.init	= &omap2_init_clk_clkdm,
+};
+
+static const char *dss_sys_clk_parents[] = {
+	"dss_syc_gfclk_div",
+};
+
+static struct clk dss_sys_clk;
+
+static struct clk_hw_omap dss_sys_clk_hw = {
+	.hw = {
+		.clk = &dss_sys_clk,
+	},
+	.clkdm_name	= "dss_clkdm",
+	.enable_reg	= OMAP54XX_CM_DSS_DSS_CLKCTRL,
+	.enable_bit	= OMAP54XX_OPTFCLKEN_SYS_CLK_SHIFT,
+};
+
+DEFINE_STRUCT_CLK(dss_sys_clk, dss_sys_clk_parents, dss_sys_clk_ops);
 
 DEFINE_CLK_GATE(gpio1_dbclk, "sys_32k_ck", &sys_32k_ck, 0x0,
 		OMAP54XX_CM_WKUPAON_GPIO1_CLKCTRL,
