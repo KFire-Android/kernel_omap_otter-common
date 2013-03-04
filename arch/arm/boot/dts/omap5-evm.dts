@@ -152,6 +152,8 @@
 
 			0xD4 0x6	/* gpio6_173 OUTPUT | MODE 6 HUB_NRESET */
 			0xD6 0x6	/* gpio6_172 OUTPUT | MODE 6 ETH_NRESET */
+		>;
+	};
 
         i2c1_pins: pinmux_i2c1_pins {
                 pinctrl-single,pins = <
