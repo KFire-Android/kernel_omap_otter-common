@@ -353,7 +353,7 @@ static int omap2430_musb_init(struct musb *musb)
 
 	if (IS_ERR_OR_NULL(musb->xceiv)) {
 		pr_err("HS USB OTG: no transceiver configured\n");
-		return -ENODEV;
+		return -EPROBE_DEFER;
 	}
 
 	musb->isr = omap2430_musb_interrupt;
