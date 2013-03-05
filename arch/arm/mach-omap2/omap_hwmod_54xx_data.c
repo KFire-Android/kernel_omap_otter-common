@@ -2624,6 +2624,71 @@ static struct omap_hwmod omap54xx_ocp2scp1_hwmod = {
 	},
 };
 
+static struct resource omap54xx_sata_phy_addrs[] = {
+	{
+		.name		= "sata_phy_rx",
+		.start		= 0x4A096000,
+		.end		= 0x4A096080,
+		.flags		= IORESOURCE_MEM,
+	},
+	{
+		.name		= "sata_phy_tx",
+		.start		= 0x4A096400,
+		.end		= 0x4A096464,
+		.flags		= IORESOURCE_MEM,
+	},
+	{
+		.name		= "sata_pll",
+		.start		= 0x4A096800,
+		.end		= 0x4A096840,
+		.flags		= IORESOURCE_MEM,
+	},
+	{ }
+};
+
+static struct omap_ocp2scp_dev ocp2scp3_dev_attr[] = {
+	{
+		.drv_name       = "omap-sata",
+		.res		= omap54xx_sata_phy_addrs,
+	},
+	{ }
+};
+
+/* ocp2scp3 */
+static struct omap_hwmod omap54xx_ocp2scp3_hwmod;
+static struct omap_hwmod_addr_space omap54xx_ocp2scp3_addrs[] = {
+	{
+		.name		= "ocp2scp3",
+		.pa_start	= 0x4a090000,
+		.pa_end		= 0x4a09001f,
+		.flags		= ADDR_TYPE_RT
+	},
+	{ }
+};
+
+/* l4_cfg -> ocp2scp3 */
+static struct omap_hwmod_ocp_if omap54xx_l4_cfg__ocp2scp3 = {
+	.master		= &omap54xx_l4_cfg_hwmod,
+	.slave		= &omap54xx_ocp2scp3_hwmod,
+	.clk		= "l4_root_clk_div",
+	.addr		= omap54xx_ocp2scp3_addrs,
+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+};
+
+static struct omap_hwmod omap54xx_ocp2scp3_hwmod = {
+	.name		= "ocp2scp3",
+	.class		= &omap54xx_ocp2scp_hwmod_class,
+	.clkdm_name	= "l3init_clkdm",
+	.prcm = {
+		.omap4 = {
+			.clkctrl_offs = OMAP54XX_CM_L3INIT_OCP2SCP3_CLKCTRL_OFFSET,
+			.context_offs = OMAP54XX_RM_L3INIT_OCP2SCP3_CONTEXT_OFFSET,
+			.modulemode   = MODULEMODE_HWCTRL,
+		},
+	},
+	.dev_attr	= ocp2scp3_dev_attr,
+};
+
 /*
  * 'sata' class
  * sata:  serial ata interface  gen2 compliant   ( 1 rx/ 1 tx)
@@ -3389,8 +3454,8 @@ static struct omap_hwmod_class omap54xx_usb_host_hs_hwmod_class = {
 
 /* usb_host_hs */
 static struct omap_hwmod_irq_info omap54xx_usb_host_hs_irqs[] = {
-	{ .name = "ohci", .irq = 76 + OMAP54XX_IRQ_GIC_START },
-	{ .name = "ehci", .irq = 77 + OMAP54XX_IRQ_GIC_START },
+	{ .name = "ohci-irq", .irq = 76 + OMAP54XX_IRQ_GIC_START },
+	{ .name = "ehci-irq", .irq = 77 + OMAP54XX_IRQ_GIC_START },
 	{ .irq = -1 }
 };
 
@@ -5786,13 +5851,8 @@ static struct omap_hwmod_addr_space omap54xx_usb_tll_hs_addrs[] = {
 	{
 		.name		= "tll",
 		.pa_start	= 0x4a062000,
-		.pa_end		= 0x4a0627ff,
+		.pa_end		= 0x4a062fff,
 		.flags		= ADDR_TYPE_RT
-	},
-	{
-		.name		= "ulpi",
-		.pa_start	= 0x4a062800,
-		.pa_end		= 0x4a062bff,
 	},
 	{ }
 };
@@ -5953,6 +6013,7 @@ static struct omap_hwmod_ocp_if *omap54xx_hwmod_ocp_ifs[] __initdata = {
 	&omap54xx_l4_cfg__mpu,
 	&omap54xx_l3_main_2__ocmc_ram,
 	&omap54xx_l4_cfg__ocp2scp1,
+	&omap54xx_l4_cfg__ocp2scp3,
 	&omap54xx_l4_cfg__sata,
 	&omap54xx_l4_wkup__scrm,
 	&omap54xx_l4_abe__slimbus1,

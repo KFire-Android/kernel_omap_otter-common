@@ -20,7 +20,6 @@
 #ifndef _MWIFIEX_IOCTL_H_
 #define _MWIFIEX_IOCTL_H_
 
-#include <net/mac80211.h>
 #include <net/lib80211.h>
 
 enum {
@@ -107,6 +106,8 @@ struct mwifiex_uap_bss_param {
 	u8 rates[MWIFIEX_SUPPORTED_RATES];
 	u32 sta_ao_timer;
 	u32 ps_sta_ao_timer;
+	u8 qos_info;
+	struct mwifiex_types_wmm_info wmm_info;
 };
 
 enum {
@@ -177,7 +178,6 @@ struct mwifiex_ds_tx_ba_stream_tbl {
 struct mwifiex_debug_info {
 	u32 int_counter;
 	u32 packets_out[MAX_NUM_TID];
-	u32 max_tx_buf_size;
 	u32 tx_buf_size;
 	u32 curr_tx_buf_size;
 	u32 tx_tbl_num;

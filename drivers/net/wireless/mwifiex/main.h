@@ -599,8 +599,10 @@ struct mwifiex_if_ops {
 	int (*cmdrsp_complete) (struct mwifiex_adapter *, struct sk_buff *);
 	int (*event_complete) (struct mwifiex_adapter *, struct sk_buff *);
 	int (*data_complete) (struct mwifiex_adapter *, struct sk_buff *);
+	int (*init_fw_port) (struct mwifiex_adapter *);
 	int (*dnld_fw) (struct mwifiex_adapter *, struct mwifiex_fw_image *);
 	void (*card_reset) (struct mwifiex_adapter *);
+	int (*clean_pcie_ring) (struct mwifiex_adapter *adapter);
 };
 
 struct mwifiex_adapter {
@@ -629,7 +631,6 @@ struct mwifiex_adapter {
 	/* spin lock for main process */
 	spinlock_t main_proc_lock;
 	u32 mwifiex_processing;
-	u16 max_tx_buf_size;
 	u16 tx_buf_size;
 	u16 curr_tx_buf_size;
 	u32 ioport;
@@ -890,6 +891,10 @@ void mwifiex_set_ht_params(struct mwifiex_private *priv,
 			   struct cfg80211_ap_settings *params);
 void mwifiex_set_uap_rates(struct mwifiex_uap_bss_param *bss_cfg,
 			   struct cfg80211_ap_settings *params);
+void
+mwifiex_set_wmm_params(struct mwifiex_private *priv,
+		       struct mwifiex_uap_bss_param *bss_cfg,
+		       struct cfg80211_ap_settings *params);
 
 /*
  * This function checks if the queuing is RA based or not.

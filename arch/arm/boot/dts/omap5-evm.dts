@@ -26,6 +26,40 @@
 		regulator-max-microvolt = <3000000>;
 	};
 
+	/* HS USB Port 2 RESET */
+	hsusb2_reset: hsusb2_reset_reg {
+		compatible = "regulator-fixed";
+		regulator-name = "hsusb2_reset";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		gpio = <&gpio6 13 0>;	/* gpio6_173 HUB_NRESET */
+		startup-delay-us = <70000>;
+		enable-active-high;
+	};
+
+	/* HS USB Host PHY on PORT 2 */
+	hsusb2_phy: hsusb2_phy {
+		compatible = "usb-nop-xceiv";
+		reset-supply = <&hsusb2_reset>;
+	};
+
+	/* HS USB Port 3 RESET */
+	hsusb3_reset: hsusb3_reset_reg {
+		compatible = "regulator-fixed";
+		regulator-name = "hsusb3_reset";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		gpio = <&gpio6 12 0>;	/* gpio6_172 ETH_NRESET */
+		startup-delay-us = <70000>;
+		enable-active-high;
+	};
+
+	/* HS USB Host PHY on PORT 3 */
+	hsusb3_phy: hsusb3_phy {
+		compatible = "usb-nop-xceiv";
+		reset-supply = <&hsusb3_reset>;
+	};
+
 };
 
 &omap5_pmx_core {
@@ -36,7 +70,34 @@
 			&dmic_pins
 			&mcbsp1_pins
 			&mcbsp2_pins
+			&usbhost_pins
 	>;
+
+	mmc1_pins: pinmux_mmc1_pins {
+		pinctrl-single,pins = <
+			0x1a2 0x118	/* sdcard_clk.sdcard_clk INPUT PULLUP | MODE0 */
+			0x1a4 0x118	/* sdcard_cmd.sdcard_cmd INPUT PULLUP | MODE0 */
+			0x1a6 0x118	/* sdcard_data2.sdcard_data2 INPUT PULLUP | MODE0 */
+			0x1a8 0x118	/* sdcard_data3.sdcard_data3 INPUT PULLUP | MODE0 */
+			0x1aa 0x118	/* sdcard_data0.sdcard_data0 INPUT PULLUP | MODE0 */
+			0x1ac 0x118	/* sdcard_data1.sdcard_data1 INPUT PULLUP | MODE0 */
+		>;
+	};
+
+	mmc2_pins: pinmux_mmc2_pins {
+		pinctrl-single,pins = <
+			0x0 0x118	/* emmc_clk.emmc_clk INPUT PULLUP | MODE0 */
+			0x2 0x118	/* emmc_cmd.emmc_cmd INPUT PULLUP | MODE0 */
+			0x4 0x118	/* emmc_data0.emmc_data0 INPUT PULLUP | MODE0 */
+			0x6 0x118	/* emmc_data1.emmc_data1 INPUT PULLUP | MODE0 */
+			0x8 0x118	/* emmc_data2.emmc_data2 INPUT PULLUP | MODE0 */
+			0xa 0x118	/* emmc_data3.emmc_data3 INPUT PULLUP | MODE0 */
+			0xc 0x118	/* emmc_data4.emmc_data4 INPUT PULLUP | MODE0 */
+			0xe 0x118	/* emmc_data5.emmc_data5 INPUT PULLUP | MODE0 */
+			0x10 0x118	/* emmc_data6.emmc_data6 INPUT PULLUP | MODE0 */
+			0x12 0x118	/* emmc_data7.emmc_data7 INPUT PULLUP | MODE0 */
+		>;
+	};
 
 	twl6040_pins: pinmux_twl6040_pins {
 		pinctrl-single,pins = <
@@ -80,14 +141,94 @@
 			0x15a 0x100	/* abemcbsp2_clkx.abemcbsp2_clkx INPUT | MODE0 */
 		>;
 	};
+
+	usbhost_pins: pinmux_usbhost_pins {
+		pinctrl-single,pins = <
+			0x84 0x100	/* usbb2_hsic_strobe INPUT | MODE 0 */
+			0x86 0x100	/* usbb2_hsic_data INPUT | MODE 0 */
+
+			0x19e 0x100	/* usbb3_hsic_strobe INPUT | MODE 0 */
+			0x1a0 0x100	/* usbb3_hsic_data INPUT | MODE 0 */
+
+			0xD4 0x6	/* gpio6_173 OUTPUT | MODE 6 HUB_NRESET */
+			0xD6 0x6	/* gpio6_172 OUTPUT | MODE 6 ETH_NRESET */
+		>;
+	};
+
+        i2c1_pins: pinmux_i2c1_pins {
+                pinctrl-single,pins = <
+                        0x1b2 0x118        /* i2c1_scl PULLUP | INPUTENABLE | MODE0 */
+                        0x1b4 0x118        /* i2c1_sda PULLUP | INPUTENABLE | MODE0 */
+                >;
+        };
+
+	i2c2_pins: pinmux_i2c2_pins {
+		pinctrl-single,pins = <
+			0x178 0x100        /* i2c2_scl INPUTENABLE | MODE0 */
+			0x17a 0x100        /* i2c2_sda INPUTENABLE | MODE0 */
+		>;
+	};
+
+	i2c3_pins: pinmux_i2c3_pins {
+		pinctrl-single,pins = <
+			0x13a 0x100        /* i2c3_scl INPUTENABLE | MODE0 */
+			0x13c 0x100     /* i2c3_sda INPUTENABLE | MODE0 */
+		>;
+	};
+
+	i2c4_pins: pinmux_i2c4_pins {
+		pinctrl-single,pins = <
+			0xb8 0x100        /* i2c4_scl INPUTENABLE | MODE0 */
+			0xba 0x100     /* i2c4_sda INPUTENABLE | MODE0 */
+		>;
+	};
+
+	i2c5_pins: pinmux_i2c5_pins {
+		pinctrl-single,pins = <
+			0x184 0x100        /* i2c5_scl INPUTENABLE | MODE0 */
+			0x186 0x100     /* i2c5_sda INPUTENABLE | MODE0 */
+		>;
+	};
+
+	mcspi2_pins: pinmux_mcspi2_pins {
+		pinctrl-single,pins = <
+			0xbc 0x100	/*  MCSPI2_CLK INPUTENABLE | MODE0 */
+			0xbe 0x100	/*  MCSPI2_SIMO INPUTENABLE | MODE0 */
+			0xc0 0x118	/*  MCSPI2_SOMI PULLUP | INPUTENABLE | MODE0*/
+			0xc2 0x0	/*  MCSPI2_CS MODE0*/
+		>;
+	};
+
+	mcspi3_pins: pinmux_mcspi3_pins {
+		pinctrl-single,pins = <
+			0x78 0x101	/*  MCSPI2_SOMI INPUTENABLE | MODE1 */
+			0x7a 0x101	/*  MCSPI2_CS INPUTENABLE | MODE1 */
+			0x7c 0x101	/*  MCSPI2_SIMO INPUTENABLE | MODE1 */
+			0x7e 0x101	/*  MCSPI2_CLK INPUTENABLE | MODE1 */
+		>;
+	};
+
+	mcspi4_pins: pinmux_mcspi4_pins {
+		pinctrl-single,pins = <
+			0x164 0x101	/*  MCSPI2_CLK INPUTENABLE | MODE1 */
+			0x168 0x101	/*  MCSPI2_SIMO INPUTENABLE | MODE1 */
+			0x16a 0x101	/*  MCSPI2_SOMI INPUTENABLE | MODE1 */
+			0x16c 0x101	/*  MCSPI2_CS INPUTENABLE | MODE1 */
+		>;
+	};
 };
 
 &mmc1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&mmc1_pins>;
 	vmmc-supply = <&vmmcsd_fixed>;
 	bus-width = <4>;
+	cd-gpios = <&gpio3 3 0>; /* gpio 67 */
 };
 
 &mmc2 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&mmc2_pins>;
 	vmmc-supply = <&vmmcsd_fixed>;
 	bus-width = <8>;
 	ti,non-removable;
@@ -106,7 +247,17 @@
 	status = "disabled";
 };
 
+&i2c1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&i2c1_pins>;
+
+	clock-frequency = <400000>;
+};
+
 &i2c2 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&i2c2_pins>;
+
 	clock-frequency = <400000>;
 
 	/* Pressure Sensor */
@@ -116,7 +267,17 @@
 	};
 };
 
+&i2c3 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&i2c3_pins>;
+
+	clock-frequency = <400000>;
+};
+
 &i2c4 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&i2c4_pins>;
+
 	clock-frequency = <400000>;
 
 	/* Temperature Sensor */
@@ -124,6 +285,13 @@
 		compatible = "ti,tmp102";
 		reg = <0x48>;
 	};
+};
+
+&i2c5 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&i2c5_pins>;
+
+	clock-frequency = <400000>;
 };
 
 &keypad {
@@ -152,6 +320,15 @@
 	device-handle = <&samsung_K3PE0E000B>;
 };
 
+&usbhshost {
+	port2-mode = "ehci-hsic";
+	port3-mode = "ehci-hsic";
+};
+
+&usbhsehci {
+	phys = <0 &hsusb2_phy &hsusb3_phy>;
+};
+
 &i2c1 {
 	clock-frequency = <400000>;
 
@@ -165,3 +342,22 @@
 };
 
 /include/ "palmas.dtsi"
+
+&mcspi1 {
+
+};
+
+&mcspi2 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&mcspi2_pins>;
+};
+
+&mcspi3 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&mcspi3_pins>;
+};
+
+&mcspi4 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&mcspi4_pins>;
+};
