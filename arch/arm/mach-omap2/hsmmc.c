@@ -494,8 +494,7 @@ static u32 __init omap_hsmmc_si_spec_caps(struct omap2_hsmmc_info *c)
 		if (c->mmc == 1) {
 			caps |= (MMC_CAP_UHS_SDR12 | MMC_CAP_UHS_SDR25 |
 				MMC_CAP_UHS_DDR50);
-			if (omap_rev() == OMAP5430_REV_ES2_0)
-				caps |= MMC_CAP_UHS_SDR104;
+			caps |= MMC_CAP_UHS_SDR104;
 		}
 	}
 	return caps;
@@ -506,8 +505,7 @@ static u32 __init omap_hsmmc_si_spec_caps2(struct omap2_hsmmc_info *c)
 	u32 caps2 = 0;
 	if (cpu_is_omap54xx()) {
 		if (c->mmc == 2) {
-			if (omap_rev() == OMAP5430_REV_ES2_0)
-				caps2 |= MMC_CAP2_HS200_1_8V_SDR;
+			caps2 |= MMC_CAP2_HS200_1_8V_SDR;
 		}
 	}
 	return caps2;
@@ -621,17 +619,10 @@ static int __init omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
 		if (mmc->slots[0].features & HSMMC_HAS_PBIAS) {
 			/* on-chip level shifting via PBIAS0/PBIAS1 */
 			if (cpu_is_omap54xx()) {
-				if (omap_rev() == OMAP5430_REV_ES2_0) {
-					mmc->slots[0].before_set_reg =
-						omap5_es2_before_set_reg;
-					mmc->slots[0].after_set_reg =
-						omap5_es2_after_set_reg;
-				} else {
-					mmc->slots[0].before_set_reg =
-						omap4_hsmmc1_before_set_reg;
-					mmc->slots[0].after_set_reg =
-						omap4_hsmmc1_after_set_reg;
-				}
+				mmc->slots[0].before_set_reg =
+					omap5_es2_before_set_reg;
+				mmc->slots[0].after_set_reg =
+					omap5_es2_after_set_reg;
 				omap_mux_get_by_name("sdcard_clk",
 						&mmc->slots[0].p_mmc_clk,
 						&mmc->slots[0].mux_mmc_clk);
