@@ -40,6 +40,7 @@
 #include <plat/clock.h>
 #include <linux/gpio.h>
 
+#include "ti_hdmi_4xxx_ip.h"
 #include "ti_hdmi.h"
 #include "dss.h"
 #include "dss_features.h"
@@ -88,7 +89,7 @@ static struct {
 	void (*hdmi_cec_hpd)(int phy_addr, int status);
 	void (*hdmi_start_frame_cb)(void);
 	bool (*hdmi_power_on_cb)(void);
-	void (*hdmi_hdcp_irq_cb)(void);
+	void (*hdmi_hdcp_irq_cb)(int);
 } hdmi;
 
 static const u8 edid_header[8] = {0x0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x0};
@@ -518,6 +519,9 @@ err:
 
 static void hdmi_power_off(struct omap_dss_device *dssdev)
 {
+        if (cpu_is_omap44xx() && hdmi.hdmi_hdcp_irq_cb)
+                hdmi.hdmi_hdcp_irq_cb(HDMI_HPD_LOW);
+
 	dss_mgr_disable(dssdev->manager);
 
 	if (hdmi.ip_data.ops->hdcp_disable)
@@ -536,7 +540,7 @@ static void hdmi_power_off(struct omap_dss_device *dssdev)
 
 void omapdss_hdmi_register_hdcp_callbacks(void (*hdmi_start_frame_cb)(void),
 				bool (*hdmi_power_on_cb)(void),
-				void (*hdmi_hdcp_irq_cb)(void))
+				void (*hdmi_hdcp_irq_cb)(int))
 {
 	hdmi.hdmi_start_frame_cb = hdmi_start_frame_cb;
 	hdmi.hdmi_power_on_cb = hdmi_power_on_cb;
@@ -1128,7 +1132,7 @@ static irqreturn_t hdmi_irq_handler(int irq, void *arg)
 		hdmi.hdmi_cec_irq_cb();
 
 	if (hdmi.hdmi_hdcp_irq_cb && (r & HDMI_HDCP_INT))
-		hdmi.hdmi_hdcp_irq_cb();
+		hdmi.hdmi_hdcp_irq_cb(HDMI_HPD_HIGH);
 
 	r = hdmi.ip_data.ops->irq_process(&hdmi.ip_data);
 	return IRQ_HANDLED;

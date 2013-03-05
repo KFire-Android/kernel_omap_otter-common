@@ -604,7 +604,7 @@ int omapdss_hdmi_display_3d_type(struct omap_dss_device *dssdev,
 					int type);
 void omapdss_hdmi_register_hdcp_callbacks(void (*hdmi_start_frame_cb)(void),
 					bool (*hdmi_power_on_cb)(void),
-					void (*hdmi_hdcp_irq_cb)(void));
+					void (*hdmi_hdcp_irq_cb)(int));
 int hdmi_panel_init(void);
 void hdmi_panel_exit(void);
 #ifdef CONFIG_OMAP4_DSS_HDMI_AUDIO

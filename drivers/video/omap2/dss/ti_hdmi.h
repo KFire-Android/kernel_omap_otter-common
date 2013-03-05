@@ -25,7 +25,17 @@
 #include <video/cec.h>
 #include <linux/wait.h>
 
-#include "hdcp.h"
+/* HDCP interrupts bits */
+#define KSVACCESSINT		(1 << 0x0)
+#define KSVSHA1CALCINT		(1 << 0x1)
+#define KEEPOUTERRORINT		(1 << 0x2)
+#define LOSTARBITRATION		(1 << 0x3)
+#define I2CNACK			(1 << 0x4)
+#define HDCP_FAILED		(1 << 0x6)
+#define HDCP_ENGAGED		(1 << 0x7)
+
+#define HDMI_HDCP_ENABLED	0x1
+#define HDMI_HDCP_FAILED	0x0
 
 #define HDMI_CEC_INT		0x100
 #define HDMI_HDCP_INT		0x200
