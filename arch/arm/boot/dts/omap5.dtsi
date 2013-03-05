@@ -379,6 +379,24 @@
 			ti,hwmods = "kbd";
 		};
 
+		aess: aess@0x401f1000 {
+			compatible = "ti,omap4-aess";
+			reg = <0x401f1000 0x3ff>, /* MPU private access */
+			      <0x40180000 0xffff>, /* DMEM - MPU */
+			      <0x401a0000 0x1fff>, /* CMEM - MPU */
+			      <0x401c0000 0x5fff>, /* SMEM - MPU */
+			      <0x401e0000 0x1fff>, /* PMEM - MPU */
+			      <0x4901f000 0x3ff>, /* L3 Interconnect */
+			      <0x49080000 0xffff>, /* DMEM - MPU */
+			      <0x490a0000 0x1fff>, /* CMEM - MPU */
+			      <0x490ce000 0x5fff>, /* SMEM - MPU */
+			      <0x490e0000 0x1fff>; /* PMEM - MPU */
+			reg-names = "mpu", "dmem", "cmem", "smem", "pmem",
+				"dma","dmem_dma", "cmem_dma", "smem_dma", "pmem_dma";
+			interrupts = <0 99 0x4>;
+			ti,hwmods = "aess";
+		};
+
 		mcpdm: mcpdm@40132000 {
 			compatible = "ti,omap4-mcpdm";
 			reg = <0x40132000 0x7f>, /* MPU private access */
@@ -395,6 +413,15 @@
 			reg-names = "mpu", "dma";
 			interrupts = <0 114 0x4>;
 			ti,hwmods = "dmic";
+		};
+
+		mcasp: mcasp@40128000 {
+			compatible = "ti,omap4-mcasp";
+			reg = <0x40128000 0x7f>, /* MPU private access */
+			      <0x49028000 0x7f>; /* L3 Interconnect */
+			reg-names = "mpu", "dma";
+			interrupts = <0 109 0x4>;
+			ti,hwmods = "mcasp";
 		};
 
 		mcbsp1: mcbsp@40122000 {
@@ -624,6 +651,46 @@
 			reg = <0x4ae14000 0x80>;
 			interrupts = <0 80 0x4>;
 			ti,hwmods = "wd_timer2";
+		};
+
+		dss {
+			compatible = "ti,omap4-dss";
+			ti,hwmods = "dss_core";
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			dispc {
+				compatible = "ti,omap4-dispc";
+				ti,hwmods = "dss_dispc";
+			};
+
+			dpi: dpi {
+				compatible = "ti,omap4-dpi";
+				video-source = <2>;
+			};
+
+			dsi1: dsi@1 {
+				compatible = "ti,omap4-dsi";
+				ti,hwmods = "dss_dsi1_a";
+				reg = <0>;
+				vdds_dsi-supply = <&ldo7_reg>;
+				video-source = <0>;
+			};
+
+			dsi2: dsi@2 {
+				compatible = "ti,omap4-dsi";
+				ti,hwmods = "dss_dsi1_c";
+				reg = <1>;
+				vdds_dsi-supply = <&ldo7_reg>;
+				video-source = <2>;
+			};
+
+			hdmi: hdmi {
+				compatible = "ti,omap4-hdmi", "simple-bus";
+				ti,hwmods = "dss_hdmi";
+				vdda_hdmi_dac-supply = <&ldo7_reg>;
+				video-source = <1>;
+			};
 		};
 	};
 };

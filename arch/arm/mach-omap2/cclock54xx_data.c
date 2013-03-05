@@ -45,6 +45,8 @@
 #define OMAP54XX_MODULEMODE_HWCTRL		0
 #define OMAP54XX_MODULEMODE_SWCTRL		1
 
+#define OMAP5_DPLL_ABE_DEFFREQ				98304000
+
 /* Root clocks */
 
 DEFINE_CLK_FIXED_RATE(pad_clks_src_ck, CLK_IS_ROOT, 12000000, 0x0);
@@ -1410,6 +1412,7 @@ int __init omap5xxx_clk_init(void)
 {
 	u32 cpu_clkflg;
 	struct omap_clk *c;
+	int rc;
 
 	if (soc_is_omap54xx()) {
 		cpu_mask = RATE_IN_54XX;
@@ -1433,6 +1436,15 @@ int __init omap5xxx_clk_init(void)
 	}
 
 	omap2_clk_disable_autoidle_all();
+
+	/*
+	 * Lock the ABE DPLL in any case to avoid issues with audio.
+	 */
+	rc = clk_set_parent(&abe_dpll_clk_mux, &sys_32k_ck);
+	if (!rc)
+		rc = clk_set_rate(&dpll_abe_ck, OMAP5_DPLL_ABE_DEFFREQ);
+	if (rc)
+		pr_err("%s: failed to configure ABE DPLL!\n", __func__);
 
 	return 0;
 }

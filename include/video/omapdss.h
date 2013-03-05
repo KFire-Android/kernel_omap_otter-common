@@ -221,6 +221,53 @@ enum omap_dss_output_id {
 	OMAP_DSS_OUTPUT_HDMI	= 1 << 6,
 };
 
+/* Stereoscopic Panel types
+ * row, column, overunder, sidebyside options
+ * are with respect to native scan order
+*/
+enum s3d_disp_type {
+	S3D_DISP_NONE = 0,
+	S3D_DISP_FRAME_SEQ,
+	S3D_DISP_ROW_IL,
+	S3D_DISP_COL_IL,
+	S3D_DISP_PIX_IL,
+	S3D_DISP_CHECKB,
+	S3D_DISP_OVERUNDER,
+	S3D_DISP_SIDEBYSIDE,
+};
+
+/* Subsampling direction is based on native panel scan order.
+*/
+enum s3d_disp_sub_sampling {
+	S3D_DISP_SUB_SAMPLE_NONE = 0,
+	S3D_DISP_SUB_SAMPLE_V,
+	S3D_DISP_SUB_SAMPLE_H,
+};
+
+/* Indicates if display expects left view first followed by right or viceversa
+ * For row interlaved displays, defines first row view
+ * For column interleaved displays, defines first column view
+ * For checkerboard, defines first pixel view
+ * For overunder, defines top view
+ * For sidebyside, defines west view
+*/
+enum s3d_disp_order {
+	S3D_DISP_ORDER_L = 0,
+	S3D_DISP_ORDER_R = 1,
+};
+
+/* S3D information */
+struct s3d_disp_info {
+	enum s3d_disp_type type;
+	enum s3d_disp_sub_sampling sub_samp;
+	enum s3d_disp_order order;
+	/* Gap between left and right views
+	 * For over/under units are lines
+	 * For sidebyside units are pixels
+	  *For other types ignored*/
+	unsigned int gap;
+};
+
 /* RFBI */
 
 struct rfbi_timings {
@@ -625,6 +672,8 @@ struct omap_dss_device {
 		enum omap_dss_dsi_pixel_format dsi_pix_fmt;
 		enum omap_dss_dsi_mode dsi_mode;
 		struct omap_dss_dsi_videomode_timings dsi_vm_timings;
+		struct s3d_disp_info s3d_info;
+
 	} panel;
 
 	struct {
@@ -720,7 +769,6 @@ struct omap_dss_driver {
 
 	int (*read_edid)(struct omap_dss_device *dssdev, u8 *buf, int len);
 	bool (*detect)(struct omap_dss_device *dssdev);
-
 	/*
 	 * For display drivers that support audio. This encompasses
 	 * HDMI and DisplayPort at the moment.
@@ -738,6 +786,8 @@ struct omap_dss_driver {
 	int (*audio_start)(struct omap_dss_device *dssdev);
 	void (*audio_stop)(struct omap_dss_device *dssdev);
 
+	int (*s3d_enable)(struct omap_dss_device *dssdev,
+				struct s3d_disp_info *info, int code);
 };
 
 enum omapdss_version omapdss_get_version(void);

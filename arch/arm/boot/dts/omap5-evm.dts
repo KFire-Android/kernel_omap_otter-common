@@ -60,6 +60,67 @@
 		reset-supply = <&hsusb3_reset>;
 	};
 
+	sound {
+		compatible = "ti,abe-twl6040";
+		ti,model = "OMAP5-sEVM";
+
+		ti,jack-detection = <1>;
+		ti,mclk-freq = <19200000>;
+
+		ti,mcpdm = <&mcpdm>;
+		ti,dmic = <&dmic>;
+		ti,mcasp = <&mcasp>;
+		ti,mcbsp1 = <&mcbsp1>;
+		ti,mcbsp2 = <&mcbsp2>;
+		ti,aess = <&aess>;
+
+		ti,twl6040 = <&twl6040>;
+
+		/* Audio routing */
+		ti,audio-routing =
+			"Headset Stereophone", "HSOL",
+			"Headset Stereophone", "HSOR",
+			"Earphone Spk", "EP",
+			"Ext Spk", "HFL",
+			"Ext Spk", "HFR",
+			"Line Out", "AUXL",
+			"Line Out", "AUXR",
+			"HSMIC", "Headset Mic",
+			"Headset Mic", "Headset Mic Bias",
+			"MAINMIC", "Main Handset Mic",
+			"Main Handset Mic", "Main Mic Bias",
+			"SUBMIC", "Sub Handset Mic",
+			"Sub Handset Mic", "Main Mic Bias",
+			"AFML", "Line In",
+			"AFMR", "Line In",
+			"DMic", "Digital Mic",
+			"Digital Mic", "Digital Mic1 Bias",
+			"Headset Playback", "PDM_DL1",
+			"Handsfree Playback", "PDM_DL2",
+			"PDM_UL1", "Capture",
+			"40122000.mcbsp Playback", "BT_VX_DL",
+			"BT_VX_UL", "40122000.mcbsp Capture",
+			"40124000.mcbsp Playback", "MM_EXT_DL",
+			"MM_EXT_UL", "40124000.mcbsp Capture",
+			"DMIC0", "omap-dmic-abe.0 Capture",
+			"omap-dmic-abe.0 Capture", "Digital Mic1 Bias",
+			"Digital Mic1 Bias", "Digital Mic 0",
+			"DMIC1", "omap-dmic-abe.1 Capture",
+			"omap-dmic-abe.1 Capture", "Digital Mic1 Bias",
+			"Digital Mic1 Bias", "Digital Mic 1",
+			"DMIC2", "omap-dmic-abe.2 Capture",
+			"omap-dmic-abe.2 Capture", "Digital Mic1 Bias",
+			"Digital Mic1 Bias", "Digital Mic 2";
+	};
+
+	sound_hdmi {
+		compatible = "ti,omap-hdmi-tpd12s015-audio";
+		ti,model = "OMAP5HDMI";
+
+		ti,hdmi_audio = <&hdmi>;
+		ti,level_shifter = <&tpd12s015>;
+	};
+
 };
 
 &omap5_pmx_core {
@@ -71,6 +132,10 @@
 			&mcbsp1_pins
 			&mcbsp2_pins
 			&usbhost_pins
+			&lg4591_pins
+			&dss_hdmi_pins
+			&tpd12s015_pins
+			&tca6424a_pins
 	>;
 
 	mmc1_pins: pinmux_mmc1_pins {
@@ -216,12 +281,41 @@
 			0x16c 0x101	/*  MCSPI2_CS INPUTENABLE | MODE1 */
 		>;
 	};
+
+	lg4591_pins: pinmux_lg4591_pins {
+		pinctrl-single,pins = <
+			0xf2 0x8	/* perslimbus2_clock.gpio6_183 OUTPUT PULLDOWN | MODE0 */
+		>;
+	};
+
+	dss_hdmi_pins: pinmux_dss_hdmi_pins {
+		pinctrl-single,pins = <
+			0x0fc 0x118	/* hdmi_cec.hdmi_cec INPUT PULLUP | MODE 0 */
+			0x100 0x118	/* hdmi_scl.hdmi_scl INPUT PULLUP | MODE 0 */
+			0x102 0x118	/* hdmi_sda.hdmi_sda INPUT PULLUP | MODE 0 */
+		>;
+	};
+
+	tpd12s015_pins: pinmux_tpd12s015_pins {
+		pinctrl-single,pins = <
+			0x0fe 0x116	/* hdmi_hpd.gpio7_193 INPUT PULLDOWN | MODE6 */
+		>;
+	};
+
+	tca6424a_pins: pinmux_tca6424a_pins {
+		pinctrl-single,pins = <
+			0x186 0x100	/* i2c5_scl.i2c5_scl INPUT | MODE0 */
+			0x188 0x100	/* i2c5_sda.i2c5_sda INPUT | MODE0 */
+		>;
+	};
+
 };
 
 &mmc1 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&mmc1_pins>;
 	vmmc-supply = <&vmmcsd_fixed>;
+	vmmc-aux-supply = <&ldo9_reg>;
 	bus-width = <4>;
 	cd-gpios = <&gpio3 3 0>; /* gpio 67 */
 };
@@ -230,6 +324,7 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&mmc2_pins>;
 	vmmc-supply = <&vmmcsd_fixed>;
+	vmmc-aux-supply = <&ldo9_reg>;
 	bus-width = <8>;
 	ti,non-removable;
 };
@@ -290,8 +385,14 @@
 &i2c5 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&i2c5_pins>;
-
 	clock-frequency = <400000>;
+
+	tca6424a: tca6424a@22 {
+		compatible = "ti,tca6424a";
+		reg = <0x22>;
+		gpio-controller;
+		#gpio-cells = <2>;
+	};
 };
 
 &keypad {
@@ -339,6 +440,17 @@
 		interrupt-parent = <&gic>;
 	};
 
+	twl6040: twl@4b {
+		compatible = "ti,twl6040";
+
+		interrupts = <0 119 4>; /* IRQ_SYS_2N cascaded to gic */
+		interrupt-parent = <&gic>;
+		ti,audpwron-gpio = <&gpio5 17 0>;  /* gpio line 145 */
+
+		vio-supply = <&smps7_reg>;
+		v2v1-supply = <&smps9_reg>;
+		enable-active-high;
+	};
 };
 
 /include/ "palmas.dtsi"
@@ -360,4 +472,44 @@
 &mcspi4 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&mcspi4_pins>;
+};
+
+/include/ "twl6040.dtsi"
+
+&dsi1 {
+	lcd {
+		compatible = "ti,lg4591";
+
+		lanes = <
+			0       /* clk + */
+			1       /* clk - */
+			2       /* data1 + */
+			3       /* data1 - */
+			4       /* data2 + */
+			5       /* data2 - */
+			6       /* data3 + */
+			7       /* data3 - */
+			8       /* data4 + */
+			9       /* data4 - */
+		>;
+
+		vdds_foo-supply = <&ldo2_reg>;
+
+		gpios = <&gpio6 23 0>;	/* 183, reset */
+	};
+};
+
+&hdmi {
+	tpd12s015: tpd12s015 {
+		compatible = "ti,tpd12s015";
+
+		gpios = <&tca6424a 0 0>,	/* TCA6424A P01, CT_CP_HDP */
+			<&tca6424a 1 0>,	/* TCA6424A P00, LS_OE*/
+			<&gpio7 1 0>;		/* 193, HPD */
+
+		hdmi-monitor {
+			compatible = "ti,hdmi_panel";
+		};
+
+	};
 };

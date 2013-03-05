@@ -53,7 +53,7 @@ struct snd_compr_stream;
  * Specifies whether the DAI can also support inverted clocks for the specified
  * format.
  */
-#define SND_SOC_DAIFMT_NB_NF		(1 << 8) /* normal bit clock + frame */
+#define SND_SOC_DAIFMT_NB_NF		(0 << 8) /* normal bit clock + frame */
 #define SND_SOC_DAIFMT_NB_IF		(2 << 8) /* normal BCLK + inv FRM */
 #define SND_SOC_DAIFMT_IB_NF		(3 << 8) /* invert BCLK + nor FRM */
 #define SND_SOC_DAIFMT_IB_IF		(4 << 8) /* invert BCLK + FRM */
@@ -91,6 +91,24 @@ struct snd_compr_stream;
                                SNDRV_PCM_FMTBIT_S32_LE |\
                                SNDRV_PCM_FMTBIT_S32_BE)
 
+#define SND_SOC_DAI_CONNECT(xname, xcodec, xplatform, xcodec_dai, xcpu_dai) \
+	.name = xname, .codec_name = xcodec, \
+	.platform_name = xplatform, .codec_dai_name = xcodec_dai,\
+	.cpu_dai_name = xcpu_dai
+#define SND_SOC_DAI_OPS(xops, xinit) \
+	.ops = xops, .init = xinit
+#define SND_SOC_DAI_IGNORE_SUSPEND .ignore_suspend = 1
+#define SND_SOC_DAI_IGNORE_PMDOWN .ignore_pmdown_time = 1
+#define SND_SOC_DAI_BE_LINK(xid, xfixup) \
+	.be_id = xid, .be_hw_params_fixup = xfixup, .no_pcm = 1
+#define SND_SOC_DAI_FE_LINK(xname, xplatform, xcpu_dai) \
+	.name = xname, .platform_name = xplatform, \
+	.cpu_dai_name = xcpu_dai, .dynamic = 1, \
+	.codec_name = "snd-soc-dummy", .codec_dai_name = "snd-soc-dummy-dai"
+#define SND_SOC_DAI_FE_TRIGGER(xplay, xcapture) \
+	.trigger = {xplay, xcapture}
+#define SND_SOC_DAI_LINK_NO_HOST	.no_host_mode = 1
+
 struct snd_soc_dai_driver;
 struct snd_soc_dai;
 struct snd_ac97_bus_ops;
@@ -102,6 +120,7 @@ void snd_soc_unregister_dai(struct device *dev);
 int snd_soc_register_dais(struct device *dev,
 		struct snd_soc_dai_driver *dai_drv, size_t count);
 void snd_soc_unregister_dais(struct device *dev, size_t count);
+void snd_soc_card_reset_dai_links(struct snd_soc_card *card);
 
 /* Digital Audio Interface clocking API.*/
 int snd_soc_dai_set_sysclk(struct snd_soc_dai *dai, int clk_id,
@@ -293,4 +312,22 @@ static inline void *snd_soc_dai_get_drvdata(struct snd_soc_dai *dai)
 	return dev_get_drvdata(dai->dev);
 }
 
+/* Backend DAI PCM ops */
+int snd_soc_dai_startup(struct snd_pcm_substream *substream,
+	struct snd_soc_dai *dai);
+
+void snd_soc_dai_shutdown(struct snd_pcm_substream *substream,
+	struct snd_soc_dai *dai);
+
+int snd_soc_dai_hw_params(struct snd_pcm_substream * substream,
+		struct snd_pcm_hw_params *hw_params, struct snd_soc_dai *dai);
+
+int snd_soc_dai_hw_free(struct snd_pcm_substream *substream,
+	struct snd_soc_dai *dai);
+
+int snd_soc_dai_prepare(struct snd_pcm_substream *substream,
+	struct snd_soc_dai *dai);
+
+int snd_soc_dai_trigger(struct snd_pcm_substream *substream,
+	int cmd, struct snd_soc_dai *dai);
 #endif

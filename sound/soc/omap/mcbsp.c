@@ -448,6 +448,7 @@ void omap_mcbsp_set_tx_threshold(struct omap_mcbsp *mcbsp, u16 threshold)
 	if (threshold && threshold <= mcbsp->max_tx_thres)
 		MCBSP_WRITE(mcbsp, THRSH2, threshold - 1);
 }
+EXPORT_SYMBOL_GPL(omap_mcbsp_set_tx_threshold);
 
 /*
  * omap_mcbsp_set_rx_threshold configures the receive threshold in words.
@@ -462,6 +463,7 @@ void omap_mcbsp_set_rx_threshold(struct omap_mcbsp *mcbsp, u16 threshold)
 	if (threshold && threshold <= mcbsp->max_rx_thres)
 		MCBSP_WRITE(mcbsp, THRSH1, threshold - 1);
 }
+EXPORT_SYMBOL_GPL(omap_mcbsp_set_rx_threshold);
 
 /*
  * omap_mcbsp_get_tx_delay returns the number of used slots in the McBSP FIFO

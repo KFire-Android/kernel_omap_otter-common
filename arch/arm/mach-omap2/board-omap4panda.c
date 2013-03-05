@@ -108,6 +108,7 @@ static struct omap_abe_twl6040_data panda_abe_audio_data = {
 	.has_aux	= ABE_TWL6040_LEFT | ABE_TWL6040_RIGHT,
 	/* PandaBoard: FM RX, PandaBoardES: audio in */
 	.has_afm	= ABE_TWL6040_LEFT | ABE_TWL6040_RIGHT,
+	.has_abe	= 1,
 	/* No jack detection. */
 	.jack_detection	= 0,
 	/* MCLK input is 38.4MHz */
@@ -123,9 +124,9 @@ static struct platform_device panda_abe_audio = {
 	},
 };
 
-static struct platform_device panda_hdmi_audio_codec = {
-	.name	= "hdmi-audio-codec",
-	.id	= -1,
+static struct platform_device panda_spdif_dit_codec = {
+	.name           = "spdif-dit",
+	.id             = -1,
 };
 
 static struct platform_device btwilink_device = {
@@ -215,7 +216,7 @@ static struct platform_device *panda_devices[] __initdata = {
 	&leds_gpio,
 	&wl1271_device,
 	&panda_abe_audio,
-	&panda_hdmi_audio_codec,
+	&panda_spdif_dit_codec,
 	&btwilink_device,
 	&hsusb1_phy_device,
 	&hsusb1_power_device,

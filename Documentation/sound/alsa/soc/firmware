@@ -1,0 +1,87 @@
+ASoC Firmware Interface
+=======================
+
+ASoC now provides a simple firmware helper interface to allow drivers to load
+kcontrols, widgets, simple coefficients and DAPM graphs alongside their 
+firmware text.
+
+Modern audio DSP devices usually have a tight coupling between their firmware
+and the kcontrols, widgets and graph they implement. It makes sense to allow
+ASoC to generate the ASoC specific objects that define the driver by reading
+them from firmware file(s) rather than having them hard coded in the DSP driver. 
+This allows vendors to write a single DSP component driver for many different
+end user devices with the differentiation coming from the firmware.
+
+
+ASoC Firmware Features
+======================
+
+The ASoC firmware interface takes firmware data and reads standard headers that
+define each section in the firmware. It can then displatch the firmware section
+to either the component driver or the generic ASoC firmware core for processing
+and enumeration. The firmware sections can come in any order and can come from
+more than one firmware file, although each file will require a request to the
+kernel fimrware API in order to load the data.
+
+The ASoC firmware headers are very simple and define the section type, size,
+version, ABI as well as verifying that the section is valid. There is an 
+alsa-utils based tool that can be used to add a section header to a firmware
+file. Firmware files can be concatentaed together using tools like cat to create
+a single firmware file from numerous firmware files.
+
+Firmware sections can have the following types :- 
+
+ o kcontrols (with or without TLV data)
+ o kcontrols (with coefficient data - for simple one time coefficients)
+ o DAPM widgets with associated kcontrol(s)
+ o DAPM graph elements
+ o Firmware text
+ o Firmware configuration data
+
+The firmware header is defined in include/uapi/sound/asoc.h as :-
+
+/*
+ * File and Block Header
+ */
+struct snd_soc_fw_hdr {
+	__le32 magic;
+	__le32 abi;		/* ABI version */
+	__le32 type;
+	__le32 vendor_type;	/* optional vendor specific type info */
+	__le32 version;		/* optional vendor specific version details */
+	__le32 size;		/* data bytes, excluding this header */
+} __attribute__((packed));
+
+
+Component Driver API
+====================
+
+Component drivers can use the ASoC firmware interface by calling either :- 
+
+int snd_soc_fw_load_card(struct snd_soc_card *card,
+	struct snd_soc_fw_card_ops *ops, const struct firmware *fw,
+	u32 index);
+int snd_soc_fw_load_platform(struct snd_soc_platform *platform,
+	struct snd_soc_fw_platform_ops *ops, const struct firmware *fw,
+	u32 index);
+int snd_soc_fw_load_codec(struct snd_soc_codec *codec,
+	struct snd_soc_fw_codec_ops *ops, const struct firmware *fw,
+	u32 index);
+
+depending on the type of the component driver. The component driver passes in a
+pointer to itself and a pointer to the firmware object (requested using FW API).
+It also passes in a pointer to some some internal functions that are used to 
+initialise any firmware object or assign private data. Finally an index number
+can be passed to identify all objects created with this firmware so that
+component drivers can load and remove multiple firmware objects based on this
+number.
+
+Firmware objects can be removed with the following calls :-
+
+void snd_soc_fw_dcontrols_remove_codec(struct snd_soc_codec *codec, u32 index);
+void snd_soc_fw_dcontrols_remove_platform(struct snd_soc_platform *platform, u32 index);
+void snd_soc_fw_dcontrols_remove_card(struct snd_soc_card *soc_card, u32 index);
+
+The ASoC FW interface for component drivers is defined in include/sound/soc-fw.h
+
+

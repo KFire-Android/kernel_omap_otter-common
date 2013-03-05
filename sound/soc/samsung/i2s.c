@@ -29,6 +29,11 @@
 
 #define msecs_to_loops(t) (loops_per_jiffy / 1000 * HZ * t)
 
+enum samsung_dai_type {
+	TYPE_PRI,
+	TYPE_SEC,
+};
+
 struct i2s_dai {
 	/* Platform device for this DAI */
 	struct platform_device *pdev;
@@ -651,6 +656,9 @@ static int i2s_startup(struct snd_pcm_substream *substream,
 	/* Enforce set_sysclk in Master mode */
 	i2s->rclk_srcrate = 0;
 
+	if (!any_active(i2s) && (i2s->quirks & QUIRK_NEED_RSTCLR))
+		writel(CON_RSTCLR, i2s->addr + I2SCON);
+
 	spin_unlock_irqrestore(&lock, flags);
 
 	return 0;
@@ -981,8 +989,7 @@ static struct i2s_dai *i2s_alloc_dai(struct platform_device *pdev, bool sec)
 		i2s->i2s_dai_drv.capture.formats = SAMSUNG_I2S_FMTS;
 	} else {	/* Create a new platform_device for Secondary */
 		i2s->pdev = platform_device_register_resndata(NULL,
-				pdev->name, pdev->id + SAMSUNG_I2S_SECOFF,
-				NULL, 0, NULL, 0);
+				"samsung-i2s-sec", -1, NULL, 0, NULL, 0);
 		if (IS_ERR(i2s->pdev))
 			return NULL;
 	}
@@ -993,6 +1000,11 @@ static struct i2s_dai *i2s_alloc_dai(struct platform_device *pdev, bool sec)
 	return i2s;
 }
 
+static inline int samsung_i2s_get_driver_data(struct platform_device *pdev)
+{
+	return platform_get_device_id(pdev)->driver_data;
+}
+
 static int samsung_i2s_probe(struct platform_device *pdev)
 {
 	u32 dma_pl_chan, dma_cp_chan, dma_pl_sec_chan;
@@ -1001,10 +1013,13 @@ static int samsung_i2s_probe(struct platform_device *pdev)
 	struct samsung_i2s *i2s_cfg;
 	struct resource *res;
 	u32 regs_base, quirks;
+	enum samsung_dai_type samsung_dai_type;
 	int ret = 0;
 
 	/* Call during Seconday interface registration */
-	if (pdev->id >= SAMSUNG_I2S_SECOFF) {
+	samsung_dai_type = samsung_i2s_get_driver_data(pdev);
+
+	if (samsung_dai_type == TYPE_SEC) {
 		sec_dai = dev_get_drvdata(&pdev->dev);
 		snd_soc_register_dai(&sec_dai->pdev->dev,
 			&sec_dai->i2s_dai_drv);
@@ -1143,9 +1158,22 @@ static int samsung_i2s_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static struct platform_device_id samsung_i2s_driver_ids[] = {
+	{
+		.name           = "samsung-i2s",
+		.driver_data	= TYPE_PRI,
+	}, {
+		.name           = "samsung-i2s-sec",
+		.driver_data	= TYPE_SEC,
+	},
+	{},
+};
+MODULE_DEVICE_TABLE(platform, samsung-i2s-driver-ids);
+
 static struct platform_driver samsung_i2s_driver = {
 	.probe  = samsung_i2s_probe,
 	.remove = samsung_i2s_remove,
+	.id_table = samsung_i2s_driver_ids,
 	.driver = {
 		.name = "samsung-i2s",
 		.owner = THIS_MODULE,

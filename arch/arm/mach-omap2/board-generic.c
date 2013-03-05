@@ -105,6 +105,8 @@ static void __init omap_generic_init(void)
 
 	of_platform_populate(NULL, omap_dt_match_table, NULL, NULL);
 
+	omapdss_init_of();
+
 	/* create clock aliases based on 'clock_alias' nodes */
 	for_each_node_by_name(np, "clock_alias") {
 		omap_create_clk_alias(np);

@@ -30,6 +30,8 @@
 #include <linux/platform_device.h>
 #include <linux/regulator/consumer.h>
 #include <linux/string.h>
+#include <linux/slab.h>
+#include <linux/of.h>
 
 #include <video/omapdss.h>
 
@@ -510,6 +512,60 @@ static void __init dpi_probe_pdata(struct platform_device *dpidev)
 	}
 }
 
+static void __init dpi_probe_of(struct platform_device *pdev)
+{
+	struct device_node *node = pdev->dev.of_node;
+	struct device_node *child;
+	struct omap_dss_device *dssdev;
+	enum omap_channel channel;
+	u32 v;
+	int r;
+
+	child = of_get_next_available_child(node, NULL);
+
+	if (!child)
+		return;
+
+	r = of_property_read_u32(node, "video-source", &v);
+	if (r) {
+		DSSERR("parsing channel failed\n");
+		return;
+	}
+
+	channel = v;
+
+	dssdev = dss_alloc_and_init_device(&pdev->dev);
+	if (!dssdev)
+		return;
+
+	dssdev->dev.of_node = child;
+	dssdev->type = OMAP_DISPLAY_TYPE_DPI;
+	dssdev->name = child->name;
+	dssdev->channel = channel;
+
+	r = dpi_init_display(dssdev);
+	if (r) {
+		DSSERR("device %s init failed: %d\n", dssdev->name, r);
+		dss_put_device(dssdev);
+		return;
+	}
+
+	r = omapdss_output_set_device(&dpi.output, dssdev);
+	if (r) {
+		DSSERR("failed to connect output to new device: %s\n",
+				dssdev->name);
+		dss_put_device(dssdev);
+		return;
+	}
+
+	r = dss_add_device(dssdev);
+	if (r) {
+		DSSERR("dss_add_device failed %d\n", r);
+		dss_put_device(dssdev);
+		return;
+	}
+}
+
 static void __init dpi_init_output(struct platform_device *pdev)
 {
 	struct omap_dss_output *out = &dpi.output;
@@ -534,7 +590,10 @@ static int __init omap_dpi_probe(struct platform_device *pdev)
 
 	dpi_init_output(pdev);
 
-	dpi_probe_pdata(pdev);
+	if (pdev->dev.of_node)
+		dpi_probe_of(pdev);
+	else if (pdev->dev.platform_data)
+		dpi_probe_pdata(pdev);
 
 	return 0;
 }
@@ -548,11 +607,23 @@ static int __exit omap_dpi_remove(struct platform_device *pdev)
 	return 0;
 }
 
+#if defined(CONFIG_OF)
+static const struct of_device_id dpi_of_match[] = {
+	{
+		.compatible = "ti,omap4-dpi",
+	},
+	{},
+};
+#else
+#define dpi_of_match NULL
+#endif
+
 static struct platform_driver omap_dpi_driver = {
 	.remove         = __exit_p(omap_dpi_remove),
 	.driver         = {
 		.name   = "omapdss_dpi",
 		.owner  = THIS_MODULE,
+		.of_match_table = dpi_of_match,
 	},
 };
 

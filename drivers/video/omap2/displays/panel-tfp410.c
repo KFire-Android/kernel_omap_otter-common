@@ -23,6 +23,8 @@
 #include <linux/i2c.h>
 #include <linux/gpio.h>
 #include <drm/drm_edid.h>
+#include <linux/of_gpio.h>
+#include <linux/of_i2c.h>
 
 #include <video/omap-panel-tfp410.h>
 
@@ -93,11 +95,51 @@ static void tfp410_power_off(struct omap_dss_device *dssdev)
 	omapdss_dpi_display_disable(dssdev);
 }
 
+static int tfp410_probe_of(struct omap_dss_device *dssdev,
+		struct panel_drv_data *ddata)
+{
+	struct device_node *node = dssdev->dev.of_node;
+	struct device_node *adapter_node;
+	struct i2c_adapter *adapter;
+	int r, gpio, datalines;
+
+	gpio = of_get_gpio(node, 0);
+
+	if (gpio_is_valid(gpio)) {
+		ddata->pd_gpio = gpio;
+	} else if (gpio == -ENOENT) {
+		ddata->pd_gpio = -1;
+	} else {
+		dev_err(&dssdev->dev, "failed to parse PD gpio\n");
+		return gpio;
+	}
+
+	r = of_property_read_u32(node, "data-lines", &datalines);
+	if (r) {
+		dev_err(&dssdev->dev, "failed to parse datalines");
+		return r;
+	}
+
+	dssdev->phy.dpi.data_lines = datalines;
+
+	adapter_node = of_parse_phandle(node, "i2c-bus", 0);
+	if (adapter_node) {
+		adapter = of_find_i2c_adapter_by_node(adapter_node);
+		if (adapter == NULL) {
+			dev_err(&dssdev->dev, "failed to parse i2c-bus\n");
+			return -EINVAL;
+		}
+
+		ddata->i2c_adapter = adapter;
+	}
+
+	return 0;
+}
+
 static int tfp410_probe(struct omap_dss_device *dssdev)
 {
 	struct panel_drv_data *ddata;
 	int r;
-	int i2c_bus_num;
 
 	ddata = devm_kzalloc(&dssdev->dev, sizeof(*ddata), GFP_KERNEL);
 	if (!ddata)
@@ -108,14 +150,29 @@ static int tfp410_probe(struct omap_dss_device *dssdev)
 	ddata->dssdev = dssdev;
 	mutex_init(&ddata->lock);
 
-	if (dssdev->data) {
+	if (dssdev->dev.of_node) {
+		r = tfp410_probe_of(dssdev, ddata);
+		if (r)
+			return r;
+	}
+	else if (dssdev->data) {
 		struct tfp410_platform_data *pdata = dssdev->data;
+		struct i2c_adapter *adapter;
+		int i2c_bus_num;
 
 		ddata->pd_gpio = pdata->power_down_gpio;
 		i2c_bus_num = pdata->i2c_bus_num;
+
+		adapter = i2c_get_adapter(i2c_bus_num);
+		if (!adapter) {
+			dev_err(&dssdev->dev, "Failed to get I2C adapter, bus %d\n",
+					i2c_bus_num);
+			return -EINVAL;
+		}
+
+		ddata->i2c_adapter = adapter;
 	} else {
-		ddata->pd_gpio = -1;
-		i2c_bus_num = -1;
+		return -EINVAL;
 	}
 
 	if (gpio_is_valid(ddata->pd_gpio)) {
@@ -126,19 +183,6 @@ static int tfp410_probe(struct omap_dss_device *dssdev)
 					ddata->pd_gpio);
 			return r;
 		}
-	}
-
-	if (i2c_bus_num != -1) {
-		struct i2c_adapter *adapter;
-
-		adapter = i2c_get_adapter(i2c_bus_num);
-		if (!adapter) {
-			dev_err(&dssdev->dev, "Failed to get I2C adapter, bus %d\n",
-					i2c_bus_num);
-			return -EINVAL;
-		}
-
-		ddata->i2c_adapter = adapter;
 	}
 
 	dev_set_drvdata(&dssdev->dev, ddata);
@@ -318,6 +362,19 @@ out:
 	return true;
 }
 
+#if defined(CONFIG_OF)
+static const struct of_device_id tfp410_of_match[] = {
+	{
+		.compatible = "ti,tfp410",
+	},
+	{},
+};
+
+MODULE_DEVICE_TABLE(of, tfp410_of_match);
+#else
+#define dss_of_match NULL
+#endif
+
 static struct omap_dss_driver tfp410_driver = {
 	.probe		= tfp410_probe,
 	.remove		= __exit_p(tfp410_remove),
@@ -335,6 +392,7 @@ static struct omap_dss_driver tfp410_driver = {
 	.driver         = {
 		.name   = "tfp410",
 		.owner  = THIS_MODULE,
+		.of_match_table = tfp410_of_match,
 	},
 };
 
