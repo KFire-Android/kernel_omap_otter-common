@@ -57,6 +57,7 @@
 #define GPIO_TWL6040_PWRON	141
 #define GPIO_SDCARD_DETECT	152
 #define HDMI_GPIO_HPD		193
+#define GPIO_MSECURE		234	/* MSECURE GPIO */
 
 static struct gpio_led panda5_gpio_leds[] = {
 	{
@@ -812,6 +813,17 @@ static int __init omap5pandai2c_init(void)
 	return 0;
 }
 
+static void __init omap_msecure_init(void)
+{
+	int err;
+	/* setup msecure line as GPIO for RTC accesses */
+	omap_mux_init_gpio(GPIO_MSECURE, OMAP_PIN_OUTPUT);
+	err = gpio_request_one(GPIO_MSECURE, GPIOF_OUT_INIT_HIGH, "msecure");
+	if (err < 0)
+		pr_err("Failed to request GPIO %d, error %d\n",
+			GPIO_MSECURE, err);
+}
+
 /* Display DVI */
 #define PANDA_DVI_TFP410_POWER_DOWN_GPIO	0
 
@@ -934,6 +946,7 @@ static void __init omap_5_panda_init(void)
 	omap5_mux_init(board_mux, NULL, OMAP_PACKAGE_CBL);
 	omap_sdrc_init(NULL, NULL);
 	omap5pandai2c_init();
+	omap_msecure_init();
 	omap5_pmic_init(1, PALMAS_NAME, OMAP44XX_IRQ_SYS_1N, PALMAS_DATA,
 			"twl6040", OMAP44XX_IRQ_SYS_2N, &twl6040_data);
 
