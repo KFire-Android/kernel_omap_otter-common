@@ -50,7 +50,7 @@
 #include <video/omap-panel-generic-dpi.h>
 
 
-#define GPIO_ETH_NRESET		15	/* USBB3 to SMSC LAN9730 */
+#define GPIO_ETH_NRESET		79	/* USBB3 to SMSC LAN9730 */
 #define GPIO_HUB_NRESET		80	/* USBB2 to SMSC 3530 HUB */
 #define GPIO_POWER_BUTTON	83
 #define GPIO_EXT_INT_PIN	99
