@@ -241,7 +241,7 @@ static struct omap_opp_def omap443x_opp_def_list[] = {
 	/* IVA OPP2 - OPP100 */
 	OPP_INITIALIZER(&iva_dev_info, true, 266100000, OMAP4430_VDD_IVA_OPP100_UV),
 	/* IVA OPP3 - OPP-Turbo */
-	OPP_INITIALIZER(&iva_dev_info, false, 332000000, OMAP4430_VDD_IVA_OPPTURBO_UV),
+	OPP_INITIALIZER(&iva_dev_info, true, 332000000, OMAP4430_VDD_IVA_OPPTURBO_UV),
 	/* ABE OPP1 - OPP50 */
 	OPP_INITIALIZER(&abe_dev_info, true, 98304000, OMAP4430_VDD_IVA_OPP50_UV),
 	/* ABE OPP2 - OPP100 */
@@ -443,7 +443,7 @@ struct omap_volt_data omap447x_vdd_iva_volt_data[] = {
 	VOLT_DATA_DEFINE(0, 0, 0, 0, 0),
 };
 
-#define OMAP4470_VDD_CORE_OPP50_UV		 925000
+#define OMAP4470_VDD_CORE_OPP50_UV		 980000
 #define OMAP4470_VDD_CORE_OPP100_UV		1126000
 #define OMAP4470_VDD_CORE_OPP100_OV_UV		1190000
 

@@ -962,7 +962,6 @@ static irqreturn_t twl6030charger_ctrl_interrupt(int irq, void *_di)
 	    (charge_state & CONTROLLER_STAT1_EXTCHRG_STATZ)) {
 		events = BQ2415x_CHARGER_FAULT;
 		blocking_notifier_call_chain(&notifier_list, events, NULL);
-		charger_fault = 1;
 	}
 
 	if (stat_reset & VBUS_DET) {
