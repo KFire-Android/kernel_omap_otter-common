@@ -68,7 +68,7 @@ int __init gcxxx_init(void)
 	const char *dev_name = "gccore";
 
 	if (!omap_has_gc320()) {
-		dev_err(&pdev->dev, "gcxxx_int failed. gcx hardware is not present\n");
+		pr_info("gcxxx_int failed. gcx hardware is not present\n");
 		return retval;
 	}
 
