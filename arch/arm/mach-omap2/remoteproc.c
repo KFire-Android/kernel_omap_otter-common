@@ -23,6 +23,7 @@
 #include <linux/memblock.h>
 #include <linux/remoteproc.h>
 
+#include <plat/common.h>
 #include <plat/omap_device.h>
 #include <plat/omap_hwmod.h>
 #include <plat/remoteproc.h>
@@ -253,7 +254,10 @@ void __init omap_rproc_reserve_cma(int platform_type)
 		cma_size = CONFIG_OMAP4_IPU_CMA_SIZE;
 		cma_addr = OMAP4_RPROC_CMA_BASE_IPU;
 	} else if (platform_type == RPROC_CMA_OMAP5) {
-		cma_size = CONFIG_OMAP5_IPU_CMA_SIZE;
+		if (omap_total_ram_size() <= SZ_512M)
+			cma_size = CONFIG_OMAP5_IPU_CMA_SIZE_512MB;
+		else
+			cma_size = CONFIG_OMAP5_IPU_CMA_SIZE;
 		cma_addr = OMAP5_RPROC_CMA_BASE_IPU;
 	}
 

@@ -89,6 +89,16 @@ config OMAP4_IPU_CMA_SIZE
 	  for OMAP4's dual Cortex-M3 sub-system. Vast majority of this
 	  memory isn't wasted in case the M3 sub-system isn't loaded.
 
+config OMAP5_IPU_CMA_SIZE_512MB
+	hex "Cortex M4 physically contiguous memory pool size (in bytes)"
+	depends on OMAP_REMOTEPROC_IPU
+	default 0x2000000
+	help
+	  Allocate a specified size of physically contiguous memory (CMA)
+	  for OMAP's dual M4 sub-system. Vast majority of this
+	  memory isn't wasted in case the M4 sub-system isn't loaded.
+
+
 config OMAP5_IPU_CMA_SIZE
 	hex "Cortex M4 physically contiguous memory pool size (in bytes)"
 	depends on OMAP_REMOTEPROC_IPU
