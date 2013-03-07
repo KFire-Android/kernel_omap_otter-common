@@ -115,6 +115,7 @@ static struct omap_rproc_pdata omap4_rproc_data[] = {
 	{
 		.name		= "dsp_c0",
 		.firmware	= "tesla-dsp.xe64T",
+		.firmware_512MB	= "tesla-dsp.xe64T",
 		.mbox_name	= "mailbox-2",
 		.oh_name	= "dsp_c0",
 		.boot_reg	= OMAP4430_CONTROL_DSP_BOOTADDR,
@@ -128,6 +129,7 @@ static struct omap_rproc_pdata omap4_rproc_data[] = {
 	{
 		.name		= "ipu_c0",
 		.firmware	= "ducati-m3-core0.xem3",
+		.firmware_512MB	= "ducati-m3-core0_512MB.xem3",
 		.mbox_name	= "mailbox-1",
 		.oh_name	= "ipu_c0",
 		.oh_name_opt	= "ipu_c1",
@@ -354,6 +356,13 @@ static int __init omap_rproc_init(void)
 			ret = PTR_ERR(od);
 			continue;
 		}
+
+		/*Select the 512MB version of the firmware for 512MB memory
+		  * configuration
+		  */
+		if (omap_total_ram_size() <= SZ_512M)
+			omap4_rproc_data[i].firmware =
+				omap4_rproc_data[i].firmware_512MB;
 
 		ret = platform_device_add_data(pdev,
 					&omap4_rproc_data[i],
