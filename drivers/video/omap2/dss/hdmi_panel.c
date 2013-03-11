@@ -32,11 +32,17 @@
 
 #include "dss.h"
 
+enum omap_hdmi_users {
+	HDMI_USER_VIDEO	= 1 << 0,
+	HDMI_USER_AUDIO	= 1 << 1,
+};
+
 static struct {
 	struct omap_dss_device *dssdev;
 	struct mutex hdmi_lock;
 	struct switch_dev hpd_switch;
 	int hpd_gpio;
+	u8 usage;
 #if defined(CONFIG_OMAP4_DSS_HDMI_AUDIO)
 	/* protects calls to HDMI driver audio functionality */
 	spinlock_t hdmi_sp_lock;
@@ -231,6 +237,7 @@ static int hdmi_panel_enable(struct omap_dss_device *dssdev)
 
 	mutex_lock(&hdmi.hdmi_lock);
 
+	hdmi.usage |= HDMI_USER_VIDEO;
 	if (dssdev->state != OMAP_DSS_DISPLAY_DISABLED) {
 		r = -EINVAL;
 		goto err;
@@ -277,6 +284,12 @@ static void hdmi_panel_disable(struct omap_dss_device *dssdev)
 {
 	mutex_lock(&hdmi.hdmi_lock);
 
+	hdmi.usage &= ~HDMI_USER_VIDEO;
+	if (hdmi.usage) {
+		DSSINFO("HDMI in use\n");
+		goto done;
+	}
+
 	if (dssdev->state == OMAP_DSS_DISPLAY_ACTIVE) {
 		hdmi_inform_power_on_to_cec(false);
 		/* We cannot cut hdmi power without respecting the content
@@ -294,6 +307,7 @@ static void hdmi_panel_disable(struct omap_dss_device *dssdev)
 	} else
 		dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
 
+done:
 	mutex_unlock(&hdmi.hdmi_lock);
 }
 
@@ -305,6 +319,12 @@ static int hdmi_panel_suspend(struct omap_dss_device *dssdev)
 
 	if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE) {
 		r = -EINVAL;
+		goto err;
+	}
+
+	hdmi.usage &= ~HDMI_USER_VIDEO;
+	if (hdmi.usage) {
+		DSSINFO("HDMI in use, will not suspend\n");
 		goto err;
 	}
 
@@ -324,6 +344,8 @@ static int hdmi_panel_resume(struct omap_dss_device *dssdev)
 	int r = 0;
 
 	mutex_lock(&hdmi.hdmi_lock);
+
+	hdmi.usage |= HDMI_USER_VIDEO;
 
 	if (dssdev->state != OMAP_DSS_DISPLAY_SUSPENDED) {
 		r = -EINVAL;
@@ -535,11 +557,23 @@ static int hdmi_panel_audio_enable(struct omap_dss_device *dssdev, bool enable)
 	unsigned long flags;
 	int r;
 
+	mutex_lock(&hdmi.hdmi_lock);
+	if (enable)
+		hdmi.usage |= HDMI_USER_AUDIO;
+	else
+		hdmi.usage &= ~HDMI_USER_AUDIO;
 	spin_lock_irqsave(&hdmi.hdmi_sp_lock, flags);
 
 	r = hdmi_audio_enable(enable);
 
 	spin_unlock_irqrestore(&hdmi.hdmi_sp_lock, flags);
+	if (hdmi.usage)
+		goto done;
+	mutex_unlock(&hdmi.hdmi_lock);
+	hdmi_panel_disable(dssdev);
+	return r;
+done:
+	mutex_unlock(&hdmi.hdmi_lock);
 	return r;
 }
 
@@ -641,6 +675,7 @@ int hdmi_panel_init(void)
 	spin_lock_init(&hdmi.hdmi_sp_lock);
 #endif
 	hdmi.hpd_switch.name = "hdmi";
+	hdmi.usage = 0;
 	r = switch_dev_register(&hdmi.hpd_switch);
 	if (r)
 		goto err_event;
