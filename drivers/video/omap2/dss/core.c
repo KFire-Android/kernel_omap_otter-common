@@ -32,6 +32,7 @@
 #include <linux/io.h>
 #include <linux/device.h>
 #include <linux/regulator/consumer.h>
+#include <linux/earlysuspend.h>
 
 #include <video/omapdss.h>
 
@@ -43,6 +44,7 @@ static struct {
 
 	struct regulator *vdds_dsi_reg;
 	struct regulator *vdds_sdi_reg;
+	struct early_suspend dss_early_suspend_info;
 } core;
 
 static char *def_disp_name;
@@ -268,25 +270,21 @@ static void omap_dss_shutdown(struct platform_device *pdev)
 	dss_disable_all_devices();
 }
 
-static int omap_dss_suspend(struct platform_device *pdev, pm_message_t state)
+static void dss_early_suspend(struct early_suspend *h)
 {
-	DSSDBG("suspend %d\n", state.event);
-
-	return dss_suspend_all_devices();
+	DSSDBG("%s\n", __func__);
+	dss_suspend_all_devices();
 }
 
-static int omap_dss_resume(struct platform_device *pdev)
+static void dss_late_resume(struct early_suspend *h)
 {
-	DSSDBG("resume\n");
-
-	return dss_resume_all_devices();
+	DSSDBG("%s\n", __func__);
+	dss_resume_all_devices();
 }
 
 static struct platform_driver omap_dss_driver = {
 	.remove         = omap_dss_remove,
 	.shutdown	= omap_dss_shutdown,
-	.suspend	= omap_dss_suspend,
-	.resume		= omap_dss_resume,
 	.driver         = {
 		.name   = "omapdss",
 		.owner  = THIS_MODULE,
@@ -519,6 +517,10 @@ static int omap_dss_bus_register(void)
 		return r;
 	}
 
+	core.dss_early_suspend_info.suspend = dss_early_suspend;
+	core.dss_early_suspend_info.resume = dss_late_resume;
+	core.dss_early_suspend_info.level = EARLY_SUSPEND_LEVEL_DISABLE_FB + 1;
+	register_early_suspend(&core.dss_early_suspend_info);
 	return 0;
 }
 
