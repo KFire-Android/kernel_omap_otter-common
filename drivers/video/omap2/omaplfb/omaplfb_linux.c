@@ -829,51 +829,6 @@ OMAPLFB_ERROR OMAPLFBUnblankDisplay(OMAPLFB_DEVINFO *psDevInfo)
 	return (OMAPLFB_OK);
 }
 
-#ifdef CONFIG_HAS_EARLYSUSPEND
-
-static void OMAPLFBBlankDisplay(OMAPLFB_DEVINFO *psDevInfo)
-{
-	OMAPLFB_CONSOLE_LOCK();
-	fb_blank(psDevInfo->psLINFBInfo, 1);
-	OMAPLFB_CONSOLE_UNLOCK();
-}
-
-static void OMAPLFBEarlySuspendHandler(struct early_suspend *h)
-{
-	unsigned uiMaxFBDevIDPlusOne = OMAPLFBMaxFBDevIDPlusOne();
-	unsigned i;
-
-	for (i=0; i < uiMaxFBDevIDPlusOne; i++)
-	{
-		OMAPLFB_DEVINFO *psDevInfo = OMAPLFBGetDevInfoPtr(i);
-
-		if (psDevInfo != NULL)
-		{
-			OMAPLFBAtomicBoolSet(&psDevInfo->sEarlySuspendFlag, OMAPLFB_TRUE);
-			OMAPLFBBlankDisplay(psDevInfo);
-		}
-	}
-}
-
-static void OMAPLFBEarlyResumeHandler(struct early_suspend *h)
-{
-	unsigned uiMaxFBDevIDPlusOne = OMAPLFBMaxFBDevIDPlusOne();
-	unsigned i;
-
-	for (i=0; i < uiMaxFBDevIDPlusOne; i++)
-	{
-		OMAPLFB_DEVINFO *psDevInfo = OMAPLFBGetDevInfoPtr(i);
-
-		if (psDevInfo != NULL)
-		{
-			OMAPLFBUnblankDisplay(psDevInfo);
-			OMAPLFBAtomicBoolSet(&psDevInfo->sEarlySuspendFlag, OMAPLFB_FALSE);
-		}
-	}
-}
-
-#endif 
-
 OMAPLFB_ERROR OMAPLFBEnableLFBEventNotification(OMAPLFB_DEVINFO *psDevInfo)
 {
 	int                res;
@@ -904,13 +859,6 @@ OMAPLFB_ERROR OMAPLFBEnableLFBEventNotification(OMAPLFB_DEVINFO *psDevInfo)
 		return eError;
 	}
 
-#ifdef CONFIG_HAS_EARLYSUSPEND
-	psDevInfo->sEarlySuspend.suspend = OMAPLFBEarlySuspendHandler;
-	psDevInfo->sEarlySuspend.resume = OMAPLFBEarlyResumeHandler;
-	psDevInfo->sEarlySuspend.level = EARLY_SUSPEND_LEVEL_DISABLE_FB + 1;
-	register_early_suspend(&psDevInfo->sEarlySuspend);
-#endif
-
 	return (OMAPLFB_OK);
 }
 
@@ -918,11 +866,6 @@ OMAPLFB_ERROR OMAPLFBDisableLFBEventNotification(OMAPLFB_DEVINFO *psDevInfo)
 {
 	int res;
 
-#ifdef CONFIG_HAS_EARLYSUSPEND
-	unregister_early_suspend(&psDevInfo->sEarlySuspend);
-#endif
-
-	
 	res = fb_unregister_client(&psDevInfo->sLINNotifBlock);
 	if (res != 0)
 	{
