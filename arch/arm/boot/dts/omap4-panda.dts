@@ -106,36 +106,6 @@
 			&hsusbb1_pins
 	>;
 
-	mmc1_pins: pinmux_mmc1_pins {
-		pinctrl-single,pins = <
-			0xa0 0x118	/* sdmmc1_clk.sdmmc1_clk INPUT PULLUP | MODE0 */
-			0xa2 0x118	/* sdmmc1_cmd.sdmmc1_cmd INPUT PULLUP | MODE0 */
-			0xa4 0x118	/* sdmmc1_data0.sdmmc1_data0 INPUT PULLUP | MODE0 */
-			0xa6 0x118	/* sdmmc1_data1.sdmmc1_data1 INPUT PULLUP | MODE0 */
-			0xa8 0x118	/* sdmmc1_data2.sdmmc1_data2 INPUT PULLUP | MODE0 */
-			0xaa 0x118	/* sdmmc1_data3.sdmmc1_data3 INPUT PULLUP | MODE0 */
-			0xac 0x118	/* sdmmc1_data4.sdmmc1_data4 INPUT PULLUP | MODE0 */
-			0xae 0x118	/* sdmmc1_data5.sdmmc1_data5 INPUT PULLUP | MODE0 */
-			0xb0 0x118	/* sdmmc1_data6.sdmmc1_data6 INPUT PULLUP | MODE0 */
-			0xb2 0x118	/* sdmmc1_data7.sdmmc1_data7 INPUT PULLUP | MODE0 */
-		>;
-	};
-
-	mmc2_pins: pinmux_mmc2_pins {
-		pinctrl-single,pins = <
-			0x0 0x119	/* gpmc_ad0.sdmmc2_data0 INPUT PULLUP | MODE1 */
-			0x2 0x119	/* gpmc_ad1.sdmmc2_data1 INPUT PULLUP | MODE1 */
-			0x4 0x119	/* gpmc_ad2.sdmmc2_data2 INPUT PULLUP | MODE1 */
-			0x6 0x119	/* gpmc_ad3.sdmmc2_data3 INPUT PULLUP | MODE1 */
-			0x8 0x119	/* gpmc_ad4.sdmmc2_data4 INPUT PULLUP | MODE1 */
-			0xa 0x119	/* gpmc_ad5.sdmmc2_data5 INPUT PULLUP | MODE1 */
-			0xc 0x119	/* gpmc_ad6.sdmmc2_data6 INPUT PULLUP | MODE1 */
-			0xe 0x119	/* gpmc_ad7.sdmmc2_data7 INPUT PULLUP | MODE1 */
-			0x40 0x119	/* gpmc_noe.sdmmc2_clk INPUT PULLUP | MODE1 */
-			0x42 0x119	/* gpmc_nwe.sdmmc2_cmd INPUT PULLUP | MODE1 */
-		>;
-	};
-
 	twl6040_pins: pinmux_twl6040_pins {
 		pinctrl-single,pins = <
 			0xe0 0x3	/* hdq_sio.gpio_127 OUTPUT | MODE3 */
@@ -284,15 +254,11 @@
 };
 
 &mmc1 {
-	pinctrl-names = "default";
-	pinctrl-0 = <&mmc1_pins>;
 	vmmc-supply = <&vmmc>;
 	bus-width = <8>;
 };
 
 &mmc2 {
-	pinctrl-names = "default";
-	pinctrl-0 = <&mmc2_pins>;
 	status = "disabled";
 };
 
