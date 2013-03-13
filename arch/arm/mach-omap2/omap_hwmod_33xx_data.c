@@ -19,6 +19,7 @@
 #include "omap_hwmod.h"
 #include <linux/platform_data/gpio-omap.h>
 #include <linux/platform_data/spi-omap2-mcspi.h>
+#include <linux/platform_data/mailbox-omap.h>
 
 #include "omap_hwmod_common_data.h"
 
@@ -1262,6 +1263,16 @@ static struct omap_hwmod_class am33xx_mailbox_hwmod_class = {
 	.sysc	= &am33xx_mailbox_sysc,
 };
 
+static struct omap_mbox_dev_info am33xx_mailbox_info[] = {
+	{ .name = "wkup_m3", .tx_id = 0, .usr_id = 3 },
+};
+
+static struct omap_mbox_pdata am33xx_mailbox_attrs = {
+	.intr_type	= MBOX_INTR_CFG_TYPE2,
+	.info_cnt	= ARRAY_SIZE(am33xx_mailbox_info),
+	.info		= am33xx_mailbox_info,
+};
+
 static struct omap_hwmod_irq_info am33xx_mailbox_irqs[] = {
 	{ .irq = 77 + OMAP_INTC_START, },
 	{ .irq = -1 },
@@ -1279,6 +1290,7 @@ static struct omap_hwmod am33xx_mailbox_hwmod = {
 			.modulemode	= MODULEMODE_SWCTRL,
 		},
 	},
+	.dev_attr	= &am33xx_mailbox_attrs,
 };
 
 /*
