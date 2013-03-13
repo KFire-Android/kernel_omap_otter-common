@@ -258,34 +258,36 @@ static int omap2_mbox_probe(struct platform_device *pdev)
 {
 	struct resource *mem;
 	int ret;
-	struct mailbox **list, *mbox;
+	struct mailbox **list, *mbox, *mboxblk;
+	struct omap_mbox2_priv *priv, *privblk;
 	struct omap_mbox_pdata *pdata = pdev->dev.platform_data;
 	struct omap_mbox_dev_info *info;
-	struct omap_mbox2_priv *priv;
 	int i;
 
-	if (!pdata || !pdata->info_cnt) {
+	if (!pdata || !pdata->info_cnt || !pdata->info) {
 		pr_err("%s: platform not supported\n", __func__);
 		return -ENODEV;
 	}
 
+	/* allocate one extra for marking end of list */
 	list = kzalloc((pdata->info_cnt + 1) * sizeof(*list), GFP_KERNEL);
 	if (!list)
 		return -ENOMEM;
 
-	mbox = kzalloc((pdata->info_cnt) * sizeof(*mbox), GFP_KERNEL);
-	if (!mbox) {
-		kfree(list);
-		return -ENOMEM;
+	mboxblk = mbox = kzalloc(pdata->info_cnt * sizeof(*mbox), GFP_KERNEL);
+	if (!mboxblk) {
+		ret = -ENOMEM;
+		goto free_list;
+	}
+
+	privblk = priv = kzalloc(pdata->info_cnt * sizeof(*priv), GFP_KERNEL);
+	if (!privblk) {
+		ret = -ENOMEM;
+		goto free_mboxblk;
 	}
 
 	info = pdata->info;
-	for (i = 0; i < pdata->info_cnt; i++, info++) {
-		priv = mbox->priv = kzalloc(sizeof(*priv), GFP_KERNEL);
-		if (!priv) {
-			ret = -ENOMEM;
-			goto free;
-		}
+	for (i = 0; i < pdata->info_cnt; i++, info++, priv++) {
 		priv->tx_fifo.msg = MAILBOX_MESSAGE(info->tx_id);
 		priv->tx_fifo.fifo_stat = MAILBOX_FIFOSTATUS(info->tx_id);
 		priv->tx_fifo.msg_stat = MAILBOX_MSGSTATUS(info->tx_id);
@@ -305,6 +307,7 @@ static int omap2_mbox_probe(struct platform_device *pdev)
 		}
 		priv->intr_type = pdata->intr_type;
 
+		mbox->priv = priv;
 		mbox->name = info->name;
 		mbox->ops = &omap2_mbox_ops;
 		mbox->irq = platform_get_irq(pdev, info->irq_id);
@@ -314,45 +317,44 @@ static int omap2_mbox_probe(struct platform_device *pdev)
 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!mem) {
 		ret = -ENOMEM;
-		goto free;
+		goto free_privblk;
 	}
 
 	mbox_base = ioremap(mem->start, resource_size(mem));
 	if (!mbox_base) {
 		ret = -ENOMEM;
-		goto free;
+		goto free_privblk;
 	}
 
 	ret = mailbox_register(&pdev->dev, list);
-	if (ret) {
-		iounmap(mbox_base);
-		goto free;
-	}
+	if (ret)
+		goto unmap_mbox;
 	platform_set_drvdata(pdev, list);
 
 	return 0;
 
-free:
-	for (; i > 0; i--)
-		kfree(list[i-1]->priv);
-	kfree(mbox);
+unmap_mbox:
+	iounmap(mbox_base);
+free_privblk:
+	kfree(privblk);
+free_mboxblk:
+	kfree(mboxblk);
+free_list:
 	kfree(list);
 	return ret;
 }
 
 static int omap2_mbox_remove(struct platform_device *pdev)
 {
-	int i;
+	struct omap_mbox2_priv *privblk;
 	struct mailbox **list = platform_get_drvdata(pdev);
+	struct mailbox *mboxblk = list[0];
 
+	privblk = mboxblk->priv;
 	mailbox_unregister();
 	iounmap(mbox_base);
-
-	for (i = 0; list[i]; i++) {
-		struct mailbox *mbox = list[i];
-		kfree(mbox->priv);
-		kfree(mbox);
-	}
+	kfree(privblk);
+	kfree(mboxblk);
 	kfree(list);
 	platform_set_drvdata(pdev, NULL);
 

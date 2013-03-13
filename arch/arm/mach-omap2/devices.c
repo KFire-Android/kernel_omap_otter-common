@@ -292,7 +292,6 @@ static inline void __init omap_init_mbox(void)
 	struct omap_hwmod *oh;
 	struct platform_device *pdev;
 	struct omap_mbox_pdata *pdata;
-	u32 pdata_len;
 
 	oh = omap_hwmod_lookup("mailbox");
 	if (!oh) {
@@ -305,9 +304,7 @@ static inline void __init omap_init_mbox(void)
 	}
 
 	pdata = (struct omap_mbox_pdata *)oh->dev_attr;
-	pdata_len = (pdata->info_cnt * (sizeof(struct omap_mbox_dev_info))) +
-			(2 * sizeof(u32));
-	pdev = omap_device_build("omap-mailbox", -1, oh, pdata, pdata_len,
+	pdev = omap_device_build("omap-mailbox", -1, oh, pdata, sizeof(*pdata),
 								NULL, 0, 0);
 	WARN(IS_ERR(pdev), "%s: could not build device, err %ld\n",
 						__func__, PTR_ERR(pdev));
