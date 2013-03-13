@@ -36,40 +36,66 @@
 
 /* Mach specific information to be recorded in the C-state driver_data */
 struct omap3_idle_statedata {
-	u32 mpu_state;
-	u32 core_state;
+	u8 mpu_fpwrst;
+	u8 core_fpwrst;
+	u8 per_min_fpwrst;
+	u8 flags;
 };
+
+/*
+ * Possible flag bits for struct omap3_idle_statedata.flags:
+ *
+ * OMAP_CPUIDLE_CX_NO_CLKDM_IDLE: don't allow the MPU clockdomain to go
+ *    inactive.  This in turn prevents the MPU DPLL from entering autoidle
+ *    mode, so wakeup latency is greatly reduced, at the cost of additional
+ *    energy consumption.  This also prevents the CORE clockdomain from
+ *    entering idle.
+ */
+#define OMAP_CPUIDLE_CX_NO_CLKDM_IDLE		BIT(0)
 
 static struct powerdomain *mpu_pd, *core_pd, *per_pd, *cam_pd;
 
+/*
+ * Prevent PER OFF if CORE is not in RETention or OFF as this would
+ * disable PER wakeups completely.
+ */
 static struct omap3_idle_statedata omap3_idle_data[] = {
 	{
-		.mpu_state = PWRDM_POWER_ON,
-		.core_state = PWRDM_POWER_ON,
+		.mpu_fpwrst = PWRDM_FUNC_PWRST_ON,
+		.core_fpwrst = PWRDM_FUNC_PWRST_ON,
+		/* In C1 do not allow PER state lower than CORE state */
+		.per_min_fpwrst = PWRDM_FUNC_PWRST_ON,
+		.flags = OMAP_CPUIDLE_CX_NO_CLKDM_IDLE,
 	},
 	{
-		.mpu_state = PWRDM_POWER_ON,
-		.core_state = PWRDM_POWER_ON,
+		.mpu_fpwrst = PWRDM_FUNC_PWRST_ON,
+		.core_fpwrst = PWRDM_FUNC_PWRST_ON,
+		.per_min_fpwrst = PWRDM_FUNC_PWRST_CSWR,
 	},
 	{
-		.mpu_state = PWRDM_POWER_RET,
-		.core_state = PWRDM_POWER_ON,
+		.mpu_fpwrst = PWRDM_FUNC_PWRST_CSWR,
+		.core_fpwrst = PWRDM_FUNC_PWRST_ON,
+		.per_min_fpwrst = PWRDM_FUNC_PWRST_CSWR,
 	},
 	{
-		.mpu_state = PWRDM_POWER_OFF,
-		.core_state = PWRDM_POWER_ON,
+		.mpu_fpwrst = PWRDM_FUNC_PWRST_OFF,
+		.core_fpwrst = PWRDM_FUNC_PWRST_ON,
+		.per_min_fpwrst = PWRDM_FUNC_PWRST_CSWR,
 	},
 	{
-		.mpu_state = PWRDM_POWER_RET,
-		.core_state = PWRDM_POWER_RET,
+		.mpu_fpwrst = PWRDM_FUNC_PWRST_CSWR,
+		.core_fpwrst = PWRDM_FUNC_PWRST_CSWR,
+		.per_min_fpwrst = PWRDM_FUNC_PWRST_OFF,
 	},
 	{
-		.mpu_state = PWRDM_POWER_OFF,
-		.core_state = PWRDM_POWER_RET,
+		.mpu_fpwrst = PWRDM_FUNC_PWRST_OFF,
+		.core_fpwrst = PWRDM_FUNC_PWRST_CSWR,
+		.per_min_fpwrst = PWRDM_FUNC_PWRST_OFF,
 	},
 	{
-		.mpu_state = PWRDM_POWER_OFF,
-		.core_state = PWRDM_POWER_OFF,
+		.mpu_fpwrst = PWRDM_FUNC_PWRST_OFF,
+		.core_fpwrst = PWRDM_FUNC_PWRST_OFF,
+		.per_min_fpwrst = PWRDM_FUNC_PWRST_OFF,
 	},
 };
 
@@ -80,25 +106,23 @@ static int __omap3_enter_idle(struct cpuidle_device *dev,
 				int index)
 {
 	struct omap3_idle_statedata *cx = &omap3_idle_data[index];
-	u32 mpu_state = cx->mpu_state, core_state = cx->core_state;
-
-	pwrdm_set_next_pwrst(mpu_pd, mpu_state);
-	pwrdm_set_next_pwrst(core_pd, core_state);
 
 	if (omap_irq_pending() || need_resched())
 		goto return_sleep_time;
 
 	/* Deny idle for C1 */
-	if (index == 0) {
+	if (cx->flags & OMAP_CPUIDLE_CX_NO_CLKDM_IDLE) {
 		clkdm_deny_idle(mpu_pd->pwrdm_clkdms[0]);
-		clkdm_deny_idle(core_pd->pwrdm_clkdms[0]);
+	} else {
+		pwrdm_set_next_fpwrst(mpu_pd, cx->mpu_fpwrst);
+		pwrdm_set_next_fpwrst(core_pd, cx->core_fpwrst);
 	}
 
 	/*
 	 * Call idle CPU PM enter notifier chain so that
 	 * VFP context is saved.
 	 */
-	if (mpu_state == PWRDM_POWER_OFF)
+	if (cx->mpu_fpwrst == PWRDM_FUNC_PWRST_OFF)
 		cpu_pm_enter();
 
 	/* Execute ARM wfi */
@@ -108,17 +132,15 @@ static int __omap3_enter_idle(struct cpuidle_device *dev,
 	 * Call idle CPU PM enter notifier chain to restore
 	 * VFP context.
 	 */
-	if (pwrdm_read_prev_pwrst(mpu_pd) == PWRDM_POWER_OFF)
+	if (cx->mpu_fpwrst == PWRDM_FUNC_PWRST_OFF &&
+	    pwrdm_read_prev_fpwrst(mpu_pd) == PWRDM_FUNC_PWRST_OFF)
 		cpu_pm_exit();
 
 	/* Re-allow idle for C1 */
-	if (index == 0) {
+	if (cx->flags & OMAP_CPUIDLE_CX_NO_CLKDM_IDLE)
 		clkdm_allow_idle(mpu_pd->pwrdm_clkdms[0]);
-		clkdm_allow_idle(core_pd->pwrdm_clkdms[0]);
-	}
 
 return_sleep_time:
-
 	return index;
 }
 
@@ -155,25 +177,25 @@ static int next_valid_state(struct cpuidle_device *dev,
 			    struct cpuidle_driver *drv, int index)
 {
 	struct omap3_idle_statedata *cx = &omap3_idle_data[index];
-	u32 mpu_deepest_state = PWRDM_POWER_RET;
-	u32 core_deepest_state = PWRDM_POWER_RET;
+	u8 mpu_deepest_fpwrst = PWRDM_FUNC_PWRST_CSWR;
+	u8 core_deepest_fpwrst = PWRDM_FUNC_PWRST_CSWR;
 	int idx;
 	int next_index = 0; /* C1 is the default value */
 
 	if (enable_off_mode) {
-		mpu_deepest_state = PWRDM_POWER_OFF;
+		mpu_deepest_fpwrst = PWRDM_FUNC_PWRST_OFF;
 		/*
 		 * Erratum i583: valable for ES rev < Es1.2 on 3630.
 		 * CORE OFF mode is not supported in a stable form, restrict
 		 * instead the CORE state to RET.
 		 */
 		if (!IS_PM34XX_ERRATUM(PM_SDRC_WAKEUP_ERRATUM_i583))
-			core_deepest_state = PWRDM_POWER_OFF;
+			core_deepest_fpwrst = PWRDM_FUNC_PWRST_OFF;
 	}
 
 	/* Check if current state is valid */
-	if ((cx->mpu_state >= mpu_deepest_state) &&
-	    (cx->core_state >= core_deepest_state))
+	if ((cx->mpu_fpwrst >= mpu_deepest_fpwrst) &&
+	    (cx->core_fpwrst >= core_deepest_fpwrst))
 		return index;
 
 	/*
@@ -181,9 +203,9 @@ static int next_valid_state(struct cpuidle_device *dev,
 	 * Start search from the next (lower) state.
 	 */
 	for (idx = index - 1; idx >= 0; idx--) {
-		cx =  &omap3_idle_data[idx];
-		if ((cx->mpu_state >= mpu_deepest_state) &&
-		    (cx->core_state >= core_deepest_state)) {
+		cx = &omap3_idle_data[idx];
+		if ((cx->mpu_fpwrst >= mpu_deepest_fpwrst) &&
+		    (cx->core_fpwrst >= core_deepest_fpwrst)) {
 			next_index = idx;
 			break;
 		}
@@ -205,16 +227,17 @@ static int omap3_enter_idle_bm(struct cpuidle_device *dev,
 			       struct cpuidle_driver *drv,
 			       int index)
 {
-	int new_state_idx;
-	u32 core_next_state, per_next_state = 0, per_saved_state = 0;
+	int new_state_idx, ret;
+	int per_next_fpwrst, per_saved_fpwrst;
 	struct omap3_idle_statedata *cx;
-	int ret;
 
 	/*
 	 * Use only C1 if CAM is active.
 	 * CAM does not have wakeup capability in OMAP3.
+	 * XXX This workaround belongs in the hwmod code & data
+	 * as a hwmod flag
 	 */
-	if (pwrdm_read_pwrst(cam_pd) == PWRDM_POWER_ON)
+	if (pwrdm_read_fpwrst(cam_pd) == PWRDM_FUNC_PWRST_ON)
 		new_state_idx = drv->safe_state_index;
 	else
 		new_state_idx = next_valid_state(dev, drv, index);
@@ -229,31 +252,20 @@ static int omap3_enter_idle_bm(struct cpuidle_device *dev,
 
 	/* Program PER state */
 	cx = &omap3_idle_data[new_state_idx];
-	core_next_state = cx->core_state;
-	per_next_state = per_saved_state = pwrdm_read_next_pwrst(per_pd);
-	if (new_state_idx == 0) {
-		/* In C1 do not allow PER state lower than CORE state */
-		if (per_next_state < core_next_state)
-			per_next_state = core_next_state;
-	} else {
-		/*
-		 * Prevent PER OFF if CORE is not in RETention or OFF as this
-		 * would disable PER wakeups completely.
-		 */
-		if ((per_next_state == PWRDM_POWER_OFF) &&
-		    (core_next_state > PWRDM_POWER_RET))
-			per_next_state = PWRDM_POWER_RET;
-	}
 
-	/* Are we changing PER target state? */
-	if (per_next_state != per_saved_state)
-		pwrdm_set_next_pwrst(per_pd, per_next_state);
+	per_next_fpwrst = pwrdm_read_next_fpwrst(per_pd);
+	WARN_ON(per_next_fpwrst < 0);
+	per_saved_fpwrst = per_next_fpwrst;
+	if (per_next_fpwrst < cx->per_min_fpwrst) {
+		per_next_fpwrst = cx->per_min_fpwrst;
+		WARN_ON(pwrdm_set_next_fpwrst(per_pd, per_next_fpwrst));
+	}
 
 	ret = omap3_enter_idle(dev, drv, new_state_idx);
 
 	/* Restore original PER state if it was modified */
-	if (per_next_state != per_saved_state)
-		pwrdm_set_next_pwrst(per_pd, per_saved_state);
+	if (per_next_fpwrst != per_saved_fpwrst)
+		WARN_ON(pwrdm_set_next_fpwrst(per_pd, per_saved_fpwrst));
 
 	return ret;
 }

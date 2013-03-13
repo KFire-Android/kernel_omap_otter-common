@@ -33,7 +33,6 @@ static inline int omap4_idle_init(void)
 extern void *omap3_secure_ram_storage;
 extern void omap3_pm_off_mode_enable(int);
 extern void omap_sram_idle(void);
-extern int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 state);
 extern int omap_pm_clkdms_setup(struct clockdomain *clkdm, void *unused);
 extern int (*omap_pm_suspend)(void);
 
@@ -52,19 +51,13 @@ static inline int omap4_opp_init(void)
 #endif
 
 extern int omap3_pm_get_suspend_state(struct powerdomain *pwrdm);
-extern int omap3_pm_set_suspend_state(struct powerdomain *pwrdm, int state);
+extern int omap3_pm_set_suspend_state(struct powerdomain *pwrdm, u8 fpwrst);
 
 #ifdef CONFIG_PM_DEBUG
 extern u32 enable_off_mode;
 #else
 #define enable_off_mode 0
 #endif
-
-#if defined(CONFIG_PM_DEBUG) && defined(CONFIG_DEBUG_FS)
-extern void pm_dbg_update_time(struct powerdomain *pwrdm, int prev);
-#else
-#define pm_dbg_update_time(pwrdm, prev) do {} while (0);
-#endif /* CONFIG_PM_DEBUG */
 
 /* 24xx */
 extern void omap24xx_idle_loop_suspend(void);
@@ -82,6 +75,13 @@ extern void omap3_do_wfi(void);
 extern unsigned int omap3_do_wfi_sz;
 /* ... and its pointer from SRAM after copy */
 extern void (*omap3_do_wfi_sram)(void);
+
+/* am33xx_do_wfi function pointer and size, for copy to SRAM */
+extern void am33xx_do_wfi(void);
+extern unsigned int am33xx_do_wfi_sz;
+extern unsigned int am33xx_resume_offset;
+/* ... and its pointer from SRAM after copy */
+extern void (*am33xx_do_wfi_sram)(void);
 
 /* save_secure_ram_context function pointer and size, for copy to SRAM */
 extern int save_secure_ram_context(u32 *addr);
