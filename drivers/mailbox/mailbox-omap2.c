@@ -145,7 +145,7 @@ static void omap2_mbox_fifo_readback(struct mailbox *mbox,
 	MAILBOX_FILL_MSG((*msg), 0, priv->data, 0);
 }
 
-static int ompa2_mbox_poll_for_space(struct mailbox *mbox)
+static int omap2_mbox_poll_for_space(struct mailbox *mbox)
 {
 	if (omap2_mbox_fifo_full(mbox))
 		return -1;
@@ -237,21 +237,21 @@ static void omap2_mbox_restore_ctx(struct mailbox *mbox)
 }
 
 static struct mailbox_ops omap2_mbox_ops = {
-	.type           = MBOX_HW_FIFO2_TYPE,
-	.startup        = omap2_mbox_startup,
-	.shutdown       = omap2_mbox_shutdown,
-	.read           = omap2_mbox_fifo_read,
-	.write          = omap2_mbox_fifo_write,
-	.empty          = omap2_mbox_fifo_empty,
+	.type		= MBOX_HW_FIFO2_TYPE,
+	.startup	= omap2_mbox_startup,
+	.shutdown	= omap2_mbox_shutdown,
+	.read		= omap2_mbox_fifo_read,
+	.write		= omap2_mbox_fifo_write,
+	.empty		= omap2_mbox_fifo_empty,
 	.needs_flush	= omap2_mbox_needs_flush,
 	.readback	= omap2_mbox_fifo_readback,
-	.poll_for_space = ompa2_mbox_poll_for_space,
-	.enable_irq     = omap2_mbox_enable_irq,
-	.disable_irq    = omap2_mbox_disable_irq,
-	.ack_irq        = omap2_mbox_ack_irq,
-	.is_irq         = omap2_mbox_is_irq,
-	.save_ctx       = omap2_mbox_save_ctx,
-	.restore_ctx    = omap2_mbox_restore_ctx,
+	.poll_for_space	= omap2_mbox_poll_for_space,
+	.enable_irq	= omap2_mbox_enable_irq,
+	.disable_irq	= omap2_mbox_disable_irq,
+	.ack_irq	= omap2_mbox_ack_irq,
+	.is_irq		= omap2_mbox_is_irq,
+	.save_ctx	= omap2_mbox_save_ctx,
+	.restore_ctx	= omap2_mbox_restore_ctx,
 };
 
 static int omap2_mbox_probe(struct platform_device *pdev)
