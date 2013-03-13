@@ -54,7 +54,7 @@ struct mailbox_queue {
 };
 
 struct mailbox {
-	char			*name;
+	const char		*name;
 	unsigned int		id;
 	unsigned int		irq;
 	struct mailbox_queue	*txq, *rxq;

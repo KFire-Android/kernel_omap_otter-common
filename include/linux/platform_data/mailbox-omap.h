@@ -30,7 +30,7 @@
  *			the MPU interrupt controller.
  */
 struct omap_mbox_dev_info {
-	char name[16];
+	const char *name;
 	u32 tx_id;
 	u32 rx_id;
 	u32 irq_id;
