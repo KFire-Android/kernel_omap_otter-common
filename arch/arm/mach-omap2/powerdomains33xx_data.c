@@ -123,7 +123,8 @@ static struct powerdomain mpu_33xx_pwrdm = {
 	.pwrstst_offs		= AM33XX_PM_MPU_PWRSTST_OFFSET,
 	.pwrsts			= PWRSTS_OFF_RET_ON,
 	.pwrsts_logic_ret	= PWRSTS_OFF_RET,
-	.flags			= PWRDM_HAS_LOWPOWERSTATECHANGE,
+	.flags			= (PWRDM_HAS_LOWPOWERSTATECHANGE |
+				   PWRDM_ACTIVE_WITH_KERNEL),
 	.banks			= 3,
 	.logicretstate_mask	= AM33XX_LOGICRETSTATE_MASK,
 	.mem_on_mask		= {

@@ -164,6 +164,7 @@ static struct powerdomain cpu0_44xx_pwrdm = {
 	.pwrsts_mem_on	= {
 		[0] = PWRSTS_ON,	/* cpu0_l1 */
 	},
+	.flags		  = PWRDM_ACTIVE_WITH_KERNEL,
 };
 
 /* cpu1_44xx_pwrdm: MPU1 processor and Neon coprocessor power domain */
@@ -218,6 +219,7 @@ static struct powerdomain mpu_44xx_pwrdm = {
 		[1] = PWRSTS_ON,	/* mpu_l2 */
 		[2] = PWRSTS_ON,	/* mpu_ram */
 	},
+	.flags		  = PWRDM_ACTIVE_WITH_KERNEL,
 };
 
 /* ivahd_44xx_pwrdm: IVA-HD power domain */
