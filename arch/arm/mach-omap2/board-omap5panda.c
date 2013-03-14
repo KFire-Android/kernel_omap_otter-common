@@ -899,7 +899,6 @@ static struct omap_dss_device omap5panda_hdmi_device = {
 
 static struct omap_dss_device *omap5panda_dss_devices[] = {
 	&omap5panda_hdmi_device,
-	&omap5_panda_dvi_device,
 };
 
 static struct omap_dss_board_info panda5_dss_data = {
