@@ -84,6 +84,7 @@ static const struct clksel *_get_clksel_by_parent(struct clk *clk,
  * @src_clk: planned new parent struct clk *
  * @clk: struct clk * that is being reparented
  * @field_val: pointer to a u32 to contain the register data for the divisor
+ * @mul: Output parameter. Multiplier for current rate. Typically 0.
  *
  * Given an intended new parent struct clk * @src_clk, and the struct
  * clk * @clk to the clock that is being reparented, find the
@@ -95,11 +96,11 @@ static const struct clksel *_get_clksel_by_parent(struct clk *clk,
  * value is passed back in the variable pointed to by @field_val)
  */
 static u8 _get_div_and_fieldval(struct clk *src_clk, struct clk *clk,
-				u32 *field_val)
+				u32 *field_val, u32 *mul)
 {
 	const struct clksel *clks;
 	const struct clksel_rate *clkr, *max_clkr = NULL;
-	u8 max_div = 0;
+	u8 max_div = 0, test_div = 0;
 
 	clks = _get_clksel_by_parent(clk, src_clk);
 	if (!clks)
@@ -118,7 +119,24 @@ static u8 _get_div_and_fieldval(struct clk *src_clk, struct clk *clk,
 		if (!(clkr->flags & cpu_mask))
 			continue;
 
-		if (clkr->div > max_div) {
+		/*
+		 * Handle special case when multiplier is set,
+		 * it means we are handling fraction divider here,
+		 * and we should do the following comparing:
+		 *	(mul / div) > max_div
+		 * So, integer truncation is not enough in this case,
+		 * we need DIV_ROUND_UP macros.
+		 * For example, if we compare 2.5 divider with
+		 * 2 divider we have the following:
+		 * integer truncation -> ((5 / 2) > 2) -> (2 > 2) -> false
+		 * DIV_ROUND_UP -> ((5 / 2) > 2) -> (3 > 2) -> true
+		 */
+		if (!clkr->mul)
+			test_div = clkr->div;
+		else
+			test_div = DIV_ROUND_UP(clkr->mul, clkr->div);
+
+		if (test_div > max_div) {
 			max_div = clkr->div;
 			max_clkr = clkr;
 		}
@@ -132,6 +150,7 @@ static u8 _get_div_and_fieldval(struct clk *src_clk, struct clk *clk,
 	}
 
 	*field_val = max_clkr->val;
+	*mul = max_clkr->mul;
 
 	return max_div;
 }
@@ -165,6 +184,7 @@ static void _write_clksel_reg(struct clk *clk, u32 field_val)
  * _clksel_to_divisor() - turn clksel field value into integer divider
  * @clk: OMAP struct clk to use
  * @field_val: register field value to find
+ * @mul: Output parameter. Multiplier for current rate. Typically 0.
  *
  * Given a struct clk of a rate-selectable clksel clock, and a register field
  * value to search for, find the corresponding clock divisor.  The register
@@ -172,7 +192,7 @@ static void _write_clksel_reg(struct clk *clk, u32 field_val)
  * before calling.  Returns 0 on error or returns the actual integer divisor
  * upon success.
  */
-static u32 _clksel_to_divisor(struct clk *clk, u32 field_val)
+static u32 _clksel_to_divisor(struct clk *clk, u32 field_val, u32 *mul)
 {
 	const struct clksel *clks;
 	const struct clksel_rate *clkr;
@@ -181,6 +201,7 @@ static u32 _clksel_to_divisor(struct clk *clk, u32 field_val)
 	if (!clks)
 		return 0;
 
+	*mul = 0;
 	for (clkr = clks->rates; clkr->div; clkr++) {
 		if (!(clkr->flags & cpu_mask))
 			continue;
@@ -196,6 +217,7 @@ static u32 _clksel_to_divisor(struct clk *clk, u32 field_val)
 		return 0;
 	}
 #endif
+	*mul = clkr->mul;
 	return clkr->div;
 }
 
@@ -203,13 +225,14 @@ static u32 _clksel_to_divisor(struct clk *clk, u32 field_val)
  * _divisor_to_clksel() - turn clksel integer divisor into a field value
  * @clk: OMAP struct clk to use
  * @div: integer divisor to search for
+ * @mul: integer multiplier to search for
  *
  * Given a struct clk of a rate-selectable clksel clock, and a clock
  * divisor, find the corresponding register field value.  Returns the
  * register field value _before_ left-shifting (i.e., LSB is at bit
  * 0); or returns 0xFFFFFFFF (~0) upon error.
  */
-static u32 _divisor_to_clksel(struct clk *clk, u32 div)
+static u32 _divisor_to_clksel(struct clk *clk, u32 div, u32 mul)
 {
 	const struct clksel *clks;
 	const struct clksel_rate *clkr;
@@ -225,8 +248,15 @@ static u32 _divisor_to_clksel(struct clk *clk, u32 div)
 		if (!(clkr->flags & cpu_mask))
 			continue;
 
-		if (clkr->div == div)
+		/* if multiplier is valid, it means we handle a specific
+		 * fraction divider */
+		if (mul) {
+			if ((clkr->mul == mul) && (clkr->div == div))
+				break;
+		/* usual path, multiplier is 0 */
+		} else if (clkr->div == div)
 			break;
+
 	}
 
 	if (!clkr->div) {
@@ -241,23 +271,71 @@ static u32 _divisor_to_clksel(struct clk *clk, u32 div)
 /**
  * _read_divisor() - get current divisor applied to parent clock (from hdwr)
  * @clk: OMAP struct clk to use.
+ * @mul: Output parameter. Multiplier for current rate. Typically 0.
  *
  * Read the current divisor register value for @clk that is programmed
  * into the hardware, convert it into the actual divisor value, and
  * return it; or return 0 on error.
  */
-static u32 _read_divisor(struct clk *clk)
+static u32 _read_divisor(struct clk *clk, u32 *mul)
 {
-	u32 v;
+	u32 v, div;
 
-	if (!clk->clksel || !clk->clksel_mask)
+	if (!clk->clksel || !clk->clksel_mask || !mul)
 		return 0;
 
 	v = __raw_readl(clk->clksel_reg);
 	v &= clk->clksel_mask;
 	v >>= __ffs(clk->clksel_mask);
 
-	return _clksel_to_divisor(clk, v);
+	div = _clksel_to_divisor(clk, v, mul);
+	return div;
+}
+
+/**
+ * _calculate_rate() - helper function for rate calculation,
+ *			takes in account fraction dividers
+ * @parent_rate: parent rate for clock.
+ * @div: clock rate divider.
+ * @mul: clock rate multiplier. Typically 0.
+ *
+ * Fractions are handled in the following way:
+ * if we need a rate divided by 2.5, calculation will look like:
+ *
+ * - mul should be set to 5
+ *
+ * - div should be set to 2
+ *
+ * - divisor will be 5/2 = 2.5
+ *
+ * - rate will be calculated, using the following formula:
+ *
+ *        parent_rate   parent_rate   parent_rate * 2
+ * rate = ----------- = ----------- = ---------------
+ *            2.5            5               5
+ *                           -
+ *                           2
+ *
+ *        parent_rate * div
+ * rate = -----------------------
+ *                mul
+ *
+ * NOTE: integer truncation is expected here
+ */
+static unsigned long _calculate_rate(unsigned long parent_rate,
+				     u32 div, u32 mul)
+{
+	/* usual path, mul is 0 */
+	if (!mul)
+		return parent_rate / div;
+	else {
+		/* handle possible integer overflow */
+		unsigned long long ll_rate =
+			(unsigned long long)parent_rate *
+			(unsigned long long)div;
+		do_div(ll_rate, mul);
+		return (unsigned long)ll_rate;
+	}
 }
 
 /* Public functions */
@@ -267,6 +345,7 @@ static u32 _read_divisor(struct clk *clk)
  * @clk: OMAP struct clk to use
  * @target_rate: desired clock rate
  * @new_div: ptr to where we should store the divisor
+ * @new_div: ptr to where we should store the multiplier
  *
  * Finds 'best' divider value in an array based on the source and target
  * rates.  The divider array must be sorted with smallest divider first.
@@ -275,7 +354,7 @@ static u32 _read_divisor(struct clk *clk)
  * Returns the rounded clock rate or returns 0xffffffff on error.
  */
 u32 omap2_clksel_round_rate_div(struct clk *clk, unsigned long target_rate,
-				u32 *new_div)
+				u32 *new_div, u32 *new_mul)
 {
 	unsigned long test_rate;
 	const struct clksel *clks;
@@ -290,6 +369,7 @@ u32 omap2_clksel_round_rate_div(struct clk *clk, unsigned long target_rate,
 		 clk->name, target_rate);
 
 	*new_div = 1;
+	*new_mul = 0;
 
 	clks = _get_clksel_by_parent(clk, clk->parent);
 	if (!clks)
@@ -304,13 +384,14 @@ u32 omap2_clksel_round_rate_div(struct clk *clk, unsigned long target_rate,
 			continue;
 
 		/* Sanity check */
-		if (clkr->div <= last_div)
+		if ((clkr->div <= last_div) && (0 == clkr->mul))
 			pr_err("clock: clksel_rate table not sorted "
 			       "for clock %s", clk->name);
 
 		last_div = clkr->div;
 
-		test_rate = clk->parent->rate / clkr->div;
+		test_rate = _calculate_rate(clk->parent->rate,
+					    clkr->div, clkr->mul);
 
 		diff = abs(test_rate - target_rate);
 
@@ -332,10 +413,15 @@ u32 omap2_clksel_round_rate_div(struct clk *clk, unsigned long target_rate,
 
 	*new_div = clkr->div;
 
-	pr_debug("clock: new_div = %d, new_rate = %ld\n", *new_div,
-		 (clk->parent->rate / clkr->div));
+	/* recalculate rate */
+	test_rate = _calculate_rate(clk->parent->rate, clkr->div, clkr->mul);
+	if (clkr->mul)
+		*new_mul = clkr->mul;
 
-	return clk->parent->rate / clkr->div;
+	pr_debug("clock: new_div = %d, new_mul = %d, new_rate = %ld\n",
+		 *new_div, *new_mul, test_rate);
+
+	return test_rate;
 }
 
 /*
@@ -402,16 +488,16 @@ void omap2_init_clksel_parent(struct clk *clk)
 unsigned long omap2_clksel_recalc(struct clk *clk)
 {
 	unsigned long rate;
-	u32 div = 0;
+	u32 div = 0, mul = 0;
 
-	div = _read_divisor(clk);
+	div = _read_divisor(clk, &mul);
 	if (div == 0)
 		return clk->rate;
 
-	rate = clk->parent->rate / div;
+	rate = _calculate_rate(clk->parent->rate, div, mul);
 
-	pr_debug("clock: %s: recalc'd rate is %ld (div %d)\n", clk->name,
-		 rate, div);
+	pr_debug("clock: %s: recalc'd rate is %ld (div %d) (mul %d)\n",
+		 clk->name, rate, div, mul);
 
 	return rate;
 }
@@ -429,9 +515,10 @@ unsigned long omap2_clksel_recalc(struct clk *clk)
  */
 long omap2_clksel_round_rate(struct clk *clk, unsigned long target_rate)
 {
-	u32 new_div;
+	u32 new_div, new_mul;
 
-	return omap2_clksel_round_rate_div(clk, target_rate, &new_div);
+	return omap2_clksel_round_rate_div(clk, target_rate,
+					   &new_div, &new_mul);
 }
 
 /**
@@ -451,22 +538,22 @@ long omap2_clksel_round_rate(struct clk *clk, unsigned long target_rate)
  */
 int omap2_clksel_set_rate(struct clk *clk, unsigned long rate)
 {
-	u32 field_val, validrate, new_div = 0;
+	u32 field_val, validrate, new_div = 0, new_mul = 0;
 
 	if (!clk->clksel || !clk->clksel_mask)
 		return -EINVAL;
 
-	validrate = omap2_clksel_round_rate_div(clk, rate, &new_div);
+	validrate = omap2_clksel_round_rate_div(clk, rate, &new_div, &new_mul);
 	if (validrate != rate)
 		return -EINVAL;
 
-	field_val = _divisor_to_clksel(clk, new_div);
+	field_val = _divisor_to_clksel(clk, new_div, new_mul);
 	if (field_val == ~0)
 		return -EINVAL;
 
 	_write_clksel_reg(clk, field_val);
 
-	clk->rate = clk->parent->rate / new_div;
+	clk->rate = _calculate_rate(clk->parent->rate, new_div, new_mul);
 
 	pr_debug("clock: %s: set rate to %ld\n", clk->name, clk->rate);
 
@@ -497,11 +584,13 @@ int omap2_clksel_set_parent(struct clk *clk, struct clk *new_parent)
 {
 	u32 field_val = 0;
 	u32 parent_div;
+	u32 parent_mul = 0;
 
 	if (!clk->clksel || !clk->clksel_mask)
 		return -EINVAL;
 
-	parent_div = _get_div_and_fieldval(new_parent, clk, &field_val);
+	parent_div = _get_div_and_fieldval(new_parent, clk, &field_val,
+					   &parent_mul);
 	if (!parent_div)
 		return -EINVAL;
 
@@ -510,10 +599,7 @@ int omap2_clksel_set_parent(struct clk *clk, struct clk *new_parent)
 	clk_reparent(clk, new_parent);
 
 	/* CLKSEL clocks follow their parents' rates, divided by a divisor */
-	clk->rate = new_parent->rate;
-
-	if (parent_div > 0)
-		clk->rate /= parent_div;
+	clk->rate = _calculate_rate(new_parent->rate, parent_div, parent_mul);
 
 	pr_debug("clock: %s: set parent to %s (new rate %ld)\n",
 		 clk->name, clk->parent->name, clk->rate);

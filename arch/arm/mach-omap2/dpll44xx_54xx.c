@@ -214,13 +214,13 @@ core_initcall(__init_dpll_list);
 int omap4_core_dpll_m2_set_rate(struct clk *clk, unsigned long rate)
 {
 	int i = 0;
-	u32 validrate = 0, shadow_freq_cfg1 = 0, new_div = 0;
+	u32 validrate = 0, shadow_freq_cfg1 = 0, new_div = 0, new_mul = 0;
 	struct omap_dpll_notifier notify;
 
 	if (!clk || !rate)
 		return -EINVAL;
 
-	validrate = omap2_clksel_round_rate_div(clk, rate, &new_div);
+	validrate = omap2_clksel_round_rate_div(clk, rate, &new_div, &new_mul);
 	if (validrate != rate)
 		return -EINVAL;
 
@@ -366,6 +366,7 @@ int omap4_core_dpll_m5x2_set_rate(struct clk *clk, unsigned long rate)
 {
 	int i = 0;
 	u32 validrate = 0, shadow_freq_cfg2 = 0, shadow_freq_cfg1, new_div = 0;
+	u32 new_mul = 0;
 
 	if (!clk || !rate)
 		return -EINVAL;
@@ -385,7 +386,7 @@ int omap4_core_dpll_m5x2_set_rate(struct clk *clk, unsigned long rate)
 	/* Configures MEMIF domain in SW_WKUP */
 	clkdm_wakeup(l3_emif_clkdm);
 
-	validrate = omap2_clksel_round_rate_div(clk, rate, &new_div);
+	validrate = omap2_clksel_round_rate_div(clk, rate, &new_div, &new_mul);
 	if (validrate != rate)
 		return -EINVAL;
 

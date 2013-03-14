@@ -520,7 +520,7 @@ static struct regulator_init_data omap4_vana_idata = {
 					| REGULATOR_CHANGE_STATUS,
 		.always_on		= true,
 		.state_mem = {
-			.disabled	= true,
+			.enabled	= true,
 		},
 		.initial_state		= PM_SUSPEND_MEM,
 	},

@@ -75,6 +75,8 @@ struct clkops {
 /**
  * struct clksel_rate - register bitfield values corresponding to clk divisors
  * @val: register bitfield value (shifted to bit 0)
+ * @mul: clock multiplier corresponding to @val, used to express fractional
+ *	divider, typically 0
  * @div: clock divisor corresponding to @val
  * @flags: (see "struct clksel_rate.flags possibilities" above)
  *
@@ -86,6 +88,7 @@ struct clkops {
  */
 struct clksel_rate {
 	u32			val;
+	u32			mul;
 	u8			div;
 	u16			flags;
 };
