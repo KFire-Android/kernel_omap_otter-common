@@ -1410,22 +1410,63 @@ static int sr_suspend(struct device *dev)
 	if (!sr_info->autocomp_active)
 		return 0;
 
+	/*
+	 * Enable SR device, so it will be accessible during
+	 * later stages of suspending when device Runtime PM is disabled.
+	 * SR device will be turned off after "noirq" suspend stage.
+	 */
+	ret = pm_runtime_resume(dev);
+	if (ret < 0)
+		return ret;
+
+	ret = 0;
+	if (sr_class->suspend)
+		ret = sr_class->suspend(sr_info);
+
+	return ret;
+}
+
+static int sr_suspend_noirq(struct device *dev)
+{
+	struct omap_sr_data *pdata;
+	struct omap_sr *sr_info;
+	int ret = 0;
+
+	pdata = dev_get_platdata(dev);
+	if (!pdata) {
+		dev_err(dev, "%s: platform data missing\n", __func__);
+		return -EINVAL;
+	}
+
+	sr_info = _sr_lookup(pdata->voltdm);
+	if (IS_ERR_OR_NULL(sr_info)) {
+		dev_warn(dev, "%s: omap_sr struct not found\n", __func__);
+		return -EINVAL;
+	}
+
+	if (!sr_info->autocomp_active)
+		return 0;
+
 	if (sr_info->suspended)
 		return 0;
 
-	if (sr_class->suspend)
-		ret = sr_class->suspend(sr_info);
+	omap_dvfs_suspend(true);
+
+	if (sr_class->suspend_noirq)
+		ret = sr_class->suspend_noirq(sr_info);
 
 	if (!ret) {
 		sr_info->suspended =  true;
 		/* Flag the same info to the other CPUs */
 		smp_wmb();
+	} else {
+		omap_dvfs_suspend(false);
 	}
 
 	return ret;
 }
 
-static int sr_resume(struct device *dev)
+static int sr_resume_noirq(struct device *dev)
 {
 	struct omap_sr_data *pdata;
 	struct omap_sr *sr_info;
@@ -1449,8 +1490,8 @@ static int sr_resume(struct device *dev)
 	if (!sr_info->suspended)
 		return 0;
 
-	if (sr_class->resume)
-		ret = sr_class->resume(sr_info);
+	if (sr_class->resume_noirq)
+		ret = sr_class->resume_noirq(sr_info);
 
 	if (!ret) {
 		sr_info->suspended =  false;
@@ -1458,10 +1499,16 @@ static int sr_resume(struct device *dev)
 		smp_wmb();
 	}
 
+	omap_dvfs_suspend(false);
+
 	return ret;
 }
 
-static SIMPLE_DEV_PM_OPS(sr_omap_dev_pm_ops, sr_suspend, sr_resume);
+static const struct dev_pm_ops sr_omap_dev_pm_ops = {
+	.suspend = sr_suspend,
+	.suspend_noirq = sr_suspend_noirq,
+	.resume_noirq = sr_resume_noirq,
+};
 
 static struct platform_driver smartreflex_driver = {
 	.probe		= omap_sr_probe,

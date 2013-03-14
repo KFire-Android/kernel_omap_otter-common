@@ -189,6 +189,9 @@ DEFINE_MUTEX(omap_dvfs_lock);
 /* QoS expected */
 static struct pm_qos_request omap_dvfs_pm_qos_handle;
 
+/* DVFS suspend status*/
+static bool dvfs_suspended;
+
 /* Dvfs scale helper function */
 static int _dvfs_scale(struct device *req_dev, struct device *target_dev,
 		struct omap_vdd_dvfs_info *tdvfs_info);
@@ -802,6 +805,23 @@ out:
 /* Public functions */
 
 /**
+ * omap_dvfs_suspend() - Suspend DVFS
+ * @suspend:	true - suspend, false - resume
+ *
+ * This API suspend DVFS if called with suspend = true and after that any
+ * DVFS transitions will be prohibited and omap_device_scale()
+ * will return -EPERM.
+ *
+ * suspend = fasle will restore normal DVFS work.
+ */
+void omap_dvfs_suspend(bool suspend)
+{
+	mutex_lock(&omap_dvfs_lock);
+	dvfs_suspended = suspend;
+	mutex_unlock(&omap_dvfs_lock);
+}
+
+/**
  * omap_device_scale() - Set a new rate at which the device is to operate
  * @target_dev:	pointer to the device that is to be scaled
  * @rate:	the rnew rate for the device.
@@ -854,6 +874,14 @@ int omap_device_scale(struct device *target_dev, unsigned long rate)
 
 	/* Lock me to ensure cross domain scaling is secure */
 	mutex_lock(&omap_dvfs_lock);
+
+	if (dvfs_suspended) {
+		dev_dbg(target_dev, "%s: %pF dvfs_suspended (freq%ld)\n",
+			__func__, (void *)_RET_IP_, rate);
+		mutex_unlock(&omap_dvfs_lock);
+		return -EPERM;
+	}
+
 	/* I would like CPU to be active always at this point */
 	omap_dvfs_pm_qos_handle.dev = target_dev;
 	pm_qos_update_request(&omap_dvfs_pm_qos_handle, 0);

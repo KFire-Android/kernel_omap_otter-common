@@ -31,6 +31,7 @@
 #include <plat/usb.h>
 #include <plat/omap_device.h>
 
+#include "clockdomain.h"
 #include "control.h"
 #include "mux.h"
 
@@ -46,6 +47,7 @@ static struct usbtll_omap_platform_data		usbtll_data;
 static struct ehci_hcd_omap_platform_data	ehci_data;
 static struct ohci_hcd_omap_platform_data	ohci_data;
 static int usbhs_update_sar;
+static struct clockdomain *l3init_clkdm;
 
 static struct omap_device_pm_latency omap_uhhtll_latency[] = {
 	  {
@@ -645,8 +647,10 @@ static int usbhs_wakeup_handler(struct omap_hwmod_mux_info *unused)
 	queued = queue_delayed_work(pm_wq, &usbhs_wakeup,
 			msecs_to_jiffies(20));
 
-	if (queued)
+	if (queued) {
+		clkdm_wakeup(l3init_clkdm);
 		pm_runtime_get(&pdev_usbhs->dev);
+	}
 
 	return 0;
 }
@@ -654,6 +658,7 @@ static int usbhs_wakeup_handler(struct omap_hwmod_mux_info *unused)
 static void usbhs_wakeup_work(struct work_struct *unused)
 {
 	pm_runtime_put_sync(&pdev_usbhs->dev);
+	clkdm_allow_idle(l3init_clkdm);
 }
 
 
@@ -979,6 +984,11 @@ void __init usbhs_init(const struct usbhs_omap_board_data *pdata)
 	if (!tll_hwm) {
 		pr_err("Could not look up %s\n", USBHS_TLL_HWMODNAME);
 		return;
+	}
+
+	l3init_clkdm = clkdm_lookup("l3_init_clkdm");
+	if (!l3init_clkdm) {
+		pr_err("Failed to get l3_init_clkdm\n");
 	}
 
 	pdev = omap_device_build(OMAP_USBTLL_DEVICE, bus_id, tll_hwm,
