@@ -22,49 +22,47 @@ typedef int __bitwise mailbox_type_t;
 #define MBOX_SHARED_MEM_TYPE	((__force mailbox_type_t) 3)
 
 struct mailbox_ops {
-	mailbox_type_t        type;
-	int             (*startup)(struct mailbox *mbox);
-	void            (*shutdown)(struct mailbox *mbox);
+	mailbox_type_t	type;
+	int		(*startup)(struct mailbox *mbox);
+	void		(*shutdown)(struct mailbox *mbox);
 	/* mailbox access */
-	void            (*read)(struct mailbox *mbox, struct mailbox_msg *msg);
-	int             (*write)(struct mailbox *mbox, struct mailbox_msg *msg);
-	int             (*empty)(struct mailbox *mbox);
-	int             (*poll_for_space)(struct mailbox *mbox);
+	void		(*read)(struct mailbox *mbox, struct mailbox_msg *msg);
+	int		(*write)(struct mailbox *mbox, struct mailbox_msg *msg);
+	int		(*empty)(struct mailbox *mbox);
+	int		(*poll_for_space)(struct mailbox *mbox);
 	int		(*needs_flush)(struct mailbox *mbox);
 	void		(*readback)(struct mailbox *mbox,
 					struct mailbox_msg *msg);
 	/* irq */
-	void            (*enable_irq)(struct mailbox *mbox,
-			mailbox_irq_t irq);
-	void            (*disable_irq)(struct mailbox *mbox,
-			mailbox_irq_t irq);
-	void            (*ack_irq)(struct mailbox *mbox, mailbox_irq_t irq);
-	int             (*is_irq)(struct mailbox *mbox, mailbox_irq_t irq);
+	void		(*enable_irq)(struct mailbox *mbox, mailbox_irq_t irq);
+	void		(*disable_irq)(struct mailbox *mbox, mailbox_irq_t irq);
+	void		(*ack_irq)(struct mailbox *mbox, mailbox_irq_t irq);
+	int		(*is_irq)(struct mailbox *mbox, mailbox_irq_t irq);
 	/* ctx */
-	void            (*save_ctx)(struct mailbox *mbox);
-	void            (*restore_ctx)(struct mailbox *mbox);
+	void		(*save_ctx)(struct mailbox *mbox);
+	void		(*restore_ctx)(struct mailbox *mbox);
 };
 
 struct mailbox_queue {
-	spinlock_t              lock;
+	spinlock_t		lock;
 	struct mutex		mlock;
-	struct kfifo            fifo;
-	struct work_struct      work;
-	struct tasklet_struct   tasklet;
-	struct mailbox          *mbox;
+	struct kfifo		fifo;
+	struct work_struct	work;
+	struct tasklet_struct	tasklet;
+	struct mailbox		*mbox;
 	bool full;
 };
 
 struct mailbox {
-	char                    *name;
-	unsigned int            id;
-	unsigned int            irq;
-	struct mailbox_queue  *txq, *rxq;
-	struct mailbox_ops    *ops;
-	struct device           *dev;
-	void                    *priv;
-	int                     use_count;
-	struct blocking_notifier_head   notifier;
+	const char		*name;
+	unsigned int		id;
+	unsigned int		irq;
+	struct mailbox_queue	*txq, *rxq;
+	struct mailbox_ops	*ops;
+	struct device		*dev;
+	void			*priv;
+	int			use_count;
+	struct blocking_notifier_head	notifier;
 };
 
 void mailbox_init_seq(struct mailbox *);
