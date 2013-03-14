@@ -604,7 +604,8 @@ static void dss_ovl_write_regs(struct omap_overlay *ovl)
 		}
 		/* check if this overlay is source for manager, which is source
 		 * for wb, ignore ovl sources */
-		if (omap_dss_check_wb(wbc, -1, op->channel)) {
+		if (wbc->mode == OMAP_WB_MEM2MEM_MODE &&
+				omap_dss_check_wb(wbc, -1, op->channel)) {
 			DSSDBG("check wb mgr wb->enabled=%d for plane:%d\n",
 							wbc->enabled, ovl->id);
 			m2m_with_mgr = true;
