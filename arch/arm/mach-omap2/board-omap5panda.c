@@ -871,37 +871,6 @@ static void __init omap_msecure_init(void)
 			GPIO_MSECURE, err);
 }
 
-/* Display DVI */
-#define PANDA_DVI_TFP410_POWER_DOWN_GPIO	0
-
-static int omap5_panda_enable_dvi(struct omap_dss_device *dssdev)
-{
-	gpio_set_value(dssdev->reset_gpio, 1);
-	return 0;
-}
-
-static void omap5_panda_disable_dvi(struct omap_dss_device *dssdev)
-{
-	gpio_set_value(dssdev->reset_gpio, 0);
-}
-
-/* Using generic display panel */
-static struct panel_generic_dpi_data omap5_dvi_panel = {
-	.name			= "generic_720p",
-	.platform_enable	= omap5_panda_enable_dvi,
-	.platform_disable	= omap5_panda_disable_dvi,
-};
-
-static struct omap_dss_device omap5_panda_dvi_device = {
-	.type			= OMAP_DISPLAY_TYPE_DPI,
-	.name			= "dvi",
-	.driver_name		= "generic_dpi_panel",
-	.data			= &omap5_dvi_panel,
-	.phy.dpi.data_lines	= 24,
-	.reset_gpio		= PANDA_DVI_TFP410_POWER_DOWN_GPIO,
-	.channel		= OMAP_DSS_CHANNEL_LCD2,
-};
-
 static struct omap_dss_hdmi_data omap5panda_hdmi_data = {
         .hpd_gpio = HDMI_GPIO_HPD,
 	.ct_cp_hpd_gpio = HDMI_GPIO_CT_CP_HPD,
