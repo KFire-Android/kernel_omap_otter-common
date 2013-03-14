@@ -331,7 +331,6 @@ static struct wilink_board_init_data __initdata omap5_wilink_init_data = {
 	.st_devs = {
 		&wl18xx_device,
 		&btwilink_device,
-		&nfcwilink_device,
 		NULL, /* Terminator */
 	},
 	.mux_signals = {
