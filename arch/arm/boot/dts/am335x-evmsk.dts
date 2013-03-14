@@ -255,3 +255,11 @@
 	status = "okay";
 	vmmc-supply = <&vmmc_reg>;
 };
+
+&cpsw_emac0 {
+	phy_id = <&davinci_mdio>, <0>;
+};
+
+&cpsw_emac1 {
+	phy_id = <&davinci_mdio>, <1>;
+};
