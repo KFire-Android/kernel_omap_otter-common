@@ -115,7 +115,6 @@ static struct omap_rproc_pdata omap4_rproc_data[] = {
 	{
 		.name		= "dsp_c0",
 		.firmware	= "tesla-dsp.xe64T",
-		.firmware_512MB	= "tesla-dsp.xe64T",
 		.mbox_name	= "mailbox-2",
 		.oh_name	= "dsp_c0",
 		.boot_reg	= OMAP4430_CONTROL_DSP_BOOTADDR,
@@ -129,7 +128,6 @@ static struct omap_rproc_pdata omap4_rproc_data[] = {
 	{
 		.name		= "ipu_c0",
 		.firmware	= "ducati-m3-core0.xem3",
-		.firmware_512MB	= "ducati-m3-core0_512MB.xem3",
 		.mbox_name	= "mailbox-1",
 		.oh_name	= "ipu_c0",
 		.oh_name_opt	= "ipu_c1",
@@ -358,11 +356,17 @@ static int __init omap_rproc_init(void)
 		}
 
 		/*Select the 512MB version of the firmware for 512MB memory
-		  * configuration
+		  * configuration for IPU
 		  */
-		if (omap_total_ram_size() <= SZ_512M)
-			omap4_rproc_data[i].firmware =
-				omap4_rproc_data[i].firmware_512MB;
+		if (strcmp(omap4_rproc_data[i].name,"ipu_c0") == 0) {
+			if ((omap_total_ram_size() <= SZ_512M )&& (omap_total_ram_size() > (SZ_1M * 384)))
+				omap4_rproc_data[i].firmware = "ducati-m3-core0_512MB.xem3";
+			else if ((omap_total_ram_size() <= (SZ_1M * 384)) && (omap_total_ram_size() > SZ_256M)) {
+				omap4_rproc_data[i].firmware = "ducati-m3-core0_384MB.xem3";
+			} else if (omap_total_ram_size() <= SZ_256M){
+				omap4_rproc_data[i].firmware = "ducati-m3-core0_256MB.xem3";
+			}
+		}
 
 		ret = platform_device_add_data(pdev,
 					&omap4_rproc_data[i],
