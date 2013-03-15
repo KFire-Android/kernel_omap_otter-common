@@ -666,7 +666,8 @@ static bool musb_tx_dma_program(struct dma_controller *dma,
 	 */
 	wmb();
 
-	if (!dma->channel_program(channel, pkt_size, mode,
+	if (!dma->channel_program(channel, pkt_size |
+			(qh->hb_mult << 11), mode,
 			urb->transfer_dma + offset, length)) {
 		dma->channel_release(channel);
 		hw_ep->tx_channel = NULL;
@@ -869,8 +870,8 @@ finish:
 		} else {
 			csr = musb_readw(hw_ep->regs, MUSB_RXCSR);
 
-			if (csr & (MUSB_RXCSR_RXPKTRDY
-					| MUSB_RXCSR_DMAENAB
+			if (csr & (MUSB_RXCSR_RXPKTRDY |
+				(is_cppi41_enabled() ? 0 : MUSB_RXCSR_DMAENAB)
 					| MUSB_RXCSR_H_REQPKT))
 				ERR("broken !rx_reinit, ep%d csr %04x\n",
 						hw_ep->epnum, csr);
@@ -896,8 +897,9 @@ finish:
 			 * errors, we dare not queue multiple transfers.
 			 */
 			dma_ok = dma_controller->channel_program(dma_channel,
-					packet_sz, !(urb->transfer_flags &
-						     URB_SHORT_NOT_OK),
+					packet_sz | (qh->hb_mult << 11),
+					!(urb->transfer_flags &
+						URB_SHORT_NOT_OK),
 					urb->transfer_dma + offset,
 					qh->segsize);
 			if (!dma_ok) {
@@ -1673,9 +1675,13 @@ void musb_host_rx(struct musb *musb, u8 epnum)
 			| MUSB_RXCSR_H_AUTOREQ
 			| MUSB_RXCSR_AUTOCLEAR
 			| MUSB_RXCSR_RXPKTRDY);
+
+		if (is_cppi41_enabled() && usb_pipeisoc(pipe))
+			val |= MUSB_RXCSR_DMAENAB;
+
 		musb_writew(hw_ep->regs, MUSB_RXCSR, val);
 
-#ifdef CONFIG_USB_INVENTRA_DMA
+#if defined(CONFIG_USB_INVENTRA_DMA) || defined(CONFIG_USB_TI_CPPI41_DMA)
 		if (usb_pipeisoc(pipe)) {
 			struct usb_iso_packet_descriptor *d;
 
@@ -1688,11 +1694,20 @@ void musb_host_rx(struct musb *musb, u8 epnum)
 			if (d->status != -EILSEQ && d->status != -EOVERFLOW)
 				d->status = 0;
 
+			done = false;
 			if (++qh->iso_idx >= urb->number_of_packets)
 				done = true;
-			else
-				done = false;
+			else if (is_cppi41_enabled()) {
+				struct dma_controller   *c;
+				int ret, idx = qh->iso_idx;
 
+				c = musb->dma_controller;
+				ret = c->channel_program(dma, qh->maxpacket |
+					(qh->hb_mult << 11), 0,
+					(u32)urb->transfer_dma +
+					urb->iso_frame_desc[idx].offset,
+					urb->iso_frame_desc[idx].length);
+			}
 		} else  {
 		/* done if urb buffer is full or short packet is recd */
 		done = (urb->actual_length + xfer_len >=
@@ -1835,7 +1850,7 @@ void musb_host_rx(struct musb *musb, u8 epnum)
 			 * adjusted first...
 			 */
 			ret = c->channel_program(
-				dma, qh->maxpacket,
+				dma, qh->maxpacket | ((qh->hb_mult - 1) << 11),
 				dma->desired_mode, buf, length);
 
 			if (!ret) {

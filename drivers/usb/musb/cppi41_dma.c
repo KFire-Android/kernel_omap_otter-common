@@ -959,7 +959,7 @@ static int cppi41_channel_program(struct dma_channel *channel,	u16 maxpacket,
 	cppi_ch->start_addr = dma_addr;
 	cppi_ch->curr_offset = 0;
 	cppi_ch->hb_mult = (maxpacket >> 11) & 0x03;
-	cppi_ch->pkt_size = maxpacket & 0x7ff;
+	cppi_ch->pkt_size = maxpacket & ~(3 << 11);
 	cppi_ch->length = length;
 	cppi_ch->transfer_mode = mode;
 	cppi_ch->zlp_queued = 0;
