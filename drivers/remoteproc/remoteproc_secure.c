@@ -35,14 +35,28 @@
 #include <linux/delay.h>
 #include <linux/vmalloc.h>
 #include <linux/rproc_drm.h>
-#include <linux/rproc_secure.h>
+
 #include "remoteproc_internal.h"
+
+/**
+ * enum rproc_secure_state - remote processor secure states
+ * @RPROC_SECURE_OFF:		unsecure state
+ * @RPROC_SECURE_RELOAD:	reloading before enteriing secure mode
+ * @RPROC_SECURE_AUTHENTICATED:	code authenticated & firewalled
+ * @RPROC_SECURE_ON:		secure mode
+ */
+enum rproc_secure_state {
+	RPROC_SECURE_OFF		= 0,
+	RPROC_SECURE_RELOAD		= 1,
+	RPROC_SECURE_AUTHENTICATED	= 2,
+	RPROC_SECURE_ON			= 3,
+};
 
 static struct completion secure_reload_complete;
 static struct completion secure_complete;
 static struct work_struct secure_validate;
 static struct mutex secure_lock;
-static enum rproc_secure_st secure_state;
+static enum rproc_secure_state secure_state;
 static int secure_reload;
 static struct rproc_sec_params *secure_params;
 static rproc_drm_invoke_service_t rproc_secure_drm_service_alternate;
@@ -63,7 +77,7 @@ static int rproc_secure_drm_service(
 static void rproc_secure_work(struct work_struct *work)
 {
 	int ret = 0;
-	enum rproc_secure_st state = secure_state;
+	enum rproc_secure_state state = secure_state;
 
 	/* call the secure mode API to validate code */
 	ret = rproc_secure_drm_service(AUTHENTICATION_A2, secure_params);

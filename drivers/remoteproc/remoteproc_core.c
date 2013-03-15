@@ -45,7 +45,6 @@
 #include <linux/delay.h>
 #include <linux/vmalloc.h>
 #include <linux/rproc_drm.h>
-#include <linux/rproc_secure.h>
 
 #include "remoteproc_internal.h"
 
