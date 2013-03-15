@@ -180,7 +180,6 @@ int rproc_secure_boot(struct rproc *rproc, const struct firmware *fw)
 	list_for_each_entry(maps, &rproc->carveouts, node) {
 		if (maps->memregion == RPROC_MEMREGION_CODE) {
 			/* update location of carveout region */
-			secure_params->ducati_base_address = maps->dma;
 			secure_params->ducati_code = maps->dma;
 			secure_params->ducati_code_size = maps->len;
 
@@ -195,6 +194,7 @@ int rproc_secure_boot(struct rproc *rproc, const struct firmware *fw)
 			secure_params->ducati_data_size = maps->len;
 		}
 		if (maps->memregion == RPROC_MEMREGION_SMEM) {
+			secure_params->ducati_base_address = maps->dma;
 			secure_params->ducati_smem = maps->dma;
 			secure_params->ducati_smem_size = maps->len;
 		}
