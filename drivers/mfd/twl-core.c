@@ -905,6 +905,7 @@ add_children(struct twl4030_platform_data *pdata, unsigned irq_base,
 
 		if (twl_has_usb() && pdata->usb) {
 			pdata->usb->features = features;
+			pdata->usb->errata = twl_errata;
 
 			child = add_child(0, "twl6030_usb",
 					  pdata->usb, sizeof(*pdata->usb),
@@ -1432,6 +1433,13 @@ static void __devinit twl_setup_errata(int features)
 		 */
 		if (twlrev == 1)
 			twl_errata |= TWL6032_ERRATA_DB00119490;
+		/*
+		 * For TWL6032 all revisions that miss VBUS
+		 * detection interrupt (while OPA_MODE is set to 1 in
+		 * the CHARGERUSB_CTRL1 register) BOOST mode must be disabled
+		 * in ID detection interrupt by ID_FLOAT event.
+		 */
+		twl_errata |= TWL6032_ERRATA_VBUS_IRQ_LOST_OPA_MODE;
 	} else {
 		/*
 		 * Errata ProDB00112620 present only in the TWL6030 ES2.1

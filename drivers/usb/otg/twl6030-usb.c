@@ -92,6 +92,9 @@
 
 #define CHARGERUSB_CTRL1		0x8
 
+#define BOOST_MODE_OFF_MASK		0x00
+#define BOOST_MODE_ON_MASK		0x40
+
 #define CONTROLLER_STAT1		0x03
 #define	VBUS_DET			BIT(2)
 
@@ -113,6 +116,7 @@ struct twl6030_usb {
 	bool			irq_enabled;
 	bool			vbus_enable;
 	unsigned long		features;
+	u32			errata;
 
 	enum omap_musb_vbus_id_status prev_status;
 
@@ -326,7 +330,20 @@ static irqreturn_t twl6030_usbotg_irq(int irq, void *_twl)
 		if (twl->prev_status != OMAP_MUSB_ID_GROUND)
 			goto exit;
 		twl->prev_status = OMAP_MUSB_ID_FLOAT;
-
+		/*
+		 * NOTE:
+		 * This is workaround for the TWL6032 that miss VBUS
+		 * detection interrupt while OPA_MODE is set to 1 in
+		 * the CHARGERUSB_CTRL1 register.
+		 * Just set BOOST mode for OTG to off and VBUS interrupt
+		 * will start to work.
+		 */
+		if (twl->errata & TWL6032_ERRATA_VBUS_IRQ_LOST_OPA_MODE) {
+			twl->prev_status = OMAP_MUSB_VBUS_VALID;
+			twl->vbus_enable = 0;
+			twl6030_writeb(twl, TWL_MODULE_MAIN_CHARGE,
+				       BOOST_MODE_OFF_MASK, CHARGERUSB_CTRL1);
+		}
 		twl6030_writeb(twl, TWL_MODULE_USB, 0x10, USB_ID_INT_EN_HI_CLR);
 		twl6030_writeb(twl, TWL_MODULE_USB, 0x1, USB_ID_INT_EN_HI_SET);
 	}
@@ -359,16 +376,18 @@ static void otg_set_vbus_work(struct work_struct *data)
 								set_vbus_work);
 
 	/*
-	 * Start driving VBUS. Set OPA_MODE bit in CHARGERUSB_CTRL1
-	 * register. This enables boost mode.
+	 * Start driving VBUS. Set OPA_MODE bit and clear HZ_MODE bit
+	 * in CHARGERUSB_CTRL1 register. This enables Boost mode for OTG
+	 * purpose.
+	 * Since in OTG operating mode internal USB charger used as VBUS supply
+	 * then it should not be in high-impedance mode on VBUS.
 	 */
-
 	if (twl->vbus_enable)
-		twl6030_writeb(twl, TWL_MODULE_MAIN_CHARGE , 0x40,
-							CHARGERUSB_CTRL1);
+		twl6030_writeb(twl, TWL_MODULE_MAIN_CHARGE,
+			       BOOST_MODE_ON_MASK, CHARGERUSB_CTRL1);
 	else
-		twl6030_writeb(twl, TWL_MODULE_MAIN_CHARGE , 0x00,
-							CHARGERUSB_CTRL1);
+		twl6030_writeb(twl, TWL_MODULE_MAIN_CHARGE,
+			       BOOST_MODE_OFF_MASK, CHARGERUSB_CTRL1);
 }
 
 static int twl6030_set_vbus(struct phy_companion *comparator, bool enabled)
@@ -397,6 +416,7 @@ static int __devinit twl6030_usb_probe(struct platform_device *pdev)
 	twl->irq1		= platform_get_irq(pdev, 0);
 	twl->irq2		= platform_get_irq(pdev, 1);
 	twl->features		= pdata->features;
+	twl->errata		= pdata->errata;
 	twl->prev_status	= OMAP_MUSB_UNKNOWN;
 
 	twl->comparator.set_vbus	= twl6030_set_vbus;
