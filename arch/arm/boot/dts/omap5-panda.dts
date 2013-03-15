@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
+ * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -8,14 +8,3 @@
 /dts-v1/;
 
 /include/ "omap5-board-common.dtsi"
-/include/ "samsung_k3pe0e000b.dtsi"
-
-&emif1 {
-	cs1-used;
-	device-handle = <&samsung_K3PE0E000B>;
-};
-
-&emif2 {
-	cs1-used;
-	device-handle = <&samsung_K3PE0E000B>;
-};
