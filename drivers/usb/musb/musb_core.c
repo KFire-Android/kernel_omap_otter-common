@@ -783,6 +783,10 @@ b_host:
 			/* FALLTHROUGH */
 		case OTG_STATE_B_PERIPHERAL:
 		case OTG_STATE_B_IDLE:
+			pr_info("musb %s gadget disconnected.\n",
+				musb->gadget_driver
+				? musb->gadget_driver->driver.name
+				: "");
 			musb_g_disconnect(musb);
 			break;
 		default:
