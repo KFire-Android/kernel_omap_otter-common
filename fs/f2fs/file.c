@@ -13,6 +13,7 @@
 #include <linux/stat.h>
 #include <linux/buffer_head.h>
 #include <linux/writeback.h>
+#include <linux/blkdev.h>
 #include <linux/falloc.h>
 #include <linux/types.h>
 #include <linux/compat.h>
@@ -176,6 +177,7 @@ int f2fs_sync_file(struct file *file, int datasync)
 		}
 		filemap_fdatawait_range(sbi->node_inode->i_mapping,
 							0, LONG_MAX);
+		ret = blkdev_issue_flush(inode->i_sb->s_bdev, GFP_KERNEL, NULL);
 	}
 out:
 	mutex_unlock(&inode->i_mutex);
