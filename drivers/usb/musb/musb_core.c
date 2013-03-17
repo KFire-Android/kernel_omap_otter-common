@@ -2057,7 +2057,7 @@ static int musb_remove(struct platform_device *pdev)
 	iounmap(ctrl_base);
 	device_init_wakeup(dev, 0);
 #ifndef CONFIG_MUSB_PIO_ONLY
-	dma_set_mask(dev, *dev->parent->dma_mask);
+	dma_set_mask(dev, *dev->dma_mask);
 #endif
 	return 0;
 }
