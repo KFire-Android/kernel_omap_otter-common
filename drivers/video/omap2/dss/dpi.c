@@ -197,7 +197,7 @@ static void dpi_config_lcd_manager(struct omap_dss_device *dssdev)
 	dss_mgr_set_lcd_config(mgr, &dpi.mgr_config);
 }
 
-int omapdss_dpi_display_enable(struct omap_dss_device *dssdev)
+static int omap_dpi_display_enable(struct omap_dss_device *dssdev)
 {
 	struct omap_dss_output *out = dssdev->output;
 	int r;
@@ -283,9 +283,8 @@ err_no_reg:
 	mutex_unlock(&dpi.lock);
 	return r;
 }
-EXPORT_SYMBOL(omapdss_dpi_display_enable);
 
-void omapdss_dpi_display_disable(struct omap_dss_device *dssdev)
+static void omap_dpi_display_disable(struct omap_dss_device *dssdev)
 {
 	struct omap_overlay_manager *mgr = dssdev->output->manager;
 
@@ -308,9 +307,8 @@ void omapdss_dpi_display_disable(struct omap_dss_device *dssdev)
 
 	mutex_unlock(&dpi.lock);
 }
-EXPORT_SYMBOL(omapdss_dpi_display_disable);
 
-void omapdss_dpi_set_timings(struct omap_dss_device *dssdev,
+static void omap_dpi_set_timings(struct omap_dss_device *dssdev,
 		struct omap_video_timings *timings)
 {
 	DSSDBG("dpi_set_timings\n");
@@ -321,9 +319,8 @@ void omapdss_dpi_set_timings(struct omap_dss_device *dssdev,
 
 	mutex_unlock(&dpi.lock);
 }
-EXPORT_SYMBOL(omapdss_dpi_set_timings);
 
-int dpi_check_timings(struct omap_dss_device *dssdev,
+static int omap_dpi_check_timings(struct omap_dss_device *dssdev,
 			struct omap_video_timings *timings)
 {
 	int r;
@@ -369,9 +366,8 @@ int dpi_check_timings(struct omap_dss_device *dssdev,
 
 	return 0;
 }
-EXPORT_SYMBOL(dpi_check_timings);
 
-void omapdss_dpi_set_data_lines(struct omap_dss_device *dssdev, int data_lines)
+static void omap_dpi_set_data_lines(struct omap_dss_device *dssdev, int data_lines)
 {
 	mutex_lock(&dpi.lock);
 
@@ -379,7 +375,6 @@ void omapdss_dpi_set_data_lines(struct omap_dss_device *dssdev, int data_lines)
 
 	mutex_unlock(&dpi.lock);
 }
-EXPORT_SYMBOL(omapdss_dpi_set_data_lines);
 
 static int __init dpi_verify_dsi_pll(struct platform_device *dsidev)
 {
@@ -584,9 +579,19 @@ static void __exit dpi_uninit_output(struct platform_device *pdev)
 	dss_unregister_output(out);
 }
 
+static struct dpi_common_ops ops = {
+	.enable = omap_dpi_display_enable,
+	.disable = omap_dpi_display_disable,
+	.set_timings = omap_dpi_set_timings,
+	.check_timings = omap_dpi_check_timings,
+	.set_data_lines = omap_dpi_set_data_lines,
+};
+
 static int __init omap_dpi_probe(struct platform_device *pdev)
 {
 	mutex_init(&dpi.lock);
+
+	dpi_common_set_ops(&ops);
 
 	dpi_init_output(pdev);
 
@@ -627,12 +632,12 @@ static struct platform_driver omap_dpi_driver = {
 	},
 };
 
-int __init dpi_init_platform_driver(void)
+int __init omap_dpi_init_platform_driver(void)
 {
 	return platform_driver_probe(&omap_dpi_driver, omap_dpi_probe);
 }
 
-void __exit dpi_uninit_platform_driver(void)
+void __exit omap_dpi_uninit_platform_driver(void)
 {
 	platform_driver_unregister(&omap_dpi_driver);
 }

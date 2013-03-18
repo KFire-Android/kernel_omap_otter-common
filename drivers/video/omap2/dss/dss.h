@@ -172,6 +172,17 @@ struct dss_lcd_mgr_config {
 	int lcden_sig_polarity;
 };
 
+struct dpi_common_ops {
+	int (*enable) (struct omap_dss_device *dssdev);
+	void (*disable) (struct omap_dss_device *dssdev);
+	void (*set_timings) (struct omap_dss_device *dssdev,
+		struct omap_video_timings *timings);
+	int (*check_timings) (struct omap_dss_device *dssdev,
+		struct omap_video_timings *timings);
+	void (*set_data_lines) (struct omap_dss_device *dssdev,
+		int data_lines);
+};
+
 struct seq_file;
 struct platform_device;
 
@@ -374,8 +385,10 @@ static inline struct platform_device *dsi_get_dsidev_from_id(int module)
 #endif
 
 /* DPI */
-int dpi_init_platform_driver(void) __init;
-void dpi_uninit_platform_driver(void) __exit;
+void dpi_common_set_ops(struct dpi_common_ops *ops);
+int omap_dpi_init_platform_driver(void) __init;
+void omap_dpi_uninit_platform_driver(void) __exit;
+
 
 /* DISPC */
 int dispc_init_platform_driver(void) __init;

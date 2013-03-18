@@ -5,7 +5,7 @@ omapdss-y := core.o dss.o dss_dpll.o dss_features.o dispc.o dispc_coefs.o \
 # DSS compat layer files
 omapdss-y += manager.o manager-sysfs.o overlay.o overlay-sysfs.o apply.o \
 	dispc-compat.o display-sysfs.o
-omapdss-$(CONFIG_OMAP2_DSS_DPI) += dpi.o
+omapdss-$(CONFIG_OMAP2_DSS_DPI) += dpi.o dpi_common.o
 omapdss-$(CONFIG_OMAP2_DSS_RFBI) += rfbi.o
 omapdss-$(CONFIG_OMAP2_DSS_VENC) += venc.o venc_panel.o
 omapdss-$(CONFIG_OMAP2_DSS_SDI) += sdi.o
