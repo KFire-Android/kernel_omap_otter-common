@@ -17,22 +17,15 @@
 
 #define pr_fmt(fmt)    "%s: " fmt, __func__
 
-#include <linux/kernel.h>
-#include <linux/module.h>
+#include <linux/types.h>
+#include <linux/export.h>
 #include <linux/device.h>
-#include <linux/slab.h>
 #include <linux/mutex.h>
-#include <linux/dma-mapping.h>
 #include <linux/firmware.h>
 #include <linux/string.h>
-#include <linux/remoteproc.h>
-#include <linux/iommu.h>
-#include <linux/klist.h>
+#include <linux/list.h>
 #include <linux/elf.h>
-#include <asm/byteorder.h>
-#include <linux/kthread.h>
-#include <linux/delay.h>
-#include <linux/vmalloc.h>
+#include <linux/remoteproc.h>
 #include <linux/rproc_drm.h>
 
 #include "remoteproc_internal.h"
@@ -51,10 +44,10 @@ enum rproc_secure_state {
 	RPROC_SECURE_ON			= 3,
 };
 
-static struct completion secure_reload_complete;
+static DECLARE_COMPLETION(secure_reload_complete);
+static DEFINE_MUTEX(secure_lock);
 static struct completion secure_complete;
 static struct work_struct secure_validate;
-static struct mutex secure_lock;
 static enum rproc_secure_state secure_state;
 static int secure_reload;
 static struct rproc_sec_params *secure_params;
@@ -93,36 +86,38 @@ static void rproc_secure_work(struct work_struct *work)
 
 	mutex_unlock(&secure_lock);
 	complete_all(&secure_complete);
-	return;
 }
 
 /**
- * rproc_secure_init() - initialize secure params
+ * rproc_secure_init() - initialize rproc_secure module
+ * @rproc: remote processor
  *
+ * Initializes all the state variables and objects required
+ * by the rproc_secure module. This is needed so that rprocs
+ * can be registered & unregistered (when used as modules)
+ * without rebooting.
  */
 void rproc_secure_init(struct rproc *rproc)
 {
 	dev_dbg(&rproc->dev, "init secure service\n");
 
 	secure_reload = 0;
-	secure_state = RPROC_SECURE_OFF;
 	secure_params = NULL;
+	secure_state = RPROC_SECURE_OFF;
 	INIT_WORK(&secure_validate, rproc_secure_work);
-	mutex_init(&secure_lock);
-	return;
 }
 
 /**
  * rproc_secure_reset() - reset secure service and firewalls
+ * @rproc: remote processor
  *
+ * Reset the state of the DRM service
  */
 void rproc_secure_reset(struct rproc *rproc)
 {
 	dev_dbg(&rproc->dev, "reseting secure service\n");
 
 	rproc_secure_drm_service(AUTHENTICATION_A0, NULL);
-
-	return;
 }
 
 /**
@@ -259,6 +254,7 @@ int rproc_secure_boot(struct rproc *rproc, const struct firmware *fw)
 	schedule_work(&secure_validate);
 
 	return ret;
+
 out:
 	if (secure_state == RPROC_SECURE_RELOAD)
 		complete_all(&secure_reload_complete);
