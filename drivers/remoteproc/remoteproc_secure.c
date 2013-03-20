@@ -46,8 +46,6 @@ enum rproc_secure_state {
 
 static DECLARE_COMPLETION(secure_reload_complete);
 static DEFINE_MUTEX(secure_lock);
-static struct completion secure_complete;
-static struct work_struct secure_validate;
 static enum rproc_secure_state secure_state;
 static int secure_reload;
 static struct rproc_sec_params *secure_params;
@@ -58,35 +56,6 @@ static int rproc_secure_drm_service(
 
 #define dev_to_rproc(dev) container_of(dev, struct rproc, dev)
 
-/**
- * rproc_secure_work() - authenticate ducati code sections
- *
- * Workqueue to authenticate all ducati code. Since the authentication
- * can take some time, we use a workqueue. If the authentication is
- * done while entering secure mode, set completion flag to notify
- * thread requesting reload
- */
-static void rproc_secure_work(struct work_struct *work)
-{
-	int ret = 0;
-	enum rproc_secure_state state = secure_state;
-
-	/* call the secure mode API to validate code */
-	ret = rproc_secure_drm_service(AUTHENTICATION_A2, secure_params);
-	if (ret)
-		pr_debug("%s: error failed to validate code\n", __func__);
-
-	if (!ret)
-		secure_state = RPROC_SECURE_AUTHENTICATED;
-	else
-		secure_state = RPROC_SECURE_OFF;
-
-	if (state == RPROC_SECURE_RELOAD)
-		complete_all(&secure_reload_complete);
-
-	mutex_unlock(&secure_lock);
-	complete_all(&secure_complete);
-}
 
 /**
  * rproc_secure_init() - initialize rproc_secure module
@@ -104,7 +73,6 @@ void rproc_secure_init(struct rproc *rproc)
 	secure_reload = 0;
 	secure_params = NULL;
 	secure_state = RPROC_SECURE_OFF;
-	INIT_WORK(&secure_validate, rproc_secure_work);
 }
 
 /**
@@ -157,6 +125,7 @@ int rproc_secure_boot(struct rproc *rproc, const struct firmware *fw)
 	struct elf32_shdr *shdr =
 		(struct elf32_shdr *) (fw->data + ehdr->e_shoff);
 	const char *name_sect = fw->data + shdr[ehdr->e_shstrndx].sh_offset;
+	enum rproc_secure_state state = secure_state;
 
 	/* enter secure authentication process */
 	mutex_lock(&secure_lock);
@@ -242,6 +211,7 @@ int rproc_secure_boot(struct rproc *rproc, const struct firmware *fw)
 	secure_params->decoded_buffer_address = (dma_addr_t) 0xB5200000;
 	secure_params->decoded_buffer_size = (uint32_t) 0x5100000;
 
+	/* TODO: consolidate the back to back authentication calls */
 	/* validate boot section */
 	ret = rproc_secure_drm_service(AUTHENTICATION_A1, secure_params);
 	if (ret) {
@@ -250,13 +220,16 @@ int rproc_secure_boot(struct rproc *rproc, const struct firmware *fw)
 	}
 
 	/* validate all code */
-	init_completion(&secure_complete);
-	schedule_work(&secure_validate);
-
-	return ret;
+	ret = rproc_secure_drm_service(AUTHENTICATION_A2, secure_params);
+	if (ret) {
+		dev_err(dev, "error failed to validate code\n");
+		secure_state = RPROC_SECURE_OFF;
+	} else {
+		secure_state = RPROC_SECURE_AUTHENTICATED;
+	}
 
 out:
-	if (secure_state == RPROC_SECURE_RELOAD)
+	if (state == RPROC_SECURE_RELOAD)
 		complete_all(&secure_reload_complete);
 
 	mutex_unlock(&secure_lock);
