@@ -63,7 +63,7 @@
 #include <plat/sgx_omaplfb.h>
 #define OMAP5_SEVM_FB_RAM_SIZE       (SZ_16M + SZ_4M) /* 1280×800*4 * 2 */
 
-#define GPIO_ETH_NRESET		15	/* USBB3 to SMSC LAN9730 */
+#define GPIO_ETH_NRESET		79	/* USBB3 to SMSC LAN9730 */
 #define GPIO_HUB_NRESET		80	/* USBB2 to SMSC 3530 HUB */
 #define GPIO_POWER_BUTTON	83
 #define GPIO_EXT_INT_PIN	99
@@ -72,6 +72,7 @@
 #define HDMI_GPIO_HPD		193
 #define HDMI_GPIO_CT_CP_HPD	256
 #define HDMI_GPIO_LS_OE		257
+#define GPIO_MSECURE		234	/* MSECURE GPIO */
 
 static struct gpio_led panda5_gpio_leds[] = {
 	{
@@ -497,15 +498,33 @@ static struct regulator_init_data omap5_ldo3 = {
 	},
 };
 
+static struct regulator_consumer_supply omap5_dss_phy_supply[] = {
+	REGULATOR_SUPPLY("vdds_dsi", "omapdss"),
+	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dsi.0"),
+	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dsi.1"),
+	REGULATOR_SUPPLY("vdds_hdmi", "omapdss_hdmi"),
+};
+
+
 static struct regulator_init_data omap5_ldo4 = {
 	.constraints = {
+#ifdef CONFIG_ARCH_OMAP5_ES1
 		.min_uV			= 2200000,
 		.max_uV			= 2200000,
+#else
+		.min_uV			= 1500000,
+		.max_uV			= 1500000,
+		.apply_uV		= 1,
+#endif
 		.valid_modes_mask	= REGULATOR_MODE_NORMAL
 					| REGULATOR_MODE_STANDBY,
 		.valid_ops_mask		= REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
 	},
+#ifndef CONFIG_ARCH_OMAP5_ES1
+	.num_consumer_supplies	= ARRAY_SIZE(omap5_dss_phy_supply),
+	.consumer_supplies	= omap5_dss_phy_supply,
+#endif
 };
 
 static struct regulator_init_data omap5_ldo5 = {
@@ -530,13 +549,6 @@ static struct regulator_init_data omap5_ldo6 = {
 	},
 };
 
-static struct regulator_consumer_supply omap5_dss_phy_supply[] = {
-	REGULATOR_SUPPLY("vdds_dsi", "omapdss"),
-	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dsi.0"),
-	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dsi.1"),
-	REGULATOR_SUPPLY("vdds_hdmi", "omapdss_hdmi"),
-};
-
 static struct regulator_init_data omap5_ldo7 = {
 	.constraints = {
 		.min_uV			= 1500000,
@@ -545,10 +557,14 @@ static struct regulator_init_data omap5_ldo7 = {
 					| REGULATOR_MODE_STANDBY,
 		.valid_ops_mask		= REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
+#ifdef CONFIG_ARCH_OMAP5_ES1
 		.apply_uV		= 1,
+#endif
 	},
+#ifdef CONFIG_ARCH_OMAP5_ES1
 	.num_consumer_supplies	= ARRAY_SIZE(omap5_dss_phy_supply),
 	.consumer_supplies	= omap5_dss_phy_supply,
+#endif
 };
 
 static struct regulator_init_data omap5_ldo8 = {
@@ -844,36 +860,16 @@ static int __init omap5pandai2c_init(void)
 	return 0;
 }
 
-/* Display DVI */
-#define PANDA_DVI_TFP410_POWER_DOWN_GPIO	0
-
-static int omap5_panda_enable_dvi(struct omap_dss_device *dssdev)
+static void __init omap_msecure_init(void)
 {
-	gpio_set_value(dssdev->reset_gpio, 1);
-	return 0;
+	int err;
+	/* setup msecure line as GPIO for RTC accesses */
+	omap_mux_init_gpio(GPIO_MSECURE, OMAP_PIN_OUTPUT);
+	err = gpio_request_one(GPIO_MSECURE, GPIOF_OUT_INIT_HIGH, "msecure");
+	if (err < 0)
+		pr_err("Failed to request GPIO %d, error %d\n",
+			GPIO_MSECURE, err);
 }
-
-static void omap5_panda_disable_dvi(struct omap_dss_device *dssdev)
-{
-	gpio_set_value(dssdev->reset_gpio, 0);
-}
-
-/* Using generic display panel */
-static struct panel_generic_dpi_data omap5_dvi_panel = {
-	.name			= "generic_720p",
-	.platform_enable	= omap5_panda_enable_dvi,
-	.platform_disable	= omap5_panda_disable_dvi,
-};
-
-static struct omap_dss_device omap5_panda_dvi_device = {
-	.type			= OMAP_DISPLAY_TYPE_DPI,
-	.name			= "dvi",
-	.driver_name		= "generic_dpi_panel",
-	.data			= &omap5_dvi_panel,
-	.phy.dpi.data_lines	= 24,
-	.reset_gpio		= PANDA_DVI_TFP410_POWER_DOWN_GPIO,
-	.channel		= OMAP_DSS_CHANNEL_LCD2,
-};
 
 static struct omap_dss_hdmi_data omap5panda_hdmi_data = {
         .hpd_gpio = HDMI_GPIO_HPD,
@@ -903,7 +899,6 @@ static struct omap_dss_device omap5panda_hdmi_device = {
 
 static struct omap_dss_device *omap5panda_dss_devices[] = {
 	&omap5panda_hdmi_device,
-	&omap5_panda_dvi_device,
 };
 
 static struct omap_dss_board_info panda5_dss_data = {
@@ -988,6 +983,7 @@ static void __init omap_5_panda_init(void)
 	omap_init_board_version(BOARD_MAKE_VERSION(BOARD_OMAP5_UEVM, 0));
 	omap_create_board_props();
 	omap5pandai2c_init();
+	omap_msecure_init();
 	omap5_pmic_init(1, PALMAS_NAME, OMAP44XX_IRQ_SYS_1N, PALMAS_DATA,
 			"twl6040", OMAP44XX_IRQ_SYS_2N, &twl6040_data);
 

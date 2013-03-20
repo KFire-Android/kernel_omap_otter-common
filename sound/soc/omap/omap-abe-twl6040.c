@@ -25,7 +25,6 @@
 #include <linux/mfd/twl6040.h>
 #include <linux/platform_data/omap-abe-twl6040.h>
 #include <linux/module.h>
-#include <linux/i2c.h>
 
 #include <sound/core.h>
 #include <sound/pcm.h>
@@ -53,30 +52,7 @@ struct omap_abe_data {
 	int mcbsp_cfg;
 	struct snd_soc_platform *abe_platform;
 	struct snd_soc_codec *twl6040_codec;
-	struct i2c_client *tps6130x;
-	struct i2c_adapter *adapter;
 };
-
-static struct i2c_board_info tps6130x_hwmon_info = {
-	I2C_BOARD_INFO("tps6130x", 0x33),
-};
-
-/* configure the TPS6130x Handsfree Boost Converter */
-static int omap_abe_tps6130x_configure(struct omap_abe_data *sdp4403)
-{
-	struct i2c_client *tps6130x = sdp4403->tps6130x;
-	u8 data[2];
-
-	data[0] = 0x01;
-	data[1] = 0x60;
-	if (i2c_master_send(tps6130x, data, 2) != 2)
-		dev_err(&tps6130x->dev, "I2C write to TPS6130x failed\n");
-
-	data[0] = 0x02;
-	if (i2c_master_send(tps6130x, data, 2) != 2)
-		dev_err(&tps6130x->dev, "I2C write to TPS6130x failed\n");
-	return 0;
-}
 
 static int omap_abe_modem_hw_params(struct snd_pcm_substream *substream,
 	struct snd_pcm_hw_params *params)
@@ -325,7 +301,7 @@ static int mcbsp_be_hw_params_fixup(struct snd_soc_pcm_runtime *rtd,
 	switch (be_id) {
 	case OMAP_ABE_DAI_BT_VX:
 		channels->min = 2;
-		rate->min = rate->max = 16000;
+		rate->min = rate->max = 8000;
 		break;
 	case OMAP_ABE_DAI_MM_FM:
 		channels->min = 2;
@@ -598,25 +574,6 @@ static int omap_abe_twl6040_init(struct snd_soc_pcm_runtime *rtd)
 			twl6040_hs_jack_detect(codec, &hs_jack, SND_JACK_HEADSET);
 		else
 			snd_soc_jack_report(&hs_jack, SND_JACK_HEADSET, SND_JACK_HEADSET);
-	}
-
-	/* Only configure the TPS6130x on SDP4430 and 44xx_Tablet*/
-	if (machine_is_omap_4430sdp() || machine_is_omap_tabletblaze()) {
-		card_data->adapter = i2c_get_adapter(1);
-		if (!card_data->adapter) {
-			dev_err(card->dev, "can't get i2c adapter\n");
-			return -ENODEV;
-		}
-
-		card_data->tps6130x = i2c_new_device(card_data->adapter,
-				&tps6130x_hwmon_info);
-		if (!card_data->tps6130x) {
-			dev_err(card->dev, "can't add i2c device\n");
-			i2c_put_adapter(card_data->adapter);
-			return -ENODEV;
-		}
-
-		omap_abe_tps6130x_configure(card_data);
 	}
 
 	return ret;
@@ -1513,14 +1470,8 @@ static __devinit int omap_abe_probe(struct platform_device *pdev)
 static int __devexit omap_abe_remove(struct platform_device *pdev)
 {
 	struct snd_soc_card *card = platform_get_drvdata(pdev);
-	struct omap_abe_data *card_data = snd_soc_card_get_drvdata(card);
 
 	snd_soc_unregister_card(card);
-
-	if (machine_is_omap_4430sdp() || machine_is_omap_tabletblaze()) {
-		i2c_unregister_device(card_data->tps6130x);
-		i2c_put_adapter(card_data->adapter);
-	}
 
 	return 0;
 }

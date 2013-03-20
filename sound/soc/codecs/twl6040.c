@@ -78,6 +78,7 @@ struct twl6040_data {
 	int hs_power_mode_locked;
 	unsigned int clk_in;
 	unsigned int sysclk;
+	struct regulator *vddhf_reg;
 	u16 hs_left_step;
 	u16 hs_right_step;
 	u16 hf_left_step;
@@ -461,6 +462,31 @@ static int twl6040_ep_drv_event(struct snd_soc_dapm_widget *w,
 	}
 
 	msleep(1);
+
+	return ret;
+}
+
+static int twl6040_hf_boost_event(struct snd_soc_dapm_widget *w,
+			struct snd_kcontrol *kcontrol, int event)
+{
+	struct snd_soc_codec *codec = w->codec;
+	struct twl6040_data *priv = snd_soc_codec_get_drvdata(codec);
+	int ret;
+
+	if (!priv->vddhf_reg)
+		return 0;
+
+	if (SND_SOC_DAPM_EVENT_ON(event)) {
+		ret = regulator_enable(priv->vddhf_reg);
+		if (ret)
+			dev_err(codec->dev, "failed to enable VDDHF regulator %d\n",
+				ret);
+	} else {
+		ret = regulator_disable(priv->vddhf_reg);
+		if (ret)
+			dev_err(codec->dev, "failed to disable VDDHF regulator %d\n",
+				ret);
+	}
 
 	return ret;
 }
@@ -931,6 +957,12 @@ static const struct snd_soc_dapm_widget twl6040_dapm_widgets[] = {
 			TWL6040_REG_HSLCTL, 2, 0, NULL, 0),
 	SND_SOC_DAPM_OUT_DRV("HS Right Driver",
 			TWL6040_REG_HSRCTL, 2, 0, NULL, 0),
+	SND_SOC_DAPM_SUPPLY("Handsfree Left Boost Supply", SND_SOC_NOPM, 0, 0,
+			    twl6040_hf_boost_event,
+			    SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
+	SND_SOC_DAPM_SUPPLY("Handsfree Right Boost Supply", SND_SOC_NOPM, 0, 0,
+			    twl6040_hf_boost_event,
+			    SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
 	SND_SOC_DAPM_OUT_DRV_E("Earphone Driver",
 			TWL6040_REG_EARCTL, 0, 0, NULL, 0,
 			twl6040_ep_drv_event,
@@ -1020,6 +1052,9 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"HF Left Driver", NULL, "HF Left PGA"},
 	{"HF Right Driver", NULL, "HF Right PGA"},
 
+	{"HF Left Driver", NULL, "Handsfree Left Boost Supply"},
+	{"HF Right Driver", NULL, "Handsfree Right Boost Supply"},
+
 	{"HFL", NULL, "HF Left Driver"},
 	{"HFR", NULL, "HF Right Driver"},
 
@@ -1067,9 +1102,6 @@ static int twl6040_set_bias_level(struct snd_soc_codec *codec,
 		priv->codec_powered = 1;
 
 		twl6040_restore_regs(codec);
-
-		/* Set external boost GPO */
-		twl6040_write(codec, TWL6040_REG_GPOCTL, 0x02);
 		break;
 	case SND_SOC_BIAS_OFF:
 		if (!priv->codec_powered)
@@ -1356,6 +1388,26 @@ static int twl6040_probe(struct snd_soc_codec *codec)
 
 	wake_lock_init(&priv->wake_lock, WAKE_LOCK_SUSPEND, "twl6040");
 
+	if (pdata && pdata->vddhf_uV) {
+		priv->vddhf_reg = regulator_get(codec->dev, "vddhf");
+		if (IS_ERR(priv->vddhf_reg)) {
+			ret = PTR_ERR(priv->vddhf_reg);
+			dev_warn(codec->dev, "couldn't get VDDHF regulator %d\n",
+				 ret);
+			priv->vddhf_reg = NULL;
+		}
+	}
+
+	if (priv->vddhf_reg) {
+		ret = regulator_set_voltage(priv->vddhf_reg,
+				pdata->vddhf_uV, pdata->vddhf_uV);
+		if (ret) {
+			dev_err(codec->dev, "failed to set VDDHF voltage %d\n",
+				ret);
+			goto reg_err;
+		}
+	}
+
 	jack = &priv->hs_jack;
 	jack->sdev.name = "h2w";
 	ret = switch_dev_register(&jack->sdev);
@@ -1392,8 +1444,11 @@ hfirq_err:
 	free_irq(priv->plug_irq, codec);
 plugirq_err:
 	switch_dev_unregister(&jack->sdev);
-	wake_lock_destroy(&priv->wake_lock);
 sdev_err:
+reg_err:
+	if (priv->vddhf_reg)
+		regulator_put(priv->vddhf_reg);
+	wake_lock_destroy(&priv->wake_lock);
 	destroy_workqueue(priv->workqueue);
 work_err:
 	kfree(priv);
@@ -1409,6 +1464,8 @@ static int twl6040_remove(struct snd_soc_codec *codec)
 	free_irq(priv->hf_irq, codec);
 	free_irq(priv->plug_irq, codec);
 	switch_dev_unregister(&jack->sdev);
+	if (priv->vddhf_reg)
+		regulator_put(priv->vddhf_reg);
 	wake_lock_destroy(&priv->wake_lock);
 	destroy_workqueue(priv->workqueue);
 	kfree(priv);

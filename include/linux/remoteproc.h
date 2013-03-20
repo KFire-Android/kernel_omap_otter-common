@@ -452,6 +452,7 @@ enum rproc_err {
  * @firmware_loading_complete: marks e/o asynchronous firmware loading
  * @bootaddr: address of first instruction to boot rproc with (optional)
  * @rvdevs: list of remote virtio devices
+ * @num_rvdevs: number of remote virtio devices
  * @notifyids: idr for dynamically assigning rproc-wide unique notify ids
  * @error_handler: workqueue for reseting virtio devices
  * @crash_cnt: counter for fatal errors
@@ -483,6 +484,7 @@ struct rproc {
 	struct completion firmware_loading_complete;
 	u32 bootaddr;
 	struct list_head rvdevs;
+	int num_rvdevs;
 	struct idr notifyids;
 	struct work_struct error_handler;
 	unsigned crash_cnt;

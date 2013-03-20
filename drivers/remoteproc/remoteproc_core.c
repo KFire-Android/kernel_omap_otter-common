@@ -726,11 +726,7 @@ static int rproc_handle_vdev(struct rproc *rproc, struct fw_rsc_vdev *rsc,
 	rvdev->dfeatures = rsc->dfeatures;
 
 	list_add_tail(&rvdev->node, &rproc->rvdevs);
-
-	/* it is now safe to add the virtio device */
-	ret = rproc_add_virtio_dev(rvdev, rsc->id);
-	if (ret)
-		goto free_rvdev;
+	rproc->num_rvdevs++;
 
 	return 0;
 
@@ -1228,7 +1224,9 @@ rproc_handle_virtio_rsc(struct rproc *rproc, struct resource_table *table, int l
 {
 	struct device *dev = &rproc->dev;
 	int ret = 0, i;
+	struct rproc_vdev *rvdev, *rvtmp;
 
+	rproc->num_rvdevs = 0;
 	for (i = 0; i < table->num; i++) {
 		int offset = table->offset[i];
 		struct fw_rsc_hdr *hdr = (void *)table + offset;
@@ -1249,6 +1247,20 @@ rproc_handle_virtio_rsc(struct rproc *rproc, struct resource_table *table, int l
 		vrsc = (struct fw_rsc_vdev *)hdr->data;
 
 		ret = rproc_handle_vdev(rproc, vrsc, avail);
+		if (ret) {
+			list_for_each_entry_safe(rvdev, rvtmp, &rproc->rvdevs,
+							node) {
+				rproc->num_rvdevs--;
+				list_del(&rvdev->node);
+				kfree(rvdev);
+			}
+			return ret;
+		}
+	}
+
+	/* register all remote vdevs */
+	list_for_each_entry_safe(rvdev, rvtmp, &rproc->rvdevs, node) {
+		ret = rproc_add_virtio_dev(rvdev, VIRTIO_ID_RPMSG);
 		if (ret)
 			break;
 	}
@@ -1700,7 +1712,15 @@ int rproc_boot(struct rproc *rproc)
 	}
 
 	/* skip the boot process if rproc is already powered up */
-	if (atomic_inc_return(&rproc->power) > 1) {
+	if (atomic_inc_return(&rproc->power) > rproc->num_rvdevs) {
+		ret = 0;
+		goto unlock_mutex;
+	}
+
+	/* skip booting until the last virtio device is probed */
+	if (atomic_read(&rproc->power) != rproc->num_rvdevs) {
+		dev_info(dev, "skipping power up until last virtio device %s\n",
+								rproc->name);
 		ret = 0;
 		goto unlock_mutex;
 	}

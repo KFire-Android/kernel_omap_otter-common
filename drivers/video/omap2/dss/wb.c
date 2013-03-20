@@ -134,9 +134,22 @@ static int omap_dss_wb_set_info(struct omap_writeback *wb,
 
 static void wb_irq_handler(void *data, u32 mask)
 {
-	complete((struct completion *)data);
-	omap_dispc_unregister_isr(wb_irq_handler,
-		(struct completion *)data, DISPC_IRQ_FRAMEDONEWB);
+	struct omap_writeback *wb = data;
+	/* if handling vsync, skip first frame */
+	if (wb->wb_done.vsync_active) {
+		if (++wb->wb_done.vsync_count == 1)
+			return;
+	}
+
+	wb->wb_done.is_done = true;
+	complete_all(&wb->wb_completion);
+	complete(&wb->wb_done.completion);
+	if (wb->wb_done.vsync_active)
+		omap_dispc_unregister_isr(wb_irq_handler,
+					wb, DISPC_IRQ_VSYNC);
+	else
+		omap_dispc_unregister_isr(wb_irq_handler,
+					wb, DISPC_IRQ_FRAMEDONEWB);
 }
 
 static int omap_dss_wb_wait_framedone(struct omap_writeback *wb)
@@ -153,8 +166,13 @@ static int omap_dss_wb_wait_framedone(struct omap_writeback *wb)
 static int omap_dss_wb_register_framedone(struct omap_writeback *wb)
 {
 	INIT_COMPLETION(wb->wb_completion);
+
+	if (wb->wb_done.vsync_active)
+		return omap_dispc_register_isr(wb_irq_handler,
+			wb, DISPC_IRQ_VSYNC);
+
 	return omap_dispc_register_isr(wb_irq_handler,
-			&wb->wb_completion, DISPC_IRQ_FRAMEDONEWB);
+			wb, DISPC_IRQ_FRAMEDONEWB);
 }
 
 static void omap_dss_wb_get_info(struct omap_writeback *wb,
@@ -202,6 +220,7 @@ void dss_init_writeback(struct platform_device *pdev)
 	mutex_init(&wb->lock);
 
 	init_completion(&wb->wb_completion);
+	init_completion(&wb->wb_done.completion);
 
 	omap_dss_add_wb(wb);
 

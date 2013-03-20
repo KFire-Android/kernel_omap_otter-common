@@ -69,6 +69,14 @@
 #define TWL6040_REG_ACCCTL		0x2D
 #define TWL6040_REG_STATUS		0x2E
 
+/* ASICREV (0x02) values */
+
+#define TWL6040_REV_1_0			0x00
+#define TWL6040_REV_1_1			0x01
+#define TWL6040_REV_1_3			0x02
+#define TWL6041_REV_2_0			0x10
+#define TWL6041_REV_2_2			0x12
+
 /* INTID (0x03) fields */
 
 #define TWL6040_THINT			0x01
@@ -145,9 +153,9 @@
 
 /* GPOCTL (0x1E) fields */
 
-#define TWL6040_GPO1			0x01
-#define TWL6040_GPO2			0x02
-#define TWL6040_GPO3			0x03
+#define TWL6040_GPO1			(1 << 0)
+#define TWL6040_GPO2			(1 << 1)
+#define TWL6040_GPO3			(1 << 2)
 
 /* ACCCTL (0x2D) fields */
 
@@ -191,6 +199,7 @@ struct twl6040_codec_data {
 	u16 hf_left_step;
 	u16 hf_right_step;
 	u16 amic_bias_settle_ms;
+	int vddhf_uV;
 };
 
 struct twl6040_vibra_data {
@@ -209,11 +218,15 @@ struct twl6040_vibra_data {
 	u8 voltage_raise_speed;
 };
 
+struct twl6040;
+
 struct twl6040_platform_data {
 	int audpwron_gpio;	/* audio power-on gpio */
 	unsigned int irq_base;
 	int (*set_pll_input)(int pll_id, int enable);
 	int (*pdm_ul_errata)(void);
+	int (*platform_init)(struct twl6040 *twl6040);
+	int (*platform_exit)(struct twl6040 *twl6040);
 
 	struct twl6040_codec_data *codec;
 	struct twl6040_vibra_data *vibra;
@@ -248,6 +261,7 @@ struct twl6040 {
 	u8 irq_masks_cache;
 };
 
+#if defined(CONFIG_TWL6040_CORE)
 int twl6040_reg_read(struct twl6040 *twl6040, unsigned int reg);
 int twl6040_reg_write(struct twl6040 *twl6040, unsigned int reg,
 		      u8 val);
@@ -270,5 +284,56 @@ static inline int twl6040_get_revid(struct twl6040 *twl6040)
 	return twl6040->rev;
 }
 
+#else
+static inline int twl6040_reg_read(struct twl6040 *twl6040, unsigned int reg)
+{
+	return -EINVAL;
+}
+static inline int twl6040_reg_write(struct twl6040 *twl6040, unsigned int reg,
+				    u8 val)
+{
+	return -EINVAL;
+}
+static inline int twl6040_set_bits(struct twl6040 *twl6040, unsigned int reg,
+				   u8 mask)
+{
+	return -EINVAL;
+}
+static inline int twl6040_clear_bits(struct twl6040 *twl6040, unsigned int reg,
+				     u8 mask)
+{
+	return -EINVAL;
+}
+static inline int twl6040_power(struct twl6040 *twl6040, int on)
+{
+	return -EINVAL;
+}
+static inline int twl6040_set_pll(struct twl6040 *twl6040, int pll_id,
+				  unsigned int freq_in, unsigned int freq_out)
+{
+	return -EINVAL;
+}
+static inline int twl6040_get_pll(struct twl6040 *twl6040)
+{
+	return -EINVAL;
+}
+static inline unsigned int twl6040_get_sysclk(struct twl6040 *twl6040)
+{
+	return 0;
+}
+static inline int twl6040_irq_init(struct twl6040 *twl6040)
+{
+	return -EINVAL;
+}
+static inline void twl6040_irq_exit(struct twl6040 *twl6040) { }
+static inline int twl6040_get_vibralr_status(struct twl6040 *twl6040)
+{
+	return 0;
+}
+static inline int twl6040_get_revid(struct twl6040 *twl6040)
+{
+	return 0;
+}
+#endif
 
 #endif  /* End of __TWL6040_CODEC_H__ */

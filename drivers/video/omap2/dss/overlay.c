@@ -759,8 +759,9 @@ int dss_ovl_check(struct omap_overlay *ovl,
 	if (wb) {
 		wb->get_wb_info(wb, &wb_info);
 
-		if (wb_info.enabled && wb_info.mode == OMAP_WB_MEM2MEM_MODE &&
-				(int)ovl->manager->id == (int)wb_info.source) {
+		if (wb_info.mode == OMAP_WB_MEM2MEM_MODE &&
+			(int)ovl->manager->id == (int)wb_info.source &&
+			dssdev->state != OMAP_DSS_DISPLAY_ACTIVE) {
 			dw = wb_info.width;
 			dh = wb_info.height;
 		} else

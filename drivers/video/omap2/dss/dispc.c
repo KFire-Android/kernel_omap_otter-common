@@ -1062,7 +1062,12 @@ static u32 dispc_ovl_get_fifo_size(enum omap_plane plane)
 
 static void dispc_ovl_set_mflag_attribute(enum dispc_mflag_ctrl ctrl)
 {
-	dispc_write_reg(DISPC_GLOBAL_MFLAG, ctrl);
+	REG_FLD_MOD(DISPC_GLOBAL_MFLAG, ctrl, 1, 0);
+}
+
+static void dispc_ovl_set_mflag_start(enum dispc_mflag_start start)
+{
+	REG_FLD_MOD(DISPC_GLOBAL_MFLAG, start, 2, 2);
 }
 
 void dispc_ovl_set_global_mflag(enum omap_plane plane, bool mflag)
@@ -1079,7 +1084,13 @@ void dispc_ovl_set_global_mflag(enum omap_plane plane, bool mflag)
 		bit = 14;
 	 else
 		bit = 23;
+
 	 REG_FLD_MOD(DISPC_OVL_ATTRIBUTES(plane), mflag, bit, bit);
+
+	 dispc_ovl_set_mflag_attribute(DISPC_MFLAG_CTRL_ENABLE);
+	 /* Allows the mflag signal to start at the beginning of each
+	  * frame even if the DMA buffer is empty */
+	 dispc_ovl_set_mflag_start(DISPC_MFLAG_START_ENABLE);
 
 	 fifosize = dispc_ovl_get_fifo_size(plane);
 	 /* As per the simultaion team suggestion, below thesholds are set:
@@ -1175,8 +1186,16 @@ void dispc_ovl_compute_fifo_thresholds(enum omap_plane plane,
 		*fifo_low = ovl_fifo_size - burst_size * 2;
 		*fifo_high = total_fifo_size - burst_size;
 	} else {
-		*fifo_low = ovl_fifo_size - burst_size;
-		*fifo_high = total_fifo_size - buf_unit;
+		if (cpu_is_omap44xx()) {
+			/* optimization of power consumption for OMAP4 */
+			*fifo_low = (ovl_fifo_size / 2);
+			*fifo_high = total_fifo_size - buf_unit;
+		} else {
+			/* TODO: which should be the numbers for OMAP5?
+			 * Set safest values for now */
+			*fifo_low = ovl_fifo_size - burst_size;
+			*fifo_high = total_fifo_size - buf_unit;
+		}
 	}
 }
 
@@ -1974,6 +1993,16 @@ int dispc_scaling_decision(enum omap_plane plane, struct omap_overlay_info *oi,
 		in_width = DIV_ROUND_UP(oi->width, x);
 		in_height = DIV_ROUND_UP(oi->height, y);
 
+		/* Use 5-tap filter unless must use 3-tap,
+		 * even in no-scaling case, for not to lose sharpening filters
+		 */
+		if (!(cpu_is_omap44xx() || cpu_is_omap54xx()))
+			*five_taps = in_width <= 1024;
+		else if (omap_rev() == OMAP4430_REV_ES1_0)
+			*five_taps = in_width <= 1280;
+		else
+			*five_taps = true;
+
 		if (in_width == oi->out_width && in_height == oi->out_height)
 			break;
 
@@ -1983,14 +2012,6 @@ int dispc_scaling_decision(enum omap_plane plane, struct omap_overlay_info *oi,
 		if (oi->out_width * maxdownscale < in_width ||
 				oi->out_height * maxdownscale < in_height)
 			goto loop;
-
-		/* Use 5-tap filter unless must use 3-tap */
-		if (!(cpu_is_omap44xx() || cpu_is_omap54xx()))
-			*five_taps = in_width <= 1024;
-		else if (omap_rev() == OMAP4430_REV_ES1_0)
-			*five_taps = in_width <= 1280;
-		else
-			*five_taps = true;
 
 		/*
 		 * Predecimation on OMAP4 still fetches the whole lines
@@ -2321,8 +2342,10 @@ skip_errata:
 	if (ovl->caps & OMAP_DSS_OVL_CAP_FORCE_1D)
 		dispc_ovl_set_1d_tiled_mode(plane, oi->force_1d);
 
-	if (dss_has_feature(FEAT_MFLAG))
+	if (dss_has_feature(FEAT_MFLAG)) {
+		oi->mflag_en = true;
 		dispc_ovl_set_global_mflag(ovl->id, oi->mflag_en);
+	}
 
 	dispc_ovl_set_row_inc(plane, row_inc);
 	dispc_ovl_set_pix_inc(plane, pix_inc);
@@ -2560,7 +2583,8 @@ int dispc_setup_wb(struct writeback_cache_data *wb)
 				color_mode, wb->rotation_type);
 
 	/* Force 1D tiled mode */
-	if (cpu_is_omap54xx() && (omap_rev() == OMAP5430_REV_ES2_0))
+	if (cpu_is_omap54xx() && (omap_rev() == OMAP5430_REV_ES2_0 ||
+				  omap_rev() == OMAP5432_REV_ES2_0))
 		dispc_ovl_set_1d_tiled_mode(plane, wb->force_1d);
 
 	dispc_ovl_set_row_inc(plane, row_inc);
@@ -4033,9 +4057,6 @@ static void _omap_dispc_initial_config(void)
 	dispc_configure_burst_sizes();
 
 	dispc_ovl_enable_zorder_planes();
-
-	if (dss_has_feature(FEAT_MFLAG))
-		dispc_ovl_set_mflag_attribute(DISPC_MFLAG_CTRL_ENABLE);
 }
 
 /* DISPC HW IP initialisation */

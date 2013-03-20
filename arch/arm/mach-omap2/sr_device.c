@@ -40,7 +40,7 @@ static int sr_get(struct omap_sr *sr)
 		r = omap_device_enable(sr->pdev);
 	else
 		r = pm_runtime_get_sync(&sr->pdev->dev);
-	if (r)
+	if (r < 0)
 		dev_err(&sr->pdev->dev, "%s: failed:%d susp=%d\n",
 			__func__, r, sr->suspended);
 	return r;
@@ -54,7 +54,7 @@ static int sr_put(struct omap_sr *sr)
 		r = omap_device_idle(sr->pdev);
 	else
 		r = pm_runtime_put_sync_suspend(&sr->pdev->dev);
-	if (r)
+	if (r < 0)
 		dev_err(&sr->pdev->dev, "%s: failed:%d susp=%d\n",
 			__func__, r, sr->suspended);
 	return r;

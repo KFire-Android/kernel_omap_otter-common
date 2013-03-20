@@ -21,6 +21,7 @@
 #include <linux/usb/otg.h>
 #include <linux/spi/spi.h>
 #include <linux/hwspinlock.h>
+#include <linux/i2c.h>
 #include <linux/i2c/twl.h>
 #include <linux/i2c/bq2415x.h>
 #include <linux/i2c/tmp102.h>
@@ -28,10 +29,12 @@
 #include <linux/gpio_keys.h>
 #include <linux/regulator/machine.h>
 #include <linux/regulator/fixed.h>
+#include <linux/regulator/tps6130x.h>
 #include <linux/leds.h>
 #include <linux/leds_pwm.h>
 #include <linux/platform_data/omap4-keypad.h>
 #include <linux/platform_data/thermistor_sensor.h>
+#include <linux/platform_data/lm75_platform_data.h>
 
 #include <mach/hardware.h>
 #include <asm/hardware/gic.h>
@@ -96,6 +99,8 @@
 #define PWM2S			BIT(4)
 #define PWM2R			BIT(3)
 #define PWM2CTL_MASK		(PWM2EN | PWM2S | PWM2R)
+
+static struct twl6040 *twl6040_driver_data;
 
 static const uint32_t sdp4430_keymap[] = {
 	KEY(0, 0, KEY_E),
@@ -617,12 +622,69 @@ static int __init omap4_twl6030_hsmmc_init(struct omap2_hsmmc_info *controllers)
 	return 0;
 }
 
+static int tps6130x_enable(int on)
+{
+	u8 mask;
+	int ret;
+
+	if (!twl6040_driver_data) {
+		pr_err("%s: invalid twl6040 driver data\n", __func__);
+		return -EINVAL;
+	}
+
+	/*
+	 * tps6130x NRESET driven by:
+	 * - GPO2 in TWL6040
+	 * - GPO in TWL6041 (only one GPO supported)
+	 */
+	if (twl6040_driver_data->rev >= TWL6041_REV_2_0)
+		mask = TWL6040_GPO1;
+	else
+		mask = TWL6040_GPO2;
+
+	if (on)
+		ret = twl6040_set_bits(twl6040_driver_data,
+				       TWL6040_REG_GPOCTL, mask);
+	else
+		ret = twl6040_clear_bits(twl6040_driver_data,
+					 TWL6040_REG_GPOCTL, mask);
+
+	if (ret < 0)
+		pr_err("%s: failed to write GPOCTL %d\n", __func__, ret);
+	return ret;
+}
+
+static struct tps6130x_platform_data tps6130x_pdata = {
+	.chip_enable	= tps6130x_enable,
+};
+
+static struct regulator_consumer_supply twl6040_vddhf_supply[] = {
+	REGULATOR_SUPPLY("vddhf", "twl6040-codec"),
+};
+
+static struct regulator_init_data twl6040_vddhf_data = {
+	.constraints = {
+		.min_uV			= 4075000,
+		.max_uV			= 4950000,
+		.apply_uV		= true,
+		.valid_modes_mask	= REGULATOR_MODE_NORMAL
+					| REGULATOR_MODE_STANDBY,
+		.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE
+					| REGULATOR_CHANGE_MODE
+					| REGULATOR_CHANGE_STATUS,
+	},
+	.num_consumer_supplies	= ARRAY_SIZE(twl6040_vddhf_supply),
+	.consumer_supplies	= twl6040_vddhf_supply,
+	.driver_data		= &tps6130x_pdata,
+};
+
 static struct twl6040_codec_data twl6040_codec = {
 	/* single-step ramp for headset and handsfree */
 	.hs_left_step	= 0x0f,
 	.hs_right_step	= 0x0f,
 	.hf_left_step	= 0x1d,
 	.hf_right_step	= 0x1d,
+	.vddhf_uV	= 4075000,
 };
 
 static struct twl6040_vibra_data twl6040_vibra = {
@@ -638,10 +700,60 @@ static struct twl6040_vibra_data twl6040_vibra = {
 	.voltage_raise_speed = 0x26,
 };
 
+static struct i2c_board_info sdp4430_i2c_1_tps6130x_boardinfo = {
+	I2C_BOARD_INFO("tps6130x", 0x33),
+	.platform_data = &twl6040_vddhf_data,
+};
+
+static int twl6040_platform_init(struct twl6040 *twl6040)
+{
+	if (cpu_is_omap447x())
+		return 0;
+
+	if (!twl6040) {
+		pr_err("%s: invalid twl6040 driver data\n", __func__);
+		return -EINVAL;
+	}
+
+	twl6040_driver_data = twl6040;
+
+	tps6130x_pdata.adapter = i2c_get_adapter(1);
+	if (!tps6130x_pdata.adapter) {
+		pr_err("%s: can't get i2c adapter\n", __func__);
+		return -ENODEV;
+	}
+
+	tps6130x_pdata.client = i2c_new_device(tps6130x_pdata.adapter,
+		&sdp4430_i2c_1_tps6130x_boardinfo);
+	if (!tps6130x_pdata.client) {
+		pr_err("%s: can't add i2c device\n", __func__);
+		i2c_put_adapter(tps6130x_pdata.adapter);
+		return -ENODEV;
+	}
+
+	return 0;
+}
+
+static int twl6040_platform_exit(struct twl6040 *twl6040)
+{
+	if (cpu_is_omap447x())
+		return 0;
+
+	if (tps6130x_pdata.client) {
+		i2c_unregister_device(tps6130x_pdata.client);
+		tps6130x_pdata.client = NULL;
+		i2c_put_adapter(tps6130x_pdata.adapter);
+	}
+
+	return 0;
+}
+
 static struct twl6040_platform_data twl6040_data = {
 	.codec		= &twl6040_codec,
 	.vibra		= &twl6040_vibra,
 	.audpwron_gpio	= 127,
+	.platform_init	= twl6040_platform_init,
+	.platform_exit	= twl6040_platform_exit,
 };
 
 /*
@@ -810,7 +922,8 @@ static int __init omap4_i2c_init(void)
 
 	omap4_pmic_get_config(&sdp4430_twldata, TWL_COMMON_PDATA_USB |
 			TWL_COMMON_PDATA_MADC | \
-			TWL_COMMON_PDATA_BCI,
+			TWL_COMMON_PDATA_BCI |
+			TWL_COMMON_PDATA_THERMAL,
 			TWL_COMMON_REGULATOR_VDAC |
 			TWL_COMMON_REGULATOR_VAUX1 |
 			TWL_COMMON_REGULATOR_VAUX2 |
@@ -833,6 +946,13 @@ static int __init omap4_i2c_init(void)
 		sdp4430_twldata.reg_setup_script = omap4430_twl6030_setup;
 	else if (cpu_is_omap446x())
 		sdp4430_twldata.reg_setup_script = omap4460_twl6030_setup;
+
+	/*
+	 * tps6130x regulator provides VDDHF supply for hands-free module
+	 * (part of twl6040) only on OMAP4430 and OMAP4460 boards.
+	 */
+	if (cpu_is_omap447x() && twl6040_data.codec)
+		twl6040_data.codec->vddhf_uV = 0;
 
 	omap4_pmic_init("twl6030", &sdp4430_twldata,
 			&twl6040_data, OMAP44XX_IRQ_SYS_2N);
@@ -1209,6 +1329,8 @@ static struct omap_board_mux board_mux[] __initdata = {
 					| OMAP_OFF_PULL_EN),
 	OMAP4_MUX(GPMC_NCS1, OMAP_MUX_MODE3 | OMAP_INPUT_EN | OMAP_WAKEUP_EN),
 	OMAP4_MUX(GPMC_A24, OMAP_MUX_MODE3 | OMAP_INPUT_EN | OMAP_WAKEUP_EN),
+
+	OMAP4_MUX(ABE_MCBSP1_DR, OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLDOWN),
 	{ .reg_offset = OMAP_MUX_TERMINATOR },
 };
 
@@ -1298,6 +1420,15 @@ static struct __devinitdata emif_custom_configs custom_configs = {
 };
 #endif
 
+static void set_osc_timings(void)
+{
+	/* Device Oscilator
+	 * tstart = 2ms + 2ms = 4ms.
+	 * tshut = Not defined in oscillator data sheet so setting to 1us
+	 */
+	omap_pm_setup_oscillator(4000, 1);
+}
+
 static void __init omap_4430sdp_init(void)
 {
 	int status;
@@ -1331,6 +1462,8 @@ static void __init omap_4430sdp_init(void)
 	omap4_mux_init(board_mux, NULL, package);
 	omap_init_board_version(0);
 	omap_create_board_props();
+
+	set_osc_timings();
 	omap4_i2c_init();
 	blaze_sensor_init();
 	blaze_touch_init();
@@ -1386,12 +1519,20 @@ static void __init omap_4430sdp_reserve(void)
 	omap_reserve();
 }
 
+static void __init omap_4430sdp_init_early(void)
+{
+	omap4430_init_early();
+	if (cpu_is_omap446x())
+		omap_tps6236x_gpio_no_reset_wa(TPS62361_GPIO, -1, 32);
+}
+
+
 MACHINE_START(OMAP_4430SDP, "OMAP4 Blaze board")
 	/* Maintainer: Santosh Shilimkar - Texas Instruments Inc */
 	.atag_offset	= 0x100,
 	.reserve	= omap_4430sdp_reserve,
 	.map_io		= omap4_map_io,
-	.init_early	= omap4430_init_early,
+	.init_early	= omap_4430sdp_init_early,
 	.init_irq	= gic_init_irq,
 	.handle_irq	= gic_handle_irq,
 	.init_machine	= omap_4430sdp_init,

@@ -19,6 +19,7 @@
 
 #include <linux/module.h>
 #include <linux/interrupt.h>
+#include <linux/irq.h>
 #include <linux/clk.h>
 #include <linux/io.h>
 #include <linux/debugfs.h>
@@ -26,6 +27,7 @@
 #include <linux/slab.h>
 #include <linux/pm_runtime.h>
 #include <linux/power/smartreflex.h>
+#include <linux/sched.h>
 #include <plat/voltage.h>
 #include <plat/dvfs.h>
 
@@ -39,7 +41,6 @@ static LIST_HEAD(sr_list);
 static struct omap_sr_class_data *sr_class;
 static struct omap_sr_pmic_data *sr_pmic_data;
 static struct dentry		*sr_dbg_dir;
-static atomic_t sr_driver_ready;
 
 static inline void sr_write_reg(struct omap_sr *sr, unsigned offset, u32 value)
 {
@@ -303,6 +304,7 @@ static void sr_set_regfields(struct omap_sr *sr)
 
 static void sr_start_vddautocomp(struct omap_sr *sr)
 {
+	int r;
 	if (!sr_class || !(sr_class->enable) || !(sr_class->configure)) {
 		dev_warn(&sr->pdev->dev,
 			 "%s: smartreflex class driver not registered\n",
@@ -311,18 +313,23 @@ static void sr_start_vddautocomp(struct omap_sr *sr)
 	}
 
 	/* Pause DVFS from interfering with our operations */
-	mutex_lock(&omap_dvfs_lock);
 	if (sr_class->init &&
 	    sr_class->init(sr, sr_class->class_priv_data)) {
 		dev_err(&sr->pdev->dev,
 			"%s: SRClass initialization failed\n", __func__);
-		mutex_unlock(&omap_dvfs_lock);
 		return;
 	}
 
-	if (!sr_class->enable(sr))
+	r = sr_class->enable(sr);
+	if  (!r) {
 		sr->autocomp_active = true;
-	mutex_unlock(&omap_dvfs_lock);
+	} else {
+		dev_warn(&sr->pdev->dev, "%s: SmartReflex Enable failed(%d), "
+			"autocomp(AVS) disabled for domain!\n", __func__, r);
+		WARN_ONCE(r, "AVS has to be autodisabled!\n");
+		if (sr_class->deinit)
+			sr_class->deinit(sr, sr_class->class_priv_data);
+	}
 }
 
 static void sr_stop_vddautocomp(struct omap_sr *sr)
@@ -336,7 +343,6 @@ static void sr_stop_vddautocomp(struct omap_sr *sr)
 
 	if (sr->autocomp_active) {
 		/* Pause DVFS from interfering with our operations */
-		mutex_lock(&omap_dvfs_lock);
 		sr_class->disable(sr, 1);
 		if (sr_class->deinit &&
 		    sr_class->deinit(sr,
@@ -346,51 +352,7 @@ static void sr_stop_vddautocomp(struct omap_sr *sr)
 				__func__, sr->srid);
 		}
 		sr->autocomp_active = false;
-		mutex_unlock(&omap_dvfs_lock);
 	}
-}
-
-/*
- * This function handles the intializations which have to be done
- * only when both sr device and class driver regiter has
- * completed. This will be attempted to be called from both sr class
- * driver register and sr device intializtion API's. Only one call
- * will ultimately succeed.
- *
- * Currently this function registers interrupt handler for a particular SR
- * if smartreflex class driver is already registered and has
- * requested for interrupts and the SR interrupt line in present.
- */
-static int sr_late_init(struct omap_sr *sr_info)
-{
-	struct omap_sr_data *pdata = sr_info->pdev->dev.platform_data;
-	struct resource *mem;
-	int ret = 0;
-
-	if (sr_class->notify && sr_class->notify_flags && sr_info->irq) {
-		ret = request_irq(sr_info->irq, sr_interrupt,
-				  0, sr_info->name, sr_info);
-		if (ret)
-			goto error;
-		disable_irq(sr_info->irq);
-	}
-
-	if (pdata && pdata->enable_on_init)
-		sr_start_vddautocomp(sr_info);
-
-	return ret;
-
-error:
-	iounmap(sr_info->base);
-	mem = platform_get_resource(sr_info->pdev, IORESOURCE_MEM, 0);
-	release_mem_region(mem->start, resource_size(mem));
-	list_del(&sr_info->node);
-	dev_err(&sr_info->pdev->dev, "%s: ERROR in registering"\
-		"interrupt handler. Smartreflex will"\
-		"not function as desired\n", __func__);
-	kfree(sr_info);
-
-	return ret;
 }
 
 static void sr_v1_disable(struct omap_sr *sr)
@@ -877,37 +839,9 @@ void sr_disable(struct omap_sr *sr)
 	sr->ops->put(sr);
 }
 
-/**
- * sr_notifier_control() - control the notifier mechanism
- * @sr:                SR module to be configured.
- * @enable:	true to enable notifiers and false to disable the same
- *
- * SR modules allow an MCU interrupt mechanism that vary based on the IP
- * revision, we allow the system to generate interrupt if the class driver
- * has capability to handle the same. it is upto the class driver to ensure
- * the proper sequencing and handling for a clean implementation. returns
- * 0 if all goes fine, else returns failure results
- */
-int sr_notifier_control(struct omap_sr *sr, bool enable)
+static int sr_configure_interrupts(struct omap_sr *sr, bool enable)
 {
 	u32 value = 0;
-
-	if (!sr) {
-		pr_warning("%s: sr corresponding to domain not found\n",
-			   __func__);
-		return -EINVAL;
-	}
-	if (!sr->autocomp_active)
-		return -EINVAL;
-
-	/* If I could never register an ISR, why bother?? */
-	if (!(sr_class && sr_class->notify && sr_class->notify_flags &&
-	      sr->irq)) {
-		dev_warn(&sr->pdev->dev,
-			 "%s: unable to setup IRQ without handling mechanism\n",
-			 __func__);
-		return -EINVAL;
-	}
 
 	switch (sr->ip_type) {
 	case SR_TYPE_V1:
@@ -917,8 +851,8 @@ int sr_notifier_control(struct omap_sr *sr, bool enable)
 		value = notifier_to_irqen_v2(sr_class->notify_flags);
 		break;
 	default:
-		 dev_warn(&sr->pdev->dev, "%s: unknown type of sr??\n",
-			  __func__);
+		dev_warn(&sr->pdev->dev, "%s: unknown type of sr??\n",
+			 __func__);
 		return -EINVAL;
 	}
 
@@ -936,11 +870,47 @@ int sr_notifier_control(struct omap_sr *sr, bool enable)
 		break;
 	}
 
+	return 0;
+}
+
+/**
+ * sr_notifier_control() - control the notifier mechanism
+ * @sr:                SR module to be configured.
+ * @enable:	true to enable notifiers and false to disable the same
+ *
+ * SR modules allow an MCU interrupt mechanism that vary based on the IP
+ * revision, we allow the system to generate interrupt if the class driver
+ * has capability to handle the same. it is upto the class driver to ensure
+ * the proper sequencing and handling for a clean implementation. returns
+ * 0 if all goes fine, else returns failure results
+ */
+int sr_notifier_control(struct omap_sr *sr, bool enable)
+{
+	if (!sr) {
+		pr_warning("%s: sr corresponding to domain not found\n",
+			   __func__);
+		return -EINVAL;
+	}
+	if (!sr->autocomp_active)
+		return -EINVAL;
+
+	/* If I could never register an ISR, why bother?? */
+	if (!(sr_class && sr_class->notify && sr_class->notify_flags &&
+	      sr->irq)) {
+		dev_warn(&sr->pdev->dev,
+			 "%s: unable to setup IRQ without handling mechanism\n",
+			 __func__);
+		return -EINVAL;
+	}
+
 	if (enable != sr->irq_enabled) {
-		if (enable)
+		if (enable) {
+			sr_configure_interrupts(sr, true);
 			enable_irq(sr->irq);
-		else
+		} else {
 			disable_irq(sr->irq);
+			sr_configure_interrupts(sr, false);
+		}
 		sr->irq_enabled = enable;
 	}
 
@@ -984,9 +954,6 @@ bool omap_sr_is_enabled(struct voltagedomain *voltdm)
 {
 	struct omap_sr *sr;
 
-	if (!atomic_read(&sr_driver_ready))
-		return false;
-
 	sr = _sr_lookup(voltdm);
 	if (IS_ERR(sr)) {
 		pr_warning("%s: omap_sr struct for voltdm not found\n",
@@ -1009,9 +976,7 @@ bool omap_sr_is_enabled(struct voltagedomain *voltdm)
 void omap_sr_enable(struct voltagedomain *voltdm)
 {
 	struct omap_sr *sr;
-
-	if (!atomic_read(&sr_driver_ready))
-		return;
+	int r;
 
 	sr = _sr_lookup(voltdm);
 	if (IS_ERR(sr)) {
@@ -1029,7 +994,15 @@ void omap_sr_enable(struct voltagedomain *voltdm)
 		return;
 	}
 
-	sr_class->enable(sr);
+	r = sr_class->enable(sr);
+	if  (r) {
+		dev_warn(&sr->pdev->dev, "%s: smartreflex Enable failed(%d), "
+			"autocomp(AVS) disabled for domain!\n", __func__, r);
+		WARN_ONCE(r, "AVS has to be autodisabled!\n");
+		sr->autocomp_active = false;
+		if (sr_class->deinit)
+			sr_class->deinit(sr, sr_class->class_priv_data);
+	}
 }
 
 /**
@@ -1046,9 +1019,6 @@ void omap_sr_enable(struct voltagedomain *voltdm)
 void omap_sr_disable(struct voltagedomain *voltdm)
 {
 	struct omap_sr *sr;
-
-	if (!atomic_read(&sr_driver_ready))
-		return;
 
 	sr = _sr_lookup(voltdm);
 	if (IS_ERR(sr)) {
@@ -1083,9 +1053,6 @@ void omap_sr_disable(struct voltagedomain *voltdm)
 void omap_sr_disable_reset_volt(struct voltagedomain *voltdm)
 {
 	struct omap_sr *sr;
-
-	if (!atomic_read(&sr_driver_ready))
-		return;
 
 	sr = _sr_lookup(voltdm);
 	if (IS_ERR(sr)) {
@@ -1157,10 +1124,12 @@ static int omap_sr_autocomp_store(void *data, u64 val)
 
 	/* control enable/disable only if there is a delta in value */
 	if (sr_info->autocomp_active != val) {
+		mutex_lock(&omap_dvfs_lock);
 		if (!val)
 			sr_stop_vddautocomp(sr_info);
 		else
 			sr_start_vddautocomp(sr_info);
+		mutex_unlock(&omap_dvfs_lock);
 	}
 
 	return 0;
@@ -1169,7 +1138,7 @@ static int omap_sr_autocomp_store(void *data, u64 val)
 DEFINE_SIMPLE_ATTRIBUTE(pm_sr_fops, omap_sr_autocomp_show,
 			omap_sr_autocomp_store, "%llu\n");
 
-static int __init omap_sr_probe(struct platform_device *pdev)
+static int __devinit omap_sr_probe(struct platform_device *pdev)
 {
 	struct omap_sr *sr_info;
 	struct omap_sr_data *pdata = pdev->dev.platform_data;
@@ -1177,6 +1146,21 @@ static int __init omap_sr_probe(struct platform_device *pdev)
 	struct dentry *nvalue_dir;
 	struct dentry *lvt_nvalue_dir;
 	int i, ret = 0;
+
+	if (!sr_class || !sr_class->notify || !sr_class->notify_flags) {
+		dev_err(&pdev->dev, "SR class not defined properly\n");
+		return -EINVAL;
+	}
+
+	if (!pdata) {
+		dev_err(&pdev->dev, "%s: platform data missing\n", __func__);
+		return -EINVAL;
+	}
+
+	if (!pdata->ops || !pdata->ops->get || !pdata->ops->put) {
+		dev_err(&pdev->dev, "%s: Missing fops!!\n", __func__);
+		return -EINVAL;
+	}
 
 	sr_info = devm_kzalloc(&pdev->dev, sizeof(struct omap_sr), GFP_KERNEL);
 	if (!sr_info) {
@@ -1186,11 +1170,6 @@ static int __init omap_sr_probe(struct platform_device *pdev)
 	}
 
 	platform_set_drvdata(pdev, sr_info);
-
-	if (!pdata) {
-		dev_err(&pdev->dev, "%s: platform data missing\n", __func__);
-		return -EINVAL;
-	}
 
 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!mem) {
@@ -1206,13 +1185,9 @@ static int __init omap_sr_probe(struct platform_device *pdev)
 	}
 
 	irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
-
-	pm_runtime_enable(&pdev->dev);
-	pm_runtime_irq_safe(&pdev->dev);
-
-	if (!pdata->ops || !pdata->ops->get || !pdata->ops->put) {
-		dev_err(&pdev->dev, "%s: Missing fops!!\n", __func__);
-		return -EINVAL;
+	if (!irq) {
+		dev_err(&pdev->dev, "%s: no irq resource\n", __func__);
+		return -ENODEV;
 	}
 
 	sr_info->ops = devm_kzalloc(&pdev->dev,
@@ -1251,25 +1226,20 @@ static int __init omap_sr_probe(struct platform_device *pdev)
 	sr_info->autocomp_active = false;
 	sr_info->ip_type = pdata->ip_type;
 
-	if (irq)
+	if (irq) {
 		sr_info->irq = irq->start;
-
-	sr_set_clk_length(sr_info);
-	sr_set_regfields(sr_info);
-
-	list_add(&sr_info->node, &sr_list);
-
-	/*
-	 * Call into late init to do intializations that require
-	 * both sr driver and sr class driver to be initiallized.
-	 */
-	if (sr_class) {
-		ret = sr_late_init(sr_info);
+		irq_set_status_flags(sr_info->irq, IRQ_NOAUTOEN);
+		ret = devm_request_irq(&pdev->dev, sr_info->irq, sr_interrupt,
+				       0, sr_info->name, sr_info);
 		if (ret) {
-			pr_warning("%s: Error in SR late init\n", __func__);
+			dev_err(&pdev->dev, "%s: request_irq failure (%u)\n",
+				__func__, ret);
 			goto err_free_name;
 		}
 	}
+
+	sr_set_clk_length(sr_info);
+	sr_set_regfields(sr_info);
 
 	sr_info->dbg_dir = debugfs_create_dir(sr_info->name, sr_dbg_dir);
 	if (IS_ERR_OR_NULL(sr_info->dbg_dir)) {
@@ -1338,6 +1308,21 @@ static int __init omap_sr_probe(struct platform_device *pdev)
 	}
 
 skip_lvt:
+	pm_runtime_enable(&pdev->dev);
+	pm_runtime_irq_safe(&pdev->dev);
+
+	mutex_lock(&omap_dvfs_lock);
+
+	list_add(&sr_info->node, &sr_list);
+
+	/*
+	 * Enable SR on int if allowed.
+	 */
+	if (pdata->enable_on_init)
+		sr_start_vddautocomp(sr_info);
+
+	mutex_unlock(&omap_dvfs_lock);
+
 	dev_info(&pdev->dev, "%s: SmartReflex driver initialized\n", __func__);
 	return ret;
 
@@ -1345,7 +1330,6 @@ err_debugfs:
 	debugfs_remove_recursive(sr_info->dbg_dir);
 err_free_name:
 	kfree(sr_info->name);
-	list_del(&sr_info->node);
 	return ret;
 }
 
@@ -1366,13 +1350,15 @@ static int __devexit omap_sr_remove(struct platform_device *pdev)
 		return PTR_ERR(sr_info);
 	}
 
-	if (sr_info->autocomp_active)
-		sr_stop_vddautocomp(sr_info);
+	mutex_lock(&omap_dvfs_lock);
+	sr_stop_vddautocomp(sr_info);
+	list_del(&sr_info->node);
+	mutex_unlock(&omap_dvfs_lock);
+
 	if (sr_info->dbg_dir)
 		debugfs_remove_recursive(sr_info->dbg_dir);
 
 	pm_runtime_disable(&pdev->dev);
-	list_del(&sr_info->node);
 	kfree(sr_info->name);
 
 	return 0;
@@ -1395,8 +1381,10 @@ static void __devexit omap_sr_shutdown(struct platform_device *pdev)
 		return;
 	}
 
-	if (sr_info->autocomp_active)
-		sr_stop_vddautocomp(sr_info);
+	mutex_lock(&omap_dvfs_lock);
+	sr_stop_vddautocomp(sr_info);
+	list_del(&sr_info->node);
+	mutex_unlock(&omap_dvfs_lock);
 
 	return;
 }
@@ -1422,22 +1410,63 @@ static int sr_suspend(struct device *dev)
 	if (!sr_info->autocomp_active)
 		return 0;
 
+	/*
+	 * Enable SR device, so it will be accessible during
+	 * later stages of suspending when device Runtime PM is disabled.
+	 * SR device will be turned off after "noirq" suspend stage.
+	 */
+	ret = pm_runtime_resume(dev);
+	if (ret < 0)
+		return ret;
+
+	ret = 0;
+	if (sr_class->suspend)
+		ret = sr_class->suspend(sr_info);
+
+	return ret;
+}
+
+static int sr_suspend_noirq(struct device *dev)
+{
+	struct omap_sr_data *pdata;
+	struct omap_sr *sr_info;
+	int ret = 0;
+
+	pdata = dev_get_platdata(dev);
+	if (!pdata) {
+		dev_err(dev, "%s: platform data missing\n", __func__);
+		return -EINVAL;
+	}
+
+	sr_info = _sr_lookup(pdata->voltdm);
+	if (IS_ERR_OR_NULL(sr_info)) {
+		dev_warn(dev, "%s: omap_sr struct not found\n", __func__);
+		return -EINVAL;
+	}
+
+	if (!sr_info->autocomp_active)
+		return 0;
+
 	if (sr_info->suspended)
 		return 0;
 
-	if (sr_class->suspend)
-		ret = sr_class->suspend(sr_info);
+	omap_dvfs_suspend(true);
+
+	if (sr_class->suspend_noirq)
+		ret = sr_class->suspend_noirq(sr_info);
 
 	if (!ret) {
 		sr_info->suspended =  true;
 		/* Flag the same info to the other CPUs */
 		smp_wmb();
+	} else {
+		omap_dvfs_suspend(false);
 	}
 
 	return ret;
 }
 
-static int sr_resume(struct device *dev)
+static int sr_resume_noirq(struct device *dev)
 {
 	struct omap_sr_data *pdata;
 	struct omap_sr *sr_info;
@@ -1461,8 +1490,8 @@ static int sr_resume(struct device *dev)
 	if (!sr_info->suspended)
 		return 0;
 
-	if (sr_class->resume)
-		ret = sr_class->resume(sr_info);
+	if (sr_class->resume_noirq)
+		ret = sr_class->resume_noirq(sr_info);
 
 	if (!ret) {
 		sr_info->suspended =  false;
@@ -1470,13 +1499,20 @@ static int sr_resume(struct device *dev)
 		smp_wmb();
 	}
 
+	omap_dvfs_suspend(false);
+
 	return ret;
 }
 
-static SIMPLE_DEV_PM_OPS(sr_omap_dev_pm_ops, sr_suspend, sr_resume);
+static const struct dev_pm_ops sr_omap_dev_pm_ops = {
+	.suspend = sr_suspend,
+	.suspend_noirq = sr_suspend_noirq,
+	.resume_noirq = sr_resume_noirq,
+};
 
 static struct platform_driver smartreflex_driver = {
-	.remove         = __devexit_p(omap_sr_remove),
+	.probe		= omap_sr_probe,
+	.remove		= __devexit_p(omap_sr_remove),
 	.shutdown	= __devexit_p(omap_sr_shutdown),
 	.driver		= {
 		.name	= "smartreflex",
@@ -1506,22 +1542,19 @@ static int __init sr_init(void)
 		return	PTR_ERR(sr_dbg_dir);
 	}
 
-	ret = platform_driver_probe(&smartreflex_driver, omap_sr_probe);
+	ret = platform_driver_register(&smartreflex_driver);
 	if (ret) {
 		pr_err("%s: platform driver register failed for SR\n",
 		       __func__);
 		return ret;
 	}
 
-	atomic_set(&sr_driver_ready, 1);
-
 	return 0;
 }
-late_initcall(sr_init);
+subsys_initcall(sr_init);
 
 static void __exit sr_exit(void)
 {
-	atomic_set(&sr_driver_ready, 0);
 	if (sr_dbg_dir)
 		debugfs_remove_recursive(sr_dbg_dir);
 	platform_driver_unregister(&smartreflex_driver);

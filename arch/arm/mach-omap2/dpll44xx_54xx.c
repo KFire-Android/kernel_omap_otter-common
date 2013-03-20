@@ -214,13 +214,13 @@ core_initcall(__init_dpll_list);
 int omap4_core_dpll_m2_set_rate(struct clk *clk, unsigned long rate)
 {
 	int i = 0;
-	u32 validrate = 0, shadow_freq_cfg1 = 0, new_div = 0;
+	u32 validrate = 0, shadow_freq_cfg1 = 0, new_div = 0, new_mul = 0;
 	struct omap_dpll_notifier notify;
 
 	if (!clk || !rate)
 		return -EINVAL;
 
-	validrate = omap2_clksel_round_rate_div(clk, rate, &new_div);
+	validrate = omap2_clksel_round_rate_div(clk, rate, &new_div, &new_mul);
 	if (validrate != rate)
 		return -EINVAL;
 
@@ -366,6 +366,7 @@ int omap4_core_dpll_m5x2_set_rate(struct clk *clk, unsigned long rate)
 {
 	int i = 0;
 	u32 validrate = 0, shadow_freq_cfg2 = 0, shadow_freq_cfg1, new_div = 0;
+	u32 new_mul = 0;
 
 	if (!clk || !rate)
 		return -EINVAL;
@@ -385,7 +386,7 @@ int omap4_core_dpll_m5x2_set_rate(struct clk *clk, unsigned long rate)
 	/* Configures MEMIF domain in SW_WKUP */
 	clkdm_wakeup(l3_emif_clkdm);
 
-	validrate = omap2_clksel_round_rate_div(clk, rate, &new_div);
+	validrate = omap2_clksel_round_rate_div(clk, rate, &new_div, &new_mul);
 	if (validrate != rate)
 		return -EINVAL;
 
@@ -618,52 +619,22 @@ static void omap5_mpu_dpll_update_children(unsigned long rate)
 
 int omap5_mpu_dpll_set_rate(struct clk *clk, unsigned long rate)
 {
-	struct dpll_data *dd;
-	u32 v;
 	unsigned long dpll_rate;
 
-	if (!clk || !rate || !clk->parent)
-		return -EINVAL;
-
-	dd = clk->parent->dpll_data;
-
-	if (!dd)
-		return -EINVAL;
-
-	if (!clk->parent->set_rate)
+	if (!clk || !rate || !clk->parent ||
+	    !clk->parent->set_rate || !clk->parent->dpll_data)
 		return -EINVAL;
 
 	if (rate > clk->rate)
 		omap5_mpu_dpll_update_children(rate);
 
 	dpll_rate = omap2_get_dpll_rate(clk->parent);
-	if (rate == dpll_rate)
-		return 0;
-	/*
-	 * On OMAP5430, to obtain MPU DPLL frequency higher
-	 * than 1.4GHz, DCC (Duty Cycle Correction) needs to
-	 * be enabled.
-	 * And needs to be kept disabled for <= 1.4 Ghz.
-	 */
-	if (rate <= OMAP_1_4GHz) {
-		/* If DCC is enabled, disable it */
-		v = __raw_readl(dd->mult_div1_reg);
-		if (v & OMAP54XX_DCC_EN_MASK) {
-			v &= ~OMAP54XX_DCC_EN_MASK;
-			__raw_writel(v, dd->mult_div1_reg);
-		}
-
+	if (rate != dpll_rate)
 		clk->parent->set_rate(clk->parent, rate);
-	} else {
-		clk->parent->set_rate(clk->parent, rate);
-
-		v = __raw_readl(dd->mult_div1_reg);
-		v |= OMAP54XX_DCC_EN_MASK;
-		__raw_writel(v, dd->mult_div1_reg);
-	}
 
 	if (rate < clk->rate)
 		omap5_mpu_dpll_update_children(rate);
+
 	clk->rate = rate;
 
 	return 0;
@@ -682,14 +653,7 @@ long omap5_mpu_dpll_round_rate(struct clk *clk, unsigned long rate)
 
 unsigned long omap5_mpu_dpll_recalc(struct clk *clk)
 {
-	struct dpll_data *dd;
-
-	if (!clk || !clk->parent)
-		return -EINVAL;
-
-	dd = clk->parent->dpll_data;
-
-	if (!dd)
+	if (!clk || !clk->parent || !clk->parent->dpll_data)
 		return -EINVAL;
 
 	return omap2_get_dpll_rate(clk->parent);

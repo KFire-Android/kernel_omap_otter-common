@@ -11,6 +11,7 @@
 #define TWL_COMMON_PDATA_BCI		(1 << 1)
 #define TWL_COMMON_PDATA_MADC		(1 << 2)
 #define TWL_COMMON_PDATA_AUDIO		(1 << 3)
+#define TWL_COMMON_PDATA_THERMAL	(1 << 4)
 
 /* Common LDO regulators for TWL4030/TWL6030/TWL6032 */
 /* LDOLN for TWL6032 */
@@ -114,6 +115,8 @@ extern void omap_pmic_data_init(void);
 extern int omap_tps6236x_board_setup(bool use_62361, int gpio_vsel0,
 			int gpio_vsel1, int pull0, int pull1);
 extern int omap_tps6236x_init(void);
+extern void omap_tps6236x_gpio_no_reset_wa(int gpio_vsel0,
+		int gpio_vsel1, int gpio_bank_width);
 #else
 static inline int omap_tps6236x_board_setup(bool use_62361, int gpio_vsel0,
 			int gpio_vsel1, int pull0, int pull1)
@@ -124,6 +127,9 @@ static inline int omap_tps6236x_init(void)
 {
 	return -EINVAL;
 }
+extern void omap_tps6236x_gpio_no_reset_wa(int gpio_vsel0, int gpio_vsel1,
+		int gpio_bank_width)
+{}
 #endif
 
 #ifdef CONFIG_MFD_PALMAS

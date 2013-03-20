@@ -87,7 +87,7 @@ static struct powerdomain gfx_44xx_pwrdm = {
 		[PWRDM_POWER_OSWR] = UNSUP_STATE,
 		[PWRDM_POWER_CSWR] = UNSUP_STATE,
 		[PWRDM_POWER_RET] = UNSUP_STATE,
-		[PWRDM_POWER_INACTIVE] = UNSUP_STATE,
+		[PWRDM_POWER_INACTIVE] = 20,
 		[PWRDM_POWER_ON] = 0,
 	},
 };
@@ -113,9 +113,9 @@ static struct powerdomain abe_44xx_pwrdm = {
 	.wakeup_lat = {
 		[PWRDM_POWER_OFF] = 1000,
 		[PWRDM_POWER_OSWR] = 600,
-		[PWRDM_POWER_CSWR] = 300,
+		[PWRDM_POWER_CSWR] = UNSUP_STATE,
 		[PWRDM_POWER_RET] = UNSUP_STATE,
-		[PWRDM_POWER_INACTIVE] = UNSUP_STATE,
+		[PWRDM_POWER_INACTIVE] = 20,
 		[PWRDM_POWER_ON] = 0,
 	},
 };
@@ -138,10 +138,10 @@ static struct powerdomain dss_44xx_pwrdm = {
 	.flags		  = PWRDM_HAS_LOWPOWERSTATECHANGE,
 	.wakeup_lat = {
 		[PWRDM_POWER_OFF] = 1000,
-		[PWRDM_POWER_OSWR] = UNSUP_STATE,
-		[PWRDM_POWER_CSWR] = 300,
+		[PWRDM_POWER_OSWR] = 600,
+		[PWRDM_POWER_CSWR] = UNSUP_STATE,
 		[PWRDM_POWER_RET] = UNSUP_STATE,
-		[PWRDM_POWER_INACTIVE] = UNSUP_STATE,
+		[PWRDM_POWER_INACTIVE] = 20,
 		[PWRDM_POWER_ON] = 0,
 	},
 };
@@ -171,7 +171,7 @@ static struct powerdomain tesla_44xx_pwrdm = {
 		[PWRDM_POWER_OSWR] = 600,
 		[PWRDM_POWER_CSWR] = 300,
 		[PWRDM_POWER_RET] = UNSUP_STATE,
-		[PWRDM_POWER_INACTIVE] = UNSUP_STATE,
+		[PWRDM_POWER_INACTIVE] = 20,
 		[PWRDM_POWER_ON] = 0,
 	},
 };
@@ -343,10 +343,10 @@ static struct powerdomain ivahd_44xx_pwrdm = {
 	.flags		  = PWRDM_HAS_LOWPOWERSTATECHANGE,
 	.wakeup_lat = {
 		[PWRDM_POWER_OFF] = 1000,
-		[PWRDM_POWER_OSWR] = UNSUP_STATE,
-		[PWRDM_POWER_CSWR] = 300,
+		[PWRDM_POWER_OSWR] = 600,
+		[PWRDM_POWER_CSWR] = UNSUP_STATE,
 		[PWRDM_POWER_RET] = UNSUP_STATE,
-		[PWRDM_POWER_INACTIVE] = UNSUP_STATE,
+		[PWRDM_POWER_INACTIVE] = 20,
 		[PWRDM_POWER_ON] = 0,
 	},
 };
@@ -371,7 +371,7 @@ static struct powerdomain cam_44xx_pwrdm = {
 		[PWRDM_POWER_OSWR] = UNSUP_STATE,
 		[PWRDM_POWER_CSWR] = UNSUP_STATE,
 		[PWRDM_POWER_RET] = UNSUP_STATE,
-		[PWRDM_POWER_INACTIVE] = UNSUP_STATE,
+		[PWRDM_POWER_INACTIVE] = 20,
 		[PWRDM_POWER_ON] = 0,
 	}
 };
@@ -397,7 +397,7 @@ static struct powerdomain l3init_44xx_pwrdm = {
 		[PWRDM_POWER_OSWR] = 600,
 		[PWRDM_POWER_CSWR] = 300,
 		[PWRDM_POWER_RET] = UNSUP_STATE,
-		[PWRDM_POWER_INACTIVE] = UNSUP_STATE,
+		[PWRDM_POWER_INACTIVE] = 20,
 		[PWRDM_POWER_ON] = 0,
 	},
 };
@@ -425,7 +425,7 @@ static struct powerdomain l4per_44xx_pwrdm = {
 		[PWRDM_POWER_OSWR] = 600,
 		[PWRDM_POWER_CSWR] = 300,
 		[PWRDM_POWER_RET] = UNSUP_STATE,
-		[PWRDM_POWER_INACTIVE] = UNSUP_STATE,
+		[PWRDM_POWER_INACTIVE] = 20,
 		[PWRDM_POWER_ON] = 0,
 	},
 };

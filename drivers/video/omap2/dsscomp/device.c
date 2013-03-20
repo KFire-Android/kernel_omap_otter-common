@@ -619,6 +619,45 @@ static long comp_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		r = copy_to_user(ptr, &platform_info, sizeof(platform_info));
 		break;
 	}
+	case DSSCIOC_WB_DONE:
+	{
+		struct omap_writeback *wb = omap_dss_get_wb(0);
+		u32 sync_id;
+		r = copy_from_user(&sync_id, ptr, sizeof(sync_id));
+		if (r)
+			break;
+		dev_dbg(DEV(cdev), "WB_DONE: received sync_id %u, wb sync_id = %u\n",
+			sync_id, wb->wb_done.sync_id);
+		mutex_lock(&wb->lock);
+		if (sync_id > wb->wb_done.sync_id ||
+			(sync_id == wb->wb_done.sync_id &&
+				!wb->wb_done.is_done)) {
+			int attempts = 50;
+			while (attempts--) {
+				mutex_unlock(&wb->lock);
+				r = wait_for_completion_timeout(
+					&wb->wb_done.completion,
+					msecs_to_jiffies(50));
+
+				mutex_lock(&wb->lock);
+				if (r == 0) {
+					r = -ETIMEDOUT;
+					break;
+				}
+
+				if (sync_id <= wb->wb_done.sync_id) {
+					r = 0;
+					break;
+				}
+			}
+			if (attempts < 0) {
+				dev_info(DEV(cdev), "WB_DONE: no frame received\n");
+				r = -ETIMEDOUT;
+			}
+		}
+		mutex_unlock(&wb->lock);
+		break;
+	}
 	default:
 		r = -EINVAL;
 	}

@@ -13,6 +13,7 @@
 #include <linux/delay.h>
 #include <linux/pm_qos.h>
 #include <linux/sched.h>
+#include <linux/suspend.h>
 #include <linux/power/smartreflex.h>
 #include <plat/cpu.h>
 #include <plat/dvfs.h>
@@ -208,17 +209,14 @@ static int sr_classp5_start_hw_loop(struct omap_sr *sr)
 /**
  * sr_classp5_stop_hw_loop()
  * @sr:		SmartReflex for which we stop calibration
- * @is_volt_reset:	Reset voltage or not
  *
  * Stops hardware calibration
  */
-static void sr_classp5_stop_hw_loop(struct omap_sr *sr, bool is_volt_reset)
+static void sr_classp5_stop_hw_loop(struct omap_sr *sr)
 {
 	sr_disable_errgen(sr);
 	omap_vp_disable(sr->voltdm);
 	sr_disable(sr);
-	if (is_volt_reset)
-		voltdm_reset(sr->voltdm);
 }
 
 /**
@@ -399,7 +397,7 @@ stop_sampling:
 
 	/* Fall through to close up common stuff */
 done_calib:
-	sr_classp5_stop_hw_loop(sr, false);
+	sr_classp5_stop_hw_loop(sr);
 
 	pmic = voltdm->pmic;
 
@@ -451,6 +449,7 @@ done_calib:
 static struct delayed_work recal_work;
 static struct pm_qos_request recal_qos;
 static unsigned long next_recal_time;
+static bool recal_scheduled;
 
 /**
  * sr_classp5_voltdm_recal() - Helper routine to reset calibration.
@@ -533,6 +532,81 @@ static void sr_classp5_recal_work(struct work_struct *work)
 	mutex_unlock(&omap_dvfs_lock);
 }
 
+static void sr_classp5_recal_cleanup(void)
+{
+	if (!recal_scheduled)
+		return;
+
+	cancel_delayed_work_sync(&recal_work);
+	recal_scheduled = false;
+	pr_debug("%s: Re-calibration work canceled\n", __func__);
+}
+
+
+static void sr_classp5_recal_resume(void)
+{
+	unsigned long delay, now_time = jiffies;
+
+	if (recal_scheduled)
+		return;
+
+	if (time_before(now_time, next_recal_time))
+		delay = next_recal_time - now_time;
+	else
+		delay = 0;
+
+	pr_debug("%s: Recalibration work rescheduled to delay of %d msec",
+		 __func__, jiffies_to_msecs(delay));
+
+	/* Reschedule recalibration work on each resume */
+	schedule_delayed_work(&recal_work, delay);
+	recal_scheduled = true;
+
+	return;
+}
+
+static int sr_classp5_recal_sleep_pm_callback(struct notifier_block *nfb,
+						    unsigned long action,
+						    void *ignored)
+{
+	switch (action) {
+	case PM_HIBERNATION_PREPARE:
+	case PM_SUSPEND_PREPARE:
+		/*
+		 * Need to make sure that re-calibration works
+		 * is canceled before moving to Suspend mode.
+		 * Otherwise this work may be executed at any moment, trigger
+		 * SmartReflex and race with DVFS and MPUSS CPU Idle notifiers.
+		 * As result - system will crash
+		 */
+		mutex_lock(&omap_dvfs_lock);
+		sr_classp5_recal_cleanup();
+		mutex_unlock(&omap_dvfs_lock);
+		return NOTIFY_OK;
+
+	case PM_POST_HIBERNATION:
+	case PM_POST_SUSPEND:
+		/*
+		 * Reschedule re-calibration work, which was canceled
+		 * during suspend preparation
+		 */
+		sr_classp5_recal_resume();
+		return NOTIFY_OK;
+	}
+
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block sr_classp5_recal_sleep_pm_notifier = {
+	.notifier_call = sr_classp5_recal_sleep_pm_callback,
+	.priority = 0,
+};
+
+static void __init sr_classp5_recal_register_sleep_pm_notifier(void)
+{
+	register_pm_notifier(&sr_classp5_recal_sleep_pm_notifier);
+}
+
 static void sr_classp5_recal_init(void)
 {
 	unsigned long delay;
@@ -542,50 +616,13 @@ static void sr_classp5_recal_init(void)
 	delay = msecs_to_jiffies(CONFIG_OMAP_SR_CLASS1_P5_RECALIBRATION_DELAY);
 	schedule_delayed_work(&recal_work, delay);
 	next_recal_time = jiffies + delay;
+	sr_classp5_recal_register_sleep_pm_notifier();
+	recal_scheduled = true;
 	pr_info("SmartReflex Recalibration delay = %dms\n",
 		CONFIG_OMAP_SR_CLASS1_P5_RECALIBRATION_DELAY);
 }
-
-static void sr_classp5_recal_cleanup(void)
-{
-	cancel_delayed_work_sync(&recal_work);
-}
-
-static inline void sr_classp5_recal_suspend(struct omap_sr *sr)
-{
-	sr_classp5_recal_cleanup();
-}
-
-static void sr_classp5_recal_resume(struct omap_sr *sr)
-{
-	unsigned long delay, now_time = jiffies;
-
-	if (time_before(now_time, next_recal_time))
-		delay = next_recal_time - now_time;
-	else
-		delay = 0;
-
-	pr_debug("%s %s Recalibration work rescheduled to delay of %d msec",
-		 __func__, sr->name, jiffies_to_msecs(delay));
-
-	/* Reschedule recalibration work on each resume */
-	schedule_delayed_work(&recal_work, delay);
-	return;
-}
 #else
-static inline void sr_classp5_recal_cleanup(void)
-{
-}
-
 static inline void sr_classp5_recal_init(void)
-{
-}
-
-static inline void sr_classp5_recal_suspend(struct omap_sr *sr)
-{
-}
-
-static inline void sr_classp5_recal_resume(struct omap_sr *sr)
 {
 }
 #endif			/* CONFIG_OMAP_SR_CLASS1_P5_RECALIBRATION_DELAY */
@@ -665,6 +702,18 @@ static int sr_classp5_enable(struct omap_sr *sr)
 		return -ENODATA;
 	}
 
+	/*
+	 * We are resuming from OFF - enable clocks manually to allow OFF-mode.
+	 * Clocks will be disabled at "complete" stage by PM Core
+	 */
+	if (sr->suspended) {
+		if (!volt_data->volt_calibrated || work_data->work_active)
+			/* !!! Should never ever be here !!!*/
+			WARN(true, "Trying to resume with invalid AVS state\n");
+		else
+			sr->ops->get(sr);
+	}
+
 	/* We donot expect work item to be active here */
 	WARN_ON(work_data->work_active);
 
@@ -735,23 +784,38 @@ static int sr_classp5_disable(struct omap_sr *sr, int is_volt_reset)
 	}
 
 	/* need to do rest of code ONLY if required */
-	if (volt_data->volt_calibrated && !work_data->work_active)
+	if (volt_data->volt_calibrated && !work_data->work_active) {
+		/*
+		 * We are going OFF - disable clocks manually to allow OFF-mode.
+		 */
+		if (sr->suspended)
+			sr->ops->put(sr);
 		return 0;
+	}
 
 	if (work_data->work_active) {
-		/* if volt reset and work is active, we dont allow this */
-		if (is_volt_reset)
-			return -EBUSY;
 		/* flag work is dead and remove the old work */
 		work_data->work_active = false;
 		cancel_delayed_work_sync(&work_data->work);
 		sr_notifier_control(sr, false);
 	}
 
-	sr_classp5_stop_hw_loop(sr, is_volt_reset);
+	sr_classp5_stop_hw_loop(sr);
 
-	/* Cancelled SR, so no more need to keep request */
+	if (is_volt_reset)
+		voltdm_reset(sr->voltdm);
+
+	/* Canceled SR, so no more need to keep request */
 	pm_qos_update_request(&work_data->qos, PM_QOS_DEFAULT_VALUE);
+
+	/*
+	 * We are going OFF - disable clocks manually to allow OFF-mode.
+	 */
+	if (sr->suspended) {
+		/* !!! Should never ever be here - no guarantee to recover !!!*/
+		WARN(true, "Trying to go OFF with invalid AVS state\n");
+		sr->ops->put(sr);
+	}
 
 	return 0;
 }
@@ -869,95 +933,110 @@ static int sr_classp5_deinit(struct omap_sr *sr, void *class_priv_data)
 }
 
 /**
- * sr_classp5_suspend() - class suspend handler
+ * sr_classp5_suspend_noirq() - class suspend_noirq handler
  * @sr:	SmartReflex module which is moving to suspend
  *
- * The purpose of suspend handler is to make sure that Calibration
- * and Recalibration works are cancelled before moving to OFF mode.
+ * The purpose of suspend_noirq handler is to make sure that Calibration
+ * works are canceled before moving to OFF mode.
  * Otherwise these works may be executed at any moment, trigger
  * SmartReflex and race with CPU Idle notifiers. As result - system
  * will crash
  */
-static int sr_classp5_suspend(struct omap_sr *sr)
+static int sr_classp5_suspend_noirq(struct omap_sr *sr)
 {
-	void **voltdm_cdata = NULL;
-	struct sr_classp5_calib_data *calib_data = NULL;
+	struct sr_classp5_calib_data *work_data;
+	struct omap_volt_data *volt_data;
+	struct voltagedomain *voltdm;
+	int ret = 0;
 
 	if (IS_ERR_OR_NULL(sr)) {
 		pr_err("%s: bad parameters!\n", __func__);
 		return -EINVAL;
 	}
 
-	voltdm_cdata = &sr->voltdm_cdata;
-	if (IS_ERR_OR_NULL(voltdm_cdata)) {
-		pr_err("%s: bad parameters!\n", __func__);
+	work_data = (struct sr_classp5_calib_data *)sr->voltdm_cdata;
+	if (IS_ERR_OR_NULL(work_data)) {
+		pr_err("%s: bad work data %s\n", __func__, sr->name);
 		return -EINVAL;
 	}
 
-	if (IS_ERR_OR_NULL(*voltdm_cdata)) {
-		pr_err("%s: ooopps.. class not initialized for %s! bug??\n",
-		       __func__, sr->name);
-		return -EINVAL;
-	}
-
-	calib_data = (struct sr_classp5_calib_data *)*voltdm_cdata;
-
 	/*
-	 * If Calibration or Recalibration work acquires lock
-	 * OFF mode should be cancelled
+	 * At suspend_noirq the code isn't needed to be protected by
+	 * omap_dvfs_lock, but - Let's be paranoid (may have smth on other CPUx)
 	 */
-	if (!mutex_trylock(&omap_dvfs_lock)) {
-		pr_warn("%s: %s Can't acquire dvfs lock, abort suspend\n",
-			__func__, sr->name);
-		return -EBUSY;
-	}
+	mutex_lock(&omap_dvfs_lock);
 
-	/*
-	 * Handle situation when Calibration started, but lock is
-	 * released. It means calibration is collecting samples
-	 * at this moment of time. OFF mode should be cancelled
+	/* Check if calibration is active at this moment if yes -
+	 * abort suspend.
 	 */
-	if (calib_data->work_active) {
+	if (work_data->work_active) {
 		pr_warn("%s: %s Calibration is active, abort suspend\n",
 			__func__, sr->name);
-		mutex_unlock(&omap_dvfs_lock);
-		return -EBUSY;
+		ret = -EBUSY;
+		goto finish_suspend;
 	}
 
-	/* Ensure, that both works are cancelled */
-	sr_classp5_recal_suspend(sr);
-	cancel_delayed_work_sync(&calib_data->work);
-	calib_data->num_calib_triggers = 0;
-	calib_data->work_active = false;
-	pr_debug("%s: %s Calibration works cancelled\n", __func__, sr->name);
+	/*
+	 * Check if current voltage is calibrated if no -
+	 * abort suspend.
+	 */
+	voltdm = sr->voltdm;
+	volt_data = omap_voltage_get_curr_vdata(voltdm);
+	if (IS_ERR_OR_NULL(volt_data)) {
+		pr_warning("%s: Voltage data is NULL. Cannot disable %s\n",
+			   __func__, sr->name);
+		ret = -ENODATA;
+		goto finish_suspend;
+	}
 
+	if (!volt_data->volt_calibrated) {
+		pr_warn("%s: %s Calibration hasn't been done, abort suspend\n",
+			__func__, sr->name);
+		ret = -EBUSY;
+		goto finish_suspend;
+	}
+
+	/* Let's be paranoid - cancel Calibration work manually */
+	cancel_delayed_work_sync(&work_data->work);
+	work_data->work_active = false;
+
+finish_suspend:
 	mutex_unlock(&omap_dvfs_lock);
-	return 0;
+	return ret;
 }
 
 /**
- * sr_classp5_resume() - class resume handler
+ * sr_classp5_resume_noirq() - class resume_noirq handler
  * @sr:	SmartReflex module which is moving to resume
  *
  * The main purpose of resume handler is to
- * reschedule recalibration work, which was cancelled
- * in suspend handler
+ * reschedule calibration work if the resume has been started with
+ * un-calibrated voltage.
  */
-static int sr_classp5_resume(struct omap_sr *sr)
+static int sr_classp5_resume_noirq(struct omap_sr *sr)
 {
 	struct omap_volt_data *volt_data;
 
-	sr_classp5_recal_resume(sr);
-
 	/*
-	 * If we resume from suspend and voltage is not calibrated, it means
-	 * that calibration work was not completed after recalibration work
-	 * (not scheduled at all or cancelled due to suspend), so reschedule
-	 * it here.
-	 */
+	* If we resume from suspend and voltage is not calibrated, it means
+	* that calibration work was not completed after re-calibration work
+	* (not scheduled at all or canceled due to suspend or un-calibrated
+	* OPP was selected while suspending/resuming), so reschedule
+	* it here.
+	*
+	* At this stage the code isn't needed to be protected by
+	* omap_dvfs_lock, but - Let's be paranoid (may have smth on other CPUx)
+	*
+	* More over, we shouldn't be here in case if voltage is un-calibrated
+	* voltage, so produce warning.
+	*/
+	mutex_lock(&omap_dvfs_lock);
 	volt_data = omap_voltage_get_curr_vdata(sr->voltdm);
-	if (!volt_data->volt_calibrated)
+	if (!volt_data->volt_calibrated) {
 		sr_classp5_calibration_schedule(sr);
+		WARN(true, "sr_classp5: Resume with un-calibrated voltage\n");
+	}
+	mutex_unlock(&omap_dvfs_lock);
 
 	return 0;
 }
@@ -971,8 +1050,8 @@ static struct omap_sr_class_data classp5_data = {
 	.deinit = sr_classp5_deinit,
 	.notify = sr_classp5_notify,
 	.class_type = SR_CLASS1P5,
-	.suspend = sr_classp5_suspend,
-	.resume = sr_classp5_resume,
+	.suspend_noirq = sr_classp5_suspend_noirq,
+	.resume_noirq = sr_classp5_resume_noirq,
 	/*
 	 * trigger for bound - this tells VP that SR has a voltage
 	 * change. we should try and ensure transdone is set before reading
@@ -1000,4 +1079,4 @@ static int __init sr_classp5_driver_init(void)
 	}
 	return ret;
 }
-device_initcall(sr_classp5_driver_init);
+subsys_initcall(sr_classp5_driver_init);

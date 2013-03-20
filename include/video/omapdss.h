@@ -482,6 +482,17 @@ struct omap_writeback_info {
 	bool force_1d;
 };
 
+/* HACK: omap_writeback_notifier used as temporary WA
+ * for WFD invalidation issue
+*/
+struct omap_writeback_notifier {
+	struct completion		completion;
+	u32				sync_id;
+	int				vsync_count;
+	bool				is_done;
+	bool				vsync_active;
+};
+
 struct omap_writeback {
 	struct kobject			kobj;
 	struct list_head		list;
@@ -492,6 +503,7 @@ struct omap_writeback {
 	struct mutex			lock;
 	struct omap_writeback_info	info;
 	struct completion		wb_completion;
+	struct omap_writeback_notifier	wb_done;
 
 	bool (*check_wb)(struct omap_writeback *wb);
 	int (*set_wb_info)(struct omap_writeback *wb,
@@ -772,6 +784,8 @@ struct omap_dss_device {
 	void (*platform_disable)(struct omap_dss_device *dssdev);
 	int (*set_backlight)(struct omap_dss_device *dssdev, int level);
 	int (*get_backlight)(struct omap_dss_device *dssdev);
+
+	struct omap_video_timings *dispc_timings;
 };
 
 struct omap_dss_hdmi_data

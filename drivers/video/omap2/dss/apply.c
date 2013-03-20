@@ -604,7 +604,8 @@ static void dss_ovl_write_regs(struct omap_overlay *ovl)
 		}
 		/* check if this overlay is source for manager, which is source
 		 * for wb, ignore ovl sources */
-		if (wbc->enabled && omap_dss_check_wb(wbc, -1, op->channel)) {
+		if (wbc->mode == OMAP_WB_MEM2MEM_MODE &&
+				omap_dss_check_wb(wbc, -1, op->channel)) {
 			DSSDBG("check wb mgr wb->enabled=%d for plane:%d\n",
 							wbc->enabled, ovl->id);
 			m2m_with_mgr = true;
@@ -617,8 +618,15 @@ static void dss_ovl_write_regs(struct omap_overlay *ovl)
 
 	ilace = ovl->manager->device->type == OMAP_DISPLAY_TYPE_VENC;
 
-	r = dispc_scaling_decision(ovl->id, oi, op->channel,
-						&x_decim, &y_decim, &five_taps);
+	if (m2m_with_mgr || m2m_with_ovl) {
+		/* do not calculate a pixel clock and decimation for WB */
+		x_decim = 1;
+		y_decim = 1;
+		five_taps = true;
+		r = 0;
+	} else
+		r = dispc_scaling_decision(ovl->id, oi, op->channel,
+					&x_decim, &y_decim, &five_taps);
 
 	r = r ? : dispc_ovl_setup(ovl->id, oi, ilace,
 			replication, x_decim, y_decim, five_taps,
@@ -841,7 +849,6 @@ static void dss_wb_write_regs(void)
 static void dss_wb_ovl_enable(void)
 {
 	struct writeback_cache_data *wbc;
-	struct ovl_priv_data *op = NULL;
 	struct omap_overlay *ovl;
 	const int num_ovls = dss_feat_get_num_ovls();
 	int i;
@@ -895,11 +902,10 @@ static void dss_wb_ovl_enable(void)
 				 * source pipe is switched off. */
 				for (i = 0; i < num_ovls; ++i) {
 					ovl = omap_dss_get_overlay(i);
-					if (ovl)
-						op = get_ovl_priv(ovl);
-					if (op && (int)op->channel ==
-						(int)wbc->source &&
-						!op->enabled) {
+
+					if ((int)ovl->manager->id ==
+						(int)wbc->source) {
+						dispc_ovl_enable(i, false);
 						dispc_setup_wb_source(
 							OMAP_DSS_GFX + i);
 						dispc_set_wb_channel_out(i);
@@ -1365,10 +1371,12 @@ int omap_dss_mgr_apply(struct omap_overlay_manager *mgr)
 		goto done;
 	}
 
-	r = dss_check_settings_apply(mgr, mgr->device);
-	if (r) {
-		DSSERR("failed to apply settings: illegal configuration.\n");
-		goto done;
+	if (!info.wb_only) {
+		r = dss_check_settings_apply(mgr, mgr->device);
+		if (r) {
+			DSSERR("failed to apply: illegal configuration.\n");
+			goto done;
+		}
 	}
 
 	/* Configure overlays */

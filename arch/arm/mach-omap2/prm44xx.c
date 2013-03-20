@@ -267,8 +267,25 @@ void omap44xx_prm_restore_irqen(u32 *saved_mask)
 void omap44xx_prm_reconfigure_io_chain(void)
 {
 	int i = 0;
+	u32 pending_irq;
+
 	s16 dev_inst = cpu_is_omap44xx() ? OMAP4430_PRM_DEVICE_INST :
 					   OMAP54XX_PRM_DEVICE_INST;
+
+	/*
+	 * Do not reconfigure I/O chain if we have pending I/O wakeup
+	 * interrupt. This will be done later at the end of I/O wakeup
+	 * interrupt handler routine (1). Otherwise wakeup events will
+	 * be missed because next two steps clear latches and in
+	 * the handler (1) all WAKEUP_EVENT bits will be cleared
+	 */
+	if (cpu_is_omap44xx()) {
+		pending_irq = _read_pending_irq_reg(
+					OMAP4_PRM_IRQENABLE_MPU_OFFSET,
+					OMAP4_PRM_IRQSTATUS_MPU_OFFSET);
+		if (pending_irq & OMAP4430_IO_ST_MASK)
+			return;
+	}
 
 	/* Trigger WUCLKIN enable */
 	omap4_prm_rmw_inst_reg_bits(OMAP4430_WUCLK_CTRL_MASK,

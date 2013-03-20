@@ -243,6 +243,43 @@ static void set_lpmode(struct emif_data *emif, u8 lpmode)
 	u32 temp;
 	void __iomem *base = emif->base;
 
+	/*
+	 * Workaround for errata i743 - LPDDR2 Power-Down State is Not
+	 * Efficient
+	 *
+	 * i743 DESCRIPTION:
+	 * The EMIF supports power-down state for low power. The EMIF
+	 * automatically puts the SDRAM into power-down after the memory is
+	 * not accessed for a defined number of cycles and the
+	 * EMIF_PWR_MGMT_CTRL[10:8] REG_LP_MODE bit field is set to 0x4.
+	 * As the EMIF supports automatic output impedance calibration, a ZQ
+	 * calibration long command is issued every time it exits active
+	 * power-down and precharge power-down modes. The EMIF waits and
+	 * blocks any other command during this calibration.
+	 * The EMIF does not allow selective disabling of ZQ calibration upon
+	 * exit of power-down mode. Due to very short periods of power-down
+	 * cycles, ZQ calibration overhead creates bandwidth issues and
+	 * increases overall system power consumption. On the other hand,
+	 * issuing ZQ calibration long commands when exiting self-refresh is
+	 * still required.
+	 *
+	 * WORKAROUND
+	 * Because there is no power consumption benefit of the power-down due
+	 * to the calibration and there is a performance risk, the guideline
+	 * is to not allow power-down state and, therefore, to not have set
+	 * the EMIF_PWR_MGMT_CTRL[10:8] REG_LP_MODE bit field to 0x4.
+	 */
+	if (emif->plat_data->ip_rev == EMIF_4D &&
+			EMIF_LP_MODE_PWR_DN == lpmode) {
+
+		WARN_ONCE(1, "%s: Power-down mode"
+			  " REG_LP_MODE = LP_MODE_PWR_DN(0x4) is prohibited by"
+			  " erratum i743 switch to LP_MODE_SELF_REFRESH(0x2)",
+			  __func__);
+		/* rallback LP_MODE to Self-refresh mode */
+		lpmode = EMIF_LP_MODE_SELF_REFRESH;
+	}
+
 	temp = readl(base + EMIF_POWER_MANAGEMENT_CONTROL);
 	temp &= ~LP_MODE_MASK;
 	temp |= (lpmode << LP_MODE_SHIFT);
@@ -1821,7 +1858,7 @@ static void __exit emif_unregister(void)
 	platform_driver_unregister(&emif_driver);
 }
 
-module_init(emif_register);
+arch_initcall(emif_register);
 module_exit(emif_unregister);
 MODULE_DESCRIPTION("TI EMIF SDRAM Controller Driver");
 MODULE_LICENSE("GPL");

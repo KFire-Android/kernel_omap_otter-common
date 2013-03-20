@@ -1,0 +1,5 @@
+config CACHE2DMANAGER
+	tristate "2D Cache operation driver"
+	default y
+	help
+           Enable 2D Cache operation support

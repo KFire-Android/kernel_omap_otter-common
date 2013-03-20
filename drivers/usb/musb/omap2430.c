@@ -34,6 +34,7 @@
 #include <linux/dma-mapping.h>
 #include <linux/pm_runtime.h>
 #include <linux/err.h>
+#include <linux/delay.h>
 #include <linux/usb/musb-omap.h>
 #include <linux/usb/omap4_usb_phy.h>
 #include <linux/mfd/omap_control.h>
@@ -155,6 +156,7 @@ static void omap2430_musb_set_vbus(struct musb *musb, int is_on)
 
 	if (is_on) {
 		if (musb->xceiv->state == OTG_STATE_A_IDLE) {
+			int loops = 100;
 			/* start the session */
 			devctl |= MUSB_DEVCTL_SESSION;
 			musb_writeb(musb->mregs, MUSB_DEVCTL, devctl);
@@ -164,9 +166,11 @@ static void omap2430_musb_set_vbus(struct musb *musb, int is_on)
 			 */
 			while (musb_readb(musb->mregs, MUSB_DEVCTL) & 0x80) {
 
+				mdelay(5);
 				cpu_relax();
 
-				if (time_after(jiffies, timeout)) {
+				if (time_after(jiffies, timeout)
+				    || loops-- <= 0) {
 					dev_err(musb->controller,
 					"configured as A device timeout");
 					ret = -EINVAL;
@@ -575,7 +579,7 @@ static int omap2430_runtime_suspend(struct device *dev)
 	if (musb) {
 		musb->context.otg_interfsel = musb_readl(musb->mregs,
 				OTG_INTERFSEL);
-
+		musb_writel(musb->mregs, OTG_INTERFSEL, ULPI_12PIN);
 		omap2430_low_level_exit(musb);
 		usb_phy_set_suspend(musb->xceiv, 1);
 	}

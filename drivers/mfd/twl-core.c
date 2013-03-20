@@ -162,6 +162,11 @@ defined(CONFIG_INPUT_TWL6030_PWRBUTTON_MODULE)
 #define twl6030_has_pwrbutton()        false
 #endif
 
+#if defined(CONFIG_TWL6030_THERMAL) || defined(CONFIG_TWL6030_THERMAL_MODULE)
+#define twl_has_thermal()	true
+#else
+#define twl_has_thermal()	false
+#endif
 
 #define SUB_CHIP_ID0 0
 #define SUB_CHIP_ID1 1
@@ -215,7 +220,6 @@ defined(CONFIG_INPUT_TWL6030_PWRBUTTON_MODULE)
 #define TWL6030_BASEADD_MEM		0x0017
 #define TWL6030_BASEADD_PM_MASTER	0x001F
 #define TWL6030_BASEADD_PM_SLAVE_MISC	0x0030 /* PM_RECEIVER */
-#define TWL6030_BASEADD_PM_SLAVE_RES	0x00AD
 #define TWL6030_BASEADD_PM_MISC		0x00E2
 #define TWL6030_BASEADD_PM_PUPD		0x00F0
 
@@ -393,7 +397,7 @@ static struct twl_mapping twl6030_map[] = {
 	{ SUB_CHIP_ID0, TWL6030_BASEADD_RTC },
 	{ SUB_CHIP_ID0, TWL6030_BASEADD_MEM },
 	{ SUB_CHIP_ID1, TWL6032_BASEADD_CHARGER },
-	{ SUB_CHIP_ID0, TWL6030_BASEADD_PM_SLAVE_RES },
+	{ SUB_CHIP_ID0, TWL6030_BASEADD_PM_MISC },
 };
 
 /*----------------------------------------------------------------------*/
@@ -916,60 +920,33 @@ add_children(struct twl4030_platform_data *pdata, unsigned irq_base,
 			usb3v1.dev_name = dev_name(child);
 		}
 	}
-	if (twl_has_usb() && pdata->usb && twl_class_is_6030()) {
 
-		static struct regulator_consumer_supply usb3v3;
-		int regulator;
-
+	if (twl_class_is_6030()) {
 		if (twl_has_regulator()) {
-			/* this is a template that gets copied */
-			struct regulator_init_data usb_fixed = {
-				.constraints.valid_modes_mask =
-					REGULATOR_MODE_NORMAL
-					| REGULATOR_MODE_STANDBY,
-				.constraints.valid_ops_mask =
-					REGULATOR_CHANGE_MODE
-					| REGULATOR_CHANGE_STATUS,
-			};
+			if (features & TWL6032_SUBCLASS)
+				child = add_regulator(TWL6032_REG_LDOUSB,
+						      pdata->ldousb, features);
+			else
+				child = add_regulator(TWL6030_REG_VUSB,
+						      pdata->vusb, features);
 
-			if (features & TWL6032_SUBCLASS) {
-				usb3v3.supply =	"ldousb";
-				regulator = TWL6032_REG_LDOUSB;
-			} else {
-				usb3v3.supply = "vusb";
-				regulator = TWL6030_REG_VUSB;
-			}
-			child = add_regulator_linked(regulator, &usb_fixed,
-							&usb3v3, 1,
-							features);
 			if (IS_ERR(child))
 				return PTR_ERR(child);
 		}
 
-		pdata->usb->features = features;
+		if (twl_has_usb() && pdata->usb) {
+			pdata->usb->features = features;
 
-		child = add_child(0, "twl6030_usb",
-			pdata->usb, sizeof(*pdata->usb),
-			true,
-			/* irq1 = VBUS_PRES, irq0 = USB ID */
-			irq_base + USBOTG_INTR_OFFSET,
-			irq_base + USB_PRES_INTR_OFFSET);
-
-		if (IS_ERR(child))
-			return PTR_ERR(child);
-		/* we need to connect regulators to this transceiver */
-		if (twl_has_regulator() && child)
-			usb3v3.dev_name = dev_name(child);
-	} else if (twl_has_regulator() && twl_class_is_6030()) {
-		if (features & TWL6032_SUBCLASS)
-			child = add_regulator(TWL6032_REG_LDOUSB,
-						pdata->ldousb, features);
-		else
-			child = add_regulator(TWL6030_REG_VUSB,
-						pdata->vusb, features);
+			child = add_child(0, "twl6030_usb",
+					  pdata->usb, sizeof(*pdata->usb),
+					  true,
+					  /* irq1 = VBUS_PRES, irq0 = USB ID */
+					  irq_base + USBOTG_INTR_OFFSET,
+					  irq_base + USB_PRES_INTR_OFFSET);
 
 			if (IS_ERR(child))
-					return PTR_ERR(child);
+				return PTR_ERR(child);
+		}
 	}
 
 	if (twl_has_watchdog() && twl_class_is_4030()) {
@@ -997,6 +974,15 @@ add_children(struct twl4030_platform_data *pdata, unsigned irq_base,
 		child = add_child(sub_chip_id, "twl4030-audio",
 				pdata->audio, sizeof(*pdata->audio),
 				false, 0, 0);
+		if (IS_ERR(child))
+			return PTR_ERR(child);
+	}
+
+	if (twl_class_is_6030() && twl_has_thermal()) {
+		sub_chip_id = twl_map[TWL6030_MODULE_PM_MISC].sid;
+		child = add_child(sub_chip_id, "twl6030_thermal",
+				  pdata->thermal, sizeof(*pdata->thermal),
+				  false, irq_base + HOTDIE_INTR_OFFSET, 0);
 		if (IS_ERR(child))
 			return PTR_ERR(child);
 	}

@@ -19,6 +19,7 @@
 #include "vc.h"
 #include "mux.h"
 #include "twl-common.h"
+#include <plat/omap_hwmod.h>
 
 /* Voltage limits supported */
 #define MIN_VOLTAGE_TPS62360_62_UV	770000
@@ -254,6 +255,62 @@ static __initdata struct omap_pmic_map omap_tps_map[] = {
 	/* Terminator */
 	{ .name = NULL, .pmic_data = NULL},
 };
+
+/**
+ * omap_tps6236x_gpio_no_reset_wa() - prevent GPIO banks reset on init
+ * @gpio_vsel0:	If using GPIO to control VSEL0, provide gpio number, else -1
+ * @gpio_vsel1:	If using GPIO to control VSEL1, provide gpio number, else -1
+ * @gpio_bank_width:	GPIO bank width
+ *
+ * On some platforms like OMAP4460, GPIO lines are used for controlling
+ * the TPS modes VSEL0/VSEL1, these GPIO lines should not be reset during init
+ * as reset will cause the TPS voltage to drop to 0.9 V. Hence configure
+ * corresponding OMAP HWMODs as INIT_NO_RESET.
+ *
+ * This function should be called not latter then pure_initcall because
+ * INIT_NO_RESET property of the hwmod should be configured before calling
+ * its setup() function which is done from omap_hwmod_setup_all() routine
+ * execution on core_initcall level.
+ */
+void __init omap_tps6236x_gpio_no_reset_wa(int gpio_vsel0, int gpio_vsel1,
+					       int gpio_bank_width)
+{
+	int gpio_bank;
+	struct omap_hwmod *oh;
+	char hw_name[7];
+
+	if (gpio_vsel0 != -1) {
+
+		gpio_bank = (gpio_vsel0 / gpio_bank_width) + 1;
+
+		snprintf(hw_name, sizeof(hw_name), "gpio%d", gpio_bank);
+
+		pr_debug("%s: WA: set INIT_NO_RESET flag for the %s hwmod\n",
+			 __func__, hw_name);
+
+		oh = omap_hwmod_lookup(hw_name);
+		if (oh)
+			omap_hwmod_no_setup_reset(oh);
+		else
+			pr_warn("%s: %s hwmod not found\n", __func__, hw_name);
+	}
+
+	if (gpio_vsel1 != -1) {
+
+		gpio_bank = (gpio_vsel1 / gpio_bank_width) + 1;
+
+		snprintf(hw_name, sizeof(hw_name), "gpio%d", gpio_bank);
+
+		pr_debug("%s: WA: set INIT_NO_RESET flag for the %s hwmod\n",
+			 __func__, hw_name);
+
+		oh = omap_hwmod_lookup(hw_name);
+		if (oh)
+			omap_hwmod_no_setup_reset(oh);
+		else
+			pr_warn("%s: %s hwmod not found\n", __func__, hw_name);
+	}
+}
 
 int __init omap_tps6236x_init(void)
 {

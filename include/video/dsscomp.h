@@ -379,8 +379,8 @@ struct dss2_ovl_cfg {
 	__u8 zonly;	/* only set zorder and enabled bit */
 	__u8 mgr_ix;	/* mgr index */
 
-	bool force_1d; /* force 1d access through tiled buffer */
-	bool mflag_en; /* mflag for the overlay */
+	__u8 force_1d; /* force 1d access through tiled buffer */
+	__u8 mflag_en; /* mflag for the overlay */
 } __aligned(4);
 
 enum omapdss_buffer_type {
@@ -731,4 +731,7 @@ struct dsscomp_platform_info {
 #define DSSCIOC_SETUP_DISPLAY	\
 			_IOW('O', 134, struct dsscomp_setup_display_data)
 #define DSSCIOC_QUERY_PLATFORM	_IOR('O', 135, struct dsscomp_platform_info)
+
+/*HACK: used as temporary solution to wait for writeback frame to complete */
+#define DSSCIOC_WB_DONE		_IOW('O', 136, __u32)
 #endif

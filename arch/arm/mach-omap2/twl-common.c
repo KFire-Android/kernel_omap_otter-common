@@ -33,6 +33,7 @@
 #include "twl-common.h"
 #include "pm.h"
 #include "mux.h"
+#include <linux/power/ti-fg.h>
 
 static struct i2c_board_info __initdata pmic_i2c_board_info = {
 	.addr		= 0x48,
@@ -271,6 +272,88 @@ static struct twl4030_madc_platform_data omap4_madc_pdata = {
 	.irq_line = -1,
 };
 
+/* Fuel Gauge EDV Configuration */
+static struct edv_config edv_cfg = {
+	.averaging = true,
+	.seq_edv = 5,
+	.filter_light = 155,
+	.filter_heavy = 199,
+	.overload_current = 1000,
+	.edv = {
+		{3150, 0},
+		{3450, 4},
+		{3600, 10},
+	},
+};
+
+/* Fuel Gauge OCV Configuration */
+static struct ocv_config ocv_cfg = {
+	.voltage_diff = 75,
+	.current_diff = 30,
+
+	.sleep_enter_current = 60,
+	.sleep_enter_samples = 3,
+
+	.sleep_exit_current = 100,
+	.sleep_exit_samples = 3,
+
+	.long_sleep_current = 500,
+	.ocv_period = 300,
+	.relax_period = 600,
+
+	.flat_zone_low = 35,
+	.flat_zone_high = 65,
+
+	.max_ocv_discharge = 1300,
+
+	.table = {
+		3300, 3603, 3650, 3662, 3700,
+		3723, 3734, 3746, 3756, 3769,
+		3786, 3807, 3850, 3884, 3916,
+		3949, 3990, 4033, 4077, 4129,
+		4193
+	},
+};
+
+/* General OMAP4 Battery Cell Configuration */
+static struct cell_config cell_cfg =  {
+	.cc_voltage = 4175,
+	.cc_current = 250,
+	.cc_capacity = 15,
+	.seq_cc = 5,
+
+	.cc_polarity = true,
+	.cc_out = true,
+	.ocv_below_edv1 = false,
+
+	.design_capacity = 4000,
+	.design_qmax = 4100,
+	.r_sense = 10,
+
+	.qmax_adjust = 1,
+	.fcc_adjust = 2,
+
+	.max_overcharge = 100,
+	.electronics_load = 200, /* *10 uAh */
+
+	.max_increment = 150,
+	.max_decrement = 150,
+	.low_temp = 119,
+	.deep_dsg_voltage = 30,
+	.max_dsg_estimate = 300,
+	.light_load = 100,
+	.near_full = 500,
+	.cycle_threshold = 3500,
+	.recharge = 300,
+
+	.mode_switch_capacity = 5,
+
+	.call_period = 2,
+
+	.ocv = &ocv_cfg,
+	.edv = &edv_cfg,
+};
+
 static int omap4_batt_table[] = {
 	/* adc code for temperature in degree C */
 	929, 925, /* -2 ,-1 */
@@ -289,10 +372,9 @@ static struct twl4030_bci_platform_data omap4_bci_pdata = {
 	.max_charger_voltagemV		= 4560,
 	.max_bat_voltagemV		= 4200,
 	.low_bat_voltagemV		= 3300,
-	.max_battery_capacity		= 4000,
 	.battery_tmp_tbl		= omap4_batt_table,
 	.tblsize			= ARRAY_SIZE(omap4_batt_table),
-	.sense_resistor_mohm		= 10,
+	.cell_cfg			= &cell_cfg,
 };
 
 static struct regulator_init_data omap4_vdac_idata = {
@@ -438,7 +520,7 @@ static struct regulator_init_data omap4_vana_idata = {
 					| REGULATOR_CHANGE_STATUS,
 		.always_on		= true,
 		.state_mem = {
-			.disabled	= true,
+			.enabled	= true,
 		},
 		.initial_state		= PM_SUSPEND_MEM,
 	},
@@ -469,6 +551,10 @@ static struct regulator_init_data omap4_vcxio_idata = {
 	.supply_regulator	= "V2V1",
 };
 
+static struct regulator_consumer_supply omap4_vusb_supply[] = {
+		REGULATOR_SUPPLY("vusb", "twl6030_usb"),
+};
+
 static struct regulator_init_data omap4_vusb_idata = {
 	.constraints = {
 		.min_uV			= 3300000,
@@ -482,6 +568,8 @@ static struct regulator_init_data omap4_vusb_idata = {
 		},
 		.initial_state		= PM_SUSPEND_MEM,
 	},
+	.num_consumer_supplies	= ARRAY_SIZE(omap4_vusb_supply),
+	.consumer_supplies	= omap4_vusb_supply,
 };
 
 static struct regulator_init_data omap4_clk32kg_idata = {
@@ -575,6 +663,10 @@ static struct regulator_init_data omap4_regen1_idata = {
 	},
 };
 
+static struct twl6030_thermal_data omap4_thermal_pdata = {
+	.hotdie_cfg = TWL6030_HOTDIE_130C,
+};
+
 void __init omap4_pmic_get_config(struct twl4030_platform_data *pmic_data,
 				  u32 pdata_flags, u32 regulators_flags)
 {
@@ -592,6 +684,9 @@ void __init omap4_pmic_get_config(struct twl4030_platform_data *pmic_data,
 
 	if (pdata_flags & TWL_COMMON_PDATA_MADC && !pmic_data->madc)
 		pmic_data->madc = &omap4_madc_pdata;
+
+	if (pdata_flags & TWL_COMMON_PDATA_THERMAL && !pmic_data->thermal)
+		pmic_data->thermal = &omap4_thermal_pdata;
 
 	/* Common regulator configurations */
 	if (regulators_flags & TWL_COMMON_REGULATOR_VDAC) {

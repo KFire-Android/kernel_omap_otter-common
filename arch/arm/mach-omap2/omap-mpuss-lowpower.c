@@ -72,8 +72,6 @@
 #ifdef CONFIG_SMP
 #define NUM_DEN_MASK			0xfffff000
 
-#define GIC_ISR_NON_SECURE	0xffffffff
-
 struct omap4_cpu_pm_info {
 	struct powerdomain *pwrdm;
 	void __iomem *scu_sar_addr;
@@ -568,10 +566,6 @@ int omap_enter_lowpower(unsigned int cpu, unsigned int power_state)
 	else
 		omap_pm_ops.finish_suspend(save_state);
 
-
-	if (save_state == 3)
-		omap_wakeupgen_check_interrupts("At Resume");
-
 	if (omap_mpuss_read_prev_context_state()) {
 		restore_ivahd_tesla_regs();
 		restore_l3instr_regs();
@@ -589,11 +583,8 @@ abort_suspend:
 #endif
 	}
 
-	if (pwrdm_read_device_off_state()) {
-#ifdef ARCH_OMAP5
-		prcmdebug_dump(PRCMDEBUG_LASTSLEEP);
-#endif
-	}
+	if (pwrdm_read_device_off_state())
+		omap_prcmdebug_dump(PRCMDEBUG_LASTSLEEP);
 
 sar_save_failed:
 	/*

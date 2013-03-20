@@ -4509,8 +4509,13 @@ static int dsi_display_init_dispc(struct omap_dss_device *dssdev)
 		dispc_mgr_enable_stallmode(dssdev->manager->id, false);
 		dispc_mgr_enable_fifohandcheck(dssdev->manager->id, 0);
 
-		dispc_mgr_set_lcd_timings(dssdev->manager->id,
-			&dssdev->panel.timings);
+		if (dssdev->dispc_timings) {
+			dispc_mgr_set_lcd_timings(dssdev->manager->id,
+						dssdev->dispc_timings);
+		} else {
+			dispc_mgr_set_lcd_timings(dssdev->manager->id,
+						&dssdev->panel.timings);
+		}
 	}
 
 		dispc_mgr_set_lcd_display_type(dssdev->manager->id,

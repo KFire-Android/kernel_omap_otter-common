@@ -509,6 +509,7 @@ extern u32 omap_features;
 #define OMAP5_HAS_OPP_HIGH			BIT(12)
 #define OMAP5_HAS_AUTO_RET			BIT(13)
 #define OMAP5_HAS_AVS			BIT(14)
+#define OMAP_HAS_GC320			BIT(15)
 
 #define OMAP3_HAS_FEATURE(feat,flag)			\
 static inline unsigned int omap3_has_ ##feat(void)	\
@@ -550,5 +551,15 @@ OMAP5_HAS_FEATURE(opp_high, OPP_HIGH)
 OMAP5_HAS_FEATURE(auto_ret, AUTO_RET)
 OMAP5_HAS_FEATURE(avs, AVS)
 
+/*
+ * Runtime detection of common features across OMAP families
+ */
+#define OMAP_HAS_FEATURE(feat, flag)			\
+static inline unsigned int omap_has_ ##feat(void)	\
+{							\
+	return omap_features & OMAP_HAS_ ##flag;	\
+}							\
+
+OMAP_HAS_FEATURE(gc320, GC320)
 
 #endif

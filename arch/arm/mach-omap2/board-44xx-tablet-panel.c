@@ -22,6 +22,7 @@
 
 #include <plat/board.h>
 #include <plat/vram.h>
+#include <plat/android-display.h>
 
 #include <video/omapdss.h>
 #include <video/omap-panel-tc358765.h>
@@ -129,8 +130,19 @@ static struct tc358765_board_data tablet_dsi_panel = {
 	.clrsipo	= 0x3,
 	.lv_is		= 0x1,
 	.lv_nd		= 0x6,
-	.vtgen		= 0x1,
-	.vsdelay	= 0xf,
+	.evtmode	= 0x1,
+	.vsdelay	= 0xf02,
+};
+
+struct omap_video_timings tablet_dispc_timings = {
+	.x_res = 1280,
+	.y_res = 800,
+	.hfp = 243,
+	.hsw = 9,
+	.hbp = 20,
+	.vfp = 6,
+	.vsw = 2,
+	.vbp = 4,
 };
 
 static struct omap_dss_device tablet_lcd_device = {
@@ -178,10 +190,10 @@ static struct omap_dss_device tablet_lcd_device = {
 		.timings = {
 			.x_res		= 1280,
 			.y_res		= 800,
-			.pixel_clock	= 65183,
-			.hfp		= 10,
-			.hsw		= 20,
-			.hbp		= 10,
+			.pixel_clock	= 63530,
+			.hfp		= 6,
+			.hsw		= 12,
+			.hbp		= 6,
 			.vfp		= 4,
 			.vsw		= 4,
 			.vbp		= 4,
@@ -189,10 +201,10 @@ static struct omap_dss_device tablet_lcd_device = {
 		.dsi_mode = OMAP_DSS_DSI_VIDEO_MODE,
 		.dsi_vm_data = {
 				.hsa			= 0,
-				.hfp			= 6,
-				.hbp			= 21,
-				.vsa			= 4,
-				.vfp			= 4,
+				.hfp			= 4,
+				.hbp			= 3,
+				.vsa			= 2,
+				.vfp			= 6,
 				.vbp			= 4,
 
 				.vp_de_pol		= true,
@@ -220,6 +232,7 @@ static struct omap_dss_device tablet_lcd_device = {
 	.channel = OMAP_DSS_CHANNEL_LCD,
 	.platform_enable = NULL,
 	.platform_disable = NULL,
+	.dispc_timings = &tablet_dispc_timings,
 };
 
 static int tablet_panel_enable_hdmi(struct omap_dss_device *dssdev)
@@ -252,13 +265,73 @@ static struct omap_dss_device *tablet_dss_devices[] = {
 	&tablet_hdmi_device,
 };
 
+static struct omap_dss_device *dss_devices_hdmi_default_display[] = {
+	&tablet_hdmi_device,
+};
+
+/* Allocate ( 18 + 9 ) MB for TILER1D slot size for WUXGA panel, total of
+ * 54 MB of TILER1D
+ */
+static struct dsscomp_platform_data dsscomp_config_tablet = {
+	.tiler1d_slotsz = SZ_16M,
+};
+
+static struct dsscomp_platform_data dsscomp_config_hdmi_display = {
+	.tiler1d_slotsz = (SZ_16M + SZ_2M + SZ_8M + SZ_1M),
+};
+
+/* HACK: use 2 devices, as expected by DDK */
+static struct sgx_omaplfb_config omaplfb_config_tablet[] = {
+	{
+		.tiler2d_buffers = 2,
+		.swap_chain_length = 2,
+	},
+	{
+		.vram_buffers = 2,
+		.swap_chain_length = 2,
+	},
+};
+
+static struct sgx_omaplfb_config omaplfb_config_hdmi_default_display[] = {
+	{
+		.vram_buffers = 2,
+		.swap_chain_length = 2,
+	},
+	{
+		.vram_buffers = 2,
+		.swap_chain_length = 2,
+	}
+};
+
+static struct sgx_omaplfb_platform_data omaplfb_plat_data_tablet = {
+	.num_configs = ARRAY_SIZE(omaplfb_config_tablet),
+	.configs = omaplfb_config_tablet,
+};
+
+static struct sgx_omaplfb_platform_data omaplfb_plat_data_hdmi_default_display = {
+	.num_configs = ARRAY_SIZE(omaplfb_config_hdmi_default_display),
+	.configs = omaplfb_config_hdmi_default_display,
+};
+
 static struct omap_dss_board_info tablet_dss_data = {
 	.num_devices	= ARRAY_SIZE(tablet_dss_devices),
 	.devices	= tablet_dss_devices,
 	.default_device	= &tablet_lcd_device,
 };
 
-static void tablet_hdmi_init(void)
+static struct omap_dss_board_info tablet_dss_data_hdmi_default_display = {
+	.num_devices    = ARRAY_SIZE(dss_devices_hdmi_default_display),
+	.devices        = dss_devices_hdmi_default_display,
+	.default_device = &tablet_hdmi_device,
+};
+
+static struct omapfb_platform_data tablet_fb_pdata = {
+	.mem_desc = {
+		.region_cnt = ARRAY_SIZE(omaplfb_config_tablet),
+	},
+};
+
+static void __init tablet_hdmi_init(void)
 {
 	/*
 	 * OMAP4460SDP/Blaze and OMAP4430 ES2.3 SDP/Blaze boards and
@@ -300,6 +373,21 @@ static struct i2c_board_info __initdata omap4xx_i2c_bus2_d2l_info[] = {
 	},
 };
 
+void __init tablet_android_display_setup(void)
+{
+	if (omap_android_display_is_default(&tablet_hdmi_device))
+		omap_android_display_setup(
+			&tablet_dss_data_hdmi_default_display,
+			&dsscomp_config_hdmi_display,
+			&omaplfb_plat_data_hdmi_default_display,
+			&tablet_fb_pdata);
+	else
+		omap_android_display_setup(&tablet_dss_data,
+			&dsscomp_config_tablet,
+			&omaplfb_plat_data_tablet,
+			&tablet_fb_pdata);
+}
+
 int __init tablet_display_init(void)
 {
 	omap_mux_init_signal("fref_clk4_out.fref_clk4_out",
@@ -308,8 +396,12 @@ int __init tablet_display_init(void)
 	platform_device_register(&tablet_disp_led);
 	tablet_lcd_init();
 
+	omapfb_set_platform_data(&tablet_fb_pdata);
 	omap_vram_set_sdram_vram(TABLET_FB_RAM_SIZE, 0);
-	omap_display_init(&tablet_dss_data);
+	if (omap_android_display_is_default(&tablet_hdmi_device))
+		omap_display_init(&tablet_dss_data_hdmi_default_display);
+	else
+		omap_display_init(&tablet_dss_data);
 
 	tablet_hdmi_init();
 

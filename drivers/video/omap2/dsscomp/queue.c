@@ -530,7 +530,7 @@ static int dsscomp_apply(struct dsscomp *comp)
 			 * comp - set M2M flag. It is needed to release
 			 * clocks after WB M2M mode torned off.
 			 */
-			if (!oi->cfg.enabled && wb_info.enabled &&
+			if (!oi->cfg.enabled &&
 					(int)wb_info.source == (int)mgr->id &&
 					wb_info.mode == OMAP_WB_MEM2MEM_MODE)
 				m2m_mgr_mode = true;
@@ -685,9 +685,20 @@ skip_ovl_set:
 		wb = omap_dss_get_wb(0);
 		wb->get_wb_info(wb, &wb_info);
 
-		if (wb_info.mode == OMAP_WB_MEM2MEM_MODE &&
-			wb_info.enabled)
+		if (wb_info.enabled) {
+			mutex_lock(&wb->lock);
+			wb->wb_done.sync_id = d->sync_id;
+			wb->wb_done.is_done = false;
+
+			if (wb_info.mode == OMAP_WB_MEM2MEM_MODE)
+				wb->wb_done.vsync_active = false;
+			else if (wb_info.mode == OMAP_WB_CAPTURE_MODE) {
+				wb->wb_done.vsync_active = true;
+				wb->wb_done.vsync_count = 0;
+			}
 			wb->register_framedone(wb);
+			mutex_unlock(&wb->lock);
+		}
 	}
 
 	mutex_lock(&mtx);
@@ -731,7 +742,7 @@ skip_ovl_set:
 			}
 		}
 
-		if (wb_apply && wb_info.mode == OMAP_WB_MEM2MEM_MODE) {
+		if (!r && wb_apply && wb_info.mode == OMAP_WB_MEM2MEM_MODE) {
 			r = mgr->wb_apply(mgr, cdev->wb_ovl);
 			if (r)
 				dev_err(DEV(cdev),
@@ -759,10 +770,10 @@ skip_ovl_set:
 	 * WB. In this case manager apply operation is skipped and we need to
 	 * update caches and to invoke callback functions to free the buffers.
 	 */
-	if (!m2m_mgr_mode && wb_info.mode == OMAP_WB_MEM2MEM_MODE &&
-			(int)wb_info.source == (int)mgr->id && mgr->device &&
-			mgr->device->state != OMAP_DSS_DISPLAY_ACTIVE &&
-							comp->must_apply) {
+	if (wb_info.mode == OMAP_WB_MEM2MEM_MODE &&
+		(int)wb_info.source == (int)mgr->id && mgr->device &&
+		mgr->device->state != OMAP_DSS_DISPLAY_ACTIVE &&
+		comp->must_apply && comp->blank) {
 		mgr->blank(mgr, true);
 		goto done;
 	}
