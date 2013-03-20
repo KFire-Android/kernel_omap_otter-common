@@ -2,7 +2,6 @@
  * Remote Processor Framework
  *
  * Copyright (C) 2012 Texas Instruments, Inc.
- * Copyright (C) 2012 Google, Inc.
  *
  * Shahid Akhtar <sakhtar@ti.com>
  *
@@ -59,7 +58,7 @@ static struct mutex secure_lock;
 static enum rproc_secure_state secure_state;
 static int secure_reload;
 static struct rproc_sec_params *secure_params;
-static rproc_drm_invoke_service_t rproc_secure_drm_service_alternate;
+static rproc_drm_invoke_service_t rproc_secure_drm_function;
 static int rproc_secure_drm_service(
 	enum rproc_service_enum service,
 	struct rproc_sec_params *rproc_sec_params);
@@ -336,34 +335,57 @@ EXPORT_SYMBOL(rproc_set_secure);
  * returns 0 on success
  */
 static int rproc_secure_drm_service(enum rproc_service_enum service,
-				    struct rproc_sec_params
-				    *rproc_sec_params)
+				    struct rproc_sec_params *rproc_sec_params)
 {
-	int ret = 0;
-	if (rproc_secure_drm_service_alternate)
-		ret = rproc_secure_drm_service_alternate(service,
-							 rproc_sec_params);
-	return ret;
+	if (!rproc_secure_drm_function)
+		return -ENOSYS;
+
+	return rproc_secure_drm_function(service, rproc_sec_params);
 }
 
 /**
  * rproc_register_drm_service() - called by the rproc_drm module
- * to register the service.
- * @rproc_drm_service: the rproc_drm service that is being registered
+ *				  to register the service.
+ * @drm_service: the rproc_drm service that is being registered
  *
  * remoteproc calls this rproc_drm.rproc_drm_invoke_service upon calls
  *  to rproc_drm_invoke_service
  *
  * returns 0 on success
  */
-int rproc_register_drm_service(rproc_drm_invoke_service_t
-			       rproc_drm_service)
+int rproc_register_drm_service(rproc_drm_invoke_service_t drm_service)
 {
-	if (rproc_drm_service == NULL)
-		return -ENODEV;
+	if (drm_service == NULL)
+		return -EINVAL;
 
-	rproc_secure_drm_service_alternate = rproc_drm_service ;
+	if (rproc_secure_drm_function)
+		return -EEXIST;
+
+	rproc_secure_drm_function = drm_service;
+	return 0;
+}
+EXPORT_SYMBOL(rproc_register_drm_service);
+
+/**
+ * rproc_unregister_drm_service() - called by the rproc_drm module
+ *				    to unregister the service.
+ * @drm_service: the rproc_drm service that is being registered
+ *
+ * remoteproc calls this rproc_drm.rproc_drm_invoke_service upon calls
+ *  to rproc_drm_invoke_service
+ *
+ * returns 0 on success
+ */
+int rproc_unregister_drm_service(rproc_drm_invoke_service_t drm_service)
+{
+	if (drm_service == NULL)
+		return -EINVAL;
+
+	if (drm_service != rproc_secure_drm_function)
+		return -EINVAL;
+
+	rproc_secure_drm_function = NULL;
 	return 0;
 
 }
-EXPORT_SYMBOL(rproc_register_drm_service);
+EXPORT_SYMBOL(rproc_unregister_drm_service);
