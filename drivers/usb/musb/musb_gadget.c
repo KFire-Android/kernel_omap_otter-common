@@ -421,8 +421,18 @@ static void txstate(struct musb *musb, struct musb_request *req)
 #elif defined(CONFIG_USB_TI_CPPI_DMA) || defined(CONFIG_USB_TI_CPPI41_DMA)
 		/* program endpoint CSR first, then setup DMA */
 		csr &= ~(MUSB_TXCSR_P_UNDERRUN | MUSB_TXCSR_TXPKTRDY);
-		csr |= MUSB_TXCSR_DMAENAB | MUSB_TXCSR_DMAMODE |
-		       MUSB_TXCSR_MODE;
+
+		/* use pio mode for zero byte transfer */
+		if (!request_size) {
+			csr &= ~(MUSB_TXCSR_DMAENAB | MUSB_TXCSR_TXPKTRDY);
+			musb_writew(epio, MUSB_TXCSR, csr);
+
+			csr &= ~(MUSB_TXCSR_DMAMODE);
+			use_dma = 0;
+		} else
+			csr |= MUSB_TXCSR_DMAENAB | MUSB_TXCSR_DMAMODE |
+				MUSB_TXCSR_MODE;
+
 		musb_writew(epio, MUSB_TXCSR,
 			(MUSB_TXCSR_P_WZC_BITS & ~MUSB_TXCSR_P_UNDERRUN)
 				| csr);
