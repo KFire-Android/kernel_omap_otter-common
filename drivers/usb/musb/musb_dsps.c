@@ -45,8 +45,10 @@
 #include <linux/of_address.h>
 
 #include "musb_core.h"
+#ifdef CONFIG_USB_TI_CPPI41_DMA
 #include "cppi41.h"
 #include "cppi41_dma.h"
+#endif
 
 #ifdef CONFIG_OF
 static const struct of_device_id musb_dsps_of_match[];
@@ -80,8 +82,18 @@ struct dsps_usbss_wrapper {
 	u16	irq_status;
 	u16	irq_enable_set;
 	u16	irq_enable_clr;
+	u16	irq_tx0_dma_th_enb;
+	u16	irq_rx0_dma_th_enb;
+	u16	irq_tx1_dma_th_enb;
+	u16	irq_rx1_dma_th_enb;
 	u16	irq_usb0_dma_enable;
 	u16	irq_usb1_dma_enable;
+	u16	irq_tx0_frame_th_enb;
+	u16	irq_rx0_frame_th_enb;
+	u16	irq_tx1_frame_th_enb;
+	u16	irq_rx1_frame_th_enb;
+	u16	irq_usb0_frame_enable;
+	u16	irq_usb1_frame_enable;
 };
 
 /**
@@ -100,7 +112,17 @@ struct dsps_musb_wrapper {
 	u16	coreintr_set;
 	u16	coreintr_clear;
 	u16	coreintr_status;
+#ifdef CONFIG_USB_TI_CPPI41_DMA
+	u16	tx_mode;
+	u16	rx_mode;
+	u16	g_rndis;
+	u16	auto_req;
+	u16	tear_down;
+	u16	th_xdma_idle;
+#endif
+	u16	srp_fix_time;
 	u16	phy_utmi;
+	u16	mgc_utmi_lpback;
 	u16	mode;
 
 	/* bit positions for control */
@@ -131,8 +153,49 @@ struct dsps_musb_wrapper {
 	/* number of musb instances */
 	u8		instances;
 	/* usbss wrapper register */
-	const struct dsps_usbss_wrapper usbss;
+	struct dsps_usbss_wrapper usbss;
 };
+
+#ifdef CONFIG_PM_SLEEP
+struct dsps_usbss_regs {
+	u32	sysconfig;
+
+	u32	irq_en_set;
+
+#ifdef CONFIG_USB_TI_CPPI41_DMA
+	u32	irq_dma_th_tx0[4];
+	u32	irq_dma_th_rx0[4];
+	u32	irq_dma_th_tx1[4];
+	u32	irq_dma_th_rx1[4];
+	u32	irq_dma_en[2];
+
+	u32	irq_frame_th_tx0[4];
+	u32	irq_frame_th_rx0[4];
+	u32	irq_frame_th_tx1[4];
+	u32	irq_frame_th_rx1[4];
+	u32	irq_frame_en[2];
+#endif
+};
+
+struct dsps_usb_regs {
+	u32	control;
+
+	u32	irq_en_set[2];
+
+#ifdef CONFIG_USB_TI_CPPI41_DMA
+	u32	tx_mode;
+	u32	rx_mode;
+	u32	grndis_size[15];
+	u32	auto_req;
+	u32	teardn;
+	u32	th_xdma_idle;
+#endif
+	u32	srp_fix;
+	u32	phy_utmi;
+	u32	mgc_utmi_loopback;
+	u32	mode;
+};
+#endif
 
 /**
  * DSPS glue structure.
@@ -145,6 +208,11 @@ struct dsps_glue {
 	unsigned long last_timer[2];    /* last timer data for each instance */
 	u32 __iomem *usb_ctrl[2];
 	u32 __iomem *usbss_addr;
+	u8	first;			/* ignore first call of resume */
+#ifdef CONFIG_PM
+	struct dsps_usbss_regs usbss_regs;
+	struct dsps_usb_regs usb_regs[2];
+#endif
 #ifdef CONFIG_USB_TI_CPPI41_DMA
 	struct cppi41_sched_tbl_t *dma_sched_table;
 	u32 __iomem *dma_addr;
@@ -1110,6 +1178,7 @@ static int dsps_probe(struct platform_device *pdev)
 		goto err1;
 	}
 	platform_set_drvdata(pdev, glue);
+	glue->first = 1;
 
 	/* enable the usbss clocks */
 	pm_runtime_enable(&pdev->dev);
@@ -1207,12 +1276,175 @@ static int dsps_remove(struct platform_device *pdev)
 }
 
 #ifdef CONFIG_PM_SLEEP
+static void dsps_save_context(struct dsps_glue *glue)
+{
+	struct dsps_usbss_regs *usbss = &glue->usbss_regs;
+	const struct dsps_musb_wrapper *wrp = glue->wrp;
+	u8 i, j;
+
+	/* save USBSS register */
+	usbss->irq_en_set = dsps_readl(glue->usbss_addr,
+				wrp->epintr_set);
+
+#ifdef CONFIG_USB_TI_CPPI41_DMA
+	for (i = 0 ; i < 4 ; i++) {
+		usbss->irq_dma_th_tx0[i] = dsps_readl(glue->usbss_addr,
+			wrp->usbss.irq_tx0_dma_th_enb + (4 * i));
+		usbss->irq_dma_th_rx0[i] = dsps_readl(glue->usbss_addr,
+			wrp->usbss.irq_rx0_dma_th_enb + (4 * i));
+		usbss->irq_dma_th_tx1[i] = dsps_readl(glue->usbss_addr,
+			wrp->usbss.irq_tx1_dma_th_enb + (4 * i));
+		usbss->irq_dma_th_rx1[i] = dsps_readl(glue->usbss_addr,
+			wrp->usbss.irq_rx1_dma_th_enb + (4 * i));
+
+		usbss->irq_frame_th_tx0[i] = dsps_readl(glue->usbss_addr,
+			wrp->usbss.irq_tx0_frame_th_enb + (4 * i));
+		usbss->irq_frame_th_rx0[i] = dsps_readl(glue->usbss_addr,
+			wrp->usbss.irq_rx0_frame_th_enb + (4 * i));
+		usbss->irq_frame_th_tx1[i] = dsps_readl(glue->usbss_addr,
+			wrp->usbss.irq_tx1_frame_th_enb + (4 * i));
+		usbss->irq_frame_th_rx1[i] = dsps_readl(glue->usbss_addr,
+			wrp->usbss.irq_rx1_frame_th_enb + (4 * i));
+	}
+	for (i = 0 ; i < 2 ; i++) {
+		usbss->irq_dma_en[i] = dsps_readl(glue->usbss_addr,
+				wrp->usbss.irq_usb0_dma_enable + (4 * i));
+		usbss->irq_frame_en[i] = dsps_readl(glue->usbss_addr,
+				wrp->usbss.irq_usb0_frame_enable + (4 * i));
+	}
+#endif
+	/* save usbX register */
+	for (i = 0 ; i < wrp->instances ; i++) {
+		struct dsps_usb_regs *usb = &glue->usb_regs[i];
+		const struct dsps_musb_wrapper *wrp = glue->wrp;
+		struct musb *musb = platform_get_drvdata(glue->musb[i]);
+		void __iomem *cbase = musb->ctrl_base;
+
+		musb_save_context(musb);
+		usb->control = musb_readl(cbase, wrp->control);
+
+		for (j = 0 ; j < 2 ; j++)
+			usb->irq_en_set[j] = musb_readl(cbase,
+						wrp->epintr_set + (4 * j));
+#ifdef CONFIG_USB_TI_CPPI41_DMA
+		usb->tx_mode = musb_readl(cbase, wrp->tx_mode);
+		usb->rx_mode = musb_readl(cbase, wrp->rx_mode);
+
+		for (j = 0 ; j < 15 ; j++)
+			usb->grndis_size[j] = musb_readl(cbase,
+						wrp->g_rndis + (j << 2));
+
+		usb->auto_req = musb_readl(cbase, wrp->auto_req);
+		usb->teardn = musb_readl(cbase, wrp->tear_down);
+		usb->th_xdma_idle = musb_readl(cbase, wrp->th_xdma_idle);
+#endif
+		usb->srp_fix = musb_readl(cbase, wrp->srp_fix_time);
+		usb->phy_utmi = musb_readl(cbase, wrp->phy_utmi);
+		usb->mgc_utmi_loopback = musb_readl(cbase,
+						wrp->mgc_utmi_lpback);
+		usb->mode = musb_readl(cbase, wrp->mode);
+	}
+	/* save CPPI4.1 DMA register */
+#ifdef CONFIG_USB_TI_CPPI41_DMA
+	/* save CPPI4.1 DMA register for dma block 0 */
+	cppi41_save_context(0);
+#endif
+}
+
+static void dsps_restore_context(struct dsps_glue *glue)
+{
+	struct dsps_usbss_regs *usbss = &glue->usbss_regs;
+	const struct dsps_musb_wrapper *wrp = glue->wrp;
+#ifdef CONFIG_USB_TI_CPPI41_DMA
+	void __iomem *usbss_addr = glue->usbss_addr;
+	struct dsps_usbss_wrapper *usbsswrp = &glue->wrp->usbss;
+#endif
+	u8 i, j;
+
+	/* restore USBSS register */
+	dsps_writel(glue->usbss_addr, wrp->epintr_set,
+			usbss->irq_en_set);
+
+#ifdef CONFIG_USB_TI_CPPI41_DMA
+	for (i = 0 ; i < 4 ; i++) {
+
+		dsps_writel(usbss_addr, usbsswrp->irq_tx0_dma_th_enb + (4 * i),
+				usbss->irq_dma_th_tx0[i]);
+		dsps_writel(usbss_addr, usbsswrp->irq_rx0_dma_th_enb + (4 * i),
+				usbss->irq_dma_th_rx0[i]);
+		dsps_writel(usbss_addr, usbsswrp->irq_tx1_dma_th_enb + (4 * i),
+				usbss->irq_dma_th_tx1[i]);
+		dsps_writel(usbss_addr, usbsswrp->irq_rx1_dma_th_enb + (4 * i),
+				usbss->irq_dma_th_rx1[i]);
+
+		dsps_writel(usbss_addr, usbsswrp->irq_tx0_frame_th_enb + (4 * i)
+					, usbss->irq_frame_th_tx0[i]);
+		dsps_writel(usbss_addr, usbsswrp->irq_rx0_frame_th_enb + (4 * i)
+					, usbss->irq_frame_th_rx0[i]);
+		dsps_writel(usbss_addr, usbsswrp->irq_tx1_frame_th_enb + (4 * i)
+					, usbss->irq_frame_th_tx1[i]);
+		dsps_writel(usbss_addr, usbsswrp->irq_rx1_frame_th_enb + (4 * i)
+					, usbss->irq_frame_th_rx1[i]);
+	}
+	for (i = 0 ; i < 2 ; i++) {
+		dsps_writel(usbss_addr, usbsswrp->irq_usb0_dma_enable + (4 * i),
+				usbss->irq_dma_en[i]);
+		dsps_writel(usbss_addr,
+			usbsswrp->irq_usb0_frame_enable + (4 * i),
+			usbss->irq_frame_en[i]);
+	}
+#endif
+	/* restore usbX register */
+	for (i = 0 ; i < 2 ; i++) {
+		struct dsps_usb_regs *usb = &glue->usb_regs[i];
+		const struct dsps_musb_wrapper *wrp = glue->wrp;
+		struct musb *musb = platform_get_drvdata(glue->musb[i]);
+		void __iomem *cbase = musb->ctrl_base;
+
+		musb_restore_context(musb);
+		musb_writel(cbase, wrp->control, usb->control);
+
+		for (j = 0 ; j < 2 ; j++)
+			musb_writel(cbase, wrp->epintr_set + (4 * j),
+					usb->irq_en_set[j]);
+
+#ifdef CONFIG_USB_TI_CPPI41_DMA
+		musb_writel(cbase, wrp->tx_mode, usb->tx_mode);
+		musb_writel(cbase, wrp->rx_mode, usb->rx_mode);
+
+		for (j = 0 ; j < 15 ; j++)
+			musb_writel(cbase, wrp->g_rndis + (j << 2),
+					usb->grndis_size[j]);
+
+		musb_writel(cbase, wrp->auto_req, usb->auto_req);
+		musb_writel(cbase, wrp->tear_down, usb->teardn);
+		musb_writel(cbase, wrp->th_xdma_idle, usb->th_xdma_idle);
+#endif
+		musb_writel(cbase, wrp->srp_fix_time, usb->srp_fix);
+		musb_writel(cbase, wrp->phy_utmi, usb->phy_utmi);
+		musb_writel(cbase, wrp->mgc_utmi_lpback,
+				usb->mgc_utmi_loopback);
+		musb_writel(cbase, wrp->mode, usb->mode);
+	}
+	/* restore CPPI4.1 DMA register */
+#ifdef CONFIG_USB_TI_CPPI41_DMA
+	/* save CPPI4.1 DMA register for dma block 0 */
+	cppi41_restore_context(0);
+
+	/* controller needs 200ms delay to resume */
+	msleep(200);
+#endif
+}
+
 static int dsps_suspend(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev->parent);
 	struct dsps_glue *glue = platform_get_drvdata(pdev);
 	const struct dsps_musb_wrapper *wrp = glue->wrp;
 	int i;
+
+	/* save wrappers and cppi4.1 dma register */
+	dsps_save_context(glue);
 
 	for (i = 0; i < wrp->instances; i++)
 		musb_dsps_phy_control(glue, i, 0);
@@ -1227,8 +1459,20 @@ static int dsps_resume(struct device *dev)
 	const struct dsps_musb_wrapper *wrp = glue->wrp;
 	int i;
 
+	/*
+	 * ignore first call of resume as all registers are not yet
+	 * initialized
+	 */
+	if (glue->first) {
+		glue->first = 0;
+		return 0;
+	}
+
 	for (i = 0; i < wrp->instances; i++)
 		musb_dsps_phy_control(glue, i, 1);
+
+	/* restore wrappers and cppi4.1 dma register */
+	dsps_restore_context(glue);
 
 	return 0;
 }
@@ -1247,7 +1491,17 @@ static const struct dsps_musb_wrapper ti81xx_driver_data = {
 	.coreintr_set		= 0x3c,
 	.coreintr_clear		= 0x44,
 	.coreintr_status	= 0x34,
+#ifdef CONFIG_USB_TI_CPPI41_DMA
+	.tx_mode		= 0x70,
+	.rx_mode		= 0x74,
+	.g_rndis		= 0x80,
+	.auto_req		= 0xd0,
+	.tear_down		= 0xd8,
+	.th_xdma_idle		= 0xdc,
+#endif
+	.srp_fix_time		= 0xd4,
 	.phy_utmi		= 0xe0,
+	.mgc_utmi_lpback	= 0xe4,
 	.mode			= 0xe8,
 	.reset			= 0,
 	.otg_disable		= 21,
@@ -1273,8 +1527,18 @@ static const struct dsps_musb_wrapper ti81xx_driver_data = {
 		.irq_status	= 0x28,
 		.irq_enable_set = 0x2c,
 		.irq_enable_clr = 0x30,
+		.irq_tx0_dma_th_enb = 0x100,
+		.irq_tx0_dma_th_enb = 0x110,
+		.irq_tx1_dma_th_enb = 0x120,
+		.irq_tx1_dma_th_enb = 0x130,
 		.irq_usb0_dma_enable = 0x140,
 		.irq_usb1_dma_enable = 0x144,
+		.irq_tx0_frame_th_enb = 0x200,
+		.irq_tx0_frame_th_enb = 0x210,
+		.irq_tx1_frame_th_enb = 0x220,
+		.irq_tx1_frame_th_enb = 0x230,
+		.irq_usb0_frame_enable = 0x240,
+		.irq_usb1_frame_enable = 0x244,
 	}
 };
 

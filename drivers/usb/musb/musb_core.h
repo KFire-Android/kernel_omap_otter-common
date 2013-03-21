@@ -531,6 +531,8 @@ extern void musb_load_testpacket(struct musb *);
 extern irqreturn_t musb_interrupt(struct musb *);
 
 extern void musb_hnp_stop(struct musb *musb);
+extern void musb_save_context(struct musb *musb);
+extern void musb_restore_context(struct musb *musb);
 
 static inline void musb_platform_set_vbus(struct musb *musb, int is_on)
 {
