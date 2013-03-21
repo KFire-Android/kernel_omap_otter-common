@@ -59,6 +59,7 @@
 #include "omap4_ion.h"
 #include <linux/leds-omap4430sdp-display.h>
 #include <linux/omap4_duty_cycle_governor.h>
+#include <plat/rpmsg_resmgr.h>
 
 #include "mux.h"
 #include "hsmmc.h"
@@ -1429,6 +1430,12 @@ static void set_osc_timings(void)
 	omap_pm_setup_oscillator(4000, 1);
 }
 
+static struct omap_rprm_regulator omap4_sdp4430_rprm_regulators[] = {
+	{
+		.name = "cam2pwr",
+	},
+};
+
 static void __init omap_4430sdp_init(void)
 {
 	int status;
@@ -1508,6 +1515,8 @@ static void __init omap_4430sdp_init(void)
 	if (cpu_is_omap446x())
 		platform_device_register(&thermistor);
 
+	omap_rprm_regulator_init(omap4_sdp4430_rprm_regulators,
+				ARRAY_SIZE(omap4_sdp4430_rprm_regulators));
 }
 
 static void __init omap_4430sdp_reserve(void)
