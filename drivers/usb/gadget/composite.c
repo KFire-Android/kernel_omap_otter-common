@@ -761,7 +761,7 @@ done:
 }
 EXPORT_SYMBOL_GPL(usb_add_config);
 
-static void remove_config(struct usb_composite_dev *cdev,
+static void unbind_config(struct usb_composite_dev *cdev,
 			      struct usb_configuration *config)
 {
 	while (!list_empty(&config->functions)) {
@@ -776,7 +776,6 @@ static void remove_config(struct usb_composite_dev *cdev,
 			/* may free memory for "f" */
 		}
 	}
-	list_del(&config->list);
 	if (config->unbind) {
 		DBG(cdev, "unbind config '%s'/%p\n", config->label, config);
 		config->unbind(config);
@@ -803,9 +802,11 @@ void usb_remove_config(struct usb_composite_dev *cdev,
 	if (cdev->config == config)
 		reset_config(cdev);
 
+	list_del(&config->list);
+
 	spin_unlock_irqrestore(&cdev->lock, flags);
 
-	remove_config(cdev, config);
+	unbind_config(cdev, config);
 }
 
 /*-------------------------------------------------------------------------*/
@@ -1346,7 +1347,8 @@ composite_unbind(struct usb_gadget *gadget)
 		struct usb_configuration	*c;
 		c = list_first_entry(&cdev->configs,
 				struct usb_configuration, list);
-		remove_config(cdev, c);
+		list_del(&c->list);
+		unbind_config(cdev, c);
 	}
 	if (cdev->driver->unbind)
 		cdev->driver->unbind(cdev);

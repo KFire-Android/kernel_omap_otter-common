@@ -346,7 +346,15 @@ found:
 			driver->unbind(udc->gadget);
 			goto err1;
 		}
-		usb_gadget_connect(udc->gadget);
+		/*
+		 * HACK: The Android gadget driver disconnects the gadget
+		 * on bind and expects the gadget to stay disconnected until
+		 * it calls usb_gadget_connect when userspace is ready. Remove
+		 * the call to usb_gadget_connect bellow to avoid enabling the
+		 * pullup before userspace is ready.
+		 *
+		 * usb_gadget_connect(udc->gadget);
+		 */
 	} else {
 
 		ret = usb_gadget_start(udc->gadget, driver, driver->bind);
