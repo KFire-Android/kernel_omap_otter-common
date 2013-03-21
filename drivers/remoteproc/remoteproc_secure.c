@@ -47,7 +47,7 @@ enum rproc_secure_state {
 static DECLARE_COMPLETION(secure_reload_complete);
 static DEFINE_MUTEX(secure_lock);
 static enum rproc_secure_state secure_state;
-static int secure_reload;
+static int secure_request;
 static struct rproc_sec_params *secure_params;
 static rproc_drm_invoke_service_t rproc_secure_drm_function;
 static int rproc_secure_drm_service(
@@ -70,7 +70,7 @@ void rproc_secure_init(struct rproc *rproc)
 {
 	dev_dbg(&rproc->dev, "init secure service\n");
 
-	secure_reload = 0;
+	secure_request = 0;
 	secure_params = NULL;
 	secure_state = RPROC_SECURE_OFF;
 }
@@ -83,7 +83,18 @@ void rproc_secure_init(struct rproc *rproc)
  */
 void rproc_secure_reset(struct rproc *rproc)
 {
+	int ret;
+
 	dev_dbg(&rproc->dev, "reseting secure service\n");
+
+	if (!secure_request && secure_state) {
+		/* invoke service to exit secure mode */
+		ret = rproc_secure_drm_service(EXIT_SECURE_PLAYBACK,
+								secure_params);
+		if (ret)
+			dev_err(&rproc->dev,
+				"error disabling secure mode 0x%x\n", ret);
+	}
 
 	rproc_secure_drm_service(AUTHENTICATION_A0, NULL);
 }
@@ -128,7 +139,6 @@ int rproc_secure_boot(struct rproc *rproc, const struct firmware *fw)
 	enum rproc_secure_state state = secure_state;
 
 	/* enter secure authentication process */
-	mutex_lock(&secure_lock);
 
 	/* parse fw image to location of required data sections */
 	for (i = 0; i < ehdr->e_shnum; i++, shdr++) {
@@ -211,28 +221,41 @@ int rproc_secure_boot(struct rproc *rproc, const struct firmware *fw)
 	secure_params->decoded_buffer_address = (dma_addr_t) 0xB5200000;
 	secure_params->decoded_buffer_size = (uint32_t) 0x5100000;
 
-	/* TODO: consolidate the back to back authentication calls */
-	/* validate boot section */
-	ret = rproc_secure_drm_service(AUTHENTICATION_A1, secure_params);
-	if (ret) {
-		dev_err(dev, "error failed to validate boot code\n");
-		goto out;
-	}
+	if (secure_request) {
+		/* TODO: consolidate the back to back authentication calls */
+		/* validate boot section */
+		ret = rproc_secure_drm_service(AUTHENTICATION_A1,
+							secure_params);
+		if (ret) {
+			dev_err(dev, "failed to validate boot code 0x%x\n",
+									ret);
+			goto out;
+		}
 
-	/* validate all code */
-	ret = rproc_secure_drm_service(AUTHENTICATION_A2, secure_params);
-	if (ret) {
-		dev_err(dev, "error failed to validate code\n");
-		secure_state = RPROC_SECURE_OFF;
+		/* validate all code */
+		ret = rproc_secure_drm_service(AUTHENTICATION_A2,
+							secure_params);
+		if (ret) {
+			dev_err(dev, "failed to authenticate code 0x%x\n", ret);
+			goto out;
+		}
+
+		/* invoke secure service for secure mode */
+		ret = rproc_secure_drm_service(
+				ENTER_SECURE_PLAYBACK_AFTER_AUTHENTICATION,
+				secure_params);
+		if (ret)
+			dev_err(dev, "failed to install firewalls 0x%x\n", ret);
+		else
+			secure_state = RPROC_SECURE_ON;
 	} else {
-		secure_state = RPROC_SECURE_AUTHENTICATED;
+		secure_state = RPROC_SECURE_OFF;
 	}
 
 out:
 	if (state == RPROC_SECURE_RELOAD)
 		complete_all(&secure_reload_complete);
 
-	mutex_unlock(&secure_lock);
 	return ret;
 }
 
@@ -255,43 +278,24 @@ int rproc_set_secure(const char *name, bool enable)
 	if (!secure_params)
 		return -ENODEV;
 
-	if (enable) { /* entering secure mode */
-		/* enter secure mode, reload once if fails */
-		ret = rproc_secure_drm_service(
-				ENTER_SECURE_PLAYBACK_AFTER_AUTHENTICATION,
-				secure_params);
+	mutex_lock(&secure_lock);
 
-		/* TODO: Reload only if return value is non-zero */
+	/* trigger a reload in secure mode */
+	secure_state = RPROC_SECURE_RELOAD;
+	secure_request = enable;
+	init_completion(&secure_reload_complete);
+	ret = rproc_reload(name);
+	if (ret)
+		goto out;
+	wait_for_completion(&secure_reload_complete);
 
-		/* reload code to authenticate */
-		secure_state = RPROC_SECURE_RELOAD;
-		init_completion(&secure_reload_complete);
-		ret = rproc_reload(name);
-		if (ret)
-			goto out;
-		wait_for_completion(&secure_reload_complete);
+	if (enable && secure_state != RPROC_SECURE_ON)
+		ret = -EACCES;
+	else if (!enable && secure_state != RPROC_SECURE_OFF)
+		ret = -EACCES;
 
-		/* authentication failed after reload */
-		if (secure_state != RPROC_SECURE_AUTHENTICATED) {
-			ret = -ENODEV; /* authentication failed */
-			pr_err("%s: failed authentication after reload\n",
-				__func__);
-			goto out;
-		}
-
-		/* invoke secure service for secure mode */
-		ret = rproc_secure_drm_service(
-			ENTER_SECURE_PLAYBACK_AFTER_AUTHENTICATION,
-			secure_params);
-	} else { /* disable secure mode */
-		/* invoke service to exit secure mode */
-		ret = rproc_secure_drm_service(EXIT_SECURE_PLAYBACK,
-			secure_params);
-		if (ret)
-			pr_err("%s: error disabling secure mode %d\n",
-				__func__, ret);
-	}
 out:
+	mutex_unlock(&secure_lock);
 	return ret;
 }
 EXPORT_SYMBOL(rproc_set_secure);
