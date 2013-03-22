@@ -322,7 +322,9 @@ __acquires(musb->lock)
 static inline void musb_save_toggle(struct musb_qh *qh, int is_in,
 				    struct urb *urb)
 {
+	struct musb		*musb = qh->hw_ep->musb;
 	void __iomem		*epio = qh->hw_ep->regs;
+	u8			curr_toggle;
 	u16			csr;
 
 	/*
@@ -330,9 +332,24 @@ static inline void musb_save_toggle(struct musb_qh *qh, int is_in,
 	 * problems getting toggle correct.
 	 */
 
-	if (is_in)
+	if (is_in) {
 		csr = musb_readw(epio, MUSB_RXCSR) & MUSB_RXCSR_H_DATATOGGLE;
-	else
+		curr_toggle = csr ? 1 : 0;
+
+		/* check if data toggle has gone out of sync */
+		if (is_cppi41_enabled() && qh->hw_ep->rx_channel &&
+			curr_toggle == qh->hw_ep->prev_toggle) {
+			dev_dbg(musb->controller,
+				"Data toggle same as previous (=%d) on ep%d\n",
+					curr_toggle, qh->hw_ep->epnum);
+
+			csr = musb_readw(epio, MUSB_RXCSR);
+			csr |= MUSB_RXCSR_H_DATATOGGLE |
+					MUSB_RXCSR_H_WR_DATATOGGLE;
+			musb_writew(epio, MUSB_RXCSR, csr);
+			csr = 1;
+		}
+	} else
 		csr = musb_readw(epio, MUSB_TXCSR) & MUSB_TXCSR_H_DATATOGGLE;
 
 	usb_settoggle(urb->dev, qh->epnum, !is_in, csr ? 1 : 0);
@@ -891,6 +908,13 @@ finish:
 			/* AUTOREQ is in a DMA register */
 			musb_writew(hw_ep->regs, MUSB_RXCSR, csr);
 			csr = musb_readw(hw_ep->regs, MUSB_RXCSR);
+
+			/*
+			 * Save the data toggle value which can be compared
+			 * later to see if data toggle goes out of sync
+			 */
+			hw_ep->prev_toggle = (csr &
+				MUSB_RXCSR_H_DATATOGGLE) ? 1 : 0;
 
 			/*
 			 * Unless caller treats short RX transfers as

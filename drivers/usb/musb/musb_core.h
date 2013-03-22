@@ -263,6 +263,9 @@ struct musb_hw_ep {
 	/* peripheral side */
 	struct musb_ep		ep_in;			/* TX */
 	struct musb_ep		ep_out;			/* RX */
+
+	/* save rx toggle */
+	u8			prev_toggle;
 };
 
 static inline struct musb_request *next_in_request(struct musb_hw_ep *hw_ep)
