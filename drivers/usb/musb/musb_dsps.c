@@ -686,9 +686,17 @@ static irqreturn_t cppi41dma_interrupt(int irq, void *hci)
  * XXX: This function will be removed once we have a seperate driver for
  * control module
  */
-static void musb_dsps_phy_control(struct dsps_glue *glue, u8 id, u8 on)
+static void musb_dsps_phy_control(struct dsps_glue *glue, u8 id, u8 on,
+		bool wake_up)
 {
 	u32 usbphycfg;
+	u32 wkup_val, wkup_flag;
+	void __iomem *wkup_ctrl;
+
+#define	USB0_PHY_WKUP_OFFS		28
+#define	USB1_PHY_WKUP_OFFS		20
+#define	DSPS_USB0_WKUP_CTRL_ENABLE	(1 << 0)
+#define	DSPS_USB1_WKUP_CTRL_ENABLE	(1 << 8)
 
 	usbphycfg = readl(glue->usb_ctrl[id]);
 
@@ -698,8 +706,20 @@ static void musb_dsps_phy_control(struct dsps_glue *glue, u8 id, u8 on)
 	} else {
 		usbphycfg |= USBPHY_CM_PWRDN | USBPHY_OTG_PWRDN;
 	}
-
 	writel(usbphycfg, glue->usb_ctrl[id]);
+
+	wkup_ctrl = glue->usb_ctrl[id] + (id ? USB1_PHY_WKUP_OFFS :
+			USB0_PHY_WKUP_OFFS);
+	wkup_val = readl(wkup_ctrl);
+
+	wkup_flag = id ? DSPS_USB1_WKUP_CTRL_ENABLE :
+			DSPS_USB0_WKUP_CTRL_ENABLE;
+	if (wake_up)
+		wkup_val |= wkup_flag;
+	else
+		wkup_val &= ~wkup_flag;
+
+	writel(wkup_val, wkup_ctrl);
 }
 /**
  * dsps_musb_enable - enable interrupts
@@ -968,7 +988,7 @@ static int dsps_musb_init(struct musb *musb)
 	dsps_writel(reg_base, wrp->control, (1 << wrp->reset));
 
 	/* Start the on-chip PHY and its PLL. */
-	musb_dsps_phy_control(glue, pdev->id, 1);
+	musb_dsps_phy_control(glue, pdev->id, 1, 0);
 
 	musb->isr = dsps_interrupt;
 
@@ -996,7 +1016,7 @@ static int dsps_musb_exit(struct musb *musb)
 	del_timer_sync(&glue->timer[pdev->id]);
 
 	/* Shutdown the on-chip PHY and its PLL. */
-	musb_dsps_phy_control(glue, pdev->id, 0);
+	musb_dsps_phy_control(glue, pdev->id, 0, 0);
 
 	/* NOP driver needs change if supporting dual instance */
 	usb_put_phy(musb->xceiv);
@@ -1471,13 +1491,15 @@ static int dsps_suspend(struct device *dev)
 	struct platform_device *pdev = to_platform_device(dev->parent);
 	struct dsps_glue *glue = platform_get_drvdata(pdev);
 	const struct dsps_musb_wrapper *wrp = glue->wrp;
-	int i;
+	int i, is_wkup;
 
 	/* save wrappers and cppi4.1 dma register */
 	dsps_save_context(glue);
 
-	for (i = 0; i < wrp->instances; i++)
-		musb_dsps_phy_control(glue, i, 0);
+	for (i = 0; i < wrp->instances; i++) {
+		is_wkup = device_may_wakeup(&glue->musb[i]->dev) ? true : false;
+		musb_dsps_phy_control(glue, i, 0, is_wkup);
+	}
 
 	return 0;
 }
@@ -1499,7 +1521,7 @@ static int dsps_resume(struct device *dev)
 	}
 
 	for (i = 0; i < wrp->instances; i++)
-		musb_dsps_phy_control(glue, i, 1);
+		musb_dsps_phy_control(glue, i, 1, false);
 
 	/* restore wrappers and cppi4.1 dma register */
 	dsps_restore_context(glue);
