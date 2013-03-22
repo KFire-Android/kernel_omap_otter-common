@@ -53,6 +53,12 @@
  */
 #define OMAP5_DPLL_ABE_DEFFREQ				98304000
 
+/*
+ * OMAP543x TRM, section "3.6.3.9.5 DPLL_USB Preferred Settings"
+ * states it must be at 960MHz
+ */
+#define OMAP5_DPLL_USB_DEFFREQ				960000000
+
 /* Root clocks */
 
 DEFINE_CLK_FIXED_RATE(pad_clks_src_ck, CLK_IS_ROOT, 12000000, 0x0);
@@ -1477,6 +1483,19 @@ int __init omap5xxx_clk_init(void)
 	}
 
 	omap2_clk_disable_autoidle_all();
+
+	/*
+	 * Lock USB_DPLL to avoid issues with USB host and OFF mode
+	 */
+	rc = clk_set_rate(&dpll_usb_ck, OMAP5_DPLL_USB_DEFFREQ);
+	if (rc) {
+		pr_err("%s: failed to configure DPLL_USB: %d\n", __func__, rc);
+	} else {
+		rc = clk_set_rate(&dpll_usb_m2_ck, OMAP5_DPLL_USB_DEFFREQ/2);
+		if (rc)
+			pr_err("%s: failed to configure DPLL_USB_M2: %d\n",
+			       __func__, rc);
+	}
 
 	/*
 	 * The bootloaders does not lock the ABE dpll by default.
