@@ -1995,11 +1995,20 @@ static const char *enable_init_clks[] = {
 	"ocp_wp_noc_ick",
 };
 
+static struct rate_init_clks rate_clks[] = {
+	{ .name = "dpll_abe_ck", .rate = OMAP4_DPLL_ABE_DEFFREQ },
+	{ .name = "dpll_usb_ck", .rate = OMAP4_DPLL_USB_DEFFREQ },
+	{ .name = "dpll_usb_m2_ck", .rate = OMAP4_DPLL_USB_DEFFREQ/2 },
+};
+
+static struct reparent_init_clks reparent_clks[] = {
+	{ .name = "abe_dpll_refclk_mux_ck", .parent = "sys_32k_ck" },
+};
+
 int __init omap4xxx_clk_init(void)
 {
 	u32 cpu_clkflg;
 	struct omap_clk *c;
-	int rc;
 
 	if (cpu_is_omap443x()) {
 		cpu_mask = RATE_IN_4430;
@@ -2025,33 +2034,10 @@ int __init omap4xxx_clk_init(void)
 
 	omap2_clk_disable_autoidle_all();
 
+	omap2_clk_reparent_init_clocks(reparent_clks, ARRAY_SIZE(reparent_clks));
+	omap2_clk_rate_init_clocks(rate_clks, ARRAY_SIZE(rate_clks));
 	omap2_clk_enable_init_clocks(enable_init_clks,
 				     ARRAY_SIZE(enable_init_clks));
-
-	/*
-	 * Lock USB_DPLL to avoid issues with USB host and OFF mode
-	 */
-	rc = clk_set_rate(&dpll_usb_ck, OMAP4_DPLL_USB_DEFFREQ);
-	if (rc) {
-		pr_err("%s: failed to configure DPLL_USB: %d\n", __func__, rc);
-	} else {
-		rc = clk_set_rate(&dpll_usb_m2_ck, OMAP4_DPLL_USB_DEFFREQ/2);
-		if (rc)
-			pr_err("%s: failed to configure DPLL_USB_M2: %d\n",
-								__func__, rc);
-	}
-
-	/*
-	 * On OMAP4460 the ABE DPLL fails to turn on if in idle low-power
-	 * state when turning the ABE clock domain. Workaround this by
-	 * locking the ABE DPLL on boot.
-	 * Lock the ABE DPLL in any case to avoid issues with audio.
-	 */
-	rc = clk_set_parent(&abe_dpll_refclk_mux_ck, &sys_32k_ck);
-	if (!rc)
-		rc = clk_set_rate(&dpll_abe_ck, OMAP4_DPLL_ABE_DEFFREQ);
-	if (rc)
-		pr_err("%s: failed to configure ABE DPLL!\n", __func__);
 
 	return 0;
 }

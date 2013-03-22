@@ -959,6 +959,27 @@ static const char *enable_init_clks[] = {
 	"l4ls_gclk",
 };
 
+static struct reparent_init_clks reparent_clks[] = {
+	/* TRM ERRATA: Timer 3 & 6 default parent (TCLKIN) may not be always
+	 *    physically present, in such a case HWMOD enabling of
+	 *    clock would be failure with default parent. And timer
+	 *    probe thinks clock is already enabled, this leads to
+	 *    crash upon accessing timer 3 & 6 registers in probe.
+	 *    Fix by setting parent of both these timers to master
+	 *    oscillator clock.
+	 */
+	{ .name = "timer3_fck", .parent = "sys_clkin_ck" },
+	{ .name = "timer6_fck", .parent = "sys_clkin_ck" },
+	/*
+	 * The On-Chip 32K RC Osc clock is not an accurate clock-source as per
+	 * the design/spec, so as a result, for example, timer which supposed
+	 * to get expired @60Sec, but will expire somewhere ~@40Sec, which is
+	 * not expected by any use-case, so change WDT1 clock source to PRCM
+	 * 32KHz clock.
+	 */
+	{ .name = "wdt1_fck", .parent = "clkdiv32k_ick" },
+};
+
 int __init am33xx_clk_init(void)
 {
 	struct omap_clk *c;
@@ -978,29 +999,10 @@ int __init am33xx_clk_init(void)
 	}
 
 	omap2_clk_disable_autoidle_all();
-
+	omap2_clk_reparent_init_clocks(reparent_clks, ARRAY_SIZE(reparent_clks));
 	omap2_clk_enable_init_clocks(enable_init_clks,
 				     ARRAY_SIZE(enable_init_clks));
 
-	/* TRM ERRATA: Timer 3 & 6 default parent (TCLKIN) may not be always
-	 *    physically present, in such a case HWMOD enabling of
-	 *    clock would be failure with default parent. And timer
-	 *    probe thinks clock is already enabled, this leads to
-	 *    crash upon accessing timer 3 & 6 registers in probe.
-	 *    Fix by setting parent of both these timers to master
-	 *    oscillator clock.
-	 */
-
-	clk_set_parent(&timer3_fck, &sys_clkin_ck);
-	clk_set_parent(&timer6_fck, &sys_clkin_ck);
-	/*
-	 * The On-Chip 32K RC Osc clock is not an accurate clock-source as per
-	 * the design/spec, so as a result, for example, timer which supposed
-	 * to get expired @60Sec, but will expire somewhere ~@40Sec, which is
-	 * not expected by any use-case, so change WDT1 clock source to PRCM
-	 * 32KHz clock.
-	 */
-	clk_set_parent(&wdt1_fck, &clkdiv32k_ick);
 
 	return 0;
 }
