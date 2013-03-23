@@ -70,6 +70,9 @@ void rproc_secure_init(struct rproc *rproc)
 {
 	dev_dbg(&rproc->dev, "init secure service\n");
 
+	if (strcmp(rproc->name, "ipu_c0"))
+		return;
+
 	secure_request = 0;
 	secure_params = NULL;
 	secure_state = RPROC_SECURE_OFF;
@@ -86,6 +89,9 @@ void rproc_secure_reset(struct rproc *rproc)
 	int ret;
 
 	dev_dbg(&rproc->dev, "reseting secure service\n");
+
+	if (strcmp(rproc->name, "ipu_c0"))
+		return;
 
 	if (!secure_request && secure_state) {
 		/* invoke service to exit secure mode */
@@ -137,6 +143,9 @@ int rproc_secure_boot(struct rproc *rproc, const struct firmware *fw)
 		(struct elf32_shdr *) (fw->data + ehdr->e_shoff);
 	const char *name_sect = fw->data + shdr[ehdr->e_shstrndx].sh_offset;
 	enum rproc_secure_state state = secure_state;
+
+	if (strcmp(rproc->name, "ipu_c0"))
+		return 0;
 
 	/* enter secure authentication process */
 
@@ -274,6 +283,9 @@ out:
 int rproc_set_secure(const char *name, bool enable)
 {
 	int ret = 0;
+
+	if (strcmp(name, "ipu_c0"))
+		return -EINVAL;
 
 	if (!secure_params)
 		return -ENODEV;
