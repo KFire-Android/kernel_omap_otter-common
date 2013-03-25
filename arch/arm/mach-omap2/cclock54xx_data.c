@@ -45,6 +45,14 @@
 #define OMAP54XX_MODULEMODE_HWCTRL		0
 #define OMAP54XX_MODULEMODE_SWCTRL		1
 
+/*
+ * OMAP5 ABE DPLL default frequency. In OMAP5430 ES2.0 TRM version R, section
+ * "3.6.3.2.3 CKGEN_ABE Clock Generator" states that the "DPLL_ABE_X2_CLK
+ * must be set to 196.608 MHz" and hence, the DPLL locked frequency is
+ * half of this value.
+ */
+#define OMAP5_DPLL_ABE_DEFFREQ				98304000
+
 /* Root clocks */
 
 DEFINE_CLK_FIXED_RATE(pad_clks_src_ck, CLK_IS_ROOT, 12000000, 0x0);
@@ -1445,6 +1453,7 @@ int __init omap5xxx_clk_init(void)
 {
 	u32 cpu_clkflg;
 	struct omap_clk *c;
+	int rc;
 
 	if (soc_is_omap54xx()) {
 		cpu_mask = RATE_IN_54XX;
@@ -1468,6 +1477,18 @@ int __init omap5xxx_clk_init(void)
 	}
 
 	omap2_clk_disable_autoidle_all();
+
+	/*
+	 * The bootloaders does not lock the ABE dpll by default.
+	 * This results in all sorts of problem for pheripherals
+	 * clocked from ABE dpll. Workaround this by
+	 * locking it on boot.
+	 */
+	rc = clk_set_parent(&abe_dpll_clk_mux, &sys_32k_ck);
+	if (!rc)
+		rc = clk_set_rate(&dpll_abe_ck, OMAP5_DPLL_ABE_DEFFREQ);
+	if (rc)
+		pr_err("%s: failed to configure ABE DPLL!\n", __func__);
 
 	return 0;
 }
