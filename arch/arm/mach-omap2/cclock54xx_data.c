@@ -1127,11 +1127,46 @@ DEFINE_CLK_MUX(timer9_gfclk_mux, abe_dpll_bypass_clk_mux_parents, NULL, 0x0,
 	       OMAP54XX_CLKSEL_WIDTH, 0x0, NULL);
 
 /* SCRM aux clk nodes */
+static const char *dpll_core_m3x2_opt_ck_parents[] = {
+	"dpll_core_m3x2_ck",
+};
+
+static struct clk dpll_core_m3x2_opt_ck;
+
+static struct clk_hw_omap dpll_core_m3x2_opt_ck_hw = {
+	.hw = {
+		.clk = &dpll_core_m3x2_opt_ck,
+	},
+	.clkdm_name	= "wkupaon_clkdm",
+	.enable_reg	= OMAP54XX_CM_WKUPAON_SCRM_CLKCTRL,
+	.enable_bit	= OMAP54XX_OPTFCLKEN_SCRM_CORE_SHIFT,
+};
+
+DEFINE_STRUCT_CLK(dpll_core_m3x2_opt_ck, dpll_core_m3x2_opt_ck_parents,
+		  dss_sys_clk_ops);
+
+static const char *dpll_per_m3x2_opt_ck_parents[] = {
+	"dpll_per_m3x2_ck",
+};
+
+static struct clk dpll_per_m3x2_opt_ck;
+
+static struct clk_hw_omap dpll_per_m3x2_opt_ck_hw = {
+	.hw = {
+		.clk = &dpll_per_m3x2_opt_ck,
+	},
+	.clkdm_name	= "wkupaon_clkdm",
+	.enable_reg	= OMAP54XX_CM_WKUPAON_SCRM_CLKCTRL,
+	.enable_bit	= OMAP54XX_OPTFCLKEN_SCRM_PER_SHIFT,
+};
+
+DEFINE_STRUCT_CLK(dpll_per_m3x2_opt_ck, dpll_per_m3x2_opt_ck_parents,
+		  dss_sys_clk_ops);
 
 static const struct clksel auxclk_src_sel[] = {
 	{ .parent = &sys_clkin, .rates = div_1_0_rates },
-	{ .parent = &dpll_core_m3x2_ck, .rates = div_1_1_rates },
-	{ .parent = &dpll_per_m3x2_ck, .rates = div_1_2_rates },
+	{ .parent = &dpll_core_m3x2_opt_ck, .rates = div_1_1_rates },
+	{ .parent = &dpll_per_m3x2_opt_ck, .rates = div_1_2_rates },
 	{ .parent = NULL },
 };
 
@@ -1250,6 +1285,7 @@ static struct omap_clk omap54xx_clks[] = {
 	CLK(NULL,	"dpll_core_h24x2_ck",		&dpll_core_h24x2_ck,	CK_54XX),
 	CLK(NULL,	"dpll_core_m2_ck",		&dpll_core_m2_ck,	CK_54XX),
 	CLK(NULL,	"dpll_core_m3x2_ck",		&dpll_core_m3x2_ck,	CK_54XX),
+	CLK(NULL,	"dpll_core_m3x2_opt_ck",	&dpll_core_m3x2_opt_ck,	CK_54XX),
 	CLK(NULL,	"iva_dpll_hs_clk_div",		&iva_dpll_hs_clk_div,	CK_54XX),
 	CLK(NULL,	"dpll_iva_ck",			&dpll_iva_ck,	CK_54XX),
 	CLK(NULL,	"dpll_iva_x2_ck",		&dpll_iva_x2_ck,	CK_54XX),
@@ -1266,7 +1302,7 @@ static struct omap_clk omap54xx_clks[] = {
 	CLK(NULL,	"dpll_per_h14x2_ck",		&dpll_per_h14x2_ck,	CK_54XX),
 	CLK(NULL,	"dpll_per_m2_ck",		&dpll_per_m2_ck,	CK_54XX),
 	CLK(NULL,	"dpll_per_m2x2_ck",		&dpll_per_m2x2_ck,	CK_54XX),
-	CLK(NULL,	"dpll_per_m3x2_ck",		&dpll_per_m3x2_ck,	CK_54XX),
+	CLK(NULL,	"dpll_per_m3x2_opt_ck",		&dpll_per_m3x2_opt_ck,	CK_54XX),
 	CLK(NULL,	"dpll_unipro1_ck",		&dpll_unipro1_ck,	CK_54XX),
 	CLK(NULL,	"dpll_unipro1_clkdcoldo",	&dpll_unipro1_clkdcoldo,	CK_54XX),
 	CLK(NULL,	"dpll_unipro1_m2_ck",		&dpll_unipro1_m2_ck,	CK_54XX),
