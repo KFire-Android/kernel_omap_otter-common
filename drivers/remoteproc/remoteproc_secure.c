@@ -218,8 +218,8 @@ int rproc_secure_boot(struct rproc *rproc, const struct firmware *fw)
 	}
 
 	/* TODO: Hardcoded NEED to be acquired from ION */
-	secure_params->decoded_buffer_address = (dma_addr_t) 0xB5200000;
-	secure_params->decoded_buffer_size = (uint32_t) 0x5100000;
+	secure_params->decoded_buffer_address = (dma_addr_t) 0xB4300000;
+	secure_params->decoded_buffer_size = (uint32_t) 0x6000000;
 
 	if (secure_request) {
 		/* TODO: consolidate the back to back authentication calls */
