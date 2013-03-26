@@ -341,6 +341,11 @@ struct musb {
 	struct list_head	in_bulk;	/* of musb_qh */
 	struct list_head	out_bulk;	/* of musb_qh */
 
+	struct workqueue_struct *gb_queue;
+	struct work_struct      gb_work;
+	spinlock_t              gb_lock;
+	struct list_head        gb_list;        /* of urbs */
+
 	struct timer_list	otg_timer;
 	u8			en_otg_timer;
 	struct notifier_block	nb;
@@ -542,6 +547,7 @@ extern irqreturn_t musb_interrupt(struct musb *);
 extern void musb_hnp_stop(struct musb *musb);
 extern void musb_save_context(struct musb *musb);
 extern void musb_restore_context(struct musb *musb);
+extern void musb_gb_work(struct work_struct *data);
 
 static inline void musb_platform_set_vbus(struct musb *musb, int is_on)
 {

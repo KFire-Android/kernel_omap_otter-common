@@ -1791,6 +1791,7 @@ static struct musb *allocate_instance(struct device *dev,
 	INIT_LIST_HEAD(&musb->control);
 	INIT_LIST_HEAD(&musb->in_bulk);
 	INIT_LIST_HEAD(&musb->out_bulk);
+	INIT_LIST_HEAD(&musb->gb_list);
 
 	hcd->uses_new_polling = 1;
 	hcd->has_tt = 1;
@@ -1836,6 +1837,9 @@ static void musb_free(struct musb *musb)
 
 		(void) c->stop(c);
 		dma_controller_destroy(c);
+
+		if (musb->gb_queue)
+			destroy_workqueue(musb->gb_queue);
 	}
 
 	usb_put_hcd(musb_to_hcd(musb));
@@ -1878,6 +1882,7 @@ musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl)
 	pm_runtime_enable(musb->controller);
 
 	spin_lock_init(&musb->lock);
+	spin_lock_init(&musb->gb_lock);
 	musb->board_set_power = plat->set_power;
 	musb->min_power = plat->min_power;
 	musb->ops = plat->platform_ops;
@@ -1994,7 +1999,16 @@ musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl)
 
 	pm_runtime_put(musb->controller);
 
+	musb->gb_queue = create_singlethread_workqueue(dev_name(dev));
+	if (musb->gb_queue == NULL)
+		goto fail6;
+	/* Init giveback workqueue */
+	INIT_WORK(&musb->gb_work, musb_gb_work);
+
 	return 0;
+
+fail6:
+	destroy_workqueue(musb->gb_queue);
 
 fail5:
 	musb_exit_debugfs(musb);
