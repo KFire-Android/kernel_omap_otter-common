@@ -467,6 +467,7 @@ static int cppi41_init(struct dsps_glue *glue)
 		cppi_info->rx_dma_mode = USB_TRANSPARENT_MODE;
 		cppi_info->rx_inf_mode = 0;
 		cppi_info->sched_tbl_ctrl = 0;
+		cppi_info->tx_isoc_sched_enab = 1;
 
 		cppi_info->wrp.autoreq_reg = DSPS_USB_AUTOREQ_REG;
 		cppi_info->wrp.teardown_reg = DSPS_USB_TEARDOWN_REG;
@@ -1079,9 +1080,11 @@ static struct musb_platform_ops dsps_ops = {
 	.disable	= dsps_musb_disable,
 
 	.try_idle	= dsps_musb_try_idle,
-
 	.enable_sof	= dsps_enable_sof,
 	.disable_sof	= dsps_disable_sof,
+#ifdef CONFIG_USB_TI_CPPI41_DMA
+	.sof_handler	= cppi41_isoc_schedular,
+#endif
 };
 
 static u64 musb_dmamask = DMA_BIT_MASK(32);

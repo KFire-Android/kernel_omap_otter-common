@@ -101,6 +101,7 @@ struct usb_cppi41_info {
 	u8 bd_intr_enb;
 	u8 rx_dma_mode;
 	u8 rx_inf_mode;
+	u8 tx_isoc_sched_enab;
 	u8 sched_tbl_ctrl;
 	u32 version;
 	struct cppi41_wrapper_regs wrp;
@@ -115,4 +116,5 @@ extern struct usb_cppi41_info usb_cppi41_info[];
  * @tx:	bitmask having bit N set if Tx completion queue N is not empty
  */
 void cppi41_completion(struct musb *musb, u32 rx, u32 tx);
+int cppi41_isoc_schedular(struct musb *musb);
 #endif	/* _CPPI41_DMA_H_ */

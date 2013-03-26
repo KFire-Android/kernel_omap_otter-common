@@ -293,8 +293,11 @@ start:
 		if (!hw_ep->tx_channel)
 			musb_h_tx_start(hw_ep);
 		else if (is_cppi_enabled() || is_cppi41_enabled()
-				|| tusb_dma_omap())
-			musb_h_tx_dma_start(hw_ep);
+				|| tusb_dma_omap()) {
+			if (!musb->tx_isoc_sched_enable ||
+				qh->type != USB_ENDPOINT_XFER_ISOC)
+				musb_h_tx_dma_start(hw_ep);
+		}
 	}
 }
 
@@ -453,7 +456,8 @@ static u16 musb_h_flush_rxfifo(struct musb_hw_ep *hw_ep, u16 csr)
 	 * ignore dma (various models),
 	 * leave toggle alone (may not have been saved yet)
 	 */
-	csr |= MUSB_RXCSR_FLUSHFIFO | MUSB_RXCSR_RXPKTRDY;
+	if (csr & MUSB_RXCSR_RXPKTRDY)
+		csr |= MUSB_RXCSR_FLUSHFIFO | MUSB_RXCSR_RXPKTRDY;
 	csr &= ~(MUSB_RXCSR_H_REQPKT
 		| MUSB_RXCSR_H_AUTOREQ
 		| MUSB_RXCSR_AUTOCLEAR);
@@ -1447,8 +1451,11 @@ done:
 		if (musb_tx_dma_program(musb->dma_controller, hw_ep, qh, urb,
 				offset, length)) {
 			if (is_cppi_enabled() || is_cppi41_enabled()
-				|| tusb_dma_omap())
-				musb_h_tx_dma_start(hw_ep);
+				|| tusb_dma_omap()) {
+				if (!musb->tx_isoc_sched_enable ||
+					qh->type != USB_ENDPOINT_XFER_ISOC)
+					musb_h_tx_dma_start(hw_ep);
+			}
 			return;
 		}
 	} else	if (tx_csr & MUSB_TXCSR_DMAENAB) {

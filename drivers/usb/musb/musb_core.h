@@ -450,6 +450,7 @@ struct musb {
 	struct dentry		*debugfs_root;
 #endif
 	u32			sof_enabled;
+	u8			tx_isoc_sched_enable;
 };
 
 static inline struct musb *gadget_to_musb(struct usb_gadget *g)
