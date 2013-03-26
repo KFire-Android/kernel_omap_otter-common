@@ -333,6 +333,7 @@ static int rproc_enable_iommu(struct rproc *rproc)
 	struct iommu_domain *domain;
 	struct device *dev = rproc->dev.parent;
 	int ret;
+	int iommu_sdata[2] = {0, 0};
 
 	/*
 	 * We currently use iommu_present() to decide if an IOMMU
@@ -357,6 +358,14 @@ static int rproc_enable_iommu(struct rproc *rproc)
 	}
 
 	iommu_set_fault_handler(domain, rproc_iommu_fault, rproc);
+	iommu_sdata[0] = rproc_secure_get_mode(rproc);
+	iommu_sdata[1] = rproc_secure_get_ttb(rproc);
+	ret = iommu_domain_add_iommudata(domain, iommu_sdata,
+						sizeof(iommu_sdata));
+	if (ret) {
+		dev_err(dev, "can't add iommu secure data: %d\n", ret);
+		goto free_domain;
+	}
 
 	ret = iommu_attach_device(domain, dev);
 	if (ret) {
@@ -391,6 +400,10 @@ static int rproc_program_iommu(struct rproc *rproc)
 {
 	struct rproc_mem_entry *entry;
 	int ret = 0;
+	int smode = rproc_secure_get_mode(rproc);
+
+	if (smode)
+		return 0;
 
 	list_for_each_entry(entry, &rproc->mappings, node) {
 		/*
