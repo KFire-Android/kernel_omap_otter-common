@@ -937,7 +937,7 @@ static struct omap_iommu *omap_iommu_attach(const char *name, u32 *iopgd)
 	int err = -ENOMEM;
 	struct device *dev;
 	struct omap_iommu *obj;
-	int pm_constraint;
+	int pm_constraint = 0;
 
 	dev = driver_find_device(&omap_iommu_driver.driver, NULL,
 				(void *)name,
