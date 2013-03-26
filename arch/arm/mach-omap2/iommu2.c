@@ -79,12 +79,18 @@ static int omap2_iommu_enable(struct omap_iommu *obj)
 	u32 l, pa;
 	struct iommu_platform_data *pdata = obj->dev->platform_data;
 
-	if (!obj->iopgd || !IS_ALIGNED((u32)obj->iopgd,  SZ_16K))
-		return -EINVAL;
+	if (!obj->secure_mode) {
+		if (!obj->iopgd || !IS_ALIGNED((u32)obj->iopgd,  SZ_16K))
+			return -EINVAL;
 
-	pa = virt_to_phys(obj->iopgd);
-	if (!IS_ALIGNED(pa, SZ_16K))
-		return -EINVAL;
+		pa = virt_to_phys(obj->iopgd);
+		if (!IS_ALIGNED(pa, SZ_16K))
+			return -EINVAL;
+	} else {
+		pa = (u32)obj->secure_ttb;
+		if (!pa || !IS_ALIGNED(pa, SZ_16K))
+			return -EINVAL;
+	}
 
 	l = iommu_read_reg(obj, MMU_REVISION);
 	dev_info(obj->dev, "%s: version %d.%d\n", obj->name,
