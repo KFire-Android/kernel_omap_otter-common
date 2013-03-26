@@ -1607,6 +1607,13 @@ static void usb_process_rx_bd(struct cppi41 *cppi,
 	ch_num = curr_pd->ch_num;
 	ep_num = curr_pd->ep_num;
 
+	/* the cppi41 dma will set received byte length as 1 when
+	 * zero length packet is received, fix this dummy byte by
+	 * setting acutal length received as zero
+	 */
+	if (curr_pd->hw_desc.pkt_info & CPPI41_ZLP)
+		length = 0;
+
 	rx_ch = &cppi->rx_cppi_ch[ch_num];
 	dev_dbg(dev, "Rx complete: dma channel(%d) ep%d len %d\n",
 		ch_num, ep_num, length);
