@@ -2,7 +2,6 @@
  * Remote Processor Framework
  *
  * Copyright (C) 2012 Texas Instruments, Inc.
- * Copyright (C) 2012 Google, Inc.
  *
  * Shahid Akhtar <sakhtar@ti.com>
  *
@@ -18,98 +17,92 @@
 
 #define pr_fmt(fmt)    "%s: " fmt, __func__
 
-#include <linux/kernel.h>
-#include <linux/module.h>
+#include <linux/types.h>
+#include <linux/export.h>
 #include <linux/device.h>
-#include <linux/slab.h>
 #include <linux/mutex.h>
-#include <linux/dma-mapping.h>
 #include <linux/firmware.h>
 #include <linux/string.h>
-#include <linux/remoteproc.h>
-#include <linux/iommu.h>
-#include <linux/klist.h>
+#include <linux/list.h>
 #include <linux/elf.h>
-#include <asm/byteorder.h>
-#include <linux/kthread.h>
-#include <linux/delay.h>
-#include <linux/vmalloc.h>
+#include <linux/remoteproc.h>
 #include <linux/rproc_drm.h>
-#include <linux/rproc_secure.h>
+
 #include "remoteproc_internal.h"
 
-static struct completion secure_reload_complete;
-static struct completion secure_complete;
-static struct work_struct secure_validate;
-static struct mutex secure_lock;
-static enum rproc_secure_st secure_state;
-static int secure_reload;
+/**
+ * enum rproc_secure_state - remote processor secure states
+ * @RPROC_SECURE_OFF:		unsecure state
+ * @RPROC_SECURE_RELOAD:	reloading before enteriing secure mode
+ * @RPROC_SECURE_AUTHENTICATED:	code authenticated & firewalled
+ * @RPROC_SECURE_ON:		secure mode
+ */
+enum rproc_secure_state {
+	RPROC_SECURE_OFF		= 0,
+	RPROC_SECURE_RELOAD		= 1,
+	RPROC_SECURE_AUTHENTICATED	= 2,
+	RPROC_SECURE_ON			= 3,
+};
+
+static DECLARE_COMPLETION(secure_reload_complete);
+static DEFINE_MUTEX(secure_lock);
+static enum rproc_secure_state secure_state;
+static int secure_request;
 static struct rproc_sec_params *secure_params;
-static rproc_drm_invoke_service_t rproc_secure_drm_service_alternate;
+static rproc_drm_invoke_service_t rproc_secure_drm_function;
 static int rproc_secure_drm_service(
 	enum rproc_service_enum service,
 	struct rproc_sec_params *rproc_sec_params);
 
 #define dev_to_rproc(dev) container_of(dev, struct rproc, dev)
 
-/**
- * rproc_secure_work() - authenticate ducati code sections
- *
- * Workqueue to authenticate all ducati code. Since the authentication
- * can take some time, we use a workqueue. If the authentication is
- * done while entering secure mode, set completion flag to notify
- * thread requesting reload
- */
-static void rproc_secure_work(struct work_struct *work)
-{
-	int ret = 0;
-	enum rproc_secure_st state = secure_state;
-
-	/* call the secure mode API to validate code */
-	ret = rproc_secure_drm_service(AUTHENTICATION_A2, secure_params);
-	if (ret)
-		pr_debug("%s: error failed to validate code\n", __func__);
-
-	if (!ret)
-		secure_state = RPROC_SECURE_AUTHENTICATED;
-	else
-		secure_state = RPROC_SECURE_OFF;
-
-	if (state == RPROC_SECURE_RELOAD)
-		complete_all(&secure_reload_complete);
-
-	mutex_unlock(&secure_lock);
-	complete_all(&secure_complete);
-	return;
-}
 
 /**
- * rproc_secure_init() - initialize secure params
+ * rproc_secure_init() - initialize rproc_secure module
+ * @rproc: remote processor
  *
+ * Initializes all the state variables and objects required
+ * by the rproc_secure module. This is needed so that rprocs
+ * can be registered & unregistered (when used as modules)
+ * without rebooting.
  */
 void rproc_secure_init(struct rproc *rproc)
 {
 	dev_dbg(&rproc->dev, "init secure service\n");
 
-	secure_reload = 0;
-	secure_state = RPROC_SECURE_OFF;
+	if (strcmp(rproc->name, "ipu_c0"))
+		return;
+
+	secure_request = 0;
 	secure_params = NULL;
-	INIT_WORK(&secure_validate, rproc_secure_work);
-	mutex_init(&secure_lock);
-	return;
+	secure_state = RPROC_SECURE_OFF;
 }
 
 /**
  * rproc_secure_reset() - reset secure service and firewalls
+ * @rproc: remote processor
  *
+ * Reset the state of the DRM service
  */
 void rproc_secure_reset(struct rproc *rproc)
 {
+	int ret;
+
 	dev_dbg(&rproc->dev, "reseting secure service\n");
 
-	rproc_secure_drm_service(AUTHENTICATION_A0, NULL);
+	if (strcmp(rproc->name, "ipu_c0"))
+		return;
 
-	return;
+	if (!secure_request && secure_state) {
+		/* invoke service to exit secure mode */
+		ret = rproc_secure_drm_service(EXIT_SECURE_PLAYBACK,
+								secure_params);
+		if (ret)
+			dev_err(&rproc->dev,
+				"error disabling secure mode 0x%x\n", ret);
+	}
+
+	rproc_secure_drm_service(AUTHENTICATION_A0, NULL);
 }
 
 /**
@@ -149,9 +142,12 @@ int rproc_secure_boot(struct rproc *rproc, const struct firmware *fw)
 	struct elf32_shdr *shdr =
 		(struct elf32_shdr *) (fw->data + ehdr->e_shoff);
 	const char *name_sect = fw->data + shdr[ehdr->e_shstrndx].sh_offset;
+	enum rproc_secure_state state = secure_state;
+
+	if (strcmp(rproc->name, "ipu_c0"))
+		return 0;
 
 	/* enter secure authentication process */
-	mutex_lock(&secure_lock);
 
 	/* parse fw image to location of required data sections */
 	for (i = 0; i < ehdr->e_shnum; i++, shdr++) {
@@ -193,7 +189,6 @@ int rproc_secure_boot(struct rproc *rproc, const struct firmware *fw)
 	list_for_each_entry(maps, &rproc->carveouts, node) {
 		if (maps->memregion == RPROC_MEMREGION_CODE) {
 			/* update location of carveout region */
-			secure_params->ducati_base_address = maps->dma;
 			secure_params->ducati_code = maps->dma;
 			secure_params->ducati_code_size = maps->len;
 
@@ -208,6 +203,7 @@ int rproc_secure_boot(struct rproc *rproc, const struct firmware *fw)
 			secure_params->ducati_data_size = maps->len;
 		}
 		if (maps->memregion == RPROC_MEMREGION_SMEM) {
+			secure_params->ducati_base_address = maps->dma;
 			secure_params->ducati_smem = maps->dma;
 			secure_params->ducati_smem_size = maps->len;
 		}
@@ -231,26 +227,44 @@ int rproc_secure_boot(struct rproc *rproc, const struct firmware *fw)
 	}
 
 	/* TODO: Hardcoded NEED to be acquired from ION */
-	secure_params->decoded_buffer_address = (dma_addr_t) 0xB5200000;
-	secure_params->decoded_buffer_size = (uint32_t) 0x5100000;
+	secure_params->decoded_buffer_address = (dma_addr_t) 0xB4300000;
+	secure_params->decoded_buffer_size = (uint32_t) 0x6000000;
 
-	/* validate boot section */
-	ret = rproc_secure_drm_service(AUTHENTICATION_A1, secure_params);
-	if (ret) {
-		dev_err(dev, "error failed to validate boot code\n");
-		goto out;
+	if (secure_request) {
+		/* TODO: consolidate the back to back authentication calls */
+		/* validate boot section */
+		ret = rproc_secure_drm_service(AUTHENTICATION_A1,
+							secure_params);
+		if (ret) {
+			dev_err(dev, "failed to validate boot code 0x%x\n",
+									ret);
+			goto out;
+		}
+
+		/* validate all code */
+		ret = rproc_secure_drm_service(AUTHENTICATION_A2,
+							secure_params);
+		if (ret) {
+			dev_err(dev, "failed to authenticate code 0x%x\n", ret);
+			goto out;
+		}
+
+		/* invoke secure service for secure mode */
+		ret = rproc_secure_drm_service(
+				ENTER_SECURE_PLAYBACK_AFTER_AUTHENTICATION,
+				secure_params);
+		if (ret)
+			dev_err(dev, "failed to install firewalls 0x%x\n", ret);
+		else
+			secure_state = RPROC_SECURE_ON;
+	} else {
+		secure_state = RPROC_SECURE_OFF;
 	}
 
-	/* validate all code */
-	init_completion(&secure_complete);
-	schedule_work(&secure_validate);
-
-	return ret;
 out:
-	if (secure_state == RPROC_SECURE_RELOAD)
+	if (state == RPROC_SECURE_RELOAD)
 		complete_all(&secure_reload_complete);
 
-	mutex_unlock(&secure_lock);
 	return ret;
 }
 
@@ -270,46 +284,30 @@ int rproc_set_secure(const char *name, bool enable)
 {
 	int ret = 0;
 
+	if (strcmp(name, "ipu_c0"))
+		return -EINVAL;
+
 	if (!secure_params)
 		return -ENODEV;
 
-	if (enable) { /* entering secure mode */
-		/* enter secure mode, reload once if fails */
-		ret = rproc_secure_drm_service(
-				ENTER_SECURE_PLAYBACK_AFTER_AUTHENTICATION,
-				secure_params);
+	mutex_lock(&secure_lock);
 
-		/* TODO: Reload only if return value is non-zero */
+	/* trigger a reload in secure mode */
+	secure_state = RPROC_SECURE_RELOAD;
+	secure_request = enable;
+	init_completion(&secure_reload_complete);
+	ret = rproc_reload(name);
+	if (ret)
+		goto out;
+	wait_for_completion(&secure_reload_complete);
 
-		/* reload code to authenticate */
-		secure_state = RPROC_SECURE_RELOAD;
-		init_completion(&secure_reload_complete);
-		ret = rproc_reload(name);
-		if (ret)
-			goto out;
-		wait_for_completion(&secure_reload_complete);
+	if (enable && secure_state != RPROC_SECURE_ON)
+		ret = -EACCES;
+	else if (!enable && secure_state != RPROC_SECURE_OFF)
+		ret = -EACCES;
 
-		/* authentication failed after reload */
-		if (secure_state != RPROC_SECURE_AUTHENTICATED) {
-			ret = -ENODEV; /* authentication failed */
-			pr_err("%s: failed authentication after reload\n",
-				__func__);
-			goto out;
-		}
-
-		/* invoke secure service for secure mode */
-		ret = rproc_secure_drm_service(
-			ENTER_SECURE_PLAYBACK_AFTER_AUTHENTICATION,
-			secure_params);
-	} else { /* disable secure mode */
-		/* invoke service to exit secure mode */
-		ret = rproc_secure_drm_service(EXIT_SECURE_PLAYBACK,
-			secure_params);
-		if (ret)
-			pr_err("%s: error disabling secure mode %d\n",
-				__func__, ret);
-	}
 out:
+	mutex_unlock(&secure_lock);
 	return ret;
 }
 EXPORT_SYMBOL(rproc_set_secure);
@@ -322,34 +320,57 @@ EXPORT_SYMBOL(rproc_set_secure);
  * returns 0 on success
  */
 static int rproc_secure_drm_service(enum rproc_service_enum service,
-				    struct rproc_sec_params
-				    *rproc_sec_params)
+				    struct rproc_sec_params *rproc_sec_params)
 {
-	int ret = 0;
-	if (rproc_secure_drm_service_alternate)
-		ret = rproc_secure_drm_service_alternate(service,
-							 rproc_sec_params);
-	return ret;
+	if (!rproc_secure_drm_function)
+		return -ENOSYS;
+
+	return rproc_secure_drm_function(service, rproc_sec_params);
 }
 
 /**
  * rproc_register_drm_service() - called by the rproc_drm module
- * to register the service.
- * @rproc_drm_service: the rproc_drm service that is being registered
+ *				  to register the service.
+ * @drm_service: the rproc_drm service that is being registered
  *
  * remoteproc calls this rproc_drm.rproc_drm_invoke_service upon calls
  *  to rproc_drm_invoke_service
  *
  * returns 0 on success
  */
-int rproc_register_drm_service(rproc_drm_invoke_service_t
-			       rproc_drm_service)
+int rproc_register_drm_service(rproc_drm_invoke_service_t drm_service)
 {
-	if (rproc_drm_service == NULL)
-		return -ENODEV;
+	if (drm_service == NULL)
+		return -EINVAL;
 
-	rproc_secure_drm_service_alternate = rproc_drm_service ;
+	if (rproc_secure_drm_function)
+		return -EEXIST;
+
+	rproc_secure_drm_function = drm_service;
+	return 0;
+}
+EXPORT_SYMBOL(rproc_register_drm_service);
+
+/**
+ * rproc_unregister_drm_service() - called by the rproc_drm module
+ *				    to unregister the service.
+ * @drm_service: the rproc_drm service that is being registered
+ *
+ * remoteproc calls this rproc_drm.rproc_drm_invoke_service upon calls
+ *  to rproc_drm_invoke_service
+ *
+ * returns 0 on success
+ */
+int rproc_unregister_drm_service(rproc_drm_invoke_service_t drm_service)
+{
+	if (drm_service == NULL)
+		return -EINVAL;
+
+	if (drm_service != rproc_secure_drm_function)
+		return -EINVAL;
+
+	rproc_secure_drm_function = NULL;
 	return 0;
 
 }
-EXPORT_SYMBOL(rproc_register_drm_service);
+EXPORT_SYMBOL(rproc_unregister_drm_service);

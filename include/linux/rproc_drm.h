@@ -2,7 +2,6 @@
  * Remote Processor Framework
  *
  * Copyright(c) 2012 Texas Instruments, Inc.
- * Copyright(c) 2012 Google, Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -124,7 +123,7 @@ enum rproc_service_enum {
 typedef int (*rproc_drm_invoke_service_t)(enum rproc_service_enum service,
 					  struct rproc_sec_params
 					  *rproc_sec_params);
-int rproc_register_drm_service(rproc_drm_invoke_service_t
-			       rproc_drm_invoke_service);
+int rproc_register_drm_service(rproc_drm_invoke_service_t drm_service);
+int rproc_unregister_drm_service(rproc_drm_invoke_service_t drm_service);
 
 #endif /* RPROC_DRM_H */

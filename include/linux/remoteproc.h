@@ -539,7 +539,6 @@ struct rproc_vdev {
 	unsigned long gfeatures;
 };
 
-int rproc_reload(const char *name);
 struct rproc *rproc_get_by_name(const char *name);
 void rproc_put(struct rproc *rproc);
 
@@ -550,6 +549,8 @@ void rproc_free(struct rproc *rproc);
 int rproc_register(struct rproc *rproc);
 int rproc_unregister(struct rproc *rproc);
 
+int rproc_reload(const char *name);
+int rproc_set_secure(const char *name, bool enable);
 int rproc_boot(struct rproc *rproc);
 void rproc_shutdown(struct rproc *rproc);
 void rproc_error_reporter(struct rproc *rproc, enum rproc_err type);
