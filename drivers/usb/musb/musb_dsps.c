@@ -907,6 +907,7 @@ static irqreturn_t dsps_interrupt(int irq, void *hci)
 	unsigned long flags;
 	irqreturn_t ret = IRQ_NONE;
 	u32 epintr, usbintr;
+	u8 is_babble;
 
 	spin_lock_irqsave(&musb->lock, flags);
 
@@ -937,9 +938,11 @@ static irqreturn_t dsps_interrupt(int irq, void *hci)
 	 * value but DEVCTL.BDEVICE is invalid without DEVCTL.SESSION set.
 	 * Also, DRVVBUS pulses for SRP (but not at 5V) ...
 	 */
-	if (is_host_active(musb) && usbintr & MUSB_INTR_BABBLE) {
+	is_babble = is_host_active(musb) && usbintr & MUSB_INTR_BABBLE;
+	if (is_babble) {
 		pr_info("CAUTION: musb: Babble Interrupt Occurred\n");
 		musb->int_usb = MUSB_INTR_DISCONNECT;
+		is_babble = 1;
 	}
 
 	if (usbintr & ((1 << wrp->drvvbus) << wrp->usb_shift)) {
@@ -990,6 +993,9 @@ static irqreturn_t dsps_interrupt(int irq, void *hci)
 	if (musb->int_tx || musb->int_rx || musb->int_usb)
 		ret |= musb_interrupt(musb);
 
+	if (is_babble)
+		schedule_work(&musb->work);
+
  eoi:
 	/* EOI needs to be written for the IRQ to be re-asserted. */
 	if (ret == IRQ_HANDLED || epintr || usbintr)
@@ -1003,6 +1009,42 @@ static irqreturn_t dsps_interrupt(int irq, void *hci)
 	spin_unlock_irqrestore(&musb->lock, flags);
 
 	return ret;
+}
+
+static int dsps_musb_restart(struct musb *musb)
+{
+	struct device *dev = musb->controller;
+	struct platform_device *pdev = to_platform_device(dev);
+	struct dsps_glue *glue = dev_get_drvdata(dev->parent);
+	const struct dsps_musb_wrapper *wrp = glue->wrp;
+	void __iomem *reg_base = musb->ctrl_base;
+
+	/* Reset the musb */
+	dsps_writel(reg_base, wrp->control, (1 << wrp->reset));
+	udelay(100);
+
+	/* Stop the on-chip PHY and its PLL. */
+	musb_dsps_phy_control(glue, pdev->id, 0, false);
+	udelay(100);
+
+	/* Start the on-chip PHY and its PLL. */
+	musb_dsps_phy_control(glue, pdev->id, 1, false);
+	udelay(100);
+
+	/* reinit the endpoint fifo address */
+	musb_restart(musb);
+
+	return 0;
+}
+
+static void dsps_musb_restart_work(struct work_struct *work)
+{
+	struct musb *musb = container_of(work, struct musb, work);
+	struct platform_device *pdev = to_platform_device(musb->controller);
+
+	dev_dbg(musb->controller, "restarting musb%d ...\n",
+			pdev->id);
+	dsps_musb_restart(musb);
 }
 
 static int dsps_musb_init(struct musb *musb)
@@ -1032,6 +1074,7 @@ static int dsps_musb_init(struct musb *musb)
 	}
 
 	setup_timer(&glue->timer[pdev->id], otg_timer, (unsigned long) musb);
+	INIT_WORK(&musb->work, dsps_musb_restart_work);
 
 	/* Reset the musb */
 	dsps_writel(reg_base, wrp->control, (1 << wrp->reset));

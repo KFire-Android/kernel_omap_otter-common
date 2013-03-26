@@ -1514,6 +1514,13 @@ static int musb_core_init(u16 musb_type, struct musb *musb)
 	return 0;
 }
 
+void musb_restart(struct musb *musb)
+{
+	ep_config_from_table(musb);
+	musb_start(musb);
+}
+EXPORT_SYMBOL_GPL(musb_restart);
+
 /*-------------------------------------------------------------------------*/
 
 /*
