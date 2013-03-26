@@ -45,6 +45,20 @@
 #define OMAP54XX_MODULEMODE_HWCTRL		0
 #define OMAP54XX_MODULEMODE_SWCTRL		1
 
+/*
+ * OMAP5 ABE DPLL default frequency. In OMAP5430 ES2.0 TRM version R, section
+ * "3.6.3.2.3 CKGEN_ABE Clock Generator" states that the "DPLL_ABE_X2_CLK
+ * must be set to 196.608 MHz" and hence, the DPLL locked frequency is
+ * half of this value.
+ */
+#define OMAP5_DPLL_ABE_DEFFREQ				98304000
+
+/*
+ * OMAP543x TRM, section "3.6.3.9.5 DPLL_USB Preferred Settings"
+ * states it must be at 960MHz
+ */
+#define OMAP5_DPLL_USB_DEFFREQ				960000000
+
 /* Root clocks */
 
 DEFINE_CLK_FIXED_RATE(pad_clks_src_ck, CLK_IS_ROOT, 12000000, 0x0);
@@ -1127,11 +1141,46 @@ DEFINE_CLK_MUX(timer9_gfclk_mux, abe_dpll_bypass_clk_mux_parents, NULL, 0x0,
 	       OMAP54XX_CLKSEL_WIDTH, 0x0, NULL);
 
 /* SCRM aux clk nodes */
+static const char *dpll_core_m3x2_opt_ck_parents[] = {
+	"dpll_core_m3x2_ck",
+};
+
+static struct clk dpll_core_m3x2_opt_ck;
+
+static struct clk_hw_omap dpll_core_m3x2_opt_ck_hw = {
+	.hw = {
+		.clk = &dpll_core_m3x2_opt_ck,
+	},
+	.clkdm_name	= "wkupaon_clkdm",
+	.enable_reg	= OMAP54XX_CM_WKUPAON_SCRM_CLKCTRL,
+	.enable_bit	= OMAP54XX_OPTFCLKEN_SCRM_CORE_SHIFT,
+};
+
+DEFINE_STRUCT_CLK(dpll_core_m3x2_opt_ck, dpll_core_m3x2_opt_ck_parents,
+		  dss_sys_clk_ops);
+
+static const char *dpll_per_m3x2_opt_ck_parents[] = {
+	"dpll_per_m3x2_ck",
+};
+
+static struct clk dpll_per_m3x2_opt_ck;
+
+static struct clk_hw_omap dpll_per_m3x2_opt_ck_hw = {
+	.hw = {
+		.clk = &dpll_per_m3x2_opt_ck,
+	},
+	.clkdm_name	= "wkupaon_clkdm",
+	.enable_reg	= OMAP54XX_CM_WKUPAON_SCRM_CLKCTRL,
+	.enable_bit	= OMAP54XX_OPTFCLKEN_SCRM_PER_SHIFT,
+};
+
+DEFINE_STRUCT_CLK(dpll_per_m3x2_opt_ck, dpll_per_m3x2_opt_ck_parents,
+		  dss_sys_clk_ops);
 
 static const struct clksel auxclk_src_sel[] = {
 	{ .parent = &sys_clkin, .rates = div_1_0_rates },
-	{ .parent = &dpll_core_m3x2_ck, .rates = div_1_1_rates },
-	{ .parent = &dpll_per_m3x2_ck, .rates = div_1_2_rates },
+	{ .parent = &dpll_core_m3x2_opt_ck, .rates = div_1_1_rates },
+	{ .parent = &dpll_per_m3x2_opt_ck, .rates = div_1_2_rates },
 	{ .parent = NULL },
 };
 
@@ -1250,6 +1299,7 @@ static struct omap_clk omap54xx_clks[] = {
 	CLK(NULL,	"dpll_core_h24x2_ck",		&dpll_core_h24x2_ck,	CK_54XX),
 	CLK(NULL,	"dpll_core_m2_ck",		&dpll_core_m2_ck,	CK_54XX),
 	CLK(NULL,	"dpll_core_m3x2_ck",		&dpll_core_m3x2_ck,	CK_54XX),
+	CLK(NULL,	"dpll_core_m3x2_opt_ck",	&dpll_core_m3x2_opt_ck,	CK_54XX),
 	CLK(NULL,	"iva_dpll_hs_clk_div",		&iva_dpll_hs_clk_div,	CK_54XX),
 	CLK(NULL,	"dpll_iva_ck",			&dpll_iva_ck,	CK_54XX),
 	CLK(NULL,	"dpll_iva_x2_ck",		&dpll_iva_x2_ck,	CK_54XX),
@@ -1266,7 +1316,7 @@ static struct omap_clk omap54xx_clks[] = {
 	CLK(NULL,	"dpll_per_h14x2_ck",		&dpll_per_h14x2_ck,	CK_54XX),
 	CLK(NULL,	"dpll_per_m2_ck",		&dpll_per_m2_ck,	CK_54XX),
 	CLK(NULL,	"dpll_per_m2x2_ck",		&dpll_per_m2x2_ck,	CK_54XX),
-	CLK(NULL,	"dpll_per_m3x2_ck",		&dpll_per_m3x2_ck,	CK_54XX),
+	CLK(NULL,	"dpll_per_m3x2_opt_ck",		&dpll_per_m3x2_opt_ck,	CK_54XX),
 	CLK(NULL,	"dpll_unipro1_ck",		&dpll_unipro1_ck,	CK_54XX),
 	CLK(NULL,	"dpll_unipro1_clkdcoldo",	&dpll_unipro1_clkdcoldo,	CK_54XX),
 	CLK(NULL,	"dpll_unipro1_m2_ck",		&dpll_unipro1_m2_ck,	CK_54XX),
@@ -1410,6 +1460,7 @@ int __init omap5xxx_clk_init(void)
 {
 	u32 cpu_clkflg;
 	struct omap_clk *c;
+	int rc;
 
 	if (soc_is_omap54xx()) {
 		cpu_mask = RATE_IN_54XX;
@@ -1433,6 +1484,31 @@ int __init omap5xxx_clk_init(void)
 	}
 
 	omap2_clk_disable_autoidle_all();
+
+	/*
+	 * Lock USB_DPLL to avoid issues with USB host and OFF mode
+	 */
+	rc = clk_set_rate(&dpll_usb_ck, OMAP5_DPLL_USB_DEFFREQ);
+	if (rc) {
+		pr_err("%s: failed to configure DPLL_USB: %d\n", __func__, rc);
+	} else {
+		rc = clk_set_rate(&dpll_usb_m2_ck, OMAP5_DPLL_USB_DEFFREQ/2);
+		if (rc)
+			pr_err("%s: failed to configure DPLL_USB_M2: %d\n",
+			       __func__, rc);
+	}
+
+	/*
+	 * The bootloaders does not lock the ABE dpll by default.
+	 * This results in all sorts of problem for pheripherals
+	 * clocked from ABE dpll. Workaround this by
+	 * locking it on boot.
+	 */
+	rc = clk_set_parent(&abe_dpll_clk_mux, &sys_32k_ck);
+	if (!rc)
+		rc = clk_set_rate(&dpll_abe_ck, OMAP5_DPLL_ABE_DEFFREQ);
+	if (rc)
+		pr_err("%s: failed to configure ABE DPLL!\n", __func__);
 
 	return 0;
 }

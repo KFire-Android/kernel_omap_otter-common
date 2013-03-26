@@ -620,7 +620,7 @@
 		};
 
 		wdt2: wdt@4ae14000 {
-			compatible = "ti,omap5-wdt", "ti,omap3-wdt";
+			compatible = "ti,omap5-wdt", "ti,omap4-wdt";
 			reg = <0x4ae14000 0x80>;
 			interrupts = <0 80 0x4>;
 			ti,hwmods = "wd_timer2";
