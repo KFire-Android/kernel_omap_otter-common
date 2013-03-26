@@ -213,6 +213,9 @@ struct musb_platform_ops {
 	int	(*adjust_channel_params)(struct dma_channel *channel,
 				u16 packet_sz, u8 *mode,
 				dma_addr_t *dma_addr, u32 *len);
+	int	(*enable_sof)(struct musb *musb);
+	int	(*disable_sof)(struct musb *musb);
+	int	(*sof_handler)(struct musb *musb);
 };
 
 /*
@@ -446,6 +449,7 @@ struct musb {
 #ifdef CONFIG_DEBUG_FS
 	struct dentry		*debugfs_root;
 #endif
+	u32			sof_enabled;
 };
 
 static inline struct musb *gadget_to_musb(struct usb_gadget *g)
@@ -595,4 +599,19 @@ static inline int musb_platform_exit(struct musb *musb)
 	return musb->ops->exit(musb);
 }
 
+static inline int musb_enable_sof(struct musb *musb)
+{
+	if (!musb->ops->enable_sof)
+		return -EINVAL;
+
+	return musb->ops->enable_sof(musb);
+}
+
+static inline int musb_disable_sof(struct musb *musb)
+{
+	if (!musb->ops->disable_sof)
+		return -EINVAL;
+
+	return musb->ops->disable_sof(musb);
+}
 #endif	/* __MUSB_CORE_H__ */

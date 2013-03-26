@@ -849,6 +849,52 @@ static void dsps_musb_try_idle(struct musb *musb, unsigned long timeout)
 	mod_timer(&glue->timer[pdev->id], timeout);
 }
 
+int dsps_enable_sof(struct musb *musb)
+{
+	struct device *dev = musb->controller;
+	struct platform_device *pdev = to_platform_device(dev->parent);
+	struct dsps_glue *glue = platform_get_drvdata(pdev);
+	const struct dsps_musb_wrapper *wrp = glue->wrp;
+	void __iomem *reg_base = musb->ctrl_base;
+
+	if (musb->sof_enabled) {
+		musb->sof_enabled++;
+		return musb->sof_enabled;
+	}
+
+	musb->sof_enabled = 1;
+	musb_writeb(musb->mregs, MUSB_INTRUSBE, MUSB_INTR_SOF |
+		musb_readb(musb->mregs, MUSB_INTRUSBE));
+	musb_writel(reg_base, wrp->coreintr_set, MUSB_INTR_SOF |
+		musb_readl(reg_base, wrp->coreintr_set));
+
+	return musb->sof_enabled;
+}
+
+int dsps_disable_sof(struct musb *musb)
+{
+	struct device *dev = musb->controller;
+	struct platform_device *pdev = to_platform_device(dev->parent);
+	struct dsps_glue *glue = platform_get_drvdata(pdev);
+	const struct dsps_musb_wrapper *wrp = glue->wrp;
+	void __iomem *reg_base = musb->ctrl_base;
+	u8 intrusb;
+
+	if (musb->sof_enabled)
+		musb->sof_enabled--;
+
+	if (musb->sof_enabled)
+		return musb->sof_enabled;
+
+	intrusb = musb_readb(musb->mregs, MUSB_INTRUSBE);
+	intrusb &= ~MUSB_INTR_SOF;
+	musb_writeb(musb->mregs, MUSB_INTRUSBE, intrusb);
+	musb_writel(reg_base, wrp->coreintr_clear, MUSB_INTR_SOF);
+	musb->sof_enabled = 0;
+
+	return 0;
+}
+
 static irqreturn_t dsps_interrupt(int irq, void *hci)
 {
 	struct musb  *musb = hci;
@@ -1033,6 +1079,9 @@ static struct musb_platform_ops dsps_ops = {
 	.disable	= dsps_musb_disable,
 
 	.try_idle	= dsps_musb_try_idle,
+
+	.enable_sof	= dsps_enable_sof,
+	.disable_sof	= dsps_disable_sof,
 };
 
 static u64 musb_dmamask = DMA_BIT_MASK(32);

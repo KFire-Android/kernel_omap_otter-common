@@ -903,6 +903,11 @@ b_host:
 		}		/* end of for loop */
 	}
 #endif
+	if (int_usb & MUSB_INTR_SOF) {
+		if (musb->ops->sof_handler)
+			musb->ops->sof_handler(musb);
+		handled = IRQ_HANDLED;
+	}
 
 	schedule_work(&musb->irq_work);
 
@@ -1022,7 +1027,6 @@ static void musb_shutdown(struct platform_device *pdev)
 	pm_runtime_put(musb->controller);
 	/* FIXME power down */
 }
-
 
 /*-------------------------------------------------------------------------*/
 
