@@ -42,6 +42,7 @@ struct iommu_domain {
 	void *priv;
 	iommu_fault_handler_t handler;
 	void *handler_token;
+	void *iommu_data;
 };
 
 #define IOMMU_CAP_CACHE_COHERENCY	0x1
@@ -87,6 +88,8 @@ extern int bus_set_iommu(struct bus_type *bus, struct iommu_ops *ops);
 extern bool iommu_present(struct bus_type *bus);
 extern struct iommu_domain *iommu_domain_alloc(struct bus_type *bus);
 extern void iommu_domain_free(struct iommu_domain *domain);
+extern int iommu_domain_add_iommudata(struct iommu_domain *domain,
+				      void *iommu_data, size_t data_size);
 extern int iommu_attach_device(struct iommu_domain *domain,
 			       struct device *dev);
 extern void iommu_detach_device(struct iommu_domain *domain,
@@ -161,6 +164,12 @@ static inline struct iommu_domain *iommu_domain_alloc(struct bus_type *bus)
 
 static inline void iommu_domain_free(struct iommu_domain *domain)
 {
+}
+
+static inline int iommu_domain_add_iommudata(struct iommu_domain *domain,
+					void *iommu_data, size_t data_size);
+{
+	return -EINVAL;
 }
 
 static inline int iommu_attach_device(struct iommu_domain *domain,
