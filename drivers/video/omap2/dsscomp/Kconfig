@@ -1,0 +1,21 @@
+menuconfig DSSCOMP
+	tristate "OMAP DSS Composition support (EXPERIMENTAL)"
+	depends on EXPERIMENTAL && OMAP2_DSS && DRM_OMAP_DMM_TILER
+	default n
+
+	help
+	  Frame composition driver using OMAP DSS2. Allows using
+	  all DSS2 resources in a unified configuration. Should not
+	  be used together with other DSS2 devices, such as V4L2
+	  or OMAPFB.
+
+config DSSCOMP_DEBUG_LOG
+	bool "Log event timestamps in debugfs"
+	default n
+	depends on DEBUG_FS && DSSCOMP
+
+	help
+	  Takes timestamp for each callback and state transition, and
+	  logs the last 128 entries (last few frames' worth) in a
+	  log buffer.  This is a separate menuconfig in case this is
+	  deemed an overhead.
