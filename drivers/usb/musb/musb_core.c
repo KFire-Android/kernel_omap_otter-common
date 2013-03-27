@@ -953,15 +953,19 @@ void musb_start(struct musb *musb)
 	devctl = musb_readb(regs, MUSB_DEVCTL);
 	devctl &= ~MUSB_DEVCTL_SESSION;
 
-	/* session started after:
-	 * (a) ID-grounded irq, host mode;
-	 * (b) vbus present/connect IRQ, peripheral mode;
-	 * (c) peripheral initiates, using SRP
-	 */
-	if ((devctl & MUSB_DEVCTL_VBUS) == MUSB_DEVCTL_VBUS)
-		musb->is_active = 1;
-	else
+	if (musb->port_mode == MUSB_PORT_MODE_HOST) {
 		devctl |= MUSB_DEVCTL_SESSION;
+	} else {
+		/* session started after:
+		 * (a) ID-grounded irq, host mode;
+		 * (b) vbus present/connect IRQ, peripheral mode;
+		 * (c) peripheral initiates, using SRP
+		 */
+		if ((devctl & MUSB_DEVCTL_VBUS) == MUSB_DEVCTL_VBUS)
+			musb->is_active = 1;
+		else
+			devctl |= MUSB_DEVCTL_SESSION;
+	}
 
 	musb_platform_enable(musb);
 	musb_writeb(regs, MUSB_DEVCTL, devctl);
@@ -1022,6 +1026,9 @@ static void musb_shutdown(struct platform_device *pdev)
 	pm_runtime_get_sync(musb->controller);
 
 	musb_gadget_cleanup(musb);
+
+	if (musb->port_mode == MUSB_PORT_MODE_HOST)
+		usb_remove_hcd(musb_to_hcd(musb));
 
 	spin_lock_irqsave(&musb->lock, flags);
 	musb_platform_disable(musb);
@@ -1893,6 +1900,7 @@ musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl)
 	musb->board_set_power = plat->set_power;
 	musb->min_power = plat->min_power;
 	musb->ops = plat->platform_ops;
+	musb->port_mode = plat->mode;
 
 	/* The musb_platform_init() call:
 	 *   - adjusts musb->mregs
@@ -1973,7 +1981,6 @@ musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl)
 	/* host side needs more setup */
 	hcd = musb_to_hcd(musb);
 	otg_set_host(musb->xceiv->otg, &hcd->self);
-	hcd->self.otg_port = 1;
 	musb->xceiv->otg->host = &hcd->self;
 	hcd->power_budget = 2 * (plat->power ? : 250);
 
@@ -1993,6 +2000,22 @@ musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl)
 
 	if (status < 0)
 		goto fail3;
+	/*
+	 * If the port is configured to 'host' mode only,
+	 * start the HCD here.
+	 */
+	if (musb->port_mode == MUSB_PORT_MODE_HOST) {
+		MUSB_HST_MODE(musb);
+		musb->xceiv->otg->default_a = 1;
+		musb->xceiv->state = OTG_STATE_A_IDLE;
+
+		status = usb_add_hcd(hcd, 0, 0);
+		if (status < 0)
+			goto fail3;
+
+		hcd->self.uses_pio_for_control = 1;
+	} else
+		hcd->self.otg_port = 1;
 
 	status = musb_init_debugfs(musb);
 	if (status < 0)
@@ -2022,6 +2045,8 @@ fail5:
 
 fail4:
 	musb_gadget_cleanup(musb);
+	if (musb->port_mode == MUSB_PORT_MODE_HOST)
+		usb_remove_hcd(hcd);
 
 fail3:
 	pm_runtime_put_sync(musb->controller);

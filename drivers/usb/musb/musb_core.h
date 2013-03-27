@@ -51,6 +51,10 @@ struct musb;
 struct musb_hw_ep;
 struct musb_ep;
 
+#define MUSB_PORT_MODE_HOST	1
+#define MUSB_PORT_MODE_DEV	2
+#define MUSB_PORT_MODE_OTG	3
+
 /* Helper defines for struct musb->hwvers */
 #define MUSB_HWVERS_MAJOR(x)	((x >> 10) & 0x1f)
 #define MUSB_HWVERS_MINOR(x)	(x & 0x3ff)
@@ -382,6 +386,7 @@ struct musb {
 	u16 epmask;
 	u8 nr_endpoints;
 
+	int			port_mode;	/* MUSB_PORT_MODE_* */
 	int			(*board_set_power)(int state);
 
 	u8			min_power;	/* vbus for periph, in mA/2 */

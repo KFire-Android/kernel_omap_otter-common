@@ -1947,6 +1947,11 @@ static int musb_gadget_start(struct usb_gadget *g,
 		goto err;
 	}
 
+	if (musb->port_mode == MUSB_PORT_MODE_HOST) {
+		retval = -EINVAL;
+		goto err;
+	}
+
 	pm_runtime_get_sync(musb->controller);
 
 	dev_dbg(musb->controller, "registering driver %s\n", driver->function);
