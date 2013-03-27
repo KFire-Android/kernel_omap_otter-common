@@ -129,3 +129,27 @@
 &mcbsp3 {
 	status = "disabled";
 };
+
+&emif1 {
+	cs1-used;
+	device-handle = <&samsung_K3PE0E000B>;
+};
+
+&emif2 {
+	cs1-used;
+	device-handle = <&samsung_K3PE0E000B>;
+};
+
+&i2c1 {
+	clock-frequency = <400000>;
+
+	palmas: palmas@48 {
+		reg = <0x48>;
+		/* SPI = 0, IRQ# = 7, 4 = active high level-sensitive */
+		interrupts = <0 7 4>; /* IRQ_SYS_1N cascaded to gic */
+		interrupt-parent = <&gic>;
+	};
+
+};
+
+/include/ "palmas.dtsi"
