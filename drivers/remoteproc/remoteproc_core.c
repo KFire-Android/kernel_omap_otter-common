@@ -1597,7 +1597,7 @@ static int rproc_fw_boot(struct rproc *rproc, const struct firmware *fw)
 	}
 
 	/* check and validate secure certificate */
-	rproc_secure_boot(rproc, fw);
+	rproc_secure_boot(rproc, fw->data);
 
 	/* power up the remote processor */
 	ret = rproc->ops->start(rproc);

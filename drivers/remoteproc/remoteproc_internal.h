@@ -20,7 +20,6 @@
 #ifndef REMOTEPROC_INTERNAL_H
 #define REMOTEPROC_INTERNAL_H
 
-#include <linux/firmware.h>
 #include <linux/irqreturn.h>
 
 struct rproc;
@@ -37,7 +36,7 @@ void rproc_remove_virtio_dev(struct rproc_vdev *rvdev);
 /* from remoteproc_secure.c */
 void rproc_secure_init(struct rproc *rproc);
 void rproc_secure_reset(struct rproc *rproc);
-int rproc_secure_boot(struct rproc *rproc, const struct firmware *fw);
+int rproc_secure_boot(struct rproc *rproc, const u8 *elf_data);
 
 /* from remoteproc_debugfs.c */
 void rproc_remove_trace_file(struct dentry *tfile);

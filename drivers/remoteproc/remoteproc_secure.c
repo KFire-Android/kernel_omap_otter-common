@@ -21,7 +21,6 @@
 #include <linux/export.h>
 #include <linux/device.h>
 #include <linux/mutex.h>
-#include <linux/firmware.h>
 #include <linux/string.h>
 #include <linux/list.h>
 #include <linux/elf.h>
@@ -108,7 +107,7 @@ void rproc_secure_reset(struct rproc *rproc)
 /**
  * rproc_secure_boot() - Secure ducati code during boot
  * @rproc: rproc handle
- * @fw:	firmware image loaded into core
+ * @elf_data: firmware elf image data loaded into core
  *
  * Parse the fw image to locate sections and location of memory
  * that is to be firewalled for secure playback. Invoke secure
@@ -130,7 +129,7 @@ void rproc_secure_reset(struct rproc *rproc)
  *
  * Returns 0 on success and if image is unsigned
  */
-int rproc_secure_boot(struct rproc *rproc, const struct firmware *fw)
+int rproc_secure_boot(struct rproc *rproc, const u8 *elf_data)
 {
 	struct device *dev = &rproc->dev;
 	int ret = 0;
@@ -138,10 +137,10 @@ int rproc_secure_boot(struct rproc *rproc, const struct firmware *fw)
 	u32  ttbr_da = 0, toc_da = 0, *ttbr = NULL, i;
 	struct rproc_iommu_ttbr_update *ttbru = NULL;
 	struct rproc_mem_entry *maps = NULL;
-	struct elf32_hdr *ehdr = (struct elf32_hdr *) fw->data;
+	struct elf32_hdr *ehdr = (struct elf32_hdr *)elf_data;
 	struct elf32_shdr *shdr =
-		(struct elf32_shdr *) (fw->data + ehdr->e_shoff);
-	const char *name_sect = fw->data + shdr[ehdr->e_shstrndx].sh_offset;
+		(struct elf32_shdr *)(elf_data + ehdr->e_shoff);
+	const char *name_sect = elf_data + shdr[ehdr->e_shstrndx].sh_offset;
 	enum rproc_secure_state state = secure_state;
 
 	if (strcmp(rproc->name, "ipu_c0"))
