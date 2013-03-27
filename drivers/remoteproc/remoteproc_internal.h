@@ -38,6 +38,8 @@ void rproc_secure_init(struct rproc *rproc);
 void rproc_secure_reset(struct rproc *rproc);
 int rproc_secure_parse_fw(struct rproc *rproc, const u8 *elf_data);
 int rproc_secure_boot(struct rproc *rproc);
+int rproc_secure_get_mode(struct rproc *rproc);
+int rproc_secure_get_ttb(struct rproc *rproc);
 
 /* from remoteproc_debugfs.c */
 void rproc_remove_trace_file(struct dentry *tfile);

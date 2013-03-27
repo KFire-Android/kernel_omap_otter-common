@@ -105,6 +105,41 @@ void rproc_secure_reset(struct rproc *rproc)
 }
 
 /**
+ * rproc_secure_get_mode() - get the current requested secure mode
+ * @rproc: remote processor
+ *
+ * This function is called by the remoteproc core driver code to
+ * retrieve the current requested mode.
+ */
+int rproc_secure_get_mode(struct rproc *rproc)
+{
+	if (strcmp(rproc->name, "ipu_c0"))
+		return 0;
+
+	return secure_request;
+}
+
+/**
+ * rproc_secure_get_ttb() - get the ttbr value
+ * @rproc: remote processor
+ *
+ * This function is called by the remoteproc core driver code to get
+ * the iommu ttbr address to program the iommu for secure mode. The
+ * ttbr address is obtained during the parsing of the firmware data
+ * image, and serves no purpose in regular mode.
+ */
+int rproc_secure_get_ttb(struct rproc *rproc)
+{
+	if (strcmp(rproc->name, "ipu_c0"))
+		return 0;
+
+	if (!secure_params)
+		return 0;
+
+	return secure_params->ducati_page_table_address;
+}
+
+/**
  * rproc_secure_parse_fw() - Parse the fw for secure sections
  * @rproc: rproc handle
  *
