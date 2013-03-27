@@ -387,6 +387,46 @@ static void rproc_disable_iommu(struct rproc *rproc)
 	return;
 }
 
+static int rproc_program_iommu(struct rproc *rproc)
+{
+	struct rproc_mem_entry *entry;
+	int ret = 0;
+
+	list_for_each_entry(entry, &rproc->mappings, node) {
+		/*
+		 * no point in handling devmem resource without
+		 * a valid iommu domain
+		 */
+		if (entry->type == RSC_DEVMEM && !rproc->domain) {
+			ret = -EINVAL;
+			goto out;
+		}
+		if (entry->type == RSC_CARVEOUT && !rproc->domain)
+			continue;
+
+		/* should never hit this, add this for sanity */
+		if (entry->mapped) {
+			WARN_ON(1);
+			continue;
+		}
+
+		/* cleanup will be taken care in rproc_resource_cleanup */
+		ret = iommu_map(rproc->domain, entry->da, entry->dma,
+						entry->len, entry->flags);
+		if (ret) {
+			dev_err(&rproc->dev, "iommu_map failed: %d\n", ret);
+			goto out;
+		}
+		entry->mapped = true;
+		dev_dbg(&rproc->dev,
+				"mapped entry pa 0x%x, da 0x%x, len 0x%x\n",
+				entry->dma, entry->da, entry->len);
+	}
+
+out:
+	return ret;
+}
+
 /*
  * Some remote processors will ask us to allocate them physically contiguous
  * memory regions (which we call "carveouts"), and map them to specific
@@ -916,7 +956,11 @@ static int rproc_handle_trace(struct rproc *rproc, struct fw_rsc_trace *rsc,
  * and might require us to configure their iommu before they can access
  * the on-chip peripherals they need.
  *
- * This resource entry is a request to map such a peripheral device.
+ * This resource entry is a request to map such a peripheral device. The
+ * entry information is stored in a mapping entry, and will be mapped
+ * into the IOMMU all at once along with all the mapping entries. This is
+ * being done to support a secure playback usecase, wherein the iommu
+ * will be configured differently.
  *
  * These devmem entries will contain the physical address of the device in
  * the 'pa' member. If a specific device address is expected, then 'da' will
@@ -934,11 +978,6 @@ static int rproc_handle_devmem(struct rproc *rproc, struct fw_rsc_devmem *rsc,
 {
 	struct rproc_mem_entry *mapping;
 	struct device *dev = &rproc->dev;
-	int ret;
-
-	/* no point in handling this resource without a valid iommu domain */
-	if (!rproc->domain)
-		return -EINVAL;
 
 	if (sizeof(*rsc) > avail) {
 		dev_err(dev, "devmem rsc is truncated\n");
@@ -951,15 +990,9 @@ static int rproc_handle_devmem(struct rproc *rproc, struct fw_rsc_devmem *rsc,
 		return -ENOMEM;
 	}
 
-	ret = iommu_map(rproc->domain, rsc->da, rsc->pa, rsc->len, rsc->flags);
-	if (ret) {
-		dev_err(dev, "failed to map devmem: %d\n", ret);
-		goto out;
-	}
-
 	/*
-	 * We'll need this info later when we'll want to unmap everything
-	 * (e.g. on shutdown).
+	 * We'll need this info later when we'll want to map at a later time
+	 * or unmap everything (e.g. on shutdown)
 	 *
 	 * We can't trust the remote processor not to change the resource
 	 * table, so we must maintain this info independently.
@@ -968,16 +1001,15 @@ static int rproc_handle_devmem(struct rproc *rproc, struct fw_rsc_devmem *rsc,
 	mapping->da = rsc->da;
 	mapping->len = rsc->len;
 	mapping->memregion = rsc->memregion;
+	mapping->type = RSC_DEVMEM;
+	mapping->flags = rsc->flags;
+	mapping->mapped = false;
 	list_add_tail(&mapping->node, &rproc->mappings);
 
-	dev_dbg(dev, "mapped devmem pa 0x%x, da 0x%x, len 0x%x\n",
+	dev_dbg(dev, "processed devmem pa 0x%x, da 0x%x, len 0x%x\n",
 					rsc->pa, rsc->da, rsc->len);
 
 	return 0;
-
-out:
-	kfree(mapping);
-	return ret;
 }
 
 /**
@@ -1041,55 +1073,54 @@ static int rproc_handle_carveout(struct rproc *rproc,
 	 *
 	 * In this case, we must use the IOMMU API directly and map
 	 * the memory to the device address as expected by the remote
-	 * processor.
+	 * processor. The required information is stored in a mapping
+	 * entry, and will be mapped into the IOMMU all at once along
+	 * with the rest of the mapping entries. This is being done to
+	 * support a secure playback usecase, wherein the iommu will be
+	 * configured differently.
 	 *
 	 * Obviously such remote processor devices should not be configured
 	 * to use the iommu-based DMA API: we expect 'dma' to contain the
 	 * physical address in this case.
 	 */
-	if (rproc->domain) {
-		mapping = kzalloc(sizeof(*mapping), GFP_KERNEL);
-		if (!mapping) {
-			dev_err(dev, "kzalloc mapping failed\n");
-			ret = -ENOMEM;
-			goto dma_free;
-		}
-
-		ret = iommu_map(rproc->domain, rsc->da, dma, rsc->len,
-								rsc->flags);
-		if (ret) {
-			dev_err(dev, "iommu_map failed: %d\n", ret);
-			goto free_mapping;
-		}
-
-		/*
-		 * We'll need this info later when we'll want to unmap
-		 * everything (e.g. on shutdown).
-		 *
-		 * We can't trust the remote processor not to change the
-		 * resource table, so we must maintain this info independently.
-		 */
-		mapping->da = rsc->da;
-		mapping->len = rsc->len;
-		list_add_tail(&mapping->node, &rproc->mappings);
-
-		dev_dbg(dev, "carveout mapped 0x%x to 0x%x\n", rsc->da, dma);
-
-		/*
-		 * Some remote processors might need to know the pa
-		 * even though they are behind an IOMMU. E.g., OMAP4's
-		 * remote M3 processor needs this so it can control
-		 * on-chip hardware accelerators that are not behind
-		 * the IOMMU, and therefor must know the pa.
-		 *
-		 * Generally we don't want to expose physical addresses
-		 * if we don't have to (remote processors are generally
-		 * _not_ trusted), so we might want to do this only for
-		 * remote processor that _must_ have this (e.g. OMAP4's
-		 * dual M3 subsystem).
-		 */
-		rsc->pa = dma;
+	mapping = kzalloc(sizeof(*mapping), GFP_KERNEL);
+	if (!mapping) {
+		dev_err(dev, "kzalloc mapping failed\n");
+		ret = -ENOMEM;
+		goto dma_free;
 	}
+
+	/*
+	 * We'll need this info later when we'll want to map at a later time
+	 * or unmap everything (e.g. on shutdown).
+	 *
+	 * We can't trust the remote processor not to change the
+	 * resource table, so we must maintain this info independently.
+	 */
+	mapping->dma = dma;
+	mapping->da = rsc->da;
+	mapping->len = rsc->len;
+	mapping->type = RSC_CARVEOUT;
+	mapping->flags = rsc->flags;
+	mapping->mapped = false;
+	list_add_tail(&mapping->node, &rproc->mappings);
+
+	dev_dbg(dev, "carveout processed 0x%x to 0x%x\n", rsc->da, dma);
+
+	/*
+	 * Some remote processors might need to know the pa
+	 * even though they are behind an IOMMU. E.g., OMAP4's
+	 * remote M3 processor needs this so it can control
+	 * on-chip hardware accelerators that are not behind
+	 * the IOMMU, and therefor must know the pa.
+	 *
+	 * Generally we don't want to expose physical addresses
+	 * if we don't have to (remote processors are generally
+	 * _not_ trusted), so we might want to do this only for
+	 * remote processor that _must_ have this (e.g. OMAP4's
+	 * dual M3 subsystem).
+	 */
+	rsc->pa = dma;
 
 	carveout->va = va;
 	carveout->len = rsc->len;
@@ -1101,8 +1132,6 @@ static int rproc_handle_carveout(struct rproc *rproc,
 
 	return 0;
 
-free_mapping:
-	kfree(mapping);
 dma_free:
 	dma_free_coherent(dev->parent, rsc->len, va, dma);
 free_carv:
@@ -1454,11 +1483,14 @@ static void rproc_resource_cleanup(struct rproc *rproc)
 	list_for_each_entry_safe(entry, tmp, &rproc->mappings, node) {
 		size_t unmapped;
 
-		unmapped = iommu_unmap(rproc->domain, entry->da, entry->len);
-		if (unmapped != entry->len) {
-			/* nothing much to do besides complaining */
-			dev_err(dev, "failed to unmap %u/%zu\n", entry->len,
-								unmapped);
+		if (entry->mapped) {
+			unmapped = iommu_unmap(rproc->domain, entry->da,
+								entry->len);
+			if (unmapped != entry->len) {
+				/* nothing much to do besides complaining */
+				dev_err(dev, "failed to unmap %u/%zu\n",
+							entry->len, unmapped);
+			}
 		}
 
 		list_del(&entry->node);
@@ -1547,16 +1579,6 @@ static int rproc_fw_boot(struct rproc *rproc, const struct firmware *fw)
 	dev_info(dev, "Booting fw image %s, size %zd\n", name, fw->size);
 
 	/*
-	 * if enabling an IOMMU isn't relevant for this rproc, this is
-	 * just a nop
-	 */
-	ret = rproc_enable_iommu(rproc);
-	if (ret) {
-		dev_err(dev, "can't enable iommu: %d\n", ret);
-		return ret;
-	}
-
-	/*
 	 * The ELF entry point is the rproc's boot addr (though this is not
 	 * a configurable property of all remote processors: some will always
 	 * boot at a specific hardcoded address).
@@ -1593,6 +1615,25 @@ static int rproc_fw_boot(struct rproc *rproc, const struct firmware *fw)
 	ret = rproc_load_segments(rproc, fw->data, fw->size);
 	if (ret) {
 		dev_err(dev, "Failed to load program segments: %d\n", ret);
+		goto free_version;
+	}
+
+	/*
+	 * if enabling an IOMMU isn't relevant for this rproc, this is
+	 * just a nop. the cleanup path is a bit out of order, but that
+	 * is fine since the domain will be free and the actual disable
+	 * call will be a nop.
+	 */
+	ret = rproc_enable_iommu(rproc);
+	if (ret) {
+		dev_err(dev, "can't enable iommu: %d\n", ret);
+		goto free_version;
+	}
+
+	/* map the different remoteproc memory regions into the iommu */
+	ret = rproc_program_iommu(rproc);
+	if (ret) {
+		dev_err(dev, "can't program iommu: %d\n", ret);
 		goto free_version;
 	}
 

@@ -339,6 +339,9 @@ struct fw_rsc_custom {
  * @len: length, in bytes
  * @da: device address
  * @memregion: type of memory
+ * @type: memory entry resource type
+ * @flags: iommu flags
+ * @mapped: iommu mapped state
  * @priv: associated data
  * @node: list node
  */
@@ -348,6 +351,9 @@ struct rproc_mem_entry {
 	int len;
 	u32 da;
 	u32 memregion;
+	u32 type;
+	u32 flags;
+	bool mapped;
 	void *priv;
 	struct list_head node;
 };
