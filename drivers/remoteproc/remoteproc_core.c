@@ -1618,6 +1618,13 @@ static int rproc_fw_boot(struct rproc *rproc, const struct firmware *fw)
 		goto free_version;
 	}
 
+	/* parse the secure sections */
+	ret = rproc_secure_parse_fw(rproc, fw->data);
+	if (ret) {
+		dev_err(dev, "Failed to parse secure sections: %d\n", ret);
+		goto free_version;
+	}
+
 	/*
 	 * if enabling an IOMMU isn't relevant for this rproc, this is
 	 * just a nop. the cleanup path is a bit out of order, but that
@@ -1638,7 +1645,7 @@ static int rproc_fw_boot(struct rproc *rproc, const struct firmware *fw)
 	}
 
 	/* check and validate secure certificate */
-	rproc_secure_boot(rproc, fw->data);
+	rproc_secure_boot(rproc);
 
 	/* power up the remote processor */
 	ret = rproc->ops->start(rproc);
