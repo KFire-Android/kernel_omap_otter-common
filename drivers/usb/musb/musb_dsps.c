@@ -209,6 +209,7 @@ struct dsps_glue {
 	u32 __iomem *usb_ctrl[2];
 	u32 __iomem *usbss_addr;
 	u8	first;			/* ignore first call of resume */
+	u8	timer_enab[2];
 #ifdef CONFIG_PM
 	struct dsps_usbss_regs usbss_regs;
 	struct dsps_usb_regs usb_regs[2];
@@ -1318,7 +1319,21 @@ static void dsps_save_context(struct dsps_glue *glue)
 		struct dsps_usb_regs *usb = &glue->usb_regs[i];
 		const struct dsps_musb_wrapper *wrp = glue->wrp;
 		struct musb *musb = platform_get_drvdata(glue->musb[i]);
+		struct device *dev = musb->controller;
+		struct platform_device *pdev = to_platform_device(dev);
 		void __iomem *cbase = musb->ctrl_base;
+
+		/* disable the timers */
+		if (timer_pending(&glue->timer[pdev->id]) &&
+					is_host_active(musb)) {
+			del_timer_sync(&glue->timer[pdev->id]);
+			glue->timer_enab[pdev->id] = 1;
+		}
+
+		if (timer_pending(&musb->otg_timer)) {
+			del_timer_sync(&musb->otg_timer);
+			musb->en_otg_timer = 1;
+		}
 
 		musb_save_context(musb);
 		usb->control = musb_readl(cbase, wrp->control);
@@ -1357,7 +1372,7 @@ static void dsps_restore_context(struct dsps_glue *glue)
 	const struct dsps_musb_wrapper *wrp = glue->wrp;
 #ifdef CONFIG_USB_TI_CPPI41_DMA
 	void __iomem *usbss_addr = glue->usbss_addr;
-	struct dsps_usbss_wrapper *usbsswrp = &glue->wrp->usbss;
+	struct dsps_usbss_wrapper *usbsswrp;
 #endif
 	u8 i, j;
 
@@ -1366,6 +1381,7 @@ static void dsps_restore_context(struct dsps_glue *glue)
 			usbss->irq_en_set);
 
 #ifdef CONFIG_USB_TI_CPPI41_DMA
+	usbsswrp = (struct dsps_usbss_wrapper *)&wrp->usbss;
 	for (i = 0 ; i < 4 ; i++) {
 
 		dsps_writel(usbss_addr, usbsswrp->irq_tx0_dma_th_enb + (4 * i),
@@ -1399,6 +1415,8 @@ static void dsps_restore_context(struct dsps_glue *glue)
 		struct dsps_usb_regs *usb = &glue->usb_regs[i];
 		const struct dsps_musb_wrapper *wrp = glue->wrp;
 		struct musb *musb = platform_get_drvdata(glue->musb[i]);
+		struct device *dev = musb->controller;
+		struct platform_device *pdev = to_platform_device(dev);
 		void __iomem *cbase = musb->ctrl_base;
 
 		musb_restore_context(musb);
@@ -1425,6 +1443,18 @@ static void dsps_restore_context(struct dsps_glue *glue)
 		musb_writel(cbase, wrp->mgc_utmi_lpback,
 				usb->mgc_utmi_loopback);
 		musb_writel(cbase, wrp->mode, usb->mode);
+
+		/* reenable the timers */
+		if (glue->timer_enab[pdev->id] && is_host_active(musb)) {
+			mod_timer(&glue->timer[pdev->id],
+					jiffies + wrp->poll_seconds * HZ);
+			glue->timer_enab[pdev->id] = 0;
+		}
+		if (musb->en_otg_timer) {
+			mod_timer(&musb->otg_timer,
+					jiffies + wrp->poll_seconds * HZ);
+			musb->en_otg_timer = 0;
+		}
 	}
 	/* restore CPPI4.1 DMA register */
 #ifdef CONFIG_USB_TI_CPPI41_DMA
