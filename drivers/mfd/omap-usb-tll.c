@@ -30,6 +30,8 @@
 #include <linux/platform_data/usb-omap.h>
 #include <linux/of.h>
 
+#include "omap-usb.h"
+
 #define USBTLL_DRIVER_NAME	"usbhs_tll"
 
 /* TLL Register Set */
@@ -255,7 +257,7 @@ static int usbtll_omap_probe(struct platform_device *pdev)
 		break;
 	}
 
-	tll->ch_clk = devm_kzalloc(dev, sizeof(struct clk * [tll->nch]),
+	tll->ch_clk = devm_kzalloc(dev, sizeof(struct clk *) * tll->nch,
 						GFP_KERNEL);
 	if (!tll->ch_clk) {
 		ret = -ENOMEM;
