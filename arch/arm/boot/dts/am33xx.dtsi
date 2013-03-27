@@ -445,38 +445,6 @@
 			};
 		};
 
-		sham: sham@53100000 {
-			compatible = "ti,omap4-sham";
-			ti,hwmods = "sham";
-			#address-cells = <1>;
-			#size-cells = <0>;
-			reg = <0x53100000 0x200>;
-			interrupt-parent = <&intc>;
-			interrupts = <109>;
-			dmas = <&edma 36>;
-			dma-names = "rx";
-		};
-
-		aes: aes@53500000 {
-			compatible = "ti,omap4-aes";
-			ti,hwmods = "aes";
-			#address-cells = <1>;
-			#size-cells = <0>;
-			reg = <0x53500000 0xa0>;
-			interrupt-parent = <&intc>;
-			interrupts = <102>;
-			dmas = <&edma 6
-				&edma 5>;
-			dma-names = "tx", "rx";
-		};
-
-		ocmcram: ocmcram@40300000 {
-			compatible = "ti,am3352-ocmcram";
-			reg = <0x40300000 0x10000>;
-			ti,hwmods = "ocmcram";
-			ti,no_idle_on_suspend;
-		};
-
 		wkup_m3: wkup_m3@44d00000 {
 			compatible = "ti,am3353-wkup-m3";
 			reg = <0x44d00000 0x4000	/* M3 UMEM */

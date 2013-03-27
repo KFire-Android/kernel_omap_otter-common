@@ -251,20 +251,6 @@
 	};
 };
 
-&mmc1 {
-	status = "okay";
-	vmmc-supply = <&vmmc_reg>;
-};
-
-&sham {
-	status = "okay";
-};
-
-&aes {
-	status = "okay";
-
-};
-
 &cpsw_emac0 {
 	phy_id = <&davinci_mdio>, <0>;
 };
