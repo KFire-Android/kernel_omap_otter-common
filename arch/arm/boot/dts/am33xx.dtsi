@@ -392,8 +392,8 @@
 			multipoint = <1>;
 			num-eps = <16>;
 			ram-bits = <12>;
-			port0-mode = <3>;
-			port1-mode = <3>;
+			port0-mode = <3>;		/* 1: host only mode */
+			port1-mode = <3>;		/* 2: device & 3:otg */
 			power = <250>;
 			ti,hwmods = "usb_otg_hs";
 		};
