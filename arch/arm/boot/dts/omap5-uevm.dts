@@ -26,6 +26,45 @@
 		regulator-max-microvolt = <3000000>;
 	};
 
+	sound {
+		compatible = "ti,abe-twl6040";
+		ti,model = "PandaBoard5";
+
+		ti,jack-detection = <1>;
+		ti,mclk-freq = <19200000>;
+
+		ti,mcpdm = <&mcpdm>;
+		ti,mcbsp1 = <&mcbsp1>;
+		ti,mcbsp2 = <&mcbsp2>;
+		ti,aess = <&aess>;
+
+		ti,twl6040 = <&twl6040>;
+
+		/* Audio routing */
+		ti,audio-routing =
+			"Headset Stereophone", "HSOL",
+			"Headset Stereophone", "HSOR",
+			"Line Out", "AUXL",
+			"Line Out", "AUXR",
+			"HSMIC", "Headset Mic",
+			"Headset Mic", "Headset Mic Bias",
+			"AFML", "Line In",
+			"AFMR", "Line In",
+			"Headset Playback", "PDM_DL1",
+			"PDM_UL1", "Capture",
+			"40122000.mcbsp Playback", "BT_VX_DL",
+			"BT_VX_UL", "40122000.mcbsp Capture",
+			"40124000.mcbsp Playback", "MM_EXT_DL",
+			"MM_EXT_UL", "40124000.mcbsp Capture";
+	};
+
+	sound_hdmi {
+		compatible = "ti,omap-hdmi-tpd12s015-audio";
+		ti,model = "OMAP5HDMI";
+
+		ti,hdmi_audio = <&hdmi>;
+		ti,level_shifter = <&tpd12s015>;
+	};
 };
 
 &omap5_pmx_core {
@@ -36,10 +75,14 @@
 			&dmic_pins
 			&mcbsp1_pins
 			&mcbsp2_pins
+			&dss_hdmi_pins
+			&tpd12s015_pins
+			&tca6424a_pins
 	>;
 
 	twl6040_pins: pinmux_twl6040_pins {
 		pinctrl-single,pins = <
+			0x17e 0x6	/* mcspi1_somi.gpio5_141 OUTPUT | MODE6 */
 			0x18a 0x6	/* perslimbus2_clock.gpio5_145 OUTPUT | MODE6 */
 		>;
 	};
@@ -78,6 +121,27 @@
 			0x156 0x8	/* abemcbsp2_dx.abemcbsp2_dx OUTPUT PULLDOWN | MODE0 */
 			0x158 0x100	/* abemcbsp2_fsx.abemcbsp2_fsx INPUT | MODE0 */
 			0x15a 0x100	/* abemcbsp2_clkx.abemcbsp2_clkx INPUT | MODE0 */
+		>;
+	};
+
+	dss_hdmi_pins: pinmux_dss_hdmi_pins {
+		pinctrl-single,pins = <
+			0x0fc 0x118	/* hdmi_cec.hdmi_cec INPUT PULLUP | MODE 0 */
+			0x100 0x100	/* hdmi_scl.hdmi_scl INPUT | MODE 0 */
+			0x102 0x100	/* hdmi_sda.hdmi_sda INPUT | MODE 0 */
+		>;
+	};
+
+	tpd12s015_pins: pinmux_tpd12s015_pins {
+		pinctrl-single,pins = <
+			0x0fe 0x116	/* hdmi_hpd.gpio7_193 INPUT PULLDOWN | MODE6 */
+		>;
+	};
+
+	tca6424a_pins: pinmux_tca6424a_pins {
+		pinctrl-single,pins = <
+			0x186 0x100	/* i2c5_scl.i2c5_scl INPUT | MODE0 */
+			0x188 0x100	/* i2c5_sda.i2c5_sda INPUT | MODE0 */
 		>;
 	};
 };
@@ -126,6 +190,15 @@
 	};
 };
 
+&i2c5 {
+	tca6424a: tca6424a@22 {
+		compatible = "ti,tca6424a";
+		reg = <0x22>;
+		gpio-controller;
+		#gpio-cells = <2>;
+	};
+};
+
 &mcbsp3 {
 	status = "disabled";
 };
@@ -150,6 +223,33 @@
 		interrupt-parent = <&gic>;
 	};
 
+	twl6040: twl@4b {
+		compatible = "ti,twl6040";
+
+		interrupts = <0 119 4>; /* IRQ_SYS_2N cascaded to gic */
+		interrupt-parent = <&gic>;
+		ti,audpwron-gpio = <&gpio5 13 0>;  /* gpio line 141 */
+
+		vio-supply = <&smps7_reg>;
+		v2v1-supply = <&smps9_reg>;
+		enable-active-high;
+	};
 };
 
 /include/ "palmas.dtsi"
+/include/ "twl6040.dtsi"
+
+&hdmi {
+	tpd12s015: tpd12s015 {
+		compatible = "ti,tpd12s015";
+
+		gpios = <&tca6424a 0 0>,	/* TCA6424A P01, CT_CP_HDP */
+			<&tca6424a 1 0>,	/* TCA6424A P00, LS_OE*/
+			<&gpio7 1 0>;		/* 193, HPD */
+
+		hdmi-monitor {
+			compatible = "ti,hdmi_panel";
+		};
+
+	};
+};
