@@ -101,6 +101,30 @@ static void musb_ep_program(struct musb *musb, u8 epnum,
 			struct urb *urb, int is_out,
 			u8 *buf, u32 offset, u32 len);
 
+void push_queue(struct musb *musb, struct urb *urb)
+{
+	spin_lock(&musb->gb_lock);
+	list_add_tail(&urb->giveback_list, &musb->gb_list);
+	spin_unlock(&musb->gb_lock);
+}
+
+struct urb *pop_queue(struct musb *musb)
+{
+	struct urb *urb;
+	unsigned long flags;
+
+	spin_lock_irqsave(&musb->gb_lock, flags);
+	if (list_empty(&musb->gb_list)) {
+		spin_unlock_irqrestore(&musb->gb_lock, flags);
+		return NULL;
+	}
+	urb = list_entry(musb->gb_list.next, struct urb, giveback_list);
+	list_del(&urb->giveback_list);
+	spin_unlock_irqrestore(&musb->gb_lock, flags);
+
+	return urb;
+}
+
 /*
  * Clear TX fifo. Needed to avoid BABBLE errors.
  */
@@ -178,7 +202,7 @@ static inline void musb_h_tx_dma_start(struct musb_hw_ep *ep)
 	/* NOTE: no locks here; caller should lock and select EP */
 	txcsr = musb_readw(ep->regs, MUSB_TXCSR);
 	txcsr |= MUSB_TXCSR_DMAENAB | MUSB_TXCSR_H_WZC_BITS;
-	if (is_cppi_enabled())
+	if (is_cppi_enabled() || is_cppi41_enabled())
 		txcsr |= MUSB_TXCSR_DMAMODE;
 	musb_writew(ep->regs, MUSB_TXCSR, txcsr);
 }
@@ -292,15 +316,17 @@ start:
 
 		if (!hw_ep->tx_channel)
 			musb_h_tx_start(hw_ep);
-		else if (is_cppi_enabled() || tusb_dma_omap())
-			musb_h_tx_dma_start(hw_ep);
+		else if (is_cppi_enabled() || is_cppi41_enabled()
+				|| tusb_dma_omap()) {
+			if (!musb->tx_isoc_sched_enable ||
+				qh->type != USB_ENDPOINT_XFER_ISOC)
+				musb_h_tx_dma_start(hw_ep);
+		}
 	}
 }
 
 /* Context: caller owns controller lock, IRQs are blocked */
 static void musb_giveback(struct musb *musb, struct urb *urb, int status)
-__releases(musb->lock)
-__acquires(musb->lock)
 {
 	dev_dbg(musb->controller,
 			"complete %p %pF (%d), dev%d ep%d%s, %d/%d\n",
@@ -311,17 +337,16 @@ __acquires(musb->lock)
 			urb->actual_length, urb->transfer_buffer_length
 			);
 
-	usb_hcd_unlink_urb_from_ep(musb_to_hcd(musb), urb);
-	spin_unlock(&musb->lock);
 	usb_hcd_giveback_urb(musb_to_hcd(musb), urb, status);
-	spin_lock(&musb->lock);
 }
 
 /* For bulk/interrupt endpoints only */
 static inline void musb_save_toggle(struct musb_qh *qh, int is_in,
 				    struct urb *urb)
 {
+	struct musb		*musb = qh->hw_ep->musb;
 	void __iomem		*epio = qh->hw_ep->regs;
+	u8			curr_toggle;
 	u16			csr;
 
 	/*
@@ -329,12 +354,40 @@ static inline void musb_save_toggle(struct musb_qh *qh, int is_in,
 	 * problems getting toggle correct.
 	 */
 
-	if (is_in)
+	if (is_in) {
 		csr = musb_readw(epio, MUSB_RXCSR) & MUSB_RXCSR_H_DATATOGGLE;
-	else
+		curr_toggle = csr ? 1 : 0;
+
+		/* check if data toggle has gone out of sync */
+		if (is_cppi41_enabled() && qh->hw_ep->rx_channel &&
+			curr_toggle == qh->hw_ep->prev_toggle) {
+			dev_dbg(musb->controller,
+				"Data toggle same as previous (=%d) on ep%d\n",
+					curr_toggle, qh->hw_ep->epnum);
+
+			csr = musb_readw(epio, MUSB_RXCSR);
+			csr |= MUSB_RXCSR_H_DATATOGGLE |
+					MUSB_RXCSR_H_WR_DATATOGGLE;
+			musb_writew(epio, MUSB_RXCSR, csr);
+			csr = 1;
+		}
+	} else
 		csr = musb_readw(epio, MUSB_TXCSR) & MUSB_TXCSR_H_DATATOGGLE;
 
 	usb_settoggle(urb->dev, qh->epnum, !is_in, csr ? 1 : 0);
+}
+/* Used to complete urb giveback */
+void musb_gb_work(struct work_struct *data)
+{
+	struct musb *musb = container_of(data, struct musb, gb_work);
+	struct urb *urb;
+
+	while ((urb = pop_queue(musb)) != 0) {
+		if (urb->status == -EINPROGRESS)
+			musb_giveback(musb, urb, 0);
+		else
+			musb_giveback(musb, urb, urb->status);
+	}
 }
 
 /*
@@ -349,7 +402,6 @@ static void musb_advance_schedule(struct musb *musb, struct urb *urb,
 {
 	struct musb_qh		*qh = musb_ep_get_qh(hw_ep, is_in);
 	struct musb_hw_ep	*ep = qh->hw_ep;
-	int			ready = qh->is_ready;
 	int			status;
 
 	status = (urb->status == -EINPROGRESS) ? 0 : urb->status;
@@ -366,9 +418,7 @@ static void musb_advance_schedule(struct musb *musb, struct urb *urb,
 		break;
 	}
 
-	qh->is_ready = 0;
-	musb_giveback(musb, urb, status);
-	qh->is_ready = ready;
+	usb_hcd_unlink_urb_from_ep(musb_to_hcd(musb), urb);
 
 	/* reclaim resources (and bandwidth) ASAP; deschedule it, and
 	 * invalidate qh as soon as list_empty(&hep->urb_list)
@@ -427,6 +477,10 @@ static void musb_advance_schedule(struct musb *musb, struct urb *urb,
 		    hw_ep->epnum, is_in ? 'R' : 'T', next_urb(qh));
 		musb_start_urb(musb, is_in, qh);
 	}
+
+	/* if URB is successfully completed then giveback in workqueue */
+	push_queue(musb, urb);
+	queue_work(musb->gb_queue, &musb->gb_work);
 }
 
 static u16 musb_h_flush_rxfifo(struct musb_hw_ep *hw_ep, u16 csr)
@@ -435,7 +489,8 @@ static u16 musb_h_flush_rxfifo(struct musb_hw_ep *hw_ep, u16 csr)
 	 * ignore dma (various models),
 	 * leave toggle alone (may not have been saved yet)
 	 */
-	csr |= MUSB_RXCSR_FLUSHFIFO | MUSB_RXCSR_RXPKTRDY;
+	if (csr & MUSB_RXCSR_RXPKTRDY)
+		csr |= MUSB_RXCSR_FLUSHFIFO | MUSB_RXCSR_RXPKTRDY;
 	csr &= ~(MUSB_RXCSR_H_REQPKT
 		| MUSB_RXCSR_H_AUTOREQ
 		| MUSB_RXCSR_AUTOCLEAR);
@@ -644,7 +699,8 @@ static bool musb_tx_dma_program(struct dma_controller *dma,
 	channel->desired_mode = mode;
 	musb_writew(epio, MUSB_TXCSR, csr);
 #else
-	if (!is_cppi_enabled() && !tusb_dma_omap())
+	if (!is_cppi_enabled() && !is_cppi41_enabled()
+			&& !tusb_dma_omap())
 		return false;
 
 	channel->actual_len = 0;
@@ -664,7 +720,8 @@ static bool musb_tx_dma_program(struct dma_controller *dma,
 	 */
 	wmb();
 
-	if (!dma->channel_program(channel, pkt_size, mode,
+	if (!dma->channel_program(channel, pkt_size |
+			(qh->hb_mult << 11), mode,
 			urb->transfer_dma + offset, length)) {
 		dma->channel_release(channel);
 		hw_ep->tx_channel = NULL;
@@ -867,8 +924,8 @@ finish:
 		} else {
 			csr = musb_readw(hw_ep->regs, MUSB_RXCSR);
 
-			if (csr & (MUSB_RXCSR_RXPKTRDY
-					| MUSB_RXCSR_DMAENAB
+			if (csr & (MUSB_RXCSR_RXPKTRDY |
+				(is_cppi41_enabled() ? 0 : MUSB_RXCSR_DMAENAB)
 					| MUSB_RXCSR_H_REQPKT))
 				ERR("broken !rx_reinit, ep%d csr %04x\n",
 						hw_ep->epnum, csr);
@@ -879,7 +936,8 @@ finish:
 
 		/* kick things off */
 
-		if ((is_cppi_enabled() || tusb_dma_omap()) && dma_channel) {
+		if ((is_cppi_enabled() || is_cppi41_enabled()
+			|| tusb_dma_omap()) && dma_channel) {
 			/* Candidate for DMA */
 			dma_channel->actual_len = 0L;
 			qh->segsize = len;
@@ -889,12 +947,20 @@ finish:
 			csr = musb_readw(hw_ep->regs, MUSB_RXCSR);
 
 			/*
+			 * Save the data toggle value which can be compared
+			 * later to see if data toggle goes out of sync
+			 */
+			hw_ep->prev_toggle = (csr &
+				MUSB_RXCSR_H_DATATOGGLE) ? 1 : 0;
+
+			/*
 			 * Unless caller treats short RX transfers as
 			 * errors, we dare not queue multiple transfers.
 			 */
 			dma_ok = dma_controller->channel_program(dma_channel,
-					packet_sz, !(urb->transfer_flags &
-						     URB_SHORT_NOT_OK),
+					packet_sz | (qh->hb_mult << 11),
+					!(urb->transfer_flags &
+						URB_SHORT_NOT_OK),
 					urb->transfer_dma + offset,
 					qh->segsize);
 			if (!dma_ok) {
@@ -1417,8 +1483,12 @@ done:
 	} else if ((usb_pipeisoc(pipe) || transfer_pending) && dma) {
 		if (musb_tx_dma_program(musb->dma_controller, hw_ep, qh, urb,
 				offset, length)) {
-			if (is_cppi_enabled() || tusb_dma_omap())
-				musb_h_tx_dma_start(hw_ep);
+			if (is_cppi_enabled() || is_cppi41_enabled()
+				|| tusb_dma_omap()) {
+				if (!musb->tx_isoc_sched_enable ||
+					qh->type != USB_ENDPOINT_XFER_ISOC)
+					musb_h_tx_dma_start(hw_ep);
+			}
 			return;
 		}
 	} else	if (tx_csr & MUSB_TXCSR_DMAENAB) {
@@ -1669,9 +1739,13 @@ void musb_host_rx(struct musb *musb, u8 epnum)
 			| MUSB_RXCSR_H_AUTOREQ
 			| MUSB_RXCSR_AUTOCLEAR
 			| MUSB_RXCSR_RXPKTRDY);
+
+		if (is_cppi41_enabled() && usb_pipeisoc(pipe))
+			val |= MUSB_RXCSR_DMAENAB;
+
 		musb_writew(hw_ep->regs, MUSB_RXCSR, val);
 
-#ifdef CONFIG_USB_INVENTRA_DMA
+#if defined(CONFIG_USB_INVENTRA_DMA) || defined(CONFIG_USB_TI_CPPI41_DMA)
 		if (usb_pipeisoc(pipe)) {
 			struct usb_iso_packet_descriptor *d;
 
@@ -1684,11 +1758,20 @@ void musb_host_rx(struct musb *musb, u8 epnum)
 			if (d->status != -EILSEQ && d->status != -EOVERFLOW)
 				d->status = 0;
 
+			done = false;
 			if (++qh->iso_idx >= urb->number_of_packets)
 				done = true;
-			else
-				done = false;
+			else if (is_cppi41_enabled()) {
+				struct dma_controller   *c;
+				int ret, idx = qh->iso_idx;
 
+				c = musb->dma_controller;
+				ret = c->channel_program(dma, qh->maxpacket |
+					(qh->hb_mult << 11), 0,
+					(u32)urb->transfer_dma +
+					urb->iso_frame_desc[idx].offset,
+					urb->iso_frame_desc[idx].length);
+			}
 		} else  {
 		/* done if urb buffer is full or short packet is recd */
 		done = (urb->actual_length + xfer_len >=
@@ -1831,7 +1914,7 @@ void musb_host_rx(struct musb *musb, u8 epnum)
 			 * adjusted first...
 			 */
 			ret = c->channel_program(
-				dma, qh->maxpacket,
+				dma, qh->maxpacket | ((qh->hb_mult - 1) << 11),
 				dma->desired_mode, buf, length);
 
 			if (!ret) {
@@ -1893,6 +1976,12 @@ finish:
 	urb->actual_length += xfer_len;
 	qh->offset += xfer_len;
 	if (done) {
+		/* Reset this dma ->actual_len after transfer complete,
+		 * if not subsequence dequeue request will take this
+		 */
+		if (dma)
+			dma->actual_len = 0;
+
 		if (use_sg)
 			use_sg = false;
 
@@ -2046,6 +2135,8 @@ static int musb_urb_enqueue(
 	qh = ret ? NULL : hep->hcpriv;
 	if (qh)
 		urb->hcpriv = qh;
+
+	INIT_LIST_HEAD(&urb->giveback_list);
 	spin_unlock_irqrestore(&musb->lock, flags);
 
 	/* DMA mapping was already done, if needed, and this urb is on
@@ -2309,8 +2400,12 @@ static int musb_urb_dequeue(struct usb_hcd *hcd, struct urb *urb, int status)
 			|| musb_ep_get_qh(qh->hw_ep, is_in) != qh) {
 		int	ready = qh->is_ready;
 
+		usb_hcd_unlink_urb_from_ep(musb_to_hcd(musb), urb);
+
 		qh->is_ready = 0;
+		spin_unlock(&musb->lock);
 		musb_giveback(musb, urb, 0);
+		spin_lock(&musb->lock);
 		qh->is_ready = ready;
 
 		/* If nothing else (usually musb_giveback) is using it
@@ -2371,8 +2466,13 @@ musb_h_disable(struct usb_hcd *hcd, struct usb_host_endpoint *hep)
 		 * other transfers, and since !qh->is_ready nothing
 		 * will activate any of these as it advances.
 		 */
-		while (!list_empty(&hep->urb_list))
-			musb_giveback(musb, next_urb(qh), -ESHUTDOWN);
+		while (!list_empty(&hep->urb_list)) {
+			urb = next_urb(qh);
+			usb_hcd_unlink_urb_from_ep(musb_to_hcd(musb), urb);
+			spin_unlock(&musb->lock);
+			musb_giveback(musb, urb, -ESHUTDOWN);
+			spin_lock(&musb->lock);
+		}
 
 		hep->hcpriv = NULL;
 		list_del(&qh->ring);

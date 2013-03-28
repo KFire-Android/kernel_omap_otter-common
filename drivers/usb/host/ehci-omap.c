@@ -158,7 +158,7 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
 
 	res =  platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	regs = devm_request_and_ioremap(dev, res);
-	if (IS_ERR(regs)) {
+	if (!regs) {
 		dev_err(dev, "Resource request/ioremap failed\n");
 		return -EADDRNOTAVAIL;
 	}

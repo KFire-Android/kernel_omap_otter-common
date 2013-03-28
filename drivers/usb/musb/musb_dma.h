@@ -74,6 +74,12 @@ struct musb_hw_ep;
 #define	is_cppi_enabled()	0
 #endif
 
+#ifdef CONFIG_USB_TI_CPPI41_DMA
+#define	is_cppi41_enabled()	1
+#else
+#define	is_cppi41_enabled()	0
+#endif
+
 #ifdef CONFIG_USB_TUSB_OMAP_DMA
 #define tusb_dma_omap()			1
 #else

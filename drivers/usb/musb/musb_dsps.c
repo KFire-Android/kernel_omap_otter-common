@@ -45,6 +45,10 @@
 #include <linux/of_address.h>
 
 #include "musb_core.h"
+#ifdef CONFIG_USB_TI_CPPI41_DMA
+#include "cppi41.h"
+#include "cppi41_dma.h"
+#endif
 
 #ifdef CONFIG_OF
 static const struct of_device_id musb_dsps_of_match[];
@@ -67,6 +71,32 @@ static inline void dsps_writel(void __iomem *addr, unsigned offset, u32 data)
 	{ __raw_writel(data, addr + offset); }
 
 /**
+ * DSPS usbss wrapper register offset
+ * this register definition includes usbss wrapper for TI DSPS
+ */
+struct dsps_usbss_wrapper {
+	u16	revision;
+	u16	syscfg;
+	u16	irq_eoi;
+	u16	irq_status_raw;
+	u16	irq_status;
+	u16	irq_enable_set;
+	u16	irq_enable_clr;
+	u16	irq_tx0_dma_th_enb;
+	u16	irq_rx0_dma_th_enb;
+	u16	irq_tx1_dma_th_enb;
+	u16	irq_rx1_dma_th_enb;
+	u16	irq_usb0_dma_enable;
+	u16	irq_usb1_dma_enable;
+	u16	irq_tx0_frame_th_enb;
+	u16	irq_rx0_frame_th_enb;
+	u16	irq_tx1_frame_th_enb;
+	u16	irq_rx1_frame_th_enb;
+	u16	irq_usb0_frame_enable;
+	u16	irq_usb1_frame_enable;
+};
+
+/**
  * DSPS musb wrapper register offset.
  * FIXME: This should be expanded to have all the wrapper registers from TI DSPS
  * musb ips.
@@ -82,7 +112,17 @@ struct dsps_musb_wrapper {
 	u16	coreintr_set;
 	u16	coreintr_clear;
 	u16	coreintr_status;
+#ifdef CONFIG_USB_TI_CPPI41_DMA
+	u16	tx_mode;
+	u16	rx_mode;
+	u16	g_rndis;
+	u16	auto_req;
+	u16	tear_down;
+	u16	th_xdma_idle;
+#endif
+	u16	srp_fix_time;
 	u16	phy_utmi;
+	u16	mgc_utmi_lpback;
 	u16	mode;
 
 	/* bit positions for control */
@@ -112,7 +152,50 @@ struct dsps_musb_wrapper {
 	u8		poll_seconds;
 	/* number of musb instances */
 	u8		instances;
+	/* usbss wrapper register */
+	struct dsps_usbss_wrapper usbss;
 };
+
+#ifdef CONFIG_PM_SLEEP
+struct dsps_usbss_regs {
+	u32	sysconfig;
+
+	u32	irq_en_set;
+
+#ifdef CONFIG_USB_TI_CPPI41_DMA
+	u32	irq_dma_th_tx0[4];
+	u32	irq_dma_th_rx0[4];
+	u32	irq_dma_th_tx1[4];
+	u32	irq_dma_th_rx1[4];
+	u32	irq_dma_en[2];
+
+	u32	irq_frame_th_tx0[4];
+	u32	irq_frame_th_rx0[4];
+	u32	irq_frame_th_tx1[4];
+	u32	irq_frame_th_rx1[4];
+	u32	irq_frame_en[2];
+#endif
+};
+
+struct dsps_usb_regs {
+	u32	control;
+
+	u32	irq_en_set[2];
+
+#ifdef CONFIG_USB_TI_CPPI41_DMA
+	u32	tx_mode;
+	u32	rx_mode;
+	u32	grndis_size[15];
+	u32	auto_req;
+	u32	teardn;
+	u32	th_xdma_idle;
+#endif
+	u32	srp_fix;
+	u32	phy_utmi;
+	u32	mgc_utmi_loopback;
+	u32	mode;
+};
+#endif
 
 /**
  * DSPS glue structure.
@@ -124,6 +207,20 @@ struct dsps_glue {
 	struct timer_list timer[2];	/* otg_workaround timer */
 	unsigned long last_timer[2];    /* last timer data for each instance */
 	u32 __iomem *usb_ctrl[2];
+	u32 __iomem *usbss_addr;
+	u8	first;			/* ignore first call of resume */
+	u8	timer_enab[2];
+#ifdef CONFIG_PM
+	struct dsps_usbss_regs usbss_regs;
+	struct dsps_usb_regs usb_regs[2];
+#endif
+#ifdef CONFIG_USB_TI_CPPI41_DMA
+	struct cppi41_sched_tbl_t *dma_sched_table;
+	u32 __iomem *dma_addr;
+	u8 dma_irq;
+	u8 dma_init_done;
+	u8 max_dma_channel;
+#endif
 };
 
 #define	DSPS_AM33XX_CONTROL_MODULE_PHYS_0	0x44e10620
@@ -139,6 +236,445 @@ static const resource_size_t dsps_control_module_phys[] = {
 #define USBPHY_OTGVDET_EN	(1 << 19)
 #define USBPHY_OTGSESSEND_EN	(1 << 20)
 
+#ifdef CONFIG_USB_TI_CPPI41_DMA
+static irqreturn_t cppi41dma_interrupt(int irq, void *hci);
+#define CPPI41_ADDR(offs) ((void *)((u32)glue->dma_addr + (offs - 0x2000)))
+
+/*
+ * CPPI 4.1 resources used for USB OTG controller module:
+ *
+ tx/rx completion queues for usb0 */
+static u16 tx_comp_q[] = {93, 94, 95, 96, 97,
+				98, 99, 100, 101, 102,
+				103, 104, 105, 106, 107 };
+
+static u16 rx_comp_q[] = {109, 110, 111, 112, 113,
+				114, 115, 116, 117, 118,
+				119, 120, 121, 122, 123 };
+
+/* tx/rx completion queues for usb1 */
+static u16 tx_comp_q1[] = {125, 126, 127, 128, 129,
+				 130, 131, 132, 133, 134,
+				 135, 136, 137, 138, 139 };
+
+static u16 rx_comp_q1[] = {141, 142, 143, 144, 145,
+				 146, 147, 148, 149, 150,
+				 151, 152, 153, 154, 155 };
+
+/* cppi41 dma tx channel info */
+static const struct cppi41_tx_ch tx_ch_info[] = {
+	[0] = {
+		.port_num	= 1,
+		.num_tx_queue	= 2,
+		.tx_queue	= { {0, 32} , {0, 33} }
+	},
+	[1] = {
+		.port_num	= 2,
+		.num_tx_queue	= 2,
+		.tx_queue	= { {0, 34} , {0, 35} }
+	},
+	[2] = {
+		.port_num	= 3,
+		.num_tx_queue	= 2,
+		.tx_queue	= { {0, 36} , {0, 37} }
+	},
+	[3] = {
+		.port_num	= 4,
+		.num_tx_queue	= 2,
+		.tx_queue	= { {0, 38} , {0, 39} }
+	},
+	[4] = {
+		.port_num	= 5,
+		.num_tx_queue	= 2,
+		.tx_queue	= { {0, 40} , {0, 41} }
+	},
+	[5] = {
+		.port_num	= 6,
+		.num_tx_queue	= 2,
+		.tx_queue	= { {0, 42} , {0, 43} }
+	},
+	[6] = {
+		.port_num	= 7,
+		.num_tx_queue	= 2,
+		.tx_queue	= { {0, 44} , {0, 45} }
+	},
+	[7] = {
+		.port_num	= 8,
+		.num_tx_queue	= 2,
+		.tx_queue	= { {0, 46} , {0, 47} }
+	},
+	[8] = {
+		.port_num	= 9,
+		.num_tx_queue	= 2,
+		.tx_queue	= { {0, 48} , {0, 49} }
+	},
+	[9] = {
+		.port_num	= 10,
+		.num_tx_queue	= 2,
+		.tx_queue	= { {0, 50} , {0, 51} }
+	},
+	[10] = {
+		.port_num	= 11,
+		.num_tx_queue	= 2,
+		.tx_queue	= { {0, 52} , {0, 53} }
+	},
+	[11] = {
+		.port_num	= 12,
+		.num_tx_queue	= 2,
+		.tx_queue	= { {0, 54} , {0, 55} }
+	},
+	[12] = {
+		.port_num	= 13,
+		.num_tx_queue	= 2,
+		.tx_queue	= { {0, 56} , {0, 57} }
+	},
+	[13] = {
+		.port_num	= 14,
+		.num_tx_queue	= 2,
+		.tx_queue	= { {0, 58} , {0, 59} }
+	},
+	[14] = {
+		.port_num	= 15,
+		.num_tx_queue	= 2,
+		.tx_queue	= { {0, 60} , {0, 61} }
+	},
+	[15] = {
+		.port_num	= 1,
+		.num_tx_queue	= 2,
+		.tx_queue	= { {0, 62} , {0, 63} }
+	},
+	[16] = {
+		.port_num	= 2,
+		.num_tx_queue	= 2,
+		.tx_queue	= { {0, 64} , {0, 65} }
+	},
+	[17] = {
+		.port_num	= 3,
+		.num_tx_queue	= 2,
+		.tx_queue	= { {0, 66} , {0, 67} }
+	},
+	[18] = {
+		.port_num	= 4,
+		.num_tx_queue	= 2,
+		.tx_queue	= { {0, 68} , {0, 69} }
+	},
+	[19] = {
+		.port_num	= 5,
+		.num_tx_queue	= 2,
+		.tx_queue	= { {0, 70} , {0, 71} }
+	},
+	[20] = {
+		.port_num	= 6,
+		.num_tx_queue	= 2,
+		.tx_queue	= { {0, 72} , {0, 73} }
+	},
+	[21] = {
+		.port_num	= 7,
+		.num_tx_queue	= 2,
+		.tx_queue	= { {0, 74} , {0, 75} }
+	},
+	[22] = {
+		.port_num	= 8,
+		.num_tx_queue	= 2,
+		.tx_queue	= { {0, 76} , {0, 77} }
+	},
+	[23] = {
+		.port_num	= 9,
+		.num_tx_queue	= 2,
+		.tx_queue	= { {0, 78} , {0, 79} }
+	},
+	[24] = {
+		.port_num	= 10,
+		.num_tx_queue	= 2,
+		.tx_queue	= { {0, 80} , {0, 81} }
+	},
+	[25] = {
+		.port_num	= 11,
+		.num_tx_queue	= 2,
+		.tx_queue	= { {0, 82} , {0, 83} }
+	},
+	[26] = {
+		.port_num	= 12,
+		.num_tx_queue	= 2,
+		.tx_queue	= { {0, 84} , {0, 85} }
+	},
+	[27] = {
+		.port_num	= 13,
+		.num_tx_queue	= 2,
+		.tx_queue	= { {0, 86} , {0, 87} }
+	},
+	[28] = {
+		.port_num	= 14,
+		.num_tx_queue	= 2,
+		.tx_queue	= { {0, 88} , {0, 89} }
+	},
+	[29] = {
+		.port_num	= 15,
+		.num_tx_queue	= 2,
+		.tx_queue	= { {0, 90} , {0, 91} }
+	}
+};
+
+/* Queues 0 to 66 are pre-assigned, others are spare */
+static const u32 assigned_queues[] = {	0xffffffff, /* queue 0..31 */
+					0xffffffff, /* queue 32..63 */
+					0xffffffff, /* queue 64..95 */
+					0xffffffff, /* queue 96..127 */
+					0x0fffffff  /* queue 128..155 */
+					};
+
+#define USB_CPPI41_NUM_CH	15
+#define USB_CPPI41_CH_NUM_PD	128
+#define DSPS_TX_MODE_REG	0x70	/* Transparent, CDC, [Generic] RNDIS */
+#define DSPS_RX_MODE_REG	0x74	/* Transparent, CDC, [Generic] RNDIS */
+#define DSPS_USB_AUTOREQ_REG	0xd0
+#define DSPS_USB_TEARDOWN_REG	0xd8
+#define USB_CPPI41_MAX_PD	(USB_CPPI41_CH_NUM_PD * (USB_CPPI41_NUM_CH+1))
+
+static int cppi41_init(struct dsps_glue *glue)
+{
+	struct usb_cppi41_info *cppi_info = &usb_cppi41_info[0];
+	u16 blknum = 0, order;
+	int i, id, status = 0, irq = glue->dma_irq;
+
+	if (glue->dma_init_done)
+		goto err0;
+
+	for (id = 0; id < glue->wrp->instances; ++id) {
+		cppi_info = &usb_cppi41_info[id];
+
+		cppi_info->max_dma_ch = USB_CPPI41_NUM_CH;
+		cppi_info->max_pkt_desc = USB_CPPI41_MAX_PD;
+
+		cppi_info->ep_dma_ch = kzalloc(USB_CPPI41_NUM_CH, GFP_KERNEL);
+		if (!cppi_info->ep_dma_ch) {
+			pr_err("memory allocation failure\n");
+			status = -ENOMEM;
+			goto err1;
+		}
+
+		/* init cppi info structure  */
+		cppi_info->dma_block = 0;
+		for (i = 0 ; i < USB_CPPI41_NUM_CH ; i++)
+			cppi_info->ep_dma_ch[i] = i + (15 * id);
+
+		cppi_info->q_mgr = 0;
+		cppi_info->num_tx_comp_q = 15;
+		cppi_info->num_rx_comp_q = 15;
+		cppi_info->tx_comp_q = id ? tx_comp_q1 : tx_comp_q;
+		cppi_info->rx_comp_q = id ? rx_comp_q1 : rx_comp_q;
+		cppi_info->bd_intr_enb = 1;
+		cppi_info->rx_dma_mode = USB_TRANSPARENT_MODE;
+		cppi_info->rx_inf_mode = 0;
+		cppi_info->sched_tbl_ctrl = 0;
+		cppi_info->tx_isoc_sched_enab = 1;
+
+		cppi_info->wrp.autoreq_reg = DSPS_USB_AUTOREQ_REG;
+		cppi_info->wrp.teardown_reg = DSPS_USB_TEARDOWN_REG;
+		cppi_info->wrp.tx_mode_reg = DSPS_TX_MODE_REG;
+		cppi_info->wrp.rx_mode_reg = DSPS_RX_MODE_REG;
+	}
+
+	glue->max_dma_channel = USB_CPPI41_NUM_CH * glue->wrp->instances * 2;
+	glue->dma_sched_table = kzalloc(sizeof(struct cppi41_sched_tbl_t *) *
+					glue->max_dma_channel, GFP_KERNEL);
+	if (!glue->dma_sched_table) {
+		pr_err("memory allocation failure\n");
+		status = -ENOMEM;
+		goto err1;
+	}
+
+	/* initialize the schedular table entries */
+	for (i = 0; i < glue->max_dma_channel; i += 2) {
+		/* add tx dmach for schedular table */
+		glue->dma_sched_table[i].dma_ch = i/2;
+		glue->dma_sched_table[i].is_tx = 1;
+		glue->dma_sched_table[i].enb = 1;
+
+		/* add rx dmach for schedular table */
+		glue->dma_sched_table[i+1].dma_ch = i/2;
+		glue->dma_sched_table[i+1].is_tx = 0;
+		glue->dma_sched_table[i+1].enb = 1;
+	}
+
+	/* Queue manager information */
+	cppi41_queue_mgr[0].num_queue = 159;
+	cppi41_queue_mgr[0].queue_types = CPPI41_FREE_DESC_BUF_QUEUE |
+						CPPI41_UNASSIGNED_QUEUE;
+	cppi41_queue_mgr[0].base_fdbq_num = 0;
+	cppi41_queue_mgr[0].assigned = assigned_queues;
+
+	/* init DMA block */
+	cppi41_dma_block[0].num_tx_ch = 30;
+	cppi41_dma_block[0].num_rx_ch = 30;
+	cppi41_dma_block[0].tx_ch_info = tx_ch_info;
+
+	/* initilize cppi41 dma & Qmgr address */
+	cppi41_queue_mgr[0].q_mgr_rgn_base = CPPI41_ADDR(QMGR_RGN_OFFS);
+	cppi41_queue_mgr[0].desc_mem_rgn_base = CPPI41_ADDR(QMRG_DESCRGN_OFFS);
+	cppi41_queue_mgr[0].q_mgmt_rgn_base = CPPI41_ADDR(QMGR_REG_OFFS);
+	cppi41_queue_mgr[0].q_stat_rgn_base = CPPI41_ADDR(QMGR_STAT_OFFS);
+	cppi41_dma_block[0].global_ctrl_base = CPPI41_ADDR(DMA_GLBCTRL_OFFS);
+	cppi41_dma_block[0].ch_ctrl_stat_base = CPPI41_ADDR(DMA_CHCTRL_OFFS);
+	cppi41_dma_block[0].sched_ctrl_base = CPPI41_ADDR(DMA_SCHED_OFFS);
+	cppi41_dma_block[0].sched_table_base = CPPI41_ADDR(DMA_SCHEDTBL_OFFS);
+
+	/* Initialize for Linking RAM region 0 alone */
+	status = cppi41_queue_mgr_init(cppi_info->q_mgr, 0, 0x3fff);
+	if (status < 0)
+		goto err1;
+
+	order = get_count_order(glue->max_dma_channel);
+	if (order < 5)
+		order = 5;
+
+	status = cppi41_dma_block_init(blknum, cppi_info->q_mgr, order,
+			glue->dma_sched_table, glue->max_dma_channel);
+	if (status < 0)
+		goto err1;
+
+	/* attach to the IRQ */
+	if (request_irq(irq, cppi41dma_interrupt, 0, "usb-cppi41dma", glue)) {
+		pr_err("cppi41dma request_irq %d failed!\n", irq);
+		status = -ENODEV;
+		goto err1;
+	} else
+		pr_info("registerd cppi41-dma at IRQ %d dmabase %p\n",
+			irq, cppi41_dma_block[0].global_ctrl_base);
+
+
+	/* enable all usbss the interrupts */
+	dsps_writel(glue->usbss_addr, glue->wrp->usbss.irq_eoi, 0);
+	dsps_writel(glue->usbss_addr, glue->wrp->usbss.irq_enable_set,
+		USBSS_INTR_FLAGS);
+	dsps_writel(glue->usbss_addr, glue->wrp->usbss.irq_usb0_dma_enable,
+		0xFFFeFFFe);
+
+	glue->dma_init_done = 1;
+	return 0;
+
+err1:
+	for (id = 0; id < glue->wrp->instances; ++id) {
+		cppi_info = &usb_cppi41_info[id];
+		kfree(cppi_info->ep_dma_ch);
+	}
+err0:
+	return status;
+}
+
+void cppi41_free(struct dsps_glue *glue)
+{
+	u32 numch, blknum, order;
+	struct usb_cppi41_info *cppi_info = &usb_cppi41_info[0];
+
+	if (!glue->dma_init_done)
+		return ;
+
+	numch =  glue->max_dma_channel;
+	/* disable the interrupts */
+	dsps_writel(glue->usbss_addr, glue->wrp->usbss.irq_eoi, 0);
+	dsps_writel(glue->usbss_addr, glue->wrp->usbss.irq_enable_set, 0);
+	dsps_writel(glue->usbss_addr, glue->wrp->usbss.irq_usb0_dma_enable, 0);
+
+	order = get_count_order(numch);
+	blknum = cppi_info->dma_block;
+
+	/* uninit cppi41 dma & queue mgr */
+	cppi41_dma_block_uninit(blknum, cppi_info->q_mgr, order,
+			glue->dma_sched_table, numch);
+	cppi41_queue_mgr_uninit(cppi_info->q_mgr);
+
+	/* free the irq_resource */
+	free_irq(glue->dma_irq, glue);
+
+	/* free cppi resource */
+	kfree(cppi_info->ep_dma_ch);
+	kfree(glue->dma_sched_table);
+	glue->dma_init_done = 0;
+}
+
+static irqreturn_t cppi41dma_interrupt(int irq, void *hci)
+{
+	struct dsps_glue *glue = hci;
+	u32 intr_status;
+	irqreturn_t ret = IRQ_NONE;
+	u32 q_cmpl_status_0, q_cmpl_status_1, q_cmpl_status_2;
+	u32 usb0_tx_intr, usb0_rx_intr;
+	u32 usb1_tx_intr, usb1_rx_intr;
+	void *q_mgr_base = cppi41_queue_mgr[0].q_mgr_rgn_base;
+	unsigned long flags;
+	struct platform_device *pdev;
+	struct device *dev;
+	struct musb *musb;
+
+	/*
+	 * CPPI 4.1 interrupts share the same IRQ and the EOI register but
+	 * don't get reflected in the interrupt source/mask registers.
+	 */
+	/*
+	 * Check for the interrupts from Tx/Rx completion queues; they
+	 * are level-triggered and will stay asserted until the queues
+	 * are emptied.  We're using the queue pending register 0 as a
+	 * substitute for the interrupt status register and reading it
+	 * directly for speed.
+	 */
+	intr_status = dsps_readl(glue->usbss_addr, glue->wrp->usbss.irq_status);
+
+	if (intr_status)
+		dsps_writel(glue->usbss_addr, glue->wrp->usbss.irq_status,
+			intr_status);
+	else
+		pr_err("spurious usbss intr\n");
+
+	q_cmpl_status_0 = dsps_readl(q_mgr_base, CPPI41_QSTATUS_REG2);
+	q_cmpl_status_1 = dsps_readl(q_mgr_base, CPPI41_QSTATUS_REG3);
+	q_cmpl_status_2 = dsps_readl(q_mgr_base, CPPI41_QSTATUS_REG4);
+
+	/* USB0 tx/rx completion */
+	/* usb0 tx completion interrupt for ep1..15 */
+	usb0_tx_intr = (q_cmpl_status_0 >> 29) |
+			((q_cmpl_status_1 & 0xFFF) << 3);
+	usb0_rx_intr = ((q_cmpl_status_1 & 0x07FFe000) >> 13);
+
+	usb1_tx_intr = (q_cmpl_status_1 >> 29) |
+			((q_cmpl_status_2 & 0xFFF) << 3);
+	usb1_rx_intr = ((q_cmpl_status_2 & 0x0fffe000) >> 13);
+
+	/* get proper musb handle based usb0/usb1 ctrl-id */
+	pdev = glue->musb[0];
+	dev = &pdev->dev;
+	musb = (struct musb *)dev_get_drvdata(&pdev->dev);
+
+	dev_dbg(musb->controller, "CPPI 4.1 IRQ: Tx %x, Rx %x\n", usb0_tx_intr,
+				usb0_rx_intr);
+	if (musb && (usb0_tx_intr || usb0_rx_intr)) {
+		spin_lock_irqsave(&musb->lock, flags);
+		cppi41_completion(musb, usb0_rx_intr,
+					usb0_tx_intr);
+		spin_unlock_irqrestore(&musb->lock, flags);
+		ret = IRQ_HANDLED;
+	}
+
+	dev_dbg(musb->controller, "CPPI 4.1 IRQ: Tx %x, Rx %x\n", usb1_tx_intr,
+		usb1_rx_intr);
+	pdev = glue->musb[1];
+	dev = &pdev->dev;
+	musb = (struct musb *)dev_get_drvdata(&pdev->dev);
+
+	if (musb && (usb1_rx_intr || usb1_tx_intr)) {
+		spin_lock_irqsave(&musb->lock, flags);
+		cppi41_completion(musb, usb1_rx_intr,
+			usb1_tx_intr);
+		spin_unlock_irqrestore(&musb->lock, flags);
+		ret = IRQ_HANDLED;
+	}
+
+	dsps_writel(glue->usbss_addr, glue->wrp->usbss.irq_eoi, 0);
+
+	return ret;
+}
+#endif /* CONFIG_USB_TI_CPPI41_DMA */
+
 /**
  * musb_dsps_phy_control - phy on/off
  * @glue: struct dsps_glue *
@@ -151,9 +687,17 @@ static const resource_size_t dsps_control_module_phys[] = {
  * XXX: This function will be removed once we have a seperate driver for
  * control module
  */
-static void musb_dsps_phy_control(struct dsps_glue *glue, u8 id, u8 on)
+static void musb_dsps_phy_control(struct dsps_glue *glue, u8 id, u8 on,
+		bool wake_up)
 {
 	u32 usbphycfg;
+	u32 wkup_val, wkup_flag;
+	void __iomem *wkup_ctrl;
+
+#define	USB0_PHY_WKUP_OFFS		28
+#define	USB1_PHY_WKUP_OFFS		20
+#define	DSPS_USB0_WKUP_CTRL_ENABLE	(1 << 0)
+#define	DSPS_USB1_WKUP_CTRL_ENABLE	(1 << 8)
 
 	usbphycfg = readl(glue->usb_ctrl[id]);
 
@@ -163,8 +707,20 @@ static void musb_dsps_phy_control(struct dsps_glue *glue, u8 id, u8 on)
 	} else {
 		usbphycfg |= USBPHY_CM_PWRDN | USBPHY_OTG_PWRDN;
 	}
-
 	writel(usbphycfg, glue->usb_ctrl[id]);
+
+	wkup_ctrl = glue->usb_ctrl[id] + (id ? USB1_PHY_WKUP_OFFS :
+			USB0_PHY_WKUP_OFFS);
+	wkup_val = readl(wkup_ctrl);
+
+	wkup_flag = id ? DSPS_USB1_WKUP_CTRL_ENABLE :
+			DSPS_USB0_WKUP_CTRL_ENABLE;
+	if (wake_up)
+		wkup_val |= wkup_flag;
+	else
+		wkup_val &= ~wkup_flag;
+
+	writel(wkup_val, wkup_ctrl);
 }
 /**
  * dsps_musb_enable - enable interrupts
@@ -294,6 +850,52 @@ static void dsps_musb_try_idle(struct musb *musb, unsigned long timeout)
 	mod_timer(&glue->timer[pdev->id], timeout);
 }
 
+int dsps_enable_sof(struct musb *musb)
+{
+	struct device *dev = musb->controller;
+	struct platform_device *pdev = to_platform_device(dev->parent);
+	struct dsps_glue *glue = platform_get_drvdata(pdev);
+	const struct dsps_musb_wrapper *wrp = glue->wrp;
+	void __iomem *reg_base = musb->ctrl_base;
+
+	if (musb->sof_enabled) {
+		musb->sof_enabled++;
+		return musb->sof_enabled;
+	}
+
+	musb->sof_enabled = 1;
+	musb_writeb(musb->mregs, MUSB_INTRUSBE, MUSB_INTR_SOF |
+		musb_readb(musb->mregs, MUSB_INTRUSBE));
+	musb_writel(reg_base, wrp->coreintr_set, MUSB_INTR_SOF |
+		musb_readl(reg_base, wrp->coreintr_set));
+
+	return musb->sof_enabled;
+}
+
+int dsps_disable_sof(struct musb *musb)
+{
+	struct device *dev = musb->controller;
+	struct platform_device *pdev = to_platform_device(dev->parent);
+	struct dsps_glue *glue = platform_get_drvdata(pdev);
+	const struct dsps_musb_wrapper *wrp = glue->wrp;
+	void __iomem *reg_base = musb->ctrl_base;
+	u8 intrusb;
+
+	if (musb->sof_enabled)
+		musb->sof_enabled--;
+
+	if (musb->sof_enabled)
+		return musb->sof_enabled;
+
+	intrusb = musb_readb(musb->mregs, MUSB_INTRUSBE);
+	intrusb &= ~MUSB_INTR_SOF;
+	musb_writeb(musb->mregs, MUSB_INTRUSBE, intrusb);
+	musb_writel(reg_base, wrp->coreintr_clear, MUSB_INTR_SOF);
+	musb->sof_enabled = 0;
+
+	return 0;
+}
+
 static irqreturn_t dsps_interrupt(int irq, void *hci)
 {
 	struct musb  *musb = hci;
@@ -305,6 +907,7 @@ static irqreturn_t dsps_interrupt(int irq, void *hci)
 	unsigned long flags;
 	irqreturn_t ret = IRQ_NONE;
 	u32 epintr, usbintr;
+	u8 is_babble;
 
 	spin_lock_irqsave(&musb->lock, flags);
 
@@ -335,8 +938,12 @@ static irqreturn_t dsps_interrupt(int irq, void *hci)
 	 * value but DEVCTL.BDEVICE is invalid without DEVCTL.SESSION set.
 	 * Also, DRVVBUS pulses for SRP (but not at 5V) ...
 	 */
-	if (usbintr & MUSB_INTR_BABBLE)
+	is_babble = is_host_active(musb) && usbintr & MUSB_INTR_BABBLE;
+	if (is_babble) {
 		pr_info("CAUTION: musb: Babble Interrupt Occurred\n");
+		musb->int_usb = MUSB_INTR_DISCONNECT;
+		is_babble = 1;
+	}
 
 	if (usbintr & ((1 << wrp->drvvbus) << wrp->usb_shift)) {
 		int drvvbus = dsps_readl(reg_base, wrp->status);
@@ -363,7 +970,6 @@ static irqreturn_t dsps_interrupt(int irq, void *hci)
 					jiffies + wrp->poll_seconds * HZ);
 			WARNING("VBUS error workaround (delay coming)\n");
 		} else if (drvvbus) {
-			musb->is_active = 1;
 			MUSB_HST_MODE(musb);
 			musb->xceiv->otg->default_a = 1;
 			musb->xceiv->state = OTG_STATE_A_WAIT_VRISE;
@@ -387,6 +993,9 @@ static irqreturn_t dsps_interrupt(int irq, void *hci)
 	if (musb->int_tx || musb->int_rx || musb->int_usb)
 		ret |= musb_interrupt(musb);
 
+	if (is_babble)
+		schedule_work(&musb->work);
+
  eoi:
 	/* EOI needs to be written for the IRQ to be re-asserted. */
 	if (ret == IRQ_HANDLED || epintr || usbintr)
@@ -400,6 +1009,42 @@ static irqreturn_t dsps_interrupt(int irq, void *hci)
 	spin_unlock_irqrestore(&musb->lock, flags);
 
 	return ret;
+}
+
+static int dsps_musb_restart(struct musb *musb)
+{
+	struct device *dev = musb->controller;
+	struct platform_device *pdev = to_platform_device(dev);
+	struct dsps_glue *glue = dev_get_drvdata(dev->parent);
+	const struct dsps_musb_wrapper *wrp = glue->wrp;
+	void __iomem *reg_base = musb->ctrl_base;
+
+	/* Reset the musb */
+	dsps_writel(reg_base, wrp->control, (1 << wrp->reset));
+	udelay(100);
+
+	/* Stop the on-chip PHY and its PLL. */
+	musb_dsps_phy_control(glue, pdev->id, 0, false);
+	udelay(100);
+
+	/* Start the on-chip PHY and its PLL. */
+	musb_dsps_phy_control(glue, pdev->id, 1, false);
+	udelay(100);
+
+	/* reinit the endpoint fifo address */
+	musb_restart(musb);
+
+	return 0;
+}
+
+static void dsps_musb_restart_work(struct work_struct *work)
+{
+	struct musb *musb = container_of(work, struct musb, work);
+	struct platform_device *pdev = to_platform_device(musb->controller);
+
+	dev_dbg(musb->controller, "restarting musb%d ...\n",
+			pdev->id);
+	dsps_musb_restart(musb);
 }
 
 static int dsps_musb_init(struct musb *musb)
@@ -429,12 +1074,13 @@ static int dsps_musb_init(struct musb *musb)
 	}
 
 	setup_timer(&glue->timer[pdev->id], otg_timer, (unsigned long) musb);
+	INIT_WORK(&musb->work, dsps_musb_restart_work);
 
 	/* Reset the musb */
 	dsps_writel(reg_base, wrp->control, (1 << wrp->reset));
 
 	/* Start the on-chip PHY and its PLL. */
-	musb_dsps_phy_control(glue, pdev->id, 1);
+	musb_dsps_phy_control(glue, pdev->id, 1, 0);
 
 	musb->isr = dsps_interrupt;
 
@@ -462,7 +1108,7 @@ static int dsps_musb_exit(struct musb *musb)
 	del_timer_sync(&glue->timer[pdev->id]);
 
 	/* Shutdown the on-chip PHY and its PLL. */
-	musb_dsps_phy_control(glue, pdev->id, 0);
+	musb_dsps_phy_control(glue, pdev->id, 0, 0);
 
 	/* NOP driver needs change if supporting dual instance */
 	usb_put_phy(musb->xceiv);
@@ -479,6 +1125,11 @@ static struct musb_platform_ops dsps_ops = {
 	.disable	= dsps_musb_disable,
 
 	.try_idle	= dsps_musb_try_idle,
+	.enable_sof	= dsps_enable_sof,
+	.disable_sof	= dsps_disable_sof,
+#ifdef CONFIG_USB_TI_CPPI41_DMA
+	.sof_handler	= cppi41_isoc_schedular,
+#endif
 };
 
 static u64 musb_dmamask = DMA_BIT_MASK(32);
@@ -630,6 +1281,13 @@ static int dsps_probe(struct platform_device *pdev)
 	}
 
 	glue->dev = &pdev->dev;
+	iomem[0].flags = IORESOURCE_MEM;
+	glue->usbss_addr = devm_request_and_ioremap(&pdev->dev, iomem);
+	if (glue->usbss_addr == NULL) {
+		dev_err(&pdev->dev, "Failed to obtain usbss_addr memory\n");
+		ret = -ENODEV;
+		goto err1;
+	}
 
 	glue->wrp = kmemdup(wrp, sizeof(*wrp), GFP_KERNEL);
 	if (!glue->wrp) {
@@ -638,6 +1296,7 @@ static int dsps_probe(struct platform_device *pdev)
 		goto err1;
 	}
 	platform_set_drvdata(pdev, glue);
+	glue->first = 1;
 
 	/* enable the usbss clocks */
 	pm_runtime_enable(&pdev->dev);
@@ -647,6 +1306,45 @@ static int dsps_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "pm_runtime_get_sync FAILED");
 		goto err2;
 	}
+
+#ifdef CONFIG_USB_TI_CPPI41_DMA
+	/* get memory resource */
+	iomem = platform_get_resource(pdev, IORESOURCE_MEM, 3);
+	if (!iomem) {
+		dev_err(&pdev->dev, "failed to get usbss mem resourse\n");
+		ret = -ENODEV;
+		goto err1;
+	}
+
+	iomem[0].flags = IORESOURCE_MEM;
+	glue->dma_addr = devm_request_and_ioremap(&pdev->dev, iomem);
+	if (glue->dma_addr == NULL) {
+		dev_err(&pdev->dev, "Failed to obtain usbss_addr memory\n");
+		ret = -ENODEV;
+		goto err1;
+	}
+
+	/* first resource is for usbss, so start index from 1 */
+	iomem = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+	if (!iomem) {
+		dev_err(&pdev->dev, "failed to get irq for instance %d\n", 0);
+		ret = -ENODEV;
+		goto err0;
+	}
+	glue->dma_irq = iomem->start;
+
+	/* clear any USBSS interrupts */
+	dsps_writel(glue->usbss_addr, glue->wrp->usbss.irq_eoi, 0);
+	dsps_writel(glue->usbss_addr, glue->wrp->usbss.irq_status,
+		dsps_readl(glue->usbss_addr, glue->wrp->usbss.irq_status));
+
+	/* initialize the cppi41dma init */
+	ret = cppi41_init(glue);
+	if (ret) {
+		dev_err(&pdev->dev, "cppi4.1 dma init failed\n");
+		return ret;
+	}
+#endif
 
 	/* create the child platform device for all instances of musb */
 	for (i = 0; i < wrp->instances ; i++) {
@@ -659,6 +1357,7 @@ static int dsps_probe(struct platform_device *pdev)
 			goto err3;
 		}
 	}
+
 
 	return 0;
 
@@ -685,21 +1384,219 @@ static int dsps_remove(struct platform_device *pdev)
 	/* disable usbss clocks */
 	pm_runtime_put(&pdev->dev);
 	pm_runtime_disable(&pdev->dev);
+
+#ifdef CONFIG_USB_TI_CPPI41_DMA
+	cppi41_free(glue);
+#endif
 	kfree(glue->wrp);
 	kfree(glue);
 	return 0;
 }
 
 #ifdef CONFIG_PM_SLEEP
+static void dsps_save_context(struct dsps_glue *glue)
+{
+	struct dsps_usbss_regs *usbss = &glue->usbss_regs;
+	const struct dsps_musb_wrapper *wrp = glue->wrp;
+	u8 i, j;
+
+	/* save USBSS register */
+	usbss->irq_en_set = dsps_readl(glue->usbss_addr,
+				wrp->epintr_set);
+
+#ifdef CONFIG_USB_TI_CPPI41_DMA
+	for (i = 0 ; i < 4 ; i++) {
+		usbss->irq_dma_th_tx0[i] = dsps_readl(glue->usbss_addr,
+			wrp->usbss.irq_tx0_dma_th_enb + (4 * i));
+		usbss->irq_dma_th_rx0[i] = dsps_readl(glue->usbss_addr,
+			wrp->usbss.irq_rx0_dma_th_enb + (4 * i));
+		usbss->irq_dma_th_tx1[i] = dsps_readl(glue->usbss_addr,
+			wrp->usbss.irq_tx1_dma_th_enb + (4 * i));
+		usbss->irq_dma_th_rx1[i] = dsps_readl(glue->usbss_addr,
+			wrp->usbss.irq_rx1_dma_th_enb + (4 * i));
+
+		usbss->irq_frame_th_tx0[i] = dsps_readl(glue->usbss_addr,
+			wrp->usbss.irq_tx0_frame_th_enb + (4 * i));
+		usbss->irq_frame_th_rx0[i] = dsps_readl(glue->usbss_addr,
+			wrp->usbss.irq_rx0_frame_th_enb + (4 * i));
+		usbss->irq_frame_th_tx1[i] = dsps_readl(glue->usbss_addr,
+			wrp->usbss.irq_tx1_frame_th_enb + (4 * i));
+		usbss->irq_frame_th_rx1[i] = dsps_readl(glue->usbss_addr,
+			wrp->usbss.irq_rx1_frame_th_enb + (4 * i));
+	}
+	for (i = 0 ; i < 2 ; i++) {
+		usbss->irq_dma_en[i] = dsps_readl(glue->usbss_addr,
+				wrp->usbss.irq_usb0_dma_enable + (4 * i));
+		usbss->irq_frame_en[i] = dsps_readl(glue->usbss_addr,
+				wrp->usbss.irq_usb0_frame_enable + (4 * i));
+	}
+#endif
+	/* save usbX register */
+	for (i = 0 ; i < wrp->instances ; i++) {
+		struct dsps_usb_regs *usb = &glue->usb_regs[i];
+		const struct dsps_musb_wrapper *wrp = glue->wrp;
+		struct musb *musb = platform_get_drvdata(glue->musb[i]);
+		struct device *dev = musb->controller;
+		struct platform_device *pdev = to_platform_device(dev);
+		void __iomem *cbase = musb->ctrl_base;
+
+		/* disable the timers */
+		if (timer_pending(&glue->timer[pdev->id]) &&
+					is_host_active(musb)) {
+			del_timer_sync(&glue->timer[pdev->id]);
+			glue->timer_enab[pdev->id] = 1;
+		}
+
+		if (timer_pending(&musb->otg_timer)) {
+			del_timer_sync(&musb->otg_timer);
+			musb->en_otg_timer = 1;
+		}
+
+		musb_save_context(musb);
+		usb->control = musb_readl(cbase, wrp->control);
+
+		for (j = 0 ; j < 2 ; j++)
+			usb->irq_en_set[j] = musb_readl(cbase,
+						wrp->epintr_set + (4 * j));
+#ifdef CONFIG_USB_TI_CPPI41_DMA
+		usb->tx_mode = musb_readl(cbase, wrp->tx_mode);
+		usb->rx_mode = musb_readl(cbase, wrp->rx_mode);
+
+		for (j = 0 ; j < 15 ; j++)
+			usb->grndis_size[j] = musb_readl(cbase,
+						wrp->g_rndis + (j << 2));
+
+		usb->auto_req = musb_readl(cbase, wrp->auto_req);
+		usb->teardn = musb_readl(cbase, wrp->tear_down);
+		usb->th_xdma_idle = musb_readl(cbase, wrp->th_xdma_idle);
+#endif
+		usb->srp_fix = musb_readl(cbase, wrp->srp_fix_time);
+		usb->phy_utmi = musb_readl(cbase, wrp->phy_utmi);
+		usb->mgc_utmi_loopback = musb_readl(cbase,
+						wrp->mgc_utmi_lpback);
+		usb->mode = musb_readl(cbase, wrp->mode);
+	}
+	/* save CPPI4.1 DMA register */
+#ifdef CONFIG_USB_TI_CPPI41_DMA
+	/* save CPPI4.1 DMA register for dma block 0 */
+	cppi41_save_context(0);
+#endif
+}
+
+static void dsps_restore_context(struct dsps_glue *glue)
+{
+	struct dsps_usbss_regs *usbss = &glue->usbss_regs;
+	const struct dsps_musb_wrapper *wrp = glue->wrp;
+#ifdef CONFIG_USB_TI_CPPI41_DMA
+	void __iomem *usbss_addr = glue->usbss_addr;
+	struct dsps_usbss_wrapper *usbsswrp;
+#endif
+	u8 i, j;
+
+	/* restore USBSS register */
+	dsps_writel(glue->usbss_addr, wrp->epintr_set,
+			usbss->irq_en_set);
+
+#ifdef CONFIG_USB_TI_CPPI41_DMA
+	usbsswrp = (struct dsps_usbss_wrapper *)&wrp->usbss;
+	for (i = 0 ; i < 4 ; i++) {
+
+		dsps_writel(usbss_addr, usbsswrp->irq_tx0_dma_th_enb + (4 * i),
+				usbss->irq_dma_th_tx0[i]);
+		dsps_writel(usbss_addr, usbsswrp->irq_rx0_dma_th_enb + (4 * i),
+				usbss->irq_dma_th_rx0[i]);
+		dsps_writel(usbss_addr, usbsswrp->irq_tx1_dma_th_enb + (4 * i),
+				usbss->irq_dma_th_tx1[i]);
+		dsps_writel(usbss_addr, usbsswrp->irq_rx1_dma_th_enb + (4 * i),
+				usbss->irq_dma_th_rx1[i]);
+
+		dsps_writel(usbss_addr, usbsswrp->irq_tx0_frame_th_enb + (4 * i)
+					, usbss->irq_frame_th_tx0[i]);
+		dsps_writel(usbss_addr, usbsswrp->irq_rx0_frame_th_enb + (4 * i)
+					, usbss->irq_frame_th_rx0[i]);
+		dsps_writel(usbss_addr, usbsswrp->irq_tx1_frame_th_enb + (4 * i)
+					, usbss->irq_frame_th_tx1[i]);
+		dsps_writel(usbss_addr, usbsswrp->irq_rx1_frame_th_enb + (4 * i)
+					, usbss->irq_frame_th_rx1[i]);
+	}
+	for (i = 0 ; i < 2 ; i++) {
+		dsps_writel(usbss_addr, usbsswrp->irq_usb0_dma_enable + (4 * i),
+				usbss->irq_dma_en[i]);
+		dsps_writel(usbss_addr,
+			usbsswrp->irq_usb0_frame_enable + (4 * i),
+			usbss->irq_frame_en[i]);
+	}
+#endif
+	/* restore usbX register */
+	for (i = 0 ; i < 2 ; i++) {
+		struct dsps_usb_regs *usb = &glue->usb_regs[i];
+		const struct dsps_musb_wrapper *wrp = glue->wrp;
+		struct musb *musb = platform_get_drvdata(glue->musb[i]);
+		struct device *dev = musb->controller;
+		struct platform_device *pdev = to_platform_device(dev);
+		void __iomem *cbase = musb->ctrl_base;
+
+		musb_restore_context(musb);
+		musb_writel(cbase, wrp->control, usb->control);
+
+		for (j = 0 ; j < 2 ; j++)
+			musb_writel(cbase, wrp->epintr_set + (4 * j),
+					usb->irq_en_set[j]);
+
+#ifdef CONFIG_USB_TI_CPPI41_DMA
+		musb_writel(cbase, wrp->tx_mode, usb->tx_mode);
+		musb_writel(cbase, wrp->rx_mode, usb->rx_mode);
+
+		for (j = 0 ; j < 15 ; j++)
+			musb_writel(cbase, wrp->g_rndis + (j << 2),
+					usb->grndis_size[j]);
+
+		musb_writel(cbase, wrp->auto_req, usb->auto_req);
+		musb_writel(cbase, wrp->tear_down, usb->teardn);
+		musb_writel(cbase, wrp->th_xdma_idle, usb->th_xdma_idle);
+#endif
+		musb_writel(cbase, wrp->srp_fix_time, usb->srp_fix);
+		musb_writel(cbase, wrp->phy_utmi, usb->phy_utmi);
+		musb_writel(cbase, wrp->mgc_utmi_lpback,
+				usb->mgc_utmi_loopback);
+		musb_writel(cbase, wrp->mode, usb->mode);
+
+		/* reenable the timers */
+		if (glue->timer_enab[pdev->id] && is_host_active(musb)) {
+			mod_timer(&glue->timer[pdev->id],
+					jiffies + wrp->poll_seconds * HZ);
+			glue->timer_enab[pdev->id] = 0;
+		}
+		if (musb->en_otg_timer) {
+			mod_timer(&musb->otg_timer,
+					jiffies + wrp->poll_seconds * HZ);
+			musb->en_otg_timer = 0;
+		}
+	}
+	/* restore CPPI4.1 DMA register */
+#ifdef CONFIG_USB_TI_CPPI41_DMA
+	/* save CPPI4.1 DMA register for dma block 0 */
+	cppi41_restore_context(0);
+
+	/* controller needs 200ms delay to resume */
+	msleep(200);
+#endif
+}
+
 static int dsps_suspend(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev->parent);
 	struct dsps_glue *glue = platform_get_drvdata(pdev);
 	const struct dsps_musb_wrapper *wrp = glue->wrp;
-	int i;
+	int i, is_wkup;
 
-	for (i = 0; i < wrp->instances; i++)
-		musb_dsps_phy_control(glue, i, 0);
+	/* save wrappers and cppi4.1 dma register */
+	dsps_save_context(glue);
+
+	for (i = 0; i < wrp->instances; i++) {
+		is_wkup = device_may_wakeup(&glue->musb[i]->dev) ? true : false;
+		musb_dsps_phy_control(glue, i, 0, is_wkup);
+	}
 
 	return 0;
 }
@@ -711,8 +1608,20 @@ static int dsps_resume(struct device *dev)
 	const struct dsps_musb_wrapper *wrp = glue->wrp;
 	int i;
 
+	/*
+	 * ignore first call of resume as all registers are not yet
+	 * initialized
+	 */
+	if (glue->first) {
+		glue->first = 0;
+		return 0;
+	}
+
 	for (i = 0; i < wrp->instances; i++)
-		musb_dsps_phy_control(glue, i, 1);
+		musb_dsps_phy_control(glue, i, 1, false);
+
+	/* restore wrappers and cppi4.1 dma register */
+	dsps_restore_context(glue);
 
 	return 0;
 }
@@ -731,7 +1640,17 @@ static const struct dsps_musb_wrapper ti81xx_driver_data = {
 	.coreintr_set		= 0x3c,
 	.coreintr_clear		= 0x44,
 	.coreintr_status	= 0x34,
+#ifdef CONFIG_USB_TI_CPPI41_DMA
+	.tx_mode		= 0x70,
+	.rx_mode		= 0x74,
+	.g_rndis		= 0x80,
+	.auto_req		= 0xd0,
+	.tear_down		= 0xd8,
+	.th_xdma_idle		= 0xdc,
+#endif
+	.srp_fix_time		= 0xd4,
 	.phy_utmi		= 0xe0,
+	.mgc_utmi_lpback	= 0xe4,
 	.mode			= 0xe8,
 	.reset			= 0,
 	.otg_disable		= 21,
@@ -748,7 +1667,28 @@ static const struct dsps_musb_wrapper ti81xx_driver_data = {
 	.rxep_bitmap		= (0xfffe << 16),
 	.musb_core_offset	= 0x400,
 	.poll_seconds		= 2,
-	.instances		= 1,
+	.instances		= 2,
+	.usbss			=  {
+		.revision	= 0x00,
+		.syscfg		= 0x10,
+		.irq_eoi	= 0x20,
+		.irq_status_raw = 0x24,
+		.irq_status	= 0x28,
+		.irq_enable_set = 0x2c,
+		.irq_enable_clr = 0x30,
+		.irq_tx0_dma_th_enb = 0x100,
+		.irq_tx0_dma_th_enb = 0x110,
+		.irq_tx1_dma_th_enb = 0x120,
+		.irq_tx1_dma_th_enb = 0x130,
+		.irq_usb0_dma_enable = 0x140,
+		.irq_usb1_dma_enable = 0x144,
+		.irq_tx0_frame_th_enb = 0x200,
+		.irq_tx0_frame_th_enb = 0x210,
+		.irq_tx1_frame_th_enb = 0x220,
+		.irq_tx1_frame_th_enb = 0x230,
+		.irq_usb0_frame_enable = 0x240,
+		.irq_usb1_frame_enable = 0x244,
+	}
 };
 
 static const struct platform_device_id musb_dsps_id_table[] = {
