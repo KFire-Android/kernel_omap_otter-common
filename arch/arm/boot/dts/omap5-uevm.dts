@@ -179,19 +179,6 @@
 			0x6e 0x6	/* gpio3_79 OUTPUT | MODE 6 ETH_NRESET */
 		>;
 	};
-};
-
-&omap5_pmx_wkup {
-	pinctrl-names = "default";
-	pinctrl-0 = <
-			&usbhost_wkup_pins
-	>;
-
-	usbhost_wkup_pins: pinmux_usbhost_wkup_pins {
-		pinctrl-single,pins = <
-			0x1A 0x0	/* fref_clk1_out OUTPUT | MODE 7 for USB hub clk */
-		>;
-	};
 
 	dss_hdmi_pins: pinmux_dss_hdmi_pins {
 		pinctrl-single,pins = <
@@ -213,6 +200,20 @@
 			0x188 0x100	/* i2c5_sda.i2c5_sda INPUT | MODE0 */
 		>;
 	};
+};
+
+&omap5_pmx_wkup {
+	pinctrl-names = "default";
+	pinctrl-0 = <
+			&usbhost_wkup_pins
+	>;
+
+	usbhost_wkup_pins: pinmux_usbhost_wkup_pins {
+		pinctrl-single,pins = <
+			0x1A 0x0	/* fref_clk1_out OUTPUT | MODE 7 for USB hub clk */
+		>;
+	};
+
 };
 
 &mmc1 {
