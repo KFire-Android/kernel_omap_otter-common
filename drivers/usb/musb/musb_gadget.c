@@ -44,6 +44,7 @@
 #include <linux/slab.h>
 
 #include "musb_core.h"
+#include "musb_dma.h"
 
 
 /* MUSB PERIPHERAL status 3-mar-2006:
@@ -417,11 +418,24 @@ static void txstate(struct musb *musb, struct musb_request *req)
 			}
 		}
 
-#elif defined(CONFIG_USB_TI_CPPI_DMA)
+#elif defined(CONFIG_USB_TI_CPPI_DMA) || defined(CONFIG_USB_TI_CPPI41_DMA)
 		/* program endpoint CSR first, then setup DMA */
 		csr &= ~(MUSB_TXCSR_P_UNDERRUN | MUSB_TXCSR_TXPKTRDY);
-		csr |= MUSB_TXCSR_DMAENAB | MUSB_TXCSR_DMAMODE |
-		       MUSB_TXCSR_MODE;
+
+		/* use pio mode for zero byte transfer */
+		if (!request_size) {
+			csr &= ~(MUSB_TXCSR_DMAENAB | MUSB_TXCSR_TXPKTRDY);
+			musb_writew(epio, MUSB_TXCSR, csr);
+
+			csr &= ~(MUSB_TXCSR_DMAMODE);
+			use_dma = 0;
+		} else {
+			if (!musb->tx_isoc_sched_enable ||
+				musb_ep->type != USB_ENDPOINT_XFER_ISOC)
+				csr |= MUSB_TXCSR_DMAENAB | MUSB_TXCSR_DMAMODE |
+					MUSB_TXCSR_MODE;
+		}
+
 		musb_writew(epio, MUSB_TXCSR,
 			(MUSB_TXCSR_P_WZC_BITS & ~MUSB_TXCSR_P_UNDERRUN)
 				| csr);
@@ -676,7 +690,8 @@ static void rxstate(struct musb *musb, struct musb_request *req)
 		return;
 	}
 
-	if (is_cppi_enabled() && is_buffer_mapped(req)) {
+	if ((is_cppi_enabled() || is_cppi41_enabled())
+			&& is_buffer_mapped(req)) {
 		struct dma_controller	*c = musb->dma_controller;
 		struct dma_channel	*channel = musb_ep->dma;
 
@@ -1928,6 +1943,11 @@ static int musb_gadget_start(struct usb_gadget *g,
 	int			retval = 0;
 
 	if (driver->max_speed < USB_SPEED_HIGH) {
+		retval = -EINVAL;
+		goto err;
+	}
+
+	if (musb->port_mode == MUSB_PORT_MODE_HOST) {
 		retval = -EINVAL;
 		goto err;
 	}
