@@ -48,6 +48,12 @@
  */
 #define OMAP4_DPLL_ABE_DEFFREQ				98304000
 
+/*
+ * OMAP4450 TRM Rev X, section "3.6.3.9.5 DPLL_USB Preferred Settings"
+ * states it must be at 960MHz
+ */
+#define OMAP4_DPLL_USB_DEFFREQ				960000000
+
 /* Root clocks */
 
 DEFINE_CLK_FIXED_RATE(extalt_clkin_ck, CLK_IS_ROOT, 59000000, 0x0);
@@ -2021,6 +2027,19 @@ int __init omap4xxx_clk_init(void)
 
 	omap2_clk_enable_init_clocks(enable_init_clks,
 				     ARRAY_SIZE(enable_init_clks));
+
+	/*
+	 * Lock USB_DPLL to avoid issues with USB host and OFF mode
+	 */
+	rc = clk_set_rate(&dpll_usb_ck, OMAP4_DPLL_USB_DEFFREQ);
+	if (rc) {
+		pr_err("%s: failed to configure DPLL_USB: %d\n", __func__, rc);
+	} else {
+		rc = clk_set_rate(&dpll_usb_m2_ck, OMAP4_DPLL_USB_DEFFREQ/2);
+		if (rc)
+			pr_err("%s: failed to configure DPLL_USB_M2: %d\n",
+								__func__, rc);
+	}
 
 	/*
 	 * On OMAP4460 the ABE DPLL fails to turn on if in idle low-power
