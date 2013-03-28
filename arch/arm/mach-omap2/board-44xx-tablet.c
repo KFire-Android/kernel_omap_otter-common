@@ -38,6 +38,7 @@
 #include <linux/platform_data/lm75_platform_data.h>
 #include <linux/leds-omap4430sdp-display.h>
 #include <linux/omap4_duty_cycle_governor.h>
+#include <linux/omap_die_governor.h>
 
 #include <asm/hardware/gic.h>
 #include <asm/mach-types.h>
@@ -398,6 +399,19 @@ static void init_duty_governor(void)
 #else
 static void init_duty_governor(void){}
 #endif /*CONFIG_OMAP4_DUTY_CYCLE*/
+
+/* Initial set of thresholds for different thermal zones */
+static struct omap_thermal_zone thermal_zones[] = {
+	OMAP_THERMAL_ZONE("safe", 0, 25000, 65000, 250, 1000, 400),
+	OMAP_THERMAL_ZONE("monitor", 0, 60000, 80000, 250, 250,	250),
+	OMAP_THERMAL_ZONE("alert", 0, 75000, 90000, 250, 250, 150),
+	OMAP_THERMAL_ZONE("critical", 1, 85000,	115000,	250, 250, 50),
+};
+
+static struct omap_die_governor_pdata omap_gov_pdata = {
+	.zones = thermal_zones,
+	.zones_num = ARRAY_SIZE(thermal_zones),
+};
 
 static int omap4_twl6030_hsmmc_late_init(struct device *dev)
 {
@@ -1127,7 +1141,7 @@ static void __init omap_tablet_init(void)
 	omap4_ehci_ohci_init();
 	usb_musb_init(&musb_board_data);
 	init_duty_governor();
-
+	omap_die_governor_register_pdata(&omap_gov_pdata);
 	tablet_display_init();
 	status = omap_ethernet_init();
 	if (status) {
