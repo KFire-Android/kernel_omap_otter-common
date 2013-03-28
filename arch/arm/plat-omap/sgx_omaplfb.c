@@ -33,7 +33,17 @@
 #define OMAPLFB_NUM_DEV 1
 #endif
 
-static struct sgx_omaplfb_config omaplfb_config[OMAPLFB_NUM_DEV];
+static struct sgx_omaplfb_config omaplfb_config[OMAPLFB_NUM_DEV] = {
+	{
+	.tiler2d_buffers = 2,
+	.swap_chain_length = 2,
+	},
+	{
+	.tiler2d_buffers = 0,
+	.vram_buffers = 2,
+	.swap_chain_length = 2,
+	}
+};
 
 static struct sgx_omaplfb_platform_data omaplfb_plat_data = {
 	.num_configs = OMAPLFB_NUM_DEV,
