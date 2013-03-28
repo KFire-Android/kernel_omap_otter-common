@@ -2333,7 +2333,7 @@ static const char *hwmod_states[_HWMOD_STATE_COUNT] = {
 	[_HWMOD_STATE_DISABLED]         = "disabled",
 };
 
-const char *_state_str(u8 state)
+static const char *_state_str(u8 state)
 {
 	if (state >= _HWMOD_STATE_COUNT)
 		return "invalid_state";
