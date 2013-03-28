@@ -138,6 +138,9 @@
 #include <linux/spinlock.h>
 #include <linux/slab.h>
 #include <linux/bootmem.h>
+#include <linux/debugfs.h>
+#include <linux/seq_file.h>
+#include <linux/uaccess.h>
 
 #include "clock.h"
 #include "omap_hwmod.h"
@@ -588,9 +591,7 @@ static void _set_idle_ioring_wakeup(struct omap_hwmod *oh, bool set_wake)
 static int _enable_wakeup(struct omap_hwmod *oh, u32 *v)
 {
 	if (!oh->class->sysc ||
-	    !((oh->class->sysc->sysc_flags & SYSC_HAS_ENAWAKEUP) ||
-	      (oh->class->sysc->idlemodes & SIDLE_SMART_WKUP) ||
-	      (oh->class->sysc->idlemodes & MSTANDBY_SMART_WKUP)))
+	    !(oh->class->sysc->sysc_flags & SYSC_HAS_ENAWAKEUP))
 		return -EINVAL;
 
 	if (!oh->class->sysc->sysc_fields) {
@@ -601,14 +602,7 @@ static int _enable_wakeup(struct omap_hwmod *oh, u32 *v)
 	if (oh->class->sysc->sysc_flags & SYSC_HAS_ENAWAKEUP)
 		*v |= 0x1 << oh->class->sysc->sysc_fields->enwkup_shift;
 
-	if (oh->class->sysc->idlemodes & SIDLE_SMART_WKUP)
-		_set_slave_idlemode(oh, HWMOD_IDLEMODE_SMART_WKUP, v);
-	if (oh->class->sysc->idlemodes & MSTANDBY_SMART_WKUP)
-		_set_master_standbymode(oh, HWMOD_IDLEMODE_SMART_WKUP, v);
-
 	/* XXX test pwrdm_get_wken for this hwmod's subsystem */
-
-	oh->_int_flags |= _HWMOD_WAKEUP_ENABLED;
 
 	return 0;
 }
@@ -623,9 +617,7 @@ static int _enable_wakeup(struct omap_hwmod *oh, u32 *v)
 static int _disable_wakeup(struct omap_hwmod *oh, u32 *v)
 {
 	if (!oh->class->sysc ||
-	    !((oh->class->sysc->sysc_flags & SYSC_HAS_ENAWAKEUP) ||
-	      (oh->class->sysc->idlemodes & SIDLE_SMART_WKUP) ||
-	      (oh->class->sysc->idlemodes & MSTANDBY_SMART_WKUP)))
+	    !(oh->class->sysc->sysc_flags & SYSC_HAS_ENAWAKEUP))
 		return -EINVAL;
 
 	if (!oh->class->sysc->sysc_fields) {
@@ -636,14 +628,7 @@ static int _disable_wakeup(struct omap_hwmod *oh, u32 *v)
 	if (oh->class->sysc->sysc_flags & SYSC_HAS_ENAWAKEUP)
 		*v &= ~(0x1 << oh->class->sysc->sysc_fields->enwkup_shift);
 
-	if (oh->class->sysc->idlemodes & SIDLE_SMART_WKUP)
-		_set_slave_idlemode(oh, HWMOD_IDLEMODE_SMART, v);
-	if (oh->class->sysc->idlemodes & MSTANDBY_SMART_WKUP)
-		_set_master_standbymode(oh, HWMOD_IDLEMODE_SMART, v);
-
 	/* XXX test pwrdm_get_wken for this hwmod's subsystem */
-
-	oh->_int_flags &= ~_HWMOD_WAKEUP_ENABLED;
 
 	return 0;
 }
@@ -1355,13 +1340,25 @@ static void _enable_sysc(struct omap_hwmod *oh)
 
 	clkdm = _get_clkdm(oh);
 	if (sf & SYSC_HAS_SIDLEMODE) {
+		if (oh->flags & HWMOD_SWSUP_SIDLE ||
+				oh->flags & HWMOD_SWSUP_SIDLE_ACT) {
+			idlemode = HWMOD_IDLEMODE_NO;
+		} else {
+			if (oh->class->sysc->idlemodes & SIDLE_SMART_WKUP)
+				idlemode = HWMOD_IDLEMODE_SMART_WKUP;
+			else
+				idlemode = HWMOD_IDLEMODE_SMART;
+		}
+
+		/*
+		 * This is special handling for some IPs like
+		 * 32k sync timer. Force them to idle!
+		 */
 		clkdm_act = (clkdm && clkdm->flags & CLKDM_ACTIVE_WITH_MPU);
 		if (clkdm_act && !(oh->class->sysc->idlemodes &
 				   (SIDLE_SMART | SIDLE_SMART_WKUP)))
 			idlemode = HWMOD_IDLEMODE_FORCE;
-		else
-			idlemode = (oh->flags & HWMOD_SWSUP_SIDLE) ?
-				HWMOD_IDLEMODE_NO : HWMOD_IDLEMODE_SMART;
+
 		_set_slave_idlemode(oh, idlemode, &v);
 	}
 
@@ -1369,8 +1366,6 @@ static void _enable_sysc(struct omap_hwmod *oh)
 		if (oh->flags & HWMOD_SWSUP_MSTANDBY) {
 			idlemode = HWMOD_IDLEMODE_NO;
 		} else {
-			if (sf & SYSC_HAS_ENAWAKEUP)
-				_enable_wakeup(oh, &v);
 			if (oh->class->sysc->idlemodes & MSTANDBY_SMART_WKUP)
 				idlemode = HWMOD_IDLEMODE_SMART_WKUP;
 			else
@@ -1388,9 +1383,7 @@ static void _enable_sysc(struct omap_hwmod *oh)
 	    (sf & SYSC_HAS_CLOCKACTIVITY))
 		_set_clockactivity(oh, oh->class->sysc->clockact, &v);
 
-	/* If slave is in SMARTIDLE, also enable wakeup */
-	if ((sf & SYSC_HAS_SIDLEMODE) && !(oh->flags & HWMOD_SWSUP_SIDLE))
-		_enable_wakeup(oh, &v);
+	_enable_wakeup(oh, &v);
 
 	_write_sysconfig(v, oh);
 
@@ -1427,13 +1420,14 @@ static void _idle_sysc(struct omap_hwmod *oh)
 	sf = oh->class->sysc->sysc_flags;
 
 	if (sf & SYSC_HAS_SIDLEMODE) {
-		/* XXX What about HWMOD_IDLEMODE_SMART_WKUP? */
-		if (oh->flags & HWMOD_SWSUP_SIDLE ||
-		    !(oh->class->sysc->idlemodes &
-		      (SIDLE_SMART | SIDLE_SMART_WKUP)))
+		if (oh->flags & HWMOD_SWSUP_SIDLE) {
 			idlemode = HWMOD_IDLEMODE_FORCE;
-		else
-			idlemode = HWMOD_IDLEMODE_SMART;
+		} else {
+			if (oh->class->sysc->idlemodes & SIDLE_SMART_WKUP)
+				idlemode = HWMOD_IDLEMODE_SMART_WKUP;
+			else
+				idlemode = HWMOD_IDLEMODE_SMART;
+		}
 		_set_slave_idlemode(oh, idlemode, &v);
 	}
 
@@ -1441,8 +1435,6 @@ static void _idle_sysc(struct omap_hwmod *oh)
 		if (oh->flags & HWMOD_SWSUP_MSTANDBY) {
 			idlemode = HWMOD_IDLEMODE_FORCE;
 		} else {
-			if (sf & SYSC_HAS_ENAWAKEUP)
-				_enable_wakeup(oh, &v);
 			if (oh->class->sysc->idlemodes & MSTANDBY_SMART_WKUP)
 				idlemode = HWMOD_IDLEMODE_SMART_WKUP;
 			else
@@ -1451,9 +1443,7 @@ static void _idle_sysc(struct omap_hwmod *oh)
 		_set_master_standbymode(oh, idlemode, &v);
 	}
 
-	/* If slave is in SMARTIDLE, also enable wakeup */
-	if ((sf & SYSC_HAS_SIDLEMODE) && !(oh->flags & HWMOD_SWSUP_SIDLE))
-		_enable_wakeup(oh, &v);
+	_enable_wakeup(oh, &v);
 
 	_write_sysconfig(v, oh);
 }
@@ -2180,6 +2170,7 @@ static int _enable(struct omap_hwmod *oh)
  */
 static int _idle(struct omap_hwmod *oh)
 {
+	int r, hwsup = 0;
 	pr_debug("omap_hwmod: %s: idling\n", oh->name);
 
 	if (oh->_state != _HWMOD_STATE_ENABLED) {
@@ -2194,6 +2185,23 @@ static int _idle(struct omap_hwmod *oh)
 	if (oh->class->sysc)
 		_idle_sysc(oh);
 	_del_initiator_dep(oh, mpu_oh);
+	if (oh->clkdm && oh->clkdm->flags &&
+	    (oh->clkdm->flags & CLKDM_CAN_ENABLE_AUTO) &&
+	    (oh->prcm.omap4.modulemode == MODULEMODE_HWCTRL)) {
+		/*
+		 * For modules with modulemode configured as "auto" and
+		 * if this clockdomain supports HW_AUTO mode
+		 * the clockdomain must be in SW_WKUP before disabling
+		 * a module completely.
+		 */
+		hwsup = clkdm_in_hwsup(oh->clkdm);
+		r = clkdm_hwmod_enable(oh->clkdm, oh);
+		if (r) {
+			WARN(1, "omap_hwmod: %s: could not enable clockdomain %s: %d\n",
+			     oh->name, oh->clkdm->name, r);
+			return r;
+		}
+	}
 
 	if (soc_ops.disable_module)
 		soc_ops.disable_module(oh);
@@ -2205,8 +2213,11 @@ static int _idle(struct omap_hwmod *oh)
 	 * transition to complete properly.
 	 */
 	_disable_clocks(oh);
-	if (oh->clkdm)
+	if (oh->clkdm) {
+		if (hwsup)
+			clkdm_allow_idle(oh->clkdm);
 		clkdm_hwmod_disable(oh->clkdm, oh);
+	}
 
 	/* Mux pins for device idle if populated */
 	if (oh->mux && oh->mux->pads_dynamic) {
@@ -2220,42 +2231,6 @@ static int _idle(struct omap_hwmod *oh)
 }
 
 /**
- * omap_hwmod_set_ocp_autoidle - set the hwmod's OCP autoidle bit
- * @oh: struct omap_hwmod *
- * @autoidle: desired AUTOIDLE bitfield value (0 or 1)
- *
- * Sets the IP block's OCP autoidle bit in hardware, and updates our
- * local copy. Intended to be used by drivers that require
- * direct manipulation of the AUTOIDLE bits.
- * Returns -EINVAL if @oh is null or is not in the ENABLED state, or passes
- * along the return value from _set_module_autoidle().
- *
- * Any users of this function should be scrutinized carefully.
- */
-int omap_hwmod_set_ocp_autoidle(struct omap_hwmod *oh, u8 autoidle)
-{
-	u32 v;
-	int retval = 0;
-	unsigned long flags;
-
-	if (!oh || oh->_state != _HWMOD_STATE_ENABLED)
-		return -EINVAL;
-
-	spin_lock_irqsave(&oh->_lock, flags);
-
-	v = oh->_sysc_cache;
-
-	retval = _set_module_autoidle(oh, autoidle, &v);
-
-	if (!retval)
-		_write_sysconfig(v, oh);
-
-	spin_unlock_irqrestore(&oh->_lock, flags);
-
-	return retval;
-}
-
-/**
  * _shutdown - shutdown an omap_hwmod
  * @oh: struct omap_hwmod *
  *
@@ -2266,7 +2241,7 @@ int omap_hwmod_set_ocp_autoidle(struct omap_hwmod *oh, u8 autoidle)
  */
 static int _shutdown(struct omap_hwmod *oh)
 {
-	int ret, i;
+	int ret, i, hwsup = 0;
 	u8 prev_state;
 
 	if (oh->_state != _HWMOD_STATE_IDLE &&
@@ -2302,12 +2277,32 @@ static int _shutdown(struct omap_hwmod *oh)
 	/* clocks and deps are already disabled in idle */
 	if (oh->_state == _HWMOD_STATE_ENABLED) {
 		_del_initiator_dep(oh, mpu_oh);
+		if (oh->clkdm && oh->clkdm->flags &&
+		    (oh->clkdm->flags & CLKDM_CAN_ENABLE_AUTO) &&
+		    (oh->prcm.omap4.modulemode == MODULEMODE_HWCTRL)) {
+			/*
+			 * For modules with modulemode configured as "auto" and
+			 * if this clockdomain supports HW_AUTO mode
+			 * the clockdomain must be in SW_WKUP before disabling
+			 * a module completely.
+			 */
+			hwsup = clkdm_in_hwsup(oh->clkdm);
+			ret = clkdm_hwmod_enable(oh->clkdm, oh);
+			if (ret) {
+				WARN(1, "omap_hwmod: %s: could not enable clockdomain %s: %d\n",
+				     oh->name, oh->clkdm->name, ret);
+				return ret;
+			}
+		}
 		/* XXX what about the other system initiators here? dma, dsp */
 		if (soc_ops.disable_module)
 			soc_ops.disable_module(oh);
 		_disable_clocks(oh);
-		if (oh->clkdm)
+		if (oh->clkdm) {
+			if (hwsup)
+				clkdm_allow_idle(oh->clkdm);
 			clkdm_hwmod_disable(oh->clkdm, oh);
+		}
 	}
 	/* XXX Should this code also force-disable the optional clocks? */
 
@@ -2322,6 +2317,65 @@ static int _shutdown(struct omap_hwmod *oh)
 
 	return 0;
 }
+
+#if defined(CONFIG_DEBUG_FS)
+
+static struct dentry *omap_hwmod_dbg_dir;
+
+/* internal hwmod states */
+static const char *hwmod_states[_HWMOD_STATE_COUNT] = {
+	[_HWMOD_STATE_UNKNOWN]          = "unknown",
+	[_HWMOD_STATE_REGISTERED]       = "registered",
+	[_HWMOD_STATE_CLKS_INITED]      = "clks_inited",
+	[_HWMOD_STATE_INITIALIZED]      = "initialized",
+	[_HWMOD_STATE_ENABLED]          = "enabled",
+	[_HWMOD_STATE_IDLE]             = "idle",
+	[_HWMOD_STATE_DISABLED]         = "disabled",
+};
+
+const char *_state_str(u8 state)
+{
+	if (state >= _HWMOD_STATE_COUNT)
+		return "invalid_state";
+	return hwmod_states[state];
+}
+
+static int omap_hwmod_dbg_show(struct seq_file *s, void *unused)
+{
+	struct omap_hwmod *oh;
+
+	list_for_each_entry(oh, &omap_hwmod_list, node) {
+		seq_printf(s, "name: %16s, state %d/%s\n", oh->name,
+			oh->_state, _state_str(oh->_state));
+	}
+
+	return 0;
+}
+
+static int omap_hwmod_dbg_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, omap_hwmod_dbg_show, inode->i_private);
+}
+
+static const struct file_operations omap_hwmod_dbg_fops = {
+	.open		= omap_hwmod_dbg_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
+static void __init omap_hwmod_dbg_init(void)
+{
+	omap_hwmod_dbg_dir = debugfs_create_dir("omap_hwmod", NULL);
+	if (!omap_hwmod_dbg_dir)
+		return;
+
+	(void)debugfs_create_file("state", S_IRUGO, omap_hwmod_dbg_dir,
+					NULL, &omap_hwmod_dbg_fops);
+}
+
+#endif	/* CONFIG_DEBUG_FS */
+
 
 /**
  * _init_mpu_rt_base - populate the virtual address for a hwmod
@@ -2521,6 +2575,12 @@ static void __init _setup_postsetup(struct omap_hwmod *oh)
 		oh->_int_flags |= _HWMOD_SKIP_ENABLE;
 		postsetup_state = _HWMOD_STATE_ENABLED;
 	}
+
+	/*
+	 * Process HWMOD_NO_ACCESS: module should be disabled and not accessible
+	 */
+	if (oh->flags & HWMOD_ACCESS_DISABLED)
+		postsetup_state = _HWMOD_STATE_DISABLED;
 
 	if (postsetup_state == _HWMOD_STATE_IDLE)
 		_idle(oh);
@@ -3117,38 +3177,6 @@ error:
 }
 
 /**
- * omap_hwmod_set_slave_idlemode - set the hwmod's OCP slave idlemode
- * @oh: struct omap_hwmod *
- * @idlemode: SIDLEMODE field bits (shifted to bit 0)
- *
- * Sets the IP block's OCP slave idlemode in hardware, and updates our
- * local copy.  Intended to be used by drivers that have some erratum
- * that requires direct manipulation of the SIDLEMODE bits.  Returns
- * -EINVAL if @oh is null, or passes along the return value from
- * _set_slave_idlemode().
- *
- * XXX Does this function have any current users?  If not, we should
- * remove it; it is better to let the rest of the hwmod code handle this.
- * Any users of this function should be scrutinized carefully.
- */
-int omap_hwmod_set_slave_idlemode(struct omap_hwmod *oh, u8 idlemode)
-{
-	u32 v;
-	int retval = 0;
-
-	if (!oh)
-		return -EINVAL;
-
-	v = oh->_sysc_cache;
-
-	retval = _set_slave_idlemode(oh, idlemode, &v);
-	if (!retval)
-		_write_sysconfig(v, oh);
-
-	return retval;
-}
-
-/**
  * omap_hwmod_lookup - look up a registered omap_hwmod by name
  * @name: name of the omap_hwmod to look up
  *
@@ -3163,6 +3191,11 @@ struct omap_hwmod *omap_hwmod_lookup(const char *name)
 		return NULL;
 
 	oh = _lookup(name);
+	/* check access flag */
+	if (oh && oh->flags & HWMOD_ACCESS_DISABLED) {
+		pr_warning("omap_hwmod: %s: access denied\n", oh->name);
+		oh = NULL;
+	}
 
 	return oh;
 }
@@ -3300,6 +3333,10 @@ static int __init omap_hwmod_setup_all(void)
 
 	omap_hwmod_for_each(_init, NULL);
 	omap_hwmod_for_each(_setup, NULL);
+
+#ifdef CONFIG_DEBUG_FS
+	omap_hwmod_dbg_init();
+#endif
 
 	return 0;
 }
@@ -3453,6 +3490,40 @@ int omap_hwmod_reset(struct omap_hwmod *oh)
 	spin_unlock_irqrestore(&oh->_lock, flags);
 
 	return r;
+}
+
+
+/**
+ * omap_hwmod_register_flags - set/clear hwmod flags
+ * @ohs: pointer to an array of omap_hwmods to register new flags
+ * @set_flags: flags which have to be set
+ * @clear_flags: flags which have to be cleared
+ *
+ * Intended to be called early in boot before the clock framework is
+ * initialized.  If @ohs is not null, will set/clear flags.
+ * Allowed to be called only in REGISTERED state.
+ * Returns 0.
+ */
+int __init omap_hwmod_register_flags(struct omap_hwmod **ohs,
+					u32 set_flags, u32 clear_flags)
+{
+	int i = 0;
+
+	if (!ohs)
+		return 0;
+
+	/* scan through list of modules */
+	do {
+		/* allow to be called only in registered state */
+		if (ohs[i]->_state != _HWMOD_STATE_REGISTERED) {
+			i++;
+			continue;
+		}
+
+		ohs[i]->flags = (ohs[i]->flags & ~clear_flags) | set_flags;
+	} while (ohs[++i]);
+
+	return 0;
 }
 
 /*
@@ -3669,7 +3740,9 @@ struct powerdomain *omap_hwmod_get_pwrdm(struct omap_hwmod *oh)
 	if (oh->clkdm)
 		return oh->clkdm->pwrdm.ptr;
 
-	if (oh->_clk) {
+	if (oh->clkdm) {
+		return oh->clkdm->pwrdm.ptr;
+	} else if (oh->_clk) {
 		c = oh->_clk;
 	} else {
 		oi = _find_mpu_rt_port(oh);
@@ -3770,17 +3843,8 @@ int omap_hwmod_del_initiator_dep(struct omap_hwmod *oh,
 int omap_hwmod_enable_wakeup(struct omap_hwmod *oh)
 {
 	unsigned long flags;
-	u32 v;
 
 	spin_lock_irqsave(&oh->_lock, flags);
-
-	if (oh->class->sysc &&
-	    (oh->class->sysc->sysc_flags & SYSC_HAS_ENAWAKEUP)) {
-		v = oh->_sysc_cache;
-		_enable_wakeup(oh, &v);
-		_write_sysconfig(v, oh);
-	}
-
 	_set_idle_ioring_wakeup(oh, true);
 	spin_unlock_irqrestore(&oh->_lock, flags);
 

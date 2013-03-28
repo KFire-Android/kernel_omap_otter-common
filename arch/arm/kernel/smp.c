@@ -296,6 +296,7 @@ asmlinkage void __cpuinit secondary_start_kernel(void)
 {
 	struct mm_struct *mm = &init_mm;
 	unsigned int cpu;
+	static bool booted;
 
 	/*
 	 * The identity mapping is uncached (strongly ordered), so
@@ -328,7 +329,9 @@ asmlinkage void __cpuinit secondary_start_kernel(void)
 
 	notify_cpu_starting(cpu);
 
-	calibrate_delay();
+	if (!booted)
+		calibrate_delay();
+	booted = true;
 
 	smp_store_cpu_info(cpu);
 
@@ -691,6 +694,9 @@ static int cpufreq_callback(struct notifier_block *nb,
 	int cpu = freq->cpu;
 
 	if (freq->flags & CPUFREQ_CONST_LOOPS)
+		return NOTIFY_OK;
+
+	if (arm_delay_ops.const_clock)
 		return NOTIFY_OK;
 
 	if (!per_cpu(l_p_j_ref, cpu)) {

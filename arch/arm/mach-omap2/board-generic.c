@@ -141,6 +141,7 @@ DT_MACHINE_START(AM33XX_DT, "Generic AM33XX (Flattened Device Tree)")
 	.init_machine	= omap_generic_init,
 	.timer		= &omap3_am33xx_timer,
 	.dt_compat	= am33xx_boards_compat,
+	.restart	= am33xx_restart,
 MACHINE_END
 #endif
 
@@ -179,6 +180,7 @@ DT_MACHINE_START(OMAP5_DT, "Generic OMAP5 (Flattened Device Tree)")
 	.init_irq	= omap_gic_of_init,
 	.handle_irq	= gic_handle_irq,
 	.init_machine	= omap_generic_init,
+	.init_late	= omap5_init_late,
 	.timer		= &omap5_timer,
 	.dt_compat	= omap5_boards_compat,
 	.restart	= omap44xx_restart,

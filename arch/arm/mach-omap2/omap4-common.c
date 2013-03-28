@@ -20,6 +20,8 @@
 #include <linux/of_irq.h>
 #include <linux/of_platform.h>
 #include <linux/export.h>
+#include <linux/of_address.h>
+#include <linux/interrupt.h>
 
 #include <asm/hardware/gic.h>
 #include <asm/hardware/cache-l2x0.h>
@@ -38,6 +40,7 @@
 #include "omap4-sar-layout.h"
 #include "omap-secure.h"
 #include "sram.h"
+#include "omap44xx.h"
 
 #ifdef CONFIG_CACHE_L2X0
 static void __iomem *l2cache_base;
@@ -48,6 +51,7 @@ static void __iomem *gic_dist_base_addr;
 static void __iomem *twd_base;
 
 #define IRQ_LOCALTIMER		29
+#define OMAP54XX_IRQ_AXI (3 + OMAP44XX_IRQ_GIC_START)
 
 #ifdef CONFIG_OMAP4_ERRATA_I688
 /* Used to implement memory barrier on DRAM path */
@@ -88,7 +92,10 @@ void __init omap_barriers_init(void)
 	dram_io_desc[0].type = MT_MEMORY_SO;
 	iotable_init(dram_io_desc, ARRAY_SIZE(dram_io_desc));
 	dram_sync = (void __iomem *) dram_io_desc[0].virtual;
-	sram_sync = (void __iomem *) OMAP4_SRAM_VA;
+	if (cpu_is_omap44xx())
+		sram_sync = (void __iomem *)OMAP4_ERRATA_I688_SRAM_VA;
+	else
+		sram_sync = (void __iomem *)OMAP5_ERRATA_I688_SRAM_VA;
 
 	pr_info("OMAP4: Map 0x%08llx to 0x%08lx for dram barrier\n",
 		(long long) paddr, dram_io_desc[0].virtual);
@@ -239,15 +246,21 @@ void __iomem *omap4_get_sar_ram_base(void)
  */
 static int __init omap4_sar_ram_init(void)
 {
+	unsigned long sar_base;
+
 	/*
 	 * To avoid code running on other OMAPs in
 	 * multi-omap builds
 	 */
-	if (!cpu_is_omap44xx())
+	if (cpu_is_omap44xx())
+		sar_base = OMAP44XX_SAR_RAM_BASE;
+	else if (soc_is_omap54xx())
+		sar_base = OMAP54XX_SAR_RAM_BASE;
+	else
 		return -ENOMEM;
 
 	/* Static mapping, never released */
-	sar_ram_base = ioremap(OMAP44XX_SAR_RAM_BASE, SZ_16K);
+	sar_ram_base = ioremap(sar_base, SZ_16K);
 	if (WARN_ON(!sar_ram_base))
 		return -ENOMEM;
 
@@ -261,8 +274,28 @@ static struct of_device_id irq_match[] __initdata = {
 	{ }
 };
 
+static struct of_device_id twd_match[] __initdata = {
+	{ .compatible = "arm,cortex-a9-twd-timer", },
+	{ }
+};
+
 void __init omap_gic_of_init(void)
 {
+	struct device_node *np;
+
+	/* Extract GIC distributor and TWD bases for OMAP4460 ROM Errata WA */
+	if (!cpu_is_omap446x())
+		goto skip_errata_init;
+
+	np = of_find_matching_node(NULL, irq_match);
+	gic_dist_base_addr = of_iomap(np, 0);
+	WARN_ON(!gic_dist_base_addr);
+
+	np = of_find_matching_node(NULL, twd_match);
+	twd_base = of_iomap(np, 0);
+	WARN_ON(!twd_base);
+
+skip_errata_init:
 	omap_wakeupgen_init();
 	of_irq_init(irq_match);
 }
@@ -338,3 +371,40 @@ void omap44xx_restart(char mode, const char *cmd)
 	while (1);
 }
 
+
+static irqreturn_t axi_error_handler(int irq, void *unused)
+{
+	unsigned int err;
+
+	/* read L2ECTLR to decode the AXI error */
+	asm volatile("mrc p15, 1, %0, c9, c0, 3" : "=r" (err));
+
+	if (err == AXI_ERROR) {
+		WARN(true, "\n AXI error due to L2 ECC/GIC and " \
+				"Local pheripheral illegal writes");
+	} else if (err == AXI_L2_ERROR) {
+		WARN(true, "\n AXI error due to L2 ECC/GIC illegal write");
+	} else {
+		WARN(true, "\n AXI error with Local pheripheral");
+	}
+
+	/* Clear the error */
+	asm volatile("mcr p15, 1, %0, c9, c0, 3" : : "r" (0x0));
+
+	return IRQ_HANDLED;
+}
+
+static int __init omap5_axi_err_init(void)
+{
+	int ret;
+
+	if (!soc_is_omap54xx())
+		return 0;
+
+	ret = request_threaded_irq(OMAP54XX_IRQ_AXI,
+			axi_error_handler, (irq_handler_t) 0,
+			IRQF_DISABLED, "axi-err-irq", 0);
+
+	return ret;
+}
+postcore_initcall(omap5_axi_err_init);
