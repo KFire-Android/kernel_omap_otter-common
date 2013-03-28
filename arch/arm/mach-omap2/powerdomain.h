@@ -1,7 +1,7 @@
 /*
  * OMAP2/3/4 powerdomain control
  *
- * Copyright (C) 2007-2008, 2010 Texas Instruments, Inc.
+ * Copyright (C) 2007-2008, 2010-2012 Texas Instruments, Inc.
  * Copyright (C) 2007-2011 Nokia Corporation
  *
  * Paul Walmsley
@@ -19,10 +19,34 @@
 
 #include <linux/types.h>
 #include <linux/list.h>
-
-#include <linux/atomic.h>
+#include <linux/spinlock.h>
 
 #include "voltage.h"
+
+/*
+ * PWRDM_FPWRST_OFFSET: offset of the first functional power state
+ * from 0.  This offset can be subtracted from the functional power
+ * state macros to produce offsets suitable for array indices, for
+ * example.  The intention behind the addition of this offset is to
+ * prevent functional power states from accidentally being confused
+ * with the low-level, hardware power states.
+ */
+#define PWRDM_FPWRST_OFFSET		0x80
+
+/*
+ * Powerdomain functional power states, used by the external API functions
+ * These must match the order and names in _fpwrst_names[]
+ */
+enum pwrdm_func_state {
+	PWRDM_FUNC_PWRST_OFF		= PWRDM_FPWRST_OFFSET,
+	PWRDM_FUNC_PWRST_OSWR,
+	PWRDM_FUNC_PWRST_CSWR,
+	PWRDM_FUNC_PWRST_INACTIVE,
+	PWRDM_FUNC_PWRST_ON,
+	PWRDM_MAX_FUNC_PWRSTS		/* Last value, used as the max value */
+};
+
+#define PWRDM_FPWRSTS_COUNT	(PWRDM_MAX_FUNC_PWRSTS - PWRDM_FPWRST_OFFSET)
 
 /* Powerdomain basic power states */
 #define PWRDM_POWER_OFF		0x0
@@ -44,18 +68,43 @@
 #define PWRSTS_OFF_RET_ON	(PWRSTS_OFF_RET | PWRSTS_ON)
 
 
-/* Powerdomain flags */
-#define PWRDM_HAS_HDWR_SAR	(1 << 0) /* hardware save-and-restore support */
-#define PWRDM_HAS_MPU_QUIRK	(1 << 1) /* MPU pwr domain has MEM bank 0 bits
-					  * in MEM bank 1 position. This is
-					  * true for OMAP3430
-					  */
-#define PWRDM_HAS_LOWPOWERSTATECHANGE	(1 << 2) /*
-						  * support to transition from a
-						  * sleep state to a lower sleep
-						  * state without waking up the
-						  * powerdomain
-						  */
+/*
+ * Powerdomain flags (struct powerdomain.flags)
+ *
+ * PWRDM_HAS_HDWR_SAR - powerdomain has hardware save-and-restore support
+ *
+ * PWRDM_HAS_MPU_QUIRK - MPU pwr domain has MEM bank 0 bits in MEM
+ * bank 1 position. This is true for OMAP3430
+ *
+ * PWRDM_HAS_LOWPOWERSTATECHANGE - can transition from a sleep state
+ * to a lower sleep state without waking up the powerdomain
+ *
+ * PWRDM_ACTIVE_WITH_KERNEL - this powerdomain's current power state is
+ * guaranteed to be ON whenever the kernel is running
+ */
+#define PWRDM_HAS_HDWR_SAR		BIT(0)
+#define PWRDM_HAS_MPU_QUIRK		BIT(1)
+#define PWRDM_HAS_LOWPOWERSTATECHANGE	BIT(2)
+#define PWRDM_ACTIVE_WITH_KERNEL	BIT(3)
+
+/*
+ * Powerdomain internal flags (struct powerdomain._flags)
+ *
+ * _PWRDM_NEXT_FPWRST_IS_VALID: the locally-cached copy of the
+ *    powerdomain's next-functional-power-state -- struct
+ *    powerdomain.next_fpwrst -- is valid.  If this bit is not set,
+ *    the code needs to load the current value from the hardware.
+ *
+ * _PWRDM_PREV_FPWRST_IS_VALID: the locally-cached copy of the
+ *    powerdomain's previous-functional-power-state -- struct
+ *    powerdomain.prev_fpwrst -- is valid.  If this bit is not set,
+ *    the code needs to load the current value from the hardware.  The
+ *    previous-functional-power-state cache for the CORE and MPU needs
+ *    to be invalidated right before WFI, unless they were not programmed
+ *    to change power states.
+ */
+#define _PWRDM_NEXT_FPWRST_IS_VALID	BIT(0)
+#define _PWRDM_PREV_FPWRST_IS_VALID	BIT(1)
 
 /*
  * Number of memory banks that are power-controllable.	On OMAP4430, the
@@ -99,12 +148,23 @@ struct powerdomain;
  * @mem_pwrst_mask: (AM33XX only) mask for mem state bitfield in @pwrstst_offs
  * @mem_retst_mask: (AM33XX only) mask for mem retention state bitfield
  *	in @pwrstctrl_offs
- * @state:
- * @state_counter:
- * @timer:
- * @state_timer:
+ * @fpwrst: current func power state (set in pwrdm_state_switch() or post_trans)
+ * @fpwrst_counter: estimated number of times the pwrdm entered the power states
+ * @next_fpwrst: cache of the powerdomain's next-power-state
+ * @prev_fpwrst: cache of the powerdomain's previous-power-state bitfield
+ * @timer: sched_clock() timestamp of last pwrdm_state_switch()
+ * @fpwrst_timer: estimated nanoseconds of residency in the various power states
+ * @_lock: spinlock used to serialize powerdomain and some clockdomain ops
+ * @_lock_flags: stored flags when @_lock is taken
+ * @_flags: flags (for internal use only)
  *
  * @prcm_partition possible values are defined in mach-omap2/prcm44xx.h.
+ *
+ * @prev_fpwrst is updated during pwrdm_pre_transition(), but presumably
+ * should also be updated upon clock/IP block idle transitions.
+ *
+ * Possible values for @_flags are documented above in the
+ * "Powerdomain internal flags (struct powerdomain._flags)" comments.
  */
 struct powerdomain {
 	const char *name;
@@ -120,14 +180,16 @@ struct powerdomain {
 	const u8 pwrsts_mem_ret[PWRDM_MAX_MEM_BANKS];
 	const u8 pwrsts_mem_on[PWRDM_MAX_MEM_BANKS];
 	const u8 prcm_partition;
+	u8 fpwrst;
+	u8 next_fpwrst;
+	u8 prev_fpwrst;
+	u8 _flags;
 	struct clockdomain *pwrdm_clkdms[PWRDM_MAX_CLKDMS];
 	struct list_head node;
 	struct list_head voltdm_node;
-	int state;
-	unsigned state_counter[PWRDM_MAX_PWRSTS];
-	unsigned ret_logic_off_counter;
-	unsigned ret_mem_off_counter[PWRDM_MAX_MEM_BANKS];
-
+	unsigned fpwrst_counter[PWRDM_FPWRSTS_COUNT];
+	spinlock_t _lock;
+	unsigned long _lock_flags;
 	const u8 pwrstctrl_offs;
 	const u8 pwrstst_offs;
 	const u32 logicretstate_mask;
@@ -138,7 +200,7 @@ struct powerdomain {
 
 #ifdef CONFIG_PM_DEBUG
 	s64 timer;
-	s64 state_timer[PWRDM_MAX_PWRSTS];
+	s64 fpwrst_timer[PWRDM_FPWRSTS_COUNT];
 #endif
 };
 
@@ -202,37 +264,30 @@ int pwrdm_for_each_clkdm(struct powerdomain *pwrdm,
 				   struct clockdomain *clkdm));
 struct voltagedomain *pwrdm_get_voltdm(struct powerdomain *pwrdm);
 
-int pwrdm_get_mem_bank_count(struct powerdomain *pwrdm);
-
-int pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst);
-int pwrdm_read_next_pwrst(struct powerdomain *pwrdm);
-int pwrdm_read_pwrst(struct powerdomain *pwrdm);
-int pwrdm_read_prev_pwrst(struct powerdomain *pwrdm);
 int pwrdm_clear_all_prev_pwrst(struct powerdomain *pwrdm);
-
-int pwrdm_set_logic_retst(struct powerdomain *pwrdm, u8 pwrst);
-int pwrdm_set_mem_onst(struct powerdomain *pwrdm, u8 bank, u8 pwrst);
-int pwrdm_set_mem_retst(struct powerdomain *pwrdm, u8 bank, u8 pwrst);
-
-int pwrdm_read_logic_pwrst(struct powerdomain *pwrdm);
-int pwrdm_read_prev_logic_pwrst(struct powerdomain *pwrdm);
-int pwrdm_read_logic_retst(struct powerdomain *pwrdm);
-int pwrdm_read_mem_pwrst(struct powerdomain *pwrdm, u8 bank);
-int pwrdm_read_prev_mem_pwrst(struct powerdomain *pwrdm, u8 bank);
-int pwrdm_read_mem_retst(struct powerdomain *pwrdm, u8 bank);
 
 int pwrdm_enable_hdwr_sar(struct powerdomain *pwrdm);
 int pwrdm_disable_hdwr_sar(struct powerdomain *pwrdm);
 bool pwrdm_has_hdwr_sar(struct powerdomain *pwrdm);
 
-int pwrdm_wait_transition(struct powerdomain *pwrdm);
-
+int pwrdm_state_switch_nolock(struct powerdomain *pwrdm);
 int pwrdm_state_switch(struct powerdomain *pwrdm);
+int pwrdm_state_switch_nolock(struct powerdomain *pwrdm);
 int pwrdm_pre_transition(struct powerdomain *pwrdm);
 int pwrdm_post_transition(struct powerdomain *pwrdm);
-int pwrdm_set_lowpwrstchange(struct powerdomain *pwrdm);
 int pwrdm_get_context_loss_count(struct powerdomain *pwrdm);
 bool pwrdm_can_ever_lose_context(struct powerdomain *pwrdm);
+
+extern int omap_set_pwrdm_state(struct powerdomain *pwrdm, u8 state);
+
+extern const char *pwrdm_convert_fpwrst_to_name(u8 fpwrst);
+extern int pwrdm_set_next_fpwrst(struct powerdomain *pwrdm, u8 fpwrst);
+extern int pwrdm_read_next_fpwrst(struct powerdomain *pwrdm);
+extern int pwrdm_set_fpwrst(struct powerdomain *pwrdm,
+			    enum pwrdm_func_state fpwrst);
+extern int pwrdm_read_fpwrst(struct powerdomain *pwrdm);
+extern int pwrdm_read_prev_fpwrst(struct powerdomain *pwrdm);
+extern bool pwrdm_supports_fpwrst(struct powerdomain *pwrdm, u8 fpwrst);
 
 extern void omap242x_powerdomains_init(void);
 extern void omap243x_powerdomains_init(void);
@@ -254,5 +309,11 @@ extern u32 omap2_pwrdm_get_mem_bank_stst_mask(u8 bank);
 extern struct powerdomain wkup_omap2_pwrdm;
 extern struct powerdomain gfx_omap2_pwrdm;
 
+extern void pwrdm_lock(struct powerdomain *pwrdm);
+extern void pwrdm_unlock(struct powerdomain *pwrdm);
+
+/* Debugfs functions */
+extern int pwrdm_dbg_show_counter(struct powerdomain *pwrdm, void *seq_file);
+extern int pwrdm_dbg_show_timer(struct powerdomain *pwrdm, void *seq_file);
 
 #endif

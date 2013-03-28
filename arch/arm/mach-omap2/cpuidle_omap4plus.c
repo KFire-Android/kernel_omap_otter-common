@@ -26,45 +26,38 @@
 
 /* Machine specific information */
 struct idle_statedata {
-	u32 cpu_state;
-	u32 mpu_logic_state;
-	u32 mpu_state;
+	u8 cpu_pwrst;
+	u8 mpu_pwrst;
 	u32 mpu_state_vote;
 };
 
 static struct idle_statedata omap4_idle_data[] = {
 	{
-		.cpu_state = PWRDM_POWER_ON,
-		.mpu_state = PWRDM_POWER_ON,
-		.mpu_logic_state = PWRDM_POWER_RET,
+		.cpu_pwrst = PWRDM_FUNC_PWRST_ON,
+		.mpu_pwrst = PWRDM_FUNC_PWRST_ON,
 	},
 	{
-		.cpu_state = PWRDM_POWER_OFF,
-		.mpu_state = PWRDM_POWER_RET,
-		.mpu_logic_state = PWRDM_POWER_RET,
+		.cpu_pwrst = PWRDM_FUNC_PWRST_OFF,
+		.mpu_pwrst = PWRDM_FUNC_PWRST_CSWR,
 	},
 	{
-		.cpu_state = PWRDM_POWER_OFF,
-		.mpu_state = PWRDM_POWER_RET,
-		.mpu_logic_state = PWRDM_POWER_OFF,
+		.cpu_pwrst = PWRDM_FUNC_PWRST_OFF,
+		.mpu_pwrst = PWRDM_FUNC_PWRST_OSWR,
 	},
 };
 
 static struct idle_statedata omap5_idle_data[] = {
 	{
-		.cpu_state = PWRDM_POWER_ON,
-		.mpu_state = PWRDM_POWER_ON,
-		.mpu_logic_state = PWRDM_POWER_RET,
+		.cpu_pwrst = PWRDM_FUNC_PWRST_ON,
+		.mpu_pwrst = PWRDM_FUNC_PWRST_ON,
 	},
 	{
-		.cpu_state = PWRDM_POWER_RET,
-		.mpu_state = PWRDM_POWER_RET,
-		.mpu_logic_state = PWRDM_POWER_RET,
+		.cpu_pwrst = PWRDM_FUNC_PWRST_CSWR,
+		.mpu_pwrst = PWRDM_FUNC_PWRST_CSWR,
 	},
 	{
-		.cpu_state = PWRDM_POWER_OFF,
-		.mpu_state = PWRDM_POWER_RET,
-		.mpu_logic_state = PWRDM_POWER_OFF,
+		.cpu_pwrst = PWRDM_FUNC_PWRST_OFF,
+		.mpu_pwrst = PWRDM_FUNC_PWRST_OSWR,
 	},
 };
 
@@ -110,7 +103,7 @@ static int omap_enter_idle_coupled(struct cpuidle_device *dev,
 	 * out of coherency and in OFF mode.
 	 */
 	if (dev->cpu == 0 && cpumask_test_cpu(1, cpu_online_mask)) {
-		while (pwrdm_read_pwrst(cpu_pd[1]) != PWRDM_POWER_OFF) {
+		while (pwrdm_read_fpwrst(cpu_pd[1]) != PWRDM_FUNC_PWRST_OFF) {
 			cpu_relax();
 
 			/*
@@ -135,27 +128,25 @@ static int omap_enter_idle_coupled(struct cpuidle_device *dev,
 	cpu_pm_enter();
 
 	if (dev->cpu == 0) {
-		pwrdm_set_logic_retst(mpu_pd, cx->mpu_logic_state);
-		omap_set_pwrdm_state(mpu_pd, cx->mpu_state);
+		WARN_ON(pwrdm_set_next_fpwrst(mpu_pd, cx->mpu_pwrst));
 
 		/*
 		 * Call idle CPU cluster PM enter notifier chain
 		 * to save GIC and wakeupgen context.
 		 */
-		if ((cx->mpu_state == PWRDM_POWER_RET) &&
-			(cx->mpu_logic_state == PWRDM_POWER_OFF))
-				cpu_cluster_pm_enter();
+		if (cx->mpu_pwrst == PWRDM_FUNC_PWRST_OSWR)
+			cpu_cluster_pm_enter();
 	}
 
-	omap4_enter_lowpower(dev->cpu, cx->cpu_state);
+	omap4_mpuss_enter_lowpower(dev->cpu, cx->cpu_pwrst);
 	cpu_done[dev->cpu] = true;
 
 	/* Wakeup CPU1 only if it is not offlined */
 	if (dev->cpu == 0 && cpumask_test_cpu(1, cpu_online_mask)) {
 		/* Restore MPU PD state post idle */
-		omap_set_pwrdm_state(mpu_pd, PWRDM_POWER_ON);
+		pwrdm_set_next_fpwrst(mpu_pd, PWRDM_FUNC_PWRST_ON);
 		clkdm_wakeup(cpu_clkdm[1]);
-		omap_set_pwrdm_state(cpu_pd[1], PWRDM_POWER_ON);
+		pwrdm_set_next_fpwrst(cpu_pd[1], PWRDM_FUNC_PWRST_ON);
 		clkdm_allow_idle(cpu_clkdm[1]);
 	}
 
@@ -169,8 +160,7 @@ static int omap_enter_idle_coupled(struct cpuidle_device *dev,
 	 * Call idle CPU cluster PM exit notifier chain
 	 * to restore GIC and wakeupgen context.
 	 */
-	if ((cx->mpu_state == PWRDM_POWER_RET) &&
-		(cx->mpu_logic_state == PWRDM_POWER_OFF))
+	if (cx->mpu_pwrst == PWRDM_FUNC_PWRST_OSWR)
 		cpu_cluster_pm_exit();
 
 	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu_id);
@@ -194,17 +184,17 @@ static int omap_enter_idle_smp(struct cpuidle_device *dev,
 
 	raw_spin_lock_irqsave(&mpu_lock, flag);
 	cx->mpu_state_vote++;
-	if (cx->mpu_state_vote == num_online_cpus()) {
-		pwrdm_set_logic_retst(mpu_pd, cx->mpu_logic_state);
-		omap_set_pwrdm_state(mpu_pd, cx->mpu_state);
-	}
+	if (cx->mpu_state_vote == num_online_cpus())
+		pwrdm_set_next_fpwrst(mpu_pd, cx->mpu_pwrst);
+
 	raw_spin_unlock_irqrestore(&mpu_lock, flag);
 
-	omap4_enter_lowpower(dev->cpu, cx->cpu_state);
+	omap4_mpuss_enter_lowpower(dev->cpu, cx->cpu_pwrst);
 
 	raw_spin_lock_irqsave(&mpu_lock, flag);
 	if (cx->mpu_state_vote == num_online_cpus())
-		omap_set_pwrdm_state(mpu_pd, PWRDM_POWER_ON);
+		pwrdm_set_next_fpwrst(mpu_pd, PWRDM_FUNC_PWRST_ON);
+
 	cx->mpu_state_vote--;
 	raw_spin_unlock_irqrestore(&mpu_lock, flag);
 

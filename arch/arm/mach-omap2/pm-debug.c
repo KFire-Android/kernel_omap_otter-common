@@ -52,98 +52,6 @@ enum {
 	DEBUG_FILE_TIMERS,
 };
 
-static const char pwrdm_state_names[][PWRDM_MAX_PWRSTS] = {
-	"OFF",
-	"RET",
-	"INA",
-	"ON"
-};
-
-void pm_dbg_update_time(struct powerdomain *pwrdm, int prev)
-{
-	s64 t;
-
-	if (!pm_dbg_init_done)
-		return ;
-
-	/* Update timer for previous state */
-	t = sched_clock();
-
-	pwrdm->state_timer[prev] += t - pwrdm->timer;
-
-	pwrdm->timer = t;
-}
-
-static int clkdm_dbg_show_counter(struct clockdomain *clkdm, void *user)
-{
-	struct seq_file *s = (struct seq_file *)user;
-
-	if (strcmp(clkdm->name, "emu_clkdm") == 0 ||
-		strcmp(clkdm->name, "wkup_clkdm") == 0 ||
-		strncmp(clkdm->name, "dpll", 4) == 0)
-		return 0;
-
-	seq_printf(s, "%s->%s (%d)", clkdm->name,
-			clkdm->pwrdm.ptr->name,
-			atomic_read(&clkdm->usecount));
-	seq_printf(s, "\n");
-
-	return 0;
-}
-
-static int pwrdm_dbg_show_counter(struct powerdomain *pwrdm, void *user)
-{
-	struct seq_file *s = (struct seq_file *)user;
-	int i;
-
-	if (strcmp(pwrdm->name, "emu_pwrdm") == 0 ||
-		strcmp(pwrdm->name, "wkup_pwrdm") == 0 ||
-		strncmp(pwrdm->name, "dpll", 4) == 0)
-		return 0;
-
-	if (pwrdm->state != pwrdm_read_pwrst(pwrdm))
-		printk(KERN_ERR "pwrdm state mismatch(%s) %d != %d\n",
-			pwrdm->name, pwrdm->state, pwrdm_read_pwrst(pwrdm));
-
-	seq_printf(s, "%s (%s)", pwrdm->name,
-			pwrdm_state_names[pwrdm->state]);
-	for (i = 0; i < PWRDM_MAX_PWRSTS; i++)
-		seq_printf(s, ",%s:%d", pwrdm_state_names[i],
-			pwrdm->state_counter[i]);
-
-	seq_printf(s, ",RET-LOGIC-OFF:%d", pwrdm->ret_logic_off_counter);
-	for (i = 0; i < pwrdm->banks; i++)
-		seq_printf(s, ",RET-MEMBANK%d-OFF:%d", i + 1,
-				pwrdm->ret_mem_off_counter[i]);
-
-	seq_printf(s, "\n");
-
-	return 0;
-}
-
-static int pwrdm_dbg_show_timer(struct powerdomain *pwrdm, void *user)
-{
-	struct seq_file *s = (struct seq_file *)user;
-	int i;
-
-	if (strcmp(pwrdm->name, "emu_pwrdm") == 0 ||
-		strcmp(pwrdm->name, "wkup_pwrdm") == 0 ||
-		strncmp(pwrdm->name, "dpll", 4) == 0)
-		return 0;
-
-	pwrdm_state_switch(pwrdm);
-
-	seq_printf(s, "%s (%s)", pwrdm->name,
-		pwrdm_state_names[pwrdm->state]);
-
-	for (i = 0; i < 4; i++)
-		seq_printf(s, ",%s:%lld", pwrdm_state_names[i],
-			pwrdm->state_timer[i]);
-
-	seq_printf(s, "\n");
-	return 0;
-}
-
 static int pm_dbg_show_counters(struct seq_file *s, void *unused)
 {
 	pwrdm_for_each(pwrdm_dbg_show_counter, s);
@@ -172,10 +80,10 @@ static int pm_dbg_open(struct inode *inode, struct file *file)
 }
 
 static const struct file_operations debug_fops = {
-	.open           = pm_dbg_open,
-	.read           = seq_read,
-	.llseek         = seq_lseek,
-	.release        = single_release,
+	.open		= pm_dbg_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
 };
 
 static int pwrdm_suspend_get(void *data, u64 *val)
@@ -204,16 +112,7 @@ DEFINE_SIMPLE_ATTRIBUTE(pwrdm_suspend_fops, pwrdm_suspend_get,
 
 static int __init pwrdms_setup(struct powerdomain *pwrdm, void *dir)
 {
-	int i;
-	s64 t;
 	struct dentry *d;
-
-	t = sched_clock();
-
-	for (i = 0; i < 4; i++)
-		pwrdm->state_timer[i] = 0;
-
-	pwrdm->timer = t;
 
 	if (strncmp(pwrdm->name, "dpll", 4) == 0)
 		return 0;
