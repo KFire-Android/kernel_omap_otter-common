@@ -21,7 +21,6 @@
 #include <linux/export.h>
 #include <linux/device.h>
 #include <linux/mutex.h>
-#include <linux/firmware.h>
 #include <linux/string.h>
 #include <linux/list.h>
 #include <linux/elf.h>
@@ -106,50 +105,82 @@ void rproc_secure_reset(struct rproc *rproc)
 }
 
 /**
- * rproc_secure_boot() - Secure ducati code during boot
- * @rproc: rproc handle
- * @fw:	firmware image loaded into core
+ * rproc_secure_get_mode() - get the current requested secure mode
+ * @rproc: remote processor
  *
- * Parse the fw image to locate sections and location of memory
- * that is to be firewalled for secure playback. Invoke secure
- * service to authenticate ducati boot code (blocking call) and
- * then invoke the workqueue to authenticate all remaining code.
- * In addition, it looks at all carveout memory to update a list
- * of TTBR entries that is provided to secure service.
- *
- * The function should be called after all code has been loaded to
- * memory. The .certificate section contains certificate used for
- * authentication. The .iommu_ttbr section contains list of TTBR
- * entries provided to secure service. The .secure_params section
- * contains the struct tf_rproc_sec_params that contains all data
- * passed to secure service. The .iommu_ttbr_updates section contains
- * details of carveout sections that are dynamically loaded and the
- * TTBR entries for these sections are updated here. Location of
- * secure input and secure_output buffers are also provided to the
- * secure service.
- *
- * Returns 0 on success and if image is unsigned
+ * This function is called by the remoteproc core driver code to
+ * retrieve the current requested mode.
  */
-int rproc_secure_boot(struct rproc *rproc, const struct firmware *fw)
+int rproc_secure_get_mode(struct rproc *rproc)
 {
-	struct device *dev = &rproc->dev;
+	if (strcmp(rproc->name, "ipu_c0"))
+		return 0;
+
+	return secure_request;
+}
+
+/**
+ * rproc_secure_get_ttb() - get the ttbr value
+ * @rproc: remote processor
+ *
+ * This function is called by the remoteproc core driver code to get
+ * the iommu ttbr address to program the iommu for secure mode. The
+ * ttbr address is obtained during the parsing of the firmware data
+ * image, and serves no purpose in regular mode.
+ */
+int rproc_secure_get_ttb(struct rproc *rproc)
+{
+	if (strcmp(rproc->name, "ipu_c0"))
+		return 0;
+
+	if (!secure_params)
+		return 0;
+
+	return secure_params->ducati_page_table_address;
+}
+
+/**
+ * rproc_secure_parse_fw() - Parse the fw for secure sections
+ * @rproc: rproc handle
+ *
+ * This function parses the fw image to locate sections and location
+ * of memory that is to be firewalled for secure playback. In addition,
+ * it looks at all the carveout memory entries to update a list of
+ * parameters that are passed onto the secure service. The parameters
+ * also include the location of the secure input and secure_output
+ * buffers.
+ *
+ * This function should be called after the resource table has been
+ * processed and before configuring the iommu. There are mainly 4
+ * secure sections expected in a firmware image. All the sections are
+ * needed for booting the processor in secure mode.
+ *
+ * The .certificate section contains certificate used for authentication.
+ * The .iommu_ttbr section contains the L1 table for the MMU. The
+ * .secure_params section contains the struct tf_rproc_sec_params that
+ * contains all data passed to secure service. The .iommu_ttbr_updates
+ * section contains details of carveout sections that are dynamically
+ * loaded and the TTBR entries for these sections are updated here.
+ *
+ * Returns 0 on success or if image is unsigned
+ */
+int rproc_secure_parse_fw(struct rproc *rproc, const u8 *elf_data)
+{
 	int ret = 0;
 	void *ptr;
 	u32  ttbr_da = 0, toc_da = 0, *ttbr = NULL, i;
+	struct device *dev = &rproc->dev;
 	struct rproc_iommu_ttbr_update *ttbru = NULL;
 	struct rproc_mem_entry *maps = NULL;
-	struct elf32_hdr *ehdr = (struct elf32_hdr *) fw->data;
-	struct elf32_shdr *shdr =
-		(struct elf32_shdr *) (fw->data + ehdr->e_shoff);
-	const char *name_sect = fw->data + shdr[ehdr->e_shstrndx].sh_offset;
-	enum rproc_secure_state state = secure_state;
+	struct elf32_hdr *ehdr = (struct elf32_hdr *)elf_data;
+	struct elf32_shdr *shdr = (struct elf32_shdr *)
+					(elf_data + ehdr->e_shoff);
+	const char *name_sect = elf_data + shdr[ehdr->e_shstrndx].sh_offset;
 
 	if (strcmp(rproc->name, "ipu_c0"))
 		return 0;
 
-	/* enter secure authentication process */
-
-	/* parse fw image to location of required data sections */
+	/* parse fw image for required data sections */
 	for (i = 0; i < ehdr->e_shnum; i++, shdr++) {
 		u32 filesz = shdr->sh_size;
 		u32 da = shdr->sh_addr;
@@ -168,12 +199,13 @@ int rproc_secure_boot(struct rproc *rproc, const struct firmware *fw)
 		} else if (!strcmp(name, ".iommu_ttbr_updates")) {
 			ptr = rproc_da_to_va(rproc, da, filesz);
 			ttbru = (struct rproc_iommu_ttbr_update *) ptr;
-		} else
+		} else {
 			continue;
+		}
 
 		if (!ptr) {
-			dev_err(dev, "bad phdr da 0x%x mem 0x%x\n",
-				da, filesz);
+			dev_err(dev, "bad phdr da 0x%x mem 0x%x\n", da,
+								filesz);
 			ret = -EINVAL;
 			goto out;
 		}
@@ -181,18 +213,17 @@ int rproc_secure_boot(struct rproc *rproc, const struct firmware *fw)
 
 	/* assume image is unsigned if required sections are missing */
 	if (!toc_da || !ttbr || !secure_params || !ttbru) {
-		dev_dbg(dev, "unsigned ducati image\n");
+		secure_params = NULL;
+		dev_dbg(dev, "ipu firmware image is not signed\n");
 		goto out;
 	}
 
-	/* update params for secure service */
+	/* update params for passing onto secure service */
 	list_for_each_entry(maps, &rproc->carveouts, node) {
 		if (maps->memregion == RPROC_MEMREGION_CODE) {
-			/* update location of carveout region */
 			secure_params->ducati_code = maps->dma;
 			secure_params->ducati_code_size = maps->len;
 
-			/* convert device address to physical addr */
 			secure_params->ducati_toc_address =
 				maps->dma - maps->da + toc_da;
 			secure_params->ducati_page_table_address =
@@ -207,6 +238,7 @@ int rproc_secure_boot(struct rproc *rproc, const struct firmware *fw)
 			secure_params->ducati_smem = maps->dma;
 			secure_params->ducati_smem_size = maps->len;
 		}
+
 		/* update TTBR entries for this carveout region */
 		for (i = 0; i < ttbru->count; i++)
 			ttbr[ttbru->index + i] += maps->dma;
@@ -220,16 +252,43 @@ int rproc_secure_boot(struct rproc *rproc, const struct firmware *fw)
 			secure_params->ducati_vring_size = maps->len;
 		}
 		if (maps->memregion == RPROC_MEMREGION_1D) {
-			/* TODO: Hardcoded NEED to be acquired from ION */
 			secure_params->secure_buffer_address = maps->dma;
 			secure_params->secure_buffer_size = maps->len;
 		}
 	}
 
-	/* TODO: Hardcoded NEED to be acquired from ION */
+	/* FIXME: hardcoded, NEED to be acquired from ION */
 	secure_params->decoded_buffer_address = (dma_addr_t) 0xB4300000;
 	secure_params->decoded_buffer_size = (uint32_t) 0x6000000;
 
+out:
+	return ret;
+}
+
+/**
+ * rproc_secure_boot() - Secure ducati code during boot
+ * @rproc: rproc handle
+ *
+ * This function invoke the different secure services to authenticate
+ * the ipu code and data sections (blocking calls). A bunch of secure
+ * parameters are passed to allow the secure side to configure itself
+ * and authenticate the image properly.
+ *
+ * This function should be called after all code has been loaded to
+ * memory, and just before releasing the processor reset.
+ *
+ * Returns 0 on success, or an appropriate error code otherwise
+ */
+int rproc_secure_boot(struct rproc *rproc)
+{
+	int ret = 0;
+	struct device *dev = &rproc->dev;
+	enum rproc_secure_state state = secure_state;
+
+	if (strcmp(rproc->name, "ipu_c0"))
+		return 0;
+
+	/* enter secure authentication process */
 	if (secure_request) {
 		/* TODO: consolidate the back to back authentication calls */
 		/* validate boot section */
@@ -249,7 +308,7 @@ int rproc_secure_boot(struct rproc *rproc, const struct firmware *fw)
 			goto out;
 		}
 
-		/* invoke secure service for secure mode */
+		/* invoke secure service for entering secure mode */
 		ret = rproc_secure_drm_service(
 				ENTER_SECURE_PLAYBACK_AFTER_AUTHENTICATION,
 				secure_params);

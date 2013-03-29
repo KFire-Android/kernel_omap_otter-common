@@ -377,6 +377,11 @@ static int load_iotlb_entry(struct omap_iommu *obj, struct iotlb_entry *e)
 	struct iotlb_lock l;
 	struct cr_regs *cr;
 
+	if (obj && obj->secure_mode) {
+		WARN_ON(1);
+		return -EBUSY;
+	}
+
 	if (!obj || !obj->nr_tlb_entries || !e)
 		return -EINVAL;
 
@@ -453,6 +458,11 @@ static void flush_iotlb_page(struct omap_iommu *obj, u32 da)
 {
 	int i;
 	struct cr_regs cr;
+
+	if (obj && obj->secure_mode) {
+		WARN_ON(1);
+		return;
+	}
 
 	pm_runtime_get_sync(obj->dev);
 
@@ -751,6 +761,11 @@ int omap_iopgtable_store_entry(struct omap_iommu *obj, struct iotlb_entry *e)
 {
 	int err;
 
+	if (obj && obj->secure_mode) {
+		WARN_ON(1);
+		return -EBUSY;
+	}
+
 	flush_iotlb_page(obj, e->da);
 	err = iopgtable_store_entry_core(obj, e);
 	if (!err)
@@ -769,7 +784,12 @@ EXPORT_SYMBOL_GPL(omap_iopgtable_store_entry);
 static void
 iopgtable_lookup_entry(struct omap_iommu *obj, u32 da, u32 **ppgd, u32 **ppte)
 {
-	u32 *iopgd, *iopte = NULL;
+	u32 *iopgd = NULL, *iopte = NULL;
+
+	if (obj && obj->secure_mode) {
+		WARN_ON(1);
+		goto out;
+	}
 
 	iopgd = iopgd_offset(obj, da);
 	if (!*iopgd)
@@ -838,6 +858,11 @@ out:
 static size_t iopgtable_clear_entry(struct omap_iommu *obj, u32 da)
 {
 	size_t bytes;
+
+	if (obj && obj->secure_mode) {
+		WARN_ON(1);
+		return 0;
+	}
 
 	spin_lock(&obj->page_table_lock);
 
@@ -930,14 +955,17 @@ static int device_match_by_alias(struct device *dev, void *data)
 /**
  * omap_iommu_attach() - attach iommu device to an iommu domain
  * @name:	name of target omap iommu device
- * @iopgd:	page table
+ * @domain:	iommu domain the device belongs to
  **/
-static struct omap_iommu *omap_iommu_attach(const char *name, u32 *iopgd)
+static struct omap_iommu *omap_iommu_attach(const char *name,
+						struct iommu_domain *domain)
 {
 	int err = -ENOMEM;
 	struct device *dev;
 	struct omap_iommu *obj;
-	int pm_constraint;
+	struct omap_iommu_domain *omap_domain = domain->priv;
+	int *data = domain->iommu_data;
+	int pm_constraint = 0;
 
 	dev = driver_find_device(&omap_iommu_driver.driver, NULL,
 				(void *)name,
@@ -963,7 +991,11 @@ static struct omap_iommu *omap_iommu_attach(const char *name, u32 *iopgd)
 			goto err_enable;
 	}
 
-	obj->iopgd = iopgd;
+	obj->iopgd = omap_domain->pgtable;
+	if (data) {
+		obj->secure_mode = data[0];
+		obj->secure_ttb = (void *)data[1];
+	}
 	err = iommu_enable(obj);
 	if (err)
 		goto err_enable;
@@ -1207,7 +1239,7 @@ omap_iommu_attach_dev(struct iommu_domain *domain, struct device *dev)
 	}
 
 	/* get a handle to and enable the omap iommu */
-	oiommu = omap_iommu_attach(arch_data->name, omap_domain->pgtable);
+	oiommu = omap_iommu_attach(arch_data->name, domain);
 	if (IS_ERR(oiommu)) {
 		ret = PTR_ERR(oiommu);
 		dev_err(dev, "can't get omap iommu: %d\n", ret);
