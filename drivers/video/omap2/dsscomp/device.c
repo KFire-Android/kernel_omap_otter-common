@@ -47,6 +47,7 @@
 
 #include <linux/debugfs.h>
 
+
 static DECLARE_WAIT_QUEUE_HEAD(waitq);
 static DEFINE_MUTEX(wait_mtx);
 bool alpha_only = true;
@@ -355,11 +356,9 @@ static long query_display(struct dsscomp_dev *cdev,
 	}
 	dis->mgr.ix = dis->ix;
 
-#ifdef HDMI_ENABLED
 	if (dev->driver && dis->modedb_len && dev->driver->get_modedb)
 		dis->modedb_len = dev->driver->get_modedb(dev,
 			(struct fb_videomode *)dis->modedb, dis->modedb_len);
-#endif
 	return 0;
 }
 
@@ -461,12 +460,10 @@ static long setup_display(struct dsscomp_dev *cdev,
 	if (!dev)
 		return -EINVAL;
 
-#ifdef HDMI_ENABLED
 	if (dev->driver->set_mode)
 		return dev->driver->set_mode(dev,
 				(struct fb_videomode *)&dis->mode);
 	else
-#endif
 		return 0;
 }
 
