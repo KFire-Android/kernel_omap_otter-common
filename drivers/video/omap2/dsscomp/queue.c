@@ -593,6 +593,19 @@ skip_ovl_set:
 		/* keep error if set_mgr_info failed */
 		if (!r && !cb_programmed)
 			r = -EINVAL;
+		for (oix = 0; oix < comp->frm.num_ovls; oix++) {
+			struct dss2_ovl_info *oi = comp->ovls + oix;
+			ovl = cdev->ovls[oi->cfg.ix];
+			if (oi->cfg.enabled) {
+				r = ovl->enable(ovl);
+				if (r) {
+					dev_err(DEV(cdev), "[%p] "
+						"enable overlay%d failed\n",
+						comp, ovl->id);
+					goto err;
+				}
+			}
+		}
 	}
 	mutex_unlock(&mtx);
 
@@ -623,6 +636,9 @@ skip_ovl_set:
 			mgr->wait_for_vsync(mgr);
 	}
 
+	return r;
+err:
+	mutex_unlock(&mtx);
 done:
 	return r;
 }
