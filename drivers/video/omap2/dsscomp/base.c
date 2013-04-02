@@ -206,6 +206,7 @@ int set_dss_ovl_info(struct dss2_ovl_info *oi)
 
 	info.global_alpha = cfg->global_alpha;
 	info.pre_mult_alpha = cfg->pre_mult_alpha;
+	info.wb_source = cfg->wb_source;
 	info.rotation = cfg->rotation;
 	info.mirror = cfg->mirror;
 	info.color_mode = cfg->color_mode;
@@ -217,9 +218,10 @@ int set_dss_ovl_info(struct dss2_ovl_info *oi)
 	vis.w = ovl->manager->output->device->panel.timings.x_res;
 	vis.h = ovl->manager->output->device->panel.timings.y_res;
 
-	if (crop_to_rect(&crop, &win, &vis, cfg->rotation, cfg->mirror) ||
-								vis.w < 2)
-		goto done;
+	if (!info.wb_source)
+		if (crop_to_rect(&crop, &win, &vis, cfg->rotation,
+						cfg->mirror) || vis.w < 2)
+			goto done;
 
 	/* adjust crop to UV pixel boundaries */
 	for (c = 0; c < (cfg->color_mode == OMAP_DSS_COLOR_NV12 ? 2 :
