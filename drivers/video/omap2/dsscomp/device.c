@@ -650,6 +650,7 @@ static const struct file_operations dsscomp_debug_fops = {
 static int dsscomp_probe(struct platform_device *pdev)
 {
 	int ret;
+	int r = 0;
 	struct dsscomp_dev *cdev = kzalloc(sizeof(*cdev), GFP_KERNEL);
 	if (!cdev) {
 		pr_err("dsscomp: failed to allocate device.\n");
@@ -678,6 +679,12 @@ static int dsscomp_probe(struct platform_device *pdev)
 		debugfs_create_file("log", S_IRUGO,
 			cdev->dbgfs, dsscomp_dbg_events, &dsscomp_debug_fops);
 #endif
+	}
+
+	r = omapdss_compat_init();
+	if (r) {
+		pr_err("dsscomp: compatibility mode not initialized");
+		return r;
 	}
 
 	cdev->pdev = &pdev->dev;
