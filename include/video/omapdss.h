@@ -578,6 +578,7 @@ struct omap_overlay {
 	enum omap_plane id;
 	enum omap_color_mode supported_modes;
 	enum omap_overlay_caps caps;
+	bool enabled;
 
 	/* dynamic fields */
 	struct omap_overlay_manager *manager;
@@ -639,6 +640,12 @@ struct omap_overlay_manager {
 
 	/* dynamic fields */
 	struct omap_dss_output *output;
+
+	/* Overlays associated with the manager */
+	struct omap_overlay *ovls[5];
+
+	/* No of overlays for the manager that requires update */
+	u16 num_ovls;
 
 	/*
 	 * The following functions do not block:
