@@ -284,9 +284,10 @@ DEFINE_STRUCT_CLK(dpll_disp_ck, dpll_core_ck_parents, dpll_ddr_ck_ops);
  * TODO: Add clksel here (sys_clkin, CORE_CLKOUTM6, PER_CLKOUTM2
  * and ALT_CLK1/2)
  */
-DEFINE_CLK_DIVIDER(dpll_disp_m2_ck, "dpll_disp_ck", &dpll_disp_ck, 0x0,
-		   AM33XX_CM_DIV_M2_DPLL_DISP, AM33XX_DPLL_CLKOUT_DIV_SHIFT,
-		   AM33XX_DPLL_CLKOUT_DIV_WIDTH, CLK_DIVIDER_ONE_BASED, NULL);
+DEFINE_CLK_DIVIDER(dpll_disp_m2_ck, "dpll_disp_ck", &dpll_disp_ck,
+		   CLK_SET_RATE_PARENT, AM33XX_CM_DIV_M2_DPLL_DISP,
+		   AM33XX_DPLL_CLKOUT_DIV_SHIFT, AM33XX_DPLL_CLKOUT_DIV_WIDTH,
+		   CLK_DIVIDER_ONE_BASED, NULL);
 
 /* DPLL_PER */
 static struct dpll_data dpll_per_dd = {
@@ -441,9 +442,29 @@ DEFINE_CLK_GATE(cefuse_fck, "sys_clkin_ck", &sys_clkin_ck, 0x0,
  */
 DEFINE_CLK_FIXED_FACTOR(clkdiv32k_ck, "clk_24mhz", &clk_24mhz, 0x0, 1, 732);
 
-DEFINE_CLK_GATE(clkdiv32k_ick, "clkdiv32k_ck", &clkdiv32k_ck, 0x0,
-		AM33XX_CM_PER_CLKDIV32K_CLKCTRL, AM33XX_MODULEMODE_SWCTRL_SHIFT,
-		0x0, NULL);
+static struct clk clkdiv32k_ick;
+
+static const char *clkdiv32k_ick_parent_names[] = {
+	"clkdiv32k_ck",
+};
+
+static const struct clk_ops clkdiv32k_ick_ops = {
+	.enable         = &omap2_dflt_clk_enable,
+	.disable        = &omap2_dflt_clk_disable,
+	.is_enabled     = &omap2_dflt_clk_is_enabled,
+	.init           = &omap2_init_clk_clkdm,
+};
+
+static struct clk_hw_omap clkdiv32k_ick_hw = {
+	.hw	= {
+		.clk	= &clkdiv32k_ick,
+	},
+	.enable_reg	= AM33XX_CM_PER_CLKDIV32K_CLKCTRL,
+	.enable_bit	= AM33XX_MODULEMODE_SWCTRL_SHIFT,
+	.clkdm_name	= "clk_24mhz_clkdm",
+};
+
+DEFINE_STRUCT_CLK(clkdiv32k_ick, clkdiv32k_ick_parent_names, clkdiv32k_ick_ops);
 
 /* "usbotg_fck" is an additional clock and not really a modulemode */
 DEFINE_CLK_GATE(usbotg_fck, "dpll_per_ck", &dpll_per_ck, 0x0,
@@ -719,7 +740,8 @@ static struct clk_hw_omap lcd_gclk_hw = {
 	.clksel_mask	= AM33XX_CLKSEL_0_1_MASK,
 };
 
-DEFINE_STRUCT_CLK(lcd_gclk, lcd_ck_parents, gpio_fck_ops);
+DEFINE_STRUCT_CLK_FLAGS(lcd_gclk, lcd_ck_parents,
+			gpio_fck_ops, CLK_SET_RATE_PARENT);
 
 DEFINE_CLK_FIXED_FACTOR(mmc_clk, "dpll_per_m2_ck", &dpll_per_m2_ck, 0x0, 1, 2);
 
