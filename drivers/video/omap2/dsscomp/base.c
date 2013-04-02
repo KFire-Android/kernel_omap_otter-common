@@ -211,6 +211,9 @@ int set_dss_ovl_info(struct dss2_ovl_info *oi)
 	info.mirror = cfg->mirror;
 	info.color_mode = cfg->color_mode;
 
+	/* mflag for the overlay */
+	info.mflag_en = cfg->mflag_en;
+
 	/* crop to screen */
 	crop.r = cfg->crop;
 	win.r = cfg->win;
