@@ -228,6 +228,10 @@ struct hdcp_data {
 extern struct hdcp_data hdcp;
 extern struct hdcp_sha_in sha_input;
 
+#define _9032_AUTO_RI_  /* Auto Ri mode */
+#define _9032_BCAP_     /* BCAP polling */
+#undef _9032_AN_STOP_FIX_
+
 /* HDCP state */
 #define HDCP_STATE_DISABLED             0
 #define HDCP_STATE_INIT                 1
