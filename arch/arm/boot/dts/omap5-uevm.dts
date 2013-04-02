@@ -1,0 +1,334 @@
+/*
+ * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ */
+/dts-v1/;
+
+/include/ "omap5.dtsi"
+/include/ "samsung_k3pe0e000b.dtsi"
+
+/ {
+	model = "TI OMAP5 uEVM board";
+	compatible = "ti,omap5-uevm", "ti,omap5";
+
+	memory {
+		device_type = "memory";
+		reg = <0x80000000 0x7F000000>; /* 2032 MB */
+	};
+
+	vmmcsd_fixed: fixedregulator-mmcsd {
+		compatible = "regulator-fixed";
+		regulator-name = "vmmcsd_fixed";
+		regulator-min-microvolt = <3000000>;
+		regulator-max-microvolt = <3000000>;
+	};
+
+	/* HS USB Port 2 RESET */
+	hsusb2_reset: hsusb2_reset_reg {
+		compatible = "regulator-fixed";
+		regulator-name = "hsusb2_reset";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		gpio = <&gpio3 16 0>;	/* gpio3_80 HUB_NRESET */
+		startup-delay-us = <70000>;
+		enable-active-high;
+	};
+
+	/* HS USB Host PHY on PORT 2 */
+	hsusb2_phy: hsusb2_phy {
+		compatible = "usb-nop-xceiv";
+		reset-supply = <&hsusb2_reset>;
+	};
+
+	/* HS USB Port 3 RESET */
+	hsusb3_reset: hsusb3_reset_reg {
+		compatible = "regulator-fixed";
+		regulator-name = "hsusb3_reset";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		gpio = <&gpio3 15 0>;	/* gpio3_79 ETH_NRESET */
+		startup-delay-us = <70000>;
+		enable-active-high;
+	};
+
+	/* HS USB Host PHY on PORT 3 */
+	hsusb3_phy: hsusb3_phy {
+		compatible = "usb-nop-xceiv";
+		reset-supply = <&hsusb3_reset>;
+	};
+
+	/* hsusb2_phy is clocked by FREF_CLK1 i.e. auxclk1 */
+	clock_alias {
+		clock-name = "auxclk1_ck";
+		clock-alias = "main_clk";
+		device = <&hsusb2_phy>;
+		clock-frequency = <19200000>; /* 19.2 MHz */
+	};
+
+	sound {
+		compatible = "ti,abe-twl6040";
+		ti,model = "PandaBoard5";
+
+		ti,jack-detection = <1>;
+		ti,mclk-freq = <19200000>;
+
+		ti,mcpdm = <&mcpdm>;
+		ti,mcbsp1 = <&mcbsp1>;
+		ti,mcbsp2 = <&mcbsp2>;
+		ti,aess = <&aess>;
+
+		ti,twl6040 = <&twl6040>;
+
+		/* Audio routing */
+		ti,audio-routing =
+			"Headset Stereophone", "HSOL",
+			"Headset Stereophone", "HSOR",
+			"Line Out", "AUXL",
+			"Line Out", "AUXR",
+			"HSMIC", "Headset Mic",
+			"Headset Mic", "Headset Mic Bias",
+			"AFML", "Line In",
+			"AFMR", "Line In",
+			"Headset Playback", "PDM_DL1",
+			"PDM_UL1", "Capture",
+			"40122000.mcbsp Playback", "BT_VX_DL",
+			"BT_VX_UL", "40122000.mcbsp Capture",
+			"40124000.mcbsp Playback", "MM_EXT_DL",
+			"MM_EXT_UL", "40124000.mcbsp Capture";
+	};
+
+	sound_hdmi {
+		compatible = "ti,omap-hdmi-tpd12s015-audio";
+		ti,model = "OMAP5HDMI";
+
+		ti,hdmi_audio = <&hdmi>;
+		ti,level_shifter = <&tpd12s015>;
+	};
+};
+
+&omap5_pmx_core {
+	pinctrl-names = "default";
+	pinctrl-0 = <
+			&twl6040_pins
+			&mcpdm_pins
+			&dmic_pins
+			&mcbsp1_pins
+			&mcbsp2_pins
+			&usbhost_pins
+			&dss_hdmi_pins
+			&tpd12s015_pins
+			&tca6424a_pins
+	>;
+
+	twl6040_pins: pinmux_twl6040_pins {
+		pinctrl-single,pins = <
+			0x17e 0x6	/* mcspi1_somi.gpio5_141 OUTPUT | MODE6 */
+			0x18a 0x6	/* perslimbus2_clock.gpio5_145 OUTPUT | MODE6 */
+		>;
+	};
+
+	mcpdm_pins: pinmux_mcpdm_pins {
+		pinctrl-single,pins = <
+			0x142 0x108	/* abe_clks.abe_clks INPUT PULLDOWN | MODE0 */
+			0x15c 0x108	/* abemcpdm_ul_data.abemcpdm_ul_data INPUT PULLDOWN | MODE0 */
+			0x15e 0x108	/* abemcpdm_dl_data.abemcpdm_dl_data INPUT PULLDOWN | MODE0 */
+			0x160 0x118	/* abemcpdm_frame.abemcpdm_frame INPUT PULLUP | MODE0 */
+			0x162 0x108	/* abemcpdm_lb_clk.abemcpdm_lb_clk INPUT PULLDOWN | MODE0 */
+		>;
+	};
+
+	dmic_pins: pinmux_dmic_pins {
+		pinctrl-single,pins = <
+			0x144 0x100	/* abedmic_din1.abedmic_din1 INPUT | MODE0 */
+			0x146 0x100	/* abedmic_din2.abedmic_din2 INPUT | MODE0 */
+			0x148 0x100	/* abedmic_din3.abedmic_din3 INPUT | MODE0 */
+			0x14a 0		/* abedmic_clk1.abedmic_clk1 OUTPUT | MODE0 */
+		>;
+	};
+
+	mcbsp1_pins: pinmux_mcbsp1_pins {
+		pinctrl-single,pins = <
+			0x14c 0x101	/* abedmic_clk2.abemcbsp1_fsx INPUT | MODE1 */
+			0x14e 0x9	/* abedmic_clk3.abemcbsp1_dx OUTPUT PULLDOWN | MODE1 */
+			0x150 0x101	/* abeslimbus1_clock.abemcbsp1_clkx INPUT | MODE0 */
+			0x152 0x109	/* abeslimbus1_data.abemcbsp1_dr INPUT PULLDOWN | MODE1 */
+		>;
+	};
+
+	mcbsp2_pins: pinmux_mcbsp2_pins {
+		pinctrl-single,pins = <
+			0x154 0x108	/* abemcbsp2_dr.abemcbsp2_dr INPUT PULLDOWN | MODE0 */
+			0x156 0x8	/* abemcbsp2_dx.abemcbsp2_dx OUTPUT PULLDOWN | MODE0 */
+			0x158 0x100	/* abemcbsp2_fsx.abemcbsp2_fsx INPUT | MODE0 */
+			0x15a 0x100	/* abemcbsp2_clkx.abemcbsp2_clkx INPUT | MODE0 */
+		>;
+	};
+
+	usbhost_pins: pinmux_usbhost_pins {
+		pinctrl-single,pins = <
+			0x84 0x100	/* usbb2_hsic_strobe INPUT | MODE 0 */
+			0x86 0x100	/* usbb2_hsic_data INPUT | MODE 0 */
+
+			0x19e 0x100	/* usbb3_hsic_strobe INPUT | MODE 0 */
+			0x1a0 0x100	/* usbb3_hsic_data INPUT | MODE 0 */
+
+			0x70 0x6	/* gpio3_80 OUTPUT | MODE 6 HUB_NRESET */
+			0x6e 0x6	/* gpio3_79 OUTPUT | MODE 6 ETH_NRESET */
+		>;
+	};
+
+	dss_hdmi_pins: pinmux_dss_hdmi_pins {
+		pinctrl-single,pins = <
+			0x0fc 0x118	/* hdmi_cec.hdmi_cec INPUT PULLUP | MODE 0 */
+			0x100 0x100	/* hdmi_scl.hdmi_scl INPUT | MODE 0 */
+			0x102 0x100	/* hdmi_sda.hdmi_sda INPUT | MODE 0 */
+		>;
+	};
+
+	tpd12s015_pins: pinmux_tpd12s015_pins {
+		pinctrl-single,pins = <
+			0x0fe 0x116	/* hdmi_hpd.gpio7_193 INPUT PULLDOWN | MODE6 */
+		>;
+	};
+
+	tca6424a_pins: pinmux_tca6424a_pins {
+		pinctrl-single,pins = <
+			0x186 0x100	/* i2c5_scl.i2c5_scl INPUT | MODE0 */
+			0x188 0x100	/* i2c5_sda.i2c5_sda INPUT | MODE0 */
+		>;
+	};
+};
+
+&omap5_pmx_wkup {
+	pinctrl-names = "default";
+	pinctrl-0 = <
+			&usbhost_wkup_pins
+	>;
+
+	usbhost_wkup_pins: pinmux_usbhost_wkup_pins {
+		pinctrl-single,pins = <
+			0x1A 0x0	/* fref_clk1_out OUTPUT | MODE 7 for USB hub clk */
+		>;
+	};
+
+};
+
+&mmc1 {
+	vmmc-supply = <&vmmcsd_fixed>;
+	bus-width = <4>;
+};
+
+&mmc2 {
+	vmmc-supply = <&vmmcsd_fixed>;
+	bus-width = <8>;
+	ti,non-removable;
+};
+
+&mmc3 {
+	bus-width = <4>;
+	ti,non-removable;
+};
+
+&mmc4 {
+	status = "disabled";
+};
+
+&mmc5 {
+	status = "disabled";
+};
+
+&i2c2 {
+	clock-frequency = <400000>;
+
+	/* Pressure Sensor */
+	bmp085@77 {
+		compatible = "bosch,bmp085";
+		reg = <0x77>;
+	};
+};
+
+&i2c4 {
+	clock-frequency = <400000>;
+
+	/* Temperature Sensor */
+	tmp102@48{
+		compatible = "ti,tmp102";
+		reg = <0x48>;
+	};
+};
+
+&i2c5 {
+	tca6424a: tca6424a@22 {
+		compatible = "ti,tca6424a";
+		reg = <0x22>;
+		gpio-controller;
+		#gpio-cells = <2>;
+	};
+};
+
+&mcbsp3 {
+	status = "disabled";
+};
+
+&emif1 {
+	cs1-used;
+	device-handle = <&samsung_K3PE0E000B>;
+};
+
+&emif2 {
+	cs1-used;
+	device-handle = <&samsung_K3PE0E000B>;
+};
+
+&i2c1 {
+	clock-frequency = <400000>;
+
+	palmas: palmas@48 {
+		reg = <0x48>;
+		/* SPI = 0, IRQ# = 7, 4 = active high level-sensitive */
+		interrupts = <0 7 4>; /* IRQ_SYS_1N cascaded to gic */
+		interrupt-parent = <&gic>;
+	};
+
+	twl6040: twl@4b {
+		compatible = "ti,twl6040";
+
+		interrupts = <0 119 4>; /* IRQ_SYS_2N cascaded to gic */
+		interrupt-parent = <&gic>;
+		ti,audpwron-gpio = <&gpio5 13 0>;  /* gpio line 141 */
+
+		vio-supply = <&smps7_reg>;
+		v2v1-supply = <&smps9_reg>;
+		enable-active-high;
+	};
+};
+
+&usbhshost {
+	port2-mode = "ehci-hsic";
+	port3-mode = "ehci-hsic";
+};
+
+&usbhsehci {
+	phys = <0 &hsusb2_phy &hsusb3_phy>;
+};
+
+/include/ "palmas.dtsi"
+/include/ "twl6040.dtsi"
+
+&hdmi {
+	tpd12s015: tpd12s015 {
+		compatible = "ti,tpd12s015";
+
+		gpios = <&tca6424a 0 0>,	/* TCA6424A P01, CT_CP_HDP */
+			<&tca6424a 1 0>,	/* TCA6424A P00, LS_OE*/
+			<&gpio7 1 0>;		/* 193, HPD */
+
+		hdmi-monitor {
+			compatible = "ti,hdmi_panel";
+		};
+
+	};
+};

@@ -113,7 +113,7 @@ struct usbhs_hcd_omap {
 };
 /*-------------------------------------------------------------------------*/
 
-const char usbhs_driver_name[] = USBHS_DRIVER_NAME;
+static const char usbhs_driver_name[] = USBHS_DRIVER_NAME;
 static u64 usbhs_dmamask = DMA_BIT_MASK(32);
 
 /*-------------------------------------------------------------------------*/

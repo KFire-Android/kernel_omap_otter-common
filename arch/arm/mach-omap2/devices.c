@@ -690,7 +690,6 @@ static int __init omap2_init_devices(void)
 		omap_init_dmic();
 		omap_init_mcpdm();
 		omap_init_mcspi();
-		omap_init_mcasp();
 		omap_init_sham();
 		omap_init_aes();
 	}

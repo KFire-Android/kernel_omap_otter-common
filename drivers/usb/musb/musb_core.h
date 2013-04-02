@@ -51,6 +51,10 @@ struct musb;
 struct musb_hw_ep;
 struct musb_ep;
 
+#define MUSB_PORT_MODE_HOST	1
+#define MUSB_PORT_MODE_DEV	2
+#define MUSB_PORT_MODE_OTG	3
+
 /* Helper defines for struct musb->hwvers */
 #define MUSB_HWVERS_MAJOR(x)	((x >> 10) & 0x1f)
 #define MUSB_HWVERS_MINOR(x)	(x & 0x3ff)
@@ -213,6 +217,9 @@ struct musb_platform_ops {
 	int	(*adjust_channel_params)(struct dma_channel *channel,
 				u16 packet_sz, u8 *mode,
 				dma_addr_t *dma_addr, u32 *len);
+	int	(*enable_sof)(struct musb *musb);
+	int	(*disable_sof)(struct musb *musb);
+	int	(*sof_handler)(struct musb *musb);
 };
 
 /*
@@ -263,6 +270,9 @@ struct musb_hw_ep {
 	/* peripheral side */
 	struct musb_ep		ep_in;			/* TX */
 	struct musb_ep		ep_out;			/* RX */
+
+	/* save rx toggle */
+	u8			prev_toggle;
 };
 
 static inline struct musb_request *next_in_request(struct musb_hw_ep *hw_ep)
@@ -310,6 +320,7 @@ struct musb {
 
 	irqreturn_t		(*isr)(int, void *);
 	struct work_struct	irq_work;
+	struct work_struct      work;
 	u16			hwvers;
 
 	u16			intrrxe;
@@ -335,7 +346,13 @@ struct musb {
 	struct list_head	in_bulk;	/* of musb_qh */
 	struct list_head	out_bulk;	/* of musb_qh */
 
+	struct workqueue_struct *gb_queue;
+	struct work_struct      gb_work;
+	spinlock_t              gb_lock;
+	struct list_head        gb_list;        /* of urbs */
+
 	struct timer_list	otg_timer;
+	u8			en_otg_timer;
 	struct notifier_block	nb;
 
 	struct dma_controller	*dma_controller;
@@ -369,6 +386,7 @@ struct musb {
 	u16 epmask;
 	u8 nr_endpoints;
 
+	int			port_mode;	/* MUSB_PORT_MODE_* */
 	int			(*board_set_power)(int state);
 
 	u8			min_power;	/* vbus for periph, in mA/2 */
@@ -442,6 +460,8 @@ struct musb {
 #ifdef CONFIG_DEBUG_FS
 	struct dentry		*debugfs_root;
 #endif
+	u32			sof_enabled;
+	u8			tx_isoc_sched_enable;
 };
 
 static inline struct musb *gadget_to_musb(struct usb_gadget *g)
@@ -531,6 +551,10 @@ extern void musb_load_testpacket(struct musb *);
 extern irqreturn_t musb_interrupt(struct musb *);
 
 extern void musb_hnp_stop(struct musb *musb);
+extern void musb_save_context(struct musb *musb);
+extern void musb_restore_context(struct musb *musb);
+extern void musb_gb_work(struct work_struct *data);
+extern void musb_restart(struct musb *musb);
 
 static inline void musb_platform_set_vbus(struct musb *musb, int is_on)
 {
@@ -589,4 +613,19 @@ static inline int musb_platform_exit(struct musb *musb)
 	return musb->ops->exit(musb);
 }
 
+static inline int musb_enable_sof(struct musb *musb)
+{
+	if (!musb->ops->enable_sof)
+		return -EINVAL;
+
+	return musb->ops->enable_sof(musb);
+}
+
+static inline int musb_disable_sof(struct musb *musb)
+{
+	if (!musb->ops->disable_sof)
+		return -EINVAL;
+
+	return musb->ops->disable_sof(musb);
+}
 #endif	/* __MUSB_CORE_H__ */

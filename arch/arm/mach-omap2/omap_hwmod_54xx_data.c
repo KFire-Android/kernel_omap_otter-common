@@ -26,6 +26,7 @@
 #include <linux/omap-dma.h>
 #include <linux/platform_data/spi-omap2-mcspi.h>
 #include <linux/platform_data/asoc-ti-mcbsp.h>
+#include <linux/platform_data/mailbox-omap.h>
 #include <plat/dmtimer.h>
 
 #include "omap_hwmod.h"
@@ -1941,6 +1942,17 @@ static struct omap_hwmod_class omap54xx_mailbox_hwmod_class = {
 };
 
 /* mailbox */
+static struct omap_mbox_dev_info omap54xx_mbox_info[] = {
+	{ .name = "mbox-ipu", .tx_id = 0, .rx_id = 1 },
+	{ .name = "mbox-dsp", .tx_id = 3, .rx_id = 2 },
+};
+
+static struct omap_mbox_pdata omap54xx_mbox_attrs = {
+	.intr_type	= MBOX_INTR_CFG_TYPE2,
+	.info_cnt	= ARRAY_SIZE(omap54xx_mbox_info),
+	.info		= omap54xx_mbox_info,
+};
+
 static struct omap_hwmod_irq_info omap54xx_mailbox_irqs[] = {
 	{ .irq = 26 + OMAP54XX_IRQ_GIC_START },
 	{ .irq = -1 }
@@ -1958,6 +1970,7 @@ static struct omap_hwmod omap54xx_mailbox_hwmod = {
 			.context_offs = OMAP54XX_RM_L4CFG_MAILBOX_CONTEXT_OFFSET,
 		},
 	},
+	.dev_attr	= &omap54xx_mbox_attrs,
 };
 
 /*

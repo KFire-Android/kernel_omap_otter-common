@@ -557,6 +557,7 @@ static irqreturn_t musb_stage0_irq(struct musb *musb, u8 int_usb,
 	}
 
 	if (int_usb & MUSB_INTR_VBUSERROR) {
+		struct usb_hcd *hcd = musb_to_hcd(musb);
 		int	ignore = 0;
 
 		/* During connection as an A-Device, we may see a short
@@ -596,6 +597,12 @@ static irqreturn_t musb_stage0_irq(struct musb *musb, u8 int_usb,
 				musb->port1_status |=
 					  USB_PORT_STAT_OVERCURRENT
 					| (USB_PORT_STAT_C_OVERCURRENT << 16);
+
+				if (hcd->status_urb)
+					usb_hcd_poll_rh_status(hcd);
+				else
+					usb_hcd_resume_root_hub(hcd);
+
 			}
 			break;
 		default:
@@ -783,6 +790,10 @@ b_host:
 			/* FALLTHROUGH */
 		case OTG_STATE_B_PERIPHERAL:
 		case OTG_STATE_B_IDLE:
+			pr_info("musb %s gadget disconnected.\n",
+				musb->gadget_driver
+				? musb->gadget_driver->driver.name
+				: "");
 			musb_g_disconnect(musb);
 			break;
 		default:
@@ -899,6 +910,11 @@ b_host:
 		}		/* end of for loop */
 	}
 #endif
+	if (int_usb & MUSB_INTR_SOF) {
+		if (musb->ops->sof_handler)
+			musb->ops->sof_handler(musb);
+		handled = IRQ_HANDLED;
+	}
 
 	schedule_work(&musb->irq_work);
 
@@ -937,15 +953,19 @@ void musb_start(struct musb *musb)
 	devctl = musb_readb(regs, MUSB_DEVCTL);
 	devctl &= ~MUSB_DEVCTL_SESSION;
 
-	/* session started after:
-	 * (a) ID-grounded irq, host mode;
-	 * (b) vbus present/connect IRQ, peripheral mode;
-	 * (c) peripheral initiates, using SRP
-	 */
-	if ((devctl & MUSB_DEVCTL_VBUS) == MUSB_DEVCTL_VBUS)
-		musb->is_active = 1;
-	else
+	if (musb->port_mode == MUSB_PORT_MODE_HOST) {
 		devctl |= MUSB_DEVCTL_SESSION;
+	} else {
+		/* session started after:
+		 * (a) ID-grounded irq, host mode;
+		 * (b) vbus present/connect IRQ, peripheral mode;
+		 * (c) peripheral initiates, using SRP
+		 */
+		if ((devctl & MUSB_DEVCTL_VBUS) == MUSB_DEVCTL_VBUS)
+			musb->is_active = 1;
+		else
+			devctl |= MUSB_DEVCTL_SESSION;
+	}
 
 	musb_platform_enable(musb);
 	musb_writeb(regs, MUSB_DEVCTL, devctl);
@@ -1007,6 +1027,9 @@ static void musb_shutdown(struct platform_device *pdev)
 
 	musb_gadget_cleanup(musb);
 
+	if (musb->port_mode == MUSB_PORT_MODE_HOST)
+		usb_remove_hcd(musb_to_hcd(musb));
+
 	spin_lock_irqsave(&musb->lock, flags);
 	musb_platform_disable(musb);
 	musb_generic_disable(musb);
@@ -1018,7 +1041,6 @@ static void musb_shutdown(struct platform_device *pdev)
 	pm_runtime_put(musb->controller);
 	/* FIXME power down */
 }
-
 
 /*-------------------------------------------------------------------------*/
 
@@ -1499,6 +1521,13 @@ static int musb_core_init(u16 musb_type, struct musb *musb)
 	return 0;
 }
 
+void musb_restart(struct musb *musb)
+{
+	ep_config_from_table(musb);
+	musb_start(musb);
+}
+EXPORT_SYMBOL_GPL(musb_restart);
+
 /*-------------------------------------------------------------------------*/
 
 /*
@@ -1592,7 +1621,7 @@ void musb_dma_completion(struct musb *musb, u8 epnum, u8 transmit)
 
 	if (!epnum) {
 #ifndef CONFIG_USB_TUSB_OMAP_DMA
-		if (!is_cppi_enabled()) {
+		if (!is_cppi_enabled() && !is_cppi41_enabled()) {
 			/* endpoint 0 */
 			if (devctl & MUSB_DEVCTL_HM)
 				musb_h_ep0_irq(musb);
@@ -1776,6 +1805,7 @@ static struct musb *allocate_instance(struct device *dev,
 	INIT_LIST_HEAD(&musb->control);
 	INIT_LIST_HEAD(&musb->in_bulk);
 	INIT_LIST_HEAD(&musb->out_bulk);
+	INIT_LIST_HEAD(&musb->gb_list);
 
 	hcd->uses_new_polling = 1;
 	hcd->has_tt = 1;
@@ -1821,6 +1851,9 @@ static void musb_free(struct musb *musb)
 
 		(void) c->stop(c);
 		dma_controller_destroy(c);
+
+		if (musb->gb_queue)
+			destroy_workqueue(musb->gb_queue);
 	}
 
 	usb_put_hcd(musb_to_hcd(musb));
@@ -1863,9 +1896,11 @@ musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl)
 	pm_runtime_enable(musb->controller);
 
 	spin_lock_init(&musb->lock);
+	spin_lock_init(&musb->gb_lock);
 	musb->board_set_power = plat->set_power;
 	musb->min_power = plat->min_power;
 	musb->ops = plat->platform_ops;
+	musb->port_mode = plat->mode;
 
 	/* The musb_platform_init() call:
 	 *   - adjusts musb->mregs
@@ -1936,15 +1971,16 @@ musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl)
 	/* FIXME this handles wakeup irqs wrong */
 	if (enable_irq_wake(nIrq) == 0) {
 		musb->irq_wake = 1;
-		device_init_wakeup(dev, 1);
 	} else {
 		musb->irq_wake = 0;
 	}
 
+	/* initiliaze device wakeup for musb */
+	device_init_wakeup(dev, 1);
+
 	/* host side needs more setup */
 	hcd = musb_to_hcd(musb);
 	otg_set_host(musb->xceiv->otg, &hcd->self);
-	hcd->self.otg_port = 1;
 	musb->xceiv->otg->host = &hcd->self;
 	hcd->power_budget = 2 * (plat->power ? : 250);
 
@@ -1960,9 +1996,26 @@ musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl)
 	musb->xceiv->state = OTG_STATE_B_IDLE;
 
 	status = musb_gadget_setup(musb);
+	device_set_wakeup_enable(dev, 0);
 
 	if (status < 0)
 		goto fail3;
+	/*
+	 * If the port is configured to 'host' mode only,
+	 * start the HCD here.
+	 */
+	if (musb->port_mode == MUSB_PORT_MODE_HOST) {
+		MUSB_HST_MODE(musb);
+		musb->xceiv->otg->default_a = 1;
+		musb->xceiv->state = OTG_STATE_A_IDLE;
+
+		status = usb_add_hcd(hcd, 0, 0);
+		if (status < 0)
+			goto fail3;
+
+		hcd->self.uses_pio_for_control = 1;
+	} else
+		hcd->self.otg_port = 1;
 
 	status = musb_init_debugfs(musb);
 	if (status < 0)
@@ -1976,13 +2029,24 @@ musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl)
 
 	pm_runtime_put(musb->controller);
 
+	musb->gb_queue = create_singlethread_workqueue(dev_name(dev));
+	if (musb->gb_queue == NULL)
+		goto fail6;
+	/* Init giveback workqueue */
+	INIT_WORK(&musb->gb_work, musb_gb_work);
+
 	return 0;
+
+fail6:
+	destroy_workqueue(musb->gb_queue);
 
 fail5:
 	musb_exit_debugfs(musb);
 
 fail4:
 	musb_gadget_cleanup(musb);
+	if (musb->port_mode == MUSB_PORT_MODE_HOST)
+		usb_remove_hcd(hcd);
 
 fail3:
 	pm_runtime_put_sync(musb->controller);
@@ -2053,14 +2117,14 @@ static int musb_remove(struct platform_device *pdev)
 	iounmap(ctrl_base);
 	device_init_wakeup(dev, 0);
 #ifndef CONFIG_MUSB_PIO_ONLY
-	dma_set_mask(dev, *dev->parent->dma_mask);
+	dma_set_mask(dev, *dev->dma_mask);
 #endif
 	return 0;
 }
 
 #ifdef	CONFIG_PM
 
-static void musb_save_context(struct musb *musb)
+void musb_save_context(struct musb *musb)
 {
 	int i;
 	void __iomem *musb_base = musb->mregs;
@@ -2130,8 +2194,9 @@ static void musb_save_context(struct musb *musb)
 			musb_read_rxhubport(musb_base, i);
 	}
 }
+EXPORT_SYMBOL(musb_save_context);
 
-static void musb_restore_context(struct musb *musb)
+void musb_restore_context(struct musb *musb)
 {
 	int i;
 	void __iomem *musb_base = musb->mregs;
@@ -2207,18 +2272,26 @@ static void musb_restore_context(struct musb *musb)
 	}
 	musb_writeb(musb_base, MUSB_INDEX, musb->context.index);
 }
+EXPORT_SYMBOL(musb_restore_context);
 
 static int musb_suspend(struct device *dev)
 {
 	struct musb	*musb = dev_to_musb(dev);
 	unsigned long	flags;
+	u8 devctl = musb_readb(musb->mregs, MUSB_DEVCTL);
+	int ret = 0;
 
 	spin_lock_irqsave(&musb->lock, flags);
 
 	if (is_peripheral_active(musb)) {
 		/* FIXME force disconnect unless we know USB will wake
 		 * the system up quickly enough to respond ...
+		 * Don't allow system suspend while peripheral mode
+		 * is actve and cable is connected to host.
 		 */
+		if ((devctl & MUSB_DEVCTL_VBUS) == MUSB_DEVCTL_VBUS
+			&& (devctl & MUSB_DEVCTL_BDEVICE))
+			ret = -EBUSY;
 	} else if (is_host_active(musb)) {
 		/* we know all the children are suspended; sometimes
 		 * they will even be wakeup-enabled.
@@ -2226,7 +2299,7 @@ static int musb_suspend(struct device *dev)
 	}
 
 	spin_unlock_irqrestore(&musb->lock, flags);
-	return 0;
+	return ret;
 }
 
 static int musb_resume_noirq(struct device *dev)

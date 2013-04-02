@@ -499,7 +499,6 @@ static struct omap_hwmod am33xx_ocpwp_hwmod = {
 		},
 	},
 };
-#endif
 
 /* ocmcram */
 static struct omap_hwmod_class am33xx_ocmcram_hwmod_class = {
@@ -519,6 +518,25 @@ static struct omap_hwmod am33xx_ocmcram_hwmod = {
 		},
 	},
 };
+
+/* ocpwp */
+static struct omap_hwmod_class am33xx_ocpwp_hwmod_class = {
+	.name		= "ocpwp",
+};
+
+static struct omap_hwmod am33xx_ocpwp_hwmod = {
+	.name		= "ocpwp",
+	.class		= &am33xx_ocpwp_hwmod_class,
+	.clkdm_name	= "l4ls_clkdm",
+	.main_clk	= "l4ls_gclk",
+	.prcm		= {
+		.omap4	= {
+			.clkctrl_offs	= AM33XX_CM_PER_OCPWP_CLKCTRL_OFFSET,
+			.modulemode	= MODULEMODE_SWCTRL,
+		},
+	},
+};
+#endif
 
 /*
  * 'aes0' class
@@ -3522,13 +3540,6 @@ static struct omap_hwmod_ocp_if am33xx_l3_main__aes0 = {
 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
 };
 
-/* l3 main -> ocmc */
-static struct omap_hwmod_ocp_if am33xx_l3_main__ocmc = {
-	.master		= &am33xx_l3_main_hwmod,
-	.slave		= &am33xx_ocmcram_hwmod,
-	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-};
-
 static struct omap_hwmod_ocp_if *am33xx_hwmod_ocp_ifs[] __initdata = {
 	&am33xx_l4_fw__emif_fw,
 	&am33xx_l3_main__emif,
@@ -3605,7 +3616,6 @@ static struct omap_hwmod_ocp_if *am33xx_hwmod_ocp_ifs[] __initdata = {
 	&am33xx_l3_main__tptc0,
 	&am33xx_l3_main__tptc1,
 	&am33xx_l3_main__tptc2,
-	&am33xx_l3_main__ocmc,
 	&am33xx_l3_s__usbss,
 	&am33xx_l4_hs__cpgmac0,
 	&am33xx_cpgmac0__mdio,

@@ -74,6 +74,7 @@ choice
 	default USB_UX500_DMA if USB_MUSB_UX500
 	default USB_INVENTRA_DMA if USB_MUSB_OMAP2PLUS || USB_MUSB_BLACKFIN
 	default USB_TI_CPPI_DMA if USB_MUSB_DAVINCI
+	default USB_TI_CPPI41_DMA if USB_MUSB_DSPS
 	default USB_TUSB_OMAP_DMA if USB_MUSB_TUSB6010
 	default MUSB_PIO_ONLY if USB_MUSB_TUSB6010 || USB_MUSB_DA8XX || USB_MUSB_AM35X \
 				|| USB_MUSB_DSPS
@@ -99,6 +100,15 @@ config USB_TI_CPPI_DMA
 	depends on USB_MUSB_DAVINCI
 	help
 	  Enable DMA transfers when TI CPPI DMA is available.
+
+config USB_TI_CPPI41_DMA
+	bool 'TI CPPI41 (DSPS)'
+	depends on USB_MUSB_DSPS
+	help
+	 Configure this option to include the CPPI 4.1 support,
+	 The CPPI 4.1 DMA engine integrated with musb controller
+	 accelarate the usb packet transmission and receception
+	 to/from musb endpoints.
 
 config USB_TUSB_OMAP_DMA
 	bool 'TUSB 6010'

@@ -385,15 +385,16 @@
 			compatible = "ti,musb-am33xx";
 			reg = <0x47400000 0x1000	/* usbss */
 			       0x47401000 0x800		/* musb instance 0 */
-			       0x47401800 0x800>;	/* musb instance 1 */
+			       0x47401800 0x800		/* musb instance 1 */
+			       0x47402000 0x6000>;	/* cppi41 usbdma */
 			interrupts = <17		/* usbss */
 				      18		/* musb instance 0 */
 				      19>;		/* musb instance 1 */
 			multipoint = <1>;
 			num-eps = <16>;
 			ram-bits = <12>;
-			port0-mode = <3>;
-			port1-mode = <3>;
+			port0-mode = <3>;		/* 1: host only mode */
+			port1-mode = <3>;		/* 2: device & 3:otg */
 			power = <250>;
 			ti,hwmods = "usb_otg_hs";
 		};
@@ -445,6 +446,14 @@
 			};
 		};
 
+		wkup_m3: wkup_m3@44d00000 {
+			compatible = "ti,am3353-wkup-m3";
+			reg = <0x44d00000 0x4000	/* M3 UMEM */
+			       0x44d80000 0x2000>;	/* M3 DMEM */
+			interrupts = <78>;
+			ti,hwmods = "wkup_m3";
+		};
+
 		sham: sham@53100000 {
 			compatible = "ti,omap4-sham";
 			ti,hwmods = "sham";
@@ -468,21 +477,6 @@
 			dmas = <&edma 6
 				&edma 5>;
 			dma-names = "tx", "rx";
-		};
-
-		ocmcram: ocmcram@40300000 {
-			compatible = "ti,am3352-ocmcram";
-			reg = <0x40300000 0x10000>;
-			ti,hwmods = "ocmcram";
-			ti,no_idle_on_suspend;
-		};
-
-		wkup_m3: wkup_m3@44d00000 {
-			compatible = "ti,am3353-wkup-m3";
-			reg = <0x44d00000 0x4000	/* M3 UMEM */
-			       0x44d80000 0x2000>;	/* M3 DMEM */
-			interrupts = <78>;
-			ti,hwmods = "wkup_m3";
 		};
 	};
 };
