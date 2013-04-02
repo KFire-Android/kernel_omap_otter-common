@@ -30,6 +30,12 @@
 
 #include "remoteproc_internal.h"
 
+/* virtio rpmsg bus driver requests */
+enum {
+	RPROC_VIRTIO_ALLOC_TYPE,
+	RPROC_VIRTIO_BUF_ADDR,
+};
+
 /* kick the remote processor, and let it know which virtqueue to poke at */
 static void rproc_virtio_notify(struct virtqueue *vq)
 {
@@ -217,6 +223,75 @@ static void rproc_virtio_reset(struct virtio_device *vdev)
 	dev_dbg(&vdev->dev, "reset !\n");
 }
 
+/*
+ * We don't support yet the real virtio configuration semantics.
+ * There are currently no configuration parameters used by remoteproc.
+ *
+ * This function is being overloaded to allow the virtio rpmsg bus
+ * infrastructure to retrieve certain data from the remoteproc
+ * driver. It is currently used for giving out the carveout pool
+ * configuration within remoteproc driver, and for allocating the
+ * vring buffers.
+ */
+static void rproc_virtio_get(struct virtio_device *vdev, unsigned int request,
+					void *buf, unsigned len)
+{
+	struct rproc *rproc = vdev_to_rproc(vdev);
+	void *presult;
+	int iresult;
+	unsigned int addr[2];
+	dma_addr_t dma;
+
+	switch (request) {
+	case RPROC_VIRTIO_ALLOC_TYPE:
+		/* user data is at stake so bugs here cannot be tolerated */
+		BUG_ON(len != sizeof(iresult));
+		iresult = rproc->memory_pool ? 1 : 0;
+		memcpy(buf, &iresult, len);
+		break;
+	case RPROC_VIRTIO_BUF_ADDR:
+		/* user data is at stake so bugs here cannot be tolerated */
+		BUG_ON(len != sizeof(addr));
+		presult = rproc_alloc_memory(rproc, SZ_256K, &dma, 2);
+		addr[0] = (unsigned int) presult;
+		addr[1] = dma;
+		memcpy(buf, addr, len);
+		break;
+	default:
+		dev_err(&vdev->dev, "invalid request: %d\n", request);
+		break;
+	}
+}
+
+/*
+ * We don't support yet the real virtio configuration semantics.
+ * There are currently no configuration parameters used by remoteproc.
+ *
+ * This function is being overloaded to allow the virtio rpmsg bus
+ * infrastructure to free the vring buffers allocated through the
+ * rproc_virtio_get.
+ */
+static void rproc_virtio_set(struct virtio_device *vdev, unsigned int request,
+					const void *buf, unsigned len)
+{
+	struct rproc *rproc = vdev_to_rproc(vdev);
+	void *presult = NULL;
+	int iresult;
+	unsigned int *addr = (unsigned int *)buf;
+
+	switch (request) {
+	case RPROC_VIRTIO_BUF_ADDR:
+		/* user data is at stake so bugs here cannot be tolerated */
+		BUG_ON(len != (sizeof(iresult) * 2));
+		presult = (void *)addr[0];
+		rproc_free_memory(rproc, SZ_256K, presult, addr[1]);
+		break;
+	default:
+		dev_err(&vdev->dev, "invalid request: %d\n", request);
+		break;
+	}
+}
+
 /* provide the vdev features as retrieved from the firmware */
 static u32 rproc_virtio_get_features(struct virtio_device *vdev)
 {
@@ -245,6 +320,8 @@ static void rproc_virtio_finalize_features(struct virtio_device *vdev)
 }
 
 static struct virtio_config_ops rproc_virtio_config_ops = {
+	.get		= rproc_virtio_get,
+	.set		= rproc_virtio_set,
 	.get_features	= rproc_virtio_get_features,
 	.finalize_features = rproc_virtio_finalize_features,
 	.find_vqs	= rproc_virtio_find_vqs,
