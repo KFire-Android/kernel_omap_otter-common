@@ -725,10 +725,8 @@ static struct tiler1d_slot *merge_slots(struct tiler1d_slot *slot)
 	 * might be overtaken before we claim it again.
 	 * Will be fixed later with tiler slot splitting API
 	*/
-	tiler_unpin(slot->block_handle);
 	tiler_release(slot->block_handle);
 
-	tiler_unpin(slot2free->block_handle);
 	tiler_release(slot2free->block_handle);
 
 	slot->size = new_size >> PAGE_SHIFT;
@@ -756,7 +754,6 @@ static struct tiler1d_slot *split_slots(struct tiler1d_slot *slot)
 	 * might be overtaken before we claim it again.
 	 * Will be fixed later with tiler slot splitting API
 	*/
-	tiler_unpin(slot->block_handle);
 	tiler_release(slot->block_handle);
 	for (i = 0; i < MAX_NUM_TILER1D_SLOTS; i++)
 		if (slots[i].id == -1)
