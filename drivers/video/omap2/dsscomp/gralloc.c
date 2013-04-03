@@ -34,7 +34,7 @@
 #endif
 static bool blanked;
 
-#define NUM_TILER1D_SLOTS 2
+#define NUM_TILER1D_SLOTS 4
 
 static struct tiler1d_slot {
 	struct list_head q;
@@ -201,7 +201,7 @@ int dsscomp_gralloc_queue(struct dsscomp_setup_dispc_data *d,
 #ifdef CONFIG_DEBUG_FS
 	u32 ms = ktime_to_ms(ktime_get());
 #endif
-	u32 channels[ARRAY_SIZE(d->mgrs)], ch;
+	u32 channels[MAX_MANAGERS], ch;
 	int skip;
 	struct dsscomp_gralloc_t *gsync;
 	struct dss2_rect_t win = { .w = 0 };
@@ -281,7 +281,7 @@ int dsscomp_gralloc_queue(struct dsscomp_setup_dispc_data *d,
 
 	/* create dsscomp objects for set managers (including active ones) */
 	for (ch = 0; ch < MAX_MANAGERS; ch++) {
-		if (!(mgr_set_mask & (1 << ch)) && !ovl_use_mask[ch])
+		if (!(mgr_set_mask & (1 << ch)))
 			continue;
 
 		mgr = cdev->mgrs[ch];
@@ -292,15 +292,6 @@ int dsscomp_gralloc_queue(struct dsscomp_setup_dispc_data *d,
 			dev_warn(DEV(cdev), "failed to get composition on %s\n",
 					mgr->name);
 			continue;
-		}
-
-		/* set basic manager information for blanked managers */
-		if (!(mgr_set_mask & (1 << ch))) {
-			struct dss2_mgr_info mi = {
-				.alpha_blending = true,
-				.ix = comp[ch]->frm.mgr.ix,
-			};
-			dsscomp_set_mgr(comp[ch], &mi);
 		}
 
 		comp[ch]->must_apply = true;
@@ -320,24 +311,27 @@ int dsscomp_gralloc_queue(struct dsscomp_setup_dispc_data *d,
 	/* NOTE: none of the dsscomp sets should fail as composition is new */
 	for (i = 0; i < d->num_ovls; i++) {
 		struct dss2_ovl_info *oi = d->ovls + i;
-		u32 mgr_ix = oi->cfg.mgr_ix;
 		u32 size;
-
-		/* verify manager index */
-		if (mgr_ix >= d->num_mgrs) {
-			dev_err(DEV(cdev), "invalid manager for ovl%d\n",
-					oi->cfg.ix);
-			continue;
-		}
-		ch = channels[mgr_ix];
+		int j;
+		ch = oi->cfg.mgr_ix;
 
 		/* skip overlays on compositions we could not create */
 		if (!comp[ch])
 			continue;
 
-		/* swap red & blue if requested */
-		if (d->mgrs[mgr_ix].swap_rb)
-			swap_rb_in_ovl_info(d->ovls + i);
+		for (j = 0; j < d->num_mgrs; j++)
+			if (d->mgrs[j].ix == ch) {
+				/* swap red & blue if requested */
+				if (d->mgrs[j].swap_rb)
+					swap_rb_in_ovl_info(d->ovls + i);
+				break;
+			}
+
+		if (j == d->num_mgrs) {
+			dev_err(DEV(cdev), "invalid manager %d for ovl%d\n",
+						ch, oi->cfg.ix);
+			continue;
+		}
 
 		/* copy prior overlay to avoid mapping layers twice to 1D */
 		if (oi->addressing == OMAP_DSS_BUFADDR_OVL_IX) {
@@ -502,9 +496,19 @@ static void dsscomp_early_suspend(struct early_suspend *h)
 	struct dsscomp_setup_dispc_data d = {
 		.num_mgrs = 0,
 	};
-	int err;
+
+	int err, mgr_ix;
 
 	pr_info("DSSCOMP: %s\n", __func__);
+
+	/*dsscomp_gralloc_queue() expects all blanking mgrs set up in comp */
+	for (mgr_ix = 0 ; mgr_ix < cdev->num_mgrs ; mgr_ix++) {
+		struct omap_dss_device *dssdev = cdev->mgrs[mgr_ix]->device;
+		if (dssdev && dssdev->state == OMAP_DSS_DISPLAY_ACTIVE) {
+			d.num_mgrs++;
+			d.mgrs[mgr_ix].ix = mgr_ix;
+		}
+	}
 
 	/* use gralloc queue as we need to blank all screens */
 	blank_complete = false;
