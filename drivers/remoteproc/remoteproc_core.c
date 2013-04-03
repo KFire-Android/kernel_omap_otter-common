@@ -614,6 +614,170 @@ rproc_load_segments(struct rproc *rproc, const u8 *elf_data, size_t len)
 	return ret;
 }
 
+static void rproc_reset_poolmem(struct rproc *rproc)
+{
+	struct rproc_mem_pool *pool = rproc->memory_pool;
+
+	if (!pool || !pool->mem_base || !pool->mem_size) {
+		pr_warn("invalid pool\n");
+		return;
+	}
+
+	pool->cur_ipc_base = pool->mem_base;
+	pool->cur_ipc_size = SZ_256K;
+	pool->cur_ipcbuf_base = pool->cur_ipc_base + pool->cur_ipc_size;
+	pool->cur_ipcbuf_size = SZ_1M - pool->cur_ipc_size;
+	pool->cur_fw_base = pool->mem_base + SZ_1M;
+	pool->cur_fw_size = pool->mem_size - SZ_1M;
+}
+
+/**
+ * rproc_alloc_poolmem() - allocate from the rproc carveout pool
+ * @rproc: remote processor to allocate the memory for
+ * @size: size of the allocation
+ * @pa: pointer to return the physical address of the allocated segment
+ * @type: segment type to identify the carveout range to allocate from
+ *
+ * This function is the basic allocator function from the rproc carveout
+ * pool. The pool itself is divided into 3 different regions currently,
+ * one for the rproc shared vring objects, another for the vring data
+ * buffers and the last for all the firmware segments. The regions are
+ * partitioned to mimic the current ranges of the CMA allocated addresses
+ * for OMAP so that the same firmware can be used.
+ */
+static int
+rproc_alloc_poolmem(struct rproc *rproc, u32 size, dma_addr_t *pa, int type)
+{
+	struct rproc_mem_pool *pool = rproc->memory_pool;
+	size_t align_size = PAGE_SIZE << get_order(size);
+	size_t max_cma_align = PAGE_SIZE << CONFIG_CMA_ALIGNMENT;
+	size_t offset;
+
+	/* enforce the max alignment, aligned with CMA */
+	if (align_size > max_cma_align)
+		align_size = max_cma_align;
+	else
+		size = align_size;
+
+	*pa = 0;
+	if (!pool || !pool->mem_base || !pool->mem_size) {
+		pr_warn("invalid pool\n");
+		return -EINVAL;
+	}
+
+	switch (type) {
+	case RPROC_MEM_IPC_BUF:
+		if (pool->cur_ipcbuf_size < size) {
+			pr_warn("out of carveout memory\n");
+			return -ENOMEM;
+		}
+
+		offset = ALIGN(pool->cur_ipcbuf_base, align_size) -
+							pool->cur_ipcbuf_base;
+		*pa = pool->cur_ipcbuf_base + offset;
+		pool->cur_ipcbuf_base += (size + offset);
+		pool->cur_ipcbuf_size -= (size + offset);
+		break;
+	case RPROC_MEM_IPC:
+		if (pool->cur_ipc_size < size) {
+			pr_warn("out of carveout memory\n");
+			return -ENOMEM;
+		}
+
+		offset = ALIGN(pool->cur_ipc_base, align_size) -
+							pool->cur_ipc_base;
+		*pa = pool->cur_ipc_base + offset;
+		pool->cur_ipc_base += (size + offset);
+		pool->cur_ipc_size -= (size + offset);
+		break;
+	case RPROC_MEM_FW:
+		if (pool->cur_fw_size < size) {
+			pr_warn("out of carveout memory\n");
+			return -ENOMEM;
+		}
+
+		offset = ALIGN(pool->cur_fw_base, align_size) -
+							pool->cur_fw_base;
+		*pa = pool->cur_fw_base + offset;
+		pool->cur_fw_base += (size + offset);
+		pool->cur_fw_size -= (size + offset);
+		break;
+	default:
+		/* do nothing */
+		break;
+	}
+	return 0;
+}
+
+/**
+ * rproc_alloc_memory() - memory allocator for rproc segments
+ * @rproc: remote processor to allocate the memory for
+ * @size: size of the allocation
+ * @pa: pointer to return the physical address of the allocated segment
+ * @type: segment type to identify the carveout range to allocate from
+ *
+ * This function is the primary allocator function that needs to be used
+ * for allocating memory for different rproc firmware segments. It provides
+ * an unified interface and allocated memory from either the default CMA
+ * pool or the carveout pool associated with the rproc device. The carveout
+ * allocation gives out both the physical as well as the equivalent kernel
+ * virtual address.
+ *
+ * Note: The kernel virtual address returned in the case of a carveout pool
+ * may not exactly meet the same criteria as the virtual address returned
+ * from the dma_alloc_coherent API. Any kernel functions trying to leverage
+ * this address for virt to phys conversions or preparing sg lists need to
+ * be careful.
+ */
+void *rproc_alloc_memory(struct rproc *rproc, u32 size, dma_addr_t *dma,
+								int type)
+{
+	void *va = NULL;
+	struct device *dev = &rproc->dev;
+
+	/* use a carveout pool only if the rproc is configured so */
+	if (rproc->memory_pool) {
+		int ret = rproc_alloc_poolmem(rproc, size, dma, type);
+		if (ret) {
+			dev_err(dev, "rproc_alloc_poolmem failed 0x%x\n", size);
+			goto out;
+		}
+
+		/* ioremaping normal memory, so make sparse happy */
+		va = (__force void *) ioremap((unsigned long)(*dma), size);
+		if (!va) {
+			dev_err(dev, "iomap error: (phys 0x%08x size 0x%x)\n",
+						(u32)(*dma), size);
+			goto out;
+		}
+	} else {
+		va = dma_alloc_coherent(dev->parent, size, dma, GFP_KERNEL);
+		if (!va) {
+			dev_err(dev, "dma_alloc_coherent failed\n");
+			goto out;
+		}
+	}
+
+out:
+	return va;
+}
+
+void rproc_free_memory(struct rproc *rproc, u32 size, void *va, dma_addr_t dma)
+{
+	struct device *dev = &rproc->dev;
+
+	if (rproc->memory_pool) {
+		/*
+		 * just unmap it, the pool need not be managed, it would
+		 * simply just need to be reset. normal memory is being
+		 * unmapped, so make sparse also happy.
+		 */
+		iounmap((__force void __iomem *)va);
+	} else {
+		dma_free_coherent(dev->parent, size, va, dma);
+	}
+}
+
 int rproc_alloc_vring(struct rproc_vdev *rvdev, int i)
 {
 	struct rproc *rproc = rvdev->rproc;
@@ -636,10 +800,10 @@ int rproc_alloc_vring(struct rproc_vdev *rvdev, int i)
 	 * this call will also configure the IOMMU for us
 	 * TODO: let the rproc know the da of this vring
 	 */
-	va = dma_alloc_coherent(dev->parent, size, &dma, GFP_KERNEL);
+	va = rproc_alloc_memory(rproc, size, &dma, RPROC_MEM_IPC);
 	if (!va) {
-		dev_err(dev, "dma_alloc_coherent failed\n");
-		return -EINVAL;
+		dev_err(dev, "rproc_alloc_memory failed\n");
+		return -ENOMEM;
 	}
 
 	/*
@@ -651,7 +815,7 @@ int rproc_alloc_vring(struct rproc_vdev *rvdev, int i)
 	ret = idr_get_new(&rproc->notifyids, vring, &notifyid);
 	if (ret) {
 		dev_err(dev, "idr_get_new failed: %d\n", ret);
-		dma_free_coherent(dev->parent, size, va, dma);
+		rproc_free_memory(rproc, size, va, dma);
 		return ret;
 	}
 
@@ -699,9 +863,8 @@ void rproc_free_vring(struct rproc_vring *rvring)
 {
 	int size = PAGE_ALIGN(vring_size(rvring->len, rvring->align));
 	struct rproc *rproc = rvring->rvdev->rproc;
-	struct device *dev = &rproc->dev;
 
-	dma_free_coherent(dev->parent, size, rvring->va, rvring->dma);
+	rproc_free_memory(rproc, size, rvring->va, rvring->dma);
 	idr_remove(&rproc->notifyids, rvring->notifyid);
 }
 
@@ -1066,9 +1229,9 @@ static int rproc_handle_carveout(struct rproc *rproc,
 		return -ENOMEM;
 	}
 
-	va = dma_alloc_coherent(dev->parent, rsc->len, &dma, GFP_KERNEL);
+	va = rproc_alloc_memory(rproc, rsc->len, &dma, RPROC_MEM_FW);
 	if (!va) {
-		dev_err(dev, "dma_alloc_coherent failed: %d\n", rsc->len);
+		dev_err(dev, "rproc_alloc_memory failed: %d\n", rsc->len);
 		ret = -ENOMEM;
 		goto free_carv;
 	}
@@ -1146,7 +1309,7 @@ static int rproc_handle_carveout(struct rproc *rproc,
 	return 0;
 
 dma_free:
-	dma_free_coherent(dev->parent, rsc->len, va, dma);
+	rproc_free_memory(rproc, rsc->len, va, dma);
 free_carv:
 	kfree(carveout);
 	return ret;
@@ -1486,11 +1649,14 @@ static void rproc_resource_cleanup(struct rproc *rproc)
 
 	/* clean up carveout allocations */
 	list_for_each_entry_safe(entry, tmp, &rproc->carveouts, node) {
-		dma_free_coherent(dev->parent, entry->len, entry->va,
-				entry->dma);
+		rproc_free_memory(rproc, entry->len, entry->va, entry->dma);
 		list_del(&entry->node);
 		kfree(entry);
 	}
+
+	/* reconfigure the carveout pool, if it exists */
+	if (rproc->memory_pool)
+		rproc_reset_poolmem(rproc);
 
 	/* clean up iommu mapping entries */
 	list_for_each_entry_safe(entry, tmp, &rproc->mappings, node) {
@@ -2287,6 +2453,7 @@ static void rproc_class_release(struct device *dev)
 {
 	struct rproc *rproc = container_of(dev, struct rproc, dev);
 
+	kfree(rproc->memory_pool);
 	kfree(rproc);
 }
 
@@ -2303,6 +2470,7 @@ static struct class rproc_class = {
  * @name: name of this remote processor
  * @ops: platform-specific handlers (mainly start/stop)
  * @firmware: name of firmware file to load
+ * @pool_data: optional carveout pool data
  * @len: length of private data needed by the rproc driver (in bytes)
  *
  * Allocates a new remote processor handle, but does not register
@@ -2322,9 +2490,12 @@ static struct class rproc_class = {
  */
 struct rproc *rproc_alloc(struct device *dev, const char *name,
 				const struct rproc_ops *ops,
-				const char *firmware, int len)
+				const char *firmware,
+				struct rproc_mem_pool_data *pool_data,
+				int len)
 {
 	struct rproc *rproc;
+	struct rproc_mem_pool *pool = NULL;
 
 	if (!dev || !name || !ops)
 		return NULL;
@@ -2335,10 +2506,38 @@ struct rproc *rproc_alloc(struct device *dev, const char *name,
 		return NULL;
 	}
 
+	if (pool_data) {
+		rproc->memory_pool = kzalloc(sizeof(*pool), GFP_KERNEL);
+		if (!rproc->memory_pool) {
+			dev_err(dev, "%s: kzalloc failed\n", __func__);
+			kfree(rproc);
+			return NULL;
+		}
+	}
+
 	rproc->name = name;
 	rproc->ops = ops;
 	rproc->firmware = firmware;
 	rproc->priv = &rproc[1];
+
+	/*
+	 * the current ranges for different sections are roughly chosen
+	 * based on the current OMAP configuration of 512 bytes each
+	 * for 512 vring buffers, and the alignment CMA gives back for
+	 * these sizes.
+	 */
+	if (pool_data) {
+		pool = rproc->memory_pool;
+		pool->mem_base = pool_data->mem_base;
+		pool->mem_size = pool_data->mem_size;
+		pool->cur_ipc_base = pool->mem_base;
+		pool->cur_ipc_size = SZ_256K;
+		pool->cur_ipcbuf_base = pool->cur_ipc_base +
+							pool->cur_ipc_size;
+		pool->cur_ipcbuf_size = SZ_1M - pool->cur_ipc_size;
+		pool->cur_fw_base = pool->mem_base + SZ_1M;
+		pool->cur_fw_size = pool->mem_size - SZ_1M;
+	}
 
 	device_initialize(&rproc->dev);
 	rproc->dev.parent = dev;

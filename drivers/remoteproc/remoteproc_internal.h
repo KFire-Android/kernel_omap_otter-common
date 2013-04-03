@@ -24,10 +24,20 @@
 
 struct rproc;
 
+/* memory type for allocation requests */
+enum {
+	RPROC_MEM_FW,
+	RPROC_MEM_IPC,
+	RPROC_MEM_IPC_BUF,
+};
+
 /* from remoteproc_core.c */
 void rproc_release(struct kref *kref);
 irqreturn_t rproc_vq_interrupt(struct rproc *rproc, int vq_id);
 void rproc_recover(struct rproc *rproc);
+void *rproc_alloc_memory(struct rproc *rproc, u32 size, dma_addr_t *dma,
+				int type);
+void rproc_free_memory(struct rproc *rproc, u32 size, void *va, dma_addr_t dma);
 
 /* from remoteproc_virtio.c */
 int rproc_add_virtio_dev(struct rproc_vdev *rvdev, int id);
