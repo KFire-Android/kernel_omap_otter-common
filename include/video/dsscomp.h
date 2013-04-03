@@ -379,6 +379,7 @@ struct dss2_ovl_cfg {
 	__u8 zonly;	/* only set zorder and enabled bit */
 	__u8 mgr_ix;	/* mgr index */
 
+	bool force_1d;
 	bool mflag_en; /* mflag for the overlay */
 } __aligned(4);
 

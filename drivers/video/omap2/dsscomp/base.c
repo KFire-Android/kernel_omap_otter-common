@@ -211,6 +211,8 @@ int set_dss_ovl_info(struct dss2_ovl_info *oi)
 	info.mirror = cfg->mirror;
 	info.color_mode = cfg->color_mode;
 
+	info.force_1d = cfg->force_1d;
+
 	/* mflag for the overlay */
 	info.mflag_en = cfg->mflag_en;
 
