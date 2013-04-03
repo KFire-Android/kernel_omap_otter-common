@@ -33,8 +33,10 @@
 #include <linux/earlysuspend.h>
 #endif
 static bool blanked;
+static bool presentation_mode;
 
-#define NUM_TILER1D_SLOTS 4
+#define NUM_TILER1D_SLOTS 2
+#define MAX_NUM_TILER1D_SLOTS 4
 
 static struct tiler1d_slot {
 	struct list_head q;
@@ -42,7 +44,8 @@ static struct tiler1d_slot {
 	u32 phys;
 	u32 size;
 	u32 *page_map;
-} slots[NUM_TILER1D_SLOTS];
+	short id;
+} slots[MAX_NUM_TILER1D_SLOTS];
 static struct list_head free_slots;
 static struct dsscomp_dev *cdev;
 static DEFINE_MUTEX(mtx);
@@ -64,6 +67,15 @@ struct dsscomp_gralloc_t {
 static LIST_HEAD(flip_queue);
 
 static u32 ovl_use_mask[MAX_MANAGERS];
+
+static inline bool needs_split(struct tiler1d_slot *slot)
+{
+	return slot->size == tiler1d_slot_size(cdev) >> PAGE_SHIFT;
+}
+
+static struct tiler1d_slot *split_slots(struct tiler1d_slot *slot);
+static struct tiler1d_slot *merge_slots(struct tiler1d_slot *slot);
+static struct tiler1d_slot *alloc_tiler_slot(void);
 
 static void unpin_tiler_blocks(struct list_head *slots)
 {
@@ -383,14 +395,23 @@ int dsscomp_gralloc_queue(struct dsscomp_setup_dispc_data *d,
 			goto skip_map1d;
 
 		if (!slot) {
-			if (down_timeout(&free_slots_sem,
-					msecs_to_jiffies(100))) {
+			mutex_lock(&mtx);
+			/* separate comp for tv means presentation mode */
+			if (d->num_mgrs == 1 && d->mgrs[0].ix == 1)
+				presentation_mode = true;
+			else if (d->num_mgrs == 2 ||
+				cdev->mgrs[1]->output->device->state !=
+					OMAP_DSS_DISPLAY_ACTIVE)
+				presentation_mode = false;
+
+			slot = alloc_tiler_slot();
+			if (IS_ERR_OR_NULL(slot)) {
 				dev_warn(DEV(cdev), "could not obtain "
 							"tiler slot");
+				slot = NULL;
+				mutex_unlock(&mtx);
 				goto skip_buffer;
 			}
-			mutex_lock(&mtx);
-			slot = list_first_entry(&free_slots, typeof(*slot), q);
 			list_move(&slot->q, &gsync->slots);
 			mutex_unlock(&mtx);
 		}
@@ -621,6 +642,9 @@ void dsscomp_gralloc_init(struct dsscomp_dev *cdev_)
 
 	if (!free_slots.next) {
 		INIT_LIST_HEAD(&free_slots);
+		for (i = 0; i < MAX_NUM_TILER1D_SLOTS; i++)
+			slots[i].id = -1;
+
 		for (i = 0; i < NUM_TILER1D_SLOTS; i++) {
 			struct tiler_block *block_handle =
 				tiler_reserve_1d(tiler1d_slot_size(cdev_));
@@ -638,6 +662,7 @@ void dsscomp_gralloc_init(struct dsscomp_dev *cdev_)
 				tiler_unpin(block_handle);
 				break;
 			}
+			slots[i].id = i;
 			list_add(&slots[i].q, &free_slots);
 			up(&free_slots_sem);
 		}
@@ -645,6 +670,123 @@ void dsscomp_gralloc_init(struct dsscomp_dev *cdev_)
 		if (!i)
 			ZERO(free_slots);
 	}
+}
+
+static struct tiler1d_slot *alloc_tiler_slot(void)
+{
+	struct tiler1d_slot *slot, *ret;
+	if (down_timeout(&free_slots_sem,
+			msecs_to_jiffies(100))) {
+		return ERR_PTR(-ETIME);
+	}
+	slot = list_first_entry(&free_slots, typeof(*slot), q);
+	if (presentation_mode && needs_split(slot)) {
+		ret = split_slots(slot);
+		if (IS_ERR_OR_NULL(ret))
+			goto err;
+		dev_dbg(DEV(cdev),
+			"slot split, size %u block 0x%x\n",
+			slot->size, slot->phys);
+	} else if (!presentation_mode && !needs_split(slot)) {
+		ret = merge_slots(slot);
+		if (IS_ERR_OR_NULL(ret))
+			goto err;
+		dev_dbg(DEV(cdev),
+			"slot merged, size %u ptr 0x%x\n",
+			slot->size, slot->phys);
+	}
+
+	return slot;
+err:
+	up(&free_slots_sem);
+	return ret;
+}
+
+static struct tiler1d_slot *merge_slots(struct tiler1d_slot *slot)
+{
+	struct tiler1d_slot *slot2free;
+	u32 new_size = tiler1d_slot_size(cdev);
+
+	list_for_each_entry(slot2free, &free_slots, q)
+		if (!needs_split(slot2free) && slot2free != slot)
+			break;
+
+	if (&slot2free->q == &free_slots || slot2free->id == -1) {
+		dev_err(DEV(cdev), "%s: no free slot to megre\n", __func__);
+		return ERR_PTR(-EINVAL);
+	}
+
+	down(&free_slots_sem);
+	list_del(&slot2free->q);
+
+	dev_dbg(DEV(cdev), "%s: merging with %d id\n", __func__,
+						slot2free->id);
+	/*FIXME: potentially unsafe, as tiler1d space
+	 * might be overtaken before we claim it again.
+	 * Will be fixed later with tiler slot splitting API
+	*/
+	tiler_unpin(slot->block_handle);
+	tiler_release(slot->block_handle);
+
+	tiler_unpin(slot2free->block_handle);
+	tiler_release(slot2free->block_handle);
+
+	slot->size = new_size >> PAGE_SHIFT;
+	slot->block_handle = tiler_reserve_1d(new_size);
+
+	if (IS_ERR_OR_NULL(slot->block_handle)) {
+		dev_err(DEV(cdev), "%s: failed to allocate slot\n", __func__);
+		return ERR_PTR(-ENOMEM);
+	}
+
+	slot->phys = tiler_ssptr(slot->block_handle);
+
+	vfree(slot2free->page_map);
+	slot2free->id = -1;
+
+	return slot;
+}
+
+static struct tiler1d_slot *split_slots(struct tiler1d_slot *slot)
+{
+	int i;
+	u32 new_size = tiler1d_slot_size(cdev)/2;
+
+	/*FIXME: potentially unsafe, as tiler1d space
+	 * might be overtaken before we claim it again.
+	 * Will be fixed later with tiler slot splitting API
+	*/
+	tiler_unpin(slot->block_handle);
+	tiler_release(slot->block_handle);
+	for (i = 0; i < MAX_NUM_TILER1D_SLOTS; i++)
+		if (slots[i].id == -1)
+			break;
+
+	if (i == MAX_NUM_TILER1D_SLOTS) {
+		dev_err(DEV(cdev), "%s: all slots allocated\n", __func__);
+		return ERR_PTR(-EINVAL);
+	}
+
+	dev_dbg(DEV(cdev), "%s: splitting to %d id\n", __func__, i);
+	slot->size = slots[i].size = new_size >> PAGE_SHIFT;
+	slots[i].page_map = vmalloc(sizeof(*slots[i].page_map) *
+				slots[i].size*2);
+	slot->block_handle = tiler_reserve_1d(new_size);
+	slots[i].block_handle = tiler_reserve_1d(new_size);
+
+	if (IS_ERR_OR_NULL(slot->block_handle) ||
+		IS_ERR_OR_NULL(slots[i].block_handle)) {
+		dev_err(DEV(cdev), "%s: failed to allocate slot\n", __func__);
+		return ERR_PTR(-ENOMEM);
+	}
+
+	slot->phys = tiler_ssptr(slot->block_handle);
+	slots[i].phys = tiler_ssptr(slots[i].block_handle);
+	slots[i].id = i;
+	list_add(&slots[i].q, &free_slots);
+	up(&free_slots_sem);
+
+	return &slots[i];
 }
 
 void dsscomp_gralloc_exit(void)
