@@ -68,7 +68,7 @@ struct dss_features {
 	u8 fck_div_max;
 	u8 dss_fck_multiplier;
 	const char *clk_name;
-	int (*dpi_select_source)(enum omap_channel channel);
+	int (*dpi_select_source)(int module_id, enum omap_channel channel);
 };
 
 static struct {
@@ -706,7 +706,8 @@ enum dss_hdmi_venc_clk_source_select dss_get_hdmi_venc_clk_source(void)
 	return REG_GET(DSS_CONTROL, 15, 15);
 }
 
-static int dss_dpi_select_source_omap2_omap3(enum omap_channel channel)
+static int dss_dpi_select_source_omap2_omap3(int module_id,
+		enum omap_channel channel)
 {
 	if (channel != OMAP_DSS_CHANNEL_LCD)
 		return -EINVAL;
@@ -714,7 +715,7 @@ static int dss_dpi_select_source_omap2_omap3(enum omap_channel channel)
 	return 0;
 }
 
-static int dss_dpi_select_source_omap4(enum omap_channel channel)
+static int dss_dpi_select_source_omap4(int module_id, enum omap_channel channel)
 {
 	int val;
 
@@ -734,7 +735,7 @@ static int dss_dpi_select_source_omap4(enum omap_channel channel)
 	return 0;
 }
 
-static int dss_dpi_select_source_omap5(enum omap_channel channel)
+static int dss_dpi_select_source_omap5(int module_id, enum omap_channel channel)
 {
 	int val;
 
@@ -760,9 +761,9 @@ static int dss_dpi_select_source_omap5(enum omap_channel channel)
 	return 0;
 }
 
-int dss_dpi_select_source(enum omap_channel channel)
+int dss_dpi_select_source(int module_id, enum omap_channel channel)
 {
-	return dss.feat->dpi_select_source(channel);
+	return dss.feat->dpi_select_source(module_id, channel);
 }
 
 static int dss_get_clocks(void)

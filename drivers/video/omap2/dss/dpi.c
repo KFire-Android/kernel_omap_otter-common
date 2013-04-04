@@ -232,7 +232,7 @@ int omapdss_dpi_display_enable(struct omap_dss_device *dssdev)
 	if (r)
 		goto err_get_dispc;
 
-	r = dss_dpi_select_source(dssdev->channel);
+	r = dss_dpi_select_source(0, dssdev->channel);
 	if (r)
 		goto err_src_sel;
 
