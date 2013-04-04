@@ -1582,6 +1582,7 @@ static int rproc_fw_boot(struct rproc *rproc, const struct firmware *fw)
 	struct resource_table *table;
 	int ret, tablesz, versz;
 	const u8 *version;
+	int smode = rproc_secure_get_mode(rproc);
 
 	ret = rproc_fw_sanity_check(rproc, fw);
 	if (ret)
@@ -1669,7 +1670,8 @@ static int rproc_fw_boot(struct rproc *rproc, const struct firmware *fw)
 
 	rproc->state = RPROC_RUNNING;
 	pm_runtime_set_active(dev);
-	pm_runtime_enable(dev);
+	if (!smode)
+		pm_runtime_enable(dev);
 	pm_runtime_get_noresume(dev);
 	rproc->auto_suspend_timeout = rproc->auto_suspend_timeout ? :
 					DEFAULT_AUTOSUSPEND_TIMEOUT;
@@ -1836,6 +1838,7 @@ void rproc_shutdown(struct rproc *rproc)
 {
 	struct device *dev = &rproc->dev;
 	int ret;
+	int smode = rproc_secure_get_mode(rproc);
 
 	ret = mutex_lock_interruptible(&rproc->lock);
 	if (ret) {
@@ -1857,7 +1860,8 @@ void rproc_shutdown(struct rproc *rproc)
 		pm_runtime_get_sync(dev);
 
 	pm_runtime_put_noidle(&rproc->dev);
-	pm_runtime_disable(&rproc->dev);
+	if (smode || !rproc_is_secure(rproc))
+		pm_runtime_disable(&rproc->dev);
 	pm_runtime_set_suspended(&rproc->dev);
 
 	/* power off the remote processor */
