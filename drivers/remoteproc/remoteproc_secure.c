@@ -105,6 +105,22 @@ void rproc_secure_reset(struct rproc *rproc)
 }
 
 /**
+ * rproc_is_secure() - check if the rproc is secure
+ * @rproc: remote processor
+ *
+ * This function is called by the remoteproc core driver code to
+ * check if the processor is going through a secure->non-secure
+ * transition.
+ */
+bool rproc_is_secure(struct rproc *rproc)
+{
+	if (strcmp(rproc->name, "ipu_c0"))
+		return 0;
+
+	return secure_state ? 1 : 0;
+}
+
+/**
  * rproc_secure_get_mode() - get the current requested secure mode
  * @rproc: remote processor
  *

@@ -45,6 +45,7 @@ struct omap_rproc_timers_info {
  * @idle_mask: mask of the idle register
  * @suspend_timeout: max timeout waiting for suspend request respond in msecs
  * @ops: start/stop rproc handlers
+ * @pool_data: rproc carveout pool data
  * @device_enable: omap-specific handler for enabling a device
  * @device_shutdown: omap-specific handler for shutting down a device
  * @boot_reg: physical address of the control register for storing boot address
@@ -60,6 +61,7 @@ struct omap_rproc_pdata {
 	u32 idle_mask;
 	unsigned long suspend_timeout;
 	const struct rproc_ops *ops;
+	struct rproc_mem_pool_data *pool_data;
 	struct omap_rproc_timers_info *timers;
 	int (*device_enable) (struct platform_device *pdev);
 	int (*device_shutdown) (struct platform_device *pdev);

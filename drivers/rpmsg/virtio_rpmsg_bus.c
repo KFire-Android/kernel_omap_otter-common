@@ -34,6 +34,17 @@
 #include <linux/rpmsg.h>
 #include <linux/mutex.h>
 
+/*
+ * virtio rpmsg bus driver requests
+ * NOTE: These need to be matched with the definitions in remoteproc_virtio.c
+ *       The definitions are deliberately duplicated here to avoid having to
+ *       bring in remoteproc.h (or direct remoteproc dependencies)
+ */
+enum {
+	RPROC_VIRTIO_ALLOC_TYPE,
+	RPROC_VIRTIO_BUF_ADDR,
+};
+
 int get_virtproc_id(struct virtproc_info *vrp)
 {
 	return vrp->id;
@@ -673,6 +684,8 @@ int rpmsg_send_offchannel_raw(struct rpmsg_channel *rpdev, u32 src, u32 dst,
 	struct device *dev = &rpdev->dev;
 	struct scatterlist sg;
 	struct rpmsg_hdr *msg;
+	unsigned long offset = 0;
+	void *sg_addr;
 	int err;
 
 	/* bcasting isn't allowed */
@@ -740,7 +753,14 @@ int rpmsg_send_offchannel_raw(struct rpmsg_channel *rpdev, u32 src, u32 dst,
 					msg, sizeof(*msg) + msg->len, true);
 #endif
 
-	sg_init_one(&sg, msg, sizeof(*msg) + len);
+	/* use a direct-mapped equivalent virtual address in case of carveout */
+	if (vrp->use_carveout) {
+		offset = ((unsigned long) msg) - ((unsigned long) vrp->rbufs);
+		sg_addr = __va(vrp->bufs_dma) + offset;
+	} else {
+		sg_addr = msg;
+	}
+	sg_init_one(&sg, sg_addr, sizeof(*msg) + len);
 
 	mutex_lock(&vrp->tx_lock);
 
@@ -775,6 +795,8 @@ static void rpmsg_recv_done(struct virtqueue *rvq)
 	struct scatterlist sg;
 	struct virtproc_info *vrp = rvq->vdev->priv;
 	struct device *dev = &rvq->vdev->dev;
+	unsigned long offset = 0;
+	void *sg_addr;
 	int err;
 
 	mutex_lock(&vrp->rx_lock);
@@ -830,8 +852,15 @@ static void rpmsg_recv_done(struct virtqueue *rvq)
 	} else
 		dev_warn(dev, "msg received with no recepient\n");
 
+	/* use a direct-mapped equivalent virtual address in case of carveout */
+	if (vrp->use_carveout) {
+		offset = ((unsigned long) msg) - ((unsigned long) vrp->rbufs);
+		sg_addr = __va(vrp->bufs_dma) + offset;
+	} else {
+		sg_addr = msg;
+	}
 	/* publish the real size of the buffer */
-	sg_init_one(&sg, msg, RPMSG_BUF_SIZE);
+	sg_init_one(&sg, sg_addr, RPMSG_BUF_SIZE);
 
 	/* add the buffer back to the remote processor's virtqueue */
 	err = virtqueue_add_buf(vrp->rvq, &sg, 0, 1, msg, GFP_KERNEL);
@@ -945,6 +974,7 @@ static int rpmsg_probe(struct virtio_device *vdev)
 	struct virtproc_info *vrp;
 	void *bufs_va;
 	int err = 0, i, vproc_id;
+	unsigned int bufs[2];
 
 	vrp = kzalloc(sizeof(*vrp), GFP_KERNEL);
 	if (!vrp)
@@ -973,6 +1003,9 @@ static int rpmsg_probe(struct virtio_device *vdev)
 	}
 
 	vrp->id = vproc_id;
+	/* retrieve the carveout configuration information */
+	vdev->config->get(vdev, RPROC_VIRTIO_ALLOC_TYPE,
+				&vrp->use_carveout, sizeof(vrp->use_carveout));
 
 	/* We expect two virtqueues, rx and tx (and in this order) */
 	err = vdev->config->find_vqs(vdev, 2, vqs, vq_cbs, names);
@@ -982,10 +1015,21 @@ static int rpmsg_probe(struct virtio_device *vdev)
 	vrp->rvq = vqs[0];
 	vrp->svq = vqs[1];
 
-	/* allocate coherent memory for the buffers */
-	bufs_va = dma_alloc_coherent(vdev->dev.parent->parent,
-				RPMSG_TOTAL_BUF_SPACE,
-				&vrp->bufs_dma, GFP_KERNEL);
+	/*
+	 * allocate coherent memory for the buffers.
+	 * The config->get would work even for the default configuration,
+	 * but is done this way for better readability.
+	 */
+	if (vrp->use_carveout) {
+		vdev->config->get(vdev, RPROC_VIRTIO_BUF_ADDR,
+							bufs, sizeof(bufs));
+		bufs_va = (void *)bufs[0];
+		vrp->bufs_dma = bufs[1];
+	} else {
+		bufs_va = dma_alloc_coherent(vdev->dev.parent->parent,
+						RPMSG_TOTAL_BUF_SPACE,
+						&vrp->bufs_dma, GFP_KERNEL);
+	}
 	if (!bufs_va)
 		goto vqs_del;
 
@@ -1002,8 +1046,15 @@ static int rpmsg_probe(struct virtio_device *vdev)
 	for (i = 0; i < RPMSG_NUM_BUFS / 2; i++) {
 		struct scatterlist sg;
 		void *cpu_addr = vrp->rbufs + i * RPMSG_BUF_SIZE;
+		void *sg_addr = cpu_addr;
 
-		sg_init_one(&sg, cpu_addr, RPMSG_BUF_SIZE);
+		/*
+		 * use a direct-mapped equivalent virtual address in case of a
+		 * carveout
+		 */
+		if (vrp->use_carveout)
+			sg_addr = __va(vrp->bufs_dma) + i * RPMSG_BUF_SIZE;
+		sg_init_one(&sg, sg_addr, RPMSG_BUF_SIZE);
 
 		err = virtqueue_add_buf(vrp->rvq, &sg, 0, 1, cpu_addr,
 								GFP_KERNEL);
@@ -1039,8 +1090,14 @@ static int rpmsg_probe(struct virtio_device *vdev)
 	return 0;
 
 free_coherent:
-	dma_free_coherent(vdev->dev.parent->parent, RPMSG_TOTAL_BUF_SPACE,
+	if (vrp->use_carveout) {
+		vdev->config->set(vdev, RPROC_VIRTIO_BUF_ADDR,
+						bufs, sizeof(bufs));
+	} else {
+		dma_free_coherent(vdev->dev.parent->parent,
+					RPMSG_TOTAL_BUF_SPACE,
 					 bufs_va, vrp->bufs_dma);
+	}
 vqs_del:
 	vdev->config->del_vqs(vrp->vdev);
 rem_idr:
@@ -1063,6 +1120,7 @@ static void __devexit rpmsg_remove(struct virtio_device *vdev)
 {
 	struct virtproc_info *vrp = vdev->priv;
 	int ret;
+	unsigned int bufs[2];
 
 	vdev->config->reset(vdev);
 
@@ -1078,8 +1136,16 @@ static void __devexit rpmsg_remove(struct virtio_device *vdev)
 
 	vdev->config->del_vqs(vrp->vdev);
 
-	dma_free_coherent(vdev->dev.parent->parent, RPMSG_TOTAL_BUF_SPACE,
+	if (vrp->use_carveout) {
+		bufs[0] = (unsigned int)vrp->rbufs;
+		bufs[1] = vrp->bufs_dma;
+		vdev->config->set(vdev, RPROC_VIRTIO_BUF_ADDR,
+						bufs, sizeof(bufs));
+	} else {
+		dma_free_coherent(vdev->dev.parent->parent,
+					RPMSG_TOTAL_BUF_SPACE,
 					vrp->rbufs, vrp->bufs_dma);
+	}
 
 	mutex_lock(&vprocs_mutex);
 	idr_remove(&vprocs, vrp->id);

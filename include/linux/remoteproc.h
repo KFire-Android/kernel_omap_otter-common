@@ -333,6 +333,46 @@ struct fw_rsc_custom {
 } __packed;
 
 /**
+ * struct rproc_mem_pool_data - descriptor for the rproc's contiguous memory
+ *				 pool data passed from the platform device
+ *
+ * @mem_base: starting physical address of the carveout pool
+ * @mem_size: size of the initial carveout pool
+ */
+struct rproc_mem_pool_data {
+	phys_addr_t mem_base;
+	u32 mem_size;
+};
+
+/**
+ * struct rproc_mem_pool - carveout allocator structure
+ * @mem_base: starting physical address of the carveout pool
+ * @mem_size: size of the initial carveout pool
+ * @cur_ipc_base: current available physical address for vrings
+ * @cur_ipc_size: remaining available memory for vrings
+ * @cur_ipcbuf_base: current available physical address for vring buffers
+ * @cur_ipcbuf_size: remaining available memory for vring buffers
+ * @cur_fw_base: current available physical address for fw sections
+ * @cur_fw_size: remaining available memory for fw section allocations
+ *
+ * This structure is used for managing the carveout pool for various
+ * different allocations. The structure is designed to support different
+ * rproc section data types, mainly to mimic the current range of addresses
+ * that a CMA allocation gives. The memory data type is chosen based on the
+ * resource type requesting the allocation.
+ */
+struct rproc_mem_pool {
+	phys_addr_t mem_base;
+	u32 mem_size;
+	phys_addr_t cur_ipc_base;
+	u32 cur_ipc_size;
+	phys_addr_t cur_ipcbuf_base;
+	u32 cur_ipcbuf_size;
+	phys_addr_t cur_fw_base;
+	u32 cur_fw_size;
+};
+
+/**
  * struct rproc_mem_entry - memory entry descriptor
  * @va:	virtual address
  * @dma: dma address
@@ -440,6 +480,8 @@ enum rproc_err {
  * @node: klist node of this rproc object
  * @domain: iommu domain
  * @name: human readable name of the rproc
+ * @memory_pool: platform-specific contiguous memory pool data (relevant for
+ *               allocating memory needed for the remote processor image)
  * @firmware: name of firmware file to be loaded
  * @priv: private data which belongs to the platform-specific rproc module
  * @ops: platform-specific start/stop rproc handlers
@@ -472,6 +514,7 @@ struct rproc {
 	struct klist_node node;
 	struct iommu_domain *domain;
 	const char *name;
+	struct rproc_mem_pool *memory_pool;
 	const char *firmware;
 	void *priv;
 	const struct rproc_ops *ops;
@@ -550,7 +593,8 @@ void rproc_put(struct rproc *rproc);
 
 struct rproc *rproc_alloc(struct device *dev, const char *name,
 				const struct rproc_ops *ops,
-				const char *firmware, int len);
+				const char *firmware,
+				struct rproc_mem_pool_data *data, int len);
 void rproc_free(struct rproc *rproc);
 int rproc_register(struct rproc *rproc);
 int rproc_unregister(struct rproc *rproc);
