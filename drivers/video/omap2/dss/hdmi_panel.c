@@ -335,6 +335,7 @@ static int hdmi_panel_suspend(struct omap_dss_device *dssdev)
 
 err:
 	mutex_unlock(&hdmi.hdmi_lock);
+	hdmi_inform_hpd_to_cec(0);
 
 	return r;
 }
