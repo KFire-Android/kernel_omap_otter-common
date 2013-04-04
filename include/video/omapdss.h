@@ -373,6 +373,7 @@ enum omapdss_version {
 	OMAPDSS_VER_OMAP4430_ES2,	/* OMAP4430 ES2.0, 2.1, 2.2 */
 	OMAPDSS_VER_OMAP4,		/* All other OMAP4s */
 	OMAPDSS_VER_OMAP5,
+	OMAPDSS_VER_DRA7xx,
 };
 
 /* Board specific data */

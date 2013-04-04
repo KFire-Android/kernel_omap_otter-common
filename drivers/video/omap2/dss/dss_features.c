@@ -861,6 +861,7 @@ void dss_init_hdmi_ip_ops(struct hdmi_ip_data *ip_data,
 		ip_data->ops = &omap4_hdmi_functions;
 		break;
 	case OMAPDSS_VER_OMAP5:
+	case OMAPDSS_VER_DRA7xx:
 		ip_data->ops = &omap5_hdmi_functions;
 		break;
 	default:
@@ -1002,6 +1003,7 @@ void dss_features_init(enum omapdss_version version)
 		break;
 
 	case OMAPDSS_VER_OMAP5:
+	case OMAPDSS_VER_DRA7xx:
 		omap_current_dss_features = &omap5_dss_features;
 		break;
 
