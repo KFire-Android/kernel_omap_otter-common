@@ -219,6 +219,8 @@ enum omap_dss_output_id {
 	OMAP_DSS_OUTPUT_DSI2	= 1 << 4,
 	OMAP_DSS_OUTPUT_VENC	= 1 << 5,
 	OMAP_DSS_OUTPUT_HDMI	= 1 << 6,
+	OMAP_DSS_OUTPUT_DPI1	= 1 << 7,
+	OMAP_DSS_OUTPUT_DPI2	= 1 << 8,
 };
 
 /* Stereoscopic Panel types

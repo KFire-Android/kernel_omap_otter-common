@@ -174,6 +174,20 @@ static const enum omap_display_type omap5_dss_supported_displays[] = {
 	OMAP_DISPLAY_TYPE_DSI,
 };
 
+static const enum omap_display_type dra7xx_dss_supported_displays[] = {
+	/* OMAP_DSS_CHANNEL_LCD */
+	OMAP_DISPLAY_TYPE_DPI,
+
+	/* OMAP_DSS_CHANNEL_DIGIT */
+	OMAP_DISPLAY_TYPE_HDMI | OMAP_DISPLAY_TYPE_DPI,
+
+	/* OMAP_DSS_CHANNEL_LCD2 */
+	OMAP_DISPLAY_TYPE_DPI,
+
+	/* OMAP_DSS_CHANNEL_LCD3 */
+	OMAP_DISPLAY_TYPE_DPI,
+};
+
 static const enum omap_dss_output_id omap2_dss_supported_outputs[] = {
 	/* OMAP_DSS_CHANNEL_LCD */
 	OMAP_DSS_OUTPUT_DPI | OMAP_DSS_OUTPUT_DBI,
@@ -229,6 +243,20 @@ static const enum omap_dss_output_id omap5_dss_supported_outputs[] = {
 	/* OMAP_DSS_CHANNEL_LCD3 */
 	OMAP_DSS_OUTPUT_DPI | OMAP_DSS_OUTPUT_DBI |
 	OMAP_DSS_OUTPUT_DSI2,
+};
+
+static const enum omap_dss_output_id dra7xx_dss_supported_outputs[] = {
+	/* OMAP_DSS_CHANNEL_LCD */
+	OMAP_DSS_OUTPUT_DPI,
+
+	/* OMAP_DSS_CHANNEL_DIGIT */
+	OMAP_DSS_OUTPUT_HDMI | OMAP_DSS_OUTPUT_DPI,
+
+	/* OMAP_DSS_CHANNEL_LCD2 */
+	OMAP_DSS_OUTPUT_DPI | OMAP_DSS_OUTPUT_DPI1,
+
+	/* OMAP_DSS_CHANNEL_LCD3 */
+	OMAP_DSS_OUTPUT_DPI | OMAP_DSS_OUTPUT_DPI2,
 };
 
 static const enum omap_color_mode omap2_dss_supported_color_modes[] = {
@@ -791,6 +819,27 @@ static const struct omap_dss_features omap5_dss_features = {
 	.burst_size_unit = 16,
 };
 
+/* DRA DSS Features */
+static const struct omap_dss_features dra7xx_dss_features = {
+	.reg_fields = omap5_dss_reg_fields,
+	.num_reg_fields = ARRAY_SIZE(omap5_dss_reg_fields),
+
+	.features = omap5_dss_feat_list,
+	.num_features = ARRAY_SIZE(omap5_dss_feat_list),
+
+	.num_mgrs = 4,
+	.num_ovls = 4,
+	.supported_displays = dra7xx_dss_supported_displays,
+	.supported_outputs = dra7xx_dss_supported_outputs,
+	.supported_color_modes = omap4_dss_supported_color_modes,
+	.overlay_caps = omap4_dss_overlay_caps,
+	.clksrc_names = omap5_dss_clk_source_names,
+	.dss_params = omap5_dss_param_range,
+	.supported_rotation_types = OMAP_DSS_ROT_DMA | OMAP_DSS_ROT_TILER,
+	.buffer_size_unit = 16,
+	.burst_size_unit = 16,
+};
+
 #if defined(CONFIG_OMAP4_DSS_HDMI) || defined(CONFIG_OMAP5_DSS_HDMI)
 /* HDMI OMAP4 Functions*/
 static const struct ti_hdmi_ip_ops omap4_hdmi_functions = {
@@ -1003,8 +1052,11 @@ void dss_features_init(enum omapdss_version version)
 		break;
 
 	case OMAPDSS_VER_OMAP5:
-	case OMAPDSS_VER_DRA7xx:
 		omap_current_dss_features = &omap5_dss_features;
+		break;
+
+	case OMAPDSS_VER_DRA7xx:
+		omap_current_dss_features = &dra7xx_dss_features;
 		break;
 
 	case OMAPDSS_VER_AM35xx:
