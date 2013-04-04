@@ -389,6 +389,8 @@ void dpi_common_set_ops(struct dpi_common_ops *ops);
 int omap_dpi_init_platform_driver(void) __init;
 void omap_dpi_uninit_platform_driver(void) __exit;
 
+int dra7xx_dpi_init_platform_driver(void) __init;
+void dra7xx_dpi_uninit_platform_driver(void) __exit;
 
 /* DISPC */
 int dispc_init_platform_driver(void) __init;
