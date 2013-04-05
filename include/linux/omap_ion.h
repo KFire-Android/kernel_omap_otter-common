@@ -58,6 +58,9 @@ int omap_tiler_vinfo(struct ion_client *client,
 			struct ion_handle *handle, unsigned int *vstride,
 			unsigned int *vsize);
 
+int omap_ion_share_fd_to_buffers(int fd, struct ion_buffer **buffers,
+					int *num_handles);
+
 extern struct ion_device *omap_ion_device;
 #endif /* __KERNEL__ */
 

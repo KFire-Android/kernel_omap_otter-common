@@ -152,6 +152,52 @@ static int omap_ion_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static void (*export_fd_to_ion_handles)(int fd,
+		struct ion_client **client,
+		struct ion_handle **handles,
+		int *num_handles);
+
+void omap_ion_register_pvr_export(void *pvr_export_fd)
+{
+	export_fd_to_ion_handles = pvr_export_fd;
+}
+EXPORT_SYMBOL(omap_ion_register_pvr_export);
+
+int omap_ion_share_fd_to_buffers(int fd, struct ion_buffer **buffers,
+		int *num_handles)
+{
+	struct ion_handle **handles;
+	struct ion_client *client;
+	int i = 0, ret = 0;
+
+	handles = kzalloc(*num_handles * sizeof(struct ion_handle *),
+			  GFP_KERNEL);
+	if (!handles)
+		return -ENOMEM;
+
+	if (export_fd_to_ion_handles) {
+		export_fd_to_ion_handles(fd,
+				&client,
+				handles,
+				num_handles);
+	} else {
+		pr_err("%s: export_fd_to_ion_handles not initialized",
+				__func__);
+		ret = -EINVAL;
+		goto exit;
+	}
+
+	for (i = 0; i < *num_handles; i++) {
+		if (handles[i])
+			buffers[i] = ion_share_dma_buf(client, handles[i]);
+	}
+
+exit:
+	kfree(handles);
+	return ret;
+}
+EXPORT_SYMBOL(omap_ion_share_fd_to_buffers);
+
 static struct platform_driver ion_driver = {
 	.probe = omap_ion_probe,
 	.remove = omap_ion_remove,
