@@ -1,7 +1,7 @@
 obj-$(CONFIG_OMAP2_DSS) += omapdss.o
 # Core DSS files
-omapdss-y := core.o dss.o dss_features.o dispc.o dispc_coefs.o display.o \
-	output.o
+omapdss-y := core.o dss.o dss_dpll.o dss_features.o dispc.o dispc_coefs.o \
+	display.o output.o
 # DSS compat layer files
 omapdss-y += manager.o manager-sysfs.o overlay.o overlay-sysfs.o apply.o \
 	dispc-compat.o display-sysfs.o
