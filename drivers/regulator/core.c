@@ -110,18 +110,48 @@ static const char *rdev_get_name(struct regulator_dev *rdev)
 		return "";
 }
 
-
-static inline void regulator_lock(struct regulator_dev *rdev)
+static void regulator_lock(struct regulator_dev *rdev)
 {
 	struct regulator_dev *locking_rdev = rdev;
 
-	mutex_lock(&locking_rdev->mutex);
+	while (locking_rdev->supply)
+		locking_rdev = locking_rdev->supply->rdev;
+
+	if (!mutex_trylock(&locking_rdev->mutex)) {
+		if (locking_rdev->lock_owner == current) {
+			locking_rdev->lock_count++;
+			dev_dbg(&locking_rdev->dev,
+				"Is locked. locking %s (ref=%u)\n",
+				rdev_get_name(rdev),
+				locking_rdev->lock_count);
+			return;
+		}
+		mutex_lock(&locking_rdev->mutex);
+	}
+
+	WARN_ON_ONCE(locking_rdev->lock_owner != NULL);
+	WARN_ON_ONCE(locking_rdev->lock_count != 0);
+
+	locking_rdev->lock_count = 1;
+	locking_rdev->lock_owner = current;
+	dev_dbg(&locking_rdev->dev, "Is locked. locking %s\n",
+		rdev_get_name(rdev));
 }
 
-static inline void regulator_unlock(struct regulator_dev *rdev)
+static void regulator_unlock(struct regulator_dev *rdev)
 {
 	struct regulator_dev *locking_rdev = rdev;
 
+	while (locking_rdev->supply)
+		locking_rdev = locking_rdev->supply->rdev;
+
+	dev_dbg(&locking_rdev->dev, "Is unlocked. unlocking %s (ref=%u)\n",
+		rdev_get_name(rdev), locking_rdev->lock_count);
+
+	if (--locking_rdev->lock_count)
+		return;
+
+	locking_rdev->lock_owner = NULL;
 	mutex_unlock(&locking_rdev->mutex);
 }
 
