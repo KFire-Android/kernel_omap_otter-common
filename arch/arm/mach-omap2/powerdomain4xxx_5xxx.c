@@ -386,10 +386,6 @@ static void omap4_device_set_next_state_off(bool enable)
 		partition = OMAP4430_PRM_PARTITION;
 		offset = OMAP4_PRM_DEVICE_OFF_CTRL_OFFSET;
 		inst = OMAP4430_PRM_DEVICE_INST;
-	} else if (cpu_is_omap54xx()) {
-		partition = OMAP54XX_PRM_PARTITION;
-		offset = OMAP54XX_PRM_DEVICE_OFF_CTRL_OFFSET;
-		inst = OMAP54XX_PRM_DEVICE_INST;
 	} else {
 		return;
 	}
@@ -415,10 +411,6 @@ static bool omap4_device_read_next_state_off(void)
 		partition = OMAP4430_PRM_PARTITION;
 		offset = OMAP4_PRM_DEVICE_OFF_CTRL_OFFSET;
 		inst = OMAP4430_PRM_DEVICE_INST;
-	} else if (cpu_is_omap54xx()) {
-		partition = OMAP54XX_PRM_PARTITION;
-		offset = OMAP54XX_PRM_DEVICE_OFF_CTRL_OFFSET;
-		inst = OMAP54XX_PRM_DEVICE_INST;
 	} else {
 		return false;
 	}
@@ -475,6 +467,4 @@ struct pwrdm_ops omap5_pwrdm_operations = {
 	.pwrdm_enable_hdwr_sar	= omap4_pwrdm_enable_hdwr_sar,
 	.pwrdm_disable_hdwr_sar	= omap4_pwrdm_disable_hdwr_sar,
 	.pwrdm_lost_context_rff = omap4_pwrdm_lost_context_rff,
-	.pwrdm_enable_off	= omap4_device_set_next_state_off,
-	.pwrdm_read_next_off	= omap4_device_read_next_state_off,
 };
