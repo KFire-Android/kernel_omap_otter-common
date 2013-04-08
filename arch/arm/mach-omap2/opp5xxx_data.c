@@ -171,12 +171,8 @@ static struct device_info gpu_dev_info = {
 static struct omap_opp_def omap543x_opp_def_list[] = {
 	/* MPU OPP1 - OPPLOW */
 	OPP_INITIALIZER(&mpu_dev_info, true, 499200000, OMAP54XX_VDD_MPU_OPP_LOW),
-	/*
-	 * MPU OPP2 - OPPNOM: ref addendum rev 0.4:
-	 * NOTE: 1099.8MHz is used instead of 1099.9MHz to - to ensure this maps
-	 * appropriately to the right DPLL M, N values.
-	 */
-	OPP_INITIALIZER(&mpu_dev_info, true, 1099800000, OMAP54XX_VDD_MPU_OPP_NOM),
+	/* MPU OPP2 - OPPNOM: */
+	OPP_INITIALIZER(&mpu_dev_info, true, 1000000000, OMAP54XX_VDD_MPU_OPP_NOM),
 	/* MPU OPP3 - OPP-HIGH */
 	OPP_INITIALIZER(&mpu_dev_info, true, 1500000000, OMAP54XX_VDD_MPU_OPP_HIGH),
 	/* MPU OPP4 - OPP-SPEEDBIN */
