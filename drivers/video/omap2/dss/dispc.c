@@ -85,6 +85,9 @@ struct dispc_features {
 
 	/* no DISPC_IRQ_FRAMEDONETV on this SoC */
 	bool no_framedone_tv:1;
+
+	/* revert to the OMAP4 mechanism of DISPC Smart Standby operation */
+	bool standby_workaround:1;
 };
 
 #define DISPC_MAX_NR_FIFOS 5
@@ -1584,6 +1587,7 @@ static void dispc_ovl_set_scaling(enum omap_plane plane,
 }
 
 static void dispc_ovl_set_rotation_attrs(enum omap_plane plane, u8 rotation,
+		enum omap_dss_rotation_type rotation_type,
 		bool mirroring, enum omap_color_mode color_mode)
 {
 	bool row_repeat = false;
@@ -1634,6 +1638,15 @@ static void dispc_ovl_set_rotation_attrs(enum omap_plane plane, u8 rotation,
 	if (dss_has_feature(FEAT_ROWREPEATENABLE))
 		REG_FLD_MOD(DISPC_OVL_ATTRIBUTES(plane),
 			row_repeat ? 1 : 0, 18, 18);
+
+	if (color_mode == OMAP_DSS_COLOR_NV12) {
+		bool doublestride = (rotation_type == OMAP_DSS_ROT_TILER) &&
+					(rotation == OMAP_DSS_ROT_0 ||
+					rotation == OMAP_DSS_ROT_180);
+		/* DOUBLESTRIDE */
+		REG_FLD_MOD(DISPC_OVL_ATTRIBUTES(plane), doublestride, 22, 22);
+	}
+
 }
 
 static int color_mode_to_bpp(enum omap_color_mode color_mode)
@@ -2512,7 +2525,8 @@ static int dispc_ovl_setup_common(enum omap_plane plane,
 		dispc_ovl_set_vid_color_conv(plane, cconv);
 	}
 
-	dispc_ovl_set_rotation_attrs(plane, rotation, mirror, color_mode);
+	dispc_ovl_set_rotation_attrs(plane, rotation, rotation_type, mirror,
+			color_mode);
 
 	dispc_ovl_set_zorder(plane, caps, zorder);
 	dispc_ovl_set_pre_mult_alpha(plane, caps, pre_mult_alpha);
@@ -3466,6 +3480,9 @@ static void _omap_dispc_initial_config(void)
 	dispc_configure_burst_sizes();
 
 	dispc_ovl_enable_zorder_planes();
+
+	if (dispc.feat->standby_workaround)
+		REG_FLD_MOD(DISPC_MSTANDBY_CTRL, 1, 0, 0);
 }
 
 static const struct dispc_features omap24xx_dispc_feats __initconst = {
@@ -3551,6 +3568,7 @@ static const struct dispc_features omap54xx_dispc_feats __initconst = {
 	.calc_core_clk		=	calc_core_clk_44xx,
 	.num_fifos		=	5,
 	.gfx_fifo_workaround	=	true,
+	.standby_workaround	=	true,
 };
 
 static int __init dispc_init_features(struct platform_device *pdev)
@@ -3693,12 +3711,24 @@ static const struct dev_pm_ops dispc_pm_ops = {
 	.runtime_resume = dispc_runtime_resume,
 };
 
+#if defined(CONFIG_OF)
+static const struct of_device_id dispc_of_match[] = {
+	{
+		.compatible = "ti,omap4-dispc",
+	},
+	{},
+};
+#else
+#define dispc_of_match NULL
+#endif
+
 static struct platform_driver omap_dispchw_driver = {
 	.remove         = __exit_p(omap_dispchw_remove),
 	.driver         = {
 		.name   = "omapdss_dispc",
 		.owner  = THIS_MODULE,
 		.pm	= &dispc_pm_ops,
+		.of_match_table = dispc_of_match,
 	},
 };
 

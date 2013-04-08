@@ -15,7 +15,8 @@ config OMAP_REMOTEPROC
 	depends on ARCH_OMAP4
 	depends on OMAP_IOMMU
 	select REMOTEPROC
-	select OMAP_MBOX_FWK
+	select MAILBOX
+	select OMAP2PLUS_MBOX
 	select RPMSG
 	help
 	  Say y here to support OMAP's remote processors (dual M3

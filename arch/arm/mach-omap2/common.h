@@ -68,6 +68,15 @@ static inline int omap4_pm_init(void)
 }
 #endif
 
+#if defined(CONFIG_PM) && defined(CONFIG_SOC_AM33XX)
+int am33xx_pm_init(void);
+#else
+static inline int am33xx_pm_init(void)
+{
+	return 0;
+}
+#endif
+
 #ifdef CONFIG_OMAP_MUX
 int omap_mux_late_init(void);
 #else
@@ -106,6 +115,7 @@ void omap2430_init_late(void);
 void omap3430_init_late(void);
 void omap35xx_init_late(void);
 void omap3630_init_late(void);
+void am33xx_init_late(void);
 void am35xx_init_late(void);
 void ti81xx_init_late(void);
 void omap5_init_late(void);
@@ -246,13 +256,12 @@ extern void omap5_secondary_startup(void);
 
 #if defined(CONFIG_SMP) && defined(CONFIG_PM)
 extern int omap4_mpuss_init(void);
-extern int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state);
+extern int omap4_mpuss_enter_lowpower(unsigned int cpu, u8 fpwrst);
 extern int omap4_finish_suspend(unsigned long cpu_state);
 extern void omap4_cpu_resume(void);
-extern int omap4_hotplug_cpu(unsigned int cpu, unsigned int power_state);
+extern int omap4_mpuss_hotplug_cpu(unsigned int cpu, u8 fpwrst);
 #else
-static inline int omap4_enter_lowpower(unsigned int cpu,
-					unsigned int power_state)
+static inline int omap4_mpuss_enter_lowpower(unsigned int cpu, u8 fpwrst)
 {
 	cpu_do_idle();
 	return 0;
@@ -288,6 +297,7 @@ extern void omap_reserve(void);
 
 struct omap_hwmod;
 extern int omap_dss_reset(struct omap_hwmod *);
+int __init omapdss_init_of(void);
 
 /* AXI ERROR DEFINES */
 #define AXI_L2_ERROR (1 << 30)

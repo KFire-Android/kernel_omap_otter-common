@@ -105,21 +105,15 @@ static void __init omap_generic_init(void)
 
 	of_platform_populate(NULL, omap_dt_match_table, NULL, NULL);
 
+	omapdss_init_of();
+
 	/* create clock aliases based on 'clock_alias' nodes */
 	for_each_node_by_name(np, "clock_alias") {
 		omap_create_clk_alias(np);
 		of_node_put(np);
 	}
 
-	/*
-	 * HACK: call display setup code for selected boards to enable omapdss.
-	 * This will be removed when omapdss supports DT.
-	 */
-	if (of_machine_is_compatible("ti,omap4-panda"))
-		omap4_panda_display_init_of();
-	else if (of_machine_is_compatible("ti,omap4-sdp"))
-		omap_4430sdp_display_init_of();
-	else if (of_machine_is_compatible("ti,omap5"))
+	if (of_machine_is_compatible("ti,omap5"))
 		omap_sata_init();
 }
 
@@ -207,6 +201,7 @@ DT_MACHINE_START(AM33XX_DT, "Generic AM33XX (Flattened Device Tree)")
 	.reserve	= omap_reserve,
 	.map_io		= am33xx_map_io,
 	.init_early	= am33xx_init_early,
+	.init_late	= am33xx_init_late,
 	.init_irq	= omap_intc_of_init,
 	.handle_irq	= omap3_intc_handle_irq,
 	.init_machine	= omap_generic_init,

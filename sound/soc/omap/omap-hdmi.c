@@ -37,7 +37,7 @@
 #include "omap-pcm.h"
 #include "omap-hdmi.h"
 
-#define DRV_NAME "omap-hdmi-audio-dai"
+#define DRV_NAME "omap-hdmi-audio"
 
 struct hdmi_priv {
 	struct omap_pcm_dma_data dma_params;
@@ -110,6 +110,8 @@ static int omap_hdmi_dai_hw_params(struct snd_pcm_substream *substream,
 	/*
 	 * fill the IEC-60958 channel status word
 	 */
+	/* initialize the word bytes */
+	memset(iec->status, 0, sizeof(iec->status));
 
 	/* specify IEC-60958-3 (commercial use) */
 	iec->status[0] &= ~IEC958_AES0_PROFESSIONAL;
@@ -281,8 +283,7 @@ static int omap_hdmi_probe(struct platform_device *pdev)
 		return -ENODEV;
 	}
 
-	hdmi_data->dma_params.port_addr =  hdmi_rsrc->start
-		+ OMAP_HDMI_AUDIO_DMA_PORT;
+	hdmi_data->dma_params.port_addr =  hdmi_rsrc->start;
 
 	hdmi_rsrc = platform_get_resource(pdev, IORESOURCE_DMA, 0);
 	if (!hdmi_rsrc) {
@@ -331,7 +332,7 @@ static int omap_hdmi_remove(struct platform_device *pdev)
 	snd_soc_unregister_dai(&pdev->dev);
 
 	if (hdmi_data == NULL) {
-		dev_err(&pdev->dev, "cannot obtain HDMi data\n");
+		dev_err(&pdev->dev, "cannot obtain HDMI data\n");
 		return -ENODEV;
 	}
 

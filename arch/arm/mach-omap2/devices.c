@@ -21,6 +21,7 @@
 #include <linux/platform_data/omap4-keypad.h>
 #include <linux/platform_data/omap_ocp2scp.h>
 #include <linux/usb/omap_control_usb.h>
+#include <linux/platform_data/mailbox-omap.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/map.h>
@@ -329,25 +330,32 @@ int __init omap4_keyboard_init(struct omap4_keypad_platform_data
 	return 0;
 }
 
-#if defined(CONFIG_OMAP_MBOX_FWK) || defined(CONFIG_OMAP_MBOX_FWK_MODULE)
+#if defined(CONFIG_OMAP2PLUS_MBOX) || defined(CONFIG_OMAP2PLUS_MBOX_MODULE)
 static inline void __init omap_init_mbox(void)
 {
 	struct omap_hwmod *oh;
 	struct platform_device *pdev;
+	struct omap_mbox_pdata *pdata;
 
 	oh = omap_hwmod_lookup("mailbox");
 	if (!oh) {
 		pr_err("%s: unable to find hwmod\n", __func__);
 		return;
 	}
+	if (!oh->dev_attr) {
+		pr_err("%s: hwmod doesn't have valid attrs\n", __func__);
+		return;
+	}
 
-	pdev = omap_device_build("omap-mailbox", -1, oh, NULL, 0, NULL, 0, 0);
+	pdata = (struct omap_mbox_pdata *)oh->dev_attr;
+	pdev = omap_device_build("omap-mailbox", -1, oh, pdata, sizeof(*pdata),
+								NULL, 0, 0);
 	WARN(IS_ERR(pdev), "%s: could not build device, err %ld\n",
 						__func__, PTR_ERR(pdev));
 }
 #else
 static inline void omap_init_mbox(void) { }
-#endif /* CONFIG_OMAP_MBOX_FWK */
+#endif /* CONFIG_OMAP2PLUS_MBOX */
 
 static inline void omap_init_sti(void) {}
 
@@ -365,6 +373,36 @@ static void omap_init_audio(void)
 
 #else
 static inline void omap_init_audio(void) {}
+#endif
+
+#if defined(CONFIG_SND_OMAP_SOC_MCASP) || \
+	defined(CONFIG_SND_OMAP_SOC_MCASP_MODULE)
+static struct omap_device_pm_latency omap_mcasp_latency[] = {
+	{
+		.deactivate_func = omap_device_idle_hwmods,
+		.activate_func = omap_device_enable_hwmods,
+		.flags = OMAP_DEVICE_LATENCY_AUTO_ADJUST,
+	},
+};
+
+static void omap_init_mcasp(void)
+{
+	struct omap_hwmod *oh;
+	struct platform_device *pdev;
+
+	oh = omap_hwmod_lookup("mcasp");
+	if (!oh) {
+		pr_err("could not look up mcasp hw_mod\n");
+		return;
+	}
+
+	pdev = omap_device_build("omap-mcasp", -1, oh, NULL, 0,
+				omap_mcasp_latency,
+				ARRAY_SIZE(omap_mcasp_latency), 0);
+	WARN(IS_ERR(pdev), "Can't build omap_device for omap-mcasp-audio.\n");
+}
+#else
+static inline void omap_init_mcasp(void) {}
 #endif
 
 #if defined(CONFIG_SND_OMAP_SOC_MCPDM) || \
@@ -409,34 +447,26 @@ static void __init omap_init_dmic(void)
 static inline void omap_init_dmic(void) {}
 #endif
 
-#if defined(CONFIG_SND_OMAP_SOC_OMAP_HDMI) || \
-		defined(CONFIG_SND_OMAP_SOC_OMAP_HDMI_MODULE)
+#if defined(CONFIG_SND_OMAP_SOC_ABE) || \
+	defined(CONFIG_SND_OMAP_SOC_ABE_MODULE)
 
-static struct platform_device omap_hdmi_audio = {
-	.name	= "omap-hdmi-audio",
-	.id	= -1,
-};
-
-static void __init omap_init_hdmi_audio(void)
+static void omap_init_aess(void)
 {
 	struct omap_hwmod *oh;
 	struct platform_device *pdev;
 
-	oh = omap_hwmod_lookup("dss_hdmi");
+	oh = omap_hwmod_lookup("aess");
 	if (!oh) {
-		printk(KERN_ERR "Could not look up dss_hdmi hw_mod\n");
+		pr_err("Could not look up aess hw_mod\n");
 		return;
 	}
 
-	pdev = omap_device_build("omap-hdmi-audio-dai",
-		-1, oh, NULL, 0, NULL, 0, 0);
+	pdev = omap_device_build("aess", -1, oh, NULL, 0, NULL, 0, 0);
 	WARN(IS_ERR(pdev),
-	     "Can't build omap_device for omap-hdmi-audio-dai.\n");
-
-	platform_device_register(&omap_hdmi_audio);
+	     "Could not build omap_device for omap-aess-audio\n");
 }
 #else
-static inline void omap_init_hdmi_audio(void) {}
+static inline void omap_init_aess(void) {}
 #endif
 
 #if defined(CONFIG_SPI_OMAP24XX) || defined(CONFIG_SPI_OMAP24XX_MODULE)
@@ -652,11 +682,11 @@ static int __init omap2_init_devices(void)
 	 */
 	omap_init_audio();
 	omap_init_camera();
-	omap_init_hdmi_audio();
 	omap_init_mbox();
 	/* If dtb is there, the devices will be created dynamically */
 	if (!of_have_populated_dt()) {
 		omap_init_control_usb();
+		omap_init_aess();
 		omap_init_dmic();
 		omap_init_mcpdm();
 		omap_init_mcspi();

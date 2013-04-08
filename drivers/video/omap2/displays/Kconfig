@@ -53,6 +53,13 @@ config PANEL_TAAL
         help
           Taal DSI command mode panel from TPO.
 
+config PANEL_LG4591
+	tristate "LG 4591 Panel"
+	depends on OMAP2_DSS_DSI
+	depends on BACKLIGHT_CLASS_DEVICE
+	help
+		LG 4591 DSI Video mode Panel on OMAP5 sevm.
+
 config PANEL_TPO_TD043MTEA1
         tristate "TPO TD043MTEA1 LCD Panel"
         depends on OMAP2_DSS_DPI && SPI

@@ -90,18 +90,16 @@ static int omap2_enter_full_retention(void)
 	omap2_prm_write_mod_reg(0xffffffff, CORE_MOD, OMAP24XX_PM_WKST2);
 	omap2_prm_write_mod_reg(0xffffffff, WKUP_MOD, PM_WKST);
 
-	/*
-	 * Set MPU powerdomain's next power state to RETENTION;
-	 * preserve logic state during retention
-	 */
-	pwrdm_set_logic_retst(mpu_pwrdm, PWRDM_POWER_RET);
-	pwrdm_set_next_pwrst(mpu_pwrdm, PWRDM_POWER_RET);
+	WARN_ON(pwrdm_set_next_fpwrst(core_pwrdm, PWRDM_FUNC_PWRST_CSWR));
+	WARN_ON(pwrdm_set_next_fpwrst(mpu_pwrdm, PWRDM_FUNC_PWRST_CSWR));
 
 	/* Workaround to kill USB */
 	l = omap_ctrl_readl(OMAP2_CONTROL_DEVCONF0) | OMAP24XX_USBSTANDBYCTRL;
 	omap_ctrl_writel(l, OMAP2_CONTROL_DEVCONF0);
 
 	omap2_gpio_prepare_for_idle(0);
+
+	pwrdm_pre_transition(NULL);
 
 	/* One last check for pending IRQs to avoid extra latency due
 	 * to sleeping unnecessarily. */
@@ -114,6 +112,8 @@ static int omap2_enter_full_retention(void)
 			   OMAP_SDRC_REGADDR(SDRC_POWER));
 
 no_sleep:
+	pwrdm_post_transition(NULL);
+
 	omap2_gpio_resume_after_idle();
 
 	clk_enable(osc_ck);
@@ -136,6 +136,9 @@ no_sleep:
 
 	/* Mask future PRCM-to-MPU interrupts */
 	omap2_prm_write_mod_reg(0x0, OCP_MOD, OMAP2_PRCM_IRQSTATUS_MPU_OFFSET);
+
+	WARN_ON(pwrdm_set_next_fpwrst(mpu_pwrdm, PWRDM_FUNC_PWRST_ON));
+	WARN_ON(pwrdm_set_next_fpwrst(core_pwrdm, PWRDM_FUNC_PWRST_ON));
 
 	return 0;
 }
@@ -186,17 +189,20 @@ static void omap2_enter_mpu_retention(void)
 		omap2_prm_write_mod_reg(0xffffffff, WKUP_MOD, PM_WKST);
 
 		/* Try to enter MPU retention */
-		omap2_prm_write_mod_reg((0x01 << OMAP_POWERSTATE_SHIFT) |
-				  OMAP_LOGICRETSTATE_MASK,
-				  MPU_MOD, OMAP2_PM_PWSTCTRL);
+		WARN_ON(pwrdm_set_next_fpwrst(mpu_pwrdm,
+					      PWRDM_FUNC_PWRST_CSWR));
 	} else {
 		/* Block MPU retention */
-
-		omap2_prm_write_mod_reg(OMAP_LOGICRETSTATE_MASK, MPU_MOD,
-						 OMAP2_PM_PWSTCTRL);
+		WARN_ON(pwrdm_set_next_fpwrst(mpu_pwrdm, PWRDM_FUNC_PWRST_ON));
 	}
 
+	pwrdm_pre_transition(mpu_pwrdm);
+
 	omap2_sram_idle();
+
+	pwrdm_post_transition(mpu_pwrdm);
+
+	WARN_ON(pwrdm_set_next_fpwrst(mpu_pwrdm, PWRDM_FUNC_PWRST_ON));
 }
 
 static int omap2_can_sleep(void)
@@ -228,7 +234,6 @@ static void omap2_pm_idle(void)
 
 static void __init prcm_setup_regs(void)
 {
-	int i, num_mem_banks;
 	struct powerdomain *pwrdm;
 
 	/*
@@ -238,33 +243,13 @@ static void __init prcm_setup_regs(void)
 	omap2_prm_write_mod_reg(OMAP24XX_AUTOIDLE_MASK, OCP_MOD,
 			  OMAP2_PRCM_SYSCONFIG_OFFSET);
 
-	/*
-	 * Set CORE powerdomain memory banks to retain their contents
-	 * during RETENTION
-	 */
-	num_mem_banks = pwrdm_get_mem_bank_count(core_pwrdm);
-	for (i = 0; i < num_mem_banks; i++)
-		pwrdm_set_mem_retst(core_pwrdm, i, PWRDM_POWER_RET);
-
-	/* Set CORE powerdomain's next power state to RETENTION */
-	pwrdm_set_next_pwrst(core_pwrdm, PWRDM_POWER_RET);
-
-	/*
-	 * Set MPU powerdomain's next power state to RETENTION;
-	 * preserve logic state during retention
-	 */
-	pwrdm_set_logic_retst(mpu_pwrdm, PWRDM_POWER_RET);
-	pwrdm_set_next_pwrst(mpu_pwrdm, PWRDM_POWER_RET);
-
 	/* Force-power down DSP, GFX powerdomains */
 
 	pwrdm = clkdm_get_pwrdm(dsp_clkdm);
-	pwrdm_set_next_pwrst(pwrdm, PWRDM_POWER_OFF);
-	clkdm_sleep(dsp_clkdm);
+	WARN_ON(pwrdm_set_next_fpwrst(pwrdm, PWRDM_FUNC_PWRST_OFF));
 
 	pwrdm = clkdm_get_pwrdm(gfx_clkdm);
-	pwrdm_set_next_pwrst(pwrdm, PWRDM_POWER_OFF);
-	clkdm_sleep(gfx_clkdm);
+	WARN_ON(pwrdm_set_next_fpwrst(pwrdm, PWRDM_FUNC_PWRST_OFF));
 
 	/* Enable hardware-supervised idle for all clkdms */
 	clkdm_for_each(omap_pm_clkdms_setup, NULL);

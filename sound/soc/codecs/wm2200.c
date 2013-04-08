@@ -1141,6 +1141,12 @@ SOC_DOUBLE_R_TLV("IN3 Digital Volume", WM2200_ADC_DIGITAL_VOLUME_3L,
 		 WM2200_ADC_DIGITAL_VOLUME_3R, WM2200_IN3L_DIG_VOL_SHIFT,
 		 0xbf, 0, digital_tlv),
 
+SND_SOC_BYTES_MASK("EQL Coefficients", WM2200_EQL_1, 20, WM2200_EQL_ENA),
+SND_SOC_BYTES_MASK("EQR Coefficients", WM2200_EQR_1, 20, WM2200_EQR_ENA),
+
+SND_SOC_BYTES("LHPF1 Coefficeints", WM2200_HPLPF1_2, 1),
+SND_SOC_BYTES("LHPF2 Coefficeints", WM2200_HPLPF2_2, 1),
+
 SOC_SINGLE("OUT1 High Performance Switch", WM2200_DAC_DIGITAL_VOLUME_1L,
 	   WM2200_OUT1_OSR_SHIFT, 1, 0),
 SOC_SINGLE("OUT2 High Performance Switch", WM2200_DAC_DIGITAL_VOLUME_2L,
@@ -1547,6 +1553,10 @@ static int wm2200_probe(struct snd_soc_codec *codec)
 		dev_err(codec->dev, "Failed to set cache I/O: %d\n", ret);
 		return ret;
 	}
+
+	ret = snd_soc_add_codec_controls(codec, wm_adsp_fw_controls, 2);
+	if (ret != 0)
+		return ret;
 
 	return ret;
 }
@@ -2205,6 +2215,9 @@ static int wm2200_i2c_probe(struct i2c_client *i2c,
 		wm2200->dsp[i].num = i + 1;
 		wm2200->dsp[i].dev = &i2c->dev;
 		wm2200->dsp[i].regmap = wm2200->regmap;
+		wm2200->dsp[i].sysclk_reg = WM2200_CLOCKING_3;
+		wm2200->dsp[i].sysclk_mask = WM2200_SYSCLK_FREQ_MASK;
+		wm2200->dsp[i].sysclk_shift =  WM2200_SYSCLK_FREQ_SHIFT;
 	}
 
 	wm2200->dsp[0].base = WM2200_DSP1_CONTROL_1;
@@ -2214,6 +2227,9 @@ static int wm2200_i2c_probe(struct i2c_client *i2c,
 	wm2200->dsp[1].base = WM2200_DSP2_CONTROL_1;
 	wm2200->dsp[1].mem = wm2200_dsp2_regions;
 	wm2200->dsp[1].num_mems = ARRAY_SIZE(wm2200_dsp2_regions);
+
+	for (i = 0; i < ARRAY_SIZE(wm2200->dsp); i++)
+		wm_adsp1_init(&wm2200->dsp[i]);
 
 	if (pdata)
 		wm2200->pdata = *pdata;

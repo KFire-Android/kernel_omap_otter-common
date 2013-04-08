@@ -31,6 +31,8 @@
 #include <linux/workqueue.h>
 #include <linux/slab.h>
 #include <linux/mutex.h>
+#include <linux/of_device.h>
+#include <linux/of_gpio.h>
 
 #include <video/omapdss.h>
 #include <video/omap-panel-nokia-dsi.h>
@@ -876,6 +878,67 @@ static void taal_probe_pdata(struct taal_data *td,
 	td->pin_config = pdata->pin_config;
 }
 
+static int taal_probe_of(struct omap_dss_device *dssdev, struct taal_data *td)
+{
+	struct device_node *node = dssdev->dev.of_node;
+	struct property *prop;
+	u32 lane_arr[10];
+	int gpio, len, num_pins;
+	int r, i;
+
+	gpio = of_get_gpio(node, 0);
+
+	if (gpio_is_valid(gpio)) {
+		td->reset_gpio = gpio;
+	} else {
+		dev_err(&dssdev->dev, "failed to parse reset gpio\n");
+		return gpio;
+	}
+
+	if (of_gpio_count(node) > 1) {
+		gpio = of_get_gpio(node, 1);
+
+		if (gpio_is_valid(gpio)) {
+			td->ext_te_gpio = gpio;
+		} else if (gpio == -ENOENT) {
+			td->ext_te_gpio = -1;
+		} else {
+			dev_err(&dssdev->dev, "failed to parse TE gpio\n");
+			return gpio;
+		}
+	} else {
+		td->ext_te_gpio = -1;
+	}
+
+	prop = of_find_property(node, "lanes", &len);
+	if (prop == NULL) {
+		dev_err(&dssdev->dev, "failed to find lane data\n");
+		return -EINVAL;
+	}
+
+	num_pins = len / sizeof(u32);
+
+	if (num_pins < 4 || num_pins % 2 != 0
+			|| num_pins > ARRAY_SIZE(lane_arr)) {
+		dev_err(&dssdev->dev, "bad number of lanes\n");
+		return -EINVAL;
+	}
+
+	r = of_property_read_u32_array(node, "lanes", lane_arr, num_pins);
+	if (r) {
+		dev_err(&dssdev->dev, "failed to read lane data\n");
+		return r;
+	}
+
+	td->pin_config.num_pins = num_pins;
+	for (i = 0; i < num_pins; ++i)
+		td->pin_config.pins[i] = (int)lane_arr[i];
+
+	return 0;
+}
+
+static const struct of_device_id taal_of_match[];
+
 static int taal_probe(struct omap_dss_device *dssdev)
 {
 	struct backlight_properties props;
@@ -899,6 +962,20 @@ static int taal_probe(struct omap_dss_device *dssdev)
 		taal_probe_pdata(td, pdata);
 
 		panel_name = pdata->name;
+	} else if (dssdev->dev.of_node) {
+		const struct of_device_id *of_dev_id;
+
+		of_dev_id = of_match_device(taal_of_match, &dssdev->dev);
+		if (of_dev_id == NULL)
+			return -ENODEV;
+
+		panel_name = (const char*)of_dev_id->data;
+
+		r = taal_probe_of(dssdev, td);
+		if (r) {
+			dev_err(&dssdev->dev, "failed to parse OF data\n");
+			return r;
+		}
 	} else {
 		return -ENODEV;
 	}
@@ -1742,6 +1819,20 @@ err:
 	mutex_unlock(&td->lock);
 }
 
+#if defined(CONFIG_OF)
+static const struct of_device_id taal_of_match[] = {
+	{
+		.compatible = "tpo,taal",
+		.data = "taal",
+	},
+	{},
+};
+
+MODULE_DEVICE_TABLE(of, taal_of_match);
+#else
+#define dss_of_match NULL
+#endif
+
 static struct omap_dss_driver taal_driver = {
 	.probe		= taal_probe,
 	.remove		= __exit_p(taal_remove),
@@ -1768,6 +1859,7 @@ static struct omap_dss_driver taal_driver = {
 	.driver         = {
 		.name   = "taal",
 		.owner  = THIS_MODULE,
+		.of_match_table = taal_of_match,
 	},
 };
 

@@ -36,6 +36,7 @@ struct omap_abe_twl6040_data {
 	bool	has_ep;
 	u8	has_aux;
 	u8	has_vibra;
+	bool	has_abe;
 	bool	has_dmic;
 	bool	has_hsmic;
 	bool	has_mainmic;

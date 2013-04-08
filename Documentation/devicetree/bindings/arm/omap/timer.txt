@@ -18,6 +18,8 @@ Optional properties:
 - ti,timer-pwm: 	Indicates the timer can generate a PWM output.
 - ti,timer-secure: 	Indicates the timer is reserved on a secure OMAP device
 			and therefore cannot be used by the kernel.
+- ti,timer-non-wkup	Indicates the timer is in non-wkup power domain and hence
+			will lose register context when the power domain transitions
 
 Example:
 

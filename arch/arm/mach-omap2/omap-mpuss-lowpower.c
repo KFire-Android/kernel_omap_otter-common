@@ -75,7 +75,7 @@ struct omap4_cpu_pm_info {
 struct cpu_pm_ops {
 	int (*finish_suspend)(unsigned long cpu_state);
 	void (*resume)(void);
-	void (*scu_prepare)(unsigned int cpu_id, unsigned int cpu_state);
+	void (*scu_prepare)(unsigned int cpu_id, u8 cpu_state);
 	void (*hotplug_restart)(void);
 };
 
@@ -98,10 +98,10 @@ static int default_finish_suspend(unsigned long cpu_state)
 static void dummy_cpu_resume(void)
 {}
 
-void dummy_scu_prepare(unsigned int cpu_id, unsigned int cpu_state)
+static void dummy_scu_prepare(unsigned int cpu_id, unsigned int cpu_state)
 {}
 
-struct cpu_pm_ops omap_pm_ops = {
+static struct cpu_pm_ops omap_pm_ops = {
 	.finish_suspend		= default_finish_suspend,
 	.resume			= dummy_cpu_resume,
 	.scu_prepare		= dummy_scu_prepare,
@@ -116,62 +116,40 @@ static inline void set_cpu_wakeup_addr(unsigned int cpu_id, u32 addr)
 {
 	struct omap4_cpu_pm_info *pm_info = &per_cpu(omap4_pm_info, cpu_id);
 
+	/*
+	 * XXX should not be writing directly into another IP block's
+	 * address space!
+	 */
 	__raw_writel(addr, pm_info->wkup_sar_addr);
-}
-
-/*
- * Set the CPUx powerdomain's previous power state
- */
-static inline void set_cpu_next_pwrst(unsigned int cpu_id,
-				unsigned int power_state)
-{
-	struct omap4_cpu_pm_info *pm_info = &per_cpu(omap4_pm_info, cpu_id);
-
-	pwrdm_set_next_pwrst(pm_info->pwrdm, power_state);
-}
-
-/*
- * Read CPU's previous power state
- */
-static inline unsigned int read_cpu_prev_pwrst(unsigned int cpu_id)
-{
-	struct omap4_cpu_pm_info *pm_info = &per_cpu(omap4_pm_info, cpu_id);
-
-	return pwrdm_read_prev_pwrst(pm_info->pwrdm);
-}
-
-/*
- * Clear the CPUx powerdomain's previous power state
- */
-static inline void clear_cpu_prev_pwrst(unsigned int cpu_id)
-{
-	struct omap4_cpu_pm_info *pm_info = &per_cpu(omap4_pm_info, cpu_id);
-
-	pwrdm_clear_all_prev_pwrst(pm_info->pwrdm);
 }
 
 /*
  * Store the SCU power status value to scratchpad memory
  */
-static void scu_pwrst_prepare(unsigned int cpu_id, unsigned int cpu_state)
+static void scu_pwrst_prepare(unsigned int cpu_id, u8 fpwrst)
 {
 	struct omap4_cpu_pm_info *pm_info = &per_cpu(omap4_pm_info, cpu_id);
 	u32 scu_pwr_st;
 
-	switch (cpu_state) {
-	case PWRDM_POWER_RET:
+	switch (fpwrst) {
+	case PWRDM_FUNC_PWRST_CSWR:
+	case PWRDM_FUNC_PWRST_OSWR: /* XXX is this accurate? */
 		scu_pwr_st = SCU_PM_DORMANT;
 		break;
-	case PWRDM_POWER_OFF:
+	case PWRDM_FUNC_PWRST_OFF:
 		scu_pwr_st = SCU_PM_POWEROFF;
 		break;
-	case PWRDM_POWER_ON:
-	case PWRDM_POWER_INACTIVE:
+	case PWRDM_FUNC_PWRST_ON:
+	case PWRDM_FUNC_PWRST_INACTIVE:
 	default:
 		scu_pwr_st = SCU_PM_NORMAL;
 		break;
 	}
 
+	/*
+	 * XXX should not be writing directly into another IP block's
+	 * address space!
+	 */
 	__raw_writel(scu_pwr_st, pm_info->scu_sar_addr);
 }
 
@@ -210,6 +188,10 @@ static void l2x0_pwrst_prepare(unsigned int cpu_id, unsigned int save_state)
 {
 	struct omap4_cpu_pm_info *pm_info = &per_cpu(omap4_pm_info, cpu_id);
 
+	/*
+	 * XXX should not be writing directly into another IP block's
+	 * address space!
+	 */
 	__raw_writel(save_state, pm_info->l2x0_sar_addr);
 }
 
@@ -235,11 +217,11 @@ static void save_l2x0_context(void)
 #endif
 
 /**
- * omap4_enter_lowpower: OMAP4 MPUSS Low Power Entry Function
+ * omap4_mpuss_enter_lowpower: OMAP4 MPUSS Low Power Entry Function
  * The purpose of this function is to manage low power programming
  * of OMAP4 MPUSS subsystem
  * @cpu : CPU ID
- * @power_state: Low power state.
+ * @fpwrst: functional powerstate for the MPUSS to enter
  *
  * MPUSS states for the context save:
  * save_state =
@@ -248,23 +230,25 @@ static void save_l2x0_context(void)
  *	2 - CPUx L1 and logic lost + GIC lost: MPUSS OSWR
  *	3 - CPUx L1 and logic lost + GIC + L2 lost: DEVICE OFF
  */
-int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
+int omap4_mpuss_enter_lowpower(unsigned int cpu, u8 fpwrst)
 {
+	struct omap4_cpu_pm_info *pm_info = &per_cpu(omap4_pm_info, cpu);
 	unsigned int save_state = 0;
 	unsigned int wakeup_cpu;
 
 	if (omap_rev() == OMAP4430_REV_ES1_0)
 		return -ENXIO;
 
-	switch (power_state) {
-	case PWRDM_POWER_ON:
-	case PWRDM_POWER_INACTIVE:
+	switch (fpwrst) {
+	case PWRDM_FUNC_PWRST_ON:
+	case PWRDM_FUNC_PWRST_INACTIVE:
 		save_state = 0;
 		break;
-	case PWRDM_POWER_OFF:
+	case PWRDM_FUNC_PWRST_OFF:
 		save_state = 1;
 		break;
-	case PWRDM_POWER_RET:
+	case PWRDM_FUNC_PWRST_CSWR:
+	case PWRDM_FUNC_PWRST_OSWR:
 		if (cpu_cswr_supported) {
 			save_state = 0;
 			break;
@@ -284,17 +268,16 @@ int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
 
 	/*
 	 * Check MPUSS next state and save interrupt controller if needed.
-	 * In MPUSS OSWR or device OFF, interrupt controller  contest is lost.
+	 * In MPUSS OSWR or device OFF, interrupt controller context is lost.
 	 */
 	mpuss_clear_prev_logic_pwrst();
-	if ((pwrdm_read_next_pwrst(mpuss_pd) == PWRDM_POWER_RET) &&
-		(pwrdm_read_logic_retst(mpuss_pd) == PWRDM_POWER_OFF))
+	if (pwrdm_read_next_fpwrst(mpuss_pd) == PWRDM_FUNC_PWRST_OSWR)
 		save_state = 2;
 
 	cpu_clear_prev_logic_pwrst(cpu);
-	set_cpu_next_pwrst(cpu, power_state);
+	WARN_ON(pwrdm_set_next_fpwrst(pm_info->pwrdm, fpwrst));
 	set_cpu_wakeup_addr(cpu, virt_to_phys(omap_pm_ops.resume));
-	omap_pm_ops.scu_prepare(cpu, power_state);
+	omap_pm_ops.scu_prepare(cpu, fpwrst);
 	l2x0_pwrst_prepare(cpu, save_state);
 
 	/*
@@ -313,9 +296,10 @@ int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
 	 * domain transition
 	 */
 	wakeup_cpu = smp_processor_id();
-	set_cpu_next_pwrst(wakeup_cpu, PWRDM_POWER_ON);
 
 	pwrdm_post_transition(NULL);
+
+	WARN_ON(pwrdm_set_next_fpwrst(pm_info->pwrdm, PWRDM_FUNC_PWRST_ON));
 
 	return 0;
 }
@@ -323,22 +307,23 @@ int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
 /**
  * omap4_hotplug_cpu: OMAP4 CPU hotplug entry
  * @cpu : CPU ID
- * @power_state: CPU low power state.
+ * @fpwrst: functional power state to program the CPU powerdomain to enter
  */
-int __cpuinit omap4_hotplug_cpu(unsigned int cpu, unsigned int power_state)
+int __cpuinit omap4_mpuss_hotplug_cpu(unsigned int cpu, u8 fpwrst)
 {
+	struct omap4_cpu_pm_info *pm_info = &per_cpu(omap4_pm_info, cpu);
 	unsigned int cpu_state = 0;
 
 	if (omap_rev() == OMAP4430_REV_ES1_0)
 		return -ENXIO;
 
-	if (power_state == PWRDM_POWER_OFF)
+	if (fpwrst == PWRDM_FUNC_PWRST_OFF || fpwrst == PWRDM_FUNC_PWRST_OSWR)
 		cpu_state = 1;
 
-	clear_cpu_prev_pwrst(cpu);
-	set_cpu_next_pwrst(cpu, power_state);
+	pwrdm_clear_all_prev_pwrst(pm_info->pwrdm);
+	WARN_ON(pwrdm_set_next_fpwrst(pm_info->pwrdm, fpwrst));
 	set_cpu_wakeup_addr(cpu, virt_to_phys(omap_pm_ops.hotplug_restart));
-	omap_pm_ops.scu_prepare(cpu, power_state);
+	omap_pm_ops.scu_prepare(cpu, fpwrst);
 
 	/*
 	 * CPU never retuns back if targeted power state is OFF mode.
@@ -347,7 +332,7 @@ int __cpuinit omap4_hotplug_cpu(unsigned int cpu, unsigned int power_state)
 	 */
 	omap_pm_ops.finish_suspend(cpu_state);
 
-	set_cpu_next_pwrst(cpu, PWRDM_POWER_ON);
+	WARN_ON(pwrdm_set_next_fpwrst(pm_info->pwrdm, PWRDM_FUNC_PWRST_ON));
 	return 0;
 }
 
@@ -401,7 +386,7 @@ int __init omap4_mpuss_init(void)
 	cpu_clear_prev_logic_pwrst(0);
 
 	/* Initialise CPU0 power domain state to ON */
-	pwrdm_set_next_pwrst(pm_info->pwrdm, PWRDM_POWER_ON);
+	WARN_ON(pwrdm_set_next_fpwrst(pm_info->pwrdm, PWRDM_FUNC_PWRST_ON));
 
 	if (cpu_is_omap44xx())
 		cpu_wakeup_addr = CPU1_WAKEUP_NS_PA_ADDR_OFFSET;
@@ -423,7 +408,7 @@ int __init omap4_mpuss_init(void)
 	cpu_clear_prev_logic_pwrst(1);
 
 	/* Initialise CPU1 power domain state to ON */
-	pwrdm_set_next_pwrst(pm_info->pwrdm, PWRDM_POWER_ON);
+	WARN_ON(pwrdm_set_next_fpwrst(pm_info->pwrdm, PWRDM_FUNC_PWRST_ON));
 
 	mpuss_pd = pwrdm_lookup("mpu_pwrdm");
 	if (!mpuss_pd) {
