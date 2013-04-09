@@ -25,6 +25,7 @@
 #include <linux/mfd/twl6040.h>
 #include <linux/platform_data/omap-abe-twl6040.h>
 #include <linux/module.h>
+#include <linux/regulator/consumer.h>
 
 #include <sound/core.h>
 #include <sound/pcm.h>
@@ -348,6 +349,20 @@ static struct snd_soc_jack_pin hs_jack_pins[] = {
 	},
 };
 
+static struct regulator *av_switch_reg;
+static int sdp4430_av_switch_event(struct snd_soc_dapm_widget *w,
+				struct snd_kcontrol *kcontrol, int event)
+{
+	int ret;
+
+	if (SND_SOC_DAPM_EVENT_ON(event))
+		ret = regulator_enable(av_switch_reg);
+	else
+		ret = regulator_disable(av_switch_reg);
+
+	return ret;
+}
+
 #if 0
 static int omap_abe_get_power_mode(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol)
@@ -401,6 +416,9 @@ static const struct snd_soc_dapm_widget twl6040_dapm_widgets[] = {
 	SND_SOC_DAPM_MIC("Main Handset Mic", NULL),
 	SND_SOC_DAPM_MIC("Sub Handset Mic", NULL),
 	SND_SOC_DAPM_LINE("Line In", NULL),
+	SND_SOC_DAPM_SUPPLY("AV Switch Supply",
+			    SND_SOC_NOPM, 0, 0, sdp4430_av_switch_event,
+			    SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
 	SND_SOC_DAPM_MIC("Digital Mic 0", NULL),
 	SND_SOC_DAPM_MIC("Digital Mic 1", NULL),
 	SND_SOC_DAPM_MIC("Digital Mic 2", NULL),
@@ -425,6 +443,7 @@ static const struct snd_soc_dapm_route audio_map[] = {
 	/* Routings for inputs */
 	{"HSMIC", NULL, "Headset Mic"},
 	{"Headset Mic", NULL, "Headset Mic Bias"},
+	{"Headset Mic", NULL, "AV Switch Supply"},
 
 	{"MAINMIC", NULL, "Main Handset Mic"},
 	{"Main Handset Mic", NULL, "Main Mic Bias"},
@@ -1464,6 +1483,13 @@ static __devinit int omap_abe_probe(struct platform_device *pdev)
 	if (ret)
 		dev_err(&pdev->dev, "snd_soc_register_card() failed: %d\n", ret);
 
+	av_switch_reg = regulator_get(&pdev->dev, "av-switch");
+	if (IS_ERR(av_switch_reg)) {
+		ret = PTR_ERR(av_switch_reg);
+		printk(KERN_ERR "couldn't get AV Switch regulator %d\n",
+			ret);
+	}
+
 	return ret;
 }
 
@@ -1471,6 +1497,7 @@ static int __devexit omap_abe_remove(struct platform_device *pdev)
 {
 	struct snd_soc_card *card = platform_get_drvdata(pdev);
 
+	regulator_put(av_switch_reg);
 	snd_soc_unregister_card(card);
 
 	return 0;
