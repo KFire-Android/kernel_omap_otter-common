@@ -2393,9 +2393,13 @@ skip_errata:
 	if (plane != OMAP_DSS_GFX)
 		dispc_mgr_setup_color_conv_coef(plane, &oi->cconv);
 
-	if (plane == OMAP_DSS_GFX && (omap_rev() == OMAP5430_REV_ES1_0 ||
-					omap_rev() == OMAP5432_REV_ES1_0))
-		dispc_enable_arbitration(plane, true);
+	if (plane == OMAP_DSS_GFX)
+		if (channel == OMAP_DSS_CHANNEL_DIGIT ||
+			omap_rev() == OMAP5430_REV_ES1_0 ||
+			omap_rev() == OMAP5432_REV_ES1_0)
+			dispc_enable_arbitration(plane, true);
+		else
+			dispc_enable_arbitration(plane, false);
 
 	return 0;
 }
