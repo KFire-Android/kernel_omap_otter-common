@@ -200,6 +200,31 @@
 			0x188 0x100	/* i2c5_sda.i2c5_sda INPUT | MODE0 */
 		>;
 	};
+
+	uart1_pins: pinmux_uart1_pins {
+		pinctrl-single,pins = <
+			0x60 0x0	/* uart1_tx.uart1_cts MODE0 */
+			0x62 0x118	/* uart1_tx.uart1_cts INPUT | PULLUP | MODE0 */
+			0x64 0x118	/* uart1_rx.uart1_rts INPUT | PULLUP | MODE0 */
+			0x66 0		/* uart1_rx.uart1_rts MODE0 */
+		>;
+	};
+
+	uart3_pins: pinmux_uart3_pins {
+		pinctrl-single,pins = <
+			0x19a 0x0	/* uart3_rts_irsd.uart3_tx_irtx MODE0 */
+			0x19c 0x118	/* uart3_rx_irrx.uart3_usbb3_hsic INPUT | PULLUP | MODE0 */
+		>;
+	};
+
+	uart5_pins: pinmux_uart5_pins {
+		pinctrl-single,pins = <
+			0x170 0x118	/* uart5_rx.uart5_rx INPUT | PULLUP | MODE0 */
+			0x172 0x0	/* uart5_tx.uart5_tx MODE0 */
+			0x174 0x118	/* uart5_cts.uart5_rts INPUT | PULLUP | MODE0 */
+			0x176 0x0	/* uart5_cts.uart5_rts MODE0 */
+		>;
+	};
 };
 
 &omap5_pmx_wkup {
@@ -311,4 +336,19 @@
 		};
 
 	};
+};
+
+&uart1 {
+        pinctrl-names = "default";
+        pinctrl-0 = <&uart1_pins>;
+};
+
+&uart3 {
+        pinctrl-names = "default";
+        pinctrl-0 = <&uart3_pins>;
+};
+
+&uart5 {
+        pinctrl-names = "default";
+        pinctrl-0 = <&uart5_pins>;
 };
