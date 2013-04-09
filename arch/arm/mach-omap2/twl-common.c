@@ -417,6 +417,10 @@ static struct regulator_init_data omap4_vaux1_idata = {
 	.consumer_supplies      = omap4_vaux_supply,
 };
 
+static struct regulator_consumer_supply omap4_vaux2_supply[] = {
+	REGULATOR_SUPPLY("av-switch", "omap-abe-twl6040"),
+};
+
 static struct regulator_init_data omap4_vaux2_idata = {
 	.constraints = {
 		.min_uV			= 1200000,
@@ -432,6 +436,8 @@ static struct regulator_init_data omap4_vaux2_idata = {
 		},
 		.initial_state		= PM_SUSPEND_MEM,
 	},
+	.num_consumer_supplies  = ARRAY_SIZE(omap4_vaux2_supply),
+	.consumer_supplies      = omap4_vaux2_supply,
 };
 
 static struct regulator_consumer_supply omap4_cam2_supply[] = {
