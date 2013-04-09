@@ -527,9 +527,9 @@ static void dsscomp_early_suspend(struct early_suspend *h)
 		   including disabled ones. WB works with an inactive manager
 		   and requires freeing of the prev composition too */
 		if (dssdev) {
+			d.mgrs[d.num_mgrs].ix = d.num_mgrs;
+			d.mgrs[d.num_mgrs].alpha_blending = true;
 			d.num_mgrs++;
-			d.mgrs[mgr_ix].ix = mgr_ix;
-			d.mgrs[mgr_ix].alpha_blending = true;
 		}
 	}
 
