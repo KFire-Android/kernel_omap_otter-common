@@ -17,3 +17,4 @@ obj-y += $(i2c-omap-m) $(i2c-omap-y)
 
 obj-$(CONFIG_DSSCOMP) += omap_dsscomp.o
 obj-$(CONFIG_ION_OMAP) += sgx_omaplfb.o
+obj-$(CONFIG_ION_OMAP) += android-display.o
