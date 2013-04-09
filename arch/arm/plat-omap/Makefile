@@ -16,3 +16,4 @@ i2c-omap-$(CONFIG_I2C_OMAP) := i2c.o
 obj-y += $(i2c-omap-m) $(i2c-omap-y)
 
 obj-$(CONFIG_DSSCOMP) += omap_dsscomp.o
+obj-$(CONFIG_ION_OMAP) += sgx_omaplfb.o
