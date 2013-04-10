@@ -49,6 +49,7 @@ static DECLARE_WAIT_QUEUE_HEAD(hdcp_down_wait_queue);
  *------------------------------------------------------------------------------
  */
 
+#ifdef CONFIG_OMAP4_HDCP_SUPPORT
 /* State machine / workqueue */
 static void hdcp_wq_disable(void);
 static void omap4_hdcp_wq_start_authentication(void);
@@ -119,10 +120,6 @@ static void hdcp_wq_check_r0(void)
 
                         hdcp.hdcp_state = HDCP_WAIT_KSV_LIST;
                         hdcp.auth_state = HDCP_STATE_AUTH_2ND_STEP;
-
-                        hdcp.pending_wq_event =
-                                hdcp_submit_work(HDCP_KSV_TIMEOUT_EVENT,
-                                                 HDCP_KSV_TIMEOUT_DELAY);
                 } else {
                         /* Receiver */
                         printk(KERN_INFO "HDCP: authentication step 1 "
@@ -505,6 +502,408 @@ static void omap4_hdcp_irq_cb(int status)
         }
 }
 
+static long omap4_hdcp_enable_ctl(void __user *argp)
+{
+        HDCP_DBG("hdcp_ioctl() - ENABLE %u", jiffies_to_msecs(jiffies));
+
+        if (hdcp.en_ctrl == 0) {
+                hdcp.en_ctrl =
+                        kmalloc(sizeof(struct hdcp_enable_control),
+                                                        GFP_KERNEL);
+
+                if (hdcp.en_ctrl == 0) {
+                        printk(KERN_WARNING
+                                "HDCP: Cannot allocate memory for HDCP"
+                                " enable control struct\n");
+                        return -EFAULT;
+                }
+        }
+
+        if (copy_from_user(hdcp.en_ctrl, argp,
+                           sizeof(struct hdcp_enable_control))) {
+                printk(KERN_WARNING "HDCP: Error copying from user space "
+                                    "- enable ioctl\n");
+                return -EFAULT;
+        }
+
+        /* Post event to workqueue */
+        if (hdcp_submit_work(HDCP_ENABLE_CTL, 0) == 0)
+                return -EFAULT;
+
+        return 0;
+}
+
+static long omap4_hdcp_disable_ctl(void)
+{
+        HDCP_DBG("hdcp_ioctl() - DISABLE %u", jiffies_to_msecs(jiffies));
+
+        hdcp_cancel_work(&hdcp.pending_start);
+        hdcp_cancel_work(&hdcp.pending_wq_event);
+
+        hdcp.pending_disable = 1;
+        /* Post event to workqueue */
+        if (hdcp_submit_work(HDCP_DISABLE_CTL, 0) == 0)
+                return -EFAULT;
+
+        return 0;
+}
+
+static long omap4_hdcp_query_status_ctl(void __user *argp)
+{
+        uint32_t *status = (uint32_t *)argp;
+
+        HDCP_DBG("hdcp_ioctl() - QUERY %u", jiffies_to_msecs(jiffies));
+
+        *status = hdcp.auth_state;
+
+        return 0;
+}
+
+static long omap4_hdcp_wait_event_ctl(void __user *argp)
+{
+        struct hdcp_wait_control ctrl;
+
+        HDCP_DBG("hdcp_ioctl() - WAIT %u %d", jiffies_to_msecs(jiffies),
+                                         hdcp.hdcp_up_event);
+
+        if (copy_from_user(&ctrl, argp,
+                           sizeof(struct hdcp_wait_control))) {
+                printk(KERN_WARNING "HDCP: Error copying from user space"
+                                    " - wait ioctl");
+                return -EFAULT;
+        }
+
+        if (hdcp_wait_re_entrance == 0) {
+                hdcp_wait_re_entrance = 1;
+                wait_event_interruptible(hdcp_up_wait_queue,
+                                         (hdcp.hdcp_up_event & 0xFF) != 0);
+
+                ctrl.event = hdcp.hdcp_up_event;
+
+                if ((ctrl.event & 0xFF) == HDCP_EVENT_STEP2) {
+                        if (copy_to_user(ctrl.data, &sha_input,
+                                                sizeof(struct hdcp_sha_in))) {
+                                printk(KERN_WARNING "HDCP: Error copying to "
+                                                    "user space - wait ioctl");
+                                return -EFAULT;
+                        }
+                }
+
+                hdcp.hdcp_up_event = 0;
+                hdcp_wait_re_entrance = 0;
+        } else
+                ctrl.event = HDCP_EVENT_EXIT;
+
+        /* Store output data to output pointer */
+        if (copy_to_user(argp, &ctrl,
+                         sizeof(struct hdcp_wait_control))) {
+                printk(KERN_WARNING "HDCP: Error copying to user space -"
+                                    " wait ioctl");
+                return -EFAULT;
+        }
+
+        return 0;
+}
+
+static long omap4_hdcp_done_ctl(void __user *argp)
+{
+        uint32_t *status = (uint32_t *)argp;
+
+        HDCP_DBG("hdcp_ioctl() - DONE %u %d", jiffies_to_msecs(jiffies), *status);
+
+        hdcp.hdcp_down_event &= ~(*status & 0xFF);
+        hdcp.hdcp_down_event |= *status & 0xFF00;
+
+        wake_up_interruptible(&hdcp_down_wait_queue);
+
+        return 0;
+}
+
+static long omap4_hdcp_encrypt_key_ctl(void __user *argp)
+{
+        struct hdcp_encrypt_control *ctrl;
+        uint32_t *out_key;
+
+        HDCP_DBG("hdcp_ioctl() - ENCRYPT KEY %u", jiffies_to_msecs(jiffies));
+
+        mutex_lock(&hdcp.lock);
+
+        if (hdcp.hdcp_state != HDCP_DISABLED) {
+                printk(KERN_INFO "HDCP: Cannot encrypt keys while HDCP "
+                                   "is enabled\n");
+                mutex_unlock(&hdcp.lock);
+                return -EFAULT;
+        }
+
+        hdcp.hdcp_state = HDCP_KEY_ENCRYPTION_ONGOING;
+
+        /* Encryption happens in ioctl / user context */
+        ctrl = kmalloc(sizeof(struct hdcp_encrypt_control),
+                       GFP_KERNEL);
+
+        if (ctrl == 0) {
+                printk(KERN_WARNING "HDCP: Cannot allocate memory for HDCP"
+                                    " encryption control struct\n");
+                mutex_unlock(&hdcp.lock);
+                return -EFAULT;
+        }
+
+        out_key = kmalloc(sizeof(uint32_t) *
+                                        DESHDCP_KEY_SIZE, GFP_KERNEL);
+
+        if (out_key == 0) {
+                printk(KERN_WARNING "HDCP: Cannot allocate memory for HDCP "
+                                    "encryption output key\n");
+                kfree(ctrl);
+                mutex_unlock(&hdcp.lock);
+                return -EFAULT;
+        }
+
+        if (copy_from_user(ctrl, argp,
+                                sizeof(struct hdcp_encrypt_control))) {
+                printk(KERN_WARNING "HDCP: Error copying from user space"
+                                    " - encrypt ioctl\n");
+                kfree(ctrl);
+                kfree(out_key);
+                mutex_unlock(&hdcp.lock);
+                return -EFAULT;
+        }
+
+	hdmi_runtime_get();
+
+        /* Call encrypt function */
+        hdcp_3des_encrypt_key(ctrl, out_key);
+
+	hdmi_runtime_put();
+
+        hdcp.hdcp_state = HDCP_DISABLED;
+        mutex_unlock(&hdcp.lock);
+
+        /* Store output data to output pointer */
+        if (copy_to_user(ctrl->out_key, out_key,
+                                sizeof(uint32_t)*DESHDCP_KEY_SIZE)) {
+                printk(KERN_WARNING "HDCP: Error copying to user space -"
+                                    " encrypt ioctl\n");
+                kfree(ctrl);
+                kfree(out_key);
+                return -EFAULT;
+        }
+
+        kfree(ctrl);
+        kfree(out_key);
+        return 0;
+}
+
+long omap4_hdcp_ioctl(struct file *fd, unsigned int cmd, unsigned long arg)
+{
+        void __user *argp = (void __user *)arg;
+
+        switch (cmd) {
+        case HDCP_ENABLE:
+                return omap4_hdcp_enable_ctl(argp);
+
+        case HDCP_DISABLE:
+                return omap4_hdcp_disable_ctl();
+
+        case HDCP_ENCRYPT_KEY:
+                return omap4_hdcp_encrypt_key_ctl(argp);
+
+        case HDCP_QUERY_STATUS:
+                return omap4_hdcp_query_status_ctl(argp);
+
+        case HDCP_WAIT_EVENT:
+                return omap4_hdcp_wait_event_ctl(argp);
+
+        case HDCP_DONE:
+                return omap4_hdcp_done_ctl(argp);
+
+        default:
+                return -ENOTTY;
+        } /* End switch */
+}
+#else
+static long hdcp_query_status_ctl(uint32_t *status)
+{
+        struct hdmi_ip_data *ip_data;
+
+        HDCP_DBG("hdcp_ioctl() - QUERY %u", jiffies_to_msecs(jiffies));
+
+        ip_data = get_hdmi_ip_data();
+        if (!ip_data) {
+                HDCP_ERR("null pointer hit\n");
+                return -EINVAL;
+        }
+
+        *status = ip_data->ops->hdcp_status(ip_data);
+
+        return 0;
+}
+
+static long hdcp_auth_wait_event_ctl(struct hdcp_wait_control *ctrl)
+{
+        HDCP_DBG("hdcp_ioctl() - WAIT %u %d", jiffies_to_msecs(jiffies),
+                                         hdcp.hdcp_up_event);
+
+        wait_event_interruptible(hdcp_up_wait_queue,
+                                 (hdcp.hdcp_up_event & 0xFF) != 0);
+
+        ctrl->event = hdcp.hdcp_up_event;
+
+        hdcp.hdcp_up_event = 0;
+
+        return 0;
+}
+
+static long hdcp_user_space_done_ctl(uint32_t *status)
+{
+        HDCP_DBG("hdcp_ioctl() - DONE %u %d", jiffies_to_msecs(jiffies),
+                *status);
+
+        hdcp.hdcp_down_event &= ~(*status & 0xFF);
+        hdcp.hdcp_down_event |= *status & 0xFF00;
+
+        wake_up_interruptible(&hdcp_down_wait_queue);
+
+        return 0;
+}
+
+static long hdcp_ioctl(struct file *fd, unsigned int cmd, unsigned long arg)
+{
+        void __user *argp = (void __user *)arg;
+        struct hdcp_wait_control ctrl;
+        uint32_t status;
+
+        if (!fd) {
+                HDCP_ERR("%s null pointer\n", __func__);
+                return -EINVAL;
+        }
+
+        HDCP_DBG("%s\n", __func__);
+
+        switch (cmd) {
+        case HDCP_WAIT_EVENT:
+
+                if (copy_from_user(&ctrl, argp,
+                                sizeof(struct hdcp_wait_control))) {
+                        HDCP_ERR("HDCP: Error copying from user space"
+                                    " - wait ioctl");
+                        return -EFAULT;
+                }
+
+                /* Do not allow re-entrance for this ioctl */
+                mutex_lock(&hdcp.re_entrant_lock);
+                if (hdcp.re_entrance_flag == false) {
+                        hdcp.re_entrance_flag = true;
+                        mutex_unlock(&hdcp.re_entrant_lock);
+
+                        hdcp_auth_wait_event_ctl(&ctrl);
+
+                        mutex_lock(&hdcp.re_entrant_lock);
+                        hdcp.re_entrance_flag = false;
+                        mutex_unlock(&hdcp.re_entrant_lock);
+                } else {
+                        mutex_unlock(&hdcp.re_entrant_lock);
+                        ctrl.event = HDCP_EVENT_EXIT;
+                }
+
+                /* Store output data to output pointer */
+                if (copy_to_user(argp, &ctrl,
+                         sizeof(struct hdcp_wait_control))) {
+                        HDCP_ERR("HDCP: Error copying to user space -"
+                                    " wait ioctl");
+                        return -EFAULT;
+                }
+                break;
+
+        case HDCP_QUERY_STATUS:
+
+                hdcp_query_status_ctl(&status);
+
+                /* Store output data to output pointer */
+                if (copy_to_user(argp, &status,
+                        sizeof(uint32_t))) {
+                        HDCP_ERR("HDCP: Error copying to user space -"
+                                "query status ioctl");
+                        return -EFAULT;
+                }
+
+                break;
+
+        case HDCP_DONE:
+                if (copy_from_user(&status, argp,
+                                sizeof(uint32_t))) {
+                        HDCP_ERR("HDCP: Error copying from user space"
+                                    " - done ioctl");
+                        return -EFAULT;
+                }
+
+                return hdcp_user_space_done_ctl(&status);
+
+        default:
+                return -ENOTTY;
+        } /* End switch */
+
+        return 0;
+}
+
+static void hdcp_irq_cb(int status)
+{
+	struct hdmi_ip_data *ip_data;
+	u32 intr = 0;
+
+	ip_data = get_hdmi_ip_data();
+
+	if (ip_data->ops->hdcp_int_handler)
+		intr = ip_data->ops->hdcp_int_handler(ip_data);
+
+	if (intr == KSVACCESSINT) {
+		__cancel_delayed_work(&hdcp.hdcp_work->dwork);
+		atomic_set(&hdcp.hdcp_work->state, HDCP_STATE_STEP2);
+		queue_delayed_work(hdcp.workqueue, &hdcp.hdcp_work->dwork, 0);
+	}
+
+	return;
+}
+
+static bool hdcp_3des_cb(void)
+{
+	HDCP_DBG("hdcp_3des_cb() %u\n", jiffies_to_msecs(jiffies));
+
+	if (!hdcp.hdcp_keys_loaded) {
+		HDCP_ERR("%s: hdcp_keys not loaded = %d\n",
+				__func__, hdcp.hdcp_keys_loaded);
+		return false;
+	}
+
+	/* Load 3DES key */
+	if (hdcp_3des_load_key(hdcp.en_ctrl->key) != HDCP_OK) {
+		HDCP_ERR("Error Loading  HDCP keys\n");
+		return false;
+	}
+
+	return true;
+}
+
+static void hdcp_start_frame_cb(void)
+{
+	HDCP_DBG("hdcp_start_frame_cb() %ums\n", jiffies_to_msecs(jiffies));
+
+	if (!hdcp.hdcp_keys_loaded) {
+		HDCP_DBG("%s: hdcp_keys not loaded = %d\n",
+		    __func__, hdcp.hdcp_keys_loaded);
+		return;
+	}
+
+	/* Cancel any previous work submitted */
+	__cancel_delayed_work(&hdcp.hdcp_work->dwork);
+	atomic_set(&hdcp.hdcp_work->state, HDCP_STATE_STEP1);
+	/* HDCP enable after 7 Vsync delay */
+	queue_delayed_work(hdcp.workqueue, &hdcp.hdcp_work->dwork,
+				msecs_to_jiffies(300));
+
+}
+#endif
+
 /*------------------------------------------------------------------------------
 * OMAP4 HDCP Support: End
  *------------------------------------------------------------------------------
@@ -629,168 +1028,6 @@ int hdcp_3des_load_key(uint32_t *deshdcp_encrypted_key)
 	return status;
 }
 
-static bool hdcp_3des_cb(void)
-{
-	HDCP_DBG("hdcp_3des_cb() %u\n", jiffies_to_msecs(jiffies));
-
-	if (!hdcp.hdcp_keys_loaded) {
-		HDCP_ERR("%s: hdcp_keys not loaded = %d\n",
-				__func__, hdcp.hdcp_keys_loaded);
-		return false;
-	}
-
-	/* Load 3DES key */
-	if (hdcp_3des_load_key(hdcp.en_ctrl->key) != HDCP_OK) {
-		HDCP_ERR("Error Loading  HDCP keys\n");
-		return false;
-	}
-
-	return true;
-}
-
-static void hdcp_start_frame_cb(void)
-{
-	HDCP_DBG("hdcp_start_frame_cb() %ums\n", jiffies_to_msecs(jiffies));
-
-	if (!hdcp.hdcp_keys_loaded) {
-		HDCP_DBG("%s: hdcp_keys not loaded = %d\n",
-		    __func__, hdcp.hdcp_keys_loaded);
-		return;
-	}
-
-	/* Cancel any previous work submitted */
-	__cancel_delayed_work(&hdcp.hdcp_work->dwork);
-	atomic_set(&hdcp.hdcp_work->state, HDCP_STATE_STEP1);
-	/* HDCP enable after 7 Vsync delay */
-	queue_delayed_work(hdcp.workqueue, &hdcp.hdcp_work->dwork,
-				msecs_to_jiffies(300));
-
-}
-
-static long hdcp_query_status_ctl(uint32_t *status)
-{
-	struct hdmi_ip_data *ip_data;
-
-	HDCP_DBG("hdcp_ioctl() - QUERY %u", jiffies_to_msecs(jiffies));
-
-	ip_data = get_hdmi_ip_data();
-	if (!ip_data) {
-		HDCP_ERR("null pointer hit\n");
-		return -EINVAL;
-	}
-
-	*status = ip_data->ops->hdcp_status(ip_data);
-
-	return 0;
-}
-
-static long hdcp_auth_wait_event_ctl(struct hdcp_wait_control *ctrl)
-{
-	HDCP_DBG("hdcp_ioctl() - WAIT %u %d", jiffies_to_msecs(jiffies),
-					 hdcp.hdcp_up_event);
-
-	wait_event_interruptible(hdcp_up_wait_queue,
-				 (hdcp.hdcp_up_event & 0xFF) != 0);
-
-	ctrl->event = hdcp.hdcp_up_event;
-
-	hdcp.hdcp_up_event = 0;
-
-	return 0;
-}
-
-static long hdcp_user_space_done_ctl(uint32_t *status)
-{
-	HDCP_DBG("hdcp_ioctl() - DONE %u %d", jiffies_to_msecs(jiffies),
-		*status);
-
-	hdcp.hdcp_down_event &= ~(*status & 0xFF);
-	hdcp.hdcp_down_event |= *status & 0xFF00;
-
-	wake_up_interruptible(&hdcp_down_wait_queue);
-
-	return 0;
-}
-
-static long hdcp_ioctl(struct file *fd, unsigned int cmd, unsigned long arg)
-{
-	void __user *argp = (void __user *)arg;
-	struct hdcp_wait_control ctrl;
-	uint32_t status;
-
-	if (!fd) {
-		HDCP_ERR("%s null pointer\n", __func__);
-		return -EINVAL;
-	}
-
-	HDCP_DBG("%s\n", __func__);
-
-	switch (cmd) {
-	case HDCP_WAIT_EVENT:
-
-		if (copy_from_user(&ctrl, argp,
-				sizeof(struct hdcp_wait_control))) {
-			HDCP_ERR("HDCP: Error copying from user space"
-				    " - wait ioctl");
-			return -EFAULT;
-		}
-
-		/* Do not allow re-entrance for this ioctl */
-		mutex_lock(&hdcp.re_entrant_lock);
-		if (hdcp.re_entrance_flag == false) {
-			hdcp.re_entrance_flag = true;
-			mutex_unlock(&hdcp.re_entrant_lock);
-
-			hdcp_auth_wait_event_ctl(&ctrl);
-
-			mutex_lock(&hdcp.re_entrant_lock);
-			hdcp.re_entrance_flag = false;
-			mutex_unlock(&hdcp.re_entrant_lock);
-		} else {
-			mutex_unlock(&hdcp.re_entrant_lock);
-			ctrl.event = HDCP_EVENT_EXIT;
-		}
-
-		/* Store output data to output pointer */
-		if (copy_to_user(argp, &ctrl,
-			 sizeof(struct hdcp_wait_control))) {
-			HDCP_ERR("HDCP: Error copying to user space -"
-				    " wait ioctl");
-			return -EFAULT;
-		}
-		break;
-
-	case HDCP_QUERY_STATUS:
-
-		hdcp_query_status_ctl(&status);
-
-		/* Store output data to output pointer */
-		if (copy_to_user(argp, &status,
-			sizeof(uint32_t))) {
-			HDCP_ERR("HDCP: Error copying to user space -"
-				"query status ioctl");
-			return -EFAULT;
-		}
-
-		break;
-
-	case HDCP_DONE:
-		if (copy_from_user(&status, argp,
-				sizeof(uint32_t))) {
-			HDCP_ERR("HDCP: Error copying from user space"
-				    " - done ioctl");
-			return -EFAULT;
-		}
-
-		return hdcp_user_space_done_ctl(&status);
-
-	default:
-		return -ENOTTY;
-	} /* End switch */
-
-	return 0;
-}
-
 static int hdcp_mmap(struct file *filp, struct vm_area_struct *vma)
 {
 	int status;
@@ -863,30 +1100,14 @@ static int hdcp_load_keys(void)
 	return ret;
 }
 
-static void hdcp_irq_cb(int status)
-{
-	struct hdmi_ip_data *ip_data;
-	u32 intr = 0;
-
-	ip_data = get_hdmi_ip_data();
-
-	if (ip_data->ops->hdcp_int_handler)
-		intr = ip_data->ops->hdcp_int_handler(ip_data);
-
-	if (intr == KSVACCESSINT) {
-		__cancel_delayed_work(&hdcp.hdcp_work->dwork);
-		atomic_set(&hdcp.hdcp_work->state, HDCP_STATE_STEP2);
-		queue_delayed_work(hdcp.workqueue, &hdcp.hdcp_work->dwork, 0);
-	}
-
-	return;
-}
-
-
 static const struct file_operations hdcp_fops = {
 	.owner = THIS_MODULE,
 	.mmap = hdcp_mmap,
+#ifdef CONFIG_OMAP4_HDCP_SUPPORT
+	.unlocked_ioctl = omap4_hdcp_ioctl,
+#else
 	.unlocked_ioctl = hdcp_ioctl,
+#endif
 };
 
 static int __init hdcp_init(void)
@@ -948,12 +1169,14 @@ static int __init hdcp_init(void)
         hdcp.pending_disable = 0;
         hdcp.hdcp_up_event = 0;
         hdcp.hdcp_down_event = 0;
-        hdcp_wait_re_entrance = 0;
         hdcp.hpd_low = 0;
 
         spin_lock_init(&hdcp.spinlock);
 
+#ifdef CONFIG_OMAP4_HDCP_SUPPORT
+        hdcp_wait_re_entrance = 0;
         init_completion(&hdcp_comp);
+#endif
 
 	hdcp.workqueue = create_singlethread_workqueue("hdcp");
 	if (hdcp.workqueue == NULL) {
@@ -971,12 +1194,13 @@ static int __init hdcp_init(void)
 	}
 
 	/* Register HDCP callbacks to HDMI library */
-	if (cpu_is_omap44xx())
+#ifdef CONFIG_OMAP4_HDCP_SUPPORT
 		omapdss_hdmi_register_hdcp_callbacks(&omap4_hdcp_start_frame_cb,
 				 &omap4_hdcp_3des_cb, &omap4_hdcp_irq_cb);
-	else
+#else
 		omapdss_hdmi_register_hdcp_callbacks(&hdcp_start_frame_cb,
 				 &hdcp_3des_cb, &hdcp_irq_cb);
+#endif
 
 	hdmi_runtime_put();
 
