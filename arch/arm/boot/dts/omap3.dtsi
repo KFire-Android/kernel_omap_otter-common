@@ -23,6 +23,8 @@
 	cpus {
 		cpu@0 {
 			compatible = "arm,cortex-a8";
+			clocks = <&dpll1>;
+			clock-names = "cpu";
 		};
 	};
 
@@ -71,6 +73,11 @@
 			compatible = "ti,omap-counter32k";
 			reg = <0x48320000 0x20>;
 			ti,hwmods = "counter_32k";
+		};
+
+		dpll1: dpll1 {
+			#clock-cells = <0>;
+			compatible = "ti,omap-clock";
 		};
 
 		intc: interrupt-controller@48200000 {
