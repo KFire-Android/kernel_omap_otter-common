@@ -1453,6 +1453,7 @@ static struct omap_clk omap54xx_clks[] = {
 	CLK("4013a000.timer",	"timer_sys_ck",		&dss_syc_gfclk_div, 	CK_54XX),
 	CLK("4013c000.timer",	"timer_sys_ck",		&dss_syc_gfclk_div, 	CK_54XX),
 	CLK("4013e000.timer",	"timer_sys_ck",		&dss_syc_gfclk_div, 	CK_54XX),
+	CLK("cpu0",   NULL,   &dpll_mpu_ck,   CK_54XX),
 };
 
 int __init omap5xxx_clk_init(void)
