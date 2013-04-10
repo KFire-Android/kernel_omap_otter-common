@@ -27,6 +27,7 @@
 #include <linux/suspend.h>
 #include <linux/debugfs.h>
 
+#include <linux/omap_die_governor.h>
 #include <linux/thermal_framework.h>
 
 #include <plat/cpu.h>
@@ -67,27 +68,6 @@ enum governor_instances {
 	OMAP_GOV_GPU_INSTANCE,
 	OMAP_GOV_MAX_INSTANCE,
 };
-
-#define OMAP_THERMAL_ZONE_NAME_SZ	10
-struct omap_thermal_zone {
-	char name[OMAP_THERMAL_ZONE_NAME_SZ];
-	unsigned int cooling_increment;
-	int temp_lower;
-	int temp_upper;
-	int update_rate;
-	int average_rate;
-	int max_trend;
-};
-#define OMAP_THERMAL_ZONE(n, i, l, u, r, a, t)		\
-{							\
-	.name				= n,		\
-	.cooling_increment		= (i),		\
-	.temp_lower			= (l),		\
-	.temp_upper			= (u),		\
-	.update_rate			= (r),		\
-	.average_rate			= (a),		\
-	.max_trend			= (t),		\
-}
 
 struct omap_governor {
 	struct thermal_dev *temp_sensor;
@@ -165,6 +145,8 @@ static struct omap_thermal_zone zones_es2_0[] __initdata = {
 			FAST_TEMP_MONITORING_RATE,
 			OMAP_PANIC_ZONE_MAX_TREND),
 };
+
+static struct omap_die_governor_pdata *omap_gov_pdata;
 
 static struct omap_governor *omap_gov_instance[OMAP_GOV_MAX_INSTANCE];
 
@@ -715,9 +697,17 @@ static struct thermal_dev_ops omap_gov_ops = {
 #endif
 };
 
+void omap_die_governor_register_pdata(struct omap_die_governor_pdata *omap_gov)
+{
+	if (omap_gov)
+		omap_gov_pdata = omap_gov;
+}
+EXPORT_SYMBOL_GPL(omap_die_governor_register_pdata);
+
 static int __init omap_governor_init(void)
 {
 	int i;
+	bool pdata_valid = false;
 	struct device *mpu, *gpu;
 
 	for (i = 0; i < OMAP_GOV_MAX_INSTANCE; i++) {
@@ -737,8 +727,19 @@ static int __init omap_governor_init(void)
 		omap_gov_instance[i]->enable_debug_print = false;
 	}
 
+	if (omap_gov_pdata && omap_gov_pdata->zones) {
+		if (omap_gov_pdata->zones_num != MAX_NO_MON_ZONES)
+			WARN(1, "%s: pdata is invalid\n", __func__);
+		else
+			pdata_valid = true;
+	}
+
 	/* Initializing CPU governor */
-	if (omap_rev() == OMAP5430_REV_ES1_0 ||
+	if (pdata_valid) {
+		memcpy(omap_gov_instance[OMAP_GOV_CPU_INSTANCE]->zones,
+		       omap_gov_pdata->zones, omap_gov_pdata->zones_num *
+		       sizeof(struct omap_thermal_zone));
+	} else if (omap_rev() == OMAP5430_REV_ES1_0 ||
 	    omap_rev() == OMAP5432_REV_ES1_0) {
 		memcpy(omap_gov_instance[OMAP_GOV_CPU_INSTANCE]->zones,
 		       zones_es1_0, sizeof(zones_es1_0));
@@ -777,7 +778,11 @@ static int __init omap_governor_init(void)
 	omap_gov_instance[OMAP_GOV_CPU_INSTANCE]->omap_gradient_const);
 
 	/* Initializing GPU governor */
-	if (omap_rev() == OMAP5430_REV_ES1_0 ||
+	if (pdata_valid) {
+		memcpy(omap_gov_instance[OMAP_GOV_GPU_INSTANCE]->zones,
+		       omap_gov_pdata->zones, omap_gov_pdata->zones_num *
+		       sizeof(struct omap_thermal_zone));
+	} else if (omap_rev() == OMAP5430_REV_ES1_0 ||
 	    omap_rev() == OMAP5432_REV_ES1_0) {
 		memcpy(omap_gov_instance[OMAP_GOV_GPU_INSTANCE]->zones,
 		       zones_es1_0, sizeof(zones_es1_0));

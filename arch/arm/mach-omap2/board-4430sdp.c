@@ -35,6 +35,7 @@
 #include <linux/platform_data/omap4-keypad.h>
 #include <linux/platform_data/thermistor_sensor.h>
 #include <linux/platform_data/lm75_platform_data.h>
+#include <linux/omap_die_governor.h>
 
 #include <mach/hardware.h>
 #include <asm/hardware/gic.h>
@@ -277,6 +278,19 @@ static void init_duty_governor(void)
 #else
 static void init_duty_governor(void){}
 #endif /*CONFIG_OMAP4_DUTY_CYCLE*/
+
+/* Initial set of thresholds for different thermal zones */
+static struct omap_thermal_zone thermal_zones[] = {
+	OMAP_THERMAL_ZONE("safe", 0, 25000, 65000, 250, 1000, 400),
+	OMAP_THERMAL_ZONE("monitor", 0, 60000, 80000, 250, 250,	250),
+	OMAP_THERMAL_ZONE("alert", 0, 75000, 90000, 250, 250, 150),
+	OMAP_THERMAL_ZONE("critical", 1, 85000,	115000,	250, 250, 50),
+};
+
+static struct omap_die_governor_pdata omap_gov_pdata = {
+	.zones = thermal_zones,
+	.zones_num = ARRAY_SIZE(thermal_zones),
+};
 
 static struct gpio_led sdp4430_gpio_leds[] = {
 	{
@@ -1503,6 +1517,7 @@ static void __init omap_4430sdp_init(void)
 	blaze_keypad_init();
 
 	init_duty_governor();
+	omap_die_governor_register_pdata(&omap_gov_pdata);
 	if (cpu_is_omap446x()) {
 		/* Vsel0 = gpio, vsel1 = gnd */
 		status = omap_tps6236x_board_setup(true, TPS62361_GPIO, -1,
