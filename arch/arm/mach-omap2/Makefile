@@ -306,4 +306,4 @@ obj-y					+= common-board-devices.o twl-common.o dss-common.o
 
 # Serial ATA support
 s-ata-$(CONFIG_SATA_AHCI_PLATFORM)	:= sata.o
-obj-$(CONFIG_SOC_OMAP5) 		+= $(s-ata-m) $(s-ata-y)
+obj-y 					+= $(s-ata-m) $(s-ata-y)
