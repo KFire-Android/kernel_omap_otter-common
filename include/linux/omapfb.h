@@ -24,7 +24,30 @@
 #define __LINUX_OMAPFB_H__
 
 #include <uapi/linux/omapfb.h>
+#ifdef CONFIG_ARCH_OMAP1
+#define OMAPFB_PLANE_NUM		1
+#else
+#define OMAPFB_PLANE_NUM		3
+#endif
 
+struct omapfb_mem_region {
+	u32		paddr;
+	void __iomem	*vaddr;
+	unsigned long	size;
+	u8		type;		/* OMAPFB_PLANE_MEM_* */
+	enum omapfb_color_format format;/* OMAPFB_COLOR_* */
+	unsigned	format_used:1;	/* Must be set when format is set.
+					 * Needed b/c of the badly chosen 0
+					 * base for OMAPFB_COLOR_* values
+					 */
+	unsigned	alloc:1;	/* allocated by the driver */
+	unsigned	map:1;		/* kernel mapped by the driver */
+};
+
+struct omapfb_mem_desc {
+	int				region_cnt;
+	struct omapfb_mem_region	region[OMAPFB_PLANE_NUM];
+};
 
 struct omap_lcd_config {
 	char panel_name[16];
@@ -35,7 +58,10 @@ struct omap_lcd_config {
 
 struct omapfb_platform_data {
 	struct omap_lcd_config		lcd;
+	struct omapfb_mem_desc		mem_desc;
 };
+
+extern void omapfb_set_platform_data(struct omapfb_platform_data *data);
 
 void __init omapfb_set_lcd_config(const struct omap_lcd_config *config);
 

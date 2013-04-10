@@ -116,3 +116,9 @@ static int __init omap_init_fb(void)
 arch_initcall(omap_init_fb);
 
 #endif
+
+void omapfb_set_platform_data(struct omapfb_platform_data *data)
+{
+	omapfb_config = *data;
+}
+
