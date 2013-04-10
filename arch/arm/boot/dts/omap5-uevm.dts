@@ -255,6 +255,7 @@
 &mmc3 {
 	bus-width = <4>;
 	ti,non-removable;
+	status = "disabled";
 };
 
 &mmc4 {
