@@ -404,7 +404,8 @@ unsigned long omap4_dpll_regm4xen_recalc(struct clk_hw *hw,
 long omap4_dpll_regm4xen_round_rate(struct clk_hw *hw,
 				    unsigned long target_rate,
 				    unsigned long *parent_rate);
-
+int omap5_mpu_dpll_set_rate(struct clk_hw *hw, unsigned long rate,
+					unsigned long parent_rate);
 void omap2_init_clk_clkdm(struct clk_hw *clk);
 void __init omap2_clk_disable_clkdm_control(void);
 
