@@ -921,7 +921,7 @@ static int omap_dmm_resume(struct device *dev)
 	}
 
 	number_slots = omap_dmm->container_height * omap_dmm->container_width;
-	pages = vmalloc(number_slots * sizeof(*pages));
+	pages = kmalloc(number_slots * sizeof(*pages), GFP_KERNEL);
 
 	if (!pages) {
 		dev_err(dev, "%s: Failed to allocate page structures\n",
@@ -951,7 +951,7 @@ static int omap_dmm_resume(struct device *dev)
 	dev_info(omap_dmm->dev, "%s: omap_dmm_resume:PAT entries restored\n",
 			__func__);
 
-	vfree(pages);
+	kfree(pages);
 	return 0;
 }
 
