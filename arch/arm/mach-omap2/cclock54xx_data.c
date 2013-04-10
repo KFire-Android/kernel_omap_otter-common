@@ -427,6 +427,9 @@ static struct dpll_data dpll_mpu_dd = {
 	.modes		= (1 << DPLL_LOW_POWER_BYPASS) | (1 << DPLL_LOCKED),
 	.autoidle_reg	= OMAP54XX_CM_AUTOIDLE_DPLL_MPU,
 	.idlest_reg	= OMAP54XX_CM_IDLEST_DPLL_MPU,
+	.dcc_mask       = OMAP54XX_DCC_EN_MASK,
+	/* rate bigger than 1.4 GHz will use DCC */
+	.dcc_rate       = 1400000000,
 	.mult_mask	= OMAP54XX_DPLL_MULT_MASK,
 	.div1_mask	= OMAP54XX_DPLL_DIV_MASK,
 	.enable_mask	= OMAP54XX_DPLL_EN_MASK,

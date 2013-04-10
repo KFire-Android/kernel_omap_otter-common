@@ -272,6 +272,8 @@ struct dpll_data {
 	u32			freqsel_mask;
 	u32			idlest_mask;
 	u32			dco_mask;
+	u32			dcc_mask;
+	unsigned long		dcc_rate;
 	u32			sddiv_mask;
 	u32			lpmode_mask;
 	u32			m4xen_mask;
