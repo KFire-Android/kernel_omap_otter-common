@@ -29,6 +29,20 @@
 #include "dss_features.h"
 #include "dispc-compat.h"
 
+struct callback_states {
+	/*
+	 * Keep track of callbacks at the last 3 levels of pipeline:
+	 * info, shadow registers and in DISPC registers.
+	 *
+	 * Note: We zero the function pointer when moving from one level to
+	 * another to avoid checking for dirty and shadow_dirty fields that
+	 * are not common between overlay and manager cache structures.
+	 */
+	struct omapdss_ovl_cb info, shadow, dispc;
+	bool dispc_displayed;
+	bool shadow_enabled;
+};
+
 /*
  * We have 4 levels of cache for the dispc settings. First two are in SW and
  * the latter two in HW.
@@ -66,12 +80,19 @@ struct ovl_priv_data {
 	bool info_dirty;
 	struct omap_overlay_info info;
 
+	/* callback data for the last 3 states */
+	struct callback_states cb;
+
+	/* overlay's channel in DISPC */
+	int dispc_channel;
+
 	bool shadow_info_dirty;
 
 	bool extra_info_dirty;
 	bool shadow_extra_info_dirty;
 
 	bool enabled;
+	enum omap_channel channel;
 	u32 fifo_low, fifo_high;
 
 	/*
@@ -109,6 +130,9 @@ struct mgr_priv_data {
 
 	void (*framedone_handler)(void *);
 	void *framedone_handler_data;
+
+	/* callback data for the last 3 states */
+	struct callback_states cb;
 };
 
 static struct {
@@ -117,6 +141,42 @@ static struct {
 
 	bool irq_enabled;
 } dss_data;
+
+/* propagating callback info between states */
+static inline void
+dss_ovl_configure_cb(struct callback_states *st, int i, bool enabled)
+{
+	/* complete info in shadow */
+	dss_ovl_cb(&st->shadow, i, DSS_COMPLETION_ECLIPSED_SHADOW);
+
+	/* propagate info to shadow */
+	st->shadow = st->info;
+	st->shadow_enabled = enabled;
+	/* info traveled to shadow */
+	st->info.fn = NULL;
+}
+
+static inline void
+dss_ovl_program_cb(struct callback_states *st, int i)
+{
+	/* mark previous programming as completed */
+	dss_ovl_cb(&st->dispc, i, st->dispc_displayed ?
+				DSS_COMPLETION_RELEASED : DSS_COMPLETION_TORN);
+
+	/* mark shadow info as programmed, not yet displayed */
+	dss_ovl_cb(&st->shadow, i, DSS_COMPLETION_PROGRAMMED);
+
+	/* if overlay/manager is not enabled, we are done now */
+	if (!st->shadow_enabled) {
+		dss_ovl_cb(&st->shadow, i, DSS_COMPLETION_RELEASED);
+		st->shadow.fn = NULL;
+	}
+
+	/* propagate shadow to dispc */
+	st->dispc = st->shadow;
+	st->shadow.fn = NULL;
+	st->dispc_displayed = false;
+}
 
 /* protects dss_data */
 static spinlock_t data_lock;
@@ -913,6 +973,137 @@ static void dss_apply_irq_handler(void *data, u32 mask)
 	spin_unlock(&data_lock);
 }
 
+int dss_mgr_blank(struct omap_overlay_manager *mgr,
+			bool wait_for_go)
+{
+	struct ovl_priv_data *op;
+	struct mgr_priv_data *mp;
+	unsigned long flags;
+	int r, r_get, i;
+
+	DSSDBG("dss_mgr_blank(%s,wait=%d)\n", mgr->name, wait_for_go);
+
+	r = dispc_runtime_get();
+	r_get = r;
+	/* still clear cache even if failed to get clocks, just don't config */
+
+
+	/* disable overlays in overlay user info structs and in data info */
+	for (i = 0; i < omap_dss_get_num_overlays(); i++) {
+		struct omap_overlay *ovl;
+
+		ovl = omap_dss_get_overlay(i);
+
+		if (ovl->manager != mgr)
+			continue;
+
+		r = ovl->disable(ovl);
+
+		spin_lock_irqsave(&data_lock, flags);
+		op = get_ovl_priv(ovl);
+
+		/* complete unconfigured info */
+		if (op->user_info_dirty)
+			dss_ovl_cb(&op->user_info.cb, i,
+					DSS_COMPLETION_ECLIPSED_SET);
+		dss_ovl_cb(&op->cb.info, i, DSS_COMPLETION_ECLIPSED_CACHE);
+		op->cb.info.fn = NULL;
+
+		op->user_info_dirty = false;
+		op->info_dirty = true;
+		op->enabled = false;
+		spin_unlock_irqrestore(&data_lock, flags);
+	}
+
+	spin_lock_irqsave(&data_lock, flags);
+	/* dirty manager */
+	mp = get_mgr_priv(mgr);
+	if (mp->user_info_dirty)
+		dss_ovl_cb(&mp->user_info.cb, mgr->id,
+				DSS_COMPLETION_ECLIPSED_SET);
+	dss_ovl_cb(&mp->cb.info, mgr->id, DSS_COMPLETION_ECLIPSED_CACHE);
+	mp->cb.info.fn = NULL;
+	mp->user_info.cb.fn = NULL;
+	mp->info_dirty = true;
+	mp->user_info_dirty = false;
+
+	/*
+	 * TRICKY: Enable apply irq even if not waiting for vsync, so that
+	 * DISPC programming takes place in case GO bit was on.
+	 */
+	if (!dss_data.irq_enabled) {
+		u32 mask;
+
+		mask = DISPC_IRQ_VSYNC	| DISPC_IRQ_EVSYNC_ODD |
+			DISPC_IRQ_EVSYNC_EVEN | DISPC_IRQ_FRAMEDONETV |
+			DISPC_IRQ_FRAMEDONE | DISPC_IRQ_FRAMEDONE2;
+		if (dss_has_feature(FEAT_MGR_LCD2))
+			mask |= DISPC_IRQ_VSYNC2;
+
+		r = omap_dispc_register_isr(dss_apply_irq_handler, NULL, mask);
+		dss_data.irq_enabled = true;
+	}
+
+	if (!r_get) {
+		dss_write_regs();
+		dss_set_go_bits();
+	}
+
+	if (r_get || !wait_for_go) {
+		/* pretend that programming has happened */
+		for (i = 0; i < omap_dss_get_num_overlays(); ++i) {
+			op = &dss_data.ovl_priv_data_array[i];
+			if (op->channel != mgr->id)
+				continue;
+			if (op->info_dirty)
+				dss_ovl_configure_cb(&op->cb, i, false);
+			if (op->shadow_info_dirty) {
+				dss_ovl_program_cb(&op->cb, i);
+				op->dispc_channel = op->channel;
+				op->shadow_info_dirty = false;
+			} else {
+				pr_warn("ovl%d-shadow is not dirty\n", i);
+			}
+		}
+
+		if (mp->info_dirty)
+			dss_ovl_configure_cb(&mp->cb, i, false);
+		if (mp->shadow_info_dirty) {
+			dss_ovl_program_cb(&mp->cb, i);
+			mp->shadow_info_dirty = false;
+		} else {
+			pr_warn("mgr%d-shadow is not dirty\n", mgr->id);
+		}
+	}
+
+	spin_unlock_irqrestore(&data_lock, flags);
+
+	if (wait_for_go)
+		mgr->wait_for_go(mgr);
+
+	if (!r_get)
+		dispc_runtime_put();
+
+	return r;
+}
+
+int omap_dss_manager_unregister_callback(struct omap_overlay_manager *mgr,
+					 struct omapdss_ovl_cb *cb)
+{
+	unsigned long flags;
+	int r = 0;
+	struct mgr_priv_data *mp = get_mgr_priv(mgr);
+	spin_lock_irqsave(&data_lock, flags);
+	if (mp->user_info_dirty &&
+	    mp->user_info.cb.fn == cb->fn &&
+	    mp->user_info.cb.data == cb->data)
+		mp->user_info.cb.fn = NULL;
+	else
+		r = -EPERM;
+	spin_unlock_irqrestore(&data_lock, flags);
+	return r;
+}
+
 static void omap_dss_mgr_apply_ovl(struct omap_overlay *ovl)
 {
 	struct ovl_priv_data *op;
@@ -1613,6 +1804,8 @@ int omapdss_compat_init(void)
 		/* XXX uninit sysfs files on error */
 		if (r)
 			goto err_disp_sysfs;
+
+		BLOCKING_INIT_NOTIFIER_HEAD(&dssdev->state_notifiers);
 	}
 
 	dispc_runtime_get();
