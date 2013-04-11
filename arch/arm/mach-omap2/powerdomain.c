@@ -973,7 +973,7 @@ int pwrdm_read_prev_pwrst(struct powerdomain *pwrdm)
  */
 int pwrdm_read_device_off_state(void)
 {
-	int ret = -EINVAL;
+	int ret = 0;
 
 	if (arch_pwrdm && arch_pwrdm->pwrdm_read_next_off)
 		ret = arch_pwrdm->pwrdm_read_next_off();
