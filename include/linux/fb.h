@@ -217,6 +217,10 @@ struct fb_deferred_io {
 };
 #endif
 
+#define FB_FLAG_RATIO_4_3	64
+#define FB_FLAG_RATIO_16_9	128
+#define FB_FLAG_PIXEL_REPEAT	256
+
 /*
  * Frame buffer operations
  *
