@@ -36,6 +36,7 @@
 			&dmic_pins
 			&mcbsp1_pins
 			&mcbsp2_pins
+			&palmas_pins
 	>;
 
 	twl6040_pins: pinmux_twl6040_pins {
@@ -78,6 +79,12 @@
 			0x156 0x8	/* abemcbsp2_dx.abemcbsp2_dx OUTPUT PULLDOWN | MODE0 */
 			0x158 0x100	/* abemcbsp2_fsx.abemcbsp2_fsx INPUT | MODE0 */
 			0x15a 0x100	/* abemcbsp2_clkx.abemcbsp2_clkx INPUT | MODE0 */
+		>;
+	};
+
+	palmas_pins: pinmux_palmas_pins {
+		pinctrl-single,pins = <
+			0x140 0x11f	/* MSLEEP INPUT | PULLUP | MODE7 */
 		>;
 	};
 };
