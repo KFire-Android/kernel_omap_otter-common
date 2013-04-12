@@ -36,6 +36,15 @@
 	cpus {
 		cpu@0 {
 			compatible = "arm,cortex-a15";
+			cpu0-supply = <&smps123_reg>;
+			operating-points = <
+				/* kHz    uV */
+				/* Only for Nominal Samples */
+				500000	880000
+				1000000	1060000
+				1500000	1250000
+			>;
+			clock-latency = <300000>; /* From omap-cpufreq driver */
 		};
 		cpu@1 {
 			compatible = "arm,cortex-a15";

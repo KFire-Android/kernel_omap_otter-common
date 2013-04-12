@@ -283,6 +283,8 @@ struct dpll_data {
 	u32			freqsel_mask;
 	u32			idlest_mask;
 	u32			dco_mask;
+	u32			dcc_mask;
+	unsigned long		dcc_rate;
 	u32			sddiv_mask;
 	u32			lpmode_mask;
 	u32			m4xen_mask;
@@ -423,7 +425,8 @@ unsigned long omap4_dpll_regm4xen_recalc(struct clk_hw *hw,
 long omap4_dpll_regm4xen_round_rate(struct clk_hw *hw,
 				    unsigned long target_rate,
 				    unsigned long *parent_rate);
-
+int omap5_mpu_dpll_set_rate(struct clk_hw *hw, unsigned long rate,
+					unsigned long parent_rate);
 void omap2_init_clk_clkdm(struct clk_hw *clk);
 void __init omap2_clk_disable_clkdm_control(void);
 
