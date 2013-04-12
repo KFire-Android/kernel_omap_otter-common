@@ -1193,9 +1193,6 @@ static OMAPLFB_ERROR OMAPLFBInitIonOmap(OMAPLFB_DEVINFO *psDevInfo,
 
 #if defined(CONFIG_ION_OMAP)
         gpsIONClient = ion_client_create(omap_ion_device,
-                        1 << ION_HEAP_TYPE_CARVEOUT |
-                        1 << OMAP_ION_HEAP_TYPE_TILER |
-                        1 << ION_HEAP_TYPE_SYSTEM,
                         "omaplfb");
         if (IS_ERR_OR_NULL(gpsIONClient))
         {
