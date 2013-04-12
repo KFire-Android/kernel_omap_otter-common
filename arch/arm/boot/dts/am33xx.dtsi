@@ -40,6 +40,8 @@
 				275000  1125000
 			>;
 			voltage-tolerance = <2>; /* 2 percentage */
+			clocks = <&dpll_mpu>;
+			clock-names = "cpu";
 			clock-latency = <300000>; /* From omap-cpufreq driver */
 		};
 	};
@@ -85,6 +87,11 @@
 			#interrupt-cells = <1>;
 			ti,intc-size = <128>;
 			reg = <0x48200000 0x1000>;
+		};
+
+		dpll_mpu: dpll_mpu {
+			#clock-cells = <0>;
+			compatible = "ti,omap-clock";
 		};
 
 		gpio0: gpio@44e07000 {
