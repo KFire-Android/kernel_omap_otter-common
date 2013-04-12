@@ -163,6 +163,22 @@ int omap_prcm_event_to_irq(const char *name)
 }
 
 /**
+ * omap_read_pending_irqs - read currently pending PRCM IRQs
+ * @events: ptr to two consecutive u32s, preallocated by caller
+ *
+ * Returns currently pending and enabled PRCM IRQs or -ENOENT upon failure.
+ */
+int omap_read_pending_irqs(unsigned long *events)
+{
+	if (prcm_irq_setup && prcm_irq_setup->read_pending_irqs) {
+		prcm_irq_setup->read_pending_irqs(events);
+		return 0;
+	}
+
+	return -ENOENT;
+}
+
+/**
  * omap_prcm_irq_cleanup - reverses memory allocated and other steps
  * done by omap_prcm_register_chain_handler()
  *

@@ -106,11 +106,14 @@ struct d_prcm_regs_info {
 	u32 prm_logicstatest_shift;
 	u32 prm_dev_instance;
 	u32 prm_volctrl_offset;
+	u32 prm_io_st_mask;
+	u32 control_padconf_wakeupevent0;
+	u32 control_wkup_padconf_wakeupevent0;
 };
 
 #ifdef CONFIG_PM_DEBUG
 extern void omap_prcmdebug_dump(int flags);
-
+extern void print_prcm_wakeirq(int irq, const char *action_when);
 #ifdef CONFIG_ARCH_OMAP4
 extern struct d_vdd_info d_vddinfo_omap4[];
 extern struct d_prcm_regs_info *d_prcm_regs_omap4;
@@ -129,6 +132,7 @@ extern struct d_prcm_regs_info *d_prcm_regs_omap5;
 
 #else
 static inline void omap_prcmdebug_dump(int flags) { }
+static inline void print_prcm_wakeirq(int irq, const char *action_when) { }
 #endif
 
 #endif /* __ARCH_ASM_MACH_OMAP2_PRCM_DEBUG_H */

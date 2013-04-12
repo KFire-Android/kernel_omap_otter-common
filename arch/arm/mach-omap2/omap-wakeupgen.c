@@ -31,11 +31,13 @@
 #include <mach/omap-wakeupgen.h>
 #include <mach/omap-secure.h>
 #include <plat/omap_hwmod.h>
+#include <plat/irqs.h>
 
 #include "omap4-sar-layout.h"
 #include "common.h"
 #include "pm.h"
 #include "clockdomain.h"
+#include "prcm-debug.h"
 
 #define MAX_NR_REG_BANKS	5
 #define MAX_IRQS		160
@@ -488,18 +490,22 @@ bool omap_wakeupgen_check_interrupts(char *report_string)
 				/* Since we skip GIC PPI and SGI, base 32 */
 				irq = 32 + i * 32 + k;
 				desc = irq_to_desc(irq);
-
 				if (desc && desc->action &&
-				    desc->action->name)
+				    desc->action->name) {
 					name = desc->action->name;
-				else
-					name = "unknown?";
+				} else if (irq == OMAP44XX_IRQ_PRCM) {
+					name = NULL;
+					print_prcm_wakeirq(irq, report_string);
+				} else {
+					name = "unknown";
+				}
 
-				pr_info("%s: IRQ %d(%s)(OMAP-IRQ=%d) Pending! "
-					"Wakeup Enable: CPU0=%s, CPU1=%s\n",
-					report_string, irq, name,
-					(irq - 32), wc0, wc1);
-
+				if (name)
+					pr_info("%s: IRQ %d(%s)(OMAP-IRQ=%d) "\
+						"Pending! Wakeup Enable: "\
+						"CPU0=%s,CPU1=%s\n",
+						report_string, irq, name,
+						(irq - 32), wc0, wc1);
 			}
 			k++;
 			gica >>= 1;
