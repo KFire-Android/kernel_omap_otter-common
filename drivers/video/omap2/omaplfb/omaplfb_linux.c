@@ -59,11 +59,14 @@
 #define PVR_OMAPFB3_NEEDS_PLAT_VRFB_H
 #endif
 
+
+#if 0
 #if defined(PVR_OMAPFB3_NEEDS_PLAT_VRFB_H)
 #include <plat/vrfb.h>
 #else
 #if defined(PVR_OMAPFB3_NEEDS_MACH_VRFB_H)
 #include <mach/vrfb.h>
+#endif
 #endif
 #endif
 
