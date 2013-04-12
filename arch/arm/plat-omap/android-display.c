@@ -24,7 +24,7 @@
 
 #include <plat/android-display.h>
 #include <plat/dsscomp.h>
-#include <plat/vram.h>
+//#include <plat/vram.h>
 
 struct omap_android_display_data {
 	/* members with default values */
@@ -134,7 +134,7 @@ static void set_tiler1d_slot_size(struct dsscomp_platform_data *dsscomp,
 done:
 	if (dsscomp)
 		*dsscomp = data;
-	dsscomp_set_platform_data(&data);
+	//dsscomp_set_platform_data(&data);
 
 	/* remember setting for ion carveouts */
 	mem->tiler1d_mem =
@@ -177,7 +177,7 @@ static void set_vram_sizes(struct sgx_omaplfb_config *sgx_config,
 	}
 
 	pr_info("android_display: setting vram to %u\n", vram);
-	omap_vram_set_sdram_vram(vram, 0);
+	//omap_vram_set_sdram_vram(vram, 0);
 }
 
 /* coordinate between sgx, omapdss, dsscomp and ion needs */
