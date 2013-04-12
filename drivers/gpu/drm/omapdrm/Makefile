@@ -15,7 +15,6 @@ omapdrm-y := omap_drv.o \
 	omap_fbdev.o \
 	omap_gem.o \
 	omap_gem_dmabuf.o \
-	sita.o
 
 # temporary:
 omapdrm-y += omap_gem_helpers.o
