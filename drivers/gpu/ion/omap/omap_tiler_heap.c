@@ -218,8 +218,9 @@ int omap_tiler_alloc(struct ion_heap *heap,
 		if (ret)
 			goto err_got_tiler;
 
-		ret = tiler_pin(info->tiler_handle, info->phys_pages,
-				      info->n_phys_pages,0, false);
+		ret = tiler_pin_phys(info->tiler_handle, info->phys_addrs,
+					info->n_phys_pages);
+
 		if (ret) {
 			pr_err("%s: failure to pin pages to tiler\n",
 				__func__);
