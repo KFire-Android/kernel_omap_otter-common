@@ -65,4 +65,9 @@ extern void omapfb_set_platform_data(struct omapfb_platform_data *data);
 
 void __init omapfb_set_lcd_config(const struct omap_lcd_config *config);
 
+/* helper methods that may be used by other modules */
+enum omap_color_mode;
+int omapfb_mode_to_dss_mode(struct fb_var_screeninfo *var,
+                       enum omap_color_mode *mode);
+
 #endif /* __OMAPFB_H */

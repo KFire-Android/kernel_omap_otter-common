@@ -30,7 +30,7 @@
 #include <linux/rwsem.h>
 #include <linux/dma-attrs.h>
 #include <linux/dma-mapping.h>
-
+#include <video/omapvrfb.h>
 #include <video/omapdss.h>
 
 #ifdef DEBUG
