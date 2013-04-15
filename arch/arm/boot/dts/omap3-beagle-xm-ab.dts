@@ -1,0 +1,6 @@
+/include/ "omap3-beagle-xm.dts"
+
+/* On Rev A/B USBHOST_PWR_EN is active high */
+&hsusb2_power {
+	enable-active-high;
+};
