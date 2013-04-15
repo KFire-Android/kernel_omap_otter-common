@@ -44,6 +44,7 @@
 #include "prcm-debug.h"
 #include "control.h"
 
+#define EMIF_SDRAM_CONFIG_OFFSET	0x8
 #define EMIF_SDRAM_CONFIG2_OFFSET	0xc
 
 struct power_state {
@@ -697,7 +698,7 @@ static inline int omap4_init_static_deps(void)
 
 static inline int omap5_init_static_deps(void)
 {
-	struct clockdomain *mpuss_clkdm, *emif_clkdm, *dss_clkdm, *wkupaon_clkdm;
+	struct clockdomain *dss_clkdm, *wkupaon_clkdm;
 	struct clockdomain *l3_2_clkdm, *l3_1_clkdm, *ipu_clkdm;
 	int ret;
 
@@ -1208,6 +1209,33 @@ int __init omap4_pm_init(void)
 
 	if (!gpu_pd)
 		pr_err("%s: Unable to get GPU power domain\n", __func__);
+
+	/*
+	 * HACK for EMIF and DDR3 on OMAP5
+	 * Currently we see that anytime EMIF clock idle, we get DDR3
+	 * corrupted. holding EMIF in no idle helps resolve this.
+	 * ASSUME: EMIF1 configuration will also be used for EMIF2
+	 */
+	if (cpu_is_omap543x()) {
+		void __iomem *emif1;
+		u32 val;
+
+		emif1 = ioremap(OMAP54XX_EMIF1_BASE, SZ_1M);
+
+		BUG_ON(!emif1);
+
+		val = __raw_readl(emif1 + EMIF_SDRAM_CONFIG_OFFSET);
+		val >>= 29; /* Pick up SDRAM_TYPE */
+		iounmap(emif1);
+
+		/* If DDR3 is used, Deny EMIF idle */
+		if (val == 0x3) {
+			clkdm_deny_idle(emif_clkdm);
+			WARN(1, "%s: EMIF Clock domain denied idle: DDR3 WA\n",
+			     __func__);
+		}
+	}
+
 
 err2:
 	return ret;
