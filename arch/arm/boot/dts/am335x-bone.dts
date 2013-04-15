@@ -72,6 +72,10 @@
 			};
 
 		};
+
+		rtc@44e3e000 {
+			ti,system-power-controller;
+		};
 	};
 
 	leds {
@@ -111,6 +115,8 @@
 /include/ "tps65217.dtsi"
 
 &tps {
+	ti,pmic-shutdown-controller;
+
 	regulators {
 		dcdc1_reg: regulator@0 {
 			regulator-always-on;
