@@ -373,7 +373,9 @@ static struct snd_soc_platform_driver omap_aess_platform = {
 	.stream_event	= abe_opp_stream_event,
 };
 
+#ifndef CONFIG_SND_OMAP_SOC_ABE_MODULE
 void driver_deferred_probe_trigger(void);
+#endif
 
 static void abe_fw_ready(const struct firmware *fw, void *context)
 {
@@ -397,8 +399,9 @@ static void abe_fw_ready(const struct firmware *fw, void *context)
 		snd_soc_unregister_platform(&pdev->dev);
 		release_firmware(fw);
 	}
+#ifndef CONFIG_SND_OMAP_SOC_ABE_MODULE
 	driver_deferred_probe_trigger();
-
+#endif
 }
 
 static int abe_engine_probe(struct platform_device *pdev)
