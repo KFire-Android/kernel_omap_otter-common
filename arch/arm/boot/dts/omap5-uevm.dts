@@ -121,6 +121,7 @@
 			&dss_hdmi_pins
 			&tpd12s015_pins
 			&tca6424a_pins
+			&palmas_pins
 	>;
 
 	twl6040_pins: pinmux_twl6040_pins {
@@ -252,6 +253,12 @@
 			0x16c 0x101     /*  MCSPI2_CS INPUTENABLE | MODE1 */
                 >;
 	};
+
+	palmas_pins: pinmux_palmas_pins {
+		pinctrl-single,pins = <
+			0x140 0x11f	/* MSLEEP INPUT | PULLUP | MODE7 */
+		>;
+	};
 };
 
 &omap5_pmx_wkup {
@@ -265,7 +272,6 @@
 			0x1A 0x0	/* fref_clk1_out OUTPUT | MODE 7 for USB hub clk */
 		>;
 	};
-
 };
 
 &mmc1 {
