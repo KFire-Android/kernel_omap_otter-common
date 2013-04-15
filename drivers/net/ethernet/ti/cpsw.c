@@ -1523,8 +1523,8 @@ static int cpsw_probe_dt(struct cpsw_platform_data *data,
 			memcpy(slave_data->mac_addr, mac_addr, ETH_ALEN);
 
 		if (data->dual_emac) {
-			if (of_property_read_u32(node, "dual_emac_res_vlan",
-						 &prop)) {
+			if (of_property_read_u32(slave_node,
+						"dual_emac_res_vlan", &prop)) {
 				pr_err("Missing dual_emac_res_vlan in DT.\n");
 				slave_data->dual_emac_res_vlan = i+1;
 				pr_err("Using %d as Reserved VLAN for %d slave\n",
