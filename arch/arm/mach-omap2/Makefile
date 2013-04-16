@@ -219,10 +219,6 @@ endif
 # OMAP2420 MSDI controller integration support ("MMC")
 obj-$(CONFIG_SOC_OMAP2420)		+= msdi.o
 
-ifneq ($(CONFIG_DRM_OMAP),)
-obj-y					+= drm.o
-endif
-
 # Specific board support
 obj-$(CONFIG_MACH_OMAP_GENERIC)		+= board-generic.o
 obj-$(CONFIG_MACH_OMAP_H4)		+= board-h4.o
@@ -306,4 +302,4 @@ obj-y					+= common-board-devices.o twl-common.o dss-common.o
 
 # Serial ATA support
 s-ata-$(CONFIG_SATA_AHCI_PLATFORM)	:= sata.o
-obj-$(CONFIG_SOC_OMAP5) 		+= $(s-ata-m) $(s-ata-y)
+obj-y 					+= $(s-ata-m) $(s-ata-y)

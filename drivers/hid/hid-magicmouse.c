@@ -463,6 +463,21 @@ static int magicmouse_input_mapping(struct hid_device *hdev,
 	return 0;
 }
 
+static void magicmouse_input_configured(struct hid_device *hdev,
+		struct hid_input *hi)
+
+{
+	struct magicmouse_sc *msc = hid_get_drvdata(hdev);
+
+	int ret = magicmouse_setup_input(msc->input, hdev);
+	if (ret) {
+		hid_err(hdev, "magicmouse setup input failed (%d)\n", ret);
+		/* clean msc->input to notify probe() of the failure */
+		msc->input = NULL;
+	}
+}
+
+
 static int magicmouse_probe(struct hid_device *hdev,
 	const struct hid_device_id *id)
 {
@@ -492,6 +507,12 @@ static int magicmouse_probe(struct hid_device *hdev,
 	if (ret) {
 		hid_err(hdev, "magicmouse hw start failed\n");
 		goto err_free;
+	}
+
+	if (!msc->input) {
+		hid_err(hdev, "magicmouse input not registered\n");
+		ret = -ENOMEM;
+		goto err_stop_hw;
 	}
 
 	if (id->product == USB_DEVICE_ID_APPLE_MAGICMOUSE)

@@ -18,6 +18,7 @@
 #include <linux/string.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
+#include <linux/dma-mapping.h>
 #include <linux/platform_device.h>
 #include <linux/io.h>
 #include <linux/clk.h>
@@ -25,6 +26,7 @@
 #include <linux/delay.h>
 #include <linux/of.h>
 #include <linux/of_platform.h>
+#include <linux/platform_data/omap_drm.h>
 
 #include <video/omapdss.h>
 #include "omap_hwmod.h"
@@ -103,6 +105,52 @@ static const struct omap_dss_hwmod_data omap4_dss_hwmod_data[] __initconst = {
 	{ "dss_dsi2", "omapdss_dsi", 1 },
 	{ "dss_hdmi", "omapdss_hdmi", -1 },
 };
+
+static struct omap_drm_platform_data platform_drm_data;
+
+#if defined(CONFIG_DRM_OMAP) || defined(CONFIG_DRM_OMAP_MODULE)
+
+static struct platform_device drm_device = {
+	.dev = {
+		.coherent_dma_mask = DMA_BIT_MASK(32),
+		.platform_data = &platform_drm_data,
+	},
+	.name = "omapdrm",
+	.id = 0,
+};
+
+static struct platform_device *omap_drm_device = &drm_device;
+#else
+static struct platform_device *omap_drm_device;
+#endif
+
+static int omapdrm_init(void)
+{
+	struct omap_hwmod *oh;
+	struct platform_device *dmm_pdev;
+	int r = 0;
+
+	/* create DRM and DMM device */
+	if (omap_drm_device != NULL) {
+		oh = omap_hwmod_lookup("dmm");
+		if (oh) {
+			dmm_pdev = omap_device_build(oh->name, -1, oh, NULL, 0,
+					NULL, 0, false);
+			WARN(IS_ERR(dmm_pdev),
+				"Could not build omap_device for %s\n",
+				oh->name);
+		}
+
+		platform_drm_data.omaprev = GET_OMAP_TYPE;
+
+		r = platform_device_register(omap_drm_device);
+
+		if (r < 0)
+			pr_err("Unable to register omapdrm device\n");
+	}
+
+	return r;
+}
 
 static void __init omap4_tpd12s015_mux_pads(void)
 {
@@ -483,6 +531,13 @@ int __init omap_display_init(struct omap_dss_board_info *board_data)
 
 	}
 
+	/* create DMM and DRM device */
+	r = omapdrm_init();
+	if (r < 0) {
+		pr_err("Unable to register omapdrm device\n");
+		return r;
+	}
+
 	return 0;
 }
 
@@ -707,6 +762,13 @@ int __init omapdss_init_of(void)
 	}
 
 	hdmi_init_of();
+
+	/* create omapdrm devices */
+	r = omapdrm_init();
+	if (r < 0) {
+		pr_err("Unable to create omapdrm device\n");
+		return r;
+	}
 
 	return 0;
 }

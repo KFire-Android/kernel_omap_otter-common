@@ -121,6 +121,7 @@
 			&dss_hdmi_pins
 			&tpd12s015_pins
 			&tca6424a_pins
+			&palmas_pins
 	>;
 
 	twl6040_pins: pinmux_twl6040_pins {
@@ -225,6 +226,39 @@
 			0x176 0x0	/* uart5_cts.uart5_rts MODE0 */
 		>;
 	};
+
+	mcspi2_pins: pinmux_mcspi2_pins {
+		pinctrl-single,pins = <
+			0xbc 0x100      /*  MCSPI2_CLK INPUTENABLE | MODE0 */
+			0xbe 0x100      /*  MCSPI2_SIMO INPUTENABLE | MODE0 */
+			0xc0 0x118      /*  MCSPI2_SOMI PULLUP | INPUTENABLE | MODE0*/
+			0xc2 0x0        /*  MCSPI2_CS MODE0*/
+		>;
+	};
+
+	mcspi3_pins: pinmux_mcspi3_pins {
+		pinctrl-single,pins = <
+			0x78 0x101      /*  MCSPI2_SOMI INPUTENABLE | MODE1 */
+			0x7a 0x101      /*  MCSPI2_CS INPUTENABLE | MODE1 */
+			0x7c 0x101      /*  MCSPI2_SIMO INPUTENABLE | MODE1 */
+			0x7e 0x101      /*  MCSPI2_CLK INPUTENABLE | MODE1 */
+		>;
+	};
+
+	mcspi4_pins: pinmux_mcspi4_pins {
+		pinctrl-single,pins = <
+			0x164 0x101     /*  MCSPI2_CLK INPUTENABLE | MODE1 */
+			0x168 0x101     /*  MCSPI2_SIMO INPUTENABLE | MODE1 */
+			0x16a 0x101     /*  MCSPI2_SOMI INPUTENABLE | MODE1 */
+			0x16c 0x101     /*  MCSPI2_CS INPUTENABLE | MODE1 */
+                >;
+	};
+
+	palmas_pins: pinmux_palmas_pins {
+		pinctrl-single,pins = <
+			0x140 0x11f	/* MSLEEP INPUT | PULLUP | MODE7 */
+		>;
+	};
 };
 
 &omap5_pmx_wkup {
@@ -238,7 +272,6 @@
 			0x1A 0x0	/* fref_clk1_out OUTPUT | MODE 7 for USB hub clk */
 		>;
 	};
-
 };
 
 &mmc1 {
@@ -255,6 +288,7 @@
 &mmc3 {
 	bus-width = <4>;
 	ti,non-removable;
+	status = "disabled";
 };
 
 &mmc4 {
@@ -351,4 +385,19 @@
 &uart5 {
         pinctrl-names = "default";
         pinctrl-0 = <&uart5_pins>;
+};
+
+&mcspi2 {
+        pinctrl-names = "default";
+        pinctrl-0 = <&mcspi2_pins>;
+};
+
+&mcspi3 {
+        pinctrl-names = "default";
+        pinctrl-0 = <&mcspi3_pins>;
+};
+
+&mcspi4 {
+        pinctrl-names = "default";
+        pinctrl-0 = <&mcspi4_pins>;
 };
