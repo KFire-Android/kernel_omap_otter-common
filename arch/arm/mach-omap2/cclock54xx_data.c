@@ -427,6 +427,9 @@ static struct dpll_data dpll_mpu_dd = {
 	.modes		= (1 << DPLL_LOW_POWER_BYPASS) | (1 << DPLL_LOCKED),
 	.autoidle_reg	= OMAP54XX_CM_AUTOIDLE_DPLL_MPU,
 	.idlest_reg	= OMAP54XX_CM_IDLEST_DPLL_MPU,
+	.dcc_mask       = OMAP54XX_DCC_EN_MASK,
+	/* rate bigger than 1.4 GHz will use DCC */
+	.dcc_rate       = 1400000000,
 	.mult_mask	= OMAP54XX_DPLL_MULT_MASK,
 	.div1_mask	= OMAP54XX_DPLL_DIV_MASK,
 	.enable_mask	= OMAP54XX_DPLL_EN_MASK,
@@ -443,6 +446,15 @@ static const char *dpll_mpu_ck_parents[] = {
 
 static struct clk dpll_mpu_ck;
 
+static const struct clk_ops dpll_mpu_ck_ops = {
+	.enable		= &omap3_noncore_dpll_enable,
+	.disable	= &omap3_noncore_dpll_disable,
+	.recalc_rate	= &omap3_dpll_recalc,
+	.round_rate	= &omap2_dpll_round_rate,
+	.set_rate	= &omap5_mpu_dpll_set_rate,
+	.get_parent	= &omap2_init_dpll_parent,
+};
+
 static struct clk_hw_omap dpll_mpu_ck_hw = {
 	.hw = {
 		.clk = &dpll_mpu_ck,
@@ -451,7 +463,7 @@ static struct clk_hw_omap dpll_mpu_ck_hw = {
 	.ops		= &clkhwops_omap3_dpll,
 };
 
-DEFINE_STRUCT_CLK(dpll_mpu_ck, dpll_mpu_ck_parents, dpll_iva_ck_ops);
+DEFINE_STRUCT_CLK(dpll_mpu_ck, dpll_mpu_ck_parents, dpll_mpu_ck_ops);
 
 DEFINE_CLK_OMAP_HSDIVIDER63(dpll_mpu_m2_ck, "dpll_mpu_ck", &dpll_mpu_ck, 0x0,
 			    OMAP54XX_CM_DIV_M2_DPLL_MPU,
@@ -1454,6 +1466,7 @@ static struct omap_clk omap54xx_clks[] = {
 	CLK("4013a000.timer",	"timer_sys_ck",		&dss_syc_gfclk_div, 	CK_54XX),
 	CLK("4013c000.timer",	"timer_sys_ck",		&dss_syc_gfclk_div, 	CK_54XX),
 	CLK("4013e000.timer",	"timer_sys_ck",		&dss_syc_gfclk_div, 	CK_54XX),
+	CLK("cpu0",   NULL,   &dpll_mpu_ck,   CK_54XX),
 };
 
 static struct reparent_init_clks reparent_clks[] = {
