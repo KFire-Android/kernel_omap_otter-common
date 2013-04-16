@@ -376,6 +376,32 @@ static int palmas_map_voltage_smps(struct regulator_dev *rdev,
 	return ret;
 }
 
+/**
+ * palmas_set_switch_smps10() - set or clear the switch bit on SMPS10
+ * @param palmas pointer to the palmas mfd structure
+ * @param sw boolean to indicate switch status
+ *
+ * There is not a way to represent this function within the regulator
+ * framework. This sets/clears the switch of SMPS10 so SMPS10_OUT1 and
+ * SMPS10_OUT2 are shorted together.
+ */
+int palmas_set_switch_smps10(struct palmas *palmas, int sw)
+{
+	unsigned int reg;
+
+	palmas_smps_read(palmas, PALMAS_SMPS10_CTRL, &reg);
+
+	if (sw)
+		reg |= SMPS10_SWITCH_EN;
+	else
+		reg &= ~SMPS10_SWITCH_EN;
+
+	palmas_smps_write(palmas, PALMAS_SMPS10_CTRL, reg);
+
+	return 0;
+}
+EXPORT_SYMBOL(palmas_set_switch_smps10);
+
 static struct regulator_ops palmas_ops_smps = {
 	.is_enabled		= palmas_is_enabled_smps,
 	.enable			= palmas_enable_smps,
