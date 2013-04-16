@@ -283,7 +283,8 @@ EXPORT_SYMBOL(blk_queue_max_hw_sectors);
 void blk_queue_max_discard_sectors(struct request_queue *q,
 		unsigned int max_discard_sectors)
 {
-	q->limits.max_discard_sectors = max_discard_sectors;
+	q->limits.max_discard_sectors = min_t(unsigned int, max_discard_sectors,
+					BLK_DEF_MAX_DISCARD_SECTORS);
 }
 EXPORT_SYMBOL(blk_queue_max_discard_sectors);
 
