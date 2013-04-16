@@ -11,6 +11,7 @@
 
 #include <linux/init.h>
 #include <linux/delay.h>
+#include <linux/io.h>
 
 #include "abb.h"
 #include "voltage.h"
@@ -78,6 +79,33 @@ static int omap_abb_clear_tranx(struct voltagedomain *voltdm,
 	return 0;
 }
 
+static void program_efuse_control(struct omap_abb_instance *abb, struct omap_volt_data *volt_data)
+{
+	u32 val;
+	u8 opp_sel = volt_data->opp_sel;
+	u16 vset = volt_data->abb_vset_efuse;
+	u32 mux_control_mask = abb->mux_control_mask;
+	u32 mux_control_vset_out_mask = abb->mux_control_vset_out_mask;
+
+	if (!abb->mux_control_reg)
+		return;
+
+	BUG_ON(!mux_control_vset_out_mask || !mux_control_mask);
+
+	val = readl(abb->mux_control_reg);
+	val &= ~(mux_control_vset_out_mask | mux_control_mask);
+
+	switch (opp_sel) {
+	case OMAP_ABB_SLOW_OPP:
+	case OMAP_ABB_FAST_OPP:
+		val |= mux_control_mask;
+		val |= vset <<__ffs(mux_control_vset_out_mask);
+		break;
+	}
+
+	writel(val, abb->mux_control_reg);
+}
+
 /**
  * omap_abb_set_opp() - program ABB ldo based on new voltage
  * @voltdm:	voltage domain that just finished scaling voltage
@@ -87,13 +115,14 @@ static int omap_abb_clear_tranx(struct voltagedomain *voltdm,
  * PRM_IRQSTATUS bit before and after the transition.  Returns 0 on
  * success, -ETIMEDOUT otherwise.
  */
-static int omap_abb_set_opp(struct voltagedomain *voltdm, u8 opp_sel)
+static int omap_abb_set_opp(struct voltagedomain *voltdm, struct omap_volt_data *volt_data)
 {
 	struct omap_abb_instance *abb = voltdm->abb;
+	u8 opp_sel = volt_data->opp_sel;
 	int ret = 0;
 
 	/* bail early if no transition is necessary */
-	if (opp_sel == abb->_opp_sel)
+	if (opp_sel == abb->_opp_sel && volt_data->abb_vset_efuse == abb->vset_efuse_data)
 		return ret;
 
 	/* clear interrupt status */
@@ -133,6 +162,10 @@ static int omap_abb_set_opp(struct voltagedomain *voltdm, u8 opp_sel)
 			opp_sel << __ffs(abb->common->opp_sel_mask),
 			abb->ctrl_offs);
 
+	/* Program efuse override */
+	if (opp_sel != OMAP_ABB_NOMINAL_OPP)
+		program_efuse_control(abb, volt_data);
+
 	/* initiate ABB ldo change */
 	voltdm->rmw(abb->common->opp_change_mask,
 			abb->common->opp_change_mask,
@@ -145,6 +178,8 @@ static int omap_abb_set_opp(struct voltagedomain *voltdm, u8 opp_sel)
 	/* clear interrupt status */
 	ret |= omap_abb_clear_tranx(voltdm, abb);
 
+	if (opp_sel == OMAP_ABB_NOMINAL_OPP)
+		program_efuse_control(abb, volt_data);
 out:
 	if (ret) {
 		pr_warning("%s: %s: failed scale: opp_sel=%d (%d)\n",
@@ -152,8 +187,10 @@ out:
 	} else {
 		/* track internal state */
 		abb->_opp_sel = opp_sel;
-		pr_debug("%s: %s: scaled - opp_sel=%d\n",
-			 __func__, voltdm->name, opp_sel);
+		abb->vset_efuse_data = volt_data->abb_vset_efuse;
+		pr_debug("%s: %s: scaled - opp_sel=%d (efuse=0x%08x)\n",
+			 __func__, voltdm->name, opp_sel,
+			 abb->vset_efuse_data);
 	}
 	return ret;
 }
@@ -188,7 +225,7 @@ int omap_abb_pre_scale(struct voltagedomain *voltdm,
 	if (target_volt_data->volt_nominal > cur_volt_data->volt_nominal)
 		return 0;
 
-	return omap_abb_set_opp(voltdm, target_volt_data->opp_sel);
+	return omap_abb_set_opp(voltdm, target_volt_data);
 }
 
 /**
@@ -221,7 +258,7 @@ int omap_abb_post_scale(struct voltagedomain *voltdm,
 	if (target_volt_data->volt_nominal < cur_volt_data->volt_nominal)
 		return 0;
 
-	return omap_abb_set_opp(voltdm, target_volt_data->opp_sel);
+	return omap_abb_set_opp(voltdm, target_volt_data);
 }
 
 /*
