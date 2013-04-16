@@ -107,6 +107,16 @@
 		ti,hdmi_audio = <&hdmi>;
 		ti,level_shifter = <&tpd12s015>;
 	};
+
+	leds {
+		compatible = "gpio-leds";
+		led@1 {
+			label = "omap5:blue:usr1";
+			gpios = <&gpio5 25 0>;	/* gpio5_153 D1 LED */
+			linux,default-trigger = "heartbeat";
+			default-state = "off";
+		};
+	};
 };
 
 &omap5_pmx_core {
@@ -122,6 +132,7 @@
 			&tpd12s015_pins
 			&tca6424a_pins
 			&palmas_pins
+			&led_gpio_pins
 	>;
 
 	twl6040_pins: pinmux_twl6040_pins {
@@ -257,6 +268,12 @@
 	palmas_pins: pinmux_palmas_pins {
 		pinctrl-single,pins = <
 			0x140 0x11f	/* MSLEEP INPUT | PULLUP | MODE7 */
+		>;
+	};
+
+	led_gpio_pins: pinmux_led_gpio_pins {
+		pinctrl-single,pins = <
+			0x196 0x6	/* uart3_cts_rctx.gpio5_153 OUTPUT | MODE6 */
 		>;
 	};
 };
