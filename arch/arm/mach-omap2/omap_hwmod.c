@@ -3344,7 +3344,12 @@ int __init omap_hwmod_setup_one(const char *oh_name)
  */
 static int __init omap_hwmod_setup_all(void)
 {
+	void __iomem *base = ioremap(0x4A002000, SZ_2K);
+
 	_ensure_mpu_hwmod_is_setup(NULL);
+
+	/* enable DES HDCP clock CTRL_CORE_CONTROL_IO_2 */
+	__raw_writel(0x1, base + 0x558);
 
 	omap_hwmod_for_each(_init, NULL);
 	omap_hwmod_for_each(_setup, NULL);
