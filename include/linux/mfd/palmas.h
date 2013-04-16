@@ -402,6 +402,8 @@ enum usb_irq_events {
 	N_PALMAS_USB_VOTG_SESS_VLD,
 };
 
+extern int palmas_set_switch_smps10(struct palmas *palmas, int sw);
+
 /* defines so we can store the mux settings */
 #define PALMAS_GPIO_0_MUXED					(1 << 0)
 #define PALMAS_GPIO_1_MUXED					(1 << 1)
