@@ -16,7 +16,7 @@
 		reg = <0x80000000 0x40000000>; /* 1 GB */
 	};
 
-	leds {
+	leds: leds {
 		compatible = "gpio-leds";
 		heartbeat {
 			label = "pandaboard::status1";
@@ -101,6 +101,7 @@
 			&dss_hdmi_pins
 			&tpd12s015_pins
 			&hsusbb1_pins
+			&led_gpio_pins
 	>;
 
 	twl6040_pins: pinmux_twl6040_pins {
@@ -187,6 +188,25 @@
 		pinctrl-single,pins = <
 			0xee 0x118        /* i2c4_scl PULLUP | INPUTENABLE | MODE0 */
 			0xf0 0x118     /* i2c4_sda PULLUP | INPUTENABLE | MODE0 */
+		>;
+	};
+
+	led_gpio_pins: pinmux_leds_pins {
+		pinctrl-single,pins = <
+		>;
+	};
+};
+
+&omap4_pmx_wkup {
+	pinctrl-names = "default";
+	pinctrl-0 = <
+		&led_wkgpio_pins
+	>;
+
+	led_wkgpio_pins: pinmux_leds_wkpins {
+		pinctrl-single,pins = <
+			0x1a 0x3	/* gpio_wk7 OUTPUT | MODE 3 */
+			0x1c 0x3	/* gpio_wk8 OUTPUT | MODE 3 */
 		>;
 	};
 };
