@@ -380,8 +380,12 @@ struct omap_overlay_manager *find_dss_mgr(int display_ix)
 
 	for (i = 0; i < omap_dss_get_num_overlay_managers(); i++) {
 		mgr = omap_dss_get_overlay_manager(i);
-		if (mgr->output->device && !strcmp(name, dev_name(&mgr->output->device->dev)))
-			return mgr;
+		if((mgr) && (mgr->output))
+		{
+			if (mgr->output->device && !strcmp(name,
+					dev_name(&mgr->output->device->dev)))
+				return mgr;
+		}
 	}
 	return NULL;
 }
