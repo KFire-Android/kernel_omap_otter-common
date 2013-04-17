@@ -54,6 +54,7 @@ struct omap_tiler_info {
 					   first entry onf tiler_addrs */
 	u32 vsize;			/* virtual stride of buffer */
 	u32 vstride;			/* virtual size of buffer */
+	u32 phys_stride;			/* Physical stride of the buffer */
 };
 
 static int omap_tiler_heap_allocate(struct ion_heap *heap,
@@ -61,8 +62,17 @@ static int omap_tiler_heap_allocate(struct ion_heap *heap,
 				    unsigned long size, unsigned long align,
 				    unsigned long flags)
 {
-	if (size == 0)
+	/* This means the buffer is already allocated and populated, we're getting here because
+	 * of dummy handle creation, so simply return*/	
+	if (size == 0) {
+		/*
+		  * Store the pointer to struct omap_tiler_info * into buffer here.
+		  * This will be used later on inside map_dma function to create
+		  * the sg list for tiler buffer
+		  */
+		buffer->priv_virt = (void *)flags;
 		return 0;
+	}
 
 	pr_err("%s: This should never be called directly -- use the "
 			"OMAP_ION_TILER_ALLOC flag to the ION_IOC_CUSTOM "
@@ -132,7 +142,7 @@ int omap_tiler_alloc(struct ion_heap *heap,
 	u32 n_phys_pages;
 	u32 n_tiler_pages;
 	int i = 0, ret;
-	uint32_t phys_stride, remainder;
+	uint32_t remainder;
 	dma_addr_t ssptr;
 
 	if (data->fmt == TILFMT_PAGE && data->h != 1) {
@@ -173,6 +183,9 @@ int omap_tiler_alloc(struct ion_heap *heap,
 		info->tiler_handle = tiler_reserve_2d(data->fmt, data->w,
 				data->h, PAGE_SIZE);
 
+	info->tiler_handle->width = data->w;
+	info->tiler_handle->height = data->h;
+
 	if (IS_ERR_OR_NULL(info->tiler_handle)) {
 		ret = PTR_ERR(info->tiler_handle);
 		pr_err("%s: failure to allocate address space from tiler\n",
@@ -183,13 +196,10 @@ int omap_tiler_alloc(struct ion_heap *heap,
 	/* get physical address of tiler buffer */
 	info->tiler_start = tiler_ssptr(info->tiler_handle);
 
-	/*todo: need to check if this will work when passed to phys to page fn */
-	buffer->priv_phys = info->tiler_start;
-
 	/* fill in tiler pages by using ssptr and stride */
 	info->vstride = info->tiler_handle->stride;
 	info->vsize = n_tiler_pages << PAGE_SHIFT;
-	phys_stride = (data->fmt == TILFMT_PAGE) ? info->vstride :
+	info->phys_stride = (data->fmt == TILFMT_PAGE) ? info->vstride :
 				tiler_stride(data->fmt, 0);
 	ssptr = info->tiler_start;
 	remainder = info->vstride;
@@ -203,7 +213,7 @@ int omap_tiler_alloc(struct ion_heap *heap,
 		   line */
 		if (!remainder) {
 			remainder = info->vstride;
-			ssptr += phys_stride - info->vstride;
+			ssptr += info->phys_stride - info->vstride;
 		}
 	}
 
@@ -226,7 +236,7 @@ int omap_tiler_alloc(struct ion_heap *heap,
 	data->stride = info->vstride;
 
 	/* create an ion handle  for the allocation */
-	handle = ion_alloc(client, 0, 0, 1 << OMAP_ION_HEAP_TILER, 0);
+	handle = ion_alloc(client, -1, 0, 1 << OMAP_ION_HEAP_TILER, (unsigned int) info);
 	if (IS_ERR_OR_NULL(handle)) {
 		ret = PTR_ERR(handle);
 		pr_err("%s: failure to allocate handle to manage "
@@ -236,7 +246,6 @@ int omap_tiler_alloc(struct ion_heap *heap,
 
 	buffer = ion_handle_buffer(handle);
 	buffer->size = n_tiler_pages * PAGE_SIZE;
-	buffer->priv_virt = info;
 	data->handle = handle;
 	data->offset = (size_t)(info->tiler_start & ~PAGE_MASK);
 
@@ -264,9 +273,8 @@ static void omap_tiler_heap_free(struct ion_buffer *buffer)
 	tiler_release(info->tiler_handle);
 
 	if ((buffer->heap->id == OMAP_ION_HEAP_TILER) ||
-	    (buffer->heap->id == OMAP_ION_HEAP_NONSECURE_TILER)) {
+	    (buffer->heap->id == OMAP_ION_HEAP_NONSECURE_TILER))
 		omap_tiler_free_carveout(buffer->heap, info);
-	}
 
 	kfree(info);
 }
@@ -349,34 +357,64 @@ static int omap_tiler_heap_map_user(struct ion_heap *heap,
 	return ret;
 }
 
+static struct scatterlist *sg_alloc(unsigned int nents, gfp_t gfp_mask)
+{
+	return kmalloc(nents * sizeof(struct scatterlist), gfp_mask);
+}
+
+static void sg_free(struct scatterlist *sg, unsigned int nents)
+{
+	kfree(sg);
+}
+
+
+
 struct sg_table *omap_tiler_heap_map_dma(struct ion_heap *heap,
 					      struct ion_buffer *buffer)
 {
-	struct sg_table *table;
-	int ret;
+	int ret, i;
+	struct sg_table *table = NULL;
+	struct scatterlist *sg;
+	struct omap_tiler_info *info = NULL;
+	static phys_addr_t paddr;
 
-	/*
-	 * this function is currently a placeholder. this needs to be modified to pass the
-	 * correct physical pointers
-	 */
+
+	info = buffer->priv_virt;
+
+	if(!info)
+		return table;
 
 	table = kzalloc(sizeof(struct sg_table), GFP_KERNEL);
 	if (!table)
 		return ERR_PTR(-ENOMEM);
-	ret = sg_alloc_table(table, 1, GFP_KERNEL);
+	/* sg_alloc_table can only allocate multi-page scatter-gather list tables
+	 * if the architecture supports scatter-gather lists chaining. ARM doesn't
+	 * fit in that category.
+	 * Use __sg_alloc_table instead of sg_alloc_table and allocate all entries
+	 * in one go. Otherwise trying to allocate beyond SG_MAX_SINGLE_ALLOC
+	 * when height > SG_MAX_SINGLE_ALLOC will hit a BUG_ON in __sg_alloc_table.
+	 */
+
+	ret = __sg_alloc_table(table, info->tiler_handle->height, -1, GFP_KERNEL, sg_alloc);
 	if (ret) {
 		kfree(table);
 		return ERR_PTR(ret);
 	}
-	sg_set_page(table->sgl, phys_to_page(buffer->priv_phys), buffer->size,
-		    0);
+
+	sg = table->sgl;
+	for (i = 0; i < info->tiler_handle->height; i++) {
+		paddr = info->tiler_start+ (i * info->phys_stride);
+		sg_set_page(sg, phys_to_page(paddr), info->vstride, 0);
+		sg = sg_next(sg);
+	}
+
 	return table;
 }
 
 void omap_tiler_heap_unmap_dma(struct ion_heap *heap,
 				 struct ion_buffer *buffer)
 {
-	sg_free_table(buffer->sg_table);
+	__sg_free_table(buffer->sg_table, -1, sg_free);
 }
 
 void *ion_tiler_heap_map_kernel(struct ion_heap *heap,
