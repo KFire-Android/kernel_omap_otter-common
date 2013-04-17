@@ -1634,6 +1634,12 @@ static int omapfb_alloc_fbmem_display(struct fb_info *fbi, unsigned long size,
 		}
 	}
 
+	/*FIXME: This is a hack for swap chain creation.
+	If you see this in production code, there is a
+	serious problem!!!
+	*/
+	size *= 2;
+
 	if (!size)
 		return 0;
 
