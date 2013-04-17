@@ -398,6 +398,7 @@
 			reg = <0x48034000 0x80>;
 			interrupts = <0 39 0x4>;
 			ti,hwmods = "timer3";
+			ti,timer-ipu;
 		};
 
 		timer4: timer@48036000 {
@@ -405,6 +406,7 @@
 			reg = <0x48036000 0x80>;
 			interrupts = <0 40 0x4>;
 			ti,hwmods = "timer4";
+			ti,timer-ipu;
 		};
 
 		timer5: timer@40138000 {
@@ -451,6 +453,7 @@
 			reg = <0x4803e000 0x80>;
 			interrupts = <0 45 0x4>;
 			ti,hwmods = "timer9";
+			ti,timer-ipu;
 			ti,timer-pwm;
 		};
 
@@ -467,6 +470,7 @@
 			reg = <0x48088000 0x80>;
 			interrupts = <0 47 0x4>;
 			ti,hwmods = "timer11";
+			ti,timer-ipu;
 			ti,timer-pwm;
 		};
 
