@@ -46,7 +46,6 @@ struct omap_tiler_info {
 	bool lump;			/* true for a single lump allocation */
 	u32 n_phys_pages;		/* number of physical pages */
 	u32 *phys_addrs;		/* array addrs of pages */
-	struct page **phys_pages;/* array page pointers */
 	u32 n_tiler_pages;		/* number of tiler pages */
 	u32 *tiler_addrs;		/* array of addrs of tiler pages */
 	int fmt;			/* tiler buffer format */
@@ -84,7 +83,6 @@ static int omap_tiler_alloc_carveout(struct ion_heap *heap,
 		info->lump = true;
 		for (i = 0; i < info->n_phys_pages; i++)
 			info->phys_addrs[i] = addr + i * PAGE_SIZE;
-			info->phys_pages[i] = phys_to_page(info->phys_addrs[i]);
 		return 0;
 	}
 
@@ -98,7 +96,6 @@ static int omap_tiler_alloc_carveout(struct ion_heap *heap,
 			goto err;
 		}
 		info->phys_addrs[i] = addr;
-		info->phys_pages[i] = phys_to_page(addr);
 	}
 	return 0;
 
@@ -158,7 +155,6 @@ int omap_tiler_alloc(struct ion_heap *heap,
 
 	info = kzalloc(sizeof(struct omap_tiler_info) +
 		       sizeof(u32) * n_phys_pages +
-		       sizeof(u32) * n_phys_pages +
 		       sizeof(u32) * n_tiler_pages, GFP_KERNEL);
 	if (!info)
 		return -ENOMEM;
@@ -166,7 +162,6 @@ int omap_tiler_alloc(struct ion_heap *heap,
 	info->n_phys_pages = n_phys_pages;
 	info->n_tiler_pages = n_tiler_pages;
 	info->phys_addrs = (u32 *)(info + 1);
-	info->phys_pages = (struct page **) (info->phys_addrs + n_phys_pages);
 	info->tiler_addrs = info->phys_addrs + n_phys_pages;
 	info->fmt = data->fmt;
 
@@ -231,7 +226,7 @@ int omap_tiler_alloc(struct ion_heap *heap,
 	data->stride = info->vstride;
 
 	/* create an ion handle  for the allocation */
-	handle = ion_alloc(client, 0, 0, 1<<OMAP_ION_HEAP_TILER, 1 << OMAP_ION_HEAP_TILER);
+	handle = ion_alloc(client, 0, 0, 1 << OMAP_ION_HEAP_TILER, 0);
 	if (IS_ERR_OR_NULL(handle)) {
 		ret = PTR_ERR(handle);
 		pr_err("%s: failure to allocate handle to manage "
