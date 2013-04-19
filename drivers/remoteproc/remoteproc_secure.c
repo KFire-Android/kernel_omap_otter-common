@@ -26,6 +26,7 @@
 #include <linux/elf.h>
 #include <linux/remoteproc.h>
 #include <linux/rproc_drm.h>
+#include <linux/slab.h>
 
 #include "remoteproc_internal.h"
 
@@ -101,6 +102,8 @@ void rproc_secure_reset(struct rproc *rproc)
 				"error disabling secure mode 0x%x\n", ret);
 	}
 
+	kfree(secure_params);
+	secure_params = NULL;
 	rproc_secure_drm_service(AUTHENTICATION_A0, NULL);
 }
 
@@ -187,6 +190,7 @@ int rproc_secure_parse_fw(struct rproc *rproc, const u8 *elf_data)
 	u32  ttbr_da = 0, toc_da = 0, *ttbr = NULL, i;
 	struct device *dev = &rproc->dev;
 	struct rproc_iommu_ttbr_update *ttbru = NULL;
+	struct rproc_sec_params *secure_params_local = NULL;
 	struct rproc_mem_entry *maps = NULL;
 	struct elf32_hdr *ehdr = (struct elf32_hdr *)elf_data;
 	struct elf32_shdr *shdr = (struct elf32_shdr *)
@@ -211,7 +215,7 @@ int rproc_secure_parse_fw(struct rproc *rproc, const u8 *elf_data)
 			ttbr_da = da;
 		} else if (!strcmp(name, ".secure_params")) {
 			ptr = rproc_da_to_va(rproc, da, filesz);
-			secure_params = (struct rproc_sec_params *) ptr;
+			secure_params_local = (struct rproc_sec_params *) ptr;
 		} else if (!strcmp(name, ".iommu_ttbr_updates")) {
 			ptr = rproc_da_to_va(rproc, da, filesz);
 			ttbru = (struct rproc_iommu_ttbr_update *) ptr;
@@ -228,7 +232,7 @@ int rproc_secure_parse_fw(struct rproc *rproc, const u8 *elf_data)
 	}
 
 	/* assume image is unsigned if required sections are missing */
-	if (!toc_da || !ttbr || !secure_params || !ttbru) {
+	if (!toc_da || !ttbr || !secure_params_local || !ttbru) {
 		secure_params = NULL;
 		dev_dbg(dev, "ipu firmware image is not signed\n");
 		goto out;
@@ -237,22 +241,22 @@ int rproc_secure_parse_fw(struct rproc *rproc, const u8 *elf_data)
 	/* update params for passing onto secure service */
 	list_for_each_entry(maps, &rproc->carveouts, node) {
 		if (maps->memregion == RPROC_MEMREGION_CODE) {
-			secure_params->ducati_code = maps->dma;
-			secure_params->ducati_code_size = maps->len;
+			secure_params_local->ducati_code = maps->dma;
+			secure_params_local->ducati_code_size = maps->len;
 
-			secure_params->ducati_toc_address =
+			secure_params_local->ducati_toc_address =
 				maps->dma - maps->da + toc_da;
-			secure_params->ducati_page_table_address =
+			secure_params_local->ducati_page_table_address =
 				maps->dma - maps->da + ttbr_da;
 		}
 		if (maps->memregion == RPROC_MEMREGION_DATA) {
-			secure_params->ducati_data = maps->dma;
-			secure_params->ducati_data_size = maps->len;
+			secure_params_local->ducati_data = maps->dma;
+			secure_params_local->ducati_data_size = maps->len;
 		}
 		if (maps->memregion == RPROC_MEMREGION_SMEM) {
-			secure_params->ducati_base_address = maps->dma;
-			secure_params->ducati_smem = maps->dma;
-			secure_params->ducati_smem_size = maps->len;
+			secure_params_local->ducati_base_address = maps->dma;
+			secure_params_local->ducati_smem = maps->dma;
+			secure_params_local->ducati_smem_size = maps->len;
 		}
 
 		/* update TTBR entries for this carveout region */
@@ -264,18 +268,26 @@ int rproc_secure_parse_fw(struct rproc *rproc, const u8 *elf_data)
 	/* find location of vring and iobufs */
 	list_for_each_entry(maps, &rproc->mappings, node) {
 		if (maps->memregion == RPROC_MEMREGION_VRING) {
-			secure_params->ducati_vring_smem = maps->dma;
-			secure_params->ducati_vring_size = maps->len;
+			secure_params_local->ducati_vring_smem = maps->dma;
+			secure_params_local->ducati_vring_size = maps->len;
 		}
 		if (maps->memregion == RPROC_MEMREGION_1D) {
-			secure_params->secure_buffer_address = maps->dma;
-			secure_params->secure_buffer_size = maps->len;
+			secure_params_local->secure_buffer_address = maps->dma;
+			secure_params_local->secure_buffer_size = maps->len;
 		}
 	}
 
 	/* FIXME: hardcoded, NEED to be acquired from ION */
-	secure_params->decoded_buffer_address = (dma_addr_t) 0xB4300000;
-	secure_params->decoded_buffer_size = (uint32_t) 0x6000000;
+	secure_params_local->decoded_buffer_address = (dma_addr_t) 0xB4300000;
+	secure_params_local->decoded_buffer_size = (uint32_t) 0x6000000;
+
+	/* copy the local secure params into a direct-mapped kernel memory */
+	secure_params = kzalloc(sizeof(*secure_params), GFP_KERNEL);
+	if (secure_params)
+		memcpy(secure_params, secure_params_local,
+						sizeof(*secure_params));
+	else
+		ret = -ENOMEM;
 
 out:
 	return ret;
