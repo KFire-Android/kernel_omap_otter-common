@@ -1456,7 +1456,7 @@ static struct omap_clk omap54xx_clks[] = {
 };
 
 static struct reparent_init_clks reparent_clks[] = {
-	{ .name = "abe_dpll_clk_mux", .parent = "sys_32k_ck" }
+	{ .name = "abe_dpll_clk_mux", .parent = "sys_clkin" }
 };
 
 static struct rate_init_clks rate_clks[] = {
