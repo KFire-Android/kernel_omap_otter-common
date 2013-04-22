@@ -297,7 +297,6 @@ static irqreturn_t dbx500_mbox_irq_handler(int irq, void *data)
 
 /* 5 mailboxes AP <--> PRCMU */
 static struct mailbox_ops dbx500_mbox_ops = {
-	.type		= MBOX_SHARED_MEM_TYPE,
 	.startup	= dbx500_mbox_startup,
 	.enable_irq	= dbx500_mbox_enable_irq,
 	.disable_irq	= dbx500_mbox_disable_irq,

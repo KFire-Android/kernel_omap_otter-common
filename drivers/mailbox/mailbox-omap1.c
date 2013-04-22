@@ -108,21 +108,21 @@ static int omap1_mbox_poll_for_space(struct mailbox *mbox)
 
 /* irq */
 static void
-omap1_mbox_enable_irq(struct mailbox *mbox, mailbox_type_t irq)
+omap1_mbox_enable_irq(struct mailbox *mbox, mailbox_irq_t irq)
 {
 	if (irq == IRQ_RX)
 		enable_irq(mbox->irq);
 }
 
 static void
-omap1_mbox_disable_irq(struct mailbox *mbox, mailbox_type_t irq)
+omap1_mbox_disable_irq(struct mailbox *mbox, mailbox_irq_t irq)
 {
 	if (irq == IRQ_RX)
 		disable_irq(mbox->irq);
 }
 
 static int
-omap1_mbox_is_irq(struct mailbox *mbox, mailbox_type_t irq)
+omap1_mbox_is_irq(struct mailbox *mbox, mailbox_irq_t irq)
 {
 	struct omap_mbox1_priv *priv = (struct omap_mbox1_priv *)mbox->priv;
 
@@ -135,7 +135,6 @@ omap1_mbox_is_irq(struct mailbox *mbox, mailbox_type_t irq)
 }
 
 static struct mailbox_ops omap1_mbox_ops = {
-	.type		= MBOX_HW_FIFO1_TYPE,
 	.read		= omap1_mbox_fifo_read,
 	.write		= omap1_mbox_fifo_write,
 	.empty		= omap1_mbox_fifo_empty,

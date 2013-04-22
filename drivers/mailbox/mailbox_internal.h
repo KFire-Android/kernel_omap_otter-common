@@ -16,21 +16,8 @@
 #include <linux/spinlock.h>
 #include <linux/workqueue.h>
 
-/*
- * Type of the mailbox object
- * TODO: remove this, as this is inconsequential in the common layer,
- *       individual drivers can define their own type.
- */
-typedef int __bitwise mailbox_type_t;
-#define MBOX_HW_FIFO1_TYPE	((__force mailbox_type_t) 1)
-#define MBOX_HW_FIFO2_TYPE	((__force mailbox_type_t) 2)
-#define MBOX_SHARED_MEM_TYPE	((__force mailbox_type_t) 3)
-
 /**
  * struct mailbox_ops - function ops specific to a mailbox implementation
- * @type: mailbox type, if needed by any of the ops (TODO: this should not
- *	  be part of the ops, it can be represented in the priv element
- *	  of the mailbox object itself)
  * @startup: the startup function, essential for making the mailbox active.
  *	     This will be called when the first client acquires the mailbox.
  * @shutdown: the shutdown function, essential for making the mailbox inactive
@@ -72,7 +59,6 @@ typedef int __bitwise mailbox_type_t;
  *	      is powered back to active state.
  */
 struct mailbox_ops {
-	mailbox_type_t	type;
 	int		(*startup)(struct mailbox *mbox);
 	void		(*shutdown)(struct mailbox *mbox);
 	/* mailbox access */
