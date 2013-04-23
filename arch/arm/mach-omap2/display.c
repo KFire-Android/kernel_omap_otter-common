@@ -124,7 +124,7 @@ static struct platform_device *omap_drm_device = &drm_device;
 static struct platform_device *omap_drm_device;
 #endif
 
-static int omapdrm_init(void)
+static __init int omapdrm_init(void)
 {
 	struct omap_hwmod *oh;
 	int r = 0;
