@@ -113,26 +113,6 @@
 	status = "disabled";
 };
 
-&i2c2 {
-	clock-frequency = <400000>;
-
-	/* Pressure Sensor */
-	bmp085@77 {
-		compatible = "bosch,bmp085";
-		reg = <0x77>;
-	};
-};
-
-&i2c4 {
-	clock-frequency = <400000>;
-
-	/* Temperature Sensor */
-	tmp102@48{
-		compatible = "ti,tmp102";
-		reg = <0x48>;
-	};
-};
-
 &mcbsp3 {
 	status = "disabled";
 };
