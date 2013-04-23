@@ -579,6 +579,25 @@ static struct omap_hwmod am33xx_sha0_hwmod = {
 	},
 };
 
+/* ocmcram */
+static struct omap_hwmod_class am33xx_ocmcram_hwmod_class = {
+	.name = "ocmcram",
+};
+
+static struct omap_hwmod am33xx_ocmcram_hwmod = {
+	.name		= "ocmcram",
+	.class		= &am33xx_ocmcram_hwmod_class,
+	.clkdm_name	= "l3_clkdm",
+	.flags		= (HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET),
+	.main_clk	= "l3_gclk",
+	.prcm		= {
+		.omap4	= {
+			.clkctrl_offs	= AM33XX_CM_PER_OCMCRAM_CLKCTRL_OFFSET,
+			.modulemode	= MODULEMODE_SWCTRL,
+		},
+	},
+};
+
 /*
  * 'debugss' class
  * debug sub system

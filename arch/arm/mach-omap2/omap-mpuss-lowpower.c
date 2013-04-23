@@ -98,7 +98,7 @@ static int default_finish_suspend(unsigned long cpu_state)
 static void dummy_cpu_resume(void)
 {}
 
-static void dummy_scu_prepare(unsigned int cpu_id, unsigned int cpu_state)
+static void dummy_scu_prepare(unsigned int cpu_id, u8 cpu_state)
 {}
 
 static struct cpu_pm_ops omap_pm_ops = {
