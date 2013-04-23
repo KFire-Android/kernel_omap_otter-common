@@ -116,6 +116,8 @@ struct mailbox_queue {
  *	  to the same h/w communication block
  * @irq: IRQ number that the mailbox uses to interrupt the host processor.
  *	  the same IRQ number may be shared between different mailboxes
+ * @irqflags: flags to be used when requesting the irq. The h/w block may
+ *	      impose/require specific irq flags
  * @txq: the mailbox queue object pertaining to Tx
  * @rxq: the mailbox queue object pertaining to Rx
  * @ops: function ops specific to the mailbox
@@ -131,6 +133,7 @@ struct mailbox {
 	const char		*name;
 	unsigned int		id;
 	unsigned int		irq;
+	unsigned long		irq_flags;
 	struct mailbox_queue	*txq, *rxq;
 	struct mailbox_ops	*ops;
 	struct device		*dev;

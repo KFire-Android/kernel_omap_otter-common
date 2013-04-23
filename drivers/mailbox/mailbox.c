@@ -566,8 +566,7 @@ static int mailbox_startup(struct mailbox *mbox)
 		mbox->rxq = mq;
 		mq->mbox = mbox;
 		ret = request_irq(mbox->irq, mbox_interrupt,
-				IRQF_SHARED | IRQF_NO_SUSPEND,
-				mbox->name, mbox);
+					mbox->irq_flags, mbox->name, mbox);
 		if (unlikely(ret)) {
 			pr_err("failed to register mailbox interrupt:%d\n",
 					ret);
