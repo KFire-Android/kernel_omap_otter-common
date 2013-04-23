@@ -90,7 +90,6 @@ config SOC_OMAP5
 	select USB_ARCH_HAS_EHCI if USB_SUPPORT
 	select USB_ARCH_HAS_XHCI if USB_SUPPORT
 	select ARCH_NEEDS_CPU_IDLE_COUPLED
-	select ARM_ERRATA_798181
 
 comment "OMAP Core Type"
 	depends on ARCH_OMAP2
