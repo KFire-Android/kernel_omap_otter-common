@@ -3567,6 +3567,13 @@ static struct omap_hwmod_ocp_if am33xx_l3_main__aes0 = {
 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
 };
 
+/* l3 main -> ocmc */
+static struct omap_hwmod_ocp_if am33xx_l3_main__ocmc = {
+	.master         = &am33xx_l3_main_hwmod,
+	.slave          = &am33xx_ocmcram_hwmod,
+	.user           = OCP_USER_MPU | OCP_USER_SDMA,
+};
+
 static struct omap_hwmod_ocp_if *am33xx_hwmod_ocp_ifs[] __initdata = {
 	&am33xx_l4_fw__emif_fw,
 	&am33xx_l3_main__emif,
@@ -3645,6 +3652,7 @@ static struct omap_hwmod_ocp_if *am33xx_hwmod_ocp_ifs[] __initdata = {
 	&am33xx_l3_main__tptc1,
 	&am33xx_l3_main__tptc2,
 	&am33xx_l3_s__usbss,
+	&am33xx_l3_main__ocmc,
 	&am33xx_l4_hs__cpgmac0,
 	&am33xx_cpgmac0__mdio,
 	&am33xx_l3_main__sha0,
