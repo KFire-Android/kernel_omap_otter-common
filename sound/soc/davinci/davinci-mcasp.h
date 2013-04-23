@@ -28,7 +28,7 @@
 #define DAVINCI_MCASP_DIT_DAI	1
 
 struct davinci_audio_dev {
-	struct davinci_pcm_dma_params dma_params[2];
+	void *dma_params[2];
 	void __iomem *base;
 	struct device *dev;
 
