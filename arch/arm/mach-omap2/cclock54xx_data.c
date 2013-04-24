@@ -1470,13 +1470,14 @@ static struct omap_clk omap54xx_clks[] = {
 };
 
 static struct reparent_init_clks reparent_clks[] = {
-	{ .name = "abe_dpll_clk_mux", .parent = "sys_32k_ck" }
+	{ .name = "abe_dpll_clk_mux", .parent = "sys_clkin" }
 };
 
 static struct rate_init_clks rate_clks[] = {
 	{ .name = "dpll_usb_ck", .rate = OMAP5_DPLL_USB_DEFFREQ },
 	{ .name = "dpll_usb_m2_ck", .rate = OMAP5_DPLL_USB_DEFFREQ/2 },
 	{ .name = "dpll_abe_ck", .rate = OMAP5_DPLL_ABE_DEFFREQ },
+	{ .name = "dpll_abe_m2x2_ck", .rate = OMAP5_DPLL_ABE_DEFFREQ * 2 },
 };
 
 int __init omap5xxx_clk_init(void)
