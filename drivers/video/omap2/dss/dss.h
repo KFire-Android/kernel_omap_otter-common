@@ -203,6 +203,8 @@ void dss_unregister_child_devices(struct device *parent);
 void dss_put_device(struct omap_dss_device *dssdev);
 void dss_copy_device_pdata(struct omap_dss_device *dst,
 		const struct omap_dss_device *src);
+int dss_mgr_blank(struct omap_overlay_manager *mgr,
+		bool wait_for_go);
 
 /* output */
 void dss_register_output(struct omap_dss_output *out);

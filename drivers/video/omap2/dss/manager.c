@@ -74,6 +74,7 @@ int dss_init_overlay_managers(struct platform_device *pdev)
 			dss_feat_get_supported_displays(mgr->id);
 		mgr->supported_outputs =
 			dss_feat_get_supported_outputs(mgr->id);
+		mgr->blank = &dss_mgr_blank;
 
 		INIT_LIST_HEAD(&mgr->overlays);
 
