@@ -262,7 +262,8 @@ static int palmas_rtc_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	palmas_rtc->irq = platform_get_irq(pdev, 0);
+	palmas_rtc->irq = regmap_irq_get_virq(palmas->irq_data,
+					      PALMAS_RTC_ALARM_IRQ);
 
 	palmas_rtc->rtc = rtc_device_register(pdev->name, &pdev->dev,
 				&palmas_rtc_ops, THIS_MODULE);
@@ -321,6 +322,18 @@ static const struct dev_pm_ops palmas_rtc_pm_ops = {
 	SET_SYSTEM_SLEEP_PM_OPS(palmas_rtc_suspend, palmas_rtc_resume)
 };
 
+static struct of_device_id of_palmas_match_tbl[] = {
+	{ .compatible = "ti,twl6035-rtc", },
+	{ .compatible = "ti,twl6036-rtc", },
+	{ .compatible = "ti,twl6037-rtc", },
+	{ .compatible = "ti,tps65913-rtc", },
+	{ .compatible = "ti,tps65914-rtc", },
+	{ .compatible = "ti,tps80032-rtc", },
+	{ .compatible = "ti,palmas-rtc", },
+	{ .compatible = "ti,palmas-charger-rtc", },
+	{ /* end */ },
+};
+
 static struct platform_driver palmas_rtc_driver = {
 	.probe		= palmas_rtc_probe,
 	.remove		= palmas_rtc_remove,
@@ -328,6 +341,7 @@ static struct platform_driver palmas_rtc_driver = {
 		.owner	= THIS_MODULE,
 		.name	= "palmas-rtc",
 		.pm	= &palmas_rtc_pm_ops,
+		.of_match_table = of_palmas_match_tbl,
 	},
 };
 
