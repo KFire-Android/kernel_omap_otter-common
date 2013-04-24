@@ -494,6 +494,15 @@ static const char *dpll_mpu_ck_parents[] = {
 
 static struct clk dpll_mpu_ck;
 
+static const struct clk_ops dpll_mpu_ck_ops = {
+	.enable		= &omap3_noncore_dpll_enable,
+	.disable	= &omap3_noncore_dpll_disable,
+	.recalc_rate	= &omap3_dpll_recalc,
+	.round_rate	= &omap2_dpll_round_rate,
+	.set_rate	= &omap5_mpu_dpll_set_rate,
+	.get_parent	= &omap2_init_dpll_parent,
+};
+
 static struct clk_hw_omap dpll_mpu_ck_hw = {
 	.hw = {
 		.clk = &dpll_mpu_ck,
@@ -502,7 +511,7 @@ static struct clk_hw_omap dpll_mpu_ck_hw = {
 	.ops		= &clkhwops_omap3_dpll,
 };
 
-DEFINE_STRUCT_CLK(dpll_mpu_ck, dpll_mpu_ck_parents, dpll_pcie_ref_ck_ops);
+DEFINE_STRUCT_CLK(dpll_mpu_ck, dpll_mpu_ck_parents, dpll_mpu_ck_ops);
 
 DEFINE_CLK_OMAP_HSDIVIDER63(dpll_mpu_m2_ck, "dpll_mpu_ck", &dpll_mpu_ck, 0x0,
 			    DRA7XX_CM_DIV_M2_DPLL_MPU, DRA7XX_DIVHS_MASK);
