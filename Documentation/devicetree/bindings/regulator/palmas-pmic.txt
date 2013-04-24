@@ -8,6 +8,7 @@ Required properties:
   ti,tps65913-pmic
   ti,tps65914-pmic
   ti,tps80036-pmic
+  ti,tps659038-pmic
 and also the generic series names
   ti,palmas-pmic
 
