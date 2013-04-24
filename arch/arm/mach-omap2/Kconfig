@@ -91,6 +91,7 @@ config SOC_OMAP5
 
 config SOC_DRA7XX
 	bool "TI DRA7XX"
+	select ARCH_HAS_BANDGAP
 	select ARM_ARCH_TIMER
 	select CPU_V7
 	select ARM_GIC
