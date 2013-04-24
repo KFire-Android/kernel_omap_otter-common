@@ -333,6 +333,22 @@ err:
 	return ret;
 }
 
+static struct palmas_pmic_data palmas_data = {
+	.irq_chip = &palmas_irq_chip,
+	.regmap_config = palmas_regmap_config,
+	.mfd_cell = palmas_children,
+	.id = TWL6035,
+	.has_usb = 1,
+};
+
+static const struct of_device_id of_palmas_match_tbl[] = {
+	{
+		.compatible = "ti,palmas",
+		.data = &palmas_data,
+	},
+	{ },
+};
+
 static int palmas_i2c_probe(struct i2c_client *i2c,
 			    const struct i2c_device_id *id)
 {
@@ -343,6 +359,8 @@ static int palmas_i2c_probe(struct i2c_client *i2c,
 	unsigned int reg, addr;
 	int slave;
 	struct mfd_cell *children;
+	const struct of_device_id *match;
+	const struct palmas_pmic_data *pmic_data;
 
 	pdata = dev_get_platdata(&i2c->dev);
 
@@ -364,8 +382,17 @@ static int palmas_i2c_probe(struct i2c_client *i2c,
 
 	i2c_set_clientdata(i2c, palmas);
 	palmas->dev = &i2c->dev;
-	palmas->id = id->driver_data;
+	palmas->palmas_id = id->driver_data;
 	palmas->irq = i2c->irq;
+
+	match = of_match_device(of_match_ptr(of_palmas_match_tbl), &i2c->dev);
+
+	if (match) {
+		pmic_data = match->data;
+		palmas->palmas_id = pmic_data->id;
+	} else {
+		return -ENODATA;
+	}
 
 	for (i = 0; i < PALMAS_NUM_CLIENTS; i++) {
 		if (i == 0)
@@ -382,7 +409,7 @@ static int palmas_i2c_probe(struct i2c_client *i2c,
 			}
 		}
 		palmas->regmap[i] = devm_regmap_init_i2c(palmas->i2c_clients[i],
-				&palmas_regmap_config[i]);
+				pmic_data->regmap_config + i);
 		if (IS_ERR(palmas->regmap[i])) {
 			ret = PTR_ERR(palmas->regmap[i]);
 			dev_err(palmas->dev,
@@ -400,7 +427,7 @@ static int palmas_i2c_probe(struct i2c_client *i2c,
 	regmap_write(palmas->regmap[slave], addr, reg);
 
 	ret = regmap_add_irq_chip(palmas->regmap[slave], palmas->irq,
-			IRQF_ONESHOT, 0, &palmas_irq_chip,
+			IRQF_ONESHOT, 0, pmic_data->irq_chip,
 			&palmas->irq_data);
 	if (ret < 0)
 		goto err;
@@ -491,6 +518,10 @@ static int palmas_i2c_probe(struct i2c_client *i2c,
 			return ret;
 	}
 
+	/*
+	 * For now all PMICs belonging to palmas family are assumed to get the
+	 * same childern as PALMAS
+	 */
 	children = kmemdup(palmas_children, sizeof(palmas_children),
 			   GFP_KERNEL);
 	if (!children) {
@@ -545,18 +576,13 @@ static int palmas_i2c_remove(struct i2c_client *i2c)
 }
 
 static const struct i2c_device_id palmas_i2c_id[] = {
-	{ "palmas", },
-	{ "twl6035", },
-	{ "twl6037", },
-	{ "tps65913", },
+	{ "palmas", TWL6035},
+	{ "twl6035", TWL6035},
+	{ "twl6037", TWL6037},
+	{ "tps65913", TPS65913},
 	{ /* end */ }
 };
 MODULE_DEVICE_TABLE(i2c, palmas_i2c_id);
-
-static struct of_device_id of_palmas_match_tbl[] = {
-	{ .compatible = "ti,palmas", },
-	{ /* end */ }
-};
 
 static struct i2c_driver palmas_i2c_driver = {
 	.driver = {

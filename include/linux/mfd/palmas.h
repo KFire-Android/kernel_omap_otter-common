@@ -38,6 +38,7 @@ struct palmas {
 	int designrev;
 	int sw_revision;
 
+	int palmas_id;
 	/* IRQ Data */
 	int irq;
 	u32 irq_mask;
@@ -130,6 +131,12 @@ struct palmas_reg_init {
 	 */
 	u8 vsel;
 
+};
+
+enum pmic_ids {
+	TWL6035,
+	TWL6037,
+	TPS65913,
 };
 
 enum palmas_regulators {
@@ -359,6 +366,26 @@ struct palmas_usb {
 	int vbus_enable;
 
 	u8 linkstat;
+};
+
+/**
+ * struct palmas_pmic_data -	Maintains the specific data for PMICs of PALMAS
+ *				family
+ * @irq_chip:			regmap_irq_chip specific to individual members
+ *				of PALMAS family.
+ * @regmap_config:		regmap_config specific to the individual members
+ *				of PALMAS family.
+ * @mfd_cell:			mfd cell  specific to the individual members of
+ *				PALMAS family.
+ * @id:				Id of the member of the PALMAS family.
+ * @has_usb:			Flag indicating whether PMIC supports USB
+ */
+struct palmas_pmic_data {
+	struct regmap_irq_chip *irq_chip;
+	const struct regmap_config *regmap_config;
+	const struct mfd_cell *mfd_cell;
+	int id;
+	int has_usb;
 };
 
 #define comparator_to_palmas(x) container_of((x), struct palmas_usb, comparator)
