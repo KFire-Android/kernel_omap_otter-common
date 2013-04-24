@@ -1,0 +1,36 @@
+* palmas and palmas-charger LED IP block devicetree bindings
+
+Required properties:
+- compatible : Should be from the list
+  ti,twl6035-leds
+  ti,twl6036-leds
+  ti,twl6037-leds
+  ti,tps65913-leds
+  ti,tps65914-leds
+  ti,tps80036-leds
+and also the generic series names
+  ti,palmas-leds
+
+Optional properties:
+-ti,led1-current	- sink current setting 0 - 0mA, 1 - 25mA, 2 - 5mA,
+				3 - 0mA, 4 - 5mA, 5 - 5mA, 6 - 10.0mA, 7 - 0mA
+-ti,led2-current	- see above
+-ti,led3-current	- see above
+-ti,led4-current	- see above
+-ti,chrg-led-mode	- only valid for charger - mode for charging led operation
+				0 - Charging indicator
+				1 - controlled as a general purpose LED
+-ti,chrg-led-vbat-low	- only valid for charger - blinking of low battery led
+				0 - blinking is enabled,
+				1 - blinking is disabled
+
+Example:
+leds {
+	compatible = "ti,twl6035-leds", "ti,palmas-leds";
+	ti,led1-current = <0>;
+	ti,led2-current = <0>;
+	ti,led3-current = <0>;
+	ti,led4-current = <0>;
+	ti,chrg-led-mode = <0>;
+	ti,chrg-led-vbat-low = <0>;
+};
