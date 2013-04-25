@@ -124,9 +124,9 @@ static int ti_thermal_bind(struct thermal_zone_device *thermal,
 
 	id = data->sensor_id;
 
-	/* TODO: bind with min and max states */
 	/* Simple thing, two trips, one passive another critical */
 	return thermal_zone_bind_cooling_device(thermal, 0, cdev,
+	/* bind with min and max states defined by cpu_cooling */
 						THERMAL_NO_LIMIT,
 						THERMAL_NO_LIMIT);
 }
@@ -215,6 +215,31 @@ static int ti_thermal_get_trip_temp(struct thermal_zone_device *thermal,
 	return 0;
 }
 
+/* Get the temperature trend callback functions for thermal zone */
+static int ti_thermal_get_trend(struct thermal_zone_device *thermal,
+				int trip, enum thermal_trend *trend)
+{
+	struct ti_thermal_data *data = thermal->devdata;
+	struct ti_bandgap *bgp;
+	int id, tr, ret = 0;
+
+	bgp = data->bgp;
+	id = data->sensor_id;
+
+	ret = ti_bandgap_get_trend(bgp, id, &tr);
+	if (ret)
+		return ret;
+
+	if (tr > 0)
+		*trend = THERMAL_TREND_RAISING;
+	else if (tr < 0)
+		*trend = THERMAL_TREND_DROPPING;
+	else
+		*trend = THERMAL_TREND_STABLE;
+
+	return 0;
+}
+
 /* Get critical temperature callback functions for thermal zone */
 static int ti_thermal_get_crit_temp(struct thermal_zone_device *thermal,
 				    unsigned long *temp)
@@ -225,7 +250,7 @@ static int ti_thermal_get_crit_temp(struct thermal_zone_device *thermal,
 
 static struct thermal_zone_device_ops ti_thermal_ops = {
 	.get_temp = ti_thermal_get_temp,
-	/* TODO: add .get_trend */
+	.get_trend = ti_thermal_get_trend,
 	.bind = ti_thermal_bind,
 	.unbind = ti_thermal_unbind,
 	.get_mode = ti_thermal_get_mode,
@@ -266,7 +291,6 @@ int ti_thermal_expose_sensor(struct ti_bandgap *bgp, int id,
 	if (!data)
 		return -EINVAL;
 
-	/* TODO: remove TC1 TC2 */
 	/* Create thermal zone */
 	data->ti_thermal = thermal_zone_device_register(domain,
 				OMAP_TRIP_NUMBER, 0, data, &ti_thermal_ops,
@@ -314,6 +338,11 @@ int ti_thermal_register_cpu_cooling(struct ti_bandgap *bgp, int id)
 
 	if (!data)
 		return -EINVAL;
+
+	if (!cpufreq_get_current_driver()) {
+		dev_dbg(bgp->dev, "no cpufreq driver yet\n");
+		return -EPROBE_DEFER;
+	}
 
 	/* Register cooling device */
 	data->cool_dev = cpufreq_cooling_register(cpu_present_mask);

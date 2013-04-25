@@ -31,6 +31,8 @@
 		cpu@0 {
 			compatible = "arm,cortex-a9";
 			next-level-cache = <&L2>;
+			clocks = <&dpll_mpu>;
+			clock-names = "cpu";
 		};
 		cpu@1 {
 			compatible = "arm,cortex-a9";
@@ -99,6 +101,11 @@
 			compatible = "ti,omap-counter32k";
 			reg = <0x4a304000 0x20>;
 			ti,hwmods = "counter_32k";
+		};
+
+		dpll_mpu: dpll_mpu {
+			#clock-cells = <0>;
+			compatible = "ti,omap-clock";
 		};
 
 		omap4_pmx_core: pinmux@4a100040 {

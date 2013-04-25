@@ -649,6 +649,68 @@ int ti_bandgap_write_tcold(struct ti_bandgap *bgp, int id, int val)
 }
 
 /**
+ * ti_bandgap_read_counter() - read the sensor counter
+ * @bgp: pointer to bandgap instance
+ * @id: sensor id
+ * @interval: resulting update interval in miliseconds
+ */
+static void ti_bandgap_read_counter(struct ti_bandgap *bgp, int id,
+				    int *interval)
+{
+	struct temp_sensor_registers *tsr;
+	int time;
+
+	tsr = bgp->conf->sensors[id].registers;
+	time = ti_bandgap_readl(bgp, tsr->bgap_counter);
+	time = (time & tsr->counter_mask) >>
+					__ffs(tsr->counter_mask);
+	time = time * 1000 / bgp->clk_rate;
+	*interval = time;
+}
+
+/**
+ * ti_bandgap_read_counter_delay() - read the sensor counter delay
+ * @bgp: pointer to bandgap instance
+ * @id: sensor id
+ * @interval: resulting update interval in miliseconds
+ */
+static void ti_bandgap_read_counter_delay(struct ti_bandgap *bgp, int id,
+					  int *interval)
+{
+	struct temp_sensor_registers *tsr;
+	int reg_val;
+
+	tsr = bgp->conf->sensors[id].registers;
+
+	reg_val = ti_bandgap_readl(bgp, tsr->bgap_mask_ctrl);
+	reg_val = (reg_val & tsr->mask_counter_delay_mask) >>
+				__ffs(tsr->mask_counter_delay_mask);
+	switch (reg_val) {
+	case 0:
+		*interval = 0;
+		break;
+	case 1:
+		*interval = 1;
+		break;
+	case 2:
+		*interval = 10;
+		break;
+	case 3:
+		*interval = 100;
+		break;
+	case 4:
+		*interval = 250;
+		break;
+	case 5:
+		*interval = 500;
+		break;
+	default:
+		dev_warn(bgp->dev, "Wrong counter delay value read from register %X",
+			 reg_val);
+	}
+}
+
+/**
  * ti_bandgap_read_update_interval() - read the sensor update interval
  * @bgp: pointer to bandgap instance
  * @id: sensor id
@@ -659,25 +721,85 @@ int ti_bandgap_write_tcold(struct ti_bandgap *bgp, int id, int val)
 int ti_bandgap_read_update_interval(struct ti_bandgap *bgp, int id,
 				    int *interval)
 {
-	struct temp_sensor_registers *tsr;
-	u32 time;
-	int ret;
+	int ret = 0;
 
 	ret = ti_bandgap_validate(bgp, id);
 	if (ret)
-		return ret;
+		goto exit;
 
-	if (!TI_BANDGAP_HAS(bgp, COUNTER))
-		return -ENOTSUPP;
+	if (!TI_BANDGAP_HAS(bgp, COUNTER) &&
+	    !TI_BANDGAP_HAS(bgp, COUNTER_DELAY)) {
+		ret = -ENOTSUPP;
+		goto exit;
+	}
 
-	tsr = bgp->conf->sensors[id].registers;
-	time = ti_bandgap_readl(bgp, tsr->bgap_counter);
-	time = (time & tsr->counter_mask) >> __ffs(tsr->counter_mask);
-	time = time * 1000 / bgp->clk_rate;
+	if (TI_BANDGAP_HAS(bgp, COUNTER)) {
+		ti_bandgap_read_counter(bgp, id, interval);
+		goto exit;
+	}
 
-	*interval = time;
+	ti_bandgap_read_counter_delay(bgp, id, interval);
+exit:
+	return ret;
+}
+
+/**
+ * ti_bandgap_write_counter_delay() - set the counter_delay
+ * @bgp: pointer to bandgap instance
+ * @id: sensor id
+ * @interval: desired update interval in miliseconds
+ *
+ * Return: 0 on success or the proper error code
+ */
+static int ti_bandgap_write_counter_delay(struct ti_bandgap *bgp, int id,
+					  u32 interval)
+{
+	int rval;
+
+	switch (interval) {
+	case 0: /* Immediate conversion */
+		rval = 0x0;
+		break;
+	case 1: /* Conversion after ever 1ms */
+		rval = 0x1;
+		break;
+	case 10: /* Conversion after ever 10ms */
+		rval = 0x2;
+		break;
+	case 100: /* Conversion after ever 100ms */
+		rval = 0x3;
+		break;
+	case 250: /* Conversion after ever 250ms */
+		rval = 0x4;
+		break;
+	case 500: /* Conversion after ever 500ms */
+		rval = 0x5;
+		break;
+	default:
+		dev_warn(bgp->dev, "Delay %d ms is not supported\n", interval);
+		return -EINVAL;
+	}
+
+	spin_lock(&bgp->lock);
+	RMW_BITS(bgp, id, bgap_mask_ctrl, mask_counter_delay_mask, rval);
+	spin_unlock(&bgp->lock);
 
 	return 0;
+}
+
+/**
+ * ti_bandgap_write_counter() - set the bandgap sensor counter
+ * @bgp: pointer to bandgap instance
+ * @id: sensor id
+ * @interval: desired update interval in miliseconds
+ */
+static void ti_bandgap_write_counter(struct ti_bandgap *bgp, int id,
+				     u32 interval)
+{
+	interval = interval * bgp->clk_rate / 1000;
+	spin_lock(&bgp->lock);
+	RMW_BITS(bgp, id, bgap_counter, counter_mask, interval);
+	spin_unlock(&bgp->lock);
 }
 
 /**
@@ -693,17 +815,22 @@ int ti_bandgap_write_update_interval(struct ti_bandgap *bgp,
 {
 	int ret = ti_bandgap_validate(bgp, id);
 	if (ret)
-		return ret;
+		goto exit;
 
-	if (!TI_BANDGAP_HAS(bgp, COUNTER))
-		return -ENOTSUPP;
+	if (!TI_BANDGAP_HAS(bgp, COUNTER) &&
+	    !TI_BANDGAP_HAS(bgp, COUNTER_DELAY)) {
+		ret = -ENOTSUPP;
+		goto exit;
+	}
 
-	interval = interval * bgp->clk_rate / 1000;
-	spin_lock(&bgp->lock);
-	RMW_BITS(bgp, id, bgap_counter, counter_mask, interval);
-	spin_unlock(&bgp->lock);
+	if (TI_BANDGAP_HAS(bgp, COUNTER)) {
+		ti_bandgap_write_counter(bgp, id, interval);
+		goto exit;
+	}
 
-	return 0;
+	ret = ti_bandgap_write_counter_delay(bgp, id, interval);
+exit:
+	return ret;
 }
 
 /**
@@ -832,6 +959,73 @@ static int ti_bandgap_set_continuous_mode(struct ti_bandgap *bgp)
 	}
 
 	return 0;
+}
+
+/**
+ * ti_bandgap_get_trend() - To fetch the temperature trend of a sensor
+ * @bgp: pointer to struct ti_bandgap
+ * @id: id of the individual sensor
+ * @trend: Pointer to trend.
+ *
+ * This function needs to be called to fetch the temperature trend of a
+ * Particular sensor. The function computes the difference in temperature
+ * w.r.t time. For the bandgaps with built in history buffer the temperatures
+ * are read from the buffer and for those without the Buffer -ENOTSUPP is
+ * returned.
+ *
+ * Return: 0 if no error, else return corresponding error. If no
+ *		error then the trend value is passed on to trend parameter
+ */
+int ti_bandgap_get_trend(struct ti_bandgap *bgp, int id, int *trend)
+{
+	struct temp_sensor_registers *tsr;
+	u32 temp1, temp2, reg1, reg2;
+	int t1, t2, interval, ret = 0;
+
+	ret = ti_bandgap_validate(bgp, id);
+	if (ret)
+		goto exit;
+
+	if (!TI_BANDGAP_HAS(bgp, HISTORY_BUFFER) ||
+	    !TI_BANDGAP_HAS(bgp, FREEZE_BIT)) {
+		ret = -ENOTSUPP;
+		goto exit;
+	}
+
+	tsr = bgp->conf->sensors[id].registers;
+
+	/* Freeze and read the last 2 valid readings */
+	reg1 = tsr->ctrl_dtemp_1;
+	reg2 = tsr->ctrl_dtemp_2;
+
+	/* read temperature from history buffer */
+	temp1 = ti_bandgap_readl(bgp, reg1);
+	temp1 &= tsr->bgap_dtemp_mask;
+
+	temp2 = ti_bandgap_readl(bgp, reg2);
+	temp2 &= tsr->bgap_dtemp_mask;
+
+	/* Convert from adc values to mCelsius temperature */
+	ret = ti_bandgap_adc_to_mcelsius(bgp, temp1, &t1);
+	if (ret)
+		goto exit;
+
+	ret = ti_bandgap_adc_to_mcelsius(bgp, temp2, &t2);
+	if (ret)
+		goto exit;
+
+	/* Fetch the update interval */
+	ret = ti_bandgap_read_update_interval(bgp, id, &interval);
+	if (ret || !interval)
+		goto exit;
+
+	*trend = (t1 - t2) / interval;
+
+	dev_dbg(bgp->dev, "The temperatures are t1 = %d and t2 = %d and trend =%d\n",
+		t1, t2, *trend);
+
+exit:
+	return ret;
 }
 
 /**
@@ -1114,12 +1308,18 @@ int ti_bandgap_probe(struct platform_device *pdev)
 	for (i = 0; i < bgp->conf->sensor_count; i++) {
 		char *domain;
 
-		if (bgp->conf->sensors[i].register_cooling)
-			bgp->conf->sensors[i].register_cooling(bgp, i);
+		if (bgp->conf->sensors[i].register_cooling) {
+			ret = bgp->conf->sensors[i].register_cooling(bgp, i);
+			if (ret)
+				goto remove_sensors;
+		}
 
-		domain = bgp->conf->sensors[i].domain;
-		if (bgp->conf->expose_sensor)
-			bgp->conf->expose_sensor(bgp, i, domain);
+		if (bgp->conf->expose_sensor) {
+			domain = bgp->conf->sensors[i].domain;
+			ret = bgp->conf->expose_sensor(bgp, i, domain);
+			if (ret)
+				goto remove_last_cooling;
+		}
 	}
 
 	/*
@@ -1138,6 +1338,17 @@ int ti_bandgap_probe(struct platform_device *pdev)
 
 	return 0;
 
+remove_last_cooling:
+	if (bgp->conf->sensors[i].unregister_cooling)
+		bgp->conf->sensors[i].unregister_cooling(bgp, i);
+remove_sensors:
+	for (i--; i >= 0; i--) {
+		if (bgp->conf->sensors[i].unregister_cooling)
+			bgp->conf->sensors[i].unregister_cooling(bgp, i);
+		if (bgp->conf->remove_sensor)
+			bgp->conf->remove_sensor(bgp, i);
+	}
+	ti_bandgap_power(bgp, false);
 disable_clk:
 	if (TI_BANDGAP_HAS(bgp, CLK_CTRL))
 		clk_disable_unprepare(bgp->fclock);
@@ -1161,7 +1372,7 @@ int ti_bandgap_remove(struct platform_device *pdev)
 
 	/* First thing is to remove sensor interfaces */
 	for (i = 0; i < bgp->conf->sensor_count; i++) {
-		if (bgp->conf->sensors[i].register_cooling)
+		if (bgp->conf->sensors[i].unregister_cooling)
 			bgp->conf->sensors[i].unregister_cooling(bgp, i);
 
 		if (bgp->conf->remove_sensor)
