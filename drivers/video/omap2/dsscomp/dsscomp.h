@@ -33,6 +33,8 @@
 #define MAX_MANAGERS	3
 #define MAX_DISPLAYS	4
 
+#define FULLHD_RESOLUTION (1920 * 1080)
+
 #define DEBUG_OVERLAYS		(1 << 0)
 #define DEBUG_COMPOSITIONS	(1 << 1)
 #define DEBUG_PHASES		(1 << 2)
@@ -148,6 +150,7 @@ int set_dss_wb_info(struct dss2_ovl_info *oi);
 int set_dss_mgr_info(struct dss2_mgr_info *mi, struct omapdss_ovl_cb *cb,
 								bool m2m_mode);
 struct omap_overlay_manager *find_dss_mgr(int display_ix);
+u32 get_display_ix(struct omap_overlay_manager *mgr);
 void swap_rb_in_ovl_info(struct dss2_ovl_info *oi);
 void swap_rb_in_mgr_info(struct dss2_mgr_info *mi);
 
