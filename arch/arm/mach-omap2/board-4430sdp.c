@@ -38,6 +38,7 @@
 #include <linux/omap_die_governor.h>
 
 #include <mach/hardware.h>
+#include <mach/omap-secure.h>
 #include <asm/hardware/gic.h>
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
@@ -1621,6 +1622,7 @@ static void __init omap_4430sdp_reserve(void)
 	omap_rproc_reserve_cma(RPROC_CMA_OMAP4);
 	sdp4430_android_display_setup();
 	omap4_ion_init();
+	omap4_secure_workspace_addr_default();
 	omap_reserve();
 }
 
