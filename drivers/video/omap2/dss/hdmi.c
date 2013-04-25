@@ -71,6 +71,9 @@ static struct {
 	int ls_oe_gpio;
 	int hpd_gpio;
 
+	/* level shifter state */
+	enum level_shifter_state ls_state;
+
 	struct omap_dss_output output;
 } hdmi;
 
@@ -326,6 +329,41 @@ static const struct hdmi_config s3d_timings[] = {
 	},
 };
 
+static void hdmi_set_ls_state(enum level_shifter_state state)
+{
+	bool hpd_enable = false;
+	bool ls_enable = false;
+
+	/* return early if we have nothing to do */
+	if (state == hdmi.ls_state)
+		return;
+
+	switch (state) {
+	case LS_HPD_ON:
+		hpd_enable = true;
+		break;
+
+	case LS_ENABLED:
+		hpd_enable = true;
+		ls_enable = true;
+		break;
+
+	case LS_DISABLED:
+	default:
+		break;
+	}
+
+	gpio_set_value_cansleep(hdmi.ct_cp_hpd_gpio, hpd_enable);
+
+	gpio_set_value_cansleep(hdmi.ls_oe_gpio, ls_enable);
+
+	/* wait 300us after asserting CT_CP_HPD for the 5V rail to reach 90% */
+	if (hdmi.ls_state == LS_DISABLED)
+		udelay(300);
+
+	hdmi.ls_state = state;
+}
+
 static int hdmi_runtime_get(void)
 {
 	int r;
@@ -566,18 +604,7 @@ static int hdmi_power_on_core(struct omap_dss_device *dssdev)
 {
 	int r;
 
-	if (gpio_cansleep(hdmi.ct_cp_hpd_gpio))
-		gpio_set_value_cansleep(hdmi.ct_cp_hpd_gpio, 1);
-	else
-		gpio_set_value(hdmi.ct_cp_hpd_gpio, 1);
-
-	if (gpio_cansleep(hdmi.ls_oe_gpio))
-		gpio_set_value_cansleep(hdmi.ls_oe_gpio, 1);
-	else
-		gpio_set_value(hdmi.ls_oe_gpio, 1);
-
-	/* wait 300us after CT_CP_HPD for the 5V power output to reach 90% */
-	udelay(300);
+	hdmi_set_ls_state(LS_ENABLED);
 
 	r = regulator_enable(hdmi.vdda_hdmi_dac_reg);
 	if (r)
@@ -595,15 +622,7 @@ static int hdmi_power_on_core(struct omap_dss_device *dssdev)
 err_runtime_get:
 	regulator_disable(hdmi.vdda_hdmi_dac_reg);
 err_vdac_enable:
-	if (gpio_cansleep(hdmi.ct_cp_hpd_gpio))
-		gpio_set_value_cansleep(hdmi.ct_cp_hpd_gpio, 0);
-	else
-		gpio_set_value(hdmi.ct_cp_hpd_gpio, 0);
-
-	if (gpio_cansleep(hdmi.ls_oe_gpio))
-		gpio_set_value_cansleep(hdmi.ls_oe_gpio, 0);
-	else
-		gpio_set_value(hdmi.ls_oe_gpio, 0);
+	hdmi_set_ls_state(LS_HPD_ON);
 	return r;
 }
 
@@ -611,15 +630,8 @@ static void hdmi_power_off_core(struct omap_dss_device *dssdev)
 {
 	hdmi_runtime_put();
 	regulator_disable(hdmi.vdda_hdmi_dac_reg);
-	if (gpio_cansleep(hdmi.ct_cp_hpd_gpio))
-		gpio_set_value_cansleep(hdmi.ct_cp_hpd_gpio, 0);
-	else
-		gpio_set_value(hdmi.ct_cp_hpd_gpio, 0);
 
-	if (gpio_cansleep(hdmi.ls_oe_gpio))
-		gpio_set_value_cansleep(hdmi.ls_oe_gpio, 0);
-	else
-		gpio_set_value(hdmi.ls_oe_gpio, 0);
+	hdmi_set_ls_state(LS_HPD_ON);
 }
 
 static int hdmi_power_on_full(struct omap_dss_device *dssdev)
