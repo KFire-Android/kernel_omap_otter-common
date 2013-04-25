@@ -1350,6 +1350,7 @@ static void __init hdmi_probe_of(struct platform_device *pdev)
 	int r, gpio;
 	enum omap_channel channel;
 	u32 v;
+	int gpio_count;
 
 	r = of_property_read_u32(node, "video-source", &v);
 	if (r) {
@@ -1367,7 +1368,10 @@ static void __init hdmi_probe_of(struct platform_device *pdev)
 	if (!child)
 		return;
 
-	if (of_gpio_count(node) != 3) {
+	gpio_count = of_gpio_count(node);
+
+	/* OMAP4 derivatives have 3 pins defined, OMAP5 derivatives have 5 */
+	if (gpio_count != 5 && gpio_count != 3) {
 		DSSERR("wrong number of GPIOs\n");
 		return;
 	}
@@ -1394,6 +1398,26 @@ static void __init hdmi_probe_of(struct platform_device *pdev)
 	} else {
 		DSSERR("failed to parse HPD gpio\n");
 		return;
+	}
+
+	/* if I2C SCL and SDA pins are defined, parse them */
+	/* these will only be valid for OMAP5 derivatives */
+	if (gpio_count == 5) {
+		gpio = of_get_gpio(node, 3);
+		if (gpio_is_valid(gpio)) {
+			hdmi.scl_pin = gpio;
+		} else {
+			DSSERR("failed to parse SCL gpio\n");
+			return;
+		}
+
+		gpio = of_get_gpio(node, 4);
+		if (gpio_is_valid(gpio)) {
+			hdmi.sda_pin = gpio;
+		} else {
+			DSSERR("failed to parse SDA gpio\n");
+			return;
+		}
 	}
 
 	dssdev = dss_alloc_and_init_device(&pdev->dev);
