@@ -130,6 +130,13 @@
 			#dma-requests = <127>;
 		};
 
+		dmm: dmm@4e000000 {
+			compatible = "ti,omap4-dmm";
+			reg = <0x4e000000 0x800>;
+			interrupts = <0 113 0x4>;
+			ti,hwmods = "dmm";
+		};
+
 		dss {
 			compatible = "ti,omap4-dss";
 			ti,hwmods = "dss_core";
