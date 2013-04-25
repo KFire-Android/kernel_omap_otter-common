@@ -24,6 +24,7 @@
 #define __OMAP2_DSS_H
 
 #include <linux/interrupt.h>
+#include <linux/i2c.h>
 
 #ifdef pr_fmt
 #undef pr_fmt
@@ -446,6 +447,7 @@ static inline unsigned long hdmi_get_pixel_clock(void)
 	return 0;
 }
 #endif
+struct i2c_adapter *omapdss_hdmi_adapter(void);
 int omapdss_hdmi_display_enable(struct omap_dss_device *dssdev);
 void omapdss_hdmi_display_disable(struct omap_dss_device *dssdev);
 int omapdss_hdmi_core_enable(struct omap_dss_device *dssdev);

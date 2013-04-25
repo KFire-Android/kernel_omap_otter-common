@@ -190,8 +190,8 @@
 	dss_hdmi_pins: pinmux_dss_hdmi_pins {
 		pinctrl-single,pins = <
 			0x0fc 0x118	/* hdmi_cec.hdmi_cec INPUT PULLUP | MODE 0 */
-			0x100 0x100	/* hdmi_scl.hdmi_scl INPUT | MODE 0 */
-			0x102 0x100	/* hdmi_sda.hdmi_sda INPUT | MODE 0 */
+			0x100 0x106	/* GPIO7_194, DDC-SCL */
+			0x102 0x106	/* GPIO7_195, DDC-SDA */
 		>;
 	};
 
@@ -369,7 +369,10 @@
 
 		gpios = <&tca6424a 0 0>,	/* TCA6424A P01, CT_CP_HDP */
 			<&tca6424a 1 0>,	/* TCA6424A P00, LS_OE*/
-			<&gpio7 1 0>;		/* 193, HPD */
+			<&gpio7 1 0>,		/* 193, HPD */
+			<&gpio7 2 0>,		/* 194, SCL */
+			<&gpio7 3 0>;		/* 195, SDA */
+
 
 		hdmi-monitor {
 			compatible = "ti,hdmi_panel";
