@@ -37,6 +37,8 @@
 #include <linux/slab.h>
 #include <linux/of_gpio.h>
 #include <video/omapdss.h>
+#include <linux/i2c.h>
+#include <linux/i2c-algo-bit.h>
 
 #include "ti_hdmi.h"
 #include "dss.h"
@@ -67,12 +69,19 @@ static struct {
 	struct clk *sys_clk;
 	struct regulator *vdda_hdmi_dac_reg;
 
+	/* GPIO pins */
 	int ct_cp_hpd_gpio;
 	int ls_oe_gpio;
 	int hpd_gpio;
 
 	/* level shifter state */
 	enum level_shifter_state ls_state;
+
+	/* i2c adapter info */
+	struct i2c_adapter *adap;
+	struct i2c_algo_bit_data bit_data;
+	int scl_pin;
+	int sda_pin;
 
 	struct omap_dss_output output;
 } hdmi;
@@ -1365,6 +1374,87 @@ static void __init hdmi_probe_pdata(struct platform_device *pdev)
 	}
 }
 
+struct i2c_adapter *omapdss_hdmi_adapter(void)
+{
+	return hdmi.adap;
+}
+
+static void ddc_set_sda(void *data, int state)
+{
+	if (state)
+		gpio_direction_input(hdmi.sda_pin);
+	else
+		gpio_direction_output(hdmi.sda_pin, 0);
+}
+
+static void ddc_set_scl(void *data, int state)
+{
+	if (state)
+		gpio_direction_input(hdmi.scl_pin);
+	else
+		gpio_direction_output(hdmi.scl_pin, 0);
+}
+
+static int ddc_get_sda(void *data)
+{
+	return gpio_get_value(hdmi.sda_pin);
+}
+
+static int ddc_get_scl(void *data)
+{
+	return gpio_get_value(hdmi.scl_pin);
+}
+
+static int ddc_pre_xfer(struct i2c_adapter *adap)
+{
+	/* don't read if no hdmi connected */
+	if (!gpio_get_value(hdmi.hpd_gpio))
+		return -ENODEV;
+
+	gpio_set_value_cansleep(hdmi.ls_oe_gpio, 1);
+
+	return 0;
+}
+static void ddc_post_xfer(struct i2c_adapter *adap)
+{
+	hdmi_set_ls_state(hdmi.ls_state);
+}
+
+static void ddc_i2c_init(struct platform_device *pdev)
+{
+
+	hdmi.adap = kzalloc(sizeof(*hdmi.adap), GFP_KERNEL);
+
+	if (!hdmi.adap) {
+		pr_err("Failed to allocate i2c adapter\n");
+		return;
+	}
+
+	hdmi.adap->owner = THIS_MODULE;
+	hdmi.adap->class = I2C_CLASS_DDC;
+	hdmi.adap->dev.parent = &pdev->dev;
+	hdmi.adap->algo_data = &hdmi.bit_data;
+	hdmi.adap->algo = &i2c_bit_algo;
+	hdmi.bit_data.udelay = 2;
+	hdmi.bit_data.timeout = HZ/10;
+	hdmi.bit_data.setsda = ddc_set_sda;
+	hdmi.bit_data.setscl = ddc_set_scl;
+	hdmi.bit_data.getsda = ddc_get_sda;
+	hdmi.bit_data.getscl = ddc_get_scl;
+	hdmi.bit_data.pre_xfer = ddc_pre_xfer;
+	hdmi.bit_data.post_xfer = ddc_post_xfer;
+
+	gpio_request(hdmi.sda_pin, "DDC SDA");
+	gpio_request(hdmi.scl_pin, "DDC SCL");
+	snprintf(hdmi.adap->name, sizeof(hdmi.adap->name),
+		"DSS DDC-EDID adapter");
+	if (i2c_add_adapter(hdmi.adap)) {
+		DSSERR("Cannot initialize DDC I2c\n");
+		kfree(hdmi.adap);
+		hdmi.adap = NULL;
+	}
+}
+
 static void __init hdmi_probe_of(struct platform_device *pdev)
 {
 	struct device_node *node = pdev->dev.of_node;
@@ -1593,6 +1683,10 @@ static int __init omapdss_hdmihw_probe(struct platform_device *pdev)
 	else if (pdev->dev.platform_data)
 		hdmi_probe_pdata(pdev);
 
+	/* if i2c pins defined, setup I2C adapter */
+	if (hdmi.scl_pin && hdmi.sda_pin)
+		ddc_i2c_init(pdev);
+
 #if defined(CONFIG_OMAP4_DSS_HDMI_AUDIO) || \
 	defined(CONFIG_OMAP5_DSS_HDMI_AUDIO)
 	r = hdmi_probe_audio(pdev);
@@ -1621,6 +1715,8 @@ static int __exit omapdss_hdmihw_remove(struct platform_device *pdev)
 	if (hdmi.audio_pdev != NULL)
 		platform_device_unregister(hdmi.audio_pdev);
 #endif
+
+	kfree(hdmi.adap);
 
 	device_for_each_child(&pdev->dev, NULL, hdmi_remove_child);
 
