@@ -39,6 +39,7 @@ omap5430_mpu_temp_sensor_registers = {
 	.mask_hot_mask = OMAP5430_MASK_HOT_MPU_MASK,
 	.mask_cold_mask = OMAP5430_MASK_COLD_MPU_MASK,
 	.mask_sidlemode_mask = OMAP5430_MASK_SIDLEMODE_MASK,
+	.mask_counter_delay_mask = OMAP5430_MASK_COUNTER_DELAY_MASK,
 	.mask_freeze_mask = OMAP5430_MASK_FREEZE_MPU_MASK,
 	.mask_clear_mask = OMAP5430_MASK_CLEAR_MPU_MASK,
 	.mask_clear_accum_mask = OMAP5430_MASK_CLEAR_ACCUM_MPU_MASK,
@@ -84,6 +85,7 @@ omap5430_gpu_temp_sensor_registers = {
 	.mask_hot_mask = OMAP5430_MASK_HOT_GPU_MASK,
 	.mask_cold_mask = OMAP5430_MASK_COLD_GPU_MASK,
 	.mask_sidlemode_mask = OMAP5430_MASK_SIDLEMODE_MASK,
+	.mask_counter_delay_mask = OMAP5430_MASK_COUNTER_DELAY_MASK,
 	.mask_freeze_mask = OMAP5430_MASK_FREEZE_GPU_MASK,
 	.mask_clear_mask = OMAP5430_MASK_CLEAR_GPU_MASK,
 	.mask_clear_accum_mask = OMAP5430_MASK_CLEAR_ACCUM_GPU_MASK,
@@ -129,6 +131,7 @@ omap5430_core_temp_sensor_registers = {
 	.mask_hot_mask = OMAP5430_MASK_HOT_CORE_MASK,
 	.mask_cold_mask = OMAP5430_MASK_COLD_CORE_MASK,
 	.mask_sidlemode_mask = OMAP5430_MASK_SIDLEMODE_MASK,
+	.mask_counter_delay_mask = OMAP5430_MASK_COUNTER_DELAY_MASK,
 	.mask_freeze_mask = OMAP5430_MASK_FREEZE_CORE_MASK,
 	.mask_clear_mask = OMAP5430_MASK_CLEAR_CORE_MASK,
 	.mask_clear_accum_mask = OMAP5430_MASK_CLEAR_ACCUM_CORE_MASK,
@@ -311,11 +314,12 @@ omap5430_adc_to_temp[
 };
 
 /* OMAP54xx ES2.0 data */
-/* TODO : Need to update the slope/constant for ES2.0 silicon */
 const struct ti_bandgap_data omap5430_data = {
 	.features = TI_BANDGAP_FEATURE_TSHUT_CONFIG |
 			TI_BANDGAP_FEATURE_FREEZE_BIT |
-			TI_BANDGAP_FEATURE_TALERT,
+			TI_BANDGAP_FEATURE_TALERT |
+			TI_BANDGAP_FEATURE_COUNTER_DELAY |
+			TI_BANDGAP_FEATURE_HISTORY_BUFFER,
 	.fclock_name = "l3instr_ts_gclk_div",
 	.div_ck_name = "l3instr_ts_gclk_div",
 	.conv_table = omap5430_adc_to_temp,
