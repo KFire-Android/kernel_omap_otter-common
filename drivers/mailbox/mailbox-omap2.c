@@ -42,7 +42,11 @@
 #define MBOX_NR_REGS			(MBOX_REG_SIZE / sizeof(u32))
 #define OMAP4_MBOX_NR_REGS		(OMAP4_MBOX_REG_SIZE / sizeof(u32))
 
-static void __iomem *mbox_base;
+struct omap_mbox2_device {
+	void __iomem *mbox_base;
+	u32 num_users;
+	u32 num_fifos;
+};
 
 struct omap_mbox2_fifo {
 	unsigned long msg;
@@ -63,26 +67,22 @@ struct omap_mbox2_priv {
 	u32 data;
 };
 
-static inline unsigned int mbox_read_reg(size_t ofs)
+static inline
+unsigned int mbox_read_reg(struct omap_mbox2_device *omdev, size_t ofs)
 {
-	return __raw_readl(mbox_base + ofs);
+	return __raw_readl(omdev->mbox_base + ofs);
 }
 
-static inline void mbox_write_reg(u32 val, size_t ofs)
+static inline
+void mbox_write_reg(struct omap_mbox2_device *omdev, u32 val, size_t ofs)
 {
-	__raw_writel(val, mbox_base + ofs);
+	__raw_writel(val, omdev->mbox_base + ofs);
 }
 
 /* Mailbox H/W preparations */
 static int omap2_mbox_startup(struct mailbox *mbox)
 {
-	u32 l;
-
-	pm_runtime_enable(mbox->dev->parent);
 	pm_runtime_get_sync(mbox->dev->parent);
-
-	l = mbox_read_reg(MAILBOX_REVISION);
-	pr_debug("omap mailbox rev %d.%d\n", (l & 0xf0) >> 4, (l & 0x0f));
 
 	return 0;
 }
@@ -90,7 +90,6 @@ static int omap2_mbox_startup(struct mailbox *mbox)
 static void omap2_mbox_shutdown(struct mailbox *mbox)
 {
 	pm_runtime_put_sync(mbox->dev->parent);
-	pm_runtime_disable(mbox->dev->parent);
 }
 
 /* Mailbox FIFO handle functions */
@@ -98,7 +97,9 @@ static void omap2_mbox_fifo_read(struct mailbox *mbox, struct mailbox_msg *msg)
 {
 	struct omap_mbox2_priv *priv = mbox->priv;
 	struct omap_mbox2_fifo *fifo = &priv->rx_fifo;
-	priv->data = mbox_read_reg(fifo->msg);
+	struct omap_mbox2_device *omdev = mbox->parent->priv;
+
+	priv->data = mbox_read_reg(omdev, fifo->msg);
 	MAILBOX_FILL_MSG((*msg), 0, priv->data, 0);
 }
 
@@ -106,8 +107,9 @@ static int omap2_mbox_fifo_write(struct mailbox *mbox, struct mailbox_msg *msg)
 {
 	struct omap_mbox2_fifo *fifo =
 		&((struct omap_mbox2_priv *)mbox->priv)->tx_fifo;
+	struct omap_mbox2_device *omdev = mbox->parent->priv;
 
-	mbox_write_reg((u32)msg->pdata, fifo->msg);
+	mbox_write_reg(omdev, (u32)msg->pdata, fifo->msg);
 
 	return 0;
 }
@@ -116,21 +118,24 @@ static int omap2_mbox_fifo_empty(struct mailbox *mbox)
 {
 	struct omap_mbox2_fifo *fifo =
 		&((struct omap_mbox2_priv *)mbox->priv)->rx_fifo;
-	return (mbox_read_reg(fifo->msg_stat) == 0);
+	struct omap_mbox2_device *omdev = mbox->parent->priv;
+	return (mbox_read_reg(omdev, fifo->msg_stat) == 0);
 }
 
 static int omap2_mbox_fifo_full(struct mailbox *mbox)
 {
 	struct omap_mbox2_fifo *fifo =
 		&((struct omap_mbox2_priv *)mbox->priv)->tx_fifo;
-	return mbox_read_reg(fifo->fifo_stat);
+	struct omap_mbox2_device *omdev = mbox->parent->priv;
+	return mbox_read_reg(omdev, fifo->fifo_stat);
 }
 
 static int omap2_mbox_needs_flush(struct mailbox *mbox)
 {
 	struct omap_mbox2_priv *priv = mbox->priv;
 	struct omap_mbox2_fifo *fifo = &priv->tx_fifo;
-	return mbox_read_reg(fifo->msg_stat);
+	struct omap_mbox2_device *omdev = mbox->parent->priv;
+	return mbox_read_reg(omdev, fifo->msg_stat);
 }
 
 static void omap2_mbox_fifo_readback(struct mailbox *mbox,
@@ -138,7 +143,8 @@ static void omap2_mbox_fifo_readback(struct mailbox *mbox,
 {
 	struct omap_mbox2_priv *priv = mbox->priv;
 	struct omap_mbox2_fifo *fifo = &priv->tx_fifo;
-	priv->data = mbox_read_reg(fifo->msg);
+	struct omap_mbox2_device *omdev = mbox->parent->priv;
+	priv->data = mbox_read_reg(omdev, fifo->msg);
 	MAILBOX_FILL_MSG((*msg), 0, priv->data, 0);
 }
 
@@ -154,41 +160,45 @@ static int omap2_mbox_poll_for_space(struct mailbox *mbox)
 static void omap2_mbox_enable_irq(struct mailbox *mbox, mailbox_irq_t irq)
 {
 	struct omap_mbox2_priv *p = mbox->priv;
+	struct omap_mbox2_device *omdev = mbox->parent->priv;
 	u32 l, bit = (irq == IRQ_TX) ? p->notfull_bit : p->newmsg_bit;
 
-	l = mbox_read_reg(p->irqenable);
+	l = mbox_read_reg(omdev, p->irqenable);
 	l |= bit;
-	mbox_write_reg(l, p->irqenable);
+	mbox_write_reg(omdev, l, p->irqenable);
 }
 
 static void omap2_mbox_disable_irq(struct mailbox *mbox, mailbox_irq_t irq)
 {
 	struct omap_mbox2_priv *p = mbox->priv;
+	struct omap_mbox2_device *omdev = mbox->parent->priv;
 	u32 bit = (irq == IRQ_TX) ? p->notfull_bit : p->newmsg_bit;
 
 	if (!p->intr_type)
-		bit = mbox_read_reg(p->irqdisable) & ~bit;
+		bit = mbox_read_reg(omdev, p->irqdisable) & ~bit;
 
-	mbox_write_reg(bit, p->irqdisable);
+	mbox_write_reg(omdev, bit, p->irqdisable);
 }
 
 static void omap2_mbox_ack_irq(struct mailbox *mbox, mailbox_irq_t irq)
 {
 	struct omap_mbox2_priv *p = mbox->priv;
+	struct omap_mbox2_device *omdev = mbox->parent->priv;
 	u32 bit = (irq == IRQ_TX) ? p->notfull_bit : p->newmsg_bit;
 
-	mbox_write_reg(bit, p->irqstatus);
+	mbox_write_reg(omdev, bit, p->irqstatus);
 
 	/* Flush posted write for irq status to avoid spurious interrupts */
-	mbox_read_reg(p->irqstatus);
+	mbox_read_reg(omdev, p->irqstatus);
 }
 
 static int omap2_mbox_is_irq(struct mailbox *mbox, mailbox_irq_t irq)
 {
 	struct omap_mbox2_priv *p = mbox->priv;
+	struct omap_mbox2_device *omdev = mbox->parent->priv;
 	u32 bit = (irq == IRQ_TX) ? p->notfull_bit : p->newmsg_bit;
-	u32 enable = mbox_read_reg(p->irqenable);
-	u32 status = mbox_read_reg(p->irqstatus);
+	u32 enable = mbox_read_reg(omdev, p->irqenable);
+	u32 status = mbox_read_reg(omdev, p->irqstatus);
 
 	return (int)(enable & status & bit);
 }
@@ -197,6 +207,7 @@ static void omap2_mbox_save_ctx(struct mailbox *mbox)
 {
 	int i;
 	struct omap_mbox2_priv *p = mbox->priv;
+	struct omap_mbox2_device *omdev = mbox->parent->priv;
 	int nr_regs;
 
 	if (p->intr_type)
@@ -204,7 +215,7 @@ static void omap2_mbox_save_ctx(struct mailbox *mbox)
 	else
 		nr_regs = MBOX_NR_REGS;
 	for (i = 0; i < nr_regs; i++) {
-		p->ctx[i] = mbox_read_reg(i * sizeof(u32));
+		p->ctx[i] = mbox_read_reg(omdev, i * sizeof(u32));
 
 		dev_dbg(mbox->dev, "%s: [%02x] %08x\n", __func__,
 				i, p->ctx[i]);
@@ -215,6 +226,7 @@ static void omap2_mbox_restore_ctx(struct mailbox *mbox)
 {
 	int i;
 	struct omap_mbox2_priv *p = mbox->priv;
+	struct omap_mbox2_device *omdev = mbox->parent->priv;
 	int nr_regs;
 
 	if (p->intr_type)
@@ -222,7 +234,7 @@ static void omap2_mbox_restore_ctx(struct mailbox *mbox)
 	else
 		nr_regs = MBOX_NR_REGS;
 	for (i = 0; i < nr_regs; i++) {
-		mbox_write_reg(p->ctx[i], i * sizeof(u32));
+		mbox_write_reg(omdev, p->ctx[i], i * sizeof(u32));
 
 		dev_dbg(mbox->dev, "%s: [%02x] %08x\n", __func__,
 				i, p->ctx[i]);
@@ -246,10 +258,34 @@ static struct mailbox_ops omap2_mbox_ops = {
 	.restore_ctx	= omap2_mbox_restore_ctx,
 };
 
+static int omap2_mbox_device_startup(struct mailbox_device *mdev, void *data)
+{
+	u32 l;
+
+	pm_runtime_enable(mdev->dev);
+
+	l = mbox_read_reg(mdev->priv, MAILBOX_REVISION);
+	pr_info("omap mailbox rev 0x%x\n", l);
+
+	return 0;
+}
+
+static void omap2_mbox_device_shutdown(struct mailbox_device *mdev)
+{
+	pm_runtime_disable(mdev->dev);
+}
+
+static struct mailbox_device_ops omap2_mbox_device_ops = {
+	.startup	= omap2_mbox_device_startup,
+	.shutdown	= omap2_mbox_device_shutdown,
+};
+
 static int omap2_mbox_probe(struct platform_device *pdev)
 {
 	struct resource *mem;
 	int ret;
+	struct mailbox_device *mdev;
+	struct omap_mbox2_device *omdev;
 	struct mailbox **list, *mbox, *mboxblk;
 	struct omap_mbox2_priv *priv, *privblk;
 	struct omap_mbox_pdata *pdata = pdev->dev.platform_data;
@@ -307,27 +343,39 @@ static int omap2_mbox_probe(struct platform_device *pdev)
 		list[i] = mbox++;
 	}
 
+	mdev = mailbox_device_alloc(&pdev->dev, &omap2_mbox_device_ops,
+								sizeof(*omdev));
+	if (!mdev) {
+		ret = -ENOMEM;
+		goto free_privblk;
+	}
+	omdev = mdev->priv;
+	omdev->num_users = pdata->num_users;
+	omdev->num_fifos = pdata->num_fifos;
+
 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!mem) {
 		ret = -ENOMEM;
-		goto free_privblk;
+		goto free_mdev;
 	}
 
-	mbox_base = ioremap(mem->start, resource_size(mem));
-	if (!mbox_base) {
+	omdev->mbox_base = ioremap(mem->start, resource_size(mem));
+	if (!omdev->mbox_base) {
 		ret = -ENOMEM;
-		goto free_privblk;
+		goto free_mdev;
 	}
 
-	ret = mailbox_register(&pdev->dev, list);
+	ret = mailbox_register(mdev, list);
 	if (ret)
 		goto unmap_mbox;
-	platform_set_drvdata(pdev, list);
+	platform_set_drvdata(pdev, mdev);
 
 	return 0;
 
 unmap_mbox:
-	iounmap(mbox_base);
+	iounmap(omdev->mbox_base);
+free_mdev:
+	mailbox_device_free(mdev);
 free_privblk:
 	kfree(privblk);
 free_mboxblk:
@@ -339,16 +387,19 @@ free_list:
 
 static int omap2_mbox_remove(struct platform_device *pdev)
 {
+	struct mailbox_device *mdev = platform_get_drvdata(pdev);
 	struct omap_mbox2_priv *privblk;
-	struct mailbox **list = platform_get_drvdata(pdev);
+	struct omap_mbox2_device *omdev = mdev->priv;
+	struct mailbox **list = mdev->mboxes;
 	struct mailbox *mboxblk = list[0];
 
 	privblk = mboxblk->priv;
-	mailbox_unregister();
-	iounmap(mbox_base);
+	mailbox_unregister(mdev);
+	iounmap(omdev->mbox_base);
 	kfree(privblk);
 	kfree(mboxblk);
 	kfree(list);
+	mailbox_device_free(mdev);
 	platform_set_drvdata(pdev, NULL);
 
 	return 0;
