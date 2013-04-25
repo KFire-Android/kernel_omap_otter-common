@@ -932,13 +932,24 @@ static void hdmi_dump_regs(struct seq_file *s)
 int omapdss_hdmi_read_edid(u8 *buf, int len)
 {
 	int r;
+	enum level_shifter_state restore_state = hdmi.ls_state;
+
+	/* skip if no monitor attached */
+	if (!gpio_get_value(hdmi.hpd_gpio))
+		return -ENODEV;
 
 	mutex_lock(&hdmi.lock);
 
 	r = hdmi_runtime_get();
 	BUG_ON(r);
 
+
+	hdmi_set_ls_state(LS_ENABLED);
+
 	r = hdmi.ip_data.ops->read_edid(&hdmi.ip_data, buf, len);
+
+	/* restore level shifter state */
+	hdmi_set_ls_state(restore_state);
 
 	hdmi_runtime_put();
 	mutex_unlock(&hdmi.lock);
