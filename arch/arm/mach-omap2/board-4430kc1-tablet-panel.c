@@ -73,7 +73,7 @@ static struct omap_dss_device tablet_lcd_device = {
 		.timings	= {
 			.x_res          = 1024,
 			.y_res          = 600,
-			.pixel_clock    = 46000, /* in kHz */
+			.pixel_clock    = 51200, /* in kHz */
 			.hfp            = 160,   /* HFP fix 160 */
 			.hsw            = 10,    /* HSW = 1~140 */
 			.hbp            = 150,   /* HSW + HBP = 160 */
@@ -222,24 +222,20 @@ void __init omap4_kc1_android_display_setup(struct omap_ion_platform_data *ion)
 	omap_android_display_setup(&sdp4430_dss_data,
 				   &dsscomp_config_boxer,
 				   &omaplfb_plat_data_boxer,
-				   &sdp4430_fb_data,
-				   ion);
+				   &sdp4430_fb_data);
 }
 
 void __init omap4_kc1_display_init(void)
 {
-	int ret;
+	platform_add_devices(sdp4430_panel_devices, ARRAY_SIZE(sdp4430_panel_devices));
 
 	omapfb_set_platform_data(&sdp4430_fb_data);
-
-	//omap_vram_set_sdram_vram(TABLET_FB_RAM_SIZE, 0);
-
+	omap_vram_set_sdram_vram(OTTER_FB_RAM_SIZE, 0);
 	spi_register_board_info(tablet_spi_board_info,	ARRAY_SIZE(tablet_spi_board_info));
 
 //	omap_mux_enable_wkup("sys_nirq1");
 //	omap_mux_enable_wkup("sys_nirq2");
 
-	platform_add_devices(sdp4430_panel_devices, ARRAY_SIZE(sdp4430_panel_devices));
 	omap_display_init(&sdp4430_dss_data);
 }
 

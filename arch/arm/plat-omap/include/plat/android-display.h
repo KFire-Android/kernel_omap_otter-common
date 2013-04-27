@@ -18,7 +18,6 @@
 
 #include <linux/omapfb.h>
 #include <video/omapdss.h>
-#include <mach/omap4_ion.h>
 #include <plat/sgx_omaplfb.h>
 #include <plat/dsscomp.h>
 
@@ -28,16 +27,14 @@
 int omap_android_display_setup(struct omap_dss_board_info *dss,
 				struct dsscomp_platform_data *dsscomp,
 				struct sgx_omaplfb_platform_data *sgx,
-				struct omapfb_platform_data *fb,
-				struct omap_ion_platform_data *ion);
+				struct omapfb_platform_data *fb);
 
 bool omap_android_display_is_default(struct omap_dss_device *device);
 #else
 static inline void omap_android_display_setup(struct omap_dss_board_info *dss,
 				struct dsscomp_platform_data *dsscomp,
 				struct sgx_omaplfb_platform_data *sgx,
-				struct omapfb_platform_data *fb,
-				struct omap_ion_platform_data *ion)
+				struct omapfb_platform_data *fb)
 {
 }
 
