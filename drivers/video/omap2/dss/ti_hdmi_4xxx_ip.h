@@ -28,6 +28,12 @@
 #include <sound/asound.h>
 #endif
 
+#define HDMI_HPD_LOW            0x10
+#define HDMI_HPD_HIGH           0x20
+#define HDMI_BCAP               0x40
+#define HDMI_RI_ERR             0x80
+#define HDMI_CEC_INT            0x100
+
 /* HDMI Wrapper */
 
 #define HDMI_WP_REVISION			0x0

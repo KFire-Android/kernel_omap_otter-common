@@ -45,7 +45,6 @@
 #include <linux/delay.h>
 #include <linux/vmalloc.h>
 #include <linux/rproc_drm.h>
-#include <linux/rproc_secure.h>
 
 #include "remoteproc_internal.h"
 
@@ -334,6 +333,7 @@ static int rproc_enable_iommu(struct rproc *rproc)
 	struct iommu_domain *domain;
 	struct device *dev = rproc->dev.parent;
 	int ret;
+	int iommu_sdata[2] = {0, 0};
 
 	/*
 	 * We currently use iommu_present() to decide if an IOMMU
@@ -358,6 +358,14 @@ static int rproc_enable_iommu(struct rproc *rproc)
 	}
 
 	iommu_set_fault_handler(domain, rproc_iommu_fault, rproc);
+	iommu_sdata[0] = rproc_secure_get_mode(rproc);
+	iommu_sdata[1] = rproc_secure_get_ttb(rproc);
+	ret = iommu_domain_add_iommudata(domain, iommu_sdata,
+						sizeof(iommu_sdata));
+	if (ret) {
+		dev_err(dev, "can't add iommu secure data: %d\n", ret);
+		goto free_domain;
+	}
 
 	ret = iommu_attach_device(domain, dev);
 	if (ret) {
@@ -386,6 +394,50 @@ static void rproc_disable_iommu(struct rproc *rproc)
 	iommu_domain_free(domain);
 
 	return;
+}
+
+static int rproc_program_iommu(struct rproc *rproc)
+{
+	struct rproc_mem_entry *entry;
+	int ret = 0;
+	int smode = rproc_secure_get_mode(rproc);
+
+	if (smode)
+		return 0;
+
+	list_for_each_entry(entry, &rproc->mappings, node) {
+		/*
+		 * no point in handling devmem resource without
+		 * a valid iommu domain
+		 */
+		if (entry->type == RSC_DEVMEM && !rproc->domain) {
+			ret = -EINVAL;
+			goto out;
+		}
+		if (entry->type == RSC_CARVEOUT && !rproc->domain)
+			continue;
+
+		/* should never hit this, add this for sanity */
+		if (entry->mapped) {
+			WARN_ON(1);
+			continue;
+		}
+
+		/* cleanup will be taken care in rproc_resource_cleanup */
+		ret = iommu_map(rproc->domain, entry->da, entry->dma,
+						entry->len, entry->flags);
+		if (ret) {
+			dev_err(&rproc->dev, "iommu_map failed: %d\n", ret);
+			goto out;
+		}
+		entry->mapped = true;
+		dev_dbg(&rproc->dev,
+				"mapped entry pa 0x%x, da 0x%x, len 0x%x\n",
+				entry->dma, entry->da, entry->len);
+	}
+
+out:
+	return ret;
 }
 
 /*
@@ -562,6 +614,170 @@ rproc_load_segments(struct rproc *rproc, const u8 *elf_data, size_t len)
 	return ret;
 }
 
+static void rproc_reset_poolmem(struct rproc *rproc)
+{
+	struct rproc_mem_pool *pool = rproc->memory_pool;
+
+	if (!pool || !pool->mem_base || !pool->mem_size) {
+		pr_warn("invalid pool\n");
+		return;
+	}
+
+	pool->cur_ipc_base = pool->mem_base;
+	pool->cur_ipc_size = SZ_256K;
+	pool->cur_ipcbuf_base = pool->cur_ipc_base + pool->cur_ipc_size;
+	pool->cur_ipcbuf_size = SZ_1M - pool->cur_ipc_size;
+	pool->cur_fw_base = pool->mem_base + SZ_1M;
+	pool->cur_fw_size = pool->mem_size - SZ_1M;
+}
+
+/**
+ * rproc_alloc_poolmem() - allocate from the rproc carveout pool
+ * @rproc: remote processor to allocate the memory for
+ * @size: size of the allocation
+ * @pa: pointer to return the physical address of the allocated segment
+ * @type: segment type to identify the carveout range to allocate from
+ *
+ * This function is the basic allocator function from the rproc carveout
+ * pool. The pool itself is divided into 3 different regions currently,
+ * one for the rproc shared vring objects, another for the vring data
+ * buffers and the last for all the firmware segments. The regions are
+ * partitioned to mimic the current ranges of the CMA allocated addresses
+ * for OMAP so that the same firmware can be used.
+ */
+static int
+rproc_alloc_poolmem(struct rproc *rproc, u32 size, dma_addr_t *pa, int type)
+{
+	struct rproc_mem_pool *pool = rproc->memory_pool;
+	size_t align_size = PAGE_SIZE << get_order(size);
+	size_t max_cma_align = PAGE_SIZE << CONFIG_CMA_ALIGNMENT;
+	size_t offset;
+
+	/* enforce the max alignment, aligned with CMA */
+	if (align_size > max_cma_align)
+		align_size = max_cma_align;
+	else
+		size = align_size;
+
+	*pa = 0;
+	if (!pool || !pool->mem_base || !pool->mem_size) {
+		pr_warn("invalid pool\n");
+		return -EINVAL;
+	}
+
+	switch (type) {
+	case RPROC_MEM_IPC_BUF:
+		if (pool->cur_ipcbuf_size < size) {
+			pr_warn("out of carveout memory\n");
+			return -ENOMEM;
+		}
+
+		offset = ALIGN(pool->cur_ipcbuf_base, align_size) -
+							pool->cur_ipcbuf_base;
+		*pa = pool->cur_ipcbuf_base + offset;
+		pool->cur_ipcbuf_base += (size + offset);
+		pool->cur_ipcbuf_size -= (size + offset);
+		break;
+	case RPROC_MEM_IPC:
+		if (pool->cur_ipc_size < size) {
+			pr_warn("out of carveout memory\n");
+			return -ENOMEM;
+		}
+
+		offset = ALIGN(pool->cur_ipc_base, align_size) -
+							pool->cur_ipc_base;
+		*pa = pool->cur_ipc_base + offset;
+		pool->cur_ipc_base += (size + offset);
+		pool->cur_ipc_size -= (size + offset);
+		break;
+	case RPROC_MEM_FW:
+		if (pool->cur_fw_size < size) {
+			pr_warn("out of carveout memory\n");
+			return -ENOMEM;
+		}
+
+		offset = ALIGN(pool->cur_fw_base, align_size) -
+							pool->cur_fw_base;
+		*pa = pool->cur_fw_base + offset;
+		pool->cur_fw_base += (size + offset);
+		pool->cur_fw_size -= (size + offset);
+		break;
+	default:
+		/* do nothing */
+		break;
+	}
+	return 0;
+}
+
+/**
+ * rproc_alloc_memory() - memory allocator for rproc segments
+ * @rproc: remote processor to allocate the memory for
+ * @size: size of the allocation
+ * @pa: pointer to return the physical address of the allocated segment
+ * @type: segment type to identify the carveout range to allocate from
+ *
+ * This function is the primary allocator function that needs to be used
+ * for allocating memory for different rproc firmware segments. It provides
+ * an unified interface and allocated memory from either the default CMA
+ * pool or the carveout pool associated with the rproc device. The carveout
+ * allocation gives out both the physical as well as the equivalent kernel
+ * virtual address.
+ *
+ * Note: The kernel virtual address returned in the case of a carveout pool
+ * may not exactly meet the same criteria as the virtual address returned
+ * from the dma_alloc_coherent API. Any kernel functions trying to leverage
+ * this address for virt to phys conversions or preparing sg lists need to
+ * be careful.
+ */
+void *rproc_alloc_memory(struct rproc *rproc, u32 size, dma_addr_t *dma,
+								int type)
+{
+	void *va = NULL;
+	struct device *dev = &rproc->dev;
+
+	/* use a carveout pool only if the rproc is configured so */
+	if (rproc->memory_pool) {
+		int ret = rproc_alloc_poolmem(rproc, size, dma, type);
+		if (ret) {
+			dev_err(dev, "rproc_alloc_poolmem failed 0x%x\n", size);
+			goto out;
+		}
+
+		/* ioremaping normal memory, so make sparse happy */
+		va = (__force void *) ioremap((unsigned long)(*dma), size);
+		if (!va) {
+			dev_err(dev, "iomap error: (phys 0x%08x size 0x%x)\n",
+						(u32)(*dma), size);
+			goto out;
+		}
+	} else {
+		va = dma_alloc_coherent(dev->parent, size, dma, GFP_KERNEL);
+		if (!va) {
+			dev_err(dev, "dma_alloc_coherent failed\n");
+			goto out;
+		}
+	}
+
+out:
+	return va;
+}
+
+void rproc_free_memory(struct rproc *rproc, u32 size, void *va, dma_addr_t dma)
+{
+	struct device *dev = &rproc->dev;
+
+	if (rproc->memory_pool) {
+		/*
+		 * just unmap it, the pool need not be managed, it would
+		 * simply just need to be reset. normal memory is being
+		 * unmapped, so make sparse also happy.
+		 */
+		iounmap((__force void __iomem *)va);
+	} else {
+		dma_free_coherent(dev->parent, size, va, dma);
+	}
+}
+
 int rproc_alloc_vring(struct rproc_vdev *rvdev, int i)
 {
 	struct rproc *rproc = rvdev->rproc;
@@ -584,10 +800,10 @@ int rproc_alloc_vring(struct rproc_vdev *rvdev, int i)
 	 * this call will also configure the IOMMU for us
 	 * TODO: let the rproc know the da of this vring
 	 */
-	va = dma_alloc_coherent(dev->parent, size, &dma, GFP_KERNEL);
+	va = rproc_alloc_memory(rproc, size, &dma, RPROC_MEM_IPC);
 	if (!va) {
-		dev_err(dev, "dma_alloc_coherent failed\n");
-		return -EINVAL;
+		dev_err(dev, "rproc_alloc_memory failed\n");
+		return -ENOMEM;
 	}
 
 	/*
@@ -599,7 +815,7 @@ int rproc_alloc_vring(struct rproc_vdev *rvdev, int i)
 	ret = idr_get_new(&rproc->notifyids, vring, &notifyid);
 	if (ret) {
 		dev_err(dev, "idr_get_new failed: %d\n", ret);
-		dma_free_coherent(dev->parent, size, va, dma);
+		rproc_free_memory(rproc, size, va, dma);
 		return ret;
 	}
 
@@ -647,9 +863,8 @@ void rproc_free_vring(struct rproc_vring *rvring)
 {
 	int size = PAGE_ALIGN(vring_size(rvring->len, rvring->align));
 	struct rproc *rproc = rvring->rvdev->rproc;
-	struct device *dev = &rproc->dev;
 
-	dma_free_coherent(dev->parent, size, rvring->va, rvring->dma);
+	rproc_free_memory(rproc, size, rvring->va, rvring->dma);
 	idr_remove(&rproc->notifyids, rvring->notifyid);
 }
 
@@ -917,7 +1132,11 @@ static int rproc_handle_trace(struct rproc *rproc, struct fw_rsc_trace *rsc,
  * and might require us to configure their iommu before they can access
  * the on-chip peripherals they need.
  *
- * This resource entry is a request to map such a peripheral device.
+ * This resource entry is a request to map such a peripheral device. The
+ * entry information is stored in a mapping entry, and will be mapped
+ * into the IOMMU all at once along with all the mapping entries. This is
+ * being done to support a secure playback usecase, wherein the iommu
+ * will be configured differently.
  *
  * These devmem entries will contain the physical address of the device in
  * the 'pa' member. If a specific device address is expected, then 'da' will
@@ -935,11 +1154,6 @@ static int rproc_handle_devmem(struct rproc *rproc, struct fw_rsc_devmem *rsc,
 {
 	struct rproc_mem_entry *mapping;
 	struct device *dev = &rproc->dev;
-	int ret;
-
-	/* no point in handling this resource without a valid iommu domain */
-	if (!rproc->domain)
-		return -EINVAL;
 
 	if (sizeof(*rsc) > avail) {
 		dev_err(dev, "devmem rsc is truncated\n");
@@ -952,15 +1166,9 @@ static int rproc_handle_devmem(struct rproc *rproc, struct fw_rsc_devmem *rsc,
 		return -ENOMEM;
 	}
 
-	ret = iommu_map(rproc->domain, rsc->da, rsc->pa, rsc->len, rsc->flags);
-	if (ret) {
-		dev_err(dev, "failed to map devmem: %d\n", ret);
-		goto out;
-	}
-
 	/*
-	 * We'll need this info later when we'll want to unmap everything
-	 * (e.g. on shutdown).
+	 * We'll need this info later when we'll want to map at a later time
+	 * or unmap everything (e.g. on shutdown)
 	 *
 	 * We can't trust the remote processor not to change the resource
 	 * table, so we must maintain this info independently.
@@ -969,16 +1177,15 @@ static int rproc_handle_devmem(struct rproc *rproc, struct fw_rsc_devmem *rsc,
 	mapping->da = rsc->da;
 	mapping->len = rsc->len;
 	mapping->memregion = rsc->memregion;
+	mapping->type = RSC_DEVMEM;
+	mapping->flags = rsc->flags;
+	mapping->mapped = false;
 	list_add_tail(&mapping->node, &rproc->mappings);
 
-	dev_dbg(dev, "mapped devmem pa 0x%x, da 0x%x, len 0x%x\n",
+	dev_dbg(dev, "processed devmem pa 0x%x, da 0x%x, len 0x%x\n",
 					rsc->pa, rsc->da, rsc->len);
 
 	return 0;
-
-out:
-	kfree(mapping);
-	return ret;
 }
 
 /**
@@ -1022,9 +1229,9 @@ static int rproc_handle_carveout(struct rproc *rproc,
 		return -ENOMEM;
 	}
 
-	va = dma_alloc_coherent(dev->parent, rsc->len, &dma, GFP_KERNEL);
+	va = rproc_alloc_memory(rproc, rsc->len, &dma, RPROC_MEM_FW);
 	if (!va) {
-		dev_err(dev, "dma_alloc_coherent failed: %d\n", rsc->len);
+		dev_err(dev, "rproc_alloc_memory failed: %d\n", rsc->len);
 		ret = -ENOMEM;
 		goto free_carv;
 	}
@@ -1042,55 +1249,54 @@ static int rproc_handle_carveout(struct rproc *rproc,
 	 *
 	 * In this case, we must use the IOMMU API directly and map
 	 * the memory to the device address as expected by the remote
-	 * processor.
+	 * processor. The required information is stored in a mapping
+	 * entry, and will be mapped into the IOMMU all at once along
+	 * with the rest of the mapping entries. This is being done to
+	 * support a secure playback usecase, wherein the iommu will be
+	 * configured differently.
 	 *
 	 * Obviously such remote processor devices should not be configured
 	 * to use the iommu-based DMA API: we expect 'dma' to contain the
 	 * physical address in this case.
 	 */
-	if (rproc->domain) {
-		mapping = kzalloc(sizeof(*mapping), GFP_KERNEL);
-		if (!mapping) {
-			dev_err(dev, "kzalloc mapping failed\n");
-			ret = -ENOMEM;
-			goto dma_free;
-		}
-
-		ret = iommu_map(rproc->domain, rsc->da, dma, rsc->len,
-								rsc->flags);
-		if (ret) {
-			dev_err(dev, "iommu_map failed: %d\n", ret);
-			goto free_mapping;
-		}
-
-		/*
-		 * We'll need this info later when we'll want to unmap
-		 * everything (e.g. on shutdown).
-		 *
-		 * We can't trust the remote processor not to change the
-		 * resource table, so we must maintain this info independently.
-		 */
-		mapping->da = rsc->da;
-		mapping->len = rsc->len;
-		list_add_tail(&mapping->node, &rproc->mappings);
-
-		dev_dbg(dev, "carveout mapped 0x%x to 0x%x\n", rsc->da, dma);
-
-		/*
-		 * Some remote processors might need to know the pa
-		 * even though they are behind an IOMMU. E.g., OMAP4's
-		 * remote M3 processor needs this so it can control
-		 * on-chip hardware accelerators that are not behind
-		 * the IOMMU, and therefor must know the pa.
-		 *
-		 * Generally we don't want to expose physical addresses
-		 * if we don't have to (remote processors are generally
-		 * _not_ trusted), so we might want to do this only for
-		 * remote processor that _must_ have this (e.g. OMAP4's
-		 * dual M3 subsystem).
-		 */
-		rsc->pa = dma;
+	mapping = kzalloc(sizeof(*mapping), GFP_KERNEL);
+	if (!mapping) {
+		dev_err(dev, "kzalloc mapping failed\n");
+		ret = -ENOMEM;
+		goto dma_free;
 	}
+
+	/*
+	 * We'll need this info later when we'll want to map at a later time
+	 * or unmap everything (e.g. on shutdown).
+	 *
+	 * We can't trust the remote processor not to change the
+	 * resource table, so we must maintain this info independently.
+	 */
+	mapping->dma = dma;
+	mapping->da = rsc->da;
+	mapping->len = rsc->len;
+	mapping->type = RSC_CARVEOUT;
+	mapping->flags = rsc->flags;
+	mapping->mapped = false;
+	list_add_tail(&mapping->node, &rproc->mappings);
+
+	dev_dbg(dev, "carveout processed 0x%x to 0x%x\n", rsc->da, dma);
+
+	/*
+	 * Some remote processors might need to know the pa
+	 * even though they are behind an IOMMU. E.g., OMAP4's
+	 * remote M3 processor needs this so it can control
+	 * on-chip hardware accelerators that are not behind
+	 * the IOMMU, and therefor must know the pa.
+	 *
+	 * Generally we don't want to expose physical addresses
+	 * if we don't have to (remote processors are generally
+	 * _not_ trusted), so we might want to do this only for
+	 * remote processor that _must_ have this (e.g. OMAP4's
+	 * dual M3 subsystem).
+	 */
+	rsc->pa = dma;
 
 	carveout->va = va;
 	carveout->len = rsc->len;
@@ -1102,10 +1308,8 @@ static int rproc_handle_carveout(struct rproc *rproc,
 
 	return 0;
 
-free_mapping:
-	kfree(mapping);
 dma_free:
-	dma_free_coherent(dev->parent, rsc->len, va, dma);
+	rproc_free_memory(rproc, rsc->len, va, dma);
 free_carv:
 	kfree(carveout);
 	return ret;
@@ -1445,21 +1649,27 @@ static void rproc_resource_cleanup(struct rproc *rproc)
 
 	/* clean up carveout allocations */
 	list_for_each_entry_safe(entry, tmp, &rproc->carveouts, node) {
-		dma_free_coherent(dev->parent, entry->len, entry->va,
-				entry->dma);
+		rproc_free_memory(rproc, entry->len, entry->va, entry->dma);
 		list_del(&entry->node);
 		kfree(entry);
 	}
+
+	/* reconfigure the carveout pool, if it exists */
+	if (rproc->memory_pool)
+		rproc_reset_poolmem(rproc);
 
 	/* clean up iommu mapping entries */
 	list_for_each_entry_safe(entry, tmp, &rproc->mappings, node) {
 		size_t unmapped;
 
-		unmapped = iommu_unmap(rproc->domain, entry->da, entry->len);
-		if (unmapped != entry->len) {
-			/* nothing much to do besides complaining */
-			dev_err(dev, "failed to unmap %u/%zu\n", entry->len,
-								unmapped);
+		if (entry->mapped) {
+			unmapped = iommu_unmap(rproc->domain, entry->da,
+								entry->len);
+			if (unmapped != entry->len) {
+				/* nothing much to do besides complaining */
+				dev_err(dev, "failed to unmap %u/%zu\n",
+							entry->len, unmapped);
+			}
 		}
 
 		list_del(&entry->node);
@@ -1538,6 +1748,7 @@ static int rproc_fw_boot(struct rproc *rproc, const struct firmware *fw)
 	struct resource_table *table;
 	int ret, tablesz, versz;
 	const u8 *version;
+	int smode = rproc_secure_get_mode(rproc);
 
 	ret = rproc_fw_sanity_check(rproc, fw);
 	if (ret)
@@ -1546,16 +1757,6 @@ static int rproc_fw_boot(struct rproc *rproc, const struct firmware *fw)
 	ehdr = (struct elf32_hdr *)fw->data;
 
 	dev_info(dev, "Booting fw image %s, size %zd\n", name, fw->size);
-
-	/*
-	 * if enabling an IOMMU isn't relevant for this rproc, this is
-	 * just a nop
-	 */
-	ret = rproc_enable_iommu(rproc);
-	if (ret) {
-		dev_err(dev, "can't enable iommu: %d\n", ret);
-		return ret;
-	}
 
 	/*
 	 * The ELF entry point is the rproc's boot addr (though this is not
@@ -1597,8 +1798,34 @@ static int rproc_fw_boot(struct rproc *rproc, const struct firmware *fw)
 		goto free_version;
 	}
 
+	/* parse the secure sections */
+	ret = rproc_secure_parse_fw(rproc, fw->data);
+	if (ret) {
+		dev_err(dev, "Failed to parse secure sections: %d\n", ret);
+		goto free_version;
+	}
+
+	/*
+	 * if enabling an IOMMU isn't relevant for this rproc, this is
+	 * just a nop. the cleanup path is a bit out of order, but that
+	 * is fine since the domain will be free and the actual disable
+	 * call will be a nop.
+	 */
+	ret = rproc_enable_iommu(rproc);
+	if (ret) {
+		dev_err(dev, "can't enable iommu: %d\n", ret);
+		goto free_version;
+	}
+
+	/* map the different remoteproc memory regions into the iommu */
+	ret = rproc_program_iommu(rproc);
+	if (ret) {
+		dev_err(dev, "can't program iommu: %d\n", ret);
+		goto free_version;
+	}
+
 	/* check and validate secure certificate */
-	rproc_secure_boot(rproc, fw);
+	rproc_secure_boot(rproc);
 
 	/* power up the remote processor */
 	ret = rproc->ops->start(rproc);
@@ -1609,7 +1836,8 @@ static int rproc_fw_boot(struct rproc *rproc, const struct firmware *fw)
 
 	rproc->state = RPROC_RUNNING;
 	pm_runtime_set_active(dev);
-	pm_runtime_enable(dev);
+	if (!smode)
+		pm_runtime_enable(dev);
 	pm_runtime_get_noresume(dev);
 	rproc->auto_suspend_timeout = rproc->auto_suspend_timeout ? :
 					DEFAULT_AUTOSUSPEND_TIMEOUT;
@@ -1776,6 +2004,7 @@ void rproc_shutdown(struct rproc *rproc)
 {
 	struct device *dev = &rproc->dev;
 	int ret;
+	int smode = rproc_secure_get_mode(rproc);
 
 	ret = mutex_lock_interruptible(&rproc->lock);
 	if (ret) {
@@ -1797,7 +2026,8 @@ void rproc_shutdown(struct rproc *rproc)
 		pm_runtime_get_sync(dev);
 
 	pm_runtime_put_noidle(&rproc->dev);
-	pm_runtime_disable(&rproc->dev);
+	if (smode || !rproc_is_secure(rproc))
+		pm_runtime_disable(&rproc->dev);
 	pm_runtime_set_suspended(&rproc->dev);
 
 	/* power off the remote processor */
@@ -2223,6 +2453,7 @@ static void rproc_class_release(struct device *dev)
 {
 	struct rproc *rproc = container_of(dev, struct rproc, dev);
 
+	kfree(rproc->memory_pool);
 	kfree(rproc);
 }
 
@@ -2239,6 +2470,7 @@ static struct class rproc_class = {
  * @name: name of this remote processor
  * @ops: platform-specific handlers (mainly start/stop)
  * @firmware: name of firmware file to load
+ * @pool_data: optional carveout pool data
  * @len: length of private data needed by the rproc driver (in bytes)
  *
  * Allocates a new remote processor handle, but does not register
@@ -2258,9 +2490,12 @@ static struct class rproc_class = {
  */
 struct rproc *rproc_alloc(struct device *dev, const char *name,
 				const struct rproc_ops *ops,
-				const char *firmware, int len)
+				const char *firmware,
+				struct rproc_mem_pool_data *pool_data,
+				int len)
 {
 	struct rproc *rproc;
+	struct rproc_mem_pool *pool = NULL;
 
 	if (!dev || !name || !ops)
 		return NULL;
@@ -2271,10 +2506,38 @@ struct rproc *rproc_alloc(struct device *dev, const char *name,
 		return NULL;
 	}
 
+	if (pool_data) {
+		rproc->memory_pool = kzalloc(sizeof(*pool), GFP_KERNEL);
+		if (!rproc->memory_pool) {
+			dev_err(dev, "%s: kzalloc failed\n", __func__);
+			kfree(rproc);
+			return NULL;
+		}
+	}
+
 	rproc->name = name;
 	rproc->ops = ops;
 	rproc->firmware = firmware;
 	rproc->priv = &rproc[1];
+
+	/*
+	 * the current ranges for different sections are roughly chosen
+	 * based on the current OMAP configuration of 512 bytes each
+	 * for 512 vring buffers, and the alignment CMA gives back for
+	 * these sizes.
+	 */
+	if (pool_data) {
+		pool = rproc->memory_pool;
+		pool->mem_base = pool_data->mem_base;
+		pool->mem_size = pool_data->mem_size;
+		pool->cur_ipc_base = pool->mem_base;
+		pool->cur_ipc_size = SZ_256K;
+		pool->cur_ipcbuf_base = pool->cur_ipc_base +
+							pool->cur_ipc_size;
+		pool->cur_ipcbuf_size = SZ_1M - pool->cur_ipc_size;
+		pool->cur_fw_base = pool->mem_base + SZ_1M;
+		pool->cur_fw_size = pool->mem_size - SZ_1M;
+	}
 
 	device_initialize(&rproc->dev);
 	rproc->dev.parent = dev;

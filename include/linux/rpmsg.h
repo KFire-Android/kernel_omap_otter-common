@@ -115,6 +115,8 @@ enum rpmsg_ns_flags {
  * @sleepers:	number of senders that are waiting for a tx buffer
  * @ns_ept:	the bus's name service endpoint
  * @id:		unique system-wide index id for this vproc
+ * @use_carveout: flag for using carveout for vring buffers.
+ *		  default will use CMA pool, if not enabled.
  *
  * This structure stores the rpmsg state of a given virtio remote processor
  * device (there might be several virtio proc devices for each physical
@@ -134,6 +136,7 @@ struct virtproc_info {
 	atomic_t sleepers;
 	struct rpmsg_endpoint *ns_ept;
 	int id;
+	int use_carveout;
 };
 
 /**

@@ -7,6 +7,19 @@ config REMOTEPROC
 	select FW_CONFIG
 	select VIRTIO
 
+config REMOTEPROC_USE_CARVEOUT
+	bool "Use carveout memory within remoteproc"
+	default n
+	help
+	  Say Y here if you want to use carveout memory in remoteproc.
+
+	  This option controls the memory allocation mechanism the remoteproc
+	  driver will use for its firmware sections. Enabling this option will
+	  rely on a carveout memory pool supplied to the remoteproc driver
+	  through the platform data.
+
+	  Leave it as n if you want to use the default CMA mechanism.
+
 # OMAP_REMOTEPROC depends on selection of IPU or DSP instances
 config OMAP_REMOTEPROC
 	tristate "OMAP remoteproc support"

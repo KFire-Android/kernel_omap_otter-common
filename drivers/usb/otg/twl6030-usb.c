@@ -66,6 +66,8 @@
 #define USB_OTG_ADP_RISE		0x19
 #define USB_OTG_REVISION		0x1A
 
+#define USB_ID_INT_MASK			0x1F
+
 /* to be moved to LDO */
 #define TWL6030_MISC2			0xE5
 #define TWL6030_CFG_LDO_PD2		0xF5
@@ -90,6 +92,10 @@
 
 #define CHARGERUSB_CTRL1		0x8
 
+#define BOOST_MODE_OFF_MASK		0x00
+#define BOOST_MODE_ON_MASK		0x40
+#define BOOST_MODE_STATE_MASK		0x60
+
 #define CONTROLLER_STAT1		0x03
 #define	VBUS_DET			BIT(2)
 
@@ -111,6 +117,7 @@ struct twl6030_usb {
 	bool			irq_enabled;
 	bool			vbus_enable;
 	unsigned long		features;
+	u32			errata;
 
 	enum omap_musb_vbus_id_status prev_status;
 
@@ -230,6 +237,7 @@ static ssize_t twl6030_usb_vbus_show(struct device *dev,
 	       ret = snprintf(buf, PAGE_SIZE, "id\n");
 	       break;
 	case OMAP_MUSB_VBUS_OFF:
+	case OMAP_MUSB_ID_FLOAT:
 	       ret = snprintf(buf, PAGE_SIZE, "none\n");
 	       break;
 	default:
@@ -290,9 +298,9 @@ static irqreturn_t twl6030_usb_irq(int irq, void *_twl)
 				}
 			}
 		}
+		twl->prev_status = status;
+		sysfs_notify(&twl->dev->kobj, NULL, "vbus");
 	}
-	twl->prev_status = status;
-	sysfs_notify(&twl->dev->kobj, NULL, "vbus");
 
 	return IRQ_HANDLED;
 }
@@ -300,25 +308,52 @@ static irqreturn_t twl6030_usb_irq(int irq, void *_twl)
 static irqreturn_t twl6030_usbotg_irq(int irq, void *_twl)
 {
 	struct twl6030_usb *twl = _twl;
-	int status = USB_EVENT_NONE;
 	u8 hw_state;
 
 	hw_state = twl6030_readb(twl, TWL6030_MODULE_ID0, STS_HW_CONDITIONS);
 
 	if (hw_state & STS_USB_ID) {
-
+		if (twl->prev_status == OMAP_MUSB_ID_GROUND)
+			goto exit;
+		twl->prev_status = OMAP_MUSB_ID_GROUND;
 		twl6030_enable_ldo_input_supply(twl, true);
 		regulator_enable(twl->usb3v3);
 		twl->asleep = 1;
 		twl6030_writeb(twl, TWL_MODULE_USB, 0x1, USB_ID_INT_EN_HI_CLR);
 		twl6030_writeb(twl, TWL_MODULE_USB, 0x10, USB_ID_INT_EN_HI_SET);
-		status = USB_EVENT_ID;
 		omap_musb_mailbox(OMAP_MUSB_ID_GROUND);
+		/*
+		 * NOTE:
+		 * This code is needed because if ID pin
+		 * is grounded then no operations are performed in
+		 * VBUS detection interrupt.
+		 * Just do sysfs_notify.
+		 */
+		sysfs_notify(&twl->dev->kobj, NULL, "vbus");
 	} else  {
+		if (twl->prev_status != OMAP_MUSB_ID_GROUND)
+			goto exit;
+		twl->prev_status = OMAP_MUSB_ID_FLOAT;
+		/*
+		 * NOTE:
+		 * This is workaround for the TWL6032 that miss VBUS
+		 * detection interrupt while OPA_MODE is set to 1 in
+		 * the CHARGERUSB_CTRL1 register.
+		 * Just set BOOST mode for OTG to off and VBUS interrupt
+		 * will start to work.
+		 */
+		if (twl->errata & TWL6032_ERRATA_VBUS_IRQ_LOST_OPA_MODE) {
+			twl->prev_status = OMAP_MUSB_VBUS_VALID;
+			twl->vbus_enable = 0;
+			twl6030_writeb(twl, TWL_MODULE_MAIN_CHARGE,
+				       BOOST_MODE_OFF_MASK, CHARGERUSB_CTRL1);
+		}
 		twl6030_writeb(twl, TWL_MODULE_USB, 0x10, USB_ID_INT_EN_HI_CLR);
 		twl6030_writeb(twl, TWL_MODULE_USB, 0x1, USB_ID_INT_EN_HI_SET);
 	}
-	twl6030_writeb(twl, TWL_MODULE_USB, status, USB_ID_INT_LATCH_CLR);
+exit:
+	twl6030_writeb(twl, TWL_MODULE_USB, USB_ID_INT_MASK,
+		       USB_ID_INT_LATCH_CLR);
 
 	return IRQ_HANDLED;
 }
@@ -345,26 +380,47 @@ static void otg_set_vbus_work(struct work_struct *data)
 								set_vbus_work);
 
 	/*
-	 * Start driving VBUS. Set OPA_MODE bit in CHARGERUSB_CTRL1
-	 * register. This enables boost mode.
+	 * Start driving VBUS. Set OPA_MODE bit and clear HZ_MODE bit
+	 * in CHARGERUSB_CTRL1 register. This enables Boost mode for OTG
+	 * purpose.
+	 * Since in OTG operating mode internal USB charger used as VBUS supply
+	 * then it should not be in high-impedance mode on VBUS.
 	 */
-
 	if (twl->vbus_enable)
-		twl6030_writeb(twl, TWL_MODULE_MAIN_CHARGE , 0x40,
-							CHARGERUSB_CTRL1);
+		twl6030_writeb(twl, TWL_MODULE_MAIN_CHARGE,
+			       BOOST_MODE_ON_MASK, CHARGERUSB_CTRL1);
 	else
-		twl6030_writeb(twl, TWL_MODULE_MAIN_CHARGE , 0x00,
-							CHARGERUSB_CTRL1);
+		twl6030_writeb(twl, TWL_MODULE_MAIN_CHARGE,
+			       BOOST_MODE_OFF_MASK, CHARGERUSB_CTRL1);
 }
 
 static int twl6030_set_vbus(struct phy_companion *comparator, bool enabled)
 {
 	struct twl6030_usb *twl = comparator_to_twl(comparator);
 
-	twl->vbus_enable = enabled;
-	schedule_work(&twl->set_vbus_work);
+	if (twl->vbus_enable != enabled) {
+		twl->vbus_enable = enabled;
+		schedule_work(&twl->set_vbus_work);
+	}
 
 	return 0;
+}
+
+static void twl6030_get_vbus(struct twl6030_usb *twl)
+{
+	u8 ctrl1_data;
+
+	/*
+	 * Read CHARGERUSB_CTRL1 register and set vbus_enable flag
+	 * if BOOST mode for OTG purpose is enabled and USB charger
+	 * is not in high-impedance mode on VBUS.
+	 */
+	ctrl1_data = twl6030_readb(twl, TWL_MODULE_MAIN_CHARGE,
+				   CHARGERUSB_CTRL1);
+	if ((ctrl1_data & BOOST_MODE_STATE_MASK) == BOOST_MODE_ON_MASK)
+		twl->vbus_enable = true;
+	else
+		twl->vbus_enable = false;
 }
 
 static int __devinit twl6030_usb_probe(struct platform_device *pdev)
@@ -383,6 +439,7 @@ static int __devinit twl6030_usb_probe(struct platform_device *pdev)
 	twl->irq1		= platform_get_irq(pdev, 0);
 	twl->irq2		= platform_get_irq(pdev, 1);
 	twl->features		= pdata->features;
+	twl->errata		= pdata->errata;
 	twl->prev_status	= OMAP_MUSB_UNKNOWN;
 
 	twl->comparator.set_vbus	= twl6030_set_vbus;
@@ -399,6 +456,8 @@ static int __devinit twl6030_usb_probe(struct platform_device *pdev)
 		kfree(twl);
 		return err;
 	}
+
+	twl6030_get_vbus(twl);
 
 	platform_set_drvdata(pdev, twl);
 	if (device_create_file(&pdev->dev, &dev_attr_vbus))

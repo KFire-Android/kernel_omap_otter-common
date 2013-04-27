@@ -2588,6 +2588,7 @@ static struct clk auxclkreq3_ck = {
 
 static struct clk_lookup omap54xx_clks[] = {
 	CLKDEV_INIT(NULL,	"pad_clks",			&pad_clks),
+	CLKDEV_INIT(NULL,	"pad_clks_ck",			&pad_clks),
 	CLKDEV_INIT(NULL,	"secure_32k_clk_src",		&secure_32k_clk_src),
 	CLKDEV_INIT(NULL,	"slimbus_clk",			&slimbus_clk),
 	CLKDEV_INIT(NULL,	"sys_32k_ck",			&sys_32k_ck),

@@ -46,7 +46,6 @@
 #define HDMI_WP                 0x58006000
 
 /* HDMI CORE SYSTEM base address */
-#define HDMI_IP_CORE_SYSTEM	(0x400)
 #define HDMI_IP_CORE_CEC	(0xD00)
 
 #define HDMI_CORE_CEC_TIMEOUT 200

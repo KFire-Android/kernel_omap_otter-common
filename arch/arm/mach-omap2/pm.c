@@ -458,7 +458,7 @@ static int omap_pm_begin(suspend_state_t state)
 	}
 
 	/* Enable DEV OFF */
-	if (off_mode_enabled && (cpu_is_omap44xx() || cpu_is_omap54xx()))
+	if (off_mode_enabled)
 		pwrdm_enable_off_mode(true);
 
 	return 0;
@@ -469,7 +469,7 @@ static void omap_pm_end(void)
 	int ret = 0;
 
 	/* Disable DEV OFF */
-	if (off_mode_enabled && (cpu_is_omap44xx() || cpu_is_omap54xx()))
+	if (off_mode_enabled)
 		pwrdm_enable_off_mode(false);
 
 	ret = regulator_suspend_finish();

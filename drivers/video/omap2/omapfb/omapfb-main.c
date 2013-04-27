@@ -1414,16 +1414,11 @@ static int omapfb_blank(int blank, struct fb_info *fbi)
 
 	case FB_BLANK_NORMAL:
 		/* FB_BLANK_NORMAL could be implemented.
-		 * Do not suspend for HDMI in case of early
-		 * suspend since HDMI audio can be active */
-		if (display && display->name &&
-			strcmp(display->name, "hdmi") == 0) {
-			DBG("HDMI not suspended\n");
-			break;
-		}
+		 * Needs DSS additions. */
 	case FB_BLANK_VSYNC_SUSPEND:
 	case FB_BLANK_HSYNC_SUSPEND:
 	case FB_BLANK_POWERDOWN:
+
 		if (fbdev->vsync_active)
 			omapfb_enable_vsync(fbdev, display->channel, false);
 

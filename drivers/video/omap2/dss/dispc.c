@@ -2345,6 +2345,9 @@ skip_errata:
 	if (dss_has_feature(FEAT_MFLAG)) {
 		oi->mflag_en = true;
 		dispc_ovl_set_global_mflag(ovl->id, oi->mflag_en);
+	} else if (plane == OMAP_DSS_GFX) {
+		dispc_enable_arbitration(plane,
+					channel == OMAP_DSS_CHANNEL_DIGIT);
 	}
 
 	dispc_ovl_set_row_inc(plane, row_inc);
@@ -2392,10 +2395,6 @@ skip_errata:
 
 	if (plane != OMAP_DSS_GFX)
 		dispc_mgr_setup_color_conv_coef(plane, &oi->cconv);
-
-	if (plane == OMAP_DSS_GFX && (omap_rev() == OMAP5430_REV_ES1_0 ||
-					omap_rev() == OMAP5432_REV_ES1_0))
-		dispc_enable_arbitration(plane, true);
 
 	return 0;
 }
@@ -3832,8 +3831,7 @@ static void dispc_error_worker(struct work_struct *work)
 		if (bit & errors) {
 			DSSERR("FIFO UNDERFLOW on %s, disabling the overlay\n",
 					ovl->name);
-			dispc_ovl_enable(ovl->id, false);
-			dispc_mgr_go(ovl->manager->id);
+			ovl->disable(ovl);
 			mdelay(50);
 		}
 	}

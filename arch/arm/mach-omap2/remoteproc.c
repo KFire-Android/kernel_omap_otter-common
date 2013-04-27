@@ -17,9 +17,11 @@
 
 #include <linux/kernel.h>
 #include <linux/err.h>
-#include <linux/remoteproc.h>
 #include <linux/dma-contiguous.h>
 #include <linux/dma-mapping.h>
+#include <linux/slab.h>
+#include <linux/memblock.h>
+#include <linux/remoteproc.h>
 
 #include <plat/omap_device.h>
 #include <plat/omap_hwmod.h>
@@ -175,6 +177,46 @@ static struct platform_device *omap4_rproc_devs[] __initdata = {
 #endif
 };
 
+#ifdef CONFIG_REMOTEPROC_USE_CARVEOUT
+static phys_addr_t omap_ipu_phys_mempool_base;
+static u32 omap_ipu_phys_mempool_size;
+
+static phys_addr_t omap_dsp_phys_mempool_base;
+static u32 omap_dsp_phys_mempool_size;
+
+static struct rproc_mem_pool_data *omap_rproc_get_pool_data(const char *name)
+{
+	struct rproc_mem_pool_data *pool = NULL;
+	phys_addr_t paddr;
+	u32 len;
+
+	/* get ipu mem pool data */
+	if (!strcmp("ipu_c0", name)) {
+		paddr = omap_ipu_phys_mempool_base;
+		len = omap_ipu_phys_mempool_size;
+	/* get dsp mem pool data */
+	} else if (!strcmp("dsp_c0", name)) {
+		paddr = omap_dsp_phys_mempool_base;
+		len = omap_dsp_phys_mempool_size;
+	} else
+		return pool;
+
+	if (!paddr || !len) {
+		pr_warn("%s - carveout memory is unavailable: 0x%x, 0x%x\n",
+			name, paddr, len);
+		return pool;
+	}
+
+	pool = kzalloc(sizeof(*pool), GFP_KERNEL);
+	if (pool) {
+		pool->mem_base = paddr;
+		pool->mem_size = len;
+	}
+
+	return pool;
+}
+#endif
+
 void __init omap_rproc_reserve_cma(int platform_type)
 {
 	int ret;
@@ -182,19 +224,30 @@ void __init omap_rproc_reserve_cma(int platform_type)
 	unsigned long cma_size = 0;
 
 #ifdef CONFIG_OMAP_REMOTEPROC_DSP
-
 	cma_size = CONFIG_OMAP_DSP_CMA_SIZE;
 	if (platform_type == RPROC_CMA_OMAP4)
 		cma_addr = OMAP4_RPROC_CMA_BASE_DSP;
 	else if (platform_type == RPROC_CMA_OMAP5)
 		cma_addr = OMAP5_RPROC_CMA_BASE_DSP;
 
+#ifdef CONFIG_REMOTEPROC_USE_CARVEOUT
+	/* memblock_remove for OMAP4's dsp "tesla" remote processor */
+	ret = memblock_remove(cma_addr, cma_size);
+	if (!ret) {
+		omap_dsp_phys_mempool_base = cma_addr;
+		omap_dsp_phys_mempool_size = cma_size;
+	} else {
+		pr_err("memblock_remove failed for dsp %d\n", ret);
+	}
+#else
 	/* reserve CMA memory for OMAP4's dsp "tesla" remote processor */
 	ret = dma_declare_contiguous(&omap4_tesla.dev,
 					cma_size, cma_addr, 0);
 	if (ret)
 		pr_err("dma_declare_contiguous failed for dsp %d\n", ret);
 #endif
+#endif
+
 #ifdef CONFIG_OMAP_REMOTEPROC_IPU
 	if (platform_type == RPROC_CMA_OMAP4) {
 		cma_size = CONFIG_OMAP4_IPU_CMA_SIZE;
@@ -204,11 +257,22 @@ void __init omap_rproc_reserve_cma(int platform_type)
 		cma_addr = OMAP5_RPROC_CMA_BASE_IPU;
 	}
 
+#ifdef CONFIG_REMOTEPROC_USE_CARVEOUT
+	/* memblock_remove for OMAP4's M3 "ducati" remote processor */
+	ret = memblock_remove(cma_addr, cma_size);
+	if (!ret) {
+		omap_ipu_phys_mempool_base = cma_addr;
+		omap_ipu_phys_mempool_size = cma_size;
+	} else {
+		pr_err("memblock_remove failed for ipu %d\n", ret);
+	}
+#else
 	/* reserve CMA memory for OMAP4's M3 "ducati" remote processor */
 	ret = dma_declare_contiguous(&omap4_ducati.dev,
 					cma_size, cma_addr, 0);
 	if (ret)
 		pr_err("dma_declare_contiguous failed for ipu %d\n", ret);
+#endif
 #endif
 }
 
@@ -252,6 +316,16 @@ static int __init omap_rproc_init(void)
 
 		omap4_rproc_data[i].device_enable = omap_device_enable;
 		omap4_rproc_data[i].device_shutdown = omap_device_shutdown;
+
+#ifdef CONFIG_REMOTEPROC_USE_CARVEOUT
+		omap4_rproc_data[i].pool_data =
+			omap_rproc_get_pool_data(omap4_rproc_data[i].name);
+		if (!omap4_rproc_data[i].pool_data) {
+			pr_err("could not get carveout memory pool for %s\n",
+					omap4_rproc_data[i].name);
+			continue;
+		}
+#endif
 
 		/*
 		 * decrement the timer count for OMAP5 as ipu will be run

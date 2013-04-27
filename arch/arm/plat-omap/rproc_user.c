@@ -30,7 +30,7 @@
 #include <linux/poll.h>
 #include <linux/err.h>
 #include <linux/slab.h>
-#include <linux/rproc_secure.h>
+#include <linux/remoteproc.h>
 
 
 #define RPROC_USER_NAME		"rproc_user"

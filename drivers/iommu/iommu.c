@@ -170,9 +170,27 @@ void iommu_domain_free(struct iommu_domain *domain)
 	if (likely(domain->ops->domain_destroy != NULL))
 		domain->ops->domain_destroy(domain);
 
+	kfree(domain->iommu_data);
 	kfree(domain);
 }
 EXPORT_SYMBOL_GPL(iommu_domain_free);
+
+int iommu_domain_add_iommudata(struct iommu_domain *domain, void *iommu_data,
+				size_t data_size)
+{
+	void *d = NULL;
+
+	if (iommu_data && data_size) {
+		d = kmemdup(iommu_data, data_size, GFP_KERNEL);
+		if (!d)
+			return -ENOMEM;
+	}
+
+	kfree(domain->iommu_data);
+	domain->iommu_data = d;
+	return 0;
+}
+EXPORT_SYMBOL_GPL(iommu_domain_add_iommudata);
 
 int iommu_attach_device(struct iommu_domain *domain, struct device *dev)
 {

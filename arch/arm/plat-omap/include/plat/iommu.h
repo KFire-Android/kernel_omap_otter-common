@@ -59,6 +59,8 @@ struct omap_iommu {
 	u32 da_start;
 	u32 da_end;
 	union iommu_qos	qos_request;
+	int secure_mode;	/* secure mode enabled flag */
+	void *secure_ttb;	/* ttb address to be used in secure mode */
 };
 
 struct cr_regs {

@@ -762,6 +762,7 @@ enum twl4030_usb_mode {
 struct twl4030_usb_data {
 	enum twl4030_usb_mode	usb_mode;
 	unsigned long		features;
+	u32			errata;
 
 	int		(*phy_init)(struct device *dev);
 	int		(*phy_exit)(struct device *dev);
@@ -1067,6 +1068,7 @@ static inline int twl4030charger_usb_en(int enable) { return 0; }
 #define PHOENIX_MSK_TRANSITION      0x20
 
 #define TWL6032_ERRATA_LDO_MUST_BE_ALWAYS_ON	(1 << 3)
+#define TWL6032_ERRATA_VBUS_IRQ_LOST_OPA_MODE	(1 << 4)
 
 #define TWL6032_PREQ1_RES_ASS_A	0xd7
 

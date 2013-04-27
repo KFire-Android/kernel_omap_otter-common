@@ -26,6 +26,7 @@
 #include "clock.h"
 #include "cminst44xx.h"
 #include "prm44xx.h"
+#include "prcm-common.h"
 #include "powerdomain.h"
 #include "powerdomain-private.h"
 
@@ -301,6 +302,118 @@ void omap_prcmdebug_dump(int flags)
 	_prcmdebug_dump(NULL, flags);
 }
 
+#define NR_WAKEUPEVENT_REGS	7
+
+static int prcmdebug_check_omap4_io_wakeirq(const char *action_when)
+{
+	int i, bit;
+	int iopad_wake_found = 0, size = 32;
+	long unsigned int wkup_pad_event, wkevt;
+
+	for (i = 0; i < NR_WAKEUPEVENT_REGS; i++) {
+		wkevt = __raw_readl(OMAP2_L4_IO_ADDRESS(
+			d_prcm_regs->control_padconf_wakeupevent0 + i*4));
+
+		/*Check this as PADCONF6 has just 11 bits */
+		if (i == NR_WAKEUPEVENT_REGS - 1)
+			size = 11;
+
+		for_each_set_bit(bit, &wkevt, size) {
+			pr_info("%s pending I/O pad: Reg - 0x%08X, "\
+				"CONTROL_PADCONF_WAKEUPEVENT_%d[%d]\n",
+				action_when,
+				d_prcm_regs->control_padconf_wakeupevent0 + i*4,
+				i, bit);
+			iopad_wake_found = 1;
+		}
+	}
+
+	/* WKUP_PADCONF has only 25 bits */
+	size = 25;
+	wkup_pad_event = __raw_readl(OMAP2_L4_IO_ADDRESS(
+			d_prcm_regs->control_wkup_padconf_wakeupevent0));
+	for_each_set_bit(bit, &wkup_pad_event, size) {
+		pr_info("%s pending wakeup I/O pad: Reg - 0x%08X, "\
+			"CONTROL_WKUP_PADCONF_WAKEUPEVENT_0[%d]\n",
+			action_when,
+			d_prcm_regs->control_wkup_padconf_wakeupevent0, bit);
+		iopad_wake_found = 1;
+	}
+
+	return iopad_wake_found;
+}
+
+static int prcmdebug_check_omap5_io_wakeirq(const char *action_when)
+{
+	int i, bit;
+	int iopad_wake_found = 0, size = 32;
+	long unsigned int wkup_pad_event, wkevt;
+
+	for (i = 0; i < NR_WAKEUPEVENT_REGS; i++) {
+		wkevt = __raw_readl(OMAP2_L4_IO_ADDRESS(
+			d_prcm_regs->control_padconf_wakeupevent0 + i*4));
+
+		/*Check this as PADCONF6 has just 5 bits (4 on ES2) */
+		if (i == NR_WAKEUPEVENT_REGS - 1) {
+			if (omap_rev() == OMAP5430_REV_ES1_0 ||
+			    omap_rev() == OMAP5432_REV_ES1_0)
+				size = 5;
+			else
+				size = 4;
+		}
+
+		for_each_set_bit(bit, &wkevt, size) {
+			pr_info("%s pending I/O pad: Reg - 0x%08X, "\
+				"CONTROL_PADCONF_WAKEUPEVENT_%d[%d]\n",
+				action_when,
+				d_prcm_regs->control_padconf_wakeupevent0 + i*4,
+				i, bit);
+			iopad_wake_found = 1;
+		}
+	}
+
+	/* WKUP_PADCONF has only 12 bits */
+	size = 12;
+	wkup_pad_event = __raw_readl(OMAP2_L4_IO_ADDRESS(
+			d_prcm_regs->control_wkup_padconf_wakeupevent0));
+	for_each_set_bit(bit, &wkup_pad_event, size) {
+		pr_info("%s pending wakeup I/O pad: Reg - 0x%08X, "\
+			"CONTROL_WKUP_PADCONF_WAKEUPEVENT_0[%d]\n",
+			action_when,
+			d_prcm_regs->control_wkup_padconf_wakeupevent0, bit);
+		iopad_wake_found = 1;
+	}
+
+	return iopad_wake_found;
+}
+
+static int (*prcmdebug_check_io_wakeirq)(const char *);
+
+void print_prcm_wakeirq(int irq, const char *action_when)
+{
+	int iopad_wake_found = 0;
+	unsigned long pending[2];
+
+	if (!d_prcm_regs || !prcmdebug_check_io_wakeirq) {
+		pr_err("%s: PRCM debug is not initialized properly\n",
+		       __func__);
+		return;
+	}
+
+	if (omap_read_pending_irqs(pending)) {
+		pr_debug("%s failed to read pending PRCM IRQs", __func__);
+		return;
+	}
+
+	if (pending[0] & d_prcm_regs->prm_io_st_mask)
+		iopad_wake_found = prcmdebug_check_io_wakeirq(action_when);
+
+	if ((pending[0] & ~d_prcm_regs->prm_io_st_mask) || !iopad_wake_found ||
+	    pending[1])
+		pr_info("%s pending IRQ %d, prcm: 0x%lx 0x%lx\n",
+			action_when, irq, pending[0], pending[1]);
+}
+
 static int prcmdebug_all_dump(struct seq_file *sf, void *private)
 {
 	_prcmdebug_dump(sf, 0);
@@ -343,9 +456,11 @@ static int __init prcmdebug_init(void)
 	if (cpu_is_omap44xx()) {
 		d_vdd = d_vddinfo_omap4;
 		d_prcm_regs = d_prcm_regs_omap4;
+		prcmdebug_check_io_wakeirq = prcmdebug_check_omap4_io_wakeirq;
 	} else if (cpu_is_omap54xx()) {
 		d_vdd = d_vddinfo_omap5;
 		d_prcm_regs = d_prcm_regs_omap5;
+		prcmdebug_check_io_wakeirq = prcmdebug_check_omap5_io_wakeirq;
 	} else {
 		pr_err("%s: Only OMAP4 and OMAP5 supported\n", __func__);
 		return -ENODEV;
