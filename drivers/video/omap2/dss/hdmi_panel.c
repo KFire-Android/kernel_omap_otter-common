@@ -505,6 +505,7 @@ static struct omap_dss_driver hdmi_driver = {
 	.set_timings	= hdmi_set_timings,
 	.check_timings	= hdmi_check_timings,
 	.read_edid	= hdmi_read_edid,
+	.set_mode       = omapdss_hdmi_display_set_mode,
 	.detect		= hdmi_detect,
 	.audio_enable	= hdmi_panel_audio_enable,
 	.audio_disable	= hdmi_panel_audio_disable,

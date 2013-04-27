@@ -500,6 +500,8 @@ int omapdss_hdmi_display_3d_enable(struct omap_dss_device *dssdev,
 					struct s3d_disp_info *info, int code);
 void sel_i2c(void);
 void sel_hdmi(void);
+int omapdss_hdmi_display_set_mode(struct omap_dss_device *dssdev,
+					struct fb_videomode *mode);
 int hdmi_panel_init(void);
 void hdmi_panel_exit(void);
 #if defined(CONFIG_OMAP4_DSS_HDMI_AUDIO) || \

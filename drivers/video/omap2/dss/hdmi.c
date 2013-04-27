@@ -61,6 +61,9 @@ static struct {
 	defined(CONFIG_OMAP5_DSS_HDMI_AUDIO)
 	struct platform_device *audio_pdev;
 #endif
+	int code;
+	int mode;
+	bool custom_set;
 
 	struct hdmi_ip_data ip_data;
 	int hdmi_irq;
@@ -934,6 +937,22 @@ int omapdss_hdmi_display_check_timing(struct omap_dss_device *dssdev,
 
 	return 0;
 
+}
+
+int omapdss_hdmi_display_set_mode(struct omap_dss_device *dssdev,
+				  struct fb_videomode *vm)
+{
+	int r1, r2;
+	/* turn the hdmi off and on to get new timings to use */
+	hdmi.ip_data.set_mode = true;
+	dssdev->driver->disable(dssdev);
+	hdmi.ip_data.set_mode = false;
+	r1 = hdmi_set_timings(vm, false) ? 0 : -EINVAL;
+	hdmi.custom_set = true;
+	hdmi.code = hdmi.ip_data.cfg.cm.code;
+	hdmi.mode = hdmi.ip_data.cfg.cm.mode;
+	r2 = dssdev->driver->enable(dssdev);
+	return r1 ? : r2;
 }
 
 int omapdss_hdmi_display_3d_enable(struct omap_dss_device *dssdev,
