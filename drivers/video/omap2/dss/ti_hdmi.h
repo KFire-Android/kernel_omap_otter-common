@@ -106,6 +106,7 @@ struct hdmi_config {
 	struct hdmi_s3d_info s3d_info;
 	enum hdmi_deep_color_mode deep_color;
 	enum hdmi_range range;
+	struct fb_videomode timingsfb;
 };
 
 /* HDMI PLL structure */
