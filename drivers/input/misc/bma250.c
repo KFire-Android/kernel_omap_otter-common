@@ -22,7 +22,7 @@
 #include <linux/input.h>
 #include <linux/workqueue.h>
 #include <linux/mutex.h>
-#include <linux/slab.h>			//leon
+#include <linux/slab.h>
 #include <linux/mutex.h>
 #include <linux/interrupt.h>
 #include <linux/delay.h>
@@ -40,18 +40,10 @@ static void bma250_early_suspend(struct early_suspend *h);
 static void bma250_late_resume(struct early_suspend *h);
 #endif
 
-#ifdef CONFIG_BOSCH_BMA250_INT
-#define BMA250_ENABLE_INT
-#endif
-
-#ifdef BMA250_ENABLE_INT
-#define OMAP4_GSENSOR_INT1 	34
-#endif
-
-
 extern u8 quanta_get_mbid(void);	//leon add to check the board id
 
 #define SENSOR_NAME 			"bma250"
+
 #define ABSMIN				-512
 #define ABSMAX				512
 #define SLOPE_THRESHOLD_VALUE 		32
@@ -176,177 +168,175 @@ extern u8 quanta_get_mbid(void);	//leon add to check the board id
 #define BMA250_SPARE_1_REG                      0x3F
 
 
+#define BMA250_ACC_X_LSB__POS              6
+#define BMA250_ACC_X_LSB__LEN              2
+#define BMA250_ACC_X_LSB__MSK              0xC0
+#define BMA250_ACC_X_LSB__REG              BMA250_X_AXIS_LSB_REG
 
+#define BMA250_ACC_X_MSB__POS              0
+#define BMA250_ACC_X_MSB__LEN              8
+#define BMA250_ACC_X_MSB__MSK              0xFF
+#define BMA250_ACC_X_MSB__REG              BMA250_X_AXIS_MSB_REG
 
-#define BMA250_ACC_X_LSB__POS           6
-#define BMA250_ACC_X_LSB__LEN           2
-#define BMA250_ACC_X_LSB__MSK           0xC0
-#define BMA250_ACC_X_LSB__REG           BMA250_X_AXIS_LSB_REG
+#define BMA250_ACC_Y_LSB__POS              6
+#define BMA250_ACC_Y_LSB__LEN              2
+#define BMA250_ACC_Y_LSB__MSK              0xC0
+#define BMA250_ACC_Y_LSB__REG              BMA250_Y_AXIS_LSB_REG
 
-#define BMA250_ACC_X_MSB__POS           0
-#define BMA250_ACC_X_MSB__LEN           8
-#define BMA250_ACC_X_MSB__MSK           0xFF
-#define BMA250_ACC_X_MSB__REG           BMA250_X_AXIS_MSB_REG
+#define BMA250_ACC_Y_MSB__POS              0
+#define BMA250_ACC_Y_MSB__LEN              8
+#define BMA250_ACC_Y_MSB__MSK              0xFF
+#define BMA250_ACC_Y_MSB__REG              BMA250_Y_AXIS_MSB_REG
 
-#define BMA250_ACC_Y_LSB__POS           6
-#define BMA250_ACC_Y_LSB__LEN           2
-#define BMA250_ACC_Y_LSB__MSK           0xC0
-#define BMA250_ACC_Y_LSB__REG           BMA250_Y_AXIS_LSB_REG
+#define BMA250_ACC_Z_LSB__POS              6
+#define BMA250_ACC_Z_LSB__LEN              2
+#define BMA250_ACC_Z_LSB__MSK              0xC0
+#define BMA250_ACC_Z_LSB__REG              BMA250_Z_AXIS_LSB_REG
 
-#define BMA250_ACC_Y_MSB__POS           0
-#define BMA250_ACC_Y_MSB__LEN           8
-#define BMA250_ACC_Y_MSB__MSK           0xFF
-#define BMA250_ACC_Y_MSB__REG           BMA250_Y_AXIS_MSB_REG
+#define BMA250_ACC_Z_MSB__POS              0
+#define BMA250_ACC_Z_MSB__LEN              8
+#define BMA250_ACC_Z_MSB__MSK              0xFF
+#define BMA250_ACC_Z_MSB__REG              BMA250_Z_AXIS_MSB_REG
 
-#define BMA250_ACC_Z_LSB__POS           6
-#define BMA250_ACC_Z_LSB__LEN           2
-#define BMA250_ACC_Z_LSB__MSK           0xC0
-#define BMA250_ACC_Z_LSB__REG           BMA250_Z_AXIS_LSB_REG
+#define BMA250_RANGE_SEL__POS              0
+#define BMA250_RANGE_SEL__LEN              4
+#define BMA250_RANGE_SEL__MSK              0x0F
+#define BMA250_RANGE_SEL__REG              BMA250_RANGE_SEL_REG
 
-#define BMA250_ACC_Z_MSB__POS           0
-#define BMA250_ACC_Z_MSB__LEN           8
-#define BMA250_ACC_Z_MSB__MSK           0xFF
-#define BMA250_ACC_Z_MSB__REG           BMA250_Z_AXIS_MSB_REG
+#define BMA250_BANDWIDTH__POS              0
+#define BMA250_BANDWIDTH__LEN              5
+#define BMA250_BANDWIDTH__MSK              0x1F
+#define BMA250_BANDWIDTH__REG              BMA250_BW_SEL_REG
 
-#define BMA250_RANGE_SEL__POS             0
-#define BMA250_RANGE_SEL__LEN             4
-#define BMA250_RANGE_SEL__MSK             0x0F
-#define BMA250_RANGE_SEL__REG             BMA250_RANGE_SEL_REG
+#define BMA250_EN_LOW_POWER__POS           6
+#define BMA250_EN_LOW_POWER__LEN           1
+#define BMA250_EN_LOW_POWER__MSK           0x40
+#define BMA250_EN_LOW_POWER__REG           BMA250_MODE_CTRL_REG
 
-#define BMA250_BANDWIDTH__POS             0
-#define BMA250_BANDWIDTH__LEN             5
-#define BMA250_BANDWIDTH__MSK             0x1F
-#define BMA250_BANDWIDTH__REG             BMA250_BW_SEL_REG
+#define BMA250_EN_SUSPEND__POS             7
+#define BMA250_EN_SUSPEND__LEN             1
+#define BMA250_EN_SUSPEND__MSK             0x80
+#define BMA250_EN_SUSPEND__REG             BMA250_MODE_CTRL_REG
 
-#define BMA250_EN_LOW_POWER__POS          6
-#define BMA250_EN_LOW_POWER__LEN          1
-#define BMA250_EN_LOW_POWER__MSK          0x40
-#define BMA250_EN_LOW_POWER__REG          BMA250_MODE_CTRL_REG
+#define BMA250_INT_MODE_SEL__POS           0
+#define BMA250_INT_MODE_SEL__LEN           4
+#define BMA250_INT_MODE_SEL__MSK           0x0F
+#define BMA250_INT_MODE_SEL__REG           BMA250_INT_CTRL_REG
 
-#define BMA250_EN_SUSPEND__POS            7
-#define BMA250_EN_SUSPEND__LEN            1
-#define BMA250_EN_SUSPEND__MSK            0x80
-#define BMA250_EN_SUSPEND__REG            BMA250_MODE_CTRL_REG
+#define BMA250_LOWG_INT_S__POS             0
+#define BMA250_LOWG_INT_S__LEN             1
+#define BMA250_LOWG_INT_S__MSK             0x01
+#define BMA250_LOWG_INT_S__REG             BMA250_STATUS1_REG
 
-#define BMA250_INT_MODE_SEL__POS                0
-#define BMA250_INT_MODE_SEL__LEN                4
-#define BMA250_INT_MODE_SEL__MSK                0x0F
-#define BMA250_INT_MODE_SEL__REG                BMA250_INT_CTRL_REG
+#define BMA250_HIGHG_INT_S__POS            1
+#define BMA250_HIGHG_INT_S__LEN            1
+#define BMA250_HIGHG_INT_S__MSK            0x02
+#define BMA250_HIGHG_INT_S__REG            BMA250_STATUS1_REG
 
-#define BMA250_LOWG_INT_S__POS          0
-#define BMA250_LOWG_INT_S__LEN          1
-#define BMA250_LOWG_INT_S__MSK          0x01
-#define BMA250_LOWG_INT_S__REG          BMA250_STATUS1_REG
+#define BMA250_SLOPE_INT_S__POS            2
+#define BMA250_SLOPE_INT_S__LEN            1
+#define BMA250_SLOPE_INT_S__MSK            0x04
+#define BMA250_SLOPE_INT_S__REG            BMA250_STATUS1_REG
 
-#define BMA250_HIGHG_INT_S__POS          1
-#define BMA250_HIGHG_INT_S__LEN          1
-#define BMA250_HIGHG_INT_S__MSK          0x02
-#define BMA250_HIGHG_INT_S__REG          BMA250_STATUS1_REG
+#define BMA250_DOUBLE_TAP_INT_S__POS       4
+#define BMA250_DOUBLE_TAP_INT_S__LEN       1
+#define BMA250_DOUBLE_TAP_INT_S__MSK       0x10
+#define BMA250_DOUBLE_TAP_INT_S__REG       BMA250_STATUS1_REG
 
-#define BMA250_SLOPE_INT_S__POS          2
-#define BMA250_SLOPE_INT_S__LEN          1
-#define BMA250_SLOPE_INT_S__MSK          0x04
-#define BMA250_SLOPE_INT_S__REG          BMA250_STATUS1_REG
+#define BMA250_SINGLE_TAP_INT_S__POS       5
+#define BMA250_SINGLE_TAP_INT_S__LEN       1
+#define BMA250_SINGLE_TAP_INT_S__MSK       0x20
+#define BMA250_SINGLE_TAP_INT_S__REG       BMA250_STATUS1_REG
 
-#define BMA250_DOUBLE_TAP_INT_S__POS     4
-#define BMA250_DOUBLE_TAP_INT_S__LEN     1
-#define BMA250_DOUBLE_TAP_INT_S__MSK     0x10
-#define BMA250_DOUBLE_TAP_INT_S__REG     BMA250_STATUS1_REG
+#define BMA250_ORIENT_INT_S__POS           6
+#define BMA250_ORIENT_INT_S__LEN           1
+#define BMA250_ORIENT_INT_S__MSK           0x40
+#define BMA250_ORIENT_INT_S__REG           BMA250_STATUS1_REG
 
-#define BMA250_SINGLE_TAP_INT_S__POS     5
-#define BMA250_SINGLE_TAP_INT_S__LEN     1
-#define BMA250_SINGLE_TAP_INT_S__MSK     0x20
-#define BMA250_SINGLE_TAP_INT_S__REG     BMA250_STATUS1_REG
+#define BMA250_FLAT_INT_S__POS             7
+#define BMA250_FLAT_INT_S__LEN             1
+#define BMA250_FLAT_INT_S__MSK             0x80
+#define BMA250_FLAT_INT_S__REG             BMA250_STATUS1_REG
 
-#define BMA250_ORIENT_INT_S__POS         6
-#define BMA250_ORIENT_INT_S__LEN         1
-#define BMA250_ORIENT_INT_S__MSK         0x40
-#define BMA250_ORIENT_INT_S__REG         BMA250_STATUS1_REG
+#define BMA250_DATA_INT_S__POS             7
+#define BMA250_DATA_INT_S__LEN             1
+#define BMA250_DATA_INT_S__MSK             0x80
+#define BMA250_DATA_INT_S__REG             BMA250_STATUS2_REG
 
-#define BMA250_FLAT_INT_S__POS           7
-#define BMA250_FLAT_INT_S__LEN           1
-#define BMA250_FLAT_INT_S__MSK           0x80
-#define BMA250_FLAT_INT_S__REG           BMA250_STATUS1_REG
+#define BMA250_SLOPE_FIRST_X__POS          0
+#define BMA250_SLOPE_FIRST_X__LEN          1
+#define BMA250_SLOPE_FIRST_X__MSK          0x01
+#define BMA250_SLOPE_FIRST_X__REG          BMA250_STATUS_TAP_SLOPE_REG
 
-#define BMA250_DATA_INT_S__POS           7
-#define BMA250_DATA_INT_S__LEN           1
-#define BMA250_DATA_INT_S__MSK           0x80
-#define BMA250_DATA_INT_S__REG           BMA250_STATUS2_REG
+#define BMA250_SLOPE_FIRST_Y__POS          1
+#define BMA250_SLOPE_FIRST_Y__LEN          1
+#define BMA250_SLOPE_FIRST_Y__MSK          0x02
+#define BMA250_SLOPE_FIRST_Y__REG          BMA250_STATUS_TAP_SLOPE_REG
 
-#define BMA250_SLOPE_FIRST_X__POS        0
-#define BMA250_SLOPE_FIRST_X__LEN        1
-#define BMA250_SLOPE_FIRST_X__MSK        0x01
-#define BMA250_SLOPE_FIRST_X__REG        BMA250_STATUS_TAP_SLOPE_REG
+#define BMA250_SLOPE_FIRST_Z__POS          2
+#define BMA250_SLOPE_FIRST_Z__LEN          1
+#define BMA250_SLOPE_FIRST_Z__MSK          0x04
+#define BMA250_SLOPE_FIRST_Z__REG          BMA250_STATUS_TAP_SLOPE_REG
 
-#define BMA250_SLOPE_FIRST_Y__POS        1
-#define BMA250_SLOPE_FIRST_Y__LEN        1
-#define BMA250_SLOPE_FIRST_Y__MSK        0x02
-#define BMA250_SLOPE_FIRST_Y__REG        BMA250_STATUS_TAP_SLOPE_REG
+#define BMA250_SLOPE_SIGN_S__POS           3
+#define BMA250_SLOPE_SIGN_S__LEN           1
+#define BMA250_SLOPE_SIGN_S__MSK           0x08
+#define BMA250_SLOPE_SIGN_S__REG           BMA250_STATUS_TAP_SLOPE_REG
 
-#define BMA250_SLOPE_FIRST_Z__POS        2
-#define BMA250_SLOPE_FIRST_Z__LEN        1
-#define BMA250_SLOPE_FIRST_Z__MSK        0x04
-#define BMA250_SLOPE_FIRST_Z__REG        BMA250_STATUS_TAP_SLOPE_REG
+#define BMA250_TAP_FIRST_X__POS            4
+#define BMA250_TAP_FIRST_X__LEN            1
+#define BMA250_TAP_FIRST_X__MSK            0x10
+#define BMA250_TAP_FIRST_X__REG            BMA250_STATUS_TAP_SLOPE_REG
 
-#define BMA250_SLOPE_SIGN_S__POS         3
-#define BMA250_SLOPE_SIGN_S__LEN         1
-#define BMA250_SLOPE_SIGN_S__MSK         0x08
-#define BMA250_SLOPE_SIGN_S__REG         BMA250_STATUS_TAP_SLOPE_REG
+#define BMA250_TAP_FIRST_Y__POS            5
+#define BMA250_TAP_FIRST_Y__LEN            1
+#define BMA250_TAP_FIRST_Y__MSK            0x20
+#define BMA250_TAP_FIRST_Y__REG            BMA250_STATUS_TAP_SLOPE_REG
 
-#define BMA250_TAP_FIRST_X__POS        4
-#define BMA250_TAP_FIRST_X__LEN        1
-#define BMA250_TAP_FIRST_X__MSK        0x10
-#define BMA250_TAP_FIRST_X__REG        BMA250_STATUS_TAP_SLOPE_REG
+#define BMA250_TAP_FIRST_Z__POS            6
+#define BMA250_TAP_FIRST_Z__LEN            1
+#define BMA250_TAP_FIRST_Z__MSK            0x40
+#define BMA250_TAP_FIRST_Z__REG            BMA250_STATUS_TAP_SLOPE_REG
 
-#define BMA250_TAP_FIRST_Y__POS        5
-#define BMA250_TAP_FIRST_Y__LEN        1
-#define BMA250_TAP_FIRST_Y__MSK        0x20
-#define BMA250_TAP_FIRST_Y__REG        BMA250_STATUS_TAP_SLOPE_REG
+#define BMA250_TAP_FIRST_XYZ__POS          4
+#define BMA250_TAP_FIRST_XYZ__LEN          3
+#define BMA250_TAP_FIRST_XYZ__MSK          0x70
+#define BMA250_TAP_FIRST_XYZ__REG          BMA250_STATUS_TAP_SLOPE_REG
 
-#define BMA250_TAP_FIRST_Z__POS        6
-#define BMA250_TAP_FIRST_Z__LEN        1
-#define BMA250_TAP_FIRST_Z__MSK        0x40
-#define BMA250_TAP_FIRST_Z__REG        BMA250_STATUS_TAP_SLOPE_REG
+#define BMA250_TAP_SIGN_S__POS             7
+#define BMA250_TAP_SIGN_S__LEN             1
+#define BMA250_TAP_SIGN_S__MSK             0x80
+#define BMA250_TAP_SIGN_S__REG             BMA250_STATUS_TAP_SLOPE_REG
 
-#define BMA250_TAP_FIRST_XYZ__POS        4
-#define BMA250_TAP_FIRST_XYZ__LEN        3
-#define BMA250_TAP_FIRST_XYZ__MSK        0x70
-#define BMA250_TAP_FIRST_XYZ__REG        BMA250_STATUS_TAP_SLOPE_REG
+#define BMA250_HIGHG_FIRST_X__POS          0
+#define BMA250_HIGHG_FIRST_X__LEN          1
+#define BMA250_HIGHG_FIRST_X__MSK          0x01
+#define BMA250_HIGHG_FIRST_X__REG          BMA250_STATUS_ORIENT_HIGH_REG
 
-#define BMA250_TAP_SIGN_S__POS         7
-#define BMA250_TAP_SIGN_S__LEN         1
-#define BMA250_TAP_SIGN_S__MSK         0x80
-#define BMA250_TAP_SIGN_S__REG         BMA250_STATUS_TAP_SLOPE_REG
+#define BMA250_HIGHG_FIRST_Y__POS          1
+#define BMA250_HIGHG_FIRST_Y__LEN          1
+#define BMA250_HIGHG_FIRST_Y__MSK          0x02
+#define BMA250_HIGHG_FIRST_Y__REG          BMA250_STATUS_ORIENT_HIGH_REG
 
-#define BMA250_HIGHG_FIRST_X__POS        0
-#define BMA250_HIGHG_FIRST_X__LEN        1
-#define BMA250_HIGHG_FIRST_X__MSK        0x01
-#define BMA250_HIGHG_FIRST_X__REG        BMA250_STATUS_ORIENT_HIGH_REG
+#define BMA250_HIGHG_FIRST_Z__POS          2
+#define BMA250_HIGHG_FIRST_Z__LEN          1
+#define BMA250_HIGHG_FIRST_Z__MSK          0x04
+#define BMA250_HIGHG_FIRST_Z__REG          BMA250_STATUS_ORIENT_HIGH_REG
 
-#define BMA250_HIGHG_FIRST_Y__POS        1
-#define BMA250_HIGHG_FIRST_Y__LEN        1
-#define BMA250_HIGHG_FIRST_Y__MSK        0x02
-#define BMA250_HIGHG_FIRST_Y__REG        BMA250_STATUS_ORIENT_HIGH_REG
+#define BMA250_HIGHG_SIGN_S__POS           3
+#define BMA250_HIGHG_SIGN_S__LEN           1
+#define BMA250_HIGHG_SIGN_S__MSK           0x08
+#define BMA250_HIGHG_SIGN_S__REG           BMA250_STATUS_ORIENT_HIGH_REG
 
-#define BMA250_HIGHG_FIRST_Z__POS        2
-#define BMA250_HIGHG_FIRST_Z__LEN        1
-#define BMA250_HIGHG_FIRST_Z__MSK        0x04
-#define BMA250_HIGHG_FIRST_Z__REG        BMA250_STATUS_ORIENT_HIGH_REG
+#define BMA250_ORIENT_S__POS               4
+#define BMA250_ORIENT_S__LEN               3
+#define BMA250_ORIENT_S__MSK               0x70
+#define BMA250_ORIENT_S__REG               BMA250_STATUS_ORIENT_HIGH_REG
 
-#define BMA250_HIGHG_SIGN_S__POS         3
-#define BMA250_HIGHG_SIGN_S__LEN         1
-#define BMA250_HIGHG_SIGN_S__MSK         0x08
-#define BMA250_HIGHG_SIGN_S__REG         BMA250_STATUS_ORIENT_HIGH_REG
-
-#define BMA250_ORIENT_S__POS             4
-#define BMA250_ORIENT_S__LEN             3
-#define BMA250_ORIENT_S__MSK             0x70
-#define BMA250_ORIENT_S__REG             BMA250_STATUS_ORIENT_HIGH_REG
-
-#define BMA250_FLAT_S__POS               7
-#define BMA250_FLAT_S__LEN               1
-#define BMA250_FLAT_S__MSK               0x80
-#define BMA250_FLAT_S__REG               BMA250_STATUS_ORIENT_HIGH_REG
+#define BMA250_FLAT_S__POS                 7
+#define BMA250_FLAT_S__LEN                 1
+#define BMA250_FLAT_S__MSK                 0x80
+#define BMA250_FLAT_S__REG                 BMA250_STATUS_ORIENT_HIGH_REG
 
 #define BMA250_EN_SLOPE_X_INT__POS         0
 #define BMA250_EN_SLOPE_X_INT__LEN         1
@@ -363,10 +353,10 @@ extern u8 quanta_get_mbid(void);	//leon add to check the board id
 #define BMA250_EN_SLOPE_Z_INT__MSK         0x04
 #define BMA250_EN_SLOPE_Z_INT__REG         BMA250_INT_ENABLE1_REG
 
-#define BMA250_EN_SLOPE_XYZ_INT__POS         0
-#define BMA250_EN_SLOPE_XYZ_INT__LEN         3
-#define BMA250_EN_SLOPE_XYZ_INT__MSK         0x07
-#define BMA250_EN_SLOPE_XYZ_INT__REG         BMA250_INT_ENABLE1_REG
+#define BMA250_EN_SLOPE_XYZ_INT__POS       0
+#define BMA250_EN_SLOPE_XYZ_INT__LEN       3
+#define BMA250_EN_SLOPE_XYZ_INT__MSK       0x07
+#define BMA250_EN_SLOPE_XYZ_INT__REG       BMA250_INT_ENABLE1_REG
 
 #define BMA250_EN_DOUBLE_TAP_INT__POS      4
 #define BMA250_EN_DOUBLE_TAP_INT__LEN      1
@@ -403,10 +393,10 @@ extern u8 quanta_get_mbid(void);	//leon add to check the board id
 #define BMA250_EN_HIGHG_Z_INT__MSK         0x04
 #define BMA250_EN_HIGHG_Z_INT__REG         BMA250_INT_ENABLE2_REG
 
-#define BMA250_EN_HIGHG_XYZ_INT__POS         2
-#define BMA250_EN_HIGHG_XYZ_INT__LEN         1
-#define BMA250_EN_HIGHG_XYZ_INT__MSK         0x04
-#define BMA250_EN_HIGHG_XYZ_INT__REG         BMA250_INT_ENABLE2_REG
+#define BMA250_EN_HIGHG_XYZ_INT__POS       2
+#define BMA250_EN_HIGHG_XYZ_INT__LEN       1
+#define BMA250_EN_HIGHG_XYZ_INT__MSK       0x04
+#define BMA250_EN_HIGHG_XYZ_INT__REG       BMA250_INT_ENABLE2_REG
 
 #define BMA250_EN_LOWG_INT__POS            3
 #define BMA250_EN_LOWG_INT__LEN            1
@@ -418,299 +408,296 @@ extern u8 quanta_get_mbid(void);	//leon add to check the board id
 #define BMA250_EN_NEW_DATA_INT__MSK        0x10
 #define BMA250_EN_NEW_DATA_INT__REG        BMA250_INT_ENABLE2_REG
 
-#define BMA250_EN_INT1_PAD_LOWG__POS        0
-#define BMA250_EN_INT1_PAD_LOWG__LEN        1
-#define BMA250_EN_INT1_PAD_LOWG__MSK        0x01
-#define BMA250_EN_INT1_PAD_LOWG__REG        BMA250_INT1_PAD_SEL_REG
+#define BMA250_EN_INT1_PAD_LOWG__POS       0
+#define BMA250_EN_INT1_PAD_LOWG__LEN       1
+#define BMA250_EN_INT1_PAD_LOWG__MSK       0x01
+#define BMA250_EN_INT1_PAD_LOWG__REG       BMA250_INT1_PAD_SEL_REG
 
-#define BMA250_EN_INT1_PAD_HIGHG__POS       1
-#define BMA250_EN_INT1_PAD_HIGHG__LEN       1
-#define BMA250_EN_INT1_PAD_HIGHG__MSK       0x02
-#define BMA250_EN_INT1_PAD_HIGHG__REG       BMA250_INT1_PAD_SEL_REG
+#define BMA250_EN_INT1_PAD_HIGHG__POS      1
+#define BMA250_EN_INT1_PAD_HIGHG__LEN      1
+#define BMA250_EN_INT1_PAD_HIGHG__MSK      0x02
+#define BMA250_EN_INT1_PAD_HIGHG__REG      BMA250_INT1_PAD_SEL_REG
 
-#define BMA250_EN_INT1_PAD_SLOPE__POS       2
-#define BMA250_EN_INT1_PAD_SLOPE__LEN       1
-#define BMA250_EN_INT1_PAD_SLOPE__MSK       0x04
-#define BMA250_EN_INT1_PAD_SLOPE__REG       BMA250_INT1_PAD_SEL_REG
+#define BMA250_EN_INT1_PAD_SLOPE__POS      2
+#define BMA250_EN_INT1_PAD_SLOPE__LEN      1
+#define BMA250_EN_INT1_PAD_SLOPE__MSK      0x04
+#define BMA250_EN_INT1_PAD_SLOPE__REG      BMA250_INT1_PAD_SEL_REG
 
-#define BMA250_EN_INT1_PAD_DB_TAP__POS      4
-#define BMA250_EN_INT1_PAD_DB_TAP__LEN      1
-#define BMA250_EN_INT1_PAD_DB_TAP__MSK      0x10
-#define BMA250_EN_INT1_PAD_DB_TAP__REG      BMA250_INT1_PAD_SEL_REG
+#define BMA250_EN_INT1_PAD_DB_TAP__POS     4
+#define BMA250_EN_INT1_PAD_DB_TAP__LEN     1
+#define BMA250_EN_INT1_PAD_DB_TAP__MSK     0x10
+#define BMA250_EN_INT1_PAD_DB_TAP__REG     BMA250_INT1_PAD_SEL_REG
 
-#define BMA250_EN_INT1_PAD_SNG_TAP__POS     5
-#define BMA250_EN_INT1_PAD_SNG_TAP__LEN     1
-#define BMA250_EN_INT1_PAD_SNG_TAP__MSK     0x20
-#define BMA250_EN_INT1_PAD_SNG_TAP__REG     BMA250_INT1_PAD_SEL_REG
+#define BMA250_EN_INT1_PAD_SNG_TAP__POS    5
+#define BMA250_EN_INT1_PAD_SNG_TAP__LEN    1
+#define BMA250_EN_INT1_PAD_SNG_TAP__MSK    0x20
+#define BMA250_EN_INT1_PAD_SNG_TAP__REG    BMA250_INT1_PAD_SEL_REG
 
-#define BMA250_EN_INT1_PAD_ORIENT__POS      6
-#define BMA250_EN_INT1_PAD_ORIENT__LEN      1
-#define BMA250_EN_INT1_PAD_ORIENT__MSK      0x40
-#define BMA250_EN_INT1_PAD_ORIENT__REG      BMA250_INT1_PAD_SEL_REG
+#define BMA250_EN_INT1_PAD_ORIENT__POS     6
+#define BMA250_EN_INT1_PAD_ORIENT__LEN     1
+#define BMA250_EN_INT1_PAD_ORIENT__MSK     0x40
+#define BMA250_EN_INT1_PAD_ORIENT__REG     BMA250_INT1_PAD_SEL_REG
 
-#define BMA250_EN_INT1_PAD_FLAT__POS        7
-#define BMA250_EN_INT1_PAD_FLAT__LEN        1
-#define BMA250_EN_INT1_PAD_FLAT__MSK        0x80
-#define BMA250_EN_INT1_PAD_FLAT__REG        BMA250_INT1_PAD_SEL_REG
+#define BMA250_EN_INT1_PAD_FLAT__POS       7
+#define BMA250_EN_INT1_PAD_FLAT__LEN       1
+#define BMA250_EN_INT1_PAD_FLAT__MSK       0x80
+#define BMA250_EN_INT1_PAD_FLAT__REG       BMA250_INT1_PAD_SEL_REG
 
-#define BMA250_EN_INT2_PAD_LOWG__POS        0
-#define BMA250_EN_INT2_PAD_LOWG__LEN        1
-#define BMA250_EN_INT2_PAD_LOWG__MSK        0x01
-#define BMA250_EN_INT2_PAD_LOWG__REG        BMA250_INT2_PAD_SEL_REG
+#define BMA250_EN_INT2_PAD_LOWG__POS       0
+#define BMA250_EN_INT2_PAD_LOWG__LEN       1
+#define BMA250_EN_INT2_PAD_LOWG__MSK       0x01
+#define BMA250_EN_INT2_PAD_LOWG__REG       BMA250_INT2_PAD_SEL_REG
 
-#define BMA250_EN_INT2_PAD_HIGHG__POS       1
-#define BMA250_EN_INT2_PAD_HIGHG__LEN       1
-#define BMA250_EN_INT2_PAD_HIGHG__MSK       0x02
-#define BMA250_EN_INT2_PAD_HIGHG__REG       BMA250_INT2_PAD_SEL_REG
+#define BMA250_EN_INT2_PAD_HIGHG__POS      1
+#define BMA250_EN_INT2_PAD_HIGHG__LEN      1
+#define BMA250_EN_INT2_PAD_HIGHG__MSK      0x02
+#define BMA250_EN_INT2_PAD_HIGHG__REG      BMA250_INT2_PAD_SEL_REG
 
-#define BMA250_EN_INT2_PAD_SLOPE__POS       2
-#define BMA250_EN_INT2_PAD_SLOPE__LEN       1
-#define BMA250_EN_INT2_PAD_SLOPE__MSK       0x04
-#define BMA250_EN_INT2_PAD_SLOPE__REG       BMA250_INT2_PAD_SEL_REG
+#define BMA250_EN_INT2_PAD_SLOPE__POS      2
+#define BMA250_EN_INT2_PAD_SLOPE__LEN      1
+#define BMA250_EN_INT2_PAD_SLOPE__MSK      0x04
+#define BMA250_EN_INT2_PAD_SLOPE__REG      BMA250_INT2_PAD_SEL_REG
 
-#define BMA250_EN_INT2_PAD_DB_TAP__POS      4
-#define BMA250_EN_INT2_PAD_DB_TAP__LEN      1
-#define BMA250_EN_INT2_PAD_DB_TAP__MSK      0x10
-#define BMA250_EN_INT2_PAD_DB_TAP__REG      BMA250_INT2_PAD_SEL_REG
+#define BMA250_EN_INT2_PAD_DB_TAP__POS     4
+#define BMA250_EN_INT2_PAD_DB_TAP__LEN     1
+#define BMA250_EN_INT2_PAD_DB_TAP__MSK     0x10
+#define BMA250_EN_INT2_PAD_DB_TAP__REG     BMA250_INT2_PAD_SEL_REG
 
-#define BMA250_EN_INT2_PAD_SNG_TAP__POS     5
-#define BMA250_EN_INT2_PAD_SNG_TAP__LEN     1
-#define BMA250_EN_INT2_PAD_SNG_TAP__MSK     0x20
-#define BMA250_EN_INT2_PAD_SNG_TAP__REG     BMA250_INT2_PAD_SEL_REG
+#define BMA250_EN_INT2_PAD_SNG_TAP__POS    5
+#define BMA250_EN_INT2_PAD_SNG_TAP__LEN    1
+#define BMA250_EN_INT2_PAD_SNG_TAP__MSK    0x20
+#define BMA250_EN_INT2_PAD_SNG_TAP__REG    BMA250_INT2_PAD_SEL_REG
 
-#define BMA250_EN_INT2_PAD_ORIENT__POS      6
-#define BMA250_EN_INT2_PAD_ORIENT__LEN      1
-#define BMA250_EN_INT2_PAD_ORIENT__MSK      0x40
-#define BMA250_EN_INT2_PAD_ORIENT__REG      BMA250_INT2_PAD_SEL_REG
+#define BMA250_EN_INT2_PAD_ORIENT__POS     6
+#define BMA250_EN_INT2_PAD_ORIENT__LEN     1
+#define BMA250_EN_INT2_PAD_ORIENT__MSK     0x40
+#define BMA250_EN_INT2_PAD_ORIENT__REG     BMA250_INT2_PAD_SEL_REG
 
-#define BMA250_EN_INT2_PAD_FLAT__POS        7
-#define BMA250_EN_INT2_PAD_FLAT__LEN        1
-#define BMA250_EN_INT2_PAD_FLAT__MSK        0x80
-#define BMA250_EN_INT2_PAD_FLAT__REG        BMA250_INT2_PAD_SEL_REG
+#define BMA250_EN_INT2_PAD_FLAT__POS       7
+#define BMA250_EN_INT2_PAD_FLAT__LEN       1
+#define BMA250_EN_INT2_PAD_FLAT__MSK       0x80
+#define BMA250_EN_INT2_PAD_FLAT__REG       BMA250_INT2_PAD_SEL_REG
 
-#define BMA250_EN_INT1_PAD_NEWDATA__POS     0
-#define BMA250_EN_INT1_PAD_NEWDATA__LEN     1
-#define BMA250_EN_INT1_PAD_NEWDATA__MSK     0x01
-#define BMA250_EN_INT1_PAD_NEWDATA__REG     BMA250_INT_DATA_SEL_REG
+#define BMA250_EN_INT1_PAD_NEWDATA__POS    0
+#define BMA250_EN_INT1_PAD_NEWDATA__LEN    1
+#define BMA250_EN_INT1_PAD_NEWDATA__MSK    0x01
+#define BMA250_EN_INT1_PAD_NEWDATA__REG    BMA250_INT_DATA_SEL_REG
 
-#define BMA250_EN_INT2_PAD_NEWDATA__POS     7
-#define BMA250_EN_INT2_PAD_NEWDATA__LEN     1
-#define BMA250_EN_INT2_PAD_NEWDATA__MSK     0x80
-#define BMA250_EN_INT2_PAD_NEWDATA__REG     BMA250_INT_DATA_SEL_REG
-
-
-#define BMA250_UNFILT_INT_SRC_LOWG__POS        0
-#define BMA250_UNFILT_INT_SRC_LOWG__LEN        1
-#define BMA250_UNFILT_INT_SRC_LOWG__MSK        0x01
-#define BMA250_UNFILT_INT_SRC_LOWG__REG        BMA250_INT_SRC_REG
-
-#define BMA250_UNFILT_INT_SRC_HIGHG__POS       1
-#define BMA250_UNFILT_INT_SRC_HIGHG__LEN       1
-#define BMA250_UNFILT_INT_SRC_HIGHG__MSK       0x02
-#define BMA250_UNFILT_INT_SRC_HIGHG__REG       BMA250_INT_SRC_REG
-
-#define BMA250_UNFILT_INT_SRC_SLOPE__POS       2
-#define BMA250_UNFILT_INT_SRC_SLOPE__LEN       1
-#define BMA250_UNFILT_INT_SRC_SLOPE__MSK       0x04
-#define BMA250_UNFILT_INT_SRC_SLOPE__REG       BMA250_INT_SRC_REG
-
-#define BMA250_UNFILT_INT_SRC_TAP__POS         4
-#define BMA250_UNFILT_INT_SRC_TAP__LEN         1
-#define BMA250_UNFILT_INT_SRC_TAP__MSK         0x10
-#define BMA250_UNFILT_INT_SRC_TAP__REG         BMA250_INT_SRC_REG
-
-#define BMA250_UNFILT_INT_SRC_DATA__POS        5
-#define BMA250_UNFILT_INT_SRC_DATA__LEN        1
-#define BMA250_UNFILT_INT_SRC_DATA__MSK        0x20
-#define BMA250_UNFILT_INT_SRC_DATA__REG        BMA250_INT_SRC_REG
-
-#define BMA250_INT1_PAD_ACTIVE_LEVEL__POS       0
-#define BMA250_INT1_PAD_ACTIVE_LEVEL__LEN       1
-#define BMA250_INT1_PAD_ACTIVE_LEVEL__MSK       0x01
-#define BMA250_INT1_PAD_ACTIVE_LEVEL__REG       BMA250_INT_SET_REG
-
-#define BMA250_INT2_PAD_ACTIVE_LEVEL__POS       2
-#define BMA250_INT2_PAD_ACTIVE_LEVEL__LEN       1
-#define BMA250_INT2_PAD_ACTIVE_LEVEL__MSK       0x04
-#define BMA250_INT2_PAD_ACTIVE_LEVEL__REG       BMA250_INT_SET_REG
-
-#define BMA250_INT1_PAD_OUTPUT_TYPE__POS        1
-#define BMA250_INT1_PAD_OUTPUT_TYPE__LEN        1
-#define BMA250_INT1_PAD_OUTPUT_TYPE__MSK        0x02
-#define BMA250_INT1_PAD_OUTPUT_TYPE__REG        BMA250_INT_SET_REG
-
-#define BMA250_INT2_PAD_OUTPUT_TYPE__POS        3
-#define BMA250_INT2_PAD_OUTPUT_TYPE__LEN        1
-#define BMA250_INT2_PAD_OUTPUT_TYPE__MSK        0x08
-#define BMA250_INT2_PAD_OUTPUT_TYPE__REG        BMA250_INT_SET_REG
+#define BMA250_EN_INT2_PAD_NEWDATA__POS    7
+#define BMA250_EN_INT2_PAD_NEWDATA__LEN    1
+#define BMA250_EN_INT2_PAD_NEWDATA__MSK    0x80
+#define BMA250_EN_INT2_PAD_NEWDATA__REG    BMA250_INT_DATA_SEL_REG
 
 
-#define BMA250_INT_MODE_SEL__POS                0
-#define BMA250_INT_MODE_SEL__LEN                4
-#define BMA250_INT_MODE_SEL__MSK                0x0F
-#define BMA250_INT_MODE_SEL__REG                BMA250_INT_CTRL_REG
+#define BMA250_UNFILT_INT_SRC_LOWG__POS    0
+#define BMA250_UNFILT_INT_SRC_LOWG__LEN    1
+#define BMA250_UNFILT_INT_SRC_LOWG__MSK    0x01
+#define BMA250_UNFILT_INT_SRC_LOWG__REG    BMA250_INT_SRC_REG
+
+#define BMA250_UNFILT_INT_SRC_HIGHG__POS   1
+#define BMA250_UNFILT_INT_SRC_HIGHG__LEN   1
+#define BMA250_UNFILT_INT_SRC_HIGHG__MSK   0x02
+#define BMA250_UNFILT_INT_SRC_HIGHG__REG   BMA250_INT_SRC_REG
+
+#define BMA250_UNFILT_INT_SRC_SLOPE__POS   2
+#define BMA250_UNFILT_INT_SRC_SLOPE__LEN   1
+#define BMA250_UNFILT_INT_SRC_SLOPE__MSK   0x04
+#define BMA250_UNFILT_INT_SRC_SLOPE__REG   BMA250_INT_SRC_REG
+
+#define BMA250_UNFILT_INT_SRC_TAP__POS     4
+#define BMA250_UNFILT_INT_SRC_TAP__LEN     1
+#define BMA250_UNFILT_INT_SRC_TAP__MSK     0x10
+#define BMA250_UNFILT_INT_SRC_TAP__REG     BMA250_INT_SRC_REG
+
+#define BMA250_UNFILT_INT_SRC_DATA__POS    5
+#define BMA250_UNFILT_INT_SRC_DATA__LEN    1
+#define BMA250_UNFILT_INT_SRC_DATA__MSK    0x20
+#define BMA250_UNFILT_INT_SRC_DATA__REG    BMA250_INT_SRC_REG
+
+#define BMA250_INT1_PAD_ACTIVE_LEVEL__POS  0
+#define BMA250_INT1_PAD_ACTIVE_LEVEL__LEN  1
+#define BMA250_INT1_PAD_ACTIVE_LEVEL__MSK  0x01
+#define BMA250_INT1_PAD_ACTIVE_LEVEL__REG  BMA250_INT_SET_REG
+
+#define BMA250_INT2_PAD_ACTIVE_LEVEL__POS  2
+#define BMA250_INT2_PAD_ACTIVE_LEVEL__LEN  1
+#define BMA250_INT2_PAD_ACTIVE_LEVEL__MSK  0x04
+#define BMA250_INT2_PAD_ACTIVE_LEVEL__REG  BMA250_INT_SET_REG
+
+#define BMA250_INT1_PAD_OUTPUT_TYPE__POS   1
+#define BMA250_INT1_PAD_OUTPUT_TYPE__LEN   1
+#define BMA250_INT1_PAD_OUTPUT_TYPE__MSK   0x02
+#define BMA250_INT1_PAD_OUTPUT_TYPE__REG   BMA250_INT_SET_REG
+
+#define BMA250_INT2_PAD_OUTPUT_TYPE__POS   3
+#define BMA250_INT2_PAD_OUTPUT_TYPE__LEN   1 
+#define BMA250_INT2_PAD_OUTPUT_TYPE__MSK   0x08
+#define BMA250_INT2_PAD_OUTPUT_TYPE__REG   BMA250_INT_SET_REG
 
 
-#define BMA250_INT_RESET_LATCHED__POS           7
-#define BMA250_INT_RESET_LATCHED__LEN           1
-#define BMA250_INT_RESET_LATCHED__MSK           0x80
-#define BMA250_INT_RESET_LATCHED__REG           BMA250_INT_CTRL_REG
+#define BMA250_INT_MODE_SEL__POS           0
+#define BMA250_INT_MODE_SEL__LEN           4
+#define BMA250_INT_MODE_SEL__MSK           0x0F
+#define BMA250_INT_MODE_SEL__REG           BMA250_INT_CTRL_REG
 
-#define BMA250_LOWG_DUR__POS                    0
-#define BMA250_LOWG_DUR__LEN                    8
-#define BMA250_LOWG_DUR__MSK                    0xFF
-#define BMA250_LOWG_DUR__REG                    BMA250_LOW_DURN_REG
 
-#define BMA250_LOWG_THRES__POS                  0
-#define BMA250_LOWG_THRES__LEN                  8
-#define BMA250_LOWG_THRES__MSK                  0xFF
-#define BMA250_LOWG_THRES__REG                  BMA250_LOW_THRES_REG
+#define BMA250_INT_RESET_LATCHED__POS      7
+#define BMA250_INT_RESET_LATCHED__LEN      1
+#define BMA250_INT_RESET_LATCHED__MSK      0x80
+#define BMA250_INT_RESET_LATCHED__REG      BMA250_INT_CTRL_REG
 
-#define BMA250_LOWG_HYST__POS                   0
-#define BMA250_LOWG_HYST__LEN                   2
-#define BMA250_LOWG_HYST__MSK                   0x03
-#define BMA250_LOWG_HYST__REG                   BMA250_LOW_HIGH_HYST_REG
+#define BMA250_LOWG_DUR__POS               0
+#define BMA250_LOWG_DUR__LEN               8
+#define BMA250_LOWG_DUR__MSK               0xFF
+#define BMA250_LOWG_DUR__REG               BMA250_LOW_DURN_REG
 
-#define BMA250_LOWG_INT_MODE__POS               2
-#define BMA250_LOWG_INT_MODE__LEN               1
-#define BMA250_LOWG_INT_MODE__MSK               0x04
-#define BMA250_LOWG_INT_MODE__REG               BMA250_LOW_HIGH_HYST_REG
+#define BMA250_LOWG_THRES__POS             0
+#define BMA250_LOWG_THRES__LEN             8
+#define BMA250_LOWG_THRES__MSK             0xFF
+#define BMA250_LOWG_THRES__REG             BMA250_LOW_THRES_REG
 
-#define BMA250_HIGHG_DUR__POS                    0
-#define BMA250_HIGHG_DUR__LEN                    8
-#define BMA250_HIGHG_DUR__MSK                    0xFF
-#define BMA250_HIGHG_DUR__REG                    BMA250_HIGH_DURN_REG
+#define BMA250_LOWG_HYST__POS              0
+#define BMA250_LOWG_HYST__LEN              2
+#define BMA250_LOWG_HYST__MSK              0x03
+#define BMA250_LOWG_HYST__REG              BMA250_LOW_HIGH_HYST_REG
 
-#define BMA250_HIGHG_THRES__POS                  0
-#define BMA250_HIGHG_THRES__LEN                  8
-#define BMA250_HIGHG_THRES__MSK                  0xFF
-#define BMA250_HIGHG_THRES__REG                  BMA250_HIGH_THRES_REG
+#define BMA250_LOWG_INT_MODE__POS          2
+#define BMA250_LOWG_INT_MODE__LEN          1
+#define BMA250_LOWG_INT_MODE__MSK          0x04
+#define BMA250_LOWG_INT_MODE__REG          BMA250_LOW_HIGH_HYST_REG
 
-#define BMA250_HIGHG_HYST__POS                  6
-#define BMA250_HIGHG_HYST__LEN                  2
-#define BMA250_HIGHG_HYST__MSK                  0xC0
-#define BMA250_HIGHG_HYST__REG                  BMA250_LOW_HIGH_HYST_REG
+#define BMA250_HIGHG_DUR__POS              0
+#define BMA250_HIGHG_DUR__LEN              8
+#define BMA250_HIGHG_DUR__MSK              0xFF
+#define BMA250_HIGHG_DUR__REG              BMA250_HIGH_DURN_REG
 
-#define BMA250_SLOPE_DUR__POS                    0
-#define BMA250_SLOPE_DUR__LEN                    2
-#define BMA250_SLOPE_DUR__MSK                    0x03
-#define BMA250_SLOPE_DUR__REG                    BMA250_SLOPE_DURN_REG
+#define BMA250_HIGHG_THRES__POS            0
+#define BMA250_HIGHG_THRES__LEN            8
+#define BMA250_HIGHG_THRES__MSK            0xFF
+#define BMA250_HIGHG_THRES__REG            BMA250_HIGH_THRES_REG
 
-#define BMA250_SLOPE_THRES__POS                  0
-#define BMA250_SLOPE_THRES__LEN                  8
-#define BMA250_SLOPE_THRES__MSK                  0xFF
-#define BMA250_SLOPE_THRES__REG                  BMA250_SLOPE_THRES_REG
+#define BMA250_HIGHG_HYST__POS             6
+#define BMA250_HIGHG_HYST__LEN             2
+#define BMA250_HIGHG_HYST__MSK             0xC0
+#define BMA250_HIGHG_HYST__REG             BMA250_LOW_HIGH_HYST_REG
 
-#define BMA250_TAP_DUR__POS                    0
-#define BMA250_TAP_DUR__LEN                    3
-#define BMA250_TAP_DUR__MSK                    0x07
-#define BMA250_TAP_DUR__REG                    BMA250_TAP_PARAM_REG
+#define BMA250_SLOPE_DUR__POS              0
+#define BMA250_SLOPE_DUR__LEN              2
+#define BMA250_SLOPE_DUR__MSK              0x03
+#define BMA250_SLOPE_DUR__REG              BMA250_SLOPE_DURN_REG
 
-#define BMA250_TAP_SHOCK_DURN__POS             6
-#define BMA250_TAP_SHOCK_DURN__LEN             1
-#define BMA250_TAP_SHOCK_DURN__MSK             0x40
-#define BMA250_TAP_SHOCK_DURN__REG             BMA250_TAP_PARAM_REG
+#define BMA250_SLOPE_THRES__POS            0
+#define BMA250_SLOPE_THRES__LEN            8
+#define BMA250_SLOPE_THRES__MSK            0xFF
+#define BMA250_SLOPE_THRES__REG            BMA250_SLOPE_THRES_REG
 
-#define BMA250_TAP_QUIET_DURN__POS             7
-#define BMA250_TAP_QUIET_DURN__LEN             1
-#define BMA250_TAP_QUIET_DURN__MSK             0x80
-#define BMA250_TAP_QUIET_DURN__REG             BMA250_TAP_PARAM_REG
+#define BMA250_TAP_DUR__POS                0
+#define BMA250_TAP_DUR__LEN                3
+#define BMA250_TAP_DUR__MSK                0x07
+#define BMA250_TAP_DUR__REG                BMA250_TAP_PARAM_REG
 
-#define BMA250_TAP_THRES__POS                  0
-#define BMA250_TAP_THRES__LEN                  5
-#define BMA250_TAP_THRES__MSK                  0x1F
-#define BMA250_TAP_THRES__REG                  BMA250_TAP_THRES_REG
+#define BMA250_TAP_SHOCK_DURN__POS         6
+#define BMA250_TAP_SHOCK_DURN__LEN         1
+#define BMA250_TAP_SHOCK_DURN__MSK         0x40
+#define BMA250_TAP_SHOCK_DURN__REG         BMA250_TAP_PARAM_REG
 
-#define BMA250_TAP_SAMPLES__POS                6
-#define BMA250_TAP_SAMPLES__LEN                2
-#define BMA250_TAP_SAMPLES__MSK                0xC0
-#define BMA250_TAP_SAMPLES__REG                BMA250_TAP_THRES_REG
+#define BMA250_TAP_QUIET_DURN__POS         7
+#define BMA250_TAP_QUIET_DURN__LEN         1
+#define BMA250_TAP_QUIET_DURN__MSK         0x80
+#define BMA250_TAP_QUIET_DURN__REG         BMA250_TAP_PARAM_REG
 
-#define BMA250_ORIENT_MODE__POS                  0
-#define BMA250_ORIENT_MODE__LEN                  2
-#define BMA250_ORIENT_MODE__MSK                  0x03
-#define BMA250_ORIENT_MODE__REG                  BMA250_ORIENT_PARAM_REG
+#define BMA250_TAP_THRES__POS              0
+#define BMA250_TAP_THRES__LEN              5
+#define BMA250_TAP_THRES__MSK              0x1F
+#define BMA250_TAP_THRES__REG              BMA250_TAP_THRES_REG
 
-#define BMA250_ORIENT_BLOCK__POS                 2
-#define BMA250_ORIENT_BLOCK__LEN                 2
-#define BMA250_ORIENT_BLOCK__MSK                 0x0C
-#define BMA250_ORIENT_BLOCK__REG                 BMA250_ORIENT_PARAM_REG
+#define BMA250_TAP_SAMPLES__POS            6
+#define BMA250_TAP_SAMPLES__LEN            2
+#define BMA250_TAP_SAMPLES__MSK            0xC0
+#define BMA250_TAP_SAMPLES__REG            BMA250_TAP_THRES_REG
 
-#define BMA250_ORIENT_HYST__POS                  4
-#define BMA250_ORIENT_HYST__LEN                  3
-#define BMA250_ORIENT_HYST__MSK                  0x70
-#define BMA250_ORIENT_HYST__REG                  BMA250_ORIENT_PARAM_REG
+#define BMA250_ORIENT_MODE__POS            0
+#define BMA250_ORIENT_MODE__LEN            2
+#define BMA250_ORIENT_MODE__MSK            0x03
+#define BMA250_ORIENT_MODE__REG            BMA250_ORIENT_PARAM_REG
 
-#define BMA250_ORIENT_AXIS__POS                  7
-#define BMA250_ORIENT_AXIS__LEN                  1
-#define BMA250_ORIENT_AXIS__MSK                  0x80
-#define BMA250_ORIENT_AXIS__REG                  BMA250_THETA_BLOCK_REG
+#define BMA250_ORIENT_BLOCK__POS           2
+#define BMA250_ORIENT_BLOCK__LEN           2
+#define BMA250_ORIENT_BLOCK__MSK           0x0C
+#define BMA250_ORIENT_BLOCK__REG           BMA250_ORIENT_PARAM_REG
 
-#define BMA250_THETA_BLOCK__POS                  0
-#define BMA250_THETA_BLOCK__LEN                  6
-#define BMA250_THETA_BLOCK__MSK                  0x3F
-#define BMA250_THETA_BLOCK__REG                  BMA250_THETA_BLOCK_REG
+#define BMA250_ORIENT_HYST__POS            4
+#define BMA250_ORIENT_HYST__LEN            3
+#define BMA250_ORIENT_HYST__MSK            0x70
+#define BMA250_ORIENT_HYST__REG            BMA250_ORIENT_PARAM_REG
 
-#define BMA250_THETA_FLAT__POS                  0
-#define BMA250_THETA_FLAT__LEN                  6
-#define BMA250_THETA_FLAT__MSK                  0x3F
-#define BMA250_THETA_FLAT__REG                  BMA250_THETA_FLAT_REG
+#define BMA250_ORIENT_AXIS__POS            7
+#define BMA250_ORIENT_AXIS__LEN            1
+#define BMA250_ORIENT_AXIS__MSK            0x80
+#define BMA250_ORIENT_AXIS__REG            BMA250_THETA_BLOCK_REG
 
-#define BMA250_FLAT_HOLD_TIME__POS              4
-#define BMA250_FLAT_HOLD_TIME__LEN              2
-#define BMA250_FLAT_HOLD_TIME__MSK              0x30
-#define BMA250_FLAT_HOLD_TIME__REG              BMA250_FLAT_HOLD_TIME_REG
+#define BMA250_THETA_BLOCK__POS            0
+#define BMA250_THETA_BLOCK__LEN            6
+#define BMA250_THETA_BLOCK__MSK            0x3F
+#define BMA250_THETA_BLOCK__REG            BMA250_THETA_BLOCK_REG
 
-#define BMA250_LOW_POWER_MODE_S__POS            0
-#define BMA250_LOW_POWER_MODE_S__LEN            1
-#define BMA250_LOW_POWER_MODE_S__MSK            0x01
-#define BMA250_LOW_POWER_MODE_S__REG            BMA250_STATUS_LOW_POWER_REG
+#define BMA250_THETA_FLAT__POS             0
+#define BMA250_THETA_FLAT__LEN             6
+#define BMA250_THETA_FLAT__MSK             0x3F
+#define BMA250_THETA_FLAT__REG             BMA250_THETA_FLAT_REG
+
+#define BMA250_FLAT_HOLD_TIME__POS         4
+#define BMA250_FLAT_HOLD_TIME__LEN         2
+#define BMA250_FLAT_HOLD_TIME__MSK         0x30
+#define BMA250_FLAT_HOLD_TIME__REG         BMA250_FLAT_HOLD_TIME_REG
+
+#define BMA250_LOW_POWER_MODE_S__POS       0
+#define BMA250_LOW_POWER_MODE_S__LEN       1
+#define BMA250_LOW_POWER_MODE_S__MSK       0x01
+#define BMA250_LOW_POWER_MODE_S__REG       BMA250_STATUS_LOW_POWER_REG
 
 
 /* add for fast calibration*/
-#define BMA250_EN_FAST_COMP__POS                5
-#define BMA250_EN_FAST_COMP__LEN                2
-#define BMA250_EN_FAST_COMP__MSK                0x60
-#define BMA250_EN_FAST_COMP__REG                BMA250_OFFSET_CTRL_REG
+#define BMA250_EN_FAST_COMP__POS           5
+#define BMA250_EN_FAST_COMP__LEN           2
+#define BMA250_EN_FAST_COMP__MSK           0x60
+#define BMA250_EN_FAST_COMP__REG           BMA250_OFFSET_CTRL_REG
 
-#define BMA250_FAST_COMP_RDY_S__POS             4
-#define BMA250_FAST_COMP_RDY_S__LEN             1
-#define BMA250_FAST_COMP_RDY_S__MSK             0x10
-#define BMA250_FAST_COMP_RDY_S__REG             BMA250_OFFSET_CTRL_REG
+#define BMA250_FAST_COMP_RDY_S__POS        4
+#define BMA250_FAST_COMP_RDY_S__LEN        1
+#define BMA250_FAST_COMP_RDY_S__MSK        0x10
+#define BMA250_FAST_COMP_RDY_S__REG        BMA250_OFFSET_CTRL_REG
 
-#define BMA250_NVM_RDY__POS             2
-#define BMA250_NVM_RDY__LEN             1
-#define BMA250_NVM_RDY__MSK             0x04
-#define BMA250_NVM_RDY__REG             BMA250_EEPROM_CTRL_REG
+#define BMA250_NVM_RDY__POS                2
+#define BMA250_NVM_RDY__LEN                1
+#define BMA250_NVM_RDY__MSK                0x04
+#define BMA250_NVM_RDY__REG                BMA250_EEPROM_CTRL_REG
 
-#define BMA250_NVM_PROG_TRIG__POS             1
-#define BMA250_NVM_PROG_TRIG__LEN             1
-#define BMA250_NVM_PROG_TRIG__MSK             0x02
-#define BMA250_NVM_PROG_TRIG__REG             BMA250_EEPROM_CTRL_REG
+#define BMA250_NVM_PROG_TRIG__POS          1
+#define BMA250_NVM_PROG_TRIG__LEN          1
+#define BMA250_NVM_PROG_TRIG__MSK          0x02
+#define BMA250_NVM_PROG_TRIG__REG          BMA250_EEPROM_CTRL_REG
 
-#define BMA250_NVM_PROG_MODE__POS             0
-#define BMA250_NVM_PROG_MODE__LEN             1
-#define BMA250_NVM_PROG_MODE__MSK             0x01
-#define BMA250_NVM_PROG_MODE__REG             BMA250_EEPROM_CTRL_REG
-
-
-#define BMA250_COMP_TARGET_OFFSET_X__POS        1
-#define BMA250_COMP_TARGET_OFFSET_X__LEN        2
-#define BMA250_COMP_TARGET_OFFSET_X__MSK        0x06
-#define BMA250_COMP_TARGET_OFFSET_X__REG        BMA250_OFFSET_PARAMS_REG
-
-#define BMA250_COMP_TARGET_OFFSET_Y__POS        3
-#define BMA250_COMP_TARGET_OFFSET_Y__LEN        2
-#define BMA250_COMP_TARGET_OFFSET_Y__MSK        0x18
-#define BMA250_COMP_TARGET_OFFSET_Y__REG        BMA250_OFFSET_PARAMS_REG
-
-#define BMA250_COMP_TARGET_OFFSET_Z__POS        5
-#define BMA250_COMP_TARGET_OFFSET_Z__LEN        2
-#define BMA250_COMP_TARGET_OFFSET_Z__MSK        0x60
-#define BMA250_COMP_TARGET_OFFSET_Z__REG        BMA250_OFFSET_PARAMS_REG
+#define BMA250_NVM_PROG_MODE__POS          0
+#define BMA250_NVM_PROG_MODE__LEN          1
+#define BMA250_NVM_PROG_MODE__MSK          0x01
+#define BMA250_NVM_PROG_MODE__REG          BMA250_EEPROM_CTRL_REG
 
 
+#define BMA250_COMP_TARGET_OFFSET_X__POS   1
+#define BMA250_COMP_TARGET_OFFSET_X__LEN   2
+#define BMA250_COMP_TARGET_OFFSET_X__MSK   0x06
+#define BMA250_COMP_TARGET_OFFSET_X__REG   BMA250_OFFSET_PARAMS_REG
 
+#define BMA250_COMP_TARGET_OFFSET_Y__POS   3
+#define BMA250_COMP_TARGET_OFFSET_Y__LEN   2
+#define BMA250_COMP_TARGET_OFFSET_Y__MSK   0x18
+#define BMA250_COMP_TARGET_OFFSET_Y__REG   BMA250_OFFSET_PARAMS_REG
+
+#define BMA250_COMP_TARGET_OFFSET_Z__POS   5
+#define BMA250_COMP_TARGET_OFFSET_Z__LEN   2
+#define BMA250_COMP_TARGET_OFFSET_Z__MSK   0x60
+#define BMA250_COMP_TARGET_OFFSET_Z__REG   BMA250_OFFSET_PARAMS_REG
 
 
 
@@ -724,10 +711,10 @@ extern u8 quanta_get_mbid(void);	//leon add to check the board id
 
 /* range and bandwidth */
 
-#define BMA250_RANGE_2G                 0
-#define BMA250_RANGE_4G                 1
-#define BMA250_RANGE_8G                 2
-#define BMA250_RANGE_16G                3
+#define BMA250_RANGE_2G         0
+#define BMA250_RANGE_4G         1
+#define BMA250_RANGE_8G         2
+#define BMA250_RANGE_16G        3
 
 
 #define BMA250_BW_7_81HZ        0x08
@@ -776,10 +763,6 @@ struct bma250_data {
 #endif
 	int IRQ1;
 	int IRQ2;
-#ifdef BMA250_ENABLE_INT
-	bool bint;
-	spinlock_t lock;
-#endif 	
 };
 
 static int bma250_smbus_read_byte(struct i2c_client *client,
@@ -813,61 +796,6 @@ static int bma250_smbus_read_byte_block(struct i2c_client *client,
 		return -1;
 	return 0;
 }
-#ifdef BMA250_ENABLE_INT
-static int bma250_set_int1_pad_sel(struct i2c_client *client,unsigned char int1sel)
-{
-	int comres=0;
-	unsigned char data;
-	unsigned char state;
-	state = 0x01;
-
-
-	switch (int1sel) {
-	case 0:
-		comres = bma250_smbus_read_byte(client, BMA250_EN_INT1_PAD_LOWG__REG, &data);
-		data = BMA250_SET_BITSLICE(data, BMA250_EN_INT1_PAD_LOWG, state );
-		comres = bma250_smbus_write_byte(client, BMA250_EN_INT1_PAD_LOWG__REG, &data);
-		break;
-	case 1:
-		comres = bma250_smbus_read_byte(client, BMA250_EN_INT1_PAD_HIGHG__REG, &data);
-		data = BMA250_SET_BITSLICE(data, BMA250_EN_INT1_PAD_HIGHG, state );
-		comres = bma250_smbus_write_byte(client, BMA250_EN_INT1_PAD_HIGHG__REG, &data);
-		break;
-	case 2:
-		comres = bma250_smbus_read_byte(client, BMA250_EN_INT1_PAD_SLOPE__REG, &data);
-		data = BMA250_SET_BITSLICE(data, BMA250_EN_INT1_PAD_SLOPE, state );
-		comres = bma250_smbus_write_byte(client, BMA250_EN_INT1_PAD_SLOPE__REG, &data);
-		break;
-	case 3:
-		comres = bma250_smbus_read_byte(client, BMA250_EN_INT1_PAD_DB_TAP__REG, &data);
-		data = BMA250_SET_BITSLICE(data, BMA250_EN_INT1_PAD_DB_TAP, state );
-		comres = bma250_smbus_write_byte(client, BMA250_EN_INT1_PAD_DB_TAP__REG, &data);
-		break;
-	case 4:
-		comres = bma250_smbus_read_byte(client, BMA250_EN_INT1_PAD_SNG_TAP__REG, &data);
-		data = BMA250_SET_BITSLICE(data, BMA250_EN_INT1_PAD_SNG_TAP, state );
-		comres = bma250_smbus_write_byte(client, BMA250_EN_INT1_PAD_SNG_TAP__REG, &data);
-		break;
-	case 5:
-		comres = bma250_smbus_read_byte(client, BMA250_EN_INT1_PAD_ORIENT__REG, &data);
-		data = BMA250_SET_BITSLICE(data, BMA250_EN_INT1_PAD_ORIENT, state );
-		comres = bma250_smbus_write_byte(client, BMA250_EN_INT1_PAD_ORIENT__REG, &data);
-		break;
-	case 6:
-		comres = bma250_smbus_read_byte(client, BMA250_EN_INT1_PAD_FLAT__REG, &data);
-		data = BMA250_SET_BITSLICE(data, BMA250_EN_INT1_PAD_FLAT, state );
-		comres = bma250_smbus_write_byte(client, BMA250_EN_INT1_PAD_FLAT__REG, &data);
-		break;
-	default:
-		break;
-	}
-
-	return comres;
-}
-
-
-#endif /* BMA250_ENABLE_INT1 */
-
 
 static int bma250_set_Int_Enable(struct i2c_client *client, unsigned char InterruptType , unsigned char value )
 {
@@ -951,19 +879,6 @@ static int bma250_set_Int_Enable(struct i2c_client *client, unsigned char Interr
 
 
 
-#ifdef BMA250_ENABLE_INT
-static int bma250_get_interruptstatus1(struct i2c_client *client, unsigned char *intstatus )
-{
-	int comres = 0 ;
-	unsigned char data;
-
-	comres = bma250_smbus_read_byte(client, BMA250_STATUS1_REG, &data);
-	*intstatus = data;
-
-	return comres;
-}
-
-#endif 
 static int bma250_set_Int_Mode(struct i2c_client *client, unsigned char Mode)
 {
 	int comres = 0;
@@ -2112,63 +2027,7 @@ static int bma250_detect(struct i2c_client *client,
 
 	return 0;
 }
-////////////////////////////////////for interrupt mode////////////////////////////////////////////////////////////
 
-#ifdef BMA250_ENABLE_INT
-unsigned char *orient[]={"upward looking portrait upright",   \
-	"upward looking portrait upside-down",   \
-		"upward looking landscape left",   \
-		"upward looking landscape right",   \
-		"downward looking portrait upright",   \
-		"downward looking portrait upside-down",   \
-		"downward looking landscape left",   \
-		"downward looking landscape right"};
-
-static void bma250_irq_work_func(struct work_struct *work)
-{
-	struct bma250_data *bma250 = container_of((struct work_struct *)work,
-			struct bma250_data, irq_work);
-
-	unsigned char status = 0;
-
-
-	bma250_get_interruptstatus1(bma250->bma250_client, &status);
-
-			if(gpio_get_value(irq_to_gpio(bma250->IRQ1)) == 1){
-			bma250->bint = 1;
-			schedule_delayed_work(&bma250->work,
-					msecs_to_jiffies(atomic_read(&bma250->delay)));
-			}
-			else if(gpio_get_value(irq_to_gpio(bma250->IRQ1)) == 0){
-			bma250->bint = 0;
-			cancel_delayed_work_sync(&bma250->work);
-			}
-
-}
-
-static irqreturn_t bma250_irq_handler_1(int irq, void *handle)
-{
-
-
-	struct bma250_data *data = handle;
-
-//	printk("Leon: bma250 irq handler\n");
-
-	if (data == NULL)
-		return IRQ_HANDLED;
-	if (data->bma250_client == NULL)
-		return IRQ_HANDLED;
-
-
-	schedule_work(&data->irq_work);
-
-	return IRQ_HANDLED;
-
-
-}
-
-#endif
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////// 
 struct regulator *temp;
 static int bma250_probe(struct i2c_client *client,
 		const struct i2c_device_id *id)
@@ -2183,27 +2042,27 @@ static int bma250_probe(struct i2c_client *client,
 	}
 
 	struct input_dev *dev;
-    /*For g sensor*/
-    data->vdd_regulator = regulator_get(NULL, "g-sensor-pwr");
-    if (IS_ERR(data->vdd_regulator)) {
-        printk("%s: regulator_get error\n",__func__);
-        //goto err0;
-    }
-    err = regulator_set_voltage(data->vdd_regulator, 1800000,1800000);
-    if (err) {
-        printk("%s: regulator_set 1.8V error\n",__func__);
-        //goto err0;
-    }
-    regulator_enable(data->vdd_regulator);
-    temp=data->vdd_regulator;
+	/*For g sensor*/
+	data->vdd_regulator = regulator_get(NULL, "g-sensor-pwr");
+	if (IS_ERR(data->vdd_regulator)) {
+		printk("%s: regulator_get error\n",__func__);
+		//goto err0;
+	}
+	err = regulator_set_voltage(data->vdd_regulator, 1800000,1800000);
+	if (err) {
+		printk("%s: regulator_set 1.8V error\n",__func__);
+		//goto err0;
+	}
+	regulator_enable(data->vdd_regulator);
+	temp=data->vdd_regulator;
 
 	//Apply settings to get VAUX2 belonging to APP groug, set 0x1 to VAUX2_CFG_GRP
 	twl_i2c_write_u8(TWL6030_MODULE_ID0, 0x01,0x88);
-    udelay(5);
-    if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
-               printk(KERN_INFO "i2c_check_functionality error\n");
-               goto exit;
-    }
+	udelay(5);
+	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
+		printk(KERN_INFO "i2c_check_functionality error\n");
+		goto exit;
+	}
 	/* read chip id */
 	tempvalue = 0;
 	tempvalue = i2c_smbus_read_word_data(client, BMA250_CHIP_ID_REG);
@@ -2226,41 +2085,6 @@ static int bma250_probe(struct i2c_client *client,
 	bma250_set_range(client, BMA250_RANGE_SET);
 	data->report_threshold = BMA250_REPORT_SET;
 
-#ifdef BMA250_ENABLE_INT
-	bma250_set_Int_Mode(client,14);/*latch interrupt 50ms*/
-
-	//0,log g
-	//1,high g x
-	//2,high g y
-	//3,high g z
-	//5,slope x
-	//6,slope y
-	//7,slope z
-	//8,single tap
-	//9,double tap
-	//10,orient
-	//11,flat
-
-	bma250_set_Int_Enable(client,5, 1);
-	bma250_set_Int_Enable(client,6, 1);
-	bma250_set_Int_Enable(client,7, 1);
-
-	bma250_set_int1_pad_sel(client,PAD_SLOP);
-	bma250_set_slope_threshold(client,0x08);
-	bma250_set_bandwidth(client,2);
-	err = gpio_request(OMAP4_GSENSOR_INT1, "BMA250 INT1");
-	if (err) 
-		printk("!!!!!!!!!!!!!!!gpio_request error\n");	
-	err =gpio_direction_input(OMAP4_GSENSOR_INT1);
-	if (err) 
-		printk("!!!!!!!!!!!!!!!gpio_direction error\n");	
-	data->IRQ1 = gpio_to_irq(OMAP4_GSENSOR_INT1);
-	set_irq_type(data->IRQ1, IRQ_TYPE_EDGE_BOTH);
-	err = request_irq(data->IRQ1, bma250_irq_handler_1, (IRQF_TRIGGER_RISING|IRQF_TRIGGER_FALLING), "bma250_int1", data);
-	if (err) 
-		printk("!!!!!!!!!!!!!!!request_irq error\n");	
-	INIT_WORK(&data->irq_work, bma250_irq_work_func);
-#endif
 	INIT_DELAYED_WORK(&data->work, bma250_work_func);
 	atomic_set(&data->delay, BMA250_MAX_DELAY);
 	atomic_set(&data->enable, 0);
@@ -2306,13 +2130,7 @@ static int bma250_probe(struct i2c_client *client,
 	mutex_init(&data->value_mutex);
 	mutex_init(&data->mode_mutex);
 	mutex_init(&data->enable_mutex);
-#ifdef BMA250_ENABLE_INT
-	bma250_set_enable(&client->dev, 0);	
-	data->bint = 0;
-	spin_lock_init(&data->lock);
-#else
 	bma250_set_enable(&client->dev, 1);	
-#endif
 	return 0;
 
 error_sysfs:
@@ -2324,45 +2142,9 @@ exit:
 	return err;
 }
 
-static int bma250_suspend(struct i2c_client *client, pm_message_t mesg)
-{
-printk("!!!!!!!!!!!%s!!!!!!!!!\n",__func__);
-        bma250_set_mode(client, BMA250_MODE_SUSPEND);
-#if 0
-int err = regulator_disable(temp);
-if (err) printk("%s: regulator_disable fail!\n",__func__);    
-#endif
-	return 0;
-}
-
-static int bma250_resume(struct i2c_client *client)
-{
-printk("!!!!!!!!!!!%s!!!!!!!!!\n",__func__);
-#if 0
-int err = regulator_enable(temp);
-if (err) printk("%s: regulator_disable fail!\n",__func__);
-#endif
-        bma250_set_mode(client, BMA250_MODE_NORMAL);
-	return 0;
-}
-
-
 #ifdef CONFIG_HAS_EARLYSUSPEND
 static void bma250_early_suspend(struct early_suspend *h)
 {
-#ifdef BMA250_ENABLE_INT
-	struct bma250_data *data =
-		container_of(h, struct bma250_data, early_suspend);
-
-	unsigned long flags;
-	spin_lock_irqsave(&data->lock,flags);
-	if(data->bint)	{
-		cancel_delayed_work_sync(&data->work);
-		data->bint = 0;
-	}
-	spin_unlock_irqrestore(&data->lock,flags);
-	disable_irq(data->IRQ1);
-#else		
 	struct bma250_data *data =
 		container_of(h, struct bma250_data, early_suspend);
 
@@ -2372,7 +2154,6 @@ static void bma250_early_suspend(struct early_suspend *h)
 		cancel_delayed_work_sync(&data->work);
 	}
 	mutex_unlock(&data->enable_mutex);
-#endif
 }
 
 
@@ -2380,9 +2161,6 @@ static void bma250_late_resume(struct early_suspend *h)
 {
 	struct bma250_data *data =
 		container_of(h, struct bma250_data, early_suspend);
-#ifdef BMA250_ENABLE_INT
-	enable_irq(data->IRQ1);
-#else
 
 	mutex_lock(&data->enable_mutex);
 	if (atomic_read(&data->enable)==1) {
@@ -2392,10 +2170,8 @@ static void bma250_late_resume(struct early_suspend *h)
 	}
 	
 	mutex_unlock(&data->enable_mutex);
-#endif
 }
 #endif
-
 
 static void bma250_shutdown(struct i2c_client *client)
 {
@@ -2442,8 +2218,6 @@ static struct i2c_driver bma250_driver = {
 	.probe		= bma250_probe,
 	.remove		= __devexit_p(bma250_remove),
 	.detect		= bma250_detect,
-//	.suspend        = bma250_suspend,
-//	.resume         = bma250_resume,
 	.shutdown	= bma250_shutdown,
 };
 
