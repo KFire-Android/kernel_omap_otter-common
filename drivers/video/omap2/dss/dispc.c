@@ -1537,6 +1537,7 @@ static int color_mode_to_bpp(enum omap_color_mode color_mode)
 	case OMAP_DSS_COLOR_ARGB32:
 	case OMAP_DSS_COLOR_RGBA32:
 	case OMAP_DSS_COLOR_RGBX32:
+	case OMAP_DSS_COLOR_BGRA32:
 		return 32;
 	default:
 		BUG();
