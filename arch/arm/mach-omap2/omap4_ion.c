@@ -31,14 +31,12 @@ static bool system_512m;
 
 static phys_addr_t omap4_smc_addr;
 static phys_addr_t omap4_ion_heap_secure_input_addr;
-static phys_addr_t omap4_ion_heap_secure_output_wfdhdcp_addr;
 static phys_addr_t omap4_ducati_heap_addr;
 static phys_addr_t omap4_ion_heap_tiler_mem_addr;
 static phys_addr_t omap4_ion_heap_nonsec_tiler_mem_addr;
 
 static size_t omap4_smc_size;
 static size_t omap4_ion_heap_secure_input_size;
-static size_t omap4_ion_heap_secure_output_wfdhdcp_size;
 static size_t omap4_ducati_heap_size;
 static size_t omap4_ion_heap_tiler_mem_size;
 static size_t omap4_ion_heap_nonsec_tiler_mem_size;
