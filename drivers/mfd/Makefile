@@ -5,6 +5,11 @@
 88pm860x-objs			:= 88pm860x-core.o 88pm860x-i2c.o
 obj-$(CONFIG_MFD_88PM860X)	+= 88pm860x.o
 obj-$(CONFIG_MFD_SM501)		+= sm501.o
+
+obj-$(CONFIG_MFD_AIC3XXX)	+= tlv320aic3xxx-core.o tlv320aic3xxx-irq.o
+obj-$(CONFIG_MFD_AIC3XXX_I2C)	+= tlv320aic3xxx-i2c.o
+obj-$(CONFIG_MFD_AIC3XXX_SPI)	+= tlv320aic3xxx-spi.o
+
 obj-$(CONFIG_MFD_ASIC3)		+= asic3.o tmio_core.o
 
 obj-$(CONFIG_HTC_EGPIO)		+= htc-egpio.o

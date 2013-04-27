@@ -38,6 +38,28 @@ config MFD_SM501_GPIO
 	 lines on the SM501. The platform data is used to supply the
 	 base number for the first GPIO line to register.
 
+config MFD_AIC3XXX
+	bool "Support Texas Instruments AIC3XXX"
+	select MFD_CORE
+
+config MFD_AIC3XXX_I2C
+        tristate "Support Texas Instruments AIC3XXX platform with I2C"
+	select MFD_AIC3XXX
+	select MFD_CORE
+        depends on I2C
+        help
+        Support for the Texas Instruments AIC family of audio SoC
+        core functionality controlled via I2C.
+
+config MFD_AIC3XXX_SPI
+        tristate "Support Texas Instruments AIC3XXX  platform with SPI"
+	select MFD_AIC3XXX
+	select MFD_CORE
+	depends on SPI_MASTER
+        help
+        Support for the Texas Instruments AIC family of audio SoC
+        core functionality controlled via SPI.
+
 config MFD_ASIC3
 	bool "Support for Compaq ASIC3"
 	depends on GENERIC_HARDIRQS && GPIOLIB && ARM
