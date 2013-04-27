@@ -1586,6 +1586,9 @@ static struct omap_hwmod omap44xx_dss_dispc_hwmod = {
 	.name		= "dss_dispc",
 	.class		= &omap44xx_dispc_hwmod_class,
 	.clkdm_name	= "l3_dss_clkdm",
+#if defined(CONFIG_MACH_OMAP_4430_KC1)
+	.flags		= HWMOD_INIT_NO_RESET,
+#endif
 	.mpu_irqs	= omap44xx_dss_dispc_irqs,
 	.sdma_reqs	= omap44xx_dss_dispc_sdma_reqs,
 	.main_clk	= "dss_dss_clk",
@@ -1683,6 +1686,9 @@ static struct omap_hwmod omap44xx_dss_dsi1_hwmod = {
 	.name		= "dss_dsi1",
 	.class		= &omap44xx_dsi_hwmod_class,
 	.clkdm_name	= "l3_dss_clkdm",
+#if defined(CONFIG_MACH_OMAP_4430_KC1)
+	.flags		= HWMOD_INIT_NO_RESET,
+#endif
 	.mpu_irqs	= omap44xx_dss_dsi1_irqs,
 	.sdma_reqs	= omap44xx_dss_dsi1_sdma_reqs,
 	.main_clk	= "dss_dss_clk",
@@ -1753,7 +1759,6 @@ static struct omap_hwmod_ocp_if *omap44xx_dss_dsi2_slaves[] = {
 };
 
 static struct omap_hwmod_opt_clk dss_dsi2_opt_clks[] = {
-	{ .role = "dss_clk", .clk = "dss_dss_clk" },
 	{ .role = "sys_clk", .clk = "dss_sys_clk" },
 };
 
@@ -1761,6 +1766,9 @@ static struct omap_hwmod omap44xx_dss_dsi2_hwmod = {
 	.name		= "dss_dsi2",
 	.class		= &omap44xx_dsi_hwmod_class,
 	.clkdm_name	= "l3_dss_clkdm",
+#if defined(CONFIG_MACH_OMAP_4430_KC1)
+	.flags		= HWMOD_INIT_NO_RESET,
+#endif
 	.mpu_irqs	= omap44xx_dss_dsi2_irqs,
 	.sdma_reqs	= omap44xx_dss_dsi2_sdma_reqs,
 	.main_clk	= "dss_dss_clk",
@@ -1858,6 +1866,9 @@ static struct omap_hwmod omap44xx_dss_hdmi_hwmod = {
 	.name		= "dss_hdmi",
 	.class		= &omap44xx_hdmi_hwmod_class,
 	.clkdm_name	= "l3_dss_clkdm",
+#if defined(CONFIG_MACH_OMAP_4430_KC1)
+	.flags		= HWMOD_INIT_NO_RESET,
+#endif
 	.mpu_irqs	= omap44xx_dss_hdmi_irqs,
 	.sdma_reqs	= omap44xx_dss_hdmi_sdma_reqs,
 	.main_clk	= "dss_48mhz_clk",
@@ -1950,6 +1961,9 @@ static struct omap_hwmod omap44xx_dss_rfbi_hwmod = {
 	.name		= "dss_rfbi",
 	.class		= &omap44xx_rfbi_hwmod_class,
 	.clkdm_name	= "l3_dss_clkdm",
+#if defined(CONFIG_MACH_OMAP_4430_KC1)
+	.flags		= HWMOD_INIT_NO_RESET,
+#endif
 	.sdma_reqs	= omap44xx_dss_rfbi_sdma_reqs,
 	.main_clk	= "dss_dss_clk",
 	.prcm = {
@@ -2021,6 +2035,9 @@ static struct omap_hwmod omap44xx_dss_venc_hwmod = {
 	.name		= "dss_venc",
 	.class		= &omap44xx_venc_hwmod_class,
 	.clkdm_name	= "l3_dss_clkdm",
+#if defined(CONFIG_MACH_OMAP_4430_KC1)
+	.flags		= HWMOD_INIT_NO_RESET,
+#endif
 	.main_clk	= "dss_tv_clk",
 	.prcm = {
 		.omap4 = {
@@ -5451,9 +5468,7 @@ static struct omap_hwmod omap44xx_timer10_hwmod = {
 	.name		= "timer10",
 	.class		= &omap44xx_timer_1ms_hwmod_class,
 	.clkdm_name	= "l4_per_clkdm",
-//#if defined(CONFIG_OTTER) || defined(CONFIG_OTTER2)
-/* FIXME-HASH: Need a better check */
-#if 1
+#if defined(CONFIG_MACH_OMAP_4430_KC1)
 	.flags		= HWMOD_INIT_NO_RESET,
 #endif
 	.mpu_irqs	= omap44xx_timer10_irqs,
