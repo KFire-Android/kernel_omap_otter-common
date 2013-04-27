@@ -127,9 +127,9 @@ static inline int omap_tps6236x_init(void)
 {
 	return -EINVAL;
 }
-extern void omap_tps6236x_gpio_no_reset_wa(int gpio_vsel0, int gpio_vsel1,
-		int gpio_bank_width)
-{}
+//extern void omap_tps6236x_gpio_no_reset_wa(int gpio_vsel0, int gpio_vsel1,
+//		int gpio_bank_width)
+//{}
 #endif
 
 #ifdef CONFIG_MFD_PALMAS
