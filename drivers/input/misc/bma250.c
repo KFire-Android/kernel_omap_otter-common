@@ -797,120 +797,6 @@ static int bma250_smbus_read_byte_block(struct i2c_client *client,
 	return 0;
 }
 
-static int bma250_set_Int_Enable(struct i2c_client *client, unsigned char InterruptType , unsigned char value )
-{
-	int comres = 0;
-	unsigned char data1,data2;
-
-
-	comres = bma250_smbus_read_byte(client, BMA250_INT_ENABLE1_REG, &data1);
-	comres = bma250_smbus_read_byte(client, BMA250_INT_ENABLE2_REG, &data2);
-
-	value = value & 1;
-	switch (InterruptType)
-	{
-		case 0:
-			/* Low G Interrupt  */
-			data2 = BMA250_SET_BITSLICE(data2, BMA250_EN_LOWG_INT, value );
-			break;
-		case 1:
-			/* High G X Interrupt */
-
-			data2 = BMA250_SET_BITSLICE(data2, BMA250_EN_HIGHG_X_INT, value );
-			break;
-		case 2:
-			/* High G Y Interrupt */
-
-			data2 = BMA250_SET_BITSLICE(data2, BMA250_EN_HIGHG_Y_INT, value );
-			break;
-		case 3:
-			/* High G Z Interrupt */
-
-			data2 = BMA250_SET_BITSLICE(data2, BMA250_EN_HIGHG_Z_INT, value );
-			break;
-		case 4:
-			/* New Data Interrupt  */
-
-			data2 = BMA250_SET_BITSLICE(data2, BMA250_EN_NEW_DATA_INT, value );
-			break;
-		case 5:
-			/* Slope X Interrupt */
-
-			data1 = BMA250_SET_BITSLICE(data1, BMA250_EN_SLOPE_X_INT, value );
-			break;
-		case 6:
-			/* Slope Y Interrupt */
-
-			data1 = BMA250_SET_BITSLICE(data1, BMA250_EN_SLOPE_Y_INT, value );
-			break;
-		case 7:
-			/* Slope Z Interrupt */
-
-			data1 = BMA250_SET_BITSLICE(data1, BMA250_EN_SLOPE_Z_INT, value );
-			break;
-		case 8:
-			/* Single Tap Interrupt */
-
-			data1 = BMA250_SET_BITSLICE(data1, BMA250_EN_SINGLE_TAP_INT, value );
-			break;
-		case 9:
-			/* Double Tap Interrupt */
-
-			data1 = BMA250_SET_BITSLICE(data1, BMA250_EN_DOUBLE_TAP_INT, value );
-			break;
-		case 10:
-			/* Orient Interrupt  */
-
-			data1 = BMA250_SET_BITSLICE(data1, BMA250_EN_ORIENT_INT, value );
-			break;
-		case 11:
-			/* Flat Interrupt */
-
-			data1 = BMA250_SET_BITSLICE(data1, BMA250_EN_FLAT_INT, value );
-			break;
-		default:
-			break;
-	}
-	comres = bma250_smbus_write_byte(client, BMA250_INT_ENABLE1_REG, &data1);
-	comres = bma250_smbus_write_byte(client, BMA250_INT_ENABLE2_REG, &data2);
-
-	return comres;
-}
-
-
-
-static int bma250_set_Int_Mode(struct i2c_client *client, unsigned char Mode)
-{
-	int comres = 0;
-	unsigned char data;
-
-
-	comres = bma250_smbus_read_byte(client,
-			BMA250_INT_MODE_SEL__REG, &data);
-	data = BMA250_SET_BITSLICE(data, BMA250_INT_MODE_SEL, Mode);
-	comres = bma250_smbus_write_byte(client,
-			BMA250_INT_MODE_SEL__REG, &data);
-
-
-	return comres;
-}
-
-static int bma250_set_slope_threshold(struct i2c_client *client,
-		unsigned char threshold)
-{
-	int comres = 0;
-	unsigned char data;
-
-
-	data = BMA250_SET_BITSLICE(data, BMA250_SLOPE_THRES, threshold);
-	comres = bma250_smbus_write_byte(client,
-			BMA250_SLOPE_THRES__REG, &data);
-
-
-	return comres;
-}
-
-
 static int bma250_get_cal_ready(struct i2c_client *client, unsigned char *calrdy )
 {
 	int comres = 0 ;
@@ -2035,13 +1921,14 @@ static int bma250_probe(struct i2c_client *client,
 	int err = 0;
 	int tempvalue;
 	struct bma250_data *data;
+	struct input_dev *dev;
+
 	data = kzalloc(sizeof(struct bma250_data), GFP_KERNEL);
 	if (!data) {
 		err = -ENOMEM;
 		goto exit;
 	}
 
-	struct input_dev *dev;
 	/*For g sensor*/
 	data->vdd_regulator = regulator_get(NULL, "g-sensor-pwr");
 	if (IS_ERR(data->vdd_regulator)) {
