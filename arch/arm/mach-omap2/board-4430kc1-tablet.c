@@ -73,7 +73,6 @@
 #include <linux/mfd/tlv320aic31xx-registers.h>
 #include <linux/mfd/tlv320aic3xxx-registers.h>
 #include <linux/mfd/tlv320aic3xxx-core.h>
-#include <linux/platform_data/omap-abe-aic31xx.h>
 
 #include "omap_ram_console.h"
 #include "common.h"
@@ -132,20 +131,21 @@ static struct aic3xxx_gpio_setup aic3xxx_gpio[] ={
 
 static struct aic3xxx_pdata aic31xx_codec_pdata ={
 	.audio_mclk1 = 19200000,
-	.num_gpios = ARRAY_SIZE(aic3xxx_gpio),
 	.gpio_irq = 1,
 	.gpio_defaults = aic3xxx_gpio,
-	.naudint_irq = 0/*Qoo_HEADSET_DETECT_GPIO_PIN*/ ,
+	.num_gpios = ARRAY_SIZE(aic3xxx_gpio),
+	.naudint_irq = Qoo_HEADSET_DETECT_GPIO_PIN,
 	.irq_base = TWL6040_CODEC_IRQ_BASE,
+	.regulator_name = "audio-pwr",
+	.regulator_min_uV = 3000000,
+	.regulator_max_uV = 3000000,
 };
 #endif
 
-#if 0
 static struct platform_device sdp4430_aic3110 = {
-        .name           = "tlv320aic3110-codec",
-        .id             = -1,
+        .name   = "omap4-panda-aic31xx",
+        .id     = -1,
 };
-#endif
 
 /* Board IDs */
 static u8 quanta_mbid;
@@ -194,11 +194,9 @@ static void __init quanta_boardids(void)
 }
 
 
-#if 0
 static struct platform_device __initdata *sdp4430_devices[] = {
-     &sdp4430_aic3110,
+	&sdp4430_aic3110,
 };
-#endif
 
 static struct omap_musb_board_data musb_board_data = {
 	.interface_type		= MUSB_INTERFACE_UTMI,
@@ -341,7 +339,7 @@ static struct i2c_board_info __initdata sdp4430_i2c_boardinfo[] = {
 		I2C_BOARD_INFO("summit_smb347", 0x6),
 		.irq = OMAP_GPIO_IRQ(OMAP4_CHARGER_IRQ),
 	},
-#endif    
+#endif
 };
 
 static struct i2c_board_info __initdata sdp4430_i2c_2_boardinfo[] = {
@@ -978,7 +976,7 @@ static void __init omap_kc1_init(void)
 #ifdef CONFIG_ION_OMAP
 	omap4_register_ion();
 #endif
-//	platform_add_devices(sdp4430_devices, ARRAY_SIZE(sdp4430_devices));
+	platform_add_devices(sdp4430_devices, ARRAY_SIZE(sdp4430_devices));
 
 	gpio_request(0, "sysok");
 
