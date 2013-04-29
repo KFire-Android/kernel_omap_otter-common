@@ -1261,16 +1261,20 @@ int omapdss_hdmi_read_edid(u8 *buf, int len)
 	r = hdmi_runtime_get();
 	BUG_ON(r);
 
-
 	hdmi_set_ls_state(LS_ENABLED);
 
-	r = hdmi.ip_data.ops->read_edid(&hdmi.ip_data, buf, len);
+	//r = hdmi.ip_data.ops->read_edid(&hdmi.ip_data, buf, len);
+	if(hdmi_read_valid_edid())
+		omapdss_get_edid(buf);
+	else
+		r = -1;
 
 	/* restore level shifter state */
 	hdmi_set_ls_state(restore_state);
 
 	hdmi_runtime_put();
 	mutex_unlock(&hdmi.lock);
+
 
 	return r;
 }
@@ -1313,6 +1317,12 @@ int omapdss_hdmi_display_enable(struct omap_dss_device *dssdev)
 	if (r) {
 		DSSERR("failed to start device\n");
 		goto err0;
+	}
+
+	/* Update the mode db database */
+	if (hdmi.edid_set) {
+		/* get monspecs from edid */
+		hdmi_get_monspecs(dssdev);
 	}
 
 	r = hdmi_power_on_full(dssdev);

@@ -506,6 +506,7 @@ int omapdss_hdmi_display_set_mode(struct omap_dss_device *dssdev,
 u8 *hdmi_read_valid_edid(void);
 void omapdss_hdmi_clear_edid(void);
 ssize_t omapdss_get_edid(char *buf);
+void hdmi_get_monspecs(struct omap_dss_device *dssdev);
 int hdmi_panel_init(void);
 void hdmi_panel_exit(void);
 #if defined(CONFIG_OMAP4_DSS_HDMI_AUDIO) || \
