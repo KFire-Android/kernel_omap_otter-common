@@ -1048,6 +1048,13 @@ static int __dwc3_gadget_ep_queue(struct dwc3_ep *dep, struct dwc3_request *req)
 	req->direction		= dep->direction;
 	req->epnum		= dep->number;
 
+	/* For a "read" direction aka OUT endpoints */
+	if (req->direction == 0) {
+		if (req->request.length % dep->endpoint.desc->wMaxPacketSize) {
+			req->request.length += ( dep->endpoint.desc->wMaxPacketSize - req->request.length);
+		}
+	}
+
 	/*
 	 * We only add to our list of requests now and
 	 * start consuming the list once we get XferNotReady
