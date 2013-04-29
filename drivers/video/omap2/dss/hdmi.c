@@ -945,6 +945,8 @@ static int hdmi_power_on_full(struct omap_dss_device *dssdev)
 		goto err_phy_enable;
 	}
 
+	hdmi.ip_data.cfg.cm.mode = hdmi.can_do_hdmi ? hdmi.mode : HDMI_DVI;
+
 	hdmi.ip_data.ops->video_configure(&hdmi.ip_data);
 
 	/* bypass TV gamma table */
