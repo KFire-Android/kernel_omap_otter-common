@@ -36,6 +36,8 @@
 #include <linux/mfd/tlv320aic3xxx-registers.h>
 #include <linux/mfd/tlv320aic31xx-registers.h>
 
+struct regulator *audio_regulator;
+
 int set_aic3xxx_book(struct aic3xxx *aic3xxx, int book)
 {
 	int ret = 0;
@@ -344,6 +346,28 @@ int aic3xxx_device_init(struct aic3xxx *aic3xxx)
 		memcpy(&aic3xxx->pdata, dev_get_platdata(aic3xxx->dev),
 			sizeof(aic3xxx->pdata));
 
+	if (aic3xxx->pdata.regulator_name) {
+		audio_regulator = regulator_get(NULL, aic3xxx->pdata.regulator_name);
+		if (IS_ERR(audio_regulator)) {
+			dev_err(aic3xxx->dev, "regulator_get error: %s\n", aic3xxx->pdata.regulator_name);
+			return -1;
+		}
+
+		if (aic3xxx->pdata.regulator_min_uV > 0 && aic3xxx->pdata.regulator_max_uV > 0) {
+			ret = regulator_set_voltage(audio_regulator,
+					aic3xxx->pdata.regulator_min_uV,
+					aic3xxx->pdata.regulator_max_uV);
+			if (ret) {
+				dev_err(aic3xxx->dev, "regulator_set 3V error: %s min=%d, max=%d\n",
+					aic3xxx->pdata.regulator_name,
+					aic3xxx->pdata.regulator_min_uV,
+					aic3xxx->pdata.regulator_max_uV);
+				return -1;
+			}
+			regulator_enable(audio_regulator);
+		}
+	}
+
 	/*GPIO reset for TLV320AIC31xx codec */
 	if (aic3xxx->pdata.gpio_reset) {
 		ret = gpio_request(aic3xxx->pdata.gpio_reset,
@@ -421,6 +445,11 @@ err_return:
 	if (aic3xxx->pdata.gpio_reset)
 		gpio_free(aic3xxx->pdata.gpio_reset);
 
+	if (audio_regulator) {
+		regulator_disable(audio_regulator);
+		regulator_put(audio_regulator);
+	}
+
 	return ret;
 }
 EXPORT_SYMBOL_GPL(aic3xxx_device_init);
@@ -438,6 +467,10 @@ void aic3xxx_device_exit(struct aic3xxx *aic3xxx)
 	if (aic3xxx->pdata.gpio_reset)
 		gpio_free(aic3xxx->pdata.gpio_reset);
 
+	if (audio_regulator) {
+		regulator_disable(audio_regulator);
+		regulator_put(audio_regulator);
+	}
 }
 EXPORT_SYMBOL_GPL(aic3xxx_device_exit);
 
