@@ -61,8 +61,10 @@
 /* Enable this macro allow for different ASI formats */
 /* #define ASI_MULTI_FMT */
 #undef ASI_MULTI_FMT
+
+// FIXME-HASH: This was enabled in 3.0 driver
 /* Enable register caching on write */
-/* #define EN_REG_CACHE */
+#define EN_REG_CACHE
 
 /* Enable Headset Detection */
 /* #define HEADSET_DETECTION */
@@ -258,10 +260,6 @@
 #define HPR_ENUM		23
 #define LDAC_ENUM		24
 #define RDAC_ENUM		25
-
-
-/* The headset jack insertion GPIO used on the Qoo Board */
-#define Qoo_HEADSET_DETECT_GPIO_PIN		49
 
 
 #define AIC31XX_COPS_MDSP_A	0x10
