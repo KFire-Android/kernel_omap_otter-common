@@ -390,7 +390,7 @@ static int Qoo_headset_jack_status_check(void)
 	int gpio_status, ret = 0, hs_status = 0;
 	struct snd_soc_codec *codec = hs_jack.codec;
 	struct aic31xx_priv *priv = snd_soc_codec_get_drvdata(codec);
-//	struct snd_soc_dapm_context *dapm = &codec->dapm;
+	struct snd_soc_dapm_context *dapm = &codec->dapm;
 	gpio_status = gpio_get_value(Qoo_HEADSET_DETECT_GPIO_PIN);
 	dev_info(codec->dev, "#Entered %s\n", __func__);
 	if (hs_jack.codec != NULL) {

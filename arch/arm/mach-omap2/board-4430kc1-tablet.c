@@ -131,11 +131,13 @@ static struct aic3xxx_gpio_setup aic3xxx_gpio[] ={
 
 static struct aic3xxx_pdata aic31xx_codec_pdata ={
 	.audio_mclk1 = 19200000,
-	.gpio_irq = 1,
+#if 0
 	.gpio_defaults = aic3xxx_gpio,
 	.num_gpios = ARRAY_SIZE(aic3xxx_gpio),
+	.gpio_irq = 1,
 	.naudint_irq = Qoo_HEADSET_DETECT_GPIO_PIN,
 	.irq_base = TWL6040_CODEC_IRQ_BASE,
+#endif
 	.regulator_name = "audio-pwr",
 	.regulator_min_uV = 3000000,
 	.regulator_max_uV = 3000000,
