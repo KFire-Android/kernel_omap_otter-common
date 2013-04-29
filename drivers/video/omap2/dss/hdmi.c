@@ -38,6 +38,7 @@
 #include <linux/of_gpio.h>
 #include <linux/of_i2c.h>
 #include <linux/fb.h>
+#include <linux/omapfb.h>
 #include <video/omapdss.h>
 #include <linux/i2c.h>
 #include <linux/i2c-algo-bit.h>
@@ -447,6 +448,9 @@ done:
 	DSSDBG("%s-%d\n", hdmi.ip_data.cfg.cm.mode ? "CEA" : "VESA",
 		hdmi.ip_data.cfg.cm.code);
 
+	/* convert fb timing to dss timings to be in sync. */
+	omapfb_fb2dss_timings(&hdmi.ip_data.cfg.timingsfb,&hdmi.ip_data.cfg.timings);
+
 	r = i >= 0 ? 1 : 0;
 	return r;
 
@@ -780,7 +784,28 @@ static int hdmi_power_on_full(struct omap_dss_device *dssdev)
 	p = &hdmi.ip_data.cfg.timings;
 
 	DSSDBG("hdmi_power_on x_res= %d y_res = %d\n", p->x_res, p->y_res);
+#ifdef CONFIG_USE_FB_MODE_DB
+	if (!hdmi.custom_set) {
+		struct fb_videomode fb_mode = vesa_modes[4];
+		if ((hdmi.ip_data.cfg.cm.code != 4) &&
+			(hdmi.ip_data.cfg.cm.mode != HDMI_DVI)) {
+			if (hdmi.ip_data.cfg.cm.mode == HDMI_DVI)
+				fb_mode = vesa_modes[hdmi.ip_data.cfg.cm.code];
+			else
+				fb_mode = cea_modes[hdmi.ip_data.cfg.cm.code];
+		}
+		if (!hdmi_set_timings(&fb_mode, false)) {
+			/* Fallback in case we cannot set the timings */
+			DSSERR("fallback to vesa default code");
+			fb_mode = vesa_modes[4];
+			hdmi_set_timings(&fb_mode, false);
+		}
+	}
 
+	/* Update the panel timing in dssdev */
+	omapfb_fb2dss_timings(&hdmi.ip_data.cfg.timingsfb,
+					&dssdev->panel.timings);
+#endif
 	switch (hdmi.ip_data.cfg.deep_color) {
 	case HDMI_DEEP_COLOR_30BIT:
 		phy = (p->pixel_clock * 125) / 100 ;
@@ -928,6 +953,18 @@ int omapdss_hdmi_get_range(void)
 int omapdss_hdmi_display_check_timing(struct omap_dss_device *dssdev,
 					struct omap_video_timings *timings)
 {
+#ifdef CONFIG_USE_FB_MODE_DB
+	struct fb_videomode t;
+	omapfb_dss2fb_timings(timings, &t);
+
+	/* also check interlaced timings */
+	if (!hdmi_set_timings(&t, true)) {
+		t.yres *= 2;
+		t.vmode |= FB_VMODE_INTERLACED;
+	}
+	if (!hdmi_set_timings(&t, true))
+		return -EINVAL;
+#else
 	struct hdmi_cm cm;
 
 	cm = hdmi_get_code(timings);
@@ -935,6 +972,7 @@ int omapdss_hdmi_display_check_timing(struct omap_dss_device *dssdev,
 		return -EINVAL;
 	}
 
+#endif
 	return 0;
 
 }
@@ -1052,6 +1090,21 @@ err0:
 void omapdss_hdmi_display_set_timing(struct omap_dss_device *dssdev,
 		struct omap_video_timings *timings)
 {
+#ifdef CONFIG_USE_FB_MODE_DB
+	struct fb_videomode t;
+
+	DSSDBG("x_res= %d y_res = %d\n",
+		dssdev->panel.timings.x_res,
+		dssdev->panel.timings.y_res);
+
+	omapfb_dss2fb_timings(&dssdev->panel.timings, &t);
+	/* also check interlaced timings */
+	if (!hdmi_set_timings(&t, true)) {
+		t.yres *= 2;
+		t.vmode |= FB_VMODE_INTERLACED;
+	}
+	omapdss_hdmi_display_set_mode(dssdev, &t);
+#else
 	struct hdmi_cm cm;
 	const struct hdmi_config *t;
 
@@ -1065,6 +1118,7 @@ void omapdss_hdmi_display_set_timing(struct omap_dss_device *dssdev,
 		hdmi.ip_data.cfg = *t;
 
 	mutex_unlock(&hdmi.lock);
+#endif
 }
 
 static void hdmi_dump_regs(struct seq_file *s)

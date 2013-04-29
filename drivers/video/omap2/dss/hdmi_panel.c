@@ -143,11 +143,10 @@ static int hdmi_panel_probe(struct omap_dss_device *dssdev)
 	DSSDBG("hdmi_panel_probe x_res= %d y_res = %d\n",
 		dssdev->panel.timings.x_res,
 		dssdev->panel.timings.y_res);
-
+#ifndef CONFIG_USE_FB_MODE_DB
 	omapdss_hdmi_display_set_timing(dssdev, &dssdev->panel.timings);
-
 	hdmi.dssdev = dssdev;
-
+#endif
 	return 0;
 }
 
@@ -326,9 +325,9 @@ static int hdmi_panel_enable(struct omap_dss_device *dssdev)
 		r = -EINVAL;
 		goto err;
 	}
-
+#ifndef CONFIG_USE_FB_MODE_DB
 	omapdss_hdmi_display_set_timing(dssdev, &dssdev->panel.timings);
-
+#endif
 	r = omapdss_hdmi_display_enable(dssdev);
 	if (r) {
 		DSSERR("failed to power on\n");
@@ -412,10 +411,14 @@ static void hdmi_set_timings(struct omap_dss_device *dssdev,
 	 */
 	hdmi_panel_audio_disable(dssdev);
 
-	omapdss_hdmi_display_set_timing(dssdev, timings);
 	dssdev->panel.timings = *timings;
-
+#ifndef CONFIG_USE_FB_MODE_DB
+	omapdss_hdmi_display_set_timing(dssdev, timings);
 	mutex_unlock(&hdmi.lock);
+#else
+	mutex_unlock(&hdmi.lock);
+	omapdss_hdmi_display_set_timing(dssdev, timings);
+#endif
 }
 
 static int hdmi_check_timings(struct omap_dss_device *dssdev,
