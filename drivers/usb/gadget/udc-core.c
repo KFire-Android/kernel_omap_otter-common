@@ -309,6 +309,27 @@ found:
 }
 EXPORT_SYMBOL_GPL(usb_del_gadget_udc);
 
+int usb_gadget_probe_driver_ready(struct usb_gadget_driver *driver)
+{
+	struct usb_udc		*udc = NULL;
+
+	if (!driver || !driver->bind || !driver->setup)
+		return -EINVAL;
+
+	mutex_lock(&udc_lock);
+	list_for_each_entry(udc, &udc_list, list) {
+		/* For now we take the first one */
+		if (!udc->driver) {
+			mutex_unlock(&udc_lock);
+			return 0;
+		}
+	}
+
+	mutex_unlock(&udc_lock);
+	return -EPROBE_DEFER;
+}
+EXPORT_SYMBOL_GPL(usb_gadget_probe_driver_ready);
+
 /* ------------------------------------------------------------------------- */
 
 int usb_gadget_probe_driver(struct usb_gadget_driver *driver)

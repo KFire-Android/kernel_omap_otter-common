@@ -958,7 +958,7 @@ EXPORT_SYMBOL_GPL(usb_string_id);
 
 /**
  * usb_string_ids() - allocate unused string IDs in batch
- * @cdev: the device whose string descriptor IDs are being allocated
+  @cdev: the device whose string descriptor IDs are being allocated
  * @str: an array of usb_string objects to assign numbers to
  * Context: single threaded during gadget setup
  *
@@ -1545,6 +1545,28 @@ static const struct usb_gadget_driver composite_driver_template = {
 		.owner		= THIS_MODULE,
 	},
 };
+
+int usb_composite_probe_ready(struct usb_composite_driver *driver){
+	struct usb_gadget_driver *gadget_driver;
+	int ready=0;
+
+	if (!driver || !driver->dev || !driver->bind)
+		return -EINVAL;
+
+	if (!driver->name)
+		driver->name = "composite";
+
+	driver->gadget_driver = composite_driver_template;
+	gadget_driver = &driver->gadget_driver;
+
+	gadget_driver->function =  (char *) driver->name;
+	gadget_driver->driver.name = driver->name;
+	gadget_driver->max_speed = driver->max_speed;
+
+	ready = usb_gadget_probe_driver_ready(gadget_driver);
+	driver->name = NULL;
+	return ready;
+}
 
 /**
  * usb_composite_probe() - register a composite driver

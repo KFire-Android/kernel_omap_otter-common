@@ -1404,11 +1404,15 @@ static int android_create_device(struct android_dev *dev)
 	return 0;
 }
 
-
-static int __init init(void)
+static int omap_android_probe(struct platform_device *pdev)
 {
 	struct android_dev *dev;
 	int err;
+
+	if (usb_composite_probe_ready(&android_usb_driver) != 0) {
+		err = -EPROBE_DEFER;
+		goto err_ret;
+	}
 
 	android_class = class_create(THIS_MODULE, "android_usb");
 	if (IS_ERR(android_class))
@@ -1450,15 +1454,33 @@ err_create:
 	kfree(dev);
 err_dev:
 	class_destroy(android_class);
+err_ret:
 	return err;
 }
-module_init(init);
 
-static void __exit cleanup(void)
+static int omap_android_remove(struct platform_device *pdev)
 {
 	usb_composite_unregister(&android_usb_driver);
 	class_destroy(android_class);
 	kfree(_android_dev);
 	_android_dev = NULL;
+	return 0;
 }
-module_exit(cleanup);
+
+static struct platform_driver omap_g_androiddrv = {
+  .driver = {
+    .name  = "omap_g_android",
+    .owner  = THIS_MODULE,
+  },
+  .probe    = omap_android_probe,
+  .remove    = omap_android_remove,
+};
+module_platform_driver(omap_g_androiddrv);
+
+static int __init omap_init_g_android(void)
+{
+	struct platform_device_info devinfo = { .name = "omap_g_android", };
+	platform_device_register_full(&devinfo);
+	return 0;
+}
+module_init(omap_init_g_android);
