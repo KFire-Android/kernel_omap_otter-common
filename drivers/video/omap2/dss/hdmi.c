@@ -48,10 +48,11 @@
 #include "dss_features.h"
 
 /* HDMI EDID Length move this */
-#define HDMI_EDID_MAX_LENGTH			256
+#define HDMI_EDID_MAX_LENGTH			512
 #define EDID_TIMING_DESCRIPTOR_SIZE		0x12
 #define EDID_DESCRIPTOR_BLOCK0_ADDRESS		0x36
 #define EDID_DESCRIPTOR_BLOCK1_ADDRESS		0x80
+#define EDID_HDMI_VENDOR_SPECIFIC_DATA_BLOCK	128
 #define EDID_SIZE_BLOCK0_TIMING_DESCRIPTOR	4
 #define EDID_SIZE_BLOCK1_TIMING_DESCRIPTOR	4
 
@@ -64,6 +65,8 @@ static struct {
 #endif
 	int code;
 	int mode;
+	u8 edid[HDMI_EDID_MAX_LENGTH];
+	bool edid_set;
 	bool custom_set;
 
 	struct hdmi_ip_data ip_data;
@@ -93,6 +96,8 @@ static struct {
 
 	struct omap_dss_output output;
 } hdmi;
+
+static const u8 edid_header[8] = {0x0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x0};
 
 /*
  * Logic for the below structure :
@@ -614,6 +619,45 @@ static struct hdmi_cm hdmi_get_code(struct omap_video_timings *timing)
 
 end:	return cm;
 
+}
+
+u8 *hdmi_read_valid_edid(void)
+{
+	int ret, i;
+
+	if (hdmi.edid_set)
+		return hdmi.edid;
+
+	memset(hdmi.edid, 0, HDMI_EDID_MAX_LENGTH);
+
+	hdmi_runtime_get();
+
+	ret = hdmi.ip_data.ops->read_edid(&hdmi.ip_data, hdmi.edid,
+						  HDMI_EDID_MAX_LENGTH);
+
+	hdmi_runtime_put();
+
+	for (i = 0; i < HDMI_EDID_MAX_LENGTH; i += 16)
+		DSSDBG("edid[%03x] = %02x %02x %02x %02x %02x %02x %02x %02x "\
+			"%02x %02x %02x %02x %02x %02x %02x %02x\n", i,
+			hdmi.edid[i], hdmi.edid[i + 1], hdmi.edid[i + 2],
+			hdmi.edid[i + 3], hdmi.edid[i + 4], hdmi.edid[i + 5],
+			hdmi.edid[i + 6], hdmi.edid[i + 7], hdmi.edid[i + 8],
+			hdmi.edid[i + 9], hdmi.edid[i + 10], hdmi.edid[i + 11],
+			hdmi.edid[i + 12], hdmi.edid[i + 13], hdmi.edid[i + 14],
+			hdmi.edid[i + 15]);
+
+	if (ret) {
+		DSSWARN("failed to read E-EDID\n");
+		return NULL;
+	}
+	if (memcmp(hdmi.edid, edid_header, sizeof(edid_header))) {
+		DSSWARN("failed to read E-EDID: wrong header\n");
+		return NULL;
+	}
+	hdmi.edid_set = true;
+
+	return hdmi.edid;
 }
 
 unsigned long hdmi_get_pixel_clock(void)
@@ -1269,6 +1313,19 @@ void omapdss_hdmi_core_disable(struct omap_dss_device *dssdev)
 	hdmi_power_off_core(dssdev);
 
 	mutex_unlock(&hdmi.lock);
+}
+
+void omapdss_hdmi_clear_edid(void)
+{
+	hdmi.edid_set = false;
+	hdmi.custom_set = false;
+}
+
+ssize_t omapdss_get_edid(char *buf)
+{
+	ssize_t size = hdmi.edid_set ? HDMI_EDID_MAX_LENGTH : 0;
+	memcpy(buf, hdmi.edid, size);
+	return size;
 }
 
 static irqreturn_t hdmi_irq_handler(int irq, void *arg)
@@ -1967,6 +2024,8 @@ static int __init omapdss_hdmihw_probe(struct platform_device *pdev)
 		DSSERR("can't init panel\n");
 		goto err_panel_init;
 	}
+
+        hdmi.edid_set = false;
 
 	dss_debugfs_create_file("hdmi", hdmi_dump_regs);
 
