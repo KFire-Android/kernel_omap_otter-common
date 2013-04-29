@@ -10,8 +10,8 @@
 /include/ "am33xx.dtsi"
 
 / {
-	model = "TI AM335x BeagleBone";
-	compatible = "ti,am335x-bone", "ti,am33xx";
+	model = "TI AM335x BeagleBone Black";
+	compatible = "ti,am335x-boneblack", "ti,am335x-bone", "ti,am33xx";
 
 	cpus {
 		cpu@0 {
@@ -28,7 +28,7 @@
 		pinctrl-names = "default";
 		pinctrl-0 = <&clkout2_pin>;
 
-		user_leds_s0: user_leds_s0 {
+		userled_pins: pinmux_userled_pins {
 			pinctrl-single,pins = <
 				0x54 0x7	/* gpmc_a5.gpio1_21, OUTPUT | MODE7 */
 				0x58 0x17	/* gpmc_a6.gpio1_22, OUTPUT_PULLUP | MODE7 */
@@ -36,17 +36,16 @@
 				0x60 0x17	/* gpmc_a8.gpio1_24, OUTPUT_PULLUP | MODE7 */
 			>;
 		};
-
 		i2c0_pins: pinmux_i2c0_pins {
 			pinctrl-single,pins = <
-				0x188 0x30	/* i2c0_sda.i2c0_sda PULLUP | INPUTENABLE | MODE0 */
-				0x18c 0x30	/* i2c0_scl.i2c0_scl PULLUP | INPUTENABLE | MODE0 */
+				0x188 0x70 	/* i2c0_sda, SLEWCTRL_SLOW | INPUT_PULLUP | MODE0 */
+				0x18c 0x70	/* i2c0_scl, SLEWCTRL_SLOW | INPUT_PULLUP | MODE0 */
 			>;
 		};
 
 		uart0_pins: pinmux_uart0_pins {
 			pinctrl-single,pins = <
-				0x170 0x30	/* uart0_rxd.uart0_rxd PULLUP | INPUTENABLE | MODE0 */
+				0x170 0x30	/* uart0_rxd.uart0_rxd PULLUP |INPUTENABLE | MODE0 */
 				0x174 0x00	/* uart0_txd.uart0_txd PULLDOWN | MODE0 */
 			>;
 		};
@@ -58,7 +57,7 @@
 		};
 	};
 
-	ocp {
+	ocp: ocp {
 		uart0: serial@44e09000 {
 			pinctrl-names = "default";
 			pinctrl-0 = <&uart0_pins>;
@@ -77,6 +76,10 @@
 				reg = <0x24>;
 			};
 
+			eeprom: eeprom@50 {
+				compatible = "at,24c256";
+				reg = <0x50>;
+			};
 		};
 
 		rtc@44e3e000 {
@@ -86,33 +89,34 @@
 
 	leds {
 		pinctrl-names = "default";
-		pinctrl-0 = <&user_leds_s0>;
+		pinctrl-0 = <&userled_pins>;
 
 		compatible = "gpio-leds";
 
-		led@2 {
+		led0 {
 			label = "beaglebone:green:heartbeat";
 			gpios = <&gpio1 21 0>;
 			linux,default-trigger = "heartbeat";
 			default-state = "off";
 		};
 
-		led@3 {
+		led1 {
 			label = "beaglebone:green:mmc0";
 			gpios = <&gpio1 22 0>;
 			linux,default-trigger = "mmc0";
 			default-state = "off";
 		};
 
-		led@4 {
+		led2 {
 			label = "beaglebone:green:usr2";
 			gpios = <&gpio1 23 0>;
 			default-state = "off";
 		};
 
-		led@5 {
+		led3 {
 			label = "beaglebone:green:usr3";
 			gpios = <&gpio1 24 0>;
+			linux,default-trigger = "mmc1";
 			default-state = "off";
 		};
 	};
@@ -172,26 +176,4 @@
 
 &cpsw_emac1 {
 	phy_id = <&davinci_mdio>, <1>;
-};
-
-&mmc1 {
-	status = "okay";
-	vmmc-supply = <&ldo3_reg>;
-};
-
-&mmc2 {
-	status = "okay";
-	vmmc-supply = <&ldo3_reg>;
-};
-
-&edma {
-	ti,edma-xbar-event-map = <32 12>;
-};
-
-&sham {
-	status = "okay";
-};
-
-&aes {
-	status = "okay";
 };
