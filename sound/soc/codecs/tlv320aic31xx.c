@@ -122,9 +122,6 @@ static int aic31xx_set_bias_level(struct snd_soc_codec *codec,
 
 static u8 aic31xx_reg_ctl;
 
-/* Codec Private Struct variable */
-struct aic31xx_priv aic31xx_codec_data;
-
 
 /*
  * Global Variables introduced to reduce Headphone Analog Volume Control
@@ -2195,26 +2192,8 @@ static struct platform_driver aic31xx_codec_driver = {
 	.probe	 = aic31xx_probe,
 	.remove	 = __devexit_p(aic31xx_remove),
 };
-/*
- *----------------------------------------------------------------------------
- * Function : tlv320aic31xx_modinit
- * Purpose  : Module INIT Routine
- *
- *----------------------------------------------------------------------------
- */
-static int __init tlv320aic31xx_modinit(void)
-{
-	return platform_driver_register(&aic31xx_codec_driver);
-}
-module_init(tlv320aic31xx_modinit);
 
-
-static void __exit tlv320aic31xx_exit(void)
-{
-	platform_driver_unregister(&aic31xx_codec_driver);
-}
-
-module_exit(tlv320aic31xx_exit);
+module_platform_driver(aic31xx_codec_driver);
 
 MODULE_DESCRIPTION("ASoC TLV320AIC3111 codec driver");
 MODULE_AUTHOR("naresh@ti.com");
