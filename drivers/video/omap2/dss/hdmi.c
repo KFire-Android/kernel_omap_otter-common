@@ -68,6 +68,9 @@ static struct {
 	u8 edid[HDMI_EDID_MAX_LENGTH];
 	bool edid_set;
 	bool custom_set;
+	bool can_do_hdmi;
+	bool force_timings;
+	int source_physical_address;
 
 	struct hdmi_ip_data ip_data;
 	int hdmi_irq;
@@ -458,6 +461,54 @@ done:
 
 	r = i >= 0 ? 1 : 0;
 	return r;
+
+}
+
+void hdmi_get_monspecs(struct omap_dss_device *dssdev)
+{
+	int i, j;
+	char *edid = (char *)hdmi.edid;
+	struct fb_monspecs *specs = &dssdev->panel.monspecs;
+	u32 fclk = dispc_fclk_rate() / 1000;
+	u32 max_pclk = dssdev->clocks.hdmi.max_pixclk_khz;
+
+	if (max_pclk && max_pclk < fclk)
+		fclk = max_pclk;
+
+	memset(specs, 0x0, sizeof(*specs));
+	if (!hdmi.edid_set)
+		return;
+	fb_edid_to_monspecs(edid, specs);
+	if (specs->modedb == NULL)
+		return;
+
+	for (i = 1; i <= edid[0x7e] && i * 128 < HDMI_EDID_MAX_LENGTH; i++) {
+		if (edid[i * 128] == 0x2)
+			fb_edid_add_monspecs(edid + i * 128, specs);
+	}
+	if (hdmi.force_timings) {
+		for (i = 0; i < specs->modedb_len; i++) {
+			specs->modedb[i++] = hdmi.ip_data.cfg.timingsfb;
+			break;
+		}
+		specs->modedb_len = i;
+		hdmi.force_timings = false;
+		return;
+	}
+
+	hdmi.can_do_hdmi = specs->misc & FB_MISC_HDMI;
+
+	/* filter out resolutions we don't support */
+	for (i = j = 0; i < specs->modedb_len; i++) {
+		if (!hdmi_set_timings(&specs->modedb[i], true))
+			continue;
+		if (fclk < PICOS2KHZ(specs->modedb[i].pixclock))
+			continue;
+		if (specs->modedb[i].flag & FB_FLAG_PIXEL_REPEAT)
+			continue;
+		specs->modedb[j++] = specs->modedb[i];
+	}
+	specs->modedb_len = j;
 
 }
 

@@ -499,6 +499,16 @@ MODULE_DEVICE_TABLE(of, hdmi_panel_of_match);
 #define dss_of_match NULL
 #endif
 
+static int hdmi_get_modedb(struct omap_dss_device *dssdev,
+			   struct fb_videomode *modedb, int modedb_len)
+{
+	struct fb_monspecs *specs = &dssdev->panel.monspecs;
+	if (specs->modedb_len < modedb_len)
+		modedb_len = specs->modedb_len;
+	memcpy(modedb, specs->modedb, sizeof(*modedb) * modedb_len);
+	return modedb_len;
+}
+
 static struct omap_dss_driver hdmi_driver = {
 	.probe		= hdmi_panel_probe,
 	.remove		= hdmi_panel_remove,
@@ -508,6 +518,7 @@ static struct omap_dss_driver hdmi_driver = {
 	.set_timings	= hdmi_set_timings,
 	.check_timings	= hdmi_check_timings,
 	.read_edid	= hdmi_read_edid,
+	.get_modedb	= hdmi_get_modedb,
 	.set_mode       = omapdss_hdmi_display_set_mode,
 	.detect		= hdmi_detect,
 	.audio_enable	= hdmi_panel_audio_enable,
