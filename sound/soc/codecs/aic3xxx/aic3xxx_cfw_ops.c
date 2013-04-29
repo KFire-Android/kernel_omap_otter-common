@@ -46,7 +46,9 @@ static cfw_project *aic3xxx_cfw_unpickle(void *pcfw, int n);
  * in sync at the time of host testing.
  */
 #undef CFW_FW_IF_ID
-#define CFW_FW_IF_ID 0x3FA6D547
+// FIXME-HASH: the FIRMWARE ID in the default firmware from TI is different that what's here.
+//#define CFW_FW_IF_ID 0x3FA6D547
+#define CFW_FW_IF_ID 0x5DDB8192
 //static int aic3xxx_cfw_dlimage(cfw_state *ps, cfw_image *pim);
 static int aic3xxx_cfw_dlcfg(cfw_state *ps, cfw_image *pim);
 static int aic3xxx_cfw_dlctl(cfw_state *ps, cfw_block *pb,
@@ -802,8 +804,7 @@ cfw_project *aic3xxx_cfw_unpickle(void *p, int n)
 
 	if (pjt->magic != CFW_FW_MAGIC || pjt->size != n ||
 	pjt->if_id != CFW_FW_IF_ID || !crc_chk(p, n)) {
-		error("magic:0x%08X!=0x%08X || size:%d!=%d || "
-		"version:0x%08X!=0x%08X || cksum_fail",
+		error("magic:0x%08X!=0x%08X || size:%d!=%d || version:0x%08X!=0x%08X || cksum_fail",
 			pjt->magic, CFW_FW_MAGIC, pjt->size, n,
 			pjt->if_id, CFW_FW_IF_ID);
 		return NULL;
