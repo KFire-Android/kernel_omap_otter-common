@@ -51,6 +51,13 @@
 
 &i2c2 {
 	clock-frequency = <400000>;
+
+	pcf_hdmi: pcf8575@26 {
+		compatible = "ti,pcf8575";
+		reg = <0x26>;
+		gpio-controller;
+		#gpio-cells = <2>;
+	};
 };
 
 &i2c3 {
@@ -90,5 +97,21 @@
 		compatible = "ti,tfc_s9700";
 		tlc = <&tlc59108>;
 		data-lines = <24>;
+	};
+};
+
+&hdmi {
+	tpd12s015: tpd12s015 {
+		compatible = "ti,tpd12s015";
+
+		gpios = <&pcf_hdmi 4 0>,	/* pcf8575@22 P4, CT_CP_HDP */
+			<&pcf_hdmi 5 0>,	/* pcf8575@22 P5, LS_OE */
+			<&gpio7 12 0>;		/* gpio7_12/sp1_cs2, HPD */
+
+		hdmi_ddc = <&i2c2>;
+
+		hdmi-monitor {
+			compatible = "ti,hdmi_panel";
+		};
 	};
 };

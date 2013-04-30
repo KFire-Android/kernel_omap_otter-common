@@ -36,6 +36,7 @@
 #include <linux/regulator/consumer.h>
 #include <linux/slab.h>
 #include <linux/of_gpio.h>
+#include <linux/of_i2c.h>
 #include <video/omapdss.h>
 #include <linux/i2c.h>
 #include <linux/i2c-algo-bit.h>
@@ -77,8 +78,13 @@ static struct {
 	/* level shifter state */
 	enum level_shifter_state ls_state;
 
-	/* i2c adapter info */
+	/*
+	 * i2c adapter info(this could be either a bitbanged adapter, or a
+	 * 'real' i2c adapter
+	 */
 	struct i2c_adapter *adap;
+
+	/* these are needed in case it's a bitbanged adapter */
 	struct i2c_algo_bit_data bit_data;
 	int scl_pin;
 	int sda_pin;
@@ -1543,6 +1549,8 @@ static void __init hdmi_probe_of(struct platform_device *pdev)
 	struct device_node *node = pdev->dev.of_node;
 	struct device_node *child;
 	struct omap_dss_device *dssdev;
+	struct device_node *adapter_node;
+	struct i2c_adapter *adapter = NULL;
 	int r, gpio;
 	enum omap_channel channel;
 	u32 v;
@@ -1596,8 +1604,16 @@ static void __init hdmi_probe_of(struct platform_device *pdev)
 		return;
 	}
 
-	/* if I2C SCL and SDA pins are defined, parse them */
-	/* these will only be valid for OMAP5 derivatives */
+	adapter_node = of_parse_phandle(node, "hdmi_ddc", 0);
+	if (adapter_node)
+		adapter = of_find_i2c_adapter_by_node(adapter_node);
+
+	/*
+	 * if I2C SCL and SDA pins are defined, parse them, if an adapter is
+	 * present, use the i2c adapter rather than bitbanging i2c. If there
+	 * isn't an adapter either, assume that we are using the hdmi core IP's
+	 * ddc.
+	 */
 	if (gpio_count == 5) {
 		gpio = of_get_gpio(node, 3);
 		if (gpio_is_valid(gpio)) {
