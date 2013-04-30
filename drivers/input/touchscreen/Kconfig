@@ -878,4 +878,28 @@ config TOUCHSCREEN_ILITEK
 
 	  To compile this driver as a module, choose M here.
 
+config TOUCHSCREEN_ILITEK_SWAP_XY
+	default y
+	bool "swap X and Y values"
+	depends on TOUCHSCREEN_ILITEK
+	help
+	  Say Y here if you want to swap the X and Y values
+	  read from the touchscreen controller (Useful for Ubuntu).
+
+config TOUCHSCREEN_ILITEK_FLIP_X
+	default n
+	bool "flip X values"
+	depends on TOUCHSCREEN_ILITEK
+	help
+	  Say Y here if you want to reverse the X values read
+	  from the touchscreen controller.
+
+config TOUCHSCREEN_ILITEK_FLIP_Y
+	default y
+	bool "flip Y values"
+	depends on TOUCHSCREEN_ILITEK
+	help
+	  Say Y here if you want to reverse the Y values read
+	  from the touchscreen controller.
+
 endif
