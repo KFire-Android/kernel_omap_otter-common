@@ -80,6 +80,46 @@ config INPUT_BMA250
 	  If you say yes here you get support for Bosch Sensortec's
 	  acceleration sensors BMA250.
 
+config INPUT_STK_ALS22x7
+	tristate "STK22x7 als support"
+	depends on I2C
+	help
+	  If you say yes here you get support for Sensortec's
+	  STK22x7 ambient light sensor driver
+
+config STK_ALS_CHANGE_THRESHOLD
+	int "ALS Change Threshold (Lux)"
+	depends on INPUT_STK_ALS22x7
+	default "20"
+	help
+	  To determine the data will be returned or not. (in read() )
+	  If difference >= Change Threshold ==>  the data will be returned
+	  If difference <  Change Threshold ==>  retrun 0 bytes
+
+config STK_ALS_SAMPLING_RATE
+	int "ALS Sampling rate for internal data polling (HZ)"
+	depends on INPUT_STK_ALS22x7
+	default "10"
+	help
+	  Depending on your r_set and IT.
+	  If unsured, please use the default value (10).
+
+config STK_ALS_TRANSMITTANCE
+	int "Transmittance (1/10,000)"
+	depends on INPUT_STK_ALS22x7
+	default "500"
+	help
+	  Depending on your cover lens and coating
+	  If unsured, please use the default value (500)
+	  500 means 5%
+
+config CM_ALS_TRANSMITTANCE
+	int "CM3263 Transmittance (1/10,000)"
+	depends on INPUT_STK_ALS22x7
+	default "169"
+	help
+	  Usually, this setting will be 1/4 of STK 2207
+
 config INPUT_PCSPKR
 	tristate "PC Speaker support"
 	depends on PCSPKR_PLATFORM
