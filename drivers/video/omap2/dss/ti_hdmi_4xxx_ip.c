@@ -277,6 +277,13 @@ static int hdmi_check_hpd_state(struct hdmi_ip_data *ip_data)
 	else
 		r = hdmi_set_phy_pwr(ip_data, HDMI_PHYPWRCMD_LDOON);
 
+	/*
+	 * DRA7xx doesn't show the correct PHY transition changes in the
+	 * WP_PWR_CTRL register, need to investigate
+	 */
+	if (omapdss_get_version() == OMAPDSS_VER_DRA7xx)
+		r = 0;
+
 	if (r) {
 		DSSERR("Failed to %s PHY TX power\n",
 				hpd ? "enable" : "disable");

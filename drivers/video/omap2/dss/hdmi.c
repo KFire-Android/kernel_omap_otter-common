@@ -347,6 +347,8 @@ static void hdmi_set_ls_state(enum level_shifter_state state)
 	if (state == hdmi.ls_state)
 		return;
 
+	sel_i2c();
+
 	switch (state) {
 	case LS_HPD_ON:
 		hpd_enable = true;
@@ -371,6 +373,8 @@ static void hdmi_set_ls_state(enum level_shifter_state state)
 		udelay(300);
 
 	hdmi.ls_state = state;
+
+	sel_hdmi();
 }
 
 static int hdmi_runtime_get(void)
@@ -691,6 +695,13 @@ static int hdmi_power_on_full(struct omap_dss_device *dssdev)
 	}
 
 	r = hdmi.ip_data.ops->phy_enable(&hdmi.ip_data);
+	/*
+	 * DRA7xx doesn't show the correct PHY transition changes in the
+	 * WP_PWR_CTRL register, need to investigate
+	 */
+	if (omapdss_get_version() == OMAPDSS_VER_DRA7xx)
+		r = 0;
+
 	if (r) {
 		DSSDBG("Failed to start PHY\n");
 		goto err_phy_enable;
@@ -1456,6 +1467,77 @@ static void ddc_i2c_init(struct platform_device *pdev)
 	}
 }
 
+static void init_sel_i2c_hdmi(void)
+{
+	void __iomem *clk_base = ioremap(0x4A009000, SZ_4K);
+	void __iomem *mcasp2_base = ioremap(0x48464000, SZ_1K);
+	void __iomem *pinmux = ioremap(0x4a003600, SZ_1K);
+	u32 val;
+	
+	if (omapdss_get_version() != OMAPDSS_VER_DRA7xx)
+		goto err;
+
+	if (!clk_base || !mcasp2_base || !pinmux)
+		DSSERR("couldn't ioremap for clk or mcasp2\n");
+
+	__raw_writel(0x40000, pinmux + 0xfc);
+	/* sw supervised wkup */
+	__raw_writel(0x2, clk_base + 0x8fc);
+
+	/* enable clock domain */
+	__raw_writel(0x2, clk_base + 0x860);
+
+	/* see what status looks like */
+	val = __raw_readl(clk_base + 0x8fc);
+	printk("CM_L4PER2_CLKSTCTRL %x\n", val);
+
+	/*
+	 * mcasp2 regs should be hopefully accessible, make mcasp2_aclkr
+	 * a gpio, write necessary stuff to MCASP_PFUNC and PDIR
+	 */
+	__raw_writel(0x1 << 29, mcasp2_base + 0x10);
+	__raw_writel(0x1 << 29, mcasp2_base + 0x14);
+
+err:
+	iounmap(clk_base);
+	iounmap(mcasp2_base);
+	iounmap(pinmux);
+}
+
+/* use this to configure the pcf8575@22 to set LS_OE and CT_HPD */
+void sel_i2c(void)
+{
+	void __iomem *base = ioremap(0x48464000, SZ_1K);
+
+	if (omapdss_get_version() != OMAPDSS_VER_DRA7xx)
+		goto err;
+
+	/* PDOUT */
+	__raw_writel(0x0, base + 0x18);
+
+	DSSDBG("PDOUT sel_i2c  %x\n", __raw_readl(base + 0x18));
+
+err:
+	iounmap(base);
+}
+
+/* use this to read edid and detect hpd ? */
+void sel_hdmi(void)
+{
+	void __iomem *base = ioremap(0x48464000, SZ_1K);
+
+	if (omapdss_get_version() != OMAPDSS_VER_DRA7xx)
+		goto err;
+
+	/* PDOUT */
+	__raw_writel(0x20000000, base + 0x18);
+
+	DSSDBG("PDOUT sel_hdmi %x\n", __raw_readl(base + 0x18));
+
+err:
+	iounmap(base);
+}
+
 static void __init hdmi_probe_of(struct platform_device *pdev)
 {
 	struct device_node *node = pdev->dev.of_node;
@@ -1532,6 +1614,18 @@ static void __init hdmi_probe_of(struct platform_device *pdev)
 			DSSERR("failed to parse SDA gpio\n");
 			return;
 		}
+	} else if (adapter != NULL) {
+		hdmi.adap = adapter;
+
+		/*
+		 * we have SEL_I2C_HDMI pin which acts as a control line to
+		 * a demux which choses the i2c lines to go either to hdmi
+		 * or to the other i2c2 slaves. This line is used as a mcasp2
+		 * gpio. Init the gpio pin so that it can be used to control
+		 * the demux.
+		 */
+		init_sel_i2c_hdmi();
+		sel_i2c();
 	}
 
 	dssdev = dss_alloc_and_init_device(&pdev->dev);
