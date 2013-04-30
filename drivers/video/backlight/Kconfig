@@ -238,6 +238,13 @@ config BACKLIGHT_PWM
 	  If you have a LCD backlight adjustable by PWM, say Y to enable
 	  this driver.
 
+config BACKLIGHT_O2M
+	tristate "O2Micro PWM based Backlight Driver"
+	depends on HAVE_PWM
+	help
+	  If you have an O2Micro-based LCD backlight adjustable by PWM, say Y to enable
+	  this driver.
+
 config BACKLIGHT_DA903X
 	tristate "Backlight Driver for DA9030/DA9034 using WLED"
 	depends on PMIC_DA903X
