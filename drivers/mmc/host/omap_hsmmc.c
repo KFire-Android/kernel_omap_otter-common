@@ -258,8 +258,10 @@ static int omap_hsmmc_set_power(struct device *dev, int slot, int power_on,
 	 * With DT, never turn OFF the regulator. This is because
 	 * the pbias cell programming support is still missing when
 	 * booting with Device tree
+	 * To support slots which are not affected by the above missing
+	 * functionally, power down if MMC_CAP_POWER_OFF_CARD is set.
 	 */
-	if (dev->of_node && !vdd)
+	if (dev->of_node && !vdd && !(host->mmc->caps & MMC_CAP_POWER_OFF_CARD))
 		return 0;
 
 	if (mmc_slot(host).before_set_reg)
