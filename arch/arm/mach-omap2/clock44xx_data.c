@@ -130,42 +130,42 @@ static struct clk virt_38400000_ck = {
 };
 
 static const struct clksel_rate div_1_0_rates[] = {
-	{ .div = 1, .val = 0, .flags = RATE_IN_4430 },
+	{ .div = 1, .val = 0, .flags = RATE_IN_44XX },
 	{ .div = 0 },
 };
 
 static const struct clksel_rate div_1_1_rates[] = {
-	{ .div = 1, .val = 1, .flags = RATE_IN_4430 },
+	{ .div = 1, .val = 1, .flags = RATE_IN_44XX },
 	{ .div = 0 },
 };
 
 static const struct clksel_rate div_1_2_rates[] = {
-	{ .div = 1, .val = 2, .flags = RATE_IN_4430 },
+	{ .div = 1, .val = 2, .flags = RATE_IN_44XX },
 	{ .div = 0 },
 };
 
 static const struct clksel_rate div_1_3_rates[] = {
-	{ .div = 1, .val = 3, .flags = RATE_IN_4430 },
+	{ .div = 1, .val = 3, .flags = RATE_IN_44XX },
 	{ .div = 0 },
 };
 
 static const struct clksel_rate div_1_4_rates[] = {
-	{ .div = 1, .val = 4, .flags = RATE_IN_4430 },
+	{ .div = 1, .val = 4, .flags = RATE_IN_44XX },
 	{ .div = 0 },
 };
 
 static const struct clksel_rate div_1_5_rates[] = {
-	{ .div = 1, .val = 5, .flags = RATE_IN_4430 },
+	{ .div = 1, .val = 5, .flags = RATE_IN_44XX },
 	{ .div = 0 },
 };
 
 static const struct clksel_rate div_1_6_rates[] = {
-	{ .div = 1, .val = 6, .flags = RATE_IN_4430 },
+	{ .div = 1, .val = 6, .flags = RATE_IN_44XX },
 	{ .div = 0 },
 };
 
 static const struct clksel_rate div_1_7_rates[] = {
-	{ .div = 1, .val = 7, .flags = RATE_IN_4430 },
+	{ .div = 1, .val = 7, .flags = RATE_IN_44XX },
 	{ .div = 0 },
 };
 
@@ -288,37 +288,37 @@ static struct clk dpll_abe_x2_ck = {
 };
 
 static const struct clksel_rate div31_1to31_rates[] = {
-	{ .div = 1, .val = 1, .flags = RATE_IN_4430 },
-	{ .div = 2, .val = 2, .flags = RATE_IN_4430 },
-	{ .div = 3, .val = 3, .flags = RATE_IN_4430 },
-	{ .div = 4, .val = 4, .flags = RATE_IN_4430 },
-	{ .div = 5, .val = 5, .flags = RATE_IN_4430 },
-	{ .div = 6, .val = 6, .flags = RATE_IN_4430 },
-	{ .div = 7, .val = 7, .flags = RATE_IN_4430 },
-	{ .div = 8, .val = 8, .flags = RATE_IN_4430 },
-	{ .div = 9, .val = 9, .flags = RATE_IN_4430 },
-	{ .div = 10, .val = 10, .flags = RATE_IN_4430 },
-	{ .div = 11, .val = 11, .flags = RATE_IN_4430 },
-	{ .div = 12, .val = 12, .flags = RATE_IN_4430 },
-	{ .div = 13, .val = 13, .flags = RATE_IN_4430 },
-	{ .div = 14, .val = 14, .flags = RATE_IN_4430 },
-	{ .div = 15, .val = 15, .flags = RATE_IN_4430 },
-	{ .div = 16, .val = 16, .flags = RATE_IN_4430 },
-	{ .div = 17, .val = 17, .flags = RATE_IN_4430 },
-	{ .div = 18, .val = 18, .flags = RATE_IN_4430 },
-	{ .div = 19, .val = 19, .flags = RATE_IN_4430 },
-	{ .div = 20, .val = 20, .flags = RATE_IN_4430 },
-	{ .div = 21, .val = 21, .flags = RATE_IN_4430 },
-	{ .div = 22, .val = 22, .flags = RATE_IN_4430 },
-	{ .div = 23, .val = 23, .flags = RATE_IN_4430 },
-	{ .div = 24, .val = 24, .flags = RATE_IN_4430 },
-	{ .div = 25, .val = 25, .flags = RATE_IN_4430 },
-	{ .div = 26, .val = 26, .flags = RATE_IN_4430 },
-	{ .div = 27, .val = 27, .flags = RATE_IN_4430 },
-	{ .div = 28, .val = 28, .flags = RATE_IN_4430 },
-	{ .div = 29, .val = 29, .flags = RATE_IN_4430 },
-	{ .div = 30, .val = 30, .flags = RATE_IN_4430 },
-	{ .div = 31, .val = 31, .flags = RATE_IN_4430 },
+	{ .div = 1, .val = 1, .flags = RATE_IN_44XX },
+	{ .div = 2, .val = 2, .flags = RATE_IN_44XX },
+	{ .div = 3, .val = 3, .flags = RATE_IN_44XX },
+	{ .div = 4, .val = 4, .flags = RATE_IN_44XX },
+	{ .div = 5, .val = 5, .flags = RATE_IN_44XX },
+	{ .div = 6, .val = 6, .flags = RATE_IN_44XX },
+	{ .div = 7, .val = 7, .flags = RATE_IN_44XX },
+	{ .div = 8, .val = 8, .flags = RATE_IN_44XX },
+	{ .div = 9, .val = 9, .flags = RATE_IN_44XX },
+	{ .div = 10, .val = 10, .flags = RATE_IN_44XX },
+	{ .div = 11, .val = 11, .flags = RATE_IN_44XX },
+	{ .div = 12, .val = 12, .flags = RATE_IN_44XX },
+	{ .div = 13, .val = 13, .flags = RATE_IN_44XX },
+	{ .div = 14, .val = 14, .flags = RATE_IN_44XX },
+	{ .div = 15, .val = 15, .flags = RATE_IN_44XX },
+	{ .div = 16, .val = 16, .flags = RATE_IN_44XX },
+	{ .div = 17, .val = 17, .flags = RATE_IN_44XX },
+	{ .div = 18, .val = 18, .flags = RATE_IN_44XX },
+	{ .div = 19, .val = 19, .flags = RATE_IN_44XX },
+	{ .div = 20, .val = 20, .flags = RATE_IN_44XX },
+	{ .div = 21, .val = 21, .flags = RATE_IN_44XX },
+	{ .div = 22, .val = 22, .flags = RATE_IN_44XX },
+	{ .div = 23, .val = 23, .flags = RATE_IN_44XX },
+	{ .div = 24, .val = 24, .flags = RATE_IN_44XX },
+	{ .div = 25, .val = 25, .flags = RATE_IN_44XX },
+	{ .div = 26, .val = 26, .flags = RATE_IN_44XX },
+	{ .div = 27, .val = 27, .flags = RATE_IN_44XX },
+	{ .div = 28, .val = 28, .flags = RATE_IN_44XX },
+	{ .div = 29, .val = 29, .flags = RATE_IN_44XX },
+	{ .div = 30, .val = 30, .flags = RATE_IN_44XX },
+	{ .div = 31, .val = 31, .flags = RATE_IN_44XX },
 	{ .div = 0 },
 };
 
@@ -348,9 +348,9 @@ static struct clk abe_24m_fclk = {
 };
 
 static const struct clksel_rate div3_1to4_rates[] = {
-	{ .div = 1, .val = 0, .flags = RATE_IN_4430 },
-	{ .div = 2, .val = 1, .flags = RATE_IN_4430 },
-	{ .div = 4, .val = 2, .flags = RATE_IN_4430 },
+	{ .div = 1, .val = 0, .flags = RATE_IN_44XX },
+	{ .div = 2, .val = 1, .flags = RATE_IN_44XX },
+	{ .div = 4, .val = 2, .flags = RATE_IN_44XX },
 	{ .div = 0 },
 };
 
@@ -372,8 +372,8 @@ static struct clk abe_clk = {
 };
 
 static const struct clksel_rate div2_1to2_rates[] = {
-	{ .div = 1, .val = 0, .flags = RATE_IN_4430 },
-	{ .div = 2, .val = 1, .flags = RATE_IN_4430 },
+	{ .div = 1, .val = 0, .flags = RATE_IN_44XX },
+	{ .div = 2, .val = 1, .flags = RATE_IN_44XX },
 	{ .div = 0 },
 };
 
@@ -554,10 +554,10 @@ static struct clk div_core_ck = {
 };
 
 static const struct clksel_rate div4_1to8_rates[] = {
-	{ .div = 1, .val = 0, .flags = RATE_IN_4430 },
-	{ .div = 2, .val = 1, .flags = RATE_IN_4430 },
-	{ .div = 4, .val = 2, .flags = RATE_IN_4430 },
-	{ .div = 8, .val = 3, .flags = RATE_IN_4430 },
+	{ .div = 1, .val = 0, .flags = RATE_IN_44XX },
+	{ .div = 2, .val = 1, .flags = RATE_IN_44XX },
+	{ .div = 4, .val = 2, .flags = RATE_IN_44XX },
+	{ .div = 8, .val = 3, .flags = RATE_IN_44XX },
 	{ .div = 0 },
 };
 
@@ -1090,8 +1090,8 @@ static struct clk func_24mc_fclk = {
 };
 
 static const struct clksel_rate div2_4to8_rates[] = {
-	{ .div = 4, .val = 0, .flags = RATE_IN_4430 },
-	{ .div = 8, .val = 1, .flags = RATE_IN_4430 },
+	{ .div = 4, .val = 0, .flags = RATE_IN_44XX },
+	{ .div = 8, .val = 1, .flags = RATE_IN_44XX },
 	{ .div = 0 },
 };
 
@@ -1121,8 +1121,8 @@ static struct clk func_48mc_fclk = {
 };
 
 static const struct clksel_rate div2_2to4_rates[] = {
-	{ .div = 2, .val = 0, .flags = RATE_IN_4430 },
-	{ .div = 4, .val = 1, .flags = RATE_IN_4430 },
+	{ .div = 2, .val = 0, .flags = RATE_IN_44XX },
+	{ .div = 4, .val = 1, .flags = RATE_IN_44XX },
 	{ .div = 0 },
 };
 
@@ -1161,8 +1161,8 @@ static struct clk func_96m_fclk = {
 };
 
 static const struct clksel_rate div2_1to8_rates[] = {
-	{ .div = 1, .val = 0, .flags = RATE_IN_4430 },
-	{ .div = 8, .val = 1, .flags = RATE_IN_4430 },
+	{ .div = 1, .val = 0, .flags = RATE_IN_44XX },
+	{ .div = 8, .val = 1, .flags = RATE_IN_44XX },
 	{ .div = 0 },
 };
 
@@ -1243,8 +1243,8 @@ static struct clk l4_wkup_clk_mux_ck = {
 };
 
 static const struct clksel_rate div2_2to1_rates[] = {
-	{ .div = 1, .val = 1, .flags = RATE_IN_4430 },
-	{ .div = 2, .val = 0, .flags = RATE_IN_4430 },
+	{ .div = 1, .val = 1, .flags = RATE_IN_44XX },
+	{ .div = 2, .val = 0, .flags = RATE_IN_44XX },
 	{ .div = 0 },
 };
 
@@ -1479,6 +1479,9 @@ static struct clk dss_sys_clk = {
 	.enable_reg	= OMAP4430_CM_DSS_DSS_CLKCTRL,
 	.enable_bit	= OMAP4430_OPTFCLKEN_SYS_CLK_SHIFT,
 	.clkdm_name	= "l3_dss_clkdm",
+#ifdef CONFIG_MACH_OMAP_4430_KC1
+	.flags          = ENABLE_ON_INIT,
+#endif
 	.parent		= &syc_clk_div_ck,
 	.recalc		= &followparent_recalc,
 };
@@ -1545,6 +1548,9 @@ static struct clk dss_48mhz_clk = {
 	.clkdm_name	= "l3_dss_clkdm",
 	.parent		= &func_48mc_fclk,
 	.recalc		= &followparent_recalc,
+#ifdef CONFIG_MACH_OMAP_4430_KC1
+	.flags          = ENABLE_ON_INIT,
+#endif
 };
 
 static struct clk efuse_ctrl_cust_fck = {
@@ -2410,6 +2416,9 @@ static struct clk timer10_fck = {
 	.enable_reg	= OMAP4430_CM_L4PER_DMTIMER10_CLKCTRL,
 	.enable_bit	= OMAP4430_MODULEMODE_SWCTRL,
 	.clkdm_name	= "l4_per_clkdm",
+#ifdef CONFIG_MACH_OMAP_4430_KC1
+	.flags          = ENABLE_ON_INIT,
+#endif
 };
 
 /* Merged cm2_dm11_mux into timer11 */
@@ -2815,8 +2824,8 @@ static struct clk usb_tll_hs_ick = {
 };
 
 static const struct clksel_rate div2_14to18_rates[] = {
-	{ .div = 14, .val = 0, .flags = RATE_IN_4430 },
-	{ .div = 18, .val = 1, .flags = RATE_IN_4430 },
+	{ .div = 14, .val = 0, .flags = RATE_IN_44XX },
+	{ .div = 18, .val = 1, .flags = RATE_IN_44XX },
 	{ .div = 0 },
 };
 
@@ -2922,22 +2931,22 @@ static const struct clksel auxclk_src_sel[] = {
 };
 
 static const struct clksel_rate div16_1to16_rates[] = {
-	{ .div = 1, .val = 0, .flags = RATE_IN_4430 },
-	{ .div = 2, .val = 1, .flags = RATE_IN_4430 },
-	{ .div = 3, .val = 2, .flags = RATE_IN_4430 },
-	{ .div = 4, .val = 3, .flags = RATE_IN_4430 },
-	{ .div = 5, .val = 4, .flags = RATE_IN_4430 },
-	{ .div = 6, .val = 5, .flags = RATE_IN_4430 },
-	{ .div = 7, .val = 6, .flags = RATE_IN_4430 },
-	{ .div = 8, .val = 7, .flags = RATE_IN_4430 },
-	{ .div = 9, .val = 8, .flags = RATE_IN_4430 },
-	{ .div = 10, .val = 9, .flags = RATE_IN_4430 },
-	{ .div = 11, .val = 10, .flags = RATE_IN_4430 },
-	{ .div = 12, .val = 11, .flags = RATE_IN_4430 },
-	{ .div = 13, .val = 12, .flags = RATE_IN_4430 },
-	{ .div = 14, .val = 13, .flags = RATE_IN_4430 },
-	{ .div = 15, .val = 14, .flags = RATE_IN_4430 },
-	{ .div = 16, .val = 15, .flags = RATE_IN_4430 },
+	{ .div = 1, .val = 0, .flags = RATE_IN_44XX },
+	{ .div = 2, .val = 1, .flags = RATE_IN_44XX },
+	{ .div = 3, .val = 2, .flags = RATE_IN_44XX },
+	{ .div = 4, .val = 3, .flags = RATE_IN_44XX },
+	{ .div = 5, .val = 4, .flags = RATE_IN_44XX },
+	{ .div = 6, .val = 5, .flags = RATE_IN_44XX },
+	{ .div = 7, .val = 6, .flags = RATE_IN_44XX },
+	{ .div = 8, .val = 7, .flags = RATE_IN_44XX },
+	{ .div = 9, .val = 8, .flags = RATE_IN_44XX },
+	{ .div = 10, .val = 9, .flags = RATE_IN_44XX },
+	{ .div = 11, .val = 10, .flags = RATE_IN_44XX },
+	{ .div = 12, .val = 11, .flags = RATE_IN_44XX },
+	{ .div = 13, .val = 12, .flags = RATE_IN_44XX },
+	{ .div = 14, .val = 13, .flags = RATE_IN_44XX },
+	{ .div = 15, .val = 14, .flags = RATE_IN_44XX },
+	{ .div = 16, .val = 15, .flags = RATE_IN_44XX },
 	{ .div = 0 },
 };
 
@@ -3527,7 +3536,7 @@ int __init omap4xxx_clk_init(void)
 		cpu_mask = RATE_IN_4460 | RATE_IN_4430;
 		omap4_specific_clks = omap446x_clks;
 	} else if (cpu_is_omap447x()) {
-		cpu_mask = RATE_IN_4460 | RATE_IN_4430;
+		cpu_mask = RATE_IN_4470 | RATE_IN_4460 | RATE_IN_4430;
 		omap4_specific_clks = omap447x_clks;
 	} else {
 		return 0;
