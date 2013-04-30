@@ -1899,11 +1899,7 @@ static struct attribute_group bma250_attribute_group = {
 	.attrs = bma250_attributes
 };
 
-
-
-static int bma250_detect(struct i2c_client *client,
-		struct i2c_board_info *info)
-{
+static int bma250_detect(struct i2c_client *client, struct i2c_board_info *info) {
 	struct i2c_adapter *adapter = client->adapter;
 
 	if (!i2c_check_functionality(adapter, I2C_FUNC_I2C))
@@ -1915,9 +1911,8 @@ static int bma250_detect(struct i2c_client *client,
 }
 
 struct regulator *temp;
-static int bma250_probe(struct i2c_client *client,
-		const struct i2c_device_id *id)
-{
+
+static int bma250_probe(struct i2c_client *client, const struct i2c_device_id *id) {
 	int err = 0;
 	int tempvalue;
 	struct bma250_data *data;
@@ -1944,7 +1939,7 @@ static int bma250_probe(struct i2c_client *client,
 	temp=data->vdd_regulator;
 
 	//Apply settings to get VAUX2 belonging to APP groug, set 0x1 to VAUX2_CFG_GRP
-	twl_i2c_write_u8(TWL6030_MODULE_ID0, 0x01,0x88);
+	twl_i2c_write_u8(TWL6030_MODULE_ID0, 0x01, 0x88);
 	udelay(5);
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
 		printk(KERN_INFO "i2c_check_functionality error\n");
@@ -2032,8 +2027,7 @@ exit:
 #ifdef CONFIG_HAS_EARLYSUSPEND
 static void bma250_early_suspend(struct early_suspend *h)
 {
-	struct bma250_data *data =
-		container_of(h, struct bma250_data, early_suspend);
+	struct bma250_data *data = container_of(h, struct bma250_data, early_suspend);
 
 	mutex_lock(&data->enable_mutex);
 	if (atomic_read(&data->enable)==1) {
@@ -2046,16 +2040,13 @@ static void bma250_early_suspend(struct early_suspend *h)
 
 static void bma250_late_resume(struct early_suspend *h)
 {
-	struct bma250_data *data =
-		container_of(h, struct bma250_data, early_suspend);
+	struct bma250_data *data = container_of(h, struct bma250_data, early_suspend);
 
 	mutex_lock(&data->enable_mutex);
 	if (atomic_read(&data->enable)==1) {
 		bma250_set_mode(data->bma250_client, BMA250_MODE_NORMAL);
-		schedule_delayed_work(&data->work,
-				msecs_to_jiffies(atomic_read(&data->delay)));
+		schedule_delayed_work(&data->work, msecs_to_jiffies(atomic_read(&data->delay)));
 	}
-	
 	mutex_unlock(&data->enable_mutex);
 }
 #endif
@@ -2090,7 +2081,7 @@ static int __devexit bma250_remove(struct i2c_client *client)
 
 
 static const struct i2c_device_id bma250_id[] = {
-	{ SENSOR_NAME, 0 },
+	{ "bma250", 0 },
 	{ }
 };
 
@@ -2101,6 +2092,7 @@ static struct i2c_driver bma250_driver = {
 		.owner	= THIS_MODULE,
 		.name	= SENSOR_NAME,
 	},
+	.class		= I2C_CLASS_HWMON,
 	.id_table	= bma250_id,
 	.probe		= bma250_probe,
 	.remove		= __devexit_p(bma250_remove),
@@ -2118,9 +2110,9 @@ static void __exit BMA250_exit(void)
 	i2c_del_driver(&bma250_driver);
 }
 
-MODULE_DESCRIPTION("BMA250 driver");
-MODULE_LICENSE("GPL");
-
 module_init(BMA250_init);
 module_exit(BMA250_exit);
 
+MODULE_AUTHOR("Bosch Sensortec GmbH");
+MODULE_DESCRIPTION("BMA250 driver");
+MODULE_LICENSE("GPL");
