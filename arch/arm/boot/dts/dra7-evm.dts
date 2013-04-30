@@ -27,8 +27,23 @@
 
 &i2c1 {
 	clock-frequency = <400000>;
+
 	tps659038: tps659038@58 {
 		reg = <0x58>;
+	};
+
+	pcf_lcd: pcf8575@20 {
+		compatible = "ti,pcf8575";
+		reg = <0x20>;
+		gpio-controller;
+		#gpio-cells = <2>;
+	};
+
+	/* TLC chip for LCD panel power and backlight */
+	tlc59108: tlc59108@40 {
+		compatible = "ti,tlc59108";
+		reg = <0x40>;
+		gpios = <&pcf_lcd 15 0>; /* P15, CON_LCD_PWR_DN */
 	};
 };
 
@@ -68,4 +83,12 @@
 
 &avs_iva {
 	avs-supply = <&smps8_reg>;
+};
+
+&dpi1 {
+	lcd {
+		compatible = "ti,tfc_s9700";
+		tlc = <&tlc59108>;
+		data-lines = <24>;
+	};
 };
