@@ -2343,7 +2343,6 @@ skip_errata:
 		dispc_ovl_set_1d_tiled_mode(plane, oi->force_1d);
 
 	if (dss_has_feature(FEAT_MFLAG)) {
-		oi->mflag_en = true;
 		dispc_ovl_set_global_mflag(ovl->id, oi->mflag_en);
 	} else if (plane == OMAP_DSS_GFX) {
 		dispc_enable_arbitration(plane,
