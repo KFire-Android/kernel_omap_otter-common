@@ -58,7 +58,7 @@ static void o2micro_backlight_set_brightness(struct o2micro_backlight_ctx *ctx)
 #endif /* CONFIG_FB_OMAP_BOOTLOADER_INIT */
 	unsigned long cmp_value;
 
-	pr_info("brightness_set %x\n", ctx->brightness_set);
+	pr_debug("brightness_set %x\n", ctx->brightness_set);
 
 	if (ctx->brightness_set == ctx->brightness)
 		return;
@@ -71,7 +71,7 @@ static void o2micro_backlight_set_brightness(struct o2micro_backlight_ctx *ctx)
 		cmp_value = (ctx->timer_range * ctx->brightness_set)/ctx->brightness_max + TIMERVALUE_RELOAD;
 	}
 
-	pr_info("o2micro backlight cmp val=%lx\n", cmp_value);
+	pr_debug("o2micro backlight cmp val=%lx\n", cmp_value);
 
 	if (ctx->brightness_set) {
 		omap_dm_timer_enable(ctx->timer);

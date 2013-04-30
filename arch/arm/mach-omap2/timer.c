@@ -47,6 +47,7 @@
 #include <plat/omap_hwmod.h>
 #include <plat/omap_device.h>
 #include <plat/omap-pm.h>
+#include <plat/clock.h>
 
 #include "powerdomain.h"
 
@@ -420,7 +421,7 @@ OMAP_SYS_TIMER(5)
  */
 static int omap2_dm_timer_set_src(struct platform_device *pdev, int source)
 {
-	int ret;
+	int ret = 0;
 	struct dmtimer_platform_data *pdata = pdev->dev.platform_data;
 	struct clk *fclk, *parent;
 	char *parent_name = NULL;
@@ -460,11 +461,13 @@ static int omap2_dm_timer_set_src(struct platform_device *pdev, int source)
 		return -EINVAL;
 	}
 
-	ret = clk_set_parent(fclk, parent);
-	if (IS_ERR_VALUE(ret)) {
-		dev_err(&pdev->dev, "%s: clk_set_parent() to %s FAILED\n",
-			__func__, parent_name);
-		ret = -EINVAL;
+	if (fclk->parent != parent) {
+		ret = clk_set_parent(fclk, parent);
+		if (IS_ERR_VALUE(ret)) {
+			dev_err(&pdev->dev, "%s: clk_set_parent() to %s FAILED (%d)\n",
+				__func__, parent_name, ret);
+			ret = -EINVAL;
+		}
 	}
 
 	clk_put(parent);

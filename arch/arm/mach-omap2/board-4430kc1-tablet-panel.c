@@ -23,13 +23,13 @@
 #include <linux/interrupt.h>
 #include <linux/io.h>
 #include <linux/leds-omap4430sdp-display.h>
+#include <linux/o2micro_bl.h>
 #include <linux/platform_device.h>
 #include <linux/omapfb.h>
 #include <video/omapdss.h>
 #include <linux/leds_pwm.h>
 #include <linux/leds.h>
 #include <linux/delay.h>
-// #include <linux/pwm_backlight.h>
 #include <linux/i2c/twl.h>
 #include <linux/regulator/machine.h>
 #include <linux/regulator/consumer.h>
@@ -163,20 +163,23 @@ static struct platform_device sdp4430_keypad_led = {
 	},
 };
 
-static struct omap_pwm_led_platform_data kc1_led_data = {
-	.name 		 = "lcd-backlight",
-	.default_trigger  = "backlight",
-	.intensity_timer = 10,
-	.bkl_max    = 254,
-	.bkl_min    = 5,
-	.bkl_freq    = 128,
-	.invert     = 0,
-	.def_brightness	 = DEFAULT_BACKLIGHT_BRIGHTNESS,
+
+static struct o2micro_backlight_platform_data kc1_led_data = {
+	.name         = "lcd-backlight",
+	.gpio_en_o2m  = -1,
+	.gpio_vol_o2m = -1,
+	.gpio_en_lcd  = 47,
+	.gpio_cabc_en = -1,
+	.timer        = 10,        /* use GPTimer 10 for backlight */
+	.sysclk       = 38400000,  /* input frequency to the timer, 38.4M */
+	.pwmfreq      = 75000,     /* output frequency from timer (10k on bowser) */
+	.totalsteps   = 256,       /* how many backlight steps for the user, also the max brightness */
+	.initialstep  = DEFAULT_BACKLIGHT_BRIGHTNESS
 };
 
 static struct platform_device kc1_led_device = {
-	.name	= "omap_pwm_led",
-	.id	= -1,
+	.name   = "o2micro-bl",
+	.id     = -1,
 	.dev	= {
 		.platform_data = &kc1_led_data,
 	},
