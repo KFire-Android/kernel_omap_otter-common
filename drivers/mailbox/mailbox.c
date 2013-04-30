@@ -34,16 +34,23 @@
 
 #include "mailbox_internal.h"
 
+/* global list of mailboxes registered with the mailbox core */
 static struct mailbox **mboxes;
 
+/* mailbox h/w block configuration variables */
 static int mbox_configured;
 static DEFINE_MUTEX(mbox_configured_lock);
 
+/*
+ * default size for the fifos, configured through kernel menuconfig
+ * TODO: Need to move this into the individual driver implementations, and
+ *	 pass the fifo size as a mailbox configuration value.
+ */
 static unsigned int mbox_kfifo_size = CONFIG_MBOX_KFIFO_SIZE;
 module_param(mbox_kfifo_size, uint, S_IRUGO);
 MODULE_PARM_DESC(mbox_kfifo_size, "Size of mailbox kfifo (bytes)");
 
-/* Mailbox FIFO handle functions */
+/* mailbox h/w transport communication handler helper functions */
 static inline void mbox_read(struct mailbox *mbox, struct mailbox_msg *msg)
 {
 	mbox->ops->read(mbox, msg);
@@ -67,7 +74,7 @@ static inline void mbox_fifo_readback(struct mailbox *mbox,
 		mbox->ops->readback(mbox, msg);
 }
 
-/* Mailbox IRQ handle functions */
+/* mailbox h/w irq handler helper functions */
 static inline void ack_mbox_irq(struct mailbox *mbox, mailbox_irq_t irq)
 {
 	if (mbox->ops->ack_irq)
@@ -79,13 +86,30 @@ static inline int is_mbox_irq(struct mailbox *mbox, mailbox_irq_t irq)
 }
 
 /*
- * message sender
+ * local helper to check if the h/w transport is busy or free.
+ * Returns 0 if free, and non-zero otherwise
  */
 static int __mbox_poll_for_space(struct mailbox *mbox)
 {
 	return mbox->ops->poll_for_space(mbox);
 }
 
+/**
+ * mailbox_msg_send() - send a mailbox message
+ * @mbox: handle to the acquired mailbox on which to send the message
+ * @msg: the mailbox message to be sent
+ *
+ * This API is called by a client user to send a mailbox message on an
+ * acquired mailbox. The API currently cannot be called in an atomic
+ * context. The API transmits the message immediately on the h/w
+ * communication transport if it is available, otherwise buffers the
+ * message for transmission as soon as the h/w transport is ready.
+ *
+ * The only failure from this function is when neither the h/w transport
+ * is available nor the s/w buffer fifo is empty.
+ *
+ * Returns 0 on success, or an error otherwise
+ */
 int mailbox_msg_send(struct mailbox *mbox, struct mailbox_msg *msg)
 {
 	struct mailbox_queue *mq = mbox->txq;
@@ -150,6 +174,23 @@ EXPORT_SYMBOL(mailbox_empty_tx);
 
 static struct mailbox_msg no_irq_msg_res;
 
+/**
+ * mailbox_msg_send_receive_no_irq() - send and receive a mailbox message
+ * @mbox: handle to the acquired mailbox on which to send and receive the
+ *	  message
+ * @msg: the mailbox message to be sent
+ *
+ * This API is called by a client user to send a mailbox message and also
+ * receive a response in a normal context. The API cannot be called in an
+ * atomic context. It is blocking, and sleeps upon transmission until a
+ * response is received or a default timeout expires (currently set at 3
+ * seconds).
+ *
+ * The API expects the h/w transport to be available for transmission. It
+ * is assumed that no failures occur during transmission.
+ *
+ * Returns the received mailbox message on success.
+ */
 struct mailbox_msg *mailbox_msg_send_receive_no_irq(struct mailbox *mbox,
 		struct mailbox_msg *msg)
 {
@@ -188,6 +229,19 @@ out:
 }
 EXPORT_SYMBOL(mailbox_msg_send_receive_no_irq);
 
+/**
+ * mailbox_msg_send_no_irq() - send a mailbox message without buffering
+ * @mbox: handle to the acquired mailbox on which to the message
+ * @msg: the mailbox message to be sent
+ *
+ * This API is called by a client user to send a mailbox message without
+ * performing any buffering. The API cannot be called in an atomic context.
+ *
+ * The API expects the h/w transport to be available for transmission. It
+ * is assumed that no failures occur during transmission.
+ *
+ * Returns 0 on successful transmission, or an error otherwise
+ */
 int mailbox_msg_send_no_irq(struct mailbox *mbox,
 		struct mailbox_msg *msg)
 {
@@ -212,6 +266,17 @@ out:
 }
 EXPORT_SYMBOL(mailbox_msg_send_no_irq);
 
+/**
+ * mailbox_save_ctx: save the context of a mailbox
+ * @mbox: handle to the acquired mailbox
+ *
+ * This allows a client (controlling a remote) to request a mailbox to
+ * save its context when it is powering down the remote.
+ *
+ * NOTE: This will be deprecated, new clients should not use this.
+ *       The same feature can be enabled through runtime_pm enablement
+ *	 of mailbox.
+ */
 void mailbox_save_ctx(struct mailbox *mbox)
 {
 	if (!mbox->ops->save_ctx) {
@@ -223,6 +288,18 @@ void mailbox_save_ctx(struct mailbox *mbox)
 }
 EXPORT_SYMBOL(mailbox_save_ctx);
 
+/**
+ * mailbox_restore_ctx: restore the context of a mailbox
+ * @mbox: handle to the acquired mailbox
+ *
+ * This allows a client (controlling a remote) to request a mailbox to
+ * restore its context after restoring the remote, so that it can
+ * communicate with the remote as it would normally.
+ *
+ * NOTE: This will be deprecated, new clients should not use this.
+ *       The same feature can be enabled through runtime_pm enablement
+ *	 of mailbox.
+ */
 void mailbox_restore_ctx(struct mailbox *mbox)
 {
 	if (!mbox->ops->restore_ctx) {
@@ -234,18 +311,48 @@ void mailbox_restore_ctx(struct mailbox *mbox)
 }
 EXPORT_SYMBOL(mailbox_restore_ctx);
 
+/**
+ * mailbox_enable_irq: enable a specific mailbox Rx or Tx interrupt source
+ * @mbox: handle to the acquired mailbox
+ * @irq: interrupt type associated with either the Rx or Tx
+ *
+ * This allows a client (having its own shared memory communication protocal
+ * with the remote) to request a mailbox to enable a particular interrupt
+ * signal source of the mailbox, as part of its communication state machine.
+ *
+ * NOTE: This will be deprecated, new clients should not use this. It is
+ *	 being exported for TI DSP/Bridge driver.
+ */
 void mailbox_enable_irq(struct mailbox *mbox, mailbox_irq_t irq)
 {
 	mbox->ops->enable_irq(mbox, irq);
 }
 EXPORT_SYMBOL(mailbox_enable_irq);
 
+/**
+ * mailbox_disable_irq: disable a specific mailbox Rx or Tx interrupt source
+ * @mbox: handle to the acquired mailbox
+ * @irq: interrupt type associated with either the Rx or Tx
+ *
+ * This allows a client (having its own shared memory communication protocal
+ * with the remote) to request a mailbox to disable a particular interrupt
+ * signal source of the mailbox, as part of its communication state machine.
+ *
+ * NOTE: This will be deprecated, new clients should not use this. It is
+ *	 being exported for TI DSP/Bridge driver.
+ */
 void mailbox_disable_irq(struct mailbox *mbox, mailbox_irq_t irq)
 {
 	mbox->ops->disable_irq(mbox, irq);
 }
 EXPORT_SYMBOL(mailbox_disable_irq);
 
+/*
+ * This is the tasklet function in which all the buffered messages are
+ * sent until the h/w transport is busy again. The tasklet is scheduled
+ * upon receiving an interrupt indicating the availability of the h/w
+ * transport.
+ */
 static void mbox_tx_tasklet(unsigned long tx_data)
 {
 	struct mailbox *mbox = (struct mailbox *)tx_data;
@@ -275,11 +382,16 @@ static void mbox_tx_tasklet(unsigned long tx_data)
 	}
 }
 
-/*
- * Message receiver(workqueue)
- */
 static unsigned char rx_work_data[CONFIG_MBOX_DATA_SIZE];
 
+/*
+ * This is the message receiver workqueue function, which is responsible
+ * for delivering all the received messages stored in the receive kfifo
+ * to the clients. Each message is delivered to all the registered mailbox
+ * clients. It also re-enables the receive interrupt on the mailbox (disabled
+ * when the s/w kfifo is full) after emptying atleast a message from the
+ * fifo.
+ */
 static void mbox_rx_work(struct work_struct *work)
 {
 	struct mailbox_queue *mq =
@@ -310,7 +422,9 @@ static void mbox_rx_work(struct work_struct *work)
 }
 
 /*
- * Mailbox interrupt handler
+ * Interrupt handler for Tx interrupt source for each of the mailboxes.
+ * This schedules the tasklet to transmit the messages buffered in the
+ * Tx fifo.
  */
 static void __mbox_tx_interrupt(struct mailbox *mbox)
 {
@@ -319,6 +433,12 @@ static void __mbox_tx_interrupt(struct mailbox *mbox)
 	tasklet_schedule(&mbox->txq->tasklet);
 }
 
+/*
+ * Interrupt handler for Rx interrupt source for each of the mailboxes.
+ * This performs the read from the h/w mailbox until the transport is
+ * free of any incoming messages, and buffers the read message. The
+ * buffers are delivered to clients by scheduling a work-queue.
+ */
 static void __mbox_rx_interrupt(struct mailbox *mbox)
 {
 	struct mailbox_queue *mq = mbox->rxq;
@@ -351,6 +471,10 @@ nomem:
 	schedule_work(&mbox->rxq->work);
 }
 
+/*
+ * The core mailbox interrupt handler function. The interrupt core would
+ * call this for each of the mailboxes the interrupt is configured.
+ */
 static irqreturn_t mbox_interrupt(int irq, void *p)
 {
 	struct mailbox *mbox = p;
@@ -364,6 +488,12 @@ static irqreturn_t mbox_interrupt(int irq, void *p)
 	return IRQ_HANDLED;
 }
 
+/*
+ * Helper function to allocate a mailbox queue object. This function
+ * also creates either or both of the work-queue or tasklet to
+ * deal with processing of messages on the kfifo associated with
+ * the mailbox queue object.
+ */
 static struct mailbox_queue *mbox_queue_alloc(struct mailbox *mbox,
 		void (*work) (struct work_struct *),
 		void (*tasklet)(unsigned long))
@@ -391,12 +521,20 @@ error:
 	return NULL;
 }
 
+/*
+ * Helper function to free a mailbox queue object.
+ */
 static void mbox_queue_free(struct mailbox_queue *q)
 {
 	kfifo_free(&q->fifo);
 	kfree(q);
 }
 
+/*
+ * Helper function to initialize a mailbox. This function creates
+ * the mailbox queue objects associated with the mailbox h/w channel
+ * and plugs-in the interrupt associated with the mailbox.
+ */
 static int mailbox_startup(struct mailbox *mbox)
 {
 	int ret = 0;
@@ -455,6 +593,9 @@ fail_startup:
 	return ret;
 }
 
+/*
+ * Helper function to de-initialize a mailbox
+ */
 static void mailbox_fini(struct mailbox *mbox)
 {
 	mutex_lock(&mbox_configured_lock);
@@ -476,6 +617,23 @@ static void mailbox_fini(struct mailbox *mbox)
 	mutex_unlock(&mbox_configured_lock);
 }
 
+/**
+ * mailbox_get() - acquire a mailbox
+ * @name: name of the mailbox to acquire
+ * @nb: notifier block to be invoked on received messages
+ *
+ * This API is called by a client user to use a mailbox. The returned handle
+ * needs to be used by the client for invoking any other mailbox API. Any
+ * message received on the mailbox is delivered to the client through the
+ * 'nb' notifier. There are currently no restrictions on multiple clients
+ * acquiring the same mailbox - the same message is delivered to each of the
+ * clients through their respective notifiers.
+ *
+ * The function ensures that the mailbox is put into an operational state
+ * before the function returns.
+ *
+ * Returns a usable mailbox handle on success, or NULL otherwise
+ */
 struct mailbox *mailbox_get(const char *name, struct notifier_block *nb)
 {
 	struct mailbox *_mbox, *mbox = NULL;
@@ -507,6 +665,18 @@ struct mailbox *mailbox_get(const char *name, struct notifier_block *nb)
 }
 EXPORT_SYMBOL(mailbox_get);
 
+/**
+ * mailbox_put() - release a mailbox
+ * @mbox: handle to the acquired mailbox
+ * @nb: notifier block used while acquiring the mailbox
+ *
+ * This API is to be called by a client user once it is done using the
+ * mailbox. The particular user's notifier function is removed from the
+ * notifier list of received messages on this mailbox. It also undoes
+ * any h/w configuration done during the acquisition of the mailbox.
+ *
+ * No return value
+ */
 void mailbox_put(struct mailbox *mbox, struct notifier_block *nb)
 {
 	if (nb)
@@ -517,6 +687,20 @@ EXPORT_SYMBOL(mailbox_put);
 
 static struct class mailbox_class = { .name = "mbox", };
 
+/**
+ * mailbox_register() - register the list of mailboxes
+ * @parent: reference to the parent device pointer containing the mailboxes
+ * @list: list of mailboxes associated with the mailbox device
+ *
+ * This API is to be called by individual mailbox driver implementations
+ * for registering the set of mailboxes contained in a h/w communication
+ * block with the mailbox core. Each of the mailbox represents a h/w
+ * communication channel, contained within the h/w communication block or ip.
+ *
+ * An associated device is also created for each of the mailboxes.
+ *
+ * Return 0 on success, or a failure code otherwise
+ */
 int mailbox_register(struct device *parent, struct mailbox **list)
 {
 	int ret;
@@ -546,6 +730,19 @@ err_out:
 }
 EXPORT_SYMBOL(mailbox_register);
 
+/**
+ * mailbox_unregister() - unregister the list of mailboxes
+ *
+ * This API is to be called by individual mailbox driver implementations
+ * for unregistering the set of mailboxes contained in a h/w communication
+ * block. Once unregistered, these mailboxes are not available for any
+ * client users/drivers.
+ *
+ * FIXME: This API currently assumes that there is only a single instance
+ * of the h/w communication block.
+ *
+ * Return 0 on success, or a failure code otherwise
+ */
 int mailbox_unregister(void)
 {
 	int i;
