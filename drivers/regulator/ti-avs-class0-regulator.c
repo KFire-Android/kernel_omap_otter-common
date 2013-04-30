@@ -31,12 +31,14 @@
 
 /**
  * struct tiavs_class0_data - class data for the regulator instance
+ * @desc:		regulator descriptor
  * @reg:		regulator that will actually set the voltage
  * @volt_set_table:	voltage to set data table
  * @current_idx:	current index
  * @voltage_tolerance:	% tolerance for voltage(optional)
  */
 struct tiavs_class0_data {
+	struct regulator_desc desc;
 	struct regulator *reg;
 	unsigned int *volt_set_table;
 	int current_idx;
@@ -134,15 +136,8 @@ static struct regulator_ops tiavs_class0_ops = {
 
 };
 
-static struct regulator_desc tiavs_class0_desc = {
-	.ops = &tiavs_class0_ops,
-	.name = "avsclass0",
-	.owner = THIS_MODULE,
-
-};
-
 static const struct of_device_id tiavs_class0_of_match[] = {
-	{.compatible = "ti,avsclass0", .data = &tiavs_class0_desc},
+	{.compatible = "ti,avsclass0",},
 	{},
 };
 
@@ -174,7 +169,6 @@ static int tiavs_class0_probe(struct platform_device *pdev)
 	struct tiavs_class0_data *data;
 	void __iomem *base;
 	const __be32 *val;
-	const void *temp;
 	unsigned int *volt_table;
 	bool efuse_is_uV = false;
 	int proplen, i, ret;
@@ -182,16 +176,10 @@ static int tiavs_class0_probe(struct platform_device *pdev)
 	int best_val = INT_MAX, choice = -EINVAL;
 
 	match = of_match_device(tiavs_class0_of_match, &pdev->dev);
-	if (match) {
-		temp = match->data;
+	if (match)
 		initdata = of_get_regulator_init_data(&pdev->dev, np);
-	}
 	if (!initdata) {
 		dev_err(&pdev->dev, "No proper OF?\n");
-		return -ENODEV;
-	}
-	if (!temp) {
-		dev_err(&pdev->dev, "No proper desc?\n");
 		return -ENODEV;
 	}
 
@@ -205,19 +193,18 @@ static int tiavs_class0_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	desc = devm_kzalloc(&pdev->dev, sizeof(*desc), GFP_KERNEL);
-	if (!desc) {
-		dev_err(&pdev->dev, "No memory to alloc desc!\n");
-		return -ENOMEM;
-	}
-	memcpy(desc, temp, sizeof(*desc));
-
 	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
 	if (!data) {
 		dev_err(&pdev->dev, "No memory to alloc data!\n");
 		return -ENOMEM;
 	}
 	data->reg = reg;
+
+	desc = &data->desc;
+	desc->name = dev_name(&pdev->dev);
+	desc->owner = THIS_MODULE;
+	desc->type = REGULATOR_VOLTAGE;
+	desc->ops = &tiavs_class0_ops;
 
 	/* pick up optional properties */
 	of_property_read_u32(np, "voltage-tolerance", &data->voltage_tolerance);
