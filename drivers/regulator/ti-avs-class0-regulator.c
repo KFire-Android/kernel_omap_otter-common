@@ -231,7 +231,7 @@ static int tiavs_class0_probe(struct platform_device *pdev)
 		return -ENODEV;
 	}
 
-	base = devm_request_and_ioremap(&pdev->dev, res);
+	base = devm_ioremap_nocache(&pdev->dev, res->start, resource_size(res));
 	if (!base) {
 		dev_err(&pdev->dev, "Unable to map Efuse registers\n");
 		return -ENOMEM;
