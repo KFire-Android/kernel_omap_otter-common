@@ -16,7 +16,7 @@ omapdrm-y := omap_drv.o \
 	omap_gem.o \
 	omap_gem_dmabuf.o \
 	omap_dmm_tiler.o \
-	sita.o
+	tcm-sita.o
 
 # temporary:
 omapdrm-y += omap_gem_helpers.o
