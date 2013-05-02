@@ -45,33 +45,6 @@
 #define abe_val_to_gain(val) \
 	(-OMAP_ABE_MAX_GAIN + (val * OMAP_ABE_GAIN_SCALE))
 
-/* TODO: map IO directly into ABE memories */
-unsigned int abe_mixer_read(struct snd_soc_platform *platform,
-		unsigned int reg)
-{
-	struct omap_abe *abe = snd_soc_platform_get_drvdata(platform);
-
-	if (reg > OMAP_ABE_NUM_DAPM_REG)
-		return 0;
-
-	dev_dbg(platform->dev, "read R%d (Ox%x) = 0x%x\n",
-			reg, reg, abe->opp.widget[reg]);
-	return abe->opp.widget[reg];
-}
-
-int abe_mixer_write(struct snd_soc_platform *platform, unsigned int reg,
-		unsigned int val)
-{
-	struct omap_abe *abe = snd_soc_platform_get_drvdata(platform);
-
-	if (reg > OMAP_ABE_NUM_DAPM_REG)
-		return 0;
-
-	abe->opp.widget[reg] = val;
-	dev_dbg(platform->dev, "write R%d (Ox%x) = 0x%x\n", reg, reg, val);
-	return 0;
-}
-
 void omap_abe_dc_set_hs_offset(struct snd_soc_platform *platform,
 	int left, int right, int step_mV)
 {

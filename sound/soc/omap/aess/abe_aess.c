@@ -67,39 +67,45 @@
 #include "abe_mem.h"
 #include "abe_aess.h"
 
+#define EVENT_GENERATOR_ON 1
+#define EVENT_GENERATOR_OFF 0
+
+#define EVENT_SOURCE_DMA 0
+#define EVENT_SOURCE_COUNTER 1
+
 /**
  * omap_aess_hw_configuration
- * @abe: Pointer on aess handle
+ * @aess: Pointer on aess handle
  *
  * Initialize the AESS HW registers for MPU and DMA
  * request visibility.
  */
-void omap_aess_hw_configuration(struct omap_aess *abe)
+void omap_aess_hw_configuration(struct omap_aess *aess)
 {
 	/* enable AESS auto gating (required to release all AESS clocks) */
-	omap_aess_reg_writel(abe, AESS_AUTO_GATING_ENABLE, 1);
+	omap_aess_reg_writel(aess, OMAP_AESS_AUTO_GATING_ENABLE, 1);
 	/* enables the DMAreq from AESS AESS_DMAENABLE_SET = 255 */
-	omap_aess_reg_writel(abe, AESS_DMAENABLE_SET, DMA_ENABLE_ALL);
+	omap_aess_reg_writel(aess, OMAP_AESS_DMAENABLE_SET, DMA_ENABLE_ALL);
 	/* enables the MCU IRQ from AESS to Cortex A9 */
-	omap_aess_reg_writel(abe, AESS_MCU_IRQENABLE_SET, INT_SET);
+	omap_aess_reg_writel(aess, OMAP_AESS_MCU_IRQENABLE_SET, INT_SET);
 }
 
 /**
  * omap_aess_clear_irq - clear ABE interrupt
- * @abe: Pointer on aess handle
+ * @aess: Pointer on aess handle
  *
  * This subroutine is called to clear MCU Irq
  */
-int omap_aess_clear_irq(struct omap_aess *abe)
+int omap_aess_clear_irq(struct omap_aess *aess)
 {
-	omap_aess_reg_writel(abe, ABE_MCU_IRQSTATUS, INT_CLR);
+	omap_aess_reg_writel(aess, OMAP_AESS_MCU_IRQSTATUS, INT_CLR);
 	return 0;
 }
 EXPORT_SYMBOL(omap_aess_clear_irq);
 
 /**
  * abe_write_event_generator - Selects event generator source
- * @abe: Pointer on abe handle
+ * @aess: Pointer on abe handle
  * @e: Event Generation Counter, McPDM, DMIC or default.
  *
  * Loads the AESS event generator hardware source.
@@ -114,7 +120,7 @@ EXPORT_SYMBOL(omap_aess_clear_irq);
  * (1<<1) in order to have the same speed at 50% and 100% OPP
  * (only 15 MSB bits are used at OPP50%)
  */
-int omap_aess_write_event_generator(struct omap_aess *abe, u32 e)
+int omap_aess_write_event_generator(struct omap_aess *aess, u32 e)
 {
 	u32 event, selection;
 	u32 counter = EVENT_GENERATOR_COUNTER_DEFAULT;
@@ -133,59 +139,59 @@ int omap_aess_write_event_generator(struct omap_aess *abe, u32 e)
 		aess_err("Bad event generator selection");
 		return -AESS_EINVAL;
 	}
-	omap_aess_reg_writel(abe, EVENT_GENERATOR_COUNTER, counter);
-	omap_aess_reg_writel(abe, EVENT_SOURCE_SELECTION, selection);
-	omap_aess_reg_writel(abe, EVENT_GENERATOR_START, EVENT_GENERATOR_ON);
-	omap_aess_reg_writel(abe, AUDIO_ENGINE_SCHEDULER, event);
+	omap_aess_reg_writel(aess, OMAP_AESS_EVENT_GENERATOR_COUNTER, counter);
+	omap_aess_reg_writel(aess, OMAP_AESS_EVENT_SOURCE_SELECTION, selection);
+	omap_aess_reg_writel(aess, OMAP_AESS_EVENT_GENERATOR_START, EVENT_GENERATOR_ON);
+	omap_aess_reg_writel(aess, OMAP_AESS_AUDIO_ENGINE_SCHEDULER, event);
 	return 0;
 }
 EXPORT_SYMBOL(omap_aess_write_event_generator);
 
 /**
  * omap_aess_start_event_generator - Starts event generator source
- * @abe: Pointer on abe handle
+ * @aess: Pointer on abe handle
  *
  * Start the event genrator of AESS. No more event will be send to AESS engine.
  * Upper layer must wait 1/96kHz to be sure that engine reaches
  * the IDLE instruction.
  */
-int omap_aess_start_event_generator(struct omap_aess *abe)
+int omap_aess_start_event_generator(struct omap_aess *aess)
 {
 	/* Start the event Generator */
-	omap_aess_reg_writel(abe, EVENT_GENERATOR_START, 1);
+	omap_aess_reg_writel(aess, OMAP_AESS_EVENT_GENERATOR_START, 1);
 	return 0;
 }
 EXPORT_SYMBOL(omap_aess_start_event_generator);
 
 /**
  * omap_aess_stop_event_generator - Stops event generator source
- * @abe: Pointer on abe handle
+ * @aess: Pointer on abe handle
  *
  * Stop the event genrator of AESS. No more event will be send to AESS engine.
  * Upper layer must wait 1/96kHz to be sure that engine reaches
  * the IDLE instruction.
  */
-int omap_aess_stop_event_generator(struct omap_aess *abe)
+int omap_aess_stop_event_generator(struct omap_aess *aess)
 {
 	/* Stop the event Generator */
-	omap_aess_reg_writel(abe, EVENT_GENERATOR_START, 0);
+	omap_aess_reg_writel(aess, OMAP_AESS_EVENT_GENERATOR_START, 0);
 	return 0;
 }
 EXPORT_SYMBOL(omap_aess_stop_event_generator);
 
 /**
  * omap_aess_disable_irq - disable MCU/DSP ABE interrupt
- * @abe: Pointer on abe handle
+ * @aess: Pointer on abe handle
  *
  * This subroutine is disabling ABE MCU/DSP Irq
  */
-int omap_aess_disable_irq(struct omap_aess *abe)
+int omap_aess_disable_irq(struct omap_aess *aess)
 {
 	/* disables the DMAreq from AESS AESS_DMAENABLE_CLR = 127
 	 * DMA_Req7 will still be enabled as it is used for ABE trace */
-	omap_aess_reg_writel(abe, AESS_DMAENABLE_CLR, 0x7F);
+	omap_aess_reg_writel(aess, OMAP_AESS_DMAENABLE_CLR, 0x7F);
 	/* disables the MCU IRQ from AESS to Cortex A9 */
-	omap_aess_reg_writel(abe, AESS_MCU_IRQENABLE_CLR, 0x01);
+	omap_aess_reg_writel(aess, OMAP_AESS_MCU_IRQENABLE_CLR, 0x01);
 	return 0;
 }
 EXPORT_SYMBOL(omap_aess_disable_irq);

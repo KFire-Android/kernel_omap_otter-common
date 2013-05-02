@@ -43,10 +43,8 @@
 #include "omap-pcm.h"
 #include "omap-dmic.h"
 
-#define OMAP_DMIC_LEGACY_MODE	0x0
-#define OMAP_DMIC_ABE_MODE	0x1
-
-#define OMAP_DMIC_DAI_MODE_MASK	0x0f
+#define OMAP_DMIC_LEGACY_DAI	0
+#define OMAP_DMIC_ABE_DAI	1
 
 struct omap_dmic {
 	struct device *dev;
@@ -59,7 +57,7 @@ struct omap_dmic {
 	int threshold;
 	u32 ch_enabled;
 	int active;
-	bool abe_mode;
+	bool active_dai;
 	int running;
 	struct mutex mutex;
 };
@@ -113,22 +111,21 @@ static int omap_dmic_dai_startup(struct snd_pcm_substream *substream,
 				  struct snd_soc_dai *dai)
 {
 	struct omap_dmic *dmic = snd_soc_dai_get_drvdata(dai);
-	int dai_abe_mode = dai->id & OMAP_DMIC_DAI_MODE_MASK;
 	int ret = 0;
 
 	mutex_lock(&dmic->mutex);
 
 	if (!dmic->active++) {
-		dmic->abe_mode = dai_abe_mode;
+		dmic->active_dai = dai->id;
 		/* DMIC FIFO configuration */
-		if (dmic->abe_mode == OMAP_DMIC_LEGACY_MODE)
+		if (dai->id == OMAP_DMIC_LEGACY_DAI)
 			dmic->threshold = OMAP_DMIC_THRES_MAX - 3;
 		else
 			dmic->threshold = 2;
-	} else if (dmic->abe_mode != dai_abe_mode) {
+	} else if (dmic->active_dai != dai->id) {
 		dev_err(dmic->dev, "Trying %s, while DMIC is in %s.\n",
-			dai_abe_mode ? "ABE mode" : "Legacy mode",
-			dmic->abe_mode ? "ABE mode" : "Legacy mode");
+			dai->id ? "ABE mode" : "Legacy mode",
+			dmic->active_dai ? "ABE mode" : "Legacy mode");
 		dmic->active--;
 		ret = -EINVAL;
 	}
@@ -231,7 +228,7 @@ static int omap_dmic_dai_hw_params(struct snd_pcm_substream *substream,
 
 	dmic->ch_enabled = 0;
 	channels = params_channels(params);
-	if (dmic->abe_mode == OMAP_DMIC_LEGACY_MODE)
+	if (dai->id == OMAP_DMIC_LEGACY_DAI)
 		select_channels = channels;
 	else
 		select_channels = 6;
@@ -459,15 +456,10 @@ static int omap_dmic_remove(struct snd_soc_dai *dai)
 	return 0;
 }
 
-#define DMIC_LEGACY_DAI		(OMAP_DMIC_LEGACY_MODE | (0 << 4))
-#define DMIC_ABE_DAI_1		(OMAP_DMIC_ABE_MODE | (1 << 4))
-#define DMIC_ABE_DAI_2		(OMAP_DMIC_ABE_MODE | (2 << 4))
-#define DMIC_ABE_DAI_3		(OMAP_DMIC_ABE_MODE | (3 << 4))
-
 static struct snd_soc_dai_driver omap_dmic_dai[] = {
 {
 	.name = "omap-dmic",
-	.id	= DMIC_LEGACY_DAI,
+	.id	= OMAP_DMIC_LEGACY_DAI,
 	.probe = omap_dmic_probe,
 	.remove = omap_dmic_remove,
 	.capture = {
@@ -480,34 +472,10 @@ static struct snd_soc_dai_driver omap_dmic_dai[] = {
 	.ops = &omap_dmic_dai_ops,
 },
 {
-	.name = "omap-dmic-abe-dai-0",
-	.id	= DMIC_ABE_DAI_1,
+	.name = "omap-dmic-abe-dai",
+	.id	= OMAP_DMIC_ABE_DAI,
 	.capture = {
-		.stream_name = "omap-dmic-abe.0 Capture",
-		.channels_min = 2,
-		.channels_max = 2,
-		.rates = SNDRV_PCM_RATE_96000 | SNDRV_PCM_RATE_192000,
-		.formats = SNDRV_PCM_FMTBIT_S32_LE,
-	},
-	.ops = &omap_dmic_dai_ops,
-},
-{
-	.name = "omap-dmic-abe-dai-1",
-	.id	= DMIC_ABE_DAI_2,
-	.capture = {
-		.stream_name = "omap-dmic-abe.1 Capture",
-		.channels_min = 2,
-		.channels_max = 2,
-		.rates = SNDRV_PCM_RATE_96000 | SNDRV_PCM_RATE_192000,
-		.formats = SNDRV_PCM_FMTBIT_S32_LE,
-	},
-	.ops = &omap_dmic_dai_ops,
-},
-{
-	.name = "omap-dmic-abe-dai-2",
-	.id	= DMIC_ABE_DAI_3,
-	.capture = {
-		.stream_name = "omap-dmic-abe.2 Capture",
+		.stream_name = "omap-dmic-abe Capture",
 		.channels_min = 2,
 		.channels_max = 2,
 		.rates = SNDRV_PCM_RATE_96000 | SNDRV_PCM_RATE_192000,
@@ -521,7 +489,7 @@ static int asoc_dmic_probe(struct platform_device *pdev)
 {
 	struct omap_dmic *dmic;
 	struct resource *res;
-	int ret;
+	int ret, nr_dai;
 
 	dmic = devm_kzalloc(&pdev->dev, sizeof(struct omap_dmic), GFP_KERNEL);
 	if (!dmic)
@@ -562,22 +530,20 @@ static int asoc_dmic_probe(struct platform_device *pdev)
 		goto err_put_clk;
 	}
 
-	if (!devm_request_mem_region(&pdev->dev, res->start,
-				     resource_size(res), pdev->name)) {
-		dev_err(dmic->dev, "memory region already claimed\n");
-		ret = -ENODEV;
-		goto err_put_clk;
-	}
-
-	dmic->io_base = devm_ioremap(&pdev->dev, res->start,
-				     resource_size(res));
+	dmic->io_base = devm_request_and_ioremap(&pdev->dev, res);
 	if (!dmic->io_base) {
+		dev_err(&pdev->dev, "cannot remap\n");
 		ret = -ENOMEM;
 		goto err_put_clk;
 	}
 
-	ret = snd_soc_register_dais(&pdev->dev, omap_dmic_dai,
-			ARRAY_SIZE(omap_dmic_dai));
+#if defined(CONFIG_SND_OMAP_SOC_ABE) ||\
+	defined(CONFIG_SND_OMAP_SOC_ABE_MODULE)
+	nr_dai = ARRAY_SIZE(omap_dmic_dai);
+#else
+	nr_dai = 1;
+#endif
+	ret = snd_soc_register_dais(&pdev->dev, omap_dmic_dai, nr_dai);
 	if (ret)
 		goto err_put_clk;
 

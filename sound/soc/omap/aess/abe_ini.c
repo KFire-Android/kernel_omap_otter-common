@@ -69,7 +69,6 @@
 #include "abe_gain.h"
 #include "abe_mem.h"
 #include "abe_port.h"
-#include "abe_seq.h"
 
 /* FW version that this HAL supports.
  * We cheat and since we include the FW in the driver atm we can get the
@@ -187,8 +186,9 @@ static void omap_aess_init_gain_ramp(struct omap_aess *abe)
  * Memory map of ABE memory space for PMEM/DMEM/SMEM/DMEM
  */
 int omap_aess_init_mem(struct omap_aess *abe, struct device *dev,
-	void __iomem **_io_base, u32 *fw_header)
+	void __iomem **_io_base, const void *fw_config)
 {
+	u32 *fw_header = (u32*) fw_config;
 	int i, offset = 0;
 	u32 count;
 
@@ -206,12 +206,6 @@ int omap_aess_init_mem(struct omap_aess *abe, struct device *dev,
 	abe->fw_info = kzalloc(sizeof(struct omap_aess_mapping), GFP_KERNEL);
 	if (abe->fw_info == NULL)
 		return -ENOMEM;
-
-	abe->fw_info->init_table = kzalloc(sizeof(struct omap_aess_init_task), GFP_KERNEL);
-	if (abe->fw_info->init_table == NULL) {
-		kfree(abe->fw_info);
-		return -ENOMEM;
-	}
 
 	/* get mapping */
 	count = fw_header[offset];
@@ -237,8 +231,8 @@ int omap_aess_init_mem(struct omap_aess *abe, struct device *dev,
 	count = fw_header[offset];
 	dev_dbg(abe->dev, "Tasks %d of size 0x%x at offset 0x%x\n", count,
 		sizeof(struct omap_aess_task), offset << 2);
-	abe->fw_info->init_table->nb_task = count;
-	abe->fw_info->init_table->task = (struct omap_aess_task *)&fw_header[++offset];
+	abe->fw_info->nb_init_task = count;
+	abe->fw_info->init_table = (struct omap_aess_task *)&fw_header[++offset];
 	offset += (sizeof(struct omap_aess_task) * count) / 4;
 
 	/* get ports */
@@ -285,13 +279,13 @@ EXPORT_SYMBOL(omap_aess_init_mem);
  *
  * Load the different AESS memories PMEM/DMEM/SMEM/DMEM
  */
-static int omap_aess_load_fw_param(struct omap_aess *abe, u32 *data)
+static int omap_aess_load_fw_param(struct omap_aess *abe, const void *data)
 {
 	u32 pmem_size, dmem_size, smem_size, cmem_size;
-	u32 *pmem_ptr, *dmem_ptr, *smem_ptr, *cmem_ptr, *fw_ptr;
+	u32 *pmem_ptr, *dmem_ptr, *smem_ptr, *cmem_ptr;
+	u32 *fw_ptr = (u32*) data;
 
 	/* Analyze FW memories banks sizes */
-	fw_ptr = data;
 	abe->firmware_version_number = *fw_ptr++;
 	pmem_size = *fw_ptr++;
 	cmem_size = *fw_ptr++;
@@ -309,7 +303,6 @@ static int omap_aess_load_fw_param(struct omap_aess *abe, u32 *data)
 
 	return 0;
 }
-EXPORT_SYMBOL(omap_aess_load_fw_param);
 
 /**
  * omap_aess_load_fw - Load ABE Firmware and initialize memories
@@ -317,13 +310,12 @@ EXPORT_SYMBOL(omap_aess_load_fw_param);
  * @firmware: Pointer on the ABE firmware (after the header)
  *
  */
-int omap_aess_load_fw(struct omap_aess *abe, u32 *firmware)
+int omap_aess_load_fw(struct omap_aess *abe, const void *firmware)
 {
 	omap_aess_load_fw_param(abe, firmware);
 	omap_aess_reset_all_ports(abe);
 	omap_aess_init_gain_ramp(abe);
 	omap_aess_build_scheduler_table(abe);
-	omap_aess_reset_all_sequence(abe);
 	omap_aess_select_main_port(abe, OMAP_ABE_PDM_DL_PORT);
 	return 0;
 }
@@ -334,7 +326,7 @@ EXPORT_SYMBOL(omap_aess_load_fw);
  * @abe: Pointer on aess handle
  * @firmware: Pointer on the ABE firmware (after the header)
  */
-int omap_aess_reload_fw(struct omap_aess *abe, u32 *firmware)
+int omap_aess_reload_fw(struct omap_aess *abe, const void *firmware)
 {
 	omap_aess_load_fw_param(abe, firmware);
 	omap_aess_init_gain_ramp(abe);
