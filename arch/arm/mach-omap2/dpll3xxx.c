@@ -307,11 +307,11 @@ static int omap3_noncore_dpll_program(struct clk_hw_omap *clk, u16 freqsel)
 	_omap3_noncore_dpll_bypass(clk);
 
 	/*
-	 * Set jitter correction. No jitter correction for OMAP4 and 3630
-	 * since freqsel field is no longer present
+	 * Set jitter correction. No jitter correction for OMAP4, 3630
+	 * and dra7xx since freqsel field is no longer present
 	 */
-	if (!soc_is_am33xx() && !cpu_is_omap44xx() && !cpu_is_omap3630()
-            && !soc_is_omap54xx()) {
+	if (!soc_is_am33xx() && !cpu_is_omap44xx() && !cpu_is_omap3630() &&
+	    !soc_is_omap54xx() && !soc_is_dra7xx()) {
 		v = __raw_readl(dd->control_reg);
 		v &= ~dd->freqsel_mask;
 		v |= freqsel << __ffs(dd->freqsel_mask);
@@ -512,9 +512,10 @@ int omap3_noncore_dpll_set_rate(struct clk_hw *hw, unsigned long rate,
 		if (dd->last_rounded_rate == 0)
 			return -EINVAL;
 
-		/* No freqsel on AM335x, OMAP4 and OMAP3630 */
+		/* No freqsel on AM335x, OMAP4, OMAP3630 and DRA7XX */
 		if (!soc_is_am33xx() && !cpu_is_omap44xx() &&
-		    !cpu_is_omap3630() && !soc_is_omap54xx()) {
+		    !cpu_is_omap3630() && !soc_is_omap54xx() &&
+		    !soc_is_dra7xx()) {
 			freqsel = _omap3_dpll_compute_freqsel(clk,
 						dd->last_rounded_n);
 			WARN_ON(!freqsel);
