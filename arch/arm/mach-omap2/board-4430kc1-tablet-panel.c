@@ -192,39 +192,37 @@ static struct platform_device __initdata *sdp4430_panel_devices[] = {
 	&kc1_led_device,
 };
 
-static struct dsscomp_platform_data dsscomp_config_boxer = {
+static struct dsscomp_platform_data dsscomp_config_tablet = {
 	.tiler1d_slotsz = (SZ_16M + SZ_4M),
 };
 
-#ifdef CONFIG_FB_OMAP2_NUM_FBS
-#define OMAPLFB_NUM_DEV CONFIG_FB_OMAP2_NUM_FBS
-#else
-#define OMAPLFB_NUM_DEV 1
-#endif
-
-static struct sgx_omaplfb_config omaplfb_config_boxer[OMAPLFB_NUM_DEV] = {
-        {
-        .vram_buffers = 2,
-        .swap_chain_length = 2,
-        }
+static struct sgx_omaplfb_config omaplfb_config_tablet[] = {
+	{
+		.tiler2d_buffers = 2,
+		.swap_chain_length = 2,
+	},
+	{
+		.vram_buffers = 2,
+		.swap_chain_length = 2,
+	},
 };
 
-static struct sgx_omaplfb_platform_data omaplfb_plat_data_boxer = {
-	.num_configs = OMAPLFB_NUM_DEV,
-	.configs = omaplfb_config_boxer,
+static struct sgx_omaplfb_platform_data omaplfb_plat_data_tablet = {
+	.num_configs = ARRAY_SIZE(omaplfb_config_tablet),
+	.configs = omaplfb_config_tablet,
 };
 
 static struct omapfb_platform_data sdp4430_fb_data = {
 	.mem_desc = {
-		.region_cnt = 1,
+		.region_cnt = ARRAY_SIZE(omaplfb_config_tablet),
 	},
 };
 
 void __init omap4_kc1_android_display_setup(struct omap_ion_platform_data *ion)
 {
 	omap_android_display_setup(&sdp4430_dss_data,
-				   &dsscomp_config_boxer,
-				   &omaplfb_plat_data_boxer,
+				   &dsscomp_config_tablet,
+				   &omaplfb_plat_data_tablet,
 				   &sdp4430_fb_data);
 }
 
