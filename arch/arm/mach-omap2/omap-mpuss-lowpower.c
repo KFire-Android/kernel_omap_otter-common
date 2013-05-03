@@ -116,7 +116,8 @@ static inline void set_cpu_wakeup_addr(unsigned int cpu_id, u32 addr)
 {
 	struct omap4_cpu_pm_info *pm_info = &per_cpu(omap4_pm_info, cpu_id);
 
-	__raw_writel(addr, pm_info->wkup_sar_addr);
+	if (pm_info->wkup_sar_addr)
+		__raw_writel(addr, pm_info->wkup_sar_addr);
 }
 
 /*
@@ -157,6 +158,9 @@ static void scu_pwrst_prepare(unsigned int cpu_id, unsigned int cpu_state)
 {
 	struct omap4_cpu_pm_info *pm_info = &per_cpu(omap4_pm_info, cpu_id);
 	u32 scu_pwr_st;
+
+	if (!pm_info->scu_sar_addr)
+		return;
 
 	switch (cpu_state) {
 	case PWRDM_POWER_RET:
@@ -210,7 +214,8 @@ static void l2x0_pwrst_prepare(unsigned int cpu_id, unsigned int save_state)
 {
 	struct omap4_cpu_pm_info *pm_info = &per_cpu(omap4_pm_info, cpu_id);
 
-	__raw_writel(save_state, pm_info->l2x0_sar_addr);
+	if (pm_info->l2x0_sar_addr)
+		__raw_writel(save_state, pm_info->l2x0_sar_addr);
 }
 
 /*
@@ -387,9 +392,11 @@ int __init omap4_mpuss_init(void)
 	else if (soc_is_omap54xx())
 		cpu_wakeup_addr = OMAP5_CPU0_WAKEUP_NS_PA_ADDR_OFFSET;
 	pm_info = &per_cpu(omap4_pm_info, 0x0);
-	pm_info->scu_sar_addr = sar_base + SCU_OFFSET0;
-	pm_info->wkup_sar_addr = sar_base + cpu_wakeup_addr;
-	pm_info->l2x0_sar_addr = sar_base + L2X0_SAVE_OFFSET0;
+	if (sar_base) {
+		pm_info->scu_sar_addr = sar_base + SCU_OFFSET0;
+		pm_info->wkup_sar_addr = sar_base + cpu_wakeup_addr;
+		pm_info->l2x0_sar_addr = sar_base + L2X0_SAVE_OFFSET0;
+	}
 	pm_info->pwrdm = pwrdm_lookup("cpu0_pwrdm");
 	if (!pm_info->pwrdm) {
 		pr_err("Lookup failed for CPU0 pwrdm\n");
@@ -408,9 +415,11 @@ int __init omap4_mpuss_init(void)
 	else if (soc_is_omap54xx())
 		cpu_wakeup_addr = OMAP5_CPU1_WAKEUP_NS_PA_ADDR_OFFSET;
 	pm_info = &per_cpu(omap4_pm_info, 0x1);
-	pm_info->scu_sar_addr = sar_base + SCU_OFFSET1;
-	pm_info->wkup_sar_addr = sar_base + cpu_wakeup_addr;
-	pm_info->l2x0_sar_addr = sar_base + L2X0_SAVE_OFFSET1;
+	if (sar_base) {
+		pm_info->scu_sar_addr = sar_base + SCU_OFFSET1;
+		pm_info->wkup_sar_addr = sar_base + cpu_wakeup_addr;
+		pm_info->l2x0_sar_addr = sar_base + L2X0_SAVE_OFFSET1;
+	}
 
 	pm_info->pwrdm = pwrdm_lookup("cpu1_pwrdm");
 	if (!pm_info->pwrdm) {
@@ -434,12 +443,14 @@ int __init omap4_mpuss_init(void)
 	mpuss_clear_prev_logic_pwrst();
 
 	/* Save device type on scratchpad for low level code to use */
-	if (omap_type() != OMAP2_DEVICE_TYPE_GP)
-		__raw_writel(1, sar_base + OMAP_TYPE_OFFSET);
-	else
-		__raw_writel(0, sar_base + OMAP_TYPE_OFFSET);
+	if (sar_base) {
+		if (omap_type() != OMAP2_DEVICE_TYPE_GP)
+			__raw_writel(1, sar_base + OMAP_TYPE_OFFSET);
+		else
+			__raw_writel(0, sar_base + OMAP_TYPE_OFFSET);
 
-	save_l2x0_context();
+		save_l2x0_context();
+	}
 
 	if (cpu_is_omap44xx()) {
 		omap_pm_ops.finish_suspend = omap4_finish_suspend;
@@ -447,7 +458,7 @@ int __init omap4_mpuss_init(void)
 		omap_pm_ops.resume = omap4_cpu_resume;
 		omap_pm_ops.scu_prepare = scu_pwrst_prepare;
 		cpu_context_offset = OMAP4_RM_CPU0_CPU0_CONTEXT_OFFSET;
-	} else if (soc_is_omap54xx()) {
+	} else if (soc_is_omap54xx() || soc_is_dra7xx()) {
 		omap_pm_ops.finish_suspend = omap5_finish_suspend;
 		omap_pm_ops.hotplug_restart = omap5_secondary_startup;
 		omap_pm_ops.resume = omap5_cpu_resume;
