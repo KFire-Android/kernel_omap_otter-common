@@ -74,6 +74,8 @@
 #include <linux/mfd/tlv320aic3xxx-registers.h>
 #include <linux/mfd/tlv320aic3xxx-core.h>
 
+#include <linux/platform_data/lm75_platform_data.h>
+
 #include "omap_ram_console.h"
 #include "common.h"
 #include "common-board-devices.h"
@@ -321,6 +323,13 @@ static int __init omap4_twl6030_hsmmc_init(struct omap2_hsmmc_info *controllers)
 }
 
 /***** I2C BOARD INIT ****/
+static struct lm75_platform_data lm75_pdata = {
+	.domain = "case",
+	.stats_enable = 1,
+	.average_period = 2000,
+	.average_number = 20,
+};
+
 
 static struct i2c_board_info __initdata sdp4430_i2c_boardinfo_dvt[] = {
 #ifdef CONFIG_BATTERY_BQ27541_Q
@@ -375,7 +384,7 @@ static struct i2c_board_info __initdata sdp4430_i2c_4_boardinfo[] = {
 	{ I2C_BOARD_INFO("stk_als22x7_addr3", 0x70>>1), },
 //add for Temp-sensor
 #ifdef CONFIG_SENSORS_LM75
-	{ I2C_BOARD_INFO("tmp105", 0x49), },
+	{ I2C_BOARD_INFO("tmp105", 0x49), .platform_data = &lm75_pdata, },
 #endif
 // for gsensor	
 	{ I2C_BOARD_INFO("bma250", 0x18), },
@@ -404,7 +413,7 @@ static struct i2c_board_info __initdata sdp4430_i2c_4_boardinfo_dvt[] = {
 	{ I2C_BOARD_INFO("stk_als22x7_addr3", 0x70>>1), },
 //add for Temp-sensor
 #ifdef CONFIG_SENSORS_LM75
-	{ I2C_BOARD_INFO("tmp105", 0x49), },
+	{ I2C_BOARD_INFO("tmp105", 0x49), .platform_data = &lm75_pdata, },
 #endif
 // for gsensor	
 	{ I2C_BOARD_INFO("bma250", 0x18), },
@@ -422,7 +431,7 @@ static struct i2c_board_info __initdata sdp4430_i2c_4_boardinfo_pvt[] = {
 	{ I2C_BOARD_INFO("bma250", 0x18), },
 //add for Temp-sensor
 #ifdef CONFIG_SENSORS_LM75
-	{ I2C_BOARD_INFO("tmp105", 0x48), },
+	{ I2C_BOARD_INFO("tmp105", 0x48), .platform_data = &lm75_pdata, },
 #endif
 };
 
