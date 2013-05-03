@@ -26,11 +26,14 @@
 #include "../../../drivers/staging/omapdrm/omap_dmm_tiler.h"
 #include <asm/mach/map.h>
 #include <asm/page.h>
+#include <plat/common.h>
 
 
 #include "../ion_priv.h"
 #include "omap_ion_priv.h"
 #include <asm/cacheflush.h>
+
+bool use_dynamic_pages;
 
 struct omap_ion_heap {
 	struct ion_heap heap;
@@ -120,6 +123,48 @@ static void omap_tiler_free_carveout(struct ion_heap *heap,
 		gen_pool_free(omap_heap->pool, info->phys_addrs[i], PAGE_SIZE);
 }
 
+static int omap_tiler_alloc_dynamicpages(struct omap_tiler_info *info)
+{
+	int i;
+	int ret;
+	struct page *pg;
+
+	for (i = 0; i < info->n_phys_pages; i++) {
+		pg = alloc_page(GFP_KERNEL | GFP_DMA | GFP_HIGHUSER);
+		if (!pg) {
+			ret = -ENOMEM;
+			pr_err("%s: alloc_page failed\n",
+				__func__);
+			goto err_page_alloc;
+		}
+		info->phys_addrs[i] = page_to_phys(pg);
+		dmac_flush_range((void *)page_address(pg),
+			(void *)page_address(pg) + PAGE_SIZE);
+		outer_flush_range(info->phys_addrs[i],
+			info->phys_addrs[i] + PAGE_SIZE);
+	}
+	return 0;
+
+err_page_alloc:
+	for (i -= 1; i >= 0; i--) {
+		pg = phys_to_page(info->phys_addrs[i]);
+		__free_page(pg);
+	}
+	return ret;
+}
+
+static void omap_tiler_free_dynamicpages(struct omap_tiler_info *info)
+{
+	int i;
+	struct page *pg;
+
+	for (i = 0; i < info->n_phys_pages; i++) {
+		pg = phys_to_page(info->phys_addrs[i]);
+		__free_page(pg);
+	}
+	return;
+}
+
 int omap_tiler_alloc(struct ion_heap *heap,
 		     struct ion_client *client,
 		     struct omap_ion_tiler_alloc_data *data)
@@ -204,7 +249,11 @@ int omap_tiler_alloc(struct ion_heap *heap,
 
 	if ((heap->id == OMAP_ION_HEAP_TILER) ||
 	    (heap->id == OMAP_ION_HEAP_NONSECURE_TILER)) {
-		ret = omap_tiler_alloc_carveout(heap, info);
+		if (use_dynamic_pages)
+			ret = omap_tiler_alloc_dynamicpages(info);
+		else
+			ret = omap_tiler_alloc_carveout(heap, info);
+
 		if (ret)
 			goto err_got_tiler;
 
@@ -220,7 +269,7 @@ int omap_tiler_alloc(struct ion_heap *heap,
 	data->stride = info->vstride;
 
 	/* create an ion handle  for the allocation */
-	handle = ion_alloc(client, 0, 0, 1 << OMAP_ION_HEAP_TILER);
+	handle = ion_alloc(client, 0, 0, 1 << heap->id);
 	if (IS_ERR_OR_NULL(handle)) {
 		ret = PTR_ERR(handle);
 		pr_err("%s: failure to allocate handle to manage "
@@ -229,6 +278,7 @@ int omap_tiler_alloc(struct ion_heap *heap,
 	}
 
 	buffer = ion_handle_buffer(handle);
+	buffer->heap = heap;	/* clarify tiler heap */
 	buffer->size = n_tiler_pages * PAGE_SIZE;
 	buffer->priv_virt = info;
 	data->handle = handle;
@@ -241,7 +291,10 @@ err:
 err_got_carveout:
 	if ((heap->id == OMAP_ION_HEAP_TILER) ||
 	    (heap->id == OMAP_ION_HEAP_NONSECURE_TILER)) {
-		omap_tiler_free_carveout(heap, info);
+		if (use_dynamic_pages)
+			omap_tiler_free_dynamicpages(info);
+		else
+			omap_tiler_free_carveout(heap, info);
 	}
 err_got_tiler:
 	tiler_release(info->tiler_handle);
@@ -259,7 +312,10 @@ static void omap_tiler_heap_free(struct ion_buffer *buffer)
 
 	if ((buffer->heap->id == OMAP_ION_HEAP_TILER) ||
 	    (buffer->heap->id == OMAP_ION_HEAP_NONSECURE_TILER)) {
-		omap_tiler_free_carveout(buffer->heap, info);
+		if (use_dynamic_pages)
+			omap_tiler_free_dynamicpages(info);
+		else
+			omap_tiler_free_carveout(buffer->heap, info);
 	}
 
 	kfree(info);
@@ -443,6 +499,12 @@ struct ion_heap *omap_tiler_heap_create(struct ion_platform_heap *data)
 	heap->heap.type = OMAP_ION_HEAP_TYPE_TILER;
 	heap->heap.name = data->name;
 	heap->heap.id = data->id;
+
+	if (omap_total_ram_size() <= SZ_512M)
+		use_dynamic_pages = true;
+	else
+		use_dynamic_pages = false;
+
 	return &heap->heap;
 }
 
