@@ -1481,7 +1481,11 @@ static struct omap_hwmod_opt_clk dss_opt_clks[] = {
 
 static struct omap_hwmod omap44xx_dss_hwmod = {
 	.name		= "dss_core",
+#if defined(CONFIG_MACH_OMAP_4430_KC1)
+	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET | HWMOD_INIT_NO_RESET,
+#else
 	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
+#endif
 	.class		= &omap44xx_dss_hwmod_class,
 	.clkdm_name	= "l3_dss_clkdm",
 	.main_clk	= "dss_dss_clk",
