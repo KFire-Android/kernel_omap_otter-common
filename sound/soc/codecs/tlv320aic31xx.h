@@ -41,6 +41,8 @@
 #define AUDIO_NAME "aic31xx"
 /* Macro to enable the inclusion of tiload kernel driver */
 #define AIC31XX_TiLoad
+/* Macro to enable AIC3110 codec support */
+#define AIC3110_CODEC_SUPPORT
 /* Macro enables or disables support for miniDSP in the driver */
 /* Enable the AIC31XX_TiLoad macro first before enabling these macros */
 /* #define CONFIG_MINI_DSP */
