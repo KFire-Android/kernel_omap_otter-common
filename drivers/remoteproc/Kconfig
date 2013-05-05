@@ -80,6 +80,15 @@ config OMAP_REMOTEPROC_WATCHDOG
 # Amount of CMA memory to reserve for OMAP's remoteproc sub-system.
 # We need quite much. Fortunately, CMA makes sure this memory isn't
 # wasted in case we're not loading the remote processors.
+config OMAP4_IPU_CMA_SIZE_512MB
+	hex "Cortex M3 physically contiguous memory pool size (in bytes)"
+	depends on OMAP_REMOTEPROC_IPU
+	default 0x2000000
+	help
+	  Allocate a specified size of physically contiguous memory (CMA)
+	  for OMAP4's dual Cortex-M3 sub-system. Vast majority of this
+	  memory isn't wasted in case the M3 sub-system isn't loaded.
+
 config OMAP4_IPU_CMA_SIZE
 	hex "Cortex M3 physically contiguous memory pool size (in bytes)"
 	depends on OMAP_REMOTEPROC_IPU

@@ -251,7 +251,10 @@ void __init omap_rproc_reserve_cma(int platform_type)
 
 #ifdef CONFIG_OMAP_REMOTEPROC_IPU
 	if (platform_type == RPROC_CMA_OMAP4) {
-		cma_size = CONFIG_OMAP4_IPU_CMA_SIZE;
+		if (omap_total_ram_size() <= SZ_512M)
+			cma_size = CONFIG_OMAP4_IPU_CMA_SIZE_512MB;
+		else
+			cma_size = CONFIG_OMAP4_IPU_CMA_SIZE;
 		cma_addr = OMAP4_RPROC_CMA_BASE_IPU;
 	} else if (platform_type == RPROC_CMA_OMAP5) {
 		if (omap_total_ram_size() <= SZ_512M)
