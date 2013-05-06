@@ -1804,6 +1804,9 @@ int omapdss_compat_init(void)
 	struct omap_dss_device *dssdev = NULL;
 	int i, r;
 
+	if(!pdev)
+		return -ENODEV;
+
 	mutex_lock(&compat_init_lock);
 
 	if (compat_refcnt++ > 0)
