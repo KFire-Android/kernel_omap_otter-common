@@ -341,6 +341,13 @@
 			ti,hwmods = "wd_timer2";
 		};
 
+		dmm: dmm@4e000000 {
+			compatible = "ti,omap5-dmm";
+			reg = <0x4e000000 0x800>;
+			interrupts = <0 113 0x4>;
+			ti,hwmods = "dmm";
+		};
+
 		bandgap {
 			reg = <0x4a0021e0 0xc
 				0x4a00232c 0xc
