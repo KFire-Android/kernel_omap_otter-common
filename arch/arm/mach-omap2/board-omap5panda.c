@@ -61,6 +61,9 @@
 #include <drm/drm_edid.h>
 
 #include <plat/sgx_omaplfb.h>
+#include <plat/android-display.h>
+
+
 #define OMAP5_SEVM_FB_RAM_SIZE       (SZ_16M + SZ_4M) /* 1280×800*4 * 2 */
 
 #define GPIO_ETH_NRESET		79	/* USBB3 to SMSC LAN9730 */
@@ -918,7 +921,7 @@ static struct omapfb_platform_data panda_fb_pdata = {
 		.region_cnt = 1,
 		.region = {
 			[0] = {
-				.size = OMAP5_SEVM_FB_RAM_SIZE,
+				.size = 0,
 			},
 		},
 	},
@@ -926,15 +929,8 @@ static struct omapfb_platform_data panda_fb_pdata = {
 
 static void __init omap5panda_display_init(void)
 {
-	struct sgx_omaplfb_config data = {
-		.tiler2d_buffers = 0,
-		.swap_chain_length = 2,
-		.vram_buffers = 2,
-	};
 
 	omapfb_set_platform_data(&panda_fb_pdata);
-	omap_vram_set_sdram_vram(OMAP5_SEVM_FB_RAM_SIZE, 0);
-	sgx_omaplfb_set(0, &data);
 
 	i2c_register_board_info(0, hdmi_i2c_eeprom,
 			ARRAY_SIZE(hdmi_i2c_eeprom));
@@ -1006,12 +1002,54 @@ static void __init omap_5_panda_init(void)
 	omap5panda_display_init();
 }
 
+
+struct omap_panda5_panel_data {
+	struct omap_dss_board_info *board_info;
+	struct dsscomp_platform_data *dsscomp_data;
+	struct sgx_omaplfb_platform_data *omaplfb_data;
+};
+
+
+static struct sgx_omaplfb_config omaplfb_config_hdmi_default_display[] = {
+	{
+		.tiler2d_buffers = 0,
+		.vram_buffers = 4,
+		.swap_chain_length = 2,
+	}
+};
+
+static struct sgx_omaplfb_platform_data omaplfb_plat_data_hdmi_default_display = {
+	.num_configs = 1,
+	.configs = omaplfb_config_hdmi_default_display,
+};
+
+static struct omap_panda5_panel_data panel_data_hdmi_default_display  = {
+	.board_info = &panda5_dss_data,
+	.dsscomp_data = NULL,
+	.omaplfb_data = &omaplfb_plat_data_hdmi_default_display,
+};
+
+static struct omap_panda5_panel_data *get_panel_data(void)
+{
+		return &panel_data_hdmi_default_display;
+}
+
+
+void __init panda5_android_display_setup(void)
+{
+	struct omap_panda5_panel_data *panel_data = get_panel_data();
+	omap_android_display_setup(panel_data->board_info,
+					panel_data->dsscomp_data,
+					panel_data->omaplfb_data,
+					&panda_fb_pdata);
+}
+
+
 static void __init omap_panda5_reserve(void)
 {
 	omap_rproc_reserve_cma(RPROC_CMA_OMAP5);
-
+	panda5_android_display_setup();
 	omap5_ion_init();
-
 	omap_reserve();
 }
 
