@@ -146,6 +146,8 @@ static int hdmi_panel_probe(struct omap_dss_device *dssdev)
 
 	omapdss_hdmi_display_set_timing(dssdev, &dssdev->panel.timings);
 
+	hdmi.dssdev = dssdev;
+
 	return 0;
 }
 

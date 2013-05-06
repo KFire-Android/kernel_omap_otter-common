@@ -676,12 +676,13 @@ static int hdmi_power_on_full(struct omap_dss_device *dssdev)
 		phy = (p->pixel_clock * 125) / 100 ;
 		break;
 	case HDMI_DEEP_COLOR_36BIT:
-		if (p->pixel_clock >= 148500) {
+		phy = (p->pixel_clock * 150) / 100;
+
+		if (phy >= dss_feat_get_param_max(FEAT_PARAM_HDMI_PCLK)) {
 			DSSERR("36 bit deep color not supported for the pixel clock %d\n",
 				p->pixel_clock);
 			goto err_deep_color;
 		}
-		phy = (p->pixel_clock * 150) / 100;
 		break;
 	case HDMI_DEEP_COLOR_24BIT:
 	default:
