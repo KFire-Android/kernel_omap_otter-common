@@ -172,7 +172,9 @@ static int omap_modeset_init(struct drm_device *dev)
 		 * other possible channels to which the encoder can connect are
 		 * not considered.
 		 */
-		channel = dssdev->output->dispc_channel;
+		channel = dssdev->type == OMAP_DISPLAY_TYPE_HDMI ?
+						OMAP_DSS_CHANNEL_DIGIT :
+						OMAP_DSS_CHANNEL_LCD;
 
 		/*
 		 * if this channel hasn't already been taken by a previously
