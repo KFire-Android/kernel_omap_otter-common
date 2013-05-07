@@ -1868,6 +1868,8 @@ static struct omap_mbox_dev_info omap44xx_mailbox_info[] = {
 
 static struct omap_mbox_pdata omap44xx_mailbox_attrs = {
 	.intr_type	= MBOX_INTR_CFG_TYPE2,
+	.num_users	= 3,
+	.num_fifos	= 8,
 	.info_cnt	= ARRAY_SIZE(omap44xx_mailbox_info),
 	.info		= omap44xx_mailbox_info,
 };

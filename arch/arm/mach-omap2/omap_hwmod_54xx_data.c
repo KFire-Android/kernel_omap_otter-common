@@ -1949,6 +1949,8 @@ static struct omap_mbox_dev_info omap54xx_mbox_info[] = {
 
 static struct omap_mbox_pdata omap54xx_mbox_attrs = {
 	.intr_type	= MBOX_INTR_CFG_TYPE2,
+	.num_users	= 3,
+	.num_fifos	= 8,
 	.info_cnt	= ARRAY_SIZE(omap54xx_mbox_info),
 	.info		= omap54xx_mbox_info,
 };
