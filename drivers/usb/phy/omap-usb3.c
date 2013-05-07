@@ -208,6 +208,8 @@ static int omap_usb3_probe(struct platform_device *pdev)
 {
 	struct omap_usb			*phy;
 	struct resource			*res;
+	struct device_node		*node = pdev->dev.of_node;
+	const char   			*clk_name;
 
 	phy = devm_kzalloc(&pdev->dev, sizeof(*phy), GFP_KERNEL);
 	if (!phy) {
@@ -223,27 +225,40 @@ static int omap_usb3_probe(struct platform_device *pdev)
 	}
 
 	phy->dev		= &pdev->dev;
-
 	phy->phy.dev		= phy->dev;
 	phy->phy.label		= "omap-usb3";
 	phy->phy.init		= omap_usb3_init;
 	phy->phy.set_suspend	= omap_usb3_suspend;
 	phy->phy.type		= USB_PHY_TYPE_USB3;
-
 	phy->is_suspended	= 1;
-	phy->wkupclk = devm_clk_get(phy->dev, "usb_phy_cm_clk32k");
-	if (IS_ERR(phy->wkupclk)) {
-		dev_err(&pdev->dev, "unable to get usb_phy_cm_clk32k\n");
-		return PTR_ERR(phy->wkupclk);
+
+	of_property_read_string(node, "wkupclk", &clk_name);
+	if (!clk_name) {
+		dev_err(&pdev->dev, "unable to read wkupclk property from dt \n");
+		return -EINVAL;
+	} else {
+		phy->wkupclk = devm_clk_get(phy->dev, clk_name);
+		if (IS_ERR(phy->wkupclk)) {
+			dev_err(&pdev->dev, "unable to get usb_phy wk clk\n");
+			return PTR_ERR(phy->wkupclk);
+		}
 	}
+
 	clk_prepare(phy->wkupclk);
 
-	phy->optclk = devm_clk_get(phy->dev, "usb_otg_ss_refclk960m");
-	if (IS_ERR(phy->optclk)) {
-		dev_err(&pdev->dev, "unable to get usb_otg_ss_refclk960m\n");
-		return PTR_ERR(phy->optclk);
+	of_property_read_string(node, "optclk", &clk_name);
+	if (!clk_name)
+		dev_err(&pdev->dev, "unable to read optclk property from dt\n");
+	else {
+		phy->optclk = devm_clk_get(phy->dev, clk_name);
+		if (IS_ERR(phy->optclk)) {
+			dev_err(&pdev->dev, "unable to get usb_phy opt clk\n");
+			return PTR_ERR(phy->optclk);
+		}
+		else
+			clk_prepare(phy->optclk);
 	}
-	clk_prepare(phy->optclk);
+
 
 	phy->sys_clk = devm_clk_get(phy->dev, "sys_clkin");
 	if (IS_ERR(phy->sys_clk)) {
