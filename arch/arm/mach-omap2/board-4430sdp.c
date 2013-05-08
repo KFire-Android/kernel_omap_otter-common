@@ -1241,6 +1241,22 @@ static struct dsscomp_platform_data dsscomp_config_hdmi_display = {
 	.tiler1d_slotsz = (SZ_16M + SZ_2M + SZ_8M + SZ_1M),
 };
 
+static struct sgx_omaplfb_config omaplfb_config_sdp4430[] = {
+	{
+		.tiler2d_buffers = 2,
+		.swap_chain_length = 2,
+	},
+	{
+		.vram_buffers = 2,
+		.swap_chain_length = 2,
+	},
+};
+
+static struct sgx_omaplfb_platform_data sdp4430_omaplfb_data = {
+	.num_configs = ARRAY_SIZE(omaplfb_config_sdp4430),
+	.configs = omaplfb_config_sdp4430,
+};
+
 /* HACK: use 2 devices, as expected by DDK */
 static struct sgx_omaplfb_config omaplfb_config_hdmi_default_display[] = {
 	{
@@ -1340,7 +1356,7 @@ static void __init sdp4430_android_display_setup(void)
 	else
 		omap_android_display_setup(&sdp4430_dss_data,
 					   NULL,
-					   NULL,
+					   &sdp4430_omaplfb_data,
 					   &sdp4430_fb_pdata);
 }
 
