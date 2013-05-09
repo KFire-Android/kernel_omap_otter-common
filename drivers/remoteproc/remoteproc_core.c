@@ -753,7 +753,7 @@ void *rproc_alloc_memory(struct rproc *rproc, u32 size, dma_addr_t *dma,
 	} else {
 		va = dma_alloc_coherent(dev->parent, size, dma, GFP_KERNEL);
 		if (!va) {
-			dev_err(dev, "dma_alloc_coherent failed\n");
+			dev_err(dev, "dma_alloc_coherent failed: size==0x%x, dma==0x%x\n", size, dma);
 			goto out;
 		}
 	}
