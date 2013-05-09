@@ -1714,6 +1714,8 @@ static int dss_ovl_set_manager(struct omap_overlay *ovl,
 
 	dispc_ovl_set_channel_out(ovl->id, mgr->id);
 
+	op->channel = mgr->id;
+
 	ovl->manager = mgr;
 	list_add_tail(&ovl->list, &mgr->overlays);
 
