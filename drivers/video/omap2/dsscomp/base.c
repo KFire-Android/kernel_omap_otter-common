@@ -195,6 +195,7 @@ int set_dss_ovl_info(struct dss2_ovl_info *oi)
 	/* just in case there are new fields, we get the current info */
 	ovl->get_overlay_info(ovl, &info);
 
+	ovl->enabled = cfg->enabled;
 	if (!cfg->enabled)
 		goto done;
 
