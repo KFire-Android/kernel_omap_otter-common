@@ -876,7 +876,7 @@ static void dss_completion_irq_handler(void *data, u32 mask)
 	struct omap_overlay_manager *mgr;
 	struct omap_overlay *ovl;
 	const int num_ovls = ARRAY_SIZE(dss_data.ovl_priv_data_array);
-	const int num_mgrs = MAX_DSS_MANAGERS;
+	const int num_mgrs = dss_feat_get_num_mgrs();
 	const u32 masks[] = {
 		DISPC_IRQ_FRAMEDONE | DISPC_IRQ_VSYNC,
 		DISPC_IRQ_FRAMEDONETV | DISPC_IRQ_EVSYNC_EVEN |
@@ -919,7 +919,7 @@ static void schedule_completion_irq(void)
 	struct mgr_priv_data *mp;
 	struct ovl_priv_data *op;
 	const int num_ovls = ARRAY_SIZE(dss_data.ovl_priv_data_array);
-	const int num_mgrs = MAX_DSS_MANAGERS;
+	const int num_mgrs = dss_feat_get_num_mgrs();
 	const u32 masks[] = {
 		DISPC_IRQ_FRAMEDONE | DISPC_IRQ_VSYNC,
 		DISPC_IRQ_FRAMEDONETV | DISPC_IRQ_EVSYNC_EVEN |
