@@ -1065,6 +1065,7 @@ static void dss_apply_irq_handler(void *data, u32 mask)
 		}
 	}
 
+	schedule_completion_irq();
 	dss_write_regs();
 	dss_set_go_bits();
 
