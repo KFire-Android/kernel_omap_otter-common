@@ -198,6 +198,24 @@ exit:
 }
 EXPORT_SYMBOL(omap_ion_share_fd_to_buffers);
 
+int omap_ion_fd_to_handles(int fd, struct ion_client **client,
+		struct ion_handle **handles,
+		int *num_handles)
+{
+	if (export_fd_to_ion_handles) {
+		export_fd_to_ion_handles(fd,
+				client,
+				handles,
+				num_handles);
+	} else {
+		pr_err("%s: export_fd_to_ion_handles not initialized",
+				__func__);
+		return -EINVAL;
+	}
+	return 0;
+}
+EXPORT_SYMBOL(omap_ion_fd_to_handles);
+
 static struct platform_driver ion_driver = {
 	.probe = omap_ion_probe,
 	.remove = omap_ion_remove,

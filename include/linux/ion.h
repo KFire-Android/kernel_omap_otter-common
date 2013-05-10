@@ -147,6 +147,9 @@ void ion_free(struct ion_client *client, struct ion_handle *handle);
 int ion_phys(struct ion_client *client, struct ion_handle *handle,
 	     ion_phys_addr_t *addr, size_t *len);
 
+int ion_handle_phys(struct ion_handle *handle,
+		    ion_phys_addr_t *addr, size_t *len);
+
 /**
  * ion_map_kernel - create mapping for the given handle
  * @client:	the client
