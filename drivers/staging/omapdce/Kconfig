@@ -1,0 +1,8 @@
+config DRM_OMAP_DCE
+	tristate "OMAP Distributed Codec Engine"
+	select OMAP_RPMSG
+	default n
+	help
+	  Plugin for OMAP to support hw accellerated video
+	  decoders/encoders
+
