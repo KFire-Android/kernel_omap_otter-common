@@ -56,8 +56,7 @@ unsigned int crc32(unsigned int *pdata, int n);
 struct snd_soc_codec;
 #else
 #ifdef DEBUG
-#define DBG(fmt, ...) printk("CFW[%s:%d]: " fmt "\n", \
-				__FILE__, __LINE__, ##__VA_ARGS__)
+#define DBG(fmt, ...) printk("CFW: " fmt "\n", ##__VA_ARGS__)
 #else
 #define DBG(fmt, ...)
 #endif
