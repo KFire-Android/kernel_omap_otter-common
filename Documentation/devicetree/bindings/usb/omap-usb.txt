@@ -83,7 +83,8 @@ Required properties:
    usb mailbox or usb3 phy power. omap4 has usb mailbox in control module to
    notify events to the musb core and omap5 has usb3 phy power register to
    power on usb3 phy. Should be "1" if it has mailbox and "2" if it has usb3
-   phy power.
+   phy power (usb3 phy power indicates the presense of a usb2 and usb3 phy),
+   should be "3" is it has only usb2 phy power.
 
 omap_control_usb: omap-control-usb@4a002300 {
 	compatible = "ti,omap-control-usb";

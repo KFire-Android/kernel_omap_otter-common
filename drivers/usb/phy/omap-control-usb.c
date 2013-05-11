@@ -73,14 +73,25 @@ void omap_control_usb_phy_power(struct device *dev, int on)
 	u32 val;
 	struct omap_control_usb	*control_usb = dev_get_drvdata(dev);
 
-	val = readl(control_usb->dev_conf);
+	if (control_usb->type == OMAP_CTRL_DEV_TYPE2) {
 
-	if (on)
-		val &= ~OMAP_CTRL_DEV_PHY_PD;
-	else
-		val |= OMAP_CTRL_DEV_PHY_PD;
+		val = readl(control_usb->dev_conf);
+		if (on)
+			val &= ~OMAP_CTRL_DEV_PHY_PD;
+		else
+			val |= OMAP_CTRL_DEV_PHY_PD;
 
-	writel(val, control_usb->dev_conf);
+		writel(val, control_usb->dev_conf);
+	} else {
+
+		val = readl(control_usb->ctrl_core_srcomp_north_side);
+		if (on)
+			val &= ~OMAP_CTRL_USB_SRCOMP_NORTH_SIDE_PD;
+		else
+			val |= OMAP_CTRL_USB_SRCOMP_NORTH_SIDE_PD;
+		writel(val, control_usb->ctrl_core_srcomp_north_side);
+
+	}
 }
 EXPORT_SYMBOL_GPL(omap_control_usb_phy_power);
 
@@ -200,14 +211,6 @@ static int omap_control_usb_probe(struct platform_device *pdev)
 
 	control_usb->dev	= &pdev->dev;
 
-	res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
-		"control_dev_conf");
-	control_usb->dev_conf = devm_request_and_ioremap(&pdev->dev, res);
-	if (!control_usb->dev_conf) {
-		dev_err(&pdev->dev, "Failed to obtain io memory\n");
-		return -EADDRNOTAVAIL;
-	}
-
 	if (control_usb->type == OMAP_CTRL_DEV_TYPE1) {
 		res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
 			"otghs_control");
@@ -221,6 +224,14 @@ static int omap_control_usb_probe(struct platform_device *pdev)
 
 	if (control_usb->type == OMAP_CTRL_DEV_TYPE2) {
 		res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
+			"control_dev_conf");
+		control_usb->dev_conf = devm_request_and_ioremap(&pdev->dev, res);
+		if (!control_usb->dev_conf) {
+			dev_err(&pdev->dev, "Failed to obtain io memory\n");
+			return -EADDRNOTAVAIL;
+		}
+
+		res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
 			"phy_power_usb");
 		control_usb->phy_power = devm_request_and_ioremap(
 			&pdev->dev, res);
@@ -228,6 +239,21 @@ static int omap_control_usb_probe(struct platform_device *pdev)
 			dev_dbg(&pdev->dev, "Failed to obtain io memory\n");
 			return -EADDRNOTAVAIL;
 		}
+	}
+
+	if (control_usb->type == OMAP_CTRL_DEV_TYPE3) {
+		res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
+			"ctrl_core_srcomp_north_side");
+		control_usb->ctrl_core_srcomp_north_side =
+				devm_request_and_ioremap(&pdev->dev, res);
+		if (!control_usb->ctrl_core_srcomp_north_side) {
+			dev_err(&pdev->dev, "Failed to obtain io memory\n");
+			return -EADDRNOTAVAIL;
+		}
+	}
+
+	if ((control_usb->type == OMAP_CTRL_DEV_TYPE2) ||
+		(control_usb->type == OMAP_CTRL_DEV_TYPE3)) {
 
 		control_usb->sys_clk = devm_clk_get(control_usb->dev,
 			"sys_clkin");
