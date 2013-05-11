@@ -144,9 +144,10 @@ int dwc3_omap_mailbox(enum omap_dwc3_vbus_id_status status)
 	u32			val;
 	struct dwc3_omap	*omap = _omap;
 
-	if (!omap)
+	if (!omap) {
+		dev_dbg(omap->dev, "not ready , deferring\n");
 		return -EPROBE_DEFER;
-
+	}
 	switch (status) {
 	case OMAP_DWC3_ID_GROUND:
 		dev_dbg(omap->dev, "ID GND\n");
@@ -189,7 +190,7 @@ int dwc3_omap_mailbox(enum omap_dwc3_vbus_id_status status)
 		dev_dbg(omap->dev, "ID float\n");
 	}
 
-	return IRQ_HANDLED;
+	return 0;
 }
 EXPORT_SYMBOL_GPL(dwc3_omap_mailbox);
 
