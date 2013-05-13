@@ -38,6 +38,7 @@
 #include <linux/delay.h>
 #include <linux/usb/musb-omap.h>
 #include <linux/usb/omap_control_usb.h>
+#include <linux/of_platform.h>
 
 #include "musb_core.h"
 #include "omap2430.h"
@@ -476,6 +477,9 @@ static int omap2430_probe(struct platform_device *pdev)
 	struct platform_device		*musb;
 	struct omap2430_glue		*glue;
 	struct device_node		*np = pdev->dev.of_node;
+	struct device_node              *omap_control_usb_node;
+	struct platform_device          *pdev_control_usb;
+
 	struct musb_hdrc_config		*config;
 	int				ret = -ENOMEM;
 
@@ -538,7 +542,19 @@ static int omap2430_probe(struct platform_device *pdev)
 	}
 
 	if (pdata->has_mailbox) {
-		glue->control_otghs = omap_get_control_dev();
+		omap_control_usb_node   = of_parse_phandle(np, "ctrl-module", 0);
+		if (IS_ERR(omap_control_usb_node)) {
+			dev_err(&pdev->dev, "Failed to find ctrl-module\n");
+			return -EPROBE_DEFER;
+		}
+		pdev_control_usb = of_find_device_by_node(omap_control_usb_node);
+
+		if (IS_ERR(pdev_control_usb)) {
+			dev_err(&pdev->dev, "Failed to find device node for ctrl-module\n");
+			return -EPROBE_DEFER;
+		}
+
+		glue->control_otghs = &pdev_control_usb->dev;
 		if (IS_ERR(glue->control_otghs)) {
 			dev_vdbg(&pdev->dev, "Failed to get control device\n");
 			return -ENODEV;
