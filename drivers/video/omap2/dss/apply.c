@@ -1103,6 +1103,7 @@ int dss_mgr_blank(struct omap_overlay_manager *mgr,
 	struct mgr_priv_data *mp;
 	unsigned long flags;
 	int r, r_get, i;
+	const int num_mgrs = dss_feat_get_num_mgrs();
 
 	DSSDBG("dss_mgr_blank(%s,wait=%d)\n", mgr->name, wait_for_go);
 
@@ -1155,13 +1156,12 @@ int dss_mgr_blank(struct omap_overlay_manager *mgr,
 	 * DISPC programming takes place in case GO bit was on.
 	 */
 	if (!dss_data.irq_enabled) {
-		u32 mask;
+		u32 mask = 0;
+		for (i = 0; i < num_mgrs; ++i)
+			mask |= dispc_mgr_get_vsync_irq(i);
 
-		mask = DISPC_IRQ_VSYNC	| DISPC_IRQ_EVSYNC_ODD |
-			DISPC_IRQ_EVSYNC_EVEN | DISPC_IRQ_FRAMEDONETV |
-			DISPC_IRQ_FRAMEDONE | DISPC_IRQ_FRAMEDONE2;
-		if (dss_has_feature(FEAT_MGR_LCD2))
-			mask |= DISPC_IRQ_VSYNC2;
+		for (i = 0; i < num_mgrs; ++i)
+			mask |= dispc_mgr_get_framedone_irq(i);
 
 		r = omap_dispc_register_isr(dss_apply_irq_handler, NULL, mask);
 		dss_data.irq_enabled = true;
