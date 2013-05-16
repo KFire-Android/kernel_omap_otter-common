@@ -81,6 +81,7 @@ config ARCH_OMAP4
 config SOC_OMAP5
 	bool "TI OMAP5"
 	select ARCH_HAS_BANDGAP
+	select ARCH_HAS_OPP
 	select ARM_ARCH_TIMER
 	select ARM_CPU_SUSPEND if PM
 	select ARM_GIC
@@ -88,6 +89,7 @@ config SOC_OMAP5
 	select HAVE_SMP
 	select COMMON_CLK
 	select ARCH_NEEDS_CPU_IDLE_COUPLED
+	select PM_OPP if PM
 
 config SOC_DRA7XX
 	bool "TI DRA7XX"
