@@ -26,8 +26,6 @@
 #include <linux/leds-omap4430sdp-display.h>
 #include <linux/interrupt.h>
 #include <linux/delay.h>
-// #include <linux/hwspinlock.h>
-// #include <linux/twl6040-vib.h>
 #include <linux/regulator/machine.h>
 #include <linux/regulator/fixed.h>
 #include <linux/omapfb.h>
@@ -42,10 +40,6 @@
 #include <linux/platform_data/emif_plat.h>
 
 #include <mach/hardware.h>
-//#include <mach/omap4-common.h>
-//#include <mach/emif.h>
-//#include <mach/lpddr2-elpida.h>
-//#include <mach/dmm.h>
 #include <mach/omap4_ion.h>
 #include <mach/omap-secure.h>
 
@@ -82,7 +76,6 @@
 #include "common-board-devices.h"
 #include "mux.h"
 #include "hsmmc.h"
-//#include "timer-gp.h"
 #include "control.h"
 #include "pm.h"
 #include "prm-regbits-44xx.h"
@@ -122,7 +115,7 @@
 
 #define TWL6030_RTC_GPIO		6
 
-static struct wake_lock uart_lock;
+//static struct wake_lock uart_lock;
 
 #ifdef CONFIG_SND_SOC_TLV320AIC31XX
 static struct aic3xxx_gpio_setup aic3xxx_gpio[] ={
@@ -624,25 +617,6 @@ static struct regulator_init_data sdp4430_vcxio = {
 	.consumer_supplies	= sdp4430_vcxio_supply,
 };
 
-#if 0
-static struct regulator_consumer_supply vusb_supply[] = {
-	REGULATOR_SUPPLY("vusb", "twl6030_usb"),
-};
-
-static struct regulator_init_data sdp4430_vusb = {
-	.constraints = {
-		.min_uV			= 3300000,
-		.max_uV			= 3300000,
-		.valid_modes_mask	= REGULATOR_MODE_NORMAL | REGULATOR_MODE_STANDBY,
-		.valid_ops_mask		= REGULATOR_CHANGE_MODE | REGULATOR_CHANGE_STATUS,
-		.state_mem		= { .enabled = false, .disabled = true, },
-		.initial_state          = PM_SUSPEND_MEM,
-	},
-	.num_consumer_supplies		= 1,
-//	.consumer_supplies		= vusb_supply,
-};
-#endif
-
 static struct regulator_init_data sdp4430_clk32kg = {
 	.constraints = {
 		.valid_modes_mask	= REGULATOR_MODE_NORMAL,
@@ -662,28 +636,6 @@ static struct regulator_init_data sdp4430_v2v1 = {
 	},
 };
 
-static struct regulator_init_data sdp4430_vcore1	= {
-	.constraints = {
-		.valid_ops_mask         = REGULATOR_CHANGE_STATUS,
-		.always_on              = true,
-		.state_mem = {
-			.disabled       = true,
-		},
-		.initial_state          = PM_SUSPEND_MEM,
-	},
-};
-
-static struct regulator_init_data sdp4430_vcore2	= {
-	.constraints = {
-		.valid_ops_mask         = REGULATOR_CHANGE_STATUS,
-		.always_on              = true,
-		.state_mem = {
-			.disabled       = true,
-		},
-		.initial_state          = PM_SUSPEND_MEM,
-	},
-};
-
 static struct twl4030_platform_data sdp4430_twldata = {
 	/* TWL6030 regulators at OMAP443X/4460 based SOMs */
 	.vdac		= &sdp4430_vdac,
@@ -695,14 +647,11 @@ static struct twl4030_platform_data sdp4430_twldata = {
 	.vusim		= &sdp4430_vusim,
 	.vana		= &sdp4430_vana,
 	.vcxio		= &sdp4430_vcxio,
-//	.vusb		= &sdp4430_vusb,
 
 	/* TWL6030/6032 common resources */
 	.clk32kg	= &sdp4430_clk32kg,
 
 	/* SMPS */
-	.vdd1		= &sdp4430_vcore1,
-	.vdd2		= &sdp4430_vcore2,
 	.v2v1		= &sdp4430_v2v1,
 };
 
@@ -724,8 +673,7 @@ static int __init omap4_i2c_init(void)
 		TWL_COMMON_REGULATOR_VUSB
 		);
 #if 0
-		TWL_COMMON_REGULATOR_CLK32KG
-
+		TWL_COMMON_REGULATOR_VDAC |
 		TWL_COMMON_REGULATOR_VAUX2 |
 		TWL_COMMON_REGULATOR_VAUX3 |
 		TWL_COMMON_REGULATOR_VMMC |
@@ -905,42 +853,6 @@ static void __init omap4_ehci_ohci_init(void)
 }
 #else
 static void __init omap4_ehci_ohci_init(void){}
-#endif
-
-#if 0
-static int kc1_notifier_call(struct notifier_block *this,
-					unsigned long code, void *cmd)
-{
-	void __iomem *sar_base;
-	u32 v = OMAP4430_RST_GLOBAL_COLD_SW_MASK;
-
-	sar_base = omap4_get_sar_ram_base();
-
-	if (!sar_base)
-		return notifier_from_errno(-ENOMEM);
-
-	if ((code == SYS_RESTART) && (cmd != NULL)) {
-		/* cmd != null; case: warm boot */
-		if (!strcmp(cmd, "bootloader")) {
-			/* Save reboot mode in scratch memory */
-			strcpy(sar_base + 0xA0C, cmd);
-			v |= OMAP4430_RST_GLOBAL_WARM_SW_MASK;
-		} else if (!strcmp(cmd, "recovery")) {
-			/* Save reboot mode in scratch memory */
-			strcpy(sar_base + 0xA0C, cmd);
-			v |= OMAP4430_RST_GLOBAL_WARM_SW_MASK;
-		} else {
-			v |= OMAP4430_RST_GLOBAL_COLD_SW_MASK;
-		}
-	}
-
-	omap4_prm_write_inst_reg(0xfff, OMAP4430_PRM_DEVICE_INST,
-			OMAP4_RM_RSTST);
-	omap4_prm_write_inst_reg(v, OMAP4430_PRM_DEVICE_INST, OMAP4_RM_RSTCTRL);
-	v = omap4_prm_read_inst_reg(WKUP_MOD, OMAP4_RM_RSTCTRL);
-
-	return NOTIFY_DONE;
-}
 #endif
 
 /*
