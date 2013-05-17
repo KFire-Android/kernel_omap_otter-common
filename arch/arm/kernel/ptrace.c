@@ -178,7 +178,6 @@ put_user_reg(struct task_struct *task, int offset, long data)
 
 	if (valid_user_regs(&newregs)) {
 		regs->uregs[offset] = data;
-		clear_ti_thread_flag(task_thread_info(task), TIF_SYS_RESTART);
 		ret = 0;
 	}
 
@@ -608,7 +607,6 @@ static int gpr_set(struct task_struct *target,
 		return -EINVAL;
 
 	*task_pt_regs(target) = newregs;
-	clear_ti_thread_flag(task_thread_info(target), TIF_SYS_RESTART);
 	return 0;
 }
 

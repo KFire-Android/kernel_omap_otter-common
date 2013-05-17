@@ -593,135 +593,6 @@ handle_signal(unsigned long sig, struct k_sigaction *ka,
 }
 
 /*
- * Syscall restarting codes
- *
- * -ERESTARTSYS: restart system call if no handler, or if there is a
- *	handler but it's marked SA_RESTART.  Otherwise return -EINTR.
- * -ERESTARTNOINTR: always restart system call
- * -ERESTARTNOHAND: restart system call only if no handler, otherwise
- *	return -EINTR if invoking a user signal handler.
- * -ERESTART_RESTARTBLOCK: call restart syscall if no handler, otherwise
- *	return -EINTR if invoking a user signal handler.
- */
-static void setup_syscall_restart(struct pt_regs *regs)
-{
-	regs->ARM_r0 = regs->ARM_ORIG_r0;
-	regs->ARM_pc -= thumb_mode(regs) ? 2 : 4;
-}
-
-/*
- * Depending on the signal settings we may need to revert the decision
- * to restart the system call.  But skip this if a debugger has chosen
- * to restart at a different PC.
- */
-static void syscall_restart_handler(struct pt_regs *regs, struct k_sigaction *ka)
-{
-	if (test_and_clear_thread_flag(TIF_SYS_RESTART)) {
-		long r0 = regs->ARM_r0;
-
-		/*
-		 * By default, return -EINTR to the user process for any
-		 * syscall which would otherwise be restarted.
-		 */
-		regs->ARM_r0 = -EINTR;
-
-		if (r0 == -ERESTARTNOINTR ||
-		    (r0 == -ERESTARTSYS && !(ka->sa.sa_flags & SA_RESTART)))
-			setup_syscall_restart(regs);
-	}
-}
-
-/*
- * Handle syscall restarting when there is no user handler in place for
- * a delivered signal.  Rather than doing this as part of the normal
- * signal processing, we do this on the final return to userspace, after
- * we've finished handling signals and checking for schedule events.
- *
- * This avoids bad behaviour such as:
- *  - syscall returns -ERESTARTNOHAND
- *  - signal with no handler (so we set things up to restart the syscall)
- *  - schedule
- *  - signal with handler (eg, SIGALRM)
- *  - we call the handler and then restart the syscall
- *
- * In order to avoid races with TIF_NEED_RESCHED, IRQs must be disabled
- * when this function is called and remain disabled until we exit to
- * userspace.
- */
-asmlinkage int syscall_restart(struct pt_regs *regs)
-{
-	struct thread_info *thread = current_thread_info();
-
-	clear_ti_thread_flag(thread, TIF_SYS_RESTART);
-
-	/*
-	 * Restart the system call.  We haven't setup a signal handler
-	 * to invoke, and the regset hasn't been usurped by ptrace.
-	 */
-	if (regs->ARM_r0 == -ERESTART_RESTARTBLOCK) {
-		if (thumb_mode(regs)) {
-			regs->ARM_r7 = __NR_restart_syscall - __NR_SYSCALL_BASE;
-			regs->ARM_pc -= 2;
-		} else {
-#if defined(CONFIG_AEABI) && !defined(CONFIG_OABI_COMPAT)
-			regs->ARM_r7 = __NR_restart_syscall;
-			regs->ARM_pc -= 4;
-#else
-			u32 sp = regs->ARM_sp - 4;
-			u32 __user *usp = (u32 __user *)sp;
-			int ret;
-
-			/*
-			 * For OABI, we need to play some extra games, because
-			 * we need to write to the users stack, which we can't
-			 * do reliably from IRQs-disabled context.  Temporarily
-			 * re-enable IRQs, perform the store, and then plug
-			 * the resulting race afterwards.
-			 */
-			local_irq_enable();
-			ret = put_user(regs->ARM_pc, usp);
-			local_irq_disable();
-
-			/*
-			 * Plug the reschedule race - if we need to reschedule,
-			 * abort the syscall restarting.  We haven't modified
-			 * anything other than the attempted write to the stack
-			 * so we can merely retry later.
-			 */
-			if (need_resched()) {
-				set_ti_thread_flag(thread, TIF_SYS_RESTART);
-				return -EINTR;
-			}
-
-			/*
-			 * We failed (for some reason) to write to the stack.
-			 * Terminate the task.
-			 */
-			if (ret) {
-				force_sigsegv(0, current);
-				return -EFAULT;
-			}
-
-			/*
-			 * Success, update the stack pointer and point the
-			 * PC at the restarting code.
-			 */
-			regs->ARM_sp = sp;
-			regs->ARM_pc = KERN_RESTART_CODE;
-#endif
-		}
-	} else {
-		/*
-		 * Simple restart - just back up and re-execute the last
-		 * instruction.
-		 */
-		setup_syscall_restart(regs);
-	}
-
-	return 0;
-}
-
-/*
  * Note that 'init' is a special process: it doesn't get signals it doesn't
  * want to handle. Thus you cannot kill init even with a SIGKILL even by
  * mistake.
@@ -732,6 +603,7 @@ asmlinkage int syscall_restart(struct pt_regs *regs)
  */
 static void do_signal(struct pt_regs *regs, int syscall)
 {
+	unsigned int retval = 0, continue_addr = 0, restart_addr = 0;
 	struct k_sigaction ka;
 	siginfo_t info;
 	int signr;
@@ -746,16 +618,32 @@ static void do_signal(struct pt_regs *regs, int syscall)
 		return;
 
 	/*
-	 * Set the SYS_RESTART flag to indicate that we have some
-	 * cleanup of the restart state to perform when returning to
-	 * userspace.
+	 * If we were from a system call, check for system call restarting...
 	 */
-	if (syscall &&
-	    (regs->ARM_r0 == -ERESTARTSYS ||
-	     regs->ARM_r0 == -ERESTARTNOINTR ||
-	     regs->ARM_r0 == -ERESTARTNOHAND ||
-	     regs->ARM_r0 == -ERESTART_RESTARTBLOCK))
-		set_thread_flag(TIF_SYS_RESTART);
+	if (syscall) {
+		continue_addr = regs->ARM_pc;
+		restart_addr = continue_addr - (thumb_mode(regs) ? 2 : 4);
+		retval = regs->ARM_r0;
+
+		/*
+		 * Prepare for system call restart.  We do this here so that a
+		 * debugger will see the already changed PSW.
+		 */
+		switch (retval) {
+		case -ERESTARTNOHAND:
+		case -ERESTARTSYS:
+		case -ERESTARTNOINTR:
+			regs->ARM_r0 = regs->ARM_ORIG_r0;
+			regs->ARM_pc = restart_addr;
+			break;
+		case -ERESTART_RESTARTBLOCK:
+			regs->ARM_r0 = -EINTR;
+			break;
+		}
+	}
+
+	if (try_to_freeze_nowarn())
+		goto no_signal;
 
 	/*
 	 * Get the signal to deliver.  When running under ptrace, at this
@@ -765,7 +653,19 @@ static void do_signal(struct pt_regs *regs, int syscall)
 	if (signr > 0) {
 		sigset_t *oldset;
 
-		syscall_restart_handler(regs, &ka);
+		/*
+		 * Depending on the signal settings we may need to revert the
+		 * decision to restart the system call.  But skip this if a
+		 * debugger has chosen to restart at a different PC.
+		 */
+		if (regs->ARM_pc == restart_addr) {
+			if (retval == -ERESTARTNOHAND
+			    || (retval == -ERESTARTSYS
+				&& !(ka.sa.sa_flags & SA_RESTART))) {
+				regs->ARM_r0 = -EINTR;
+				regs->ARM_pc = continue_addr;
+			}
+		}
 
 		if (test_thread_flag(TIF_RESTORE_SIGMASK))
 			oldset = &current->saved_sigmask;
@@ -784,7 +684,38 @@ static void do_signal(struct pt_regs *regs, int syscall)
 		return;
 	}
 
+ no_signal:
 	if (syscall) {
+		/*
+		 * Handle restarting a different system call.  As above,
+		 * if a debugger has chosen to restart at a different PC,
+		 * ignore the restart.
+		 */
+		if (retval == -ERESTART_RESTARTBLOCK
+		    && regs->ARM_pc == continue_addr) {
+			if (thumb_mode(regs)) {
+				regs->ARM_r7 = __NR_restart_syscall - __NR_SYSCALL_BASE;
+				regs->ARM_pc -= 2;
+			} else {
+#if defined(CONFIG_AEABI) && !defined(CONFIG_OABI_COMPAT)
+				regs->ARM_r7 = __NR_restart_syscall;
+				regs->ARM_pc -= 4;
+#else
+				u32 __user *usp;
+
+				regs->ARM_sp -= 4;
+				usp = (u32 __user *)regs->ARM_sp;
+
+				if (put_user(regs->ARM_pc, usp) == 0) {
+					regs->ARM_pc = KERN_RESTART_CODE;
+				} else {
+					regs->ARM_sp += 4;
+					force_sigsegv(0, current);
+				}
+#endif
+			}
+		}
+
 		/* If there's no signal to deliver, we just put the saved sigmask
 		 * back.
 		 */
