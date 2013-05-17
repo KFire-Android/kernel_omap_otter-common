@@ -1667,6 +1667,23 @@ static int _omap4_get_context_lost(struct omap_hwmod *oh)
 	return oh->prcm.omap4.context_lost_counter;
 }
 
+/**
+ * _enable_preprogram - Pre-program an IP block during the _enable() process
+ * @oh: struct omap_hwmod *
+ *
+ * Some IP blocks (such as AESS) require some additional programming
+ * after enable before they can enter idle.  If a function pointer to
+ * do so is present in the hwmod data, then call it and pass along the
+ * return value; otherwise, return 0.
+ */
+static int __init _enable_preprogram(struct omap_hwmod *oh)
+{
+	if (!oh->class->enable_preprogram)
+		return 0;
+
+	return oh->class->enable_preprogram(oh);
+}
+
 static struct hwmod_ops omap4_hwmod_ops = {
 	.hwmod_update_context_lost	= _omap4_update_context_lost,
 	.hwmod_get_context_lost		= _omap4_get_context_lost,
@@ -1772,6 +1789,7 @@ static int _enable(struct omap_hwmod *oh)
 				_update_sysc_cache(oh);
 			_enable_sysc(oh);
 		}
+		r = _enable_preprogram(oh);
 	} else {
 		_omap4_disable_module(oh);
 		_disable_clocks(oh);
