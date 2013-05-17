@@ -260,8 +260,11 @@ static int aess_mmap(struct snd_pcm_substream *substream,
 	struct snd_soc_dai *dai = rtd->cpu_dai;
 	int offset, size, err;
 
+// FIXME-HASH: Removed in 3.0 kernel
+#ifndef CONFIG_MACH_OMAP_4430_KC1
 	if (dai->id != OMAP_ABE_FRONTEND_DAI_LP_MEDIA)
 		return -EINVAL;
+#endif
 
 	vma->vm_flags |= VM_IO | VM_RESERVED;
 

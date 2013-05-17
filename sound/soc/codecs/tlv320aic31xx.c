@@ -988,8 +988,7 @@ void aic31xx_firmware_load(const struct firmware *fw, void *context)
 }
 
 
-static const struct snd_soc_dapm_route
-aic31xx_audio_map[] = {
+static const struct snd_soc_dapm_route aic31xx_audio_map[] = {
 
 	{"CODEC_CLK_IN", NULL, "PLLCLK"},
 	{"NDAC_DIV", NULL, "CODEC_CLK_IN"},
@@ -1052,11 +1051,6 @@ aic31xx_audio_map[] = {
 };
 
 
-#define AIC31XX_DAPM_ROUTE_NUM (sizeof(aic31xx_dapm_routes)/		\
-				sizeof(struct snd_soc_dapm_route))
-
-
-
 /*
  * __new_control_info - This function is to initialize data for new control
  * required to program the aic31xx registers.
@@ -1109,67 +1103,6 @@ static int __new_control_put(struct snd_kcontrol *kcontrol,
 	u32 reg = data_from_user >> 8;/* MAKE_REG(book, page, offset) */
 	snd_soc_write(codec, reg, val);
 	aic31xx_reg_ctl = reg;
-
-	return 0;
-}
-
-/*
- * aic31xx_add_controls - add non dapm kcontrols.
- *
- * The different controls are in "aic31xx_snd_controls" table. The following
- * different controls are supported
- *
- *	# DAC Playback volume control
- *	# PCM Playback Volume
- *	# HP Driver Gain
- *	# HP DAC Playback Switch
- *	# PGA Capture Volume
- *	# Program Registers
- */
-static int aic31xx_add_controls(struct snd_soc_codec *codec)
-{
-	int err;
-
-	dev_dbg(codec->dev, "%s\n", __func__);
-
-	err = snd_soc_add_codec_controls(codec, aic31xx_snd_controls,
-				ARRAY_SIZE(aic31xx_snd_controls));
-	if (err < 0) {
-		printk(KERN_INFO "Invalid control\n");
-		return err;
-	}
-
-
-	return 0;
-}
-
-
-/*
- * aic31xx_add_widgets
- *
- * adds all the ASoC Widgets identified by aic31xx_snd_controls array. This
- * routine will be invoked * during the Audio Driver Initialization.
- */
-static int aic31xx_add_widgets(struct snd_soc_codec *codec)
-{
-	struct snd_soc_dapm_context *dapm = &codec->dapm;
-	int ret = 0;
-	dev_dbg(codec->dev, "###aic31xx_add_widgets\n");
-	ret = snd_soc_dapm_new_controls(dapm, aic31xx_dapm_widgets,
-					ARRAY_SIZE(aic31xx_dapm_widgets));
-	if (!ret)
-		dev_dbg(codec->dev, "#Completed adding dapm widgets size = %d\n",
-					ARRAY_SIZE(aic31xx_dapm_widgets));
-
-	ret = snd_soc_dapm_add_routes(dapm, aic31xx_audio_map,
-					ARRAY_SIZE(aic31xx_audio_map));
-	if (!ret)
-		dev_dbg(codec->dev, "#Completed adding DAPM routes = %d\n",
-				ARRAY_SIZE(aic31xx_audio_map));
-
-	ret = snd_soc_dapm_new_widgets(dapm);
-	if (!ret)
-		dev_dbg(codec->dev, "widgets updated\n");
 
 	return 0;
 }
@@ -1688,20 +1621,23 @@ static int aic31xx_codec_probe(struct snd_soc_codec *codec)
 		dev_err(codec->dev, "register input dev fail\n");
 		goto input_dev_err;
 	}
-		/* Dynamic Headset detection enabled */
-		snd_soc_update_bits(codec, AIC31XX_HS_DETECT_REG,
-			AIC31XX_HEADSET_IN_MASK, AIC31XX_HEADSET_IN_MASK);
+
+	/* Dynamic Headset detection enabled */
+	snd_soc_update_bits(codec, AIC31XX_HS_DETECT_REG,
+		AIC31XX_HEADSET_IN_MASK, AIC31XX_HEADSET_IN_MASK);
 
 	/* off, with power on */
 	aic31xx_set_bias_level(codec, SND_SOC_BIAS_STANDBY);
 	aic31xx->mute_asi = 0;
 
-	aic31xx_add_controls(codec);
-	aic31xx_add_widgets(codec);
+#if 0
+	ret = snd_soc_dapm_new_widgets(&codec->dapm);
+	if (!ret)
+		snd_printd(KERN_ERR "widgets updated\n");
+#endif
 	ret = aic31xx_driver_init(codec);
 	if (ret < 0)
-		dev_dbg(codec->dev,
-	"\nAIC31xx CODEC: aic31xx_probe: TiLoad Initialization failed\n");
+		dev_dbg(codec->dev, "\nAIC31xx CODEC: aic31xx_probe: TiLoad Initialization failed\n");
 
 
 	dev_dbg(codec->dev, "%d, %s, Firmware test\n", __LINE__, __func__);
@@ -2116,6 +2052,13 @@ static struct snd_soc_codec_driver soc_codec_driver_aic31xx = {
 	.reg_cache_size		= 0,
 	.reg_word_size		= sizeof(u8),
 	.reg_cache_default	= NULL,
+
+	.controls		= aic31xx_snd_controls,
+	.num_controls		= ARRAY_SIZE(aic31xx_snd_controls),
+	.dapm_widgets		= aic31xx_dapm_widgets,
+	.num_dapm_widgets	= ARRAY_SIZE(aic31xx_dapm_widgets),
+	.dapm_routes		= aic31xx_audio_map,
+	.num_dapm_routes	= ARRAY_SIZE(aic31xx_audio_map),
 };
 
 /*
@@ -2165,7 +2108,7 @@ static struct snd_soc_dai_driver aic31xx_dai_driver[] = {
 			.formats	 = AIC31XX_FORMATS,
 		},
 	.ops = &aic31xx_dai_ops,
-}
+},
 };
 
 

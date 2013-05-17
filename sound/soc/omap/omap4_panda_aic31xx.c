@@ -311,15 +311,20 @@ static const struct snd_soc_dapm_widget omap4_aic31xx_dapm_widgets[] = {
 	SND_SOC_DAPM_MIC("Onboard Mic", mic_power_up_event),
 };
 
+#if 0
 static const struct snd_kcontrol_new omap4_aic31xx_controls[] = {
 	SOC_DAPM_PIN_SWITCH("HSMIC"),
 	SOC_DAPM_PIN_SWITCH("Speaker Jack"),
 	SOC_DAPM_PIN_SWITCH("Headphone Jack"),
 };
+#endif
+
 static const struct snd_soc_dapm_route audio_map[] = {
 	/* External Speakers: HFL, HFR */
 	{"Speaker Jack", NULL, "SPL"},
+#ifndef AIC3100_CODEC_SUPPORT
 	{"Speaker Jack", NULL, "SPR"},
+#endif
 
 	/* Headset Mic: HSMIC with bias */
 	{"MIC1LP", NULL, "HSMIC"},
@@ -330,6 +335,11 @@ static const struct snd_soc_dapm_route audio_map[] = {
 	/* Headset Stereophone(Headphone): HSOL, HSOR */
 	{"Headphone Jack", NULL, "HPL"},
 	{"Headphone Jack", NULL, "HPR"},
+
+	/* Connections between aic31xx and ABE */
+	/* FM <--> ABE */
+	{"omap-mcbsp.2 Playback", NULL, "MM_EXT_DL"},
+	{"MM_EXT_UL", NULL, "omap-mcbsp.2 Capture"},
 };
 
 /*
@@ -340,31 +350,24 @@ static const struct snd_soc_dapm_route audio_map[] = {
 static int omap4_aic31xx_init(struct snd_soc_pcm_runtime *rtd)
 {
 	struct snd_soc_codec *codec = rtd->codec;
-	struct snd_soc_dapm_context *dapm = &codec->dapm;
+//	struct snd_soc_dapm_context *dapm = &codec->dapm;
 	int ret;
 
 	/* Adding aic31xx specific widgets */
 
-	ret = snd_soc_dapm_new_controls(dapm, omap4_aic31xx_dapm_widgets,
-			ARRAY_SIZE(omap4_aic31xx_dapm_widgets));
-	if (ret)
-		return ret;
-
-
+// FIXME-HASH: We handle this in the jack-detect
+#if 0
 	ret = snd_soc_add_codec_controls(codec, omap4_aic31xx_controls,
 			ARRAY_SIZE(omap4_aic31xx_controls));
 	if (ret)
 		return ret;
 
-
-	/* Setup aic31xx specific audio path audio map */
-	ret = snd_soc_dapm_add_routes(dapm, audio_map, ARRAY_SIZE(audio_map));
-
 	ret = snd_soc_dapm_sync(dapm);
 	if (ret)
 		return ret;
-	/* Headset jack detection */
+#endif
 
+	/* Headset jack detection */
 	ret = snd_soc_jack_new(codec, "Headset Jack", SND_JACK_HEADSET, &hs_jack);
 	if (ret)
 		return ret;
@@ -525,8 +528,13 @@ static struct snd_soc_card omap_abe_card = {
 	.owner = THIS_MODULE,
 	.name = "AIC31XX_OTTER",
 	.long_name = "TI OMAP4 Kindle Fire",
+
 	.dai_link = omap4_dai_abe,
 	.num_links = ARRAY_SIZE(omap4_dai_abe),
+	.dapm_widgets = omap4_aic31xx_dapm_widgets,
+	.num_dapm_widgets = ARRAY_SIZE(omap4_aic31xx_dapm_widgets),
+	.dapm_routes = audio_map,
+	.num_dapm_routes = ARRAY_SIZE(audio_map),
 };
 
 static struct platform_device *omap4_snd_device;

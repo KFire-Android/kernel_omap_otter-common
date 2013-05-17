@@ -37,6 +37,7 @@
 #include "mcbsp.h"
 #include "omap-mcbsp.h"
 #include "omap-pcm.h"
+#include "omap-abe-priv.h"
 
 #define OMAP_MCBSP_RATES	(SNDRV_PCM_RATE_8000_96000)
 
@@ -233,6 +234,9 @@ static int omap_mcbsp_dai_hw_params(struct snd_pcm_substream *substream,
 	dma_data = &mcbsp->dma_data[substream->stream];
 	channels = params_channels(params);
 
+#ifdef CONFIG_MACH_OMAP_4430_KC1
+	if (cpu_dai->id != OMAP_ABE_DAI_MM_FM) {
+#endif
 	switch (params_format(params)) {
 	case SNDRV_PCM_FORMAT_S16_LE:
 		dma_data->data_type = OMAP_DMA_DATA_TYPE_S16;
@@ -245,6 +249,14 @@ static int omap_mcbsp_dai_hw_params(struct snd_pcm_substream *substream,
 	default:
 		return -EINVAL;
 	}
+#ifdef CONFIG_MACH_OMAP_4430_KC1
+	} else {
+		printk(KERN_ERR "[SND_DEBUG] omap_mcbsp_dai_hw_params: found OMAP_ABE_DAI_MM_FM\n");
+		regs->xcr2 |= XCOMPAND(0);
+		dma_data->data_type = OMAP_DMA_DATA_TYPE_S16;
+		wlen = 16;
+	}
+#endif
 	if (mcbsp->pdata->buffer_size) {
 		dma_data->set_threshold = omap_mcbsp_set_threshold;
 		if (mcbsp->dma_op_mode == MCBSP_DMA_MODE_THRESHOLD) {
@@ -321,6 +333,9 @@ static int omap_mcbsp_dai_hw_params(struct snd_pcm_substream *substream,
 	regs->rcr1	|= RFRLEN1(wpf - 1);
 	regs->xcr1	|= XFRLEN1(wpf - 1);
 
+#ifdef CONFIG_MACH_OMAP_4430_KC1
+	if (cpu_dai->id != OMAP_ABE_DAI_MM_FM) {
+#endif
 	switch (params_format(params)) {
 	case SNDRV_PCM_FORMAT_S16_LE:
 		/* Set word lengths */
@@ -340,6 +355,14 @@ static int omap_mcbsp_dai_hw_params(struct snd_pcm_substream *substream,
 		/* Unsupported PCM format */
 		return -EINVAL;
 	}
+#ifdef CONFIG_MACH_OMAP_4430_KC1
+	} else {
+		regs->rcr2	|= RWDLEN2(OMAP_MCBSP_WORD_16);
+		regs->rcr1	|= RWDLEN1(OMAP_MCBSP_WORD_16);
+		regs->xcr2	|= XWDLEN2(OMAP_MCBSP_WORD_16);
+		regs->xcr1	|= XWDLEN1(OMAP_MCBSP_WORD_16);
+	}
+#endif
 
 	/* In McBSP master modes, FRAME (i.e. sample rate) is generated
 	 * by _counting_ BCLKs. Calculate frame size in BCLKs */
@@ -767,6 +790,8 @@ static __devinit int asoc_mcbsp_probe(struct platform_device *pdev)
 	struct omap_mcbsp_platform_data *pdata = dev_get_platdata(&pdev->dev);
 	struct omap_mcbsp *mcbsp;
 	int ret;
+
+	snd_printd(KERN_ERR "[SND_DEBUG] asoc_mcbsp_probe.%d ENTER\n", pdev->id);
 
 	if (!pdata) {
 		dev_err(&pdev->dev, "missing platform data.\n");
