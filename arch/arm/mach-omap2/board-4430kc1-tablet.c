@@ -75,6 +75,7 @@
 #include <linux/mfd/tlv320aic3xxx-core.h>
 
 #include <linux/platform_data/lm75_platform_data.h>
+#include <linux/input/bma250.h>
 
 #include "omap_ram_console.h"
 #include "common.h"
@@ -330,6 +331,21 @@ static struct lm75_platform_data lm75_pdata = {
 	.average_number = 20,
 };
 
+static struct bma250_platform_data bma250_pdata = {
+	.regulator_name = "g-sensor-pwr",
+	.min_voltage	= 1800000,
+	.max_voltage	= 1800000,
+	.range		= BMA250_RANGE_2G,
+	.shift_adj	= BMA250_SHIFT_RANGE_2G,
+	.report_threshold = 5,
+	.poll_interval	= 50,
+	.max_interval	= 200,
+	.min_interval	= 32,
+	.axis_map_x	= 0,
+	.axis_map_y	= 1,
+	.axis_map_z	= 2,
+};
+
 
 static struct i2c_board_info __initdata sdp4430_i2c_boardinfo_dvt[] = {
 #ifdef CONFIG_BATTERY_BQ27541_Q
@@ -387,7 +403,7 @@ static struct i2c_board_info __initdata sdp4430_i2c_4_boardinfo[] = {
 	{ I2C_BOARD_INFO("tmp105", 0x49), .platform_data = &lm75_pdata, },
 #endif
 // for gsensor	
-	{ I2C_BOARD_INFO("bma250", 0x18), },
+	{ I2C_BOARD_INFO("bma250", 0x18), .platform_data = &bma250_pdata, },
 };
 
 static struct i2c_board_info __initdata sdp4430_i2c_4_boardinfo_c1c[] = {
@@ -400,7 +416,7 @@ static struct i2c_board_info __initdata sdp4430_i2c_4_boardinfo_c1c[] = {
 	{ I2C_BOARD_INFO("lm75", 0x48), },
 #endif
 // for gsensor	
-	{ I2C_BOARD_INFO("bma250", 0x18), },
+	{ I2C_BOARD_INFO("bma250", 0x18), .platform_data = &bma250_pdata, },
 };
 
 static struct i2c_board_info __initdata sdp4430_i2c_4_boardinfo_dvt[] = {
@@ -416,7 +432,7 @@ static struct i2c_board_info __initdata sdp4430_i2c_4_boardinfo_dvt[] = {
 	{ I2C_BOARD_INFO("tmp105", 0x49), .platform_data = &lm75_pdata, },
 #endif
 // for gsensor	
-	{ I2C_BOARD_INFO("bma250", 0x18), },
+	{ I2C_BOARD_INFO("bma250", 0x18), .platform_data = &bma250_pdata, },
 };
 
 static struct i2c_board_info __initdata sdp4430_i2c_4_boardinfo_pvt[] = {
@@ -428,7 +444,7 @@ static struct i2c_board_info __initdata sdp4430_i2c_4_boardinfo_pvt[] = {
 	{ I2C_BOARD_INFO("stk_als22x7_addr2", 0x22>>1), },
 	{ I2C_BOARD_INFO("stk_als22x7_addr3", 0x70>>1), },
 // for gsensor	
-	{ I2C_BOARD_INFO("bma250", 0x18), },
+	{ I2C_BOARD_INFO("bma250", 0x18), .platform_data = &bma250_pdata, },
 //add for Temp-sensor
 #ifdef CONFIG_SENSORS_LM75
 	{ I2C_BOARD_INFO("tmp105", 0x48), .platform_data = &lm75_pdata, },
