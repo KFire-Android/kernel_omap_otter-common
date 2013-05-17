@@ -60,10 +60,22 @@ struct hdcp_wait_control {
 
 #define HDCP_IOCTL_MAGIC 'h'
 
+#ifdef CONFIG_OMAP4_HDCP_SUPPORT
+#define HDCP_ENABLE       _IOW(HDCP_IOCTL_MAGIC, 0, \
+                                struct hdcp_enable_control)
+#define HDCP_DISABLE      _IO(HDCP_IOCTL_MAGIC, 1)
+#define HDCP_ENCRYPT_KEY  _IOWR(HDCP_IOCTL_MAGIC, 2, \
+                                struct hdcp_encrypt_control)
+#define HDCP_QUERY_STATUS _IOWR(HDCP_IOCTL_MAGIC, 3, uint32_t)
+#define HDCP_WAIT_EVENT _IOWR(HDCP_IOCTL_MAGIC, 4, \
+                                struct hdcp_wait_control)
+#define HDCP_DONE       _IOW(HDCP_IOCTL_MAGIC, 5, uint32_t)
+#else
 #define HDCP_WAIT_EVENT _IOWR(HDCP_IOCTL_MAGIC, 0, \
 				struct hdcp_wait_control)
 #define HDCP_DONE	_IOW(HDCP_IOCTL_MAGIC, 1, uint32_t)
 #define HDCP_QUERY_STATUS _IOWR(HDCP_IOCTL_MAGIC, 2, uint32_t)
+#endif
 
 #define HDMI_HDCP_ENABLED	0x1
 #define HDMI_HDCP_FAILED	0x0
@@ -107,7 +119,7 @@ struct hdcp_wait_control {
 /*----------------------*/
 #define DSS_SS_FROM_L3__DESHDCP 0x58007000
 
-#define HDMI_CORE 0x58060000
+#define HDMI_CORE 0x58006000
 
 /* DESHDCP registers */
 #define DESHDCP__DHDCP_CTRL   0x020

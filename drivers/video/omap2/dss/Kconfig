@@ -75,6 +75,14 @@ config OMAP4_DSS_HDMI_AUDIO
 	bool
 	depends on OMAP4_DSS_HDMI
 
+config OMAP4_HDCP_SUPPORT
+	bool "OMAP4 HDCP support"
+	depends on OMAP4_DSS_HDMI
+	default n
+	help
+	  High-bandwidth Digital Content Protection (HDCP).
+	  This option required for OMAP4 HDCP support.
+
 config OMAP5_DSS_HDMI
 	bool "OMAP5 HDMI support"
 	depends on ARCH_OMAP5 || ANDROID_SWITCH

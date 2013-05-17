@@ -280,7 +280,11 @@ u8 *hdmi_read_valid_edid(void)
 
 	memset(hdmi.edid, 0, HDMI_EDID_MAX_LENGTH);
 
-	hdmi_runtime_get();
+	ret = hdmi_runtime_get();
+	if(ret < 0) {
+		DSSWARN("hdmi_runtime_get failed.\n");
+		return NULL;
+	}
 
 	ret = hdmi.ip_data.ops->read_edid(&hdmi.ip_data, hdmi.edid,
 						  HDMI_EDID_MAX_LENGTH);
