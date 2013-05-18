@@ -357,8 +357,7 @@ static int omap4_aic31xx_init(struct snd_soc_pcm_runtime *rtd)
 
 // FIXME-HASH: We handle this in the jack-detect
 #if 0
-	ret = snd_soc_add_codec_controls(codec, omap4_aic31xx_controls,
-			ARRAY_SIZE(omap4_aic31xx_controls));
+	ret = snd_soc_add_codec_controls(codec, omap4_aic31xx_controls, ARRAY_SIZE(omap4_aic31xx_controls));
 	if (ret)
 		return ret;
 
@@ -374,11 +373,9 @@ static int omap4_aic31xx_init(struct snd_soc_pcm_runtime *rtd)
 
 	ret = snd_soc_jack_add_pins(&hs_jack, ARRAY_SIZE(hs_jack_pins), hs_jack_pins);
 
-	snd_soc_jack_add_gpios(&hs_jack, ARRAY_SIZE(hs_jack_gpios), hs_jack_gpios);
-// FIXME-HASH: Skip check for GPIOs here -- it's failing
-//	ret = snd_soc_jack_add_gpios(&hs_jack, ARRAY_SIZE(hs_jack_gpios), hs_jack_gpios);
-//	if (ret)
-//		return ret;
+	ret = snd_soc_jack_add_gpios(&hs_jack, ARRAY_SIZE(hs_jack_gpios), hs_jack_gpios);
+	if (ret)
+		return ret;
 
 	Qoo_headset_jack_status_check();
 	return ret;
@@ -475,14 +472,33 @@ static struct snd_soc_dai_link omap4_dai_abe[] = {
 		.codec_dai_name = "tlv320aic31xx-MM_EXT",
 		.platform_name = "omap-pcm-audio",
 		.codec_name = "tlv320aic31xx-codec",
-		.init = omap4_aic31xx_init,
 		.ops = &omap_abe_mcbsp_ops,
+		.ignore_suspend = 1,
 	},
 
 /*
  * Backend DAIs - i.e. dynamically matched interfaces, invisible to userspace.
  * Matched to above interfaces at runtime, based upon use case.
  */
+	{
+		.name = OMAP_ABE_BE_MM_EXT0_DL,
+		.stream_name = "FM Playback",
+
+		/* ABE components - MCBSP2 - MM-EXT */
+		.cpu_dai_name = "omap-mcbsp.2",
+		.platform_name = "aess",
+
+		/* FM */
+		.codec_dai_name = "tlv320aic31xx-MM_EXT",
+		.codec_name = "tlv320aic31xx-codec",
+
+		.no_pcm = 1, /* don't create ALSA pcm for this */
+		.be_hw_params_fixup = mcbsp_be_hw_params_fixup,
+		.ops = &omap_abe_mcbsp_ops,
+		.init = omap4_aic31xx_init,
+		.be_id = OMAP_ABE_DAI_MM_FM,
+		.ignore_suspend = 1,
+	},
 	{
 		.name = OMAP_ABE_BE_MM_EXT0_UL,
 		.stream_name = "FM Capture",
@@ -499,23 +515,7 @@ static struct snd_soc_dai_link omap4_dai_abe[] = {
 		.be_hw_params_fixup = mcbsp_be_hw_params_fixup,
 		.ops = &omap_abe_mcbsp_ops,
 		.be_id = OMAP_ABE_DAI_MM_FM,
-	},
-	{
-		.name = OMAP_ABE_BE_MM_EXT0_DL,
-		.stream_name = "FM Playback",
-
-		/* ABE components - MCBSP2 - MM-EXT */
-		.cpu_dai_name = "omap-mcbsp.2",
-		.platform_name = "aess",
-
-		/* FM */
-		.codec_dai_name = "tlv320aic31xx-MM_EXT",
-		.codec_name = "tlv320aic31xx-codec",
-
-		.no_pcm = 1, /* don't create ALSA pcm for this */
-		.be_hw_params_fixup = mcbsp_be_hw_params_fixup,
-		.ops = &omap_abe_mcbsp_ops,
-		.be_id = OMAP_ABE_DAI_MM_FM,
+		.ignore_suspend = 1,
 	},
 };
 
