@@ -349,6 +349,13 @@ config LEDS_OMAP4430_SDP_KEYPAD
 	  This option enables support for keypad LEDs on the
 	  OMAP4430 SDP.
 
+config LEDS_OTTER_BUTTON
+	bool "Kindle Fire Power Button LED support"
+	depends on LEDS_CLASS && MACH_OMAP_4430_KC1
+	help
+	  This option enables support for button LEDs on the
+	  Kindle Fire (Otter).
+
 config LEDS_NS2
 	tristate "LED support for Network Space v2 GPIO LEDs"
 	depends on LEDS_CLASS
