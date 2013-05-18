@@ -459,6 +459,15 @@ bool omap_wakeupgen_check_interrupts(char *report_string)
 		if (!gica)
 			continue;
 
+#ifdef CONFIG_OTTER
+		/*
+		 * Ignore undocumented security interrupt (always pending,
+		 * at least on a GP device)
+		 */
+		if ((i == 0) && (gica == (1 << 8)))
+			continue;
+#endif
+
 		/* report register dump for debug */
 		pr_debug("%s: %s: IRQ Bank = %d GIC Pending status=0x%08x "
 		       "GIC Enable = 0x%08x Wakeupgen Config ="
