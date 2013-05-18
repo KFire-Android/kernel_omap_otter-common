@@ -393,7 +393,7 @@ config MACH_OMAP_4430SDP
 	select CDC_TCXO
 
 config MACH_OMAP_4430_KC1
-	bool "OMAP 4430 KC1 board"
+	bool "OMAP 4430 Kindle Fires (Otters)"
 	depends on ARCH_OMAP4
 	select OMAP_PACKAGE_CBS
 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
@@ -401,12 +401,23 @@ config MACH_OMAP_4430_KC1
 	select INPUT_TOUCHSCREEN
 	select NEW_LEDS
 	select LEDS_CLASS
+	select LEDS_OTTER_BUTTON
 	select MISC_DEVICES
 	select HWMON
 	select POWER_SUPPLY
 	select TWL6030_POWEROFF
 	select TWL6030_GPADC
 	select OMAP_REBOOT_REASON
+	select BATTERY_BQ27541_Q
+	select SUMMIT_SMB347_Q
+
+config OTTER
+	bool "KFire 1st Gen (Otter)"
+	depends on MACH_OMAP_4430_KC1
+
+config OTTER2
+	bool "KFire 2nd Gen (Otter2)"
+	depends on MACH_OMAP_4430_KC1
 
 config MACH_OMAP_BLAZE
 	bool "OMAP 44XX Tablet board"
