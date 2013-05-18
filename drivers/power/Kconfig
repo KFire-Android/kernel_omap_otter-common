@@ -326,6 +326,13 @@ config CHARGER_SMB347
 	  Say Y to include support for Summit Microelectronics SMB347
 	  Battery Charger.
 
+config SUMMIT_SMB347_Q
+	bool "Kindle Fire SMB347 charger driver"
+	depends on MACH_OMAP_4430_KC1
+	help
+	  Say Y here if you want to enable SUMMIT smb347.
+	  If unsure, say Y.
+
 config AB8500_BM
 	bool "AB8500 Battery Management Driver"
 	depends on AB8500_CORE && AB8500_GPADC
