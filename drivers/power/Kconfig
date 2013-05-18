@@ -8,8 +8,6 @@ menuconfig POWER_SUPPLY
 
 if POWER_SUPPLY
 
-source "drivers/power/kc1_summit/Kconfig"
-
 config POWER_SUPPLY_DEBUG
 	bool "Power supply debug"
 	help
