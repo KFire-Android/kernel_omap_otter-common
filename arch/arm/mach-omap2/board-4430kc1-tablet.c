@@ -37,7 +37,6 @@
 #include <linux/module.h>
 #include <linux/wakelock.h>
 #include <linux/memblock.h>
-#include <linux/platform_data/emif_plat.h>
 
 #include <mach/hardware.h>
 #include <mach/omap4_ion.h>
@@ -68,8 +67,12 @@
 #include <linux/mfd/tlv320aic3xxx-registers.h>
 #include <linux/mfd/tlv320aic3xxx-core.h>
 
+#include <linux/platform_data/emif_plat.h>
 #include <linux/platform_data/lm75_platform_data.h>
 #include <linux/input/bma250.h>
+#include <linux/power/bq27541_battery.h>
+#include <linux/leds-otter-button.h>
+#include <linux/power/summit_smb347.h>
 
 #include "omap_ram_console.h"
 #include "common.h"
@@ -87,8 +90,6 @@
 #define WILINK_UART_DEV_NAME		"/dev/ttyO1"
 #define BLUETOOTH_UART			(0x1)
 #define CONSOLE_UART			(0x2)
-
-//#define OMAP4_LCD_EN_GPIO		28
 
 #define OMAP4_TOUCH_RESET_GPIO	18
 
@@ -116,34 +117,6 @@
 #define TWL6030_RTC_GPIO		6
 
 //static struct wake_lock uart_lock;
-
-#ifdef CONFIG_SND_SOC_TLV320AIC31XX
-static struct aic3xxx_gpio_setup aic3xxx_gpio[] ={
-	{
-		.reg = AIC3XXX_MAKE_REG(0, 0, 51),
-		.value = 0x14,
-	},
-};
-
-static struct aic3xxx_pdata aic31xx_codec_pdata ={
-	.audio_mclk1 = 19200000,
-#if 0
-	.gpio_defaults = aic3xxx_gpio,
-	.num_gpios = ARRAY_SIZE(aic3xxx_gpio),
-	.gpio_irq = 1,
-	.naudint_irq = Qoo_HEADSET_DETECT_GPIO_PIN,
-	.irq_base = TWL6040_CODEC_IRQ_BASE,
-#endif
-	.regulator_name = "audio-pwr",
-	.regulator_min_uV = 3000000,
-	.regulator_max_uV = 3000000,
-};
-#endif
-
-static struct platform_device sdp4430_aic3110 = {
-        .name   = "omap4-panda-aic31xx",
-        .id     = -1,
-};
 
 /* Board IDs */
 static u8 quanta_mbid;
@@ -191,9 +164,123 @@ static void __init quanta_boardids(void)
     quanta_panelid = gpio_get_value(PANELID0_GPIO) | ( gpio_get_value(PANELID1_GPIO)<<1);
 }
 
+#ifdef CONFIG_SND_SOC_TLV320AIC31XX
+static struct aic3xxx_gpio_setup aic3xxx_gpio[] ={
+	{
+		.reg = AIC3XXX_MAKE_REG(0, 0, 51),
+		.value = 0x14,
+	},
+};
+
+static struct aic3xxx_pdata aic31xx_codec_pdata ={
+	.audio_mclk1 = 19200000,
+	.gpio_defaults = aic3xxx_gpio,
+	.num_gpios = ARRAY_SIZE(aic3xxx_gpio),
+	.irq_base = TWL6040_CODEC_IRQ_BASE,
+	.regulator_name = "audio-pwr",
+	.regulator_min_uV = 3000000,
+	.regulator_max_uV = 3000000,
+};
+
+static struct platform_device sdp4430_aic3110 = {
+        .name   = "omap4-panda-aic31xx",
+        .id     = -1,
+};
+#endif
+
+#ifdef CONFIG_LEDS_OTTER_BUTTON
+#define LED_PWM1ON		0x00
+#define LED_PWM1OFF		0x01
+#define LED_PWM2ON		0x03
+#define LED_PWM2OFF		0x04
+#define LED_TOGGLE3		0x92
+
+static void __init orange_led_init(void) {
+	twl_i2c_write_u8(TWL_MODULE_PWM, 0xFF, LED_PWM2ON);
+	twl_i2c_write_u8(TWL_MODULE_PWM, 0x7F, LED_PWM2OFF);
+	twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x08, LED_TOGGLE3);
+	twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x38, LED_TOGGLE3);
+}
+
+static void orange_led_set(u8 brightness) {
+	if (brightness > 1) {
+		if (brightness == LED_FULL)
+			brightness = 0x7F;
+		else
+			brightness = (~(brightness/2)) & 0x7F;
+		twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x30, LED_TOGGLE3);
+		twl_i2c_write_u8(TWL_MODULE_PWM, brightness, LED_PWM2ON);
+	} else if (brightness <= 1) {
+		twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x08, LED_TOGGLE3);
+		twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x38, LED_TOGGLE3);
+	}
+}
+
+static void __init green_led_init(void) {
+	twl_i2c_write_u8(TWL_MODULE_PWM, 0xFF, LED_PWM1ON);
+	twl_i2c_write_u8(TWL_MODULE_PWM, 0x7F, LED_PWM1OFF);
+	twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x01, LED_TOGGLE3);
+	twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x07, LED_TOGGLE3);
+};
+
+static void green_led_set(u8 brightness) {
+	if (brightness > 1) {
+		if (brightness == LED_FULL)
+			brightness = 0x7F;
+		else
+			brightness = (~(brightness/2)) & 0x7F;
+		twl_i2c_write_u8(TWL_MODULE_PWM, brightness, LED_PWM1ON);
+		twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x06, LED_TOGGLE3);
+	} else {
+		twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x01, LED_TOGGLE3);
+		twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x07, LED_TOGGLE3);
+	}
+};
+
+static struct otter_button_led_platform_data orange_led_data = {
+	.name = "led-orange",
+	.led_init = orange_led_init,
+	.led_set_brightness = orange_led_set,
+};
+
+static struct platform_device orange_led = {
+	.name	= "led-orange-button",
+	.id	= -1,
+	.dev	= {
+		.platform_data = &orange_led_data,
+	},
+};
+
+static struct otter_button_led_platform_data green_led_data = {
+	.name = "led-green",
+	.led_init = green_led_init,
+	.led_set_brightness = green_led_set,
+};
+
+static struct platform_device green_led = {
+	.name	= "led-green-button",
+	.id	= -1,
+	.dev	= {
+		.platform_data = &green_led_data,
+	},
+};
+
+static void battery_led_callback(u8 green_value, u8 orange_value) {
+	green_led_set(green_value);
+	orange_led_set(orange_value);
+};
+#else
+static void battery_led_callback(u8 green_value, u8 orange_value) {};
+#endif
 
 static struct platform_device __initdata *sdp4430_devices[] = {
+#ifdef CONFIG_LEDS_OTTER_BUTTON
+	&orange_led,
+	&green_led,
+#endif
+#ifdef CONFIG_SND_SOC_TLV320AIC31XX
 	&sdp4430_aic3110,
+#endif
 };
 
 static struct omap_musb_board_data musb_board_data = {
@@ -317,6 +404,7 @@ static int __init omap4_twl6030_hsmmc_init(struct omap2_hsmmc_info *controllers)
 }
 
 /***** I2C BOARD INIT ****/
+
 static struct lm75_platform_data lm75_pdata = {
 	.domain = "case",
 	.stats_enable = 1,
@@ -331,7 +419,7 @@ static struct bma250_platform_data bma250_pdata = {
 	.range		= BMA250_RANGE_2G,
 	.shift_adj	= BMA250_SHIFT_RANGE_2G,
 	.report_threshold = 5,
-	.poll_interval	= 50,
+	.poll_interval	= 40,
 	.max_interval	= 200,
 	.min_interval	= 32,
 	.axis_map_x	= 0,
@@ -339,106 +427,106 @@ static struct bma250_platform_data bma250_pdata = {
 	.axis_map_z	= 2,
 };
 
+static struct bq27541_battery_platform_data bq27541_pdata = {
+	.led_callback	= battery_led_callback,
+};
+
+static struct summit_smb347_platform_data smb347_pdata = {
+	.mbid			= 0,
+	.pin_en			= 101,
+	.pin_en_name		= "CHARGE-EN",
+	.pin_susp		= 155,
+	.pin_susp_name		= "CHARGE-SUSP",
+	.initial_max_aicl	= 1800,
+	.initial_pre_max_aicl	= 1800,
+	.initial_charge_current	= 2000,
+	.led_callback		= battery_led_callback,
+};
 
 static struct i2c_board_info __initdata sdp4430_i2c_boardinfo_dvt[] = {
 #ifdef CONFIG_BATTERY_BQ27541_Q
-	{
-		I2C_BOARD_INFO("bq27541", 0x55),
-	},
+	{ I2C_BOARD_INFO("bq27541", 0x55), .platform_data = &bq27541_pdata, },
 #endif
 };
 
 static struct i2c_board_info __initdata sdp4430_i2c_boardinfo[] = {
 #ifdef CONFIG_BATTERY_BQ27541_Q
-	{
-		I2C_BOARD_INFO("bq27541", 0x55),
-	},
+	{ I2C_BOARD_INFO("bq27541", 0x55), .platform_data = &bq27541_pdata, },
 #endif
 #ifdef CONFIG_SUMMIT_SMB347_Q
-	{
-		I2C_BOARD_INFO("summit_smb347", 0x6),
-		.irq = OMAP_GPIO_IRQ(OMAP4_CHARGER_IRQ),
-	},
+	{ I2C_BOARD_INFO("summit_smb347", 0x6), .irq = OMAP_GPIO_IRQ(OMAP4_CHARGER_IRQ), .platform_data = &smb347_pdata, },
 #endif
 };
 
 static struct i2c_board_info __initdata sdp4430_i2c_2_boardinfo[] = {
-	{
 #ifdef CONFIG_TOUCHSCREEN_ILITEK
-		I2C_BOARD_INFO("ilitek_i2c", 0x41),
-		 .irq = OMAP_GPIO_IRQ(OMAP4_TOUCH_IRQ_1),
+	{ I2C_BOARD_INFO("ilitek_i2c", 0x41), .irq = OMAP_GPIO_IRQ(OMAP4_TOUCH_IRQ_1), },
 #endif
-	},
 };
 
 static struct i2c_board_info __initdata sdp4430_i2c_3_boardinfo[] = {
-#ifdef CONFIG_DEMO_HDMI
-	{
-		I2C_BOARD_INFO("adi7526", 0x39),
-		.irq = OMAP_GPIO_IRQ(OMAP4_ADI7526_IRQ),
-	},
-#endif
 #ifdef CONFIG_SND_SOC_TLV320AIC31XX
-	{
-		I2C_BOARD_INFO("tlv320aic31xx", 0x18),
-		.platform_data = &aic31xx_codec_pdata,
-	},
+	{ I2C_BOARD_INFO("tlv320aic31xx", 0x18), .platform_data = &aic31xx_codec_pdata, },
 #endif
 };
 
 static struct i2c_board_info __initdata sdp4430_i2c_4_boardinfo[] = {
-/* Added for STK ALS*/
-	{ I2C_BOARD_INFO("stk_als22x7_addr1", 0x20>>1), },
-	{ I2C_BOARD_INFO("stk_als22x7_addr2", 0x22>>1), },
-	{ I2C_BOARD_INFO("stk_als22x7_addr3", 0x70>>1), },
-//add for Temp-sensor
+#ifdef CONFIG_INPUT_STK_ALS22x7
+	{ I2C_BOARD_INFO("stk_als22x7_addr1", 0x10), },
+	{ I2C_BOARD_INFO("stk_als22x7_addr2", 0x11), },
+	{ I2C_BOARD_INFO("stk_als22x7_addr3", 0x38), },
+#endif
 #ifdef CONFIG_SENSORS_LM75
 	{ I2C_BOARD_INFO("tmp105", 0x49), .platform_data = &lm75_pdata, },
 #endif
-// for gsensor	
+#ifdef CONFIG_INPUT_BMA250
 	{ I2C_BOARD_INFO("bma250", 0x18), .platform_data = &bma250_pdata, },
+#endif
 };
 
 static struct i2c_board_info __initdata sdp4430_i2c_4_boardinfo_c1c[] = {
-/* Added for STK ALS*/
-	{ I2C_BOARD_INFO("stk_als22x7_addr1", 0x20>>1), },
-	{ I2C_BOARD_INFO("stk_als22x7_addr2", 0x22>>1), },
-	{ I2C_BOARD_INFO("stk_als22x7_addr3", 0x70>>1), },
-//add for Temp-sensor
+#ifdef CONFIG_INPUT_STK_ALS22x7
+	{ I2C_BOARD_INFO("stk_als22x7_addr1", 0x10), },
+	{ I2C_BOARD_INFO("stk_als22x7_addr2", 0x11), },
+	{ I2C_BOARD_INFO("stk_als22x7_addr3", 0x38), },
+#endif
 #ifdef CONFIG_SENSORS_LM75
 	{ I2C_BOARD_INFO("lm75", 0x48), },
 #endif
-// for gsensor	
+#ifdef CONFIG_INPUT_BMA250
 	{ I2C_BOARD_INFO("bma250", 0x18), .platform_data = &bma250_pdata, },
+#endif
 };
 
 static struct i2c_board_info __initdata sdp4430_i2c_4_boardinfo_dvt[] = {
 #ifdef CONFIG_SUMMIT_SMB347_Q
-	{ I2C_BOARD_INFO("summit_smb347", 0x6), .irq = OMAP_GPIO_IRQ(OMAP4_CHARGER_IRQ), },
+	{ I2C_BOARD_INFO("summit_smb347", 0x6), .irq = OMAP_GPIO_IRQ(OMAP4_CHARGER_IRQ), .platform_data = &smb347_pdata, },
 #endif    
-/* Added for STK ALS*/
-	{ I2C_BOARD_INFO("stk_als22x7_addr1", 0x20>>1), },
-	{ I2C_BOARD_INFO("stk_als22x7_addr2", 0x22>>1), },
-	{ I2C_BOARD_INFO("stk_als22x7_addr3", 0x70>>1), },
-//add for Temp-sensor
+#ifdef CONFIG_INPUT_STK_ALS22x7
+	{ I2C_BOARD_INFO("stk_als22x7_addr1", 0x10), },
+	{ I2C_BOARD_INFO("stk_als22x7_addr2", 0x11), },
+	{ I2C_BOARD_INFO("stk_als22x7_addr3", 0x38), },
+#endif
 #ifdef CONFIG_SENSORS_LM75
 	{ I2C_BOARD_INFO("tmp105", 0x49), .platform_data = &lm75_pdata, },
 #endif
-// for gsensor	
+#ifdef CONFIG_INPUT_BMA250
 	{ I2C_BOARD_INFO("bma250", 0x18), .platform_data = &bma250_pdata, },
+#endif
 };
 
 static struct i2c_board_info __initdata sdp4430_i2c_4_boardinfo_pvt[] = {
 #ifdef CONFIG_SUMMIT_SMB347_Q
-	{ I2C_BOARD_INFO("summit_smb347", 0x6), .irq = OMAP_GPIO_IRQ(OMAP4_CHARGER_IRQ), },
+	{ I2C_BOARD_INFO("summit_smb347", 0x6), .irq = OMAP_GPIO_IRQ(OMAP4_CHARGER_IRQ), .platform_data = &smb347_pdata, },
 #endif    
-/* Added for STK ALS*/
-	{ I2C_BOARD_INFO("stk_als22x7_addr1", 0x20>>1), },
-	{ I2C_BOARD_INFO("stk_als22x7_addr2", 0x22>>1), },
-	{ I2C_BOARD_INFO("stk_als22x7_addr3", 0x70>>1), },
-// for gsensor	
+#ifdef CONFIG_INPUT_STK_ALS22x7
+	{ I2C_BOARD_INFO("stk_als22x7_addr1", 0x10), },
+	{ I2C_BOARD_INFO("stk_als22x7_addr2", 0x11), },
+	{ I2C_BOARD_INFO("stk_als22x7_addr3", 0x38), },
+#endif
+#ifdef CONFIG_INPUT_BMA250
 	{ I2C_BOARD_INFO("bma250", 0x18), .platform_data = &bma250_pdata, },
-//add for Temp-sensor
+#endif
 #ifdef CONFIG_SENSORS_LM75
 	{ I2C_BOARD_INFO("tmp105", 0x48), .platform_data = &lm75_pdata, },
 #endif
@@ -456,15 +544,13 @@ static void __init omap_i2c_hwspinlock_init(int bus_id, int spinlock_id,
 	if (spinlock_id < 0)
 		pdata->handle = hwspin_lock_request(USE_MUTEX_LOCK);
 	else
-		pdata->handle = hwspin_lock_request_specific(spinlock_id,
-							USE_MUTEX_LOCK);
+		pdata->handle = hwspin_lock_request_specific(spinlock_id, USE_MUTEX_LOCK);
 
 	if (pdata->handle != NULL) {
 		pdata->hwspin_lock_timeout = hwspin_lock_timeout;
 		pdata->hwspin_unlock = hwspin_unlock;
 	} else {
-		pr_err("I2C hwspinlock request failed for bus %d\n", \
-								bus_id);
+		pr_err("I2C hwspinlock request failed for bus %d\n", bus_id);
 	}
 }
 
@@ -658,6 +744,8 @@ static struct twl4030_platform_data sdp4430_twldata = {
 static int __init omap4_i2c_init(void)
 {
 	int err;
+
+	smb347_pdata.mbid = quanta_get_mbid();
 
 	omap_i2c_hwspinlock_init(1, 0, &sdp4430_i2c_bus_pdata);
 	omap_i2c_hwspinlock_init(2, 1, &sdp4430_i2c_2_bus_pdata);

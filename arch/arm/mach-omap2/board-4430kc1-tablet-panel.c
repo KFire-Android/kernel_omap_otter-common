@@ -22,7 +22,6 @@
 #include <linux/init.h>
 #include <linux/interrupt.h>
 #include <linux/io.h>
-#include <linux/leds-omap4430sdp-display.h>
 #include <linux/o2micro_bl.h>
 #include <linux/platform_device.h>
 #include <linux/omapfb.h>
@@ -49,10 +48,6 @@
 //#include "dmtimer.h"
 
 #define OTTER_FB_RAM_SIZE                SZ_16M + SZ_4M /* 1920×1080*4 * 2 */
-
-#define LED_PWM2ON			0x03
-#define LED_PWM2OFF			0x04
-#define TWL6030_TOGGLE3			0x92
 
 #define DEFAULT_BACKLIGHT_BRIGHTNESS	105
 
@@ -116,54 +111,6 @@ static struct spi_board_info tablet_spi_board_info[] __initdata = {
 	},
 };
 
-static void __init sdp4430_init_display_led(void)
-{
-	twl_i2c_write_u8(TWL_MODULE_PWM, 0xFF, LED_PWM2ON);
-	twl_i2c_write_u8(TWL_MODULE_PWM, 0x7F, LED_PWM2OFF);
-	//twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x30, TWL6030_TOGGLE3);
-	twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x08, TWL6030_TOGGLE3);
-	twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x38, TWL6030_TOGGLE3);
-}
-
-static void sdp4430_set_primary_brightness(u8 brightness)
-{
-	if (brightness > 1) {
-		if (brightness == 255)
-			brightness = 0x7f;
-		else
-			brightness = (~(brightness/2)) & 0x7f;
-
-		twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x30, TWL6030_TOGGLE3);
-		twl_i2c_write_u8(TWL_MODULE_PWM, brightness, LED_PWM2ON);
-	} else if (brightness <= 1) {
-		twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x08, TWL6030_TOGGLE3);
-		twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x38, TWL6030_TOGGLE3);
-	}
-}
-
-static struct omap4430_sdp_disp_led_platform_data sdp4430_disp_led_data = {
-	.flags = LEDS_CTRL_AS_ONE_DISPLAY,
-	.display_led_init = sdp4430_init_display_led,
-	.primary_display_set = sdp4430_set_primary_brightness,
-};
-
-static struct platform_device sdp4430_disp_led = {
-	.name	= "display_led",
-	.id	= -1,
-	.dev	= {
-		.platform_data = &sdp4430_disp_led_data,
-	},
-};
-
-static struct platform_device sdp4430_keypad_led = {
-	.name	= "keypad_led",
-	.id	= -1,
-	.dev	= {
-		.platform_data = NULL,
-	},
-};
-
-
 static struct o2micro_backlight_platform_data kc1_led_data = {
 	.name         = "lcd-backlight",
 	.gpio_en_o2m  = -1,
@@ -187,8 +134,6 @@ static struct platform_device kc1_led_device = {
 
 
 static struct platform_device __initdata *sdp4430_panel_devices[] = {
-	&sdp4430_disp_led,
-	&sdp4430_keypad_led,
 	&kc1_led_device,
 };
 
