@@ -275,7 +275,8 @@ struct omap_vdd_dvfs_info *_voltdm_to_dvfs_info(struct voltagedomain *voltdm)
  *
  * NOTE: since this uses OPP functions, use under rcu_lock.
  */
-static struct opp *_volt_to_opp_ceil(struct device *dev, unsigned long volt)
+static __maybe_unused struct opp *_volt_to_opp_ceil(struct device *dev,
+						    unsigned long volt)
 {
 	struct opp *opp = ERR_PTR(-ENODEV);
 	unsigned long f = 0;
