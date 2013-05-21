@@ -297,13 +297,17 @@ static int rpmsg_omx_connect(struct rpmsg_omx_instance *omx, char *omxname)
 						msecs_to_jiffies(5000));
 
 	mutex_lock(&omx->lock);
-	if (omx->state == OMX_FAIL) {
+	if (omx->state == OMX_CONNECTED) {
+		ret = 0;
+	} else if (omx->state == OMX_FAIL) {
 		ret = -ENXIO;
 	} else if (omx->state == OMX_UNCONNECTED) {
-		if (ret)
+		if (ret) {
 			dev_err(omxserv->dev, "premature wakeup: %d\n", ret);
-		else
+			ret = -EIO;
+		} else {
 			ret = -ETIMEDOUT;
+		}
 	}
 	mutex_unlock(&omx->lock);
 
