@@ -2754,12 +2754,18 @@ static int __init omapfb_probe(struct platform_device *pdev)
 	if (def_mode && strlen(def_mode) > 0) {
 		if (omapfb_parse_def_modes(fbdev))
 			dev_warn(&pdev->dev, "cannot parse default modes\n");
-	} else if (def_display && def_display->driver->set_timings &&
-			def_display->driver->check_timings) {
-		struct omap_video_timings t;
-		r = omapfb_find_best_mode(def_display, &t);
-		if (r == 0)
-			def_display->driver->set_timings(def_display, &t);
+	}
+
+	for (i = 0; i < fbdev->num_displays; ++i) {
+		struct omap_dss_device *dssdev;
+		dssdev = fbdev->displays[i].dssdev;
+		if (dssdev && dssdev->driver->set_timings &&
+				dssdev->driver->check_timings) {
+			struct omap_video_timings t;
+			r = omapfb_find_best_mode(dssdev, &t);
+			if (r == 0)
+				dssdev->driver->set_timings(dssdev, &t);
+		}
 	}
 
 	for (i = 0; i < fbdev->num_displays; i++) {
