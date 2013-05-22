@@ -81,6 +81,7 @@
 #define DEFAULT_TRANSMITTANCE     CONFIG_STK_ALS_TRANSMITTANCE
 #define DEFAULT_CHANGE_THRESHOLD  CONFIG_STK_ALS_CHANGE_THRESHOLD
 #define ABS(x)                    ((x) >= 0 ? (x) : (-x))
+#define MAX_REPORT                8192
 
 #define ERR(format, args...)      printk(KERN_ERR "%s: " format, DRIVER_NAME, ## args)
 #define WARNING(format, args...)  printk(KERN_WARNING "%s: " format, DRIVER_NAME, ## args)
@@ -191,6 +192,9 @@ static int32_t stk_als22x7_get_lux(struct stk_als22x7_data *data) {
 
 inline void stk_als22x7_report(struct stk_als22x7_data *data, int32_t lux) {
     int32_t lux_last = data->lux_last;
+    // this fixes an oddly high start report when sensor is first enabled
+    if (lux > MAX_REPORT)
+        lux = 0;
     if (unlikely(abs(lux - lux_last) >= data->change_threshold)) {
         data->lux_last = lux;
 	input_report_abs(data->input_dev, ABS_MISC, lux);
@@ -343,7 +347,7 @@ static ssize_t stk_als22x7_lux_show(struct device *dev, struct device_attribute 
 static DEVICE_ATTR(lux, 0444, stk_als22x7_lux_show, NULL);
 
 static ssize_t stk_als22x7_lux_range_show(struct device *dev, struct device_attribute *attr, char *buf) {
-    return sprintf(buf, "%d\n", stk_als22x7_code2lux(stk_als22x7_device_data, (1 << 16) - 1));
+    return sprintf(buf, "%d\n", MAX_REPORT); // stk_als22x7_code2lux(stk_als22x7_device_data, (1 << 16) - 1));
 }
 
 static DEVICE_ATTR(lux_range, 0444, stk_als22x7_lux_range_show, NULL);
@@ -489,8 +493,9 @@ static int stk_als22x7_probe(struct i2c_client *client, const struct i2c_device_
 	return -ENOMEM;
     }
     data->input_dev->name = DEVICE_NAME;
-    set_bit(EV_ABS, data->input_dev->evbit);
-    input_set_abs_params(data->input_dev, ABS_MISC, 0, stk_als22x7_code2lux(data, (1 << 16) - 1), 0, 0);
+    input_set_capability(data->input_dev, EV_ABS, ABS_MISC);
+    input_set_abs_params(data->input_dev, ABS_MISC, 0, MAX_REPORT, 0, 0);
+//  input_set_abs_params(data->input_dev, ABS_MISC, 0, stk_als22x7_code2lux(data, (1 << 16) - 1), 0, 0);
     err = input_register_device(data->input_dev);
     if (err < 0) {
 	ERR("can not register input device\n");
