@@ -84,12 +84,23 @@ void omap_control_usb_phy_power(struct device *dev, int on)
 		writel(val, control_usb->dev_conf);
 	} else {
 
-		val = readl(control_usb->ctrl_core_srcomp_north_side);
-		if (on)
+		if (on) {
+			val = readl(control_usb->dummy_reg);
+			val |= 0x100;
+			writel(val , control_usb->dummy_reg);
+
+			val = readl(control_usb->ctrl_core_srcomp_north_side);
 			val &= ~OMAP_CTRL_USB_SRCOMP_NORTH_SIDE_PD;
-		else
+			writel(val, control_usb->ctrl_core_srcomp_north_side);
+		} else {
+			val = readl(control_usb->ctrl_core_srcomp_north_side);
 			val |= OMAP_CTRL_USB_SRCOMP_NORTH_SIDE_PD;
-		writel(val, control_usb->ctrl_core_srcomp_north_side);
+			writel(val, control_usb->ctrl_core_srcomp_north_side);
+
+			val = readl(control_usb->dummy_reg);
+			val &= ~0x100;
+			writel(val , control_usb->dummy_reg);
+		}
 
 	}
 }
@@ -239,6 +250,7 @@ static int omap_control_usb_probe(struct platform_device *pdev)
 			dev_dbg(&pdev->dev, "Failed to obtain io memory\n");
 			return -EADDRNOTAVAIL;
 		}
+
 	}
 
 	if (control_usb->type == OMAP_CTRL_DEV_TYPE3) {
@@ -250,6 +262,16 @@ static int omap_control_usb_probe(struct platform_device *pdev)
 			dev_err(&pdev->dev, "Failed to obtain io memory\n");
 			return -EADDRNOTAVAIL;
 		}
+
+		res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
+			"dummy_reg");
+		control_usb->dummy_reg = devm_request_and_ioremap(&pdev->dev, res);
+		if (!control_usb->dummy_reg) {
+			dev_err(&pdev->dev, "Failed to obtain io memory\n");
+			dev_err(&pdev->dev, "#RK: DUMMY not found  \n");
+			return -EADDRNOTAVAIL;
+		}
+
 	}
 
 	if ((control_usb->type == OMAP_CTRL_DEV_TYPE2) ||

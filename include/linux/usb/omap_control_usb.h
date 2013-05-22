@@ -26,6 +26,7 @@ struct omap_control_usb {
 	u32 __iomem *otghs_control;
 	u32 __iomem *phy_power;
 	u32 __iomem *ctrl_core_srcomp_north_side;
+	u32 __iomem *dummy_reg;
 
 	struct clk *sys_clk;
 
