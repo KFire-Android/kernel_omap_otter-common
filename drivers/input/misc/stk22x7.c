@@ -502,7 +502,7 @@ static int stk_als22x7_probe(struct i2c_client *client, const struct i2c_device_
     INFO("register input device OK\n");
 
     /* create sysfs entries only if we really found a device */
-    err = stk_als22x7_sysfs_create_files(&stk_als22x7_device->dev, stk_als22x7_attrs);
+    err = stk_als22x7_sysfs_create_files(&data->client1->dev, stk_als22x7_attrs);
     if (err) {
 	return -ENOMEM;
     }
@@ -530,7 +530,7 @@ static int __devexit stk_als22x7_remove(struct i2c_client *client) {
 #ifdef CONFIG_HAS_EARLYSUSPEND
         unregister_early_suspend(&data->early_suspend);
 #endif
-	stk_als22x7_sysfs_remove_files(&stk_als22x7_device->dev, stk_als22x7_attrs);
+	stk_als22x7_sysfs_remove_files(&data->client1->dev, stk_als22x7_attrs);
         input_unregister_device(data->input_dev);
         input_free_device(data->input_dev);
 	if (data->client2)
@@ -554,34 +554,20 @@ static const struct i2c_device_id stk_als22x7_id[] = {
 MODULE_DEVICE_TABLE(i2c, stk_als22x7_id);
 
 static struct i2c_driver stk_als22x7_driver = {
-    .driver.name = DRIVER_NAME,
-    .id_table = stk_als22x7_id,
-    .probe = stk_als22x7_probe,
-    .remove = __devexit_p(stk_als22x7_remove),
+    .driver = {
+        .owner = THIS_MODULE,
+        .name  = DRIVER_NAME,
+    },
+    .probe    = stk_als22x7_probe,
+    .remove   = __devexit_p(stk_als22x7_remove),
 #ifndef CONFIG_HAS_EARLYSUSPEND
-    .suspend = stk_als22x7_suspend,
-    .resume = stk_als22x7_resume,
+    .suspend  = stk_als22x7_suspend,
+    .resume   = stk_als22x7_resume,
 #endif
+    .id_table = stk_als22x7_id,
 };
 
-static int __init stk_als22x7_init(void) {
-    stk_als22x7_device = platform_device_alloc(DEVICE_NAME, -1);
-    if (!stk_als22x7_device)
-	return -ENOMEM;
-
-    if (platform_device_add(stk_als22x7_device))
-	return -ENOMEM;
-
-    return i2c_add_driver(&stk_als22x7_driver);
-}
-
-static void __exit stk_als22x7_exit(void) {
-    platform_device_put(stk_als22x7_device);
-    return i2c_del_driver(&stk_als22x7_driver);
-}
-
-module_init(stk_als22x7_init);
-module_exit(stk_als22x7_exit);
+module_i2c_driver(stk_als22x7_driver);
 
 MODULE_AUTHOR("Patrick Chang <patrick_chang@sitronix.com>,"
 	      "Stephan Kanthak <stylon@gmx.de>");
