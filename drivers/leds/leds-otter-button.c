@@ -5,6 +5,8 @@
  *
  * Author: Dan Murphy <DMurphy@ti.com>
  *
+ * Adaptation for Kindle Fire: Hashcode <hashcode0f@gmail.com>
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 as published by
  * the Free Software Foundation.
@@ -137,7 +139,7 @@ static int otter_button_led_probe(struct platform_device *pdev)
 	return ret;
 }
 
-static int otter_button_led_remove(struct platform_device *pdev)
+static int __exit otter_button_led_remove(struct platform_device *pdev)
 {
 	struct button_led_data *info = platform_get_drvdata(pdev);
 	led_classdev_unregister(&info->cdev);
@@ -163,29 +165,18 @@ static int otter_button_led_resume(struct platform_device *pdev)
 }
 
 static struct platform_driver otter_button_led_driver = {
-	.probe		= otter_button_led_probe,
-	.remove		= otter_button_led_remove,
-	.suspend	= otter_button_led_suspend,
-	.resume		= otter_button_led_resume,
 	.driver = {
-		.name = "button_led",
+		.name = "leds-otter-button",
 		.owner = THIS_MODULE,
 	},
+	.probe		= otter_button_led_probe,
+	.remove		= __exit_p(otter_button_led_remove),
+	.suspend	= otter_button_led_suspend,
+	.resume		= otter_button_led_resume,
 };
 
-static int __init otter_button_led_init(void)
-{
-	return platform_driver_register(&otter_button_led_driver);
-}
-
-static void __exit otter_button_led_exit(void)
-{
-	platform_driver_unregister(&otter_button_led_driver);
-}
-
-subsys_initcall(otter_button_led_init);
-module_exit(otter_button_led_exit);
+module_platform_driver(otter_button_led_driver);
 
 MODULE_DESCRIPTION("Kindle Fire Power Button LED driver");
-MODULE_AUTHOR("Hashcode <hashcode0f@gmail.com> / Dan Murphy <dmurphy@ti.com>");
+MODULE_AUTHOR("Dan Murphy <dmurphy@ti.com>");
 MODULE_LICENSE("GPL");
