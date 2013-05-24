@@ -126,6 +126,17 @@ struct twl6030_usb {
 
 static BLOCKING_NOTIFIER_HEAD(notifier_list);
 
+#if defined(CONFIG_SUMMIT_SMB347_Q)
+extern int smb347_twl6030_callback(int vbus_state, int prev_status, void *data);
+
+static void *smb347_data = NULL;
+void *g_twl = NULL;
+
+void twl6030_set_callback(void *data) {
+	smb347_data = data;
+}
+#endif
+
 #define	comparator_to_twl(x) container_of((x), struct twl6030_usb, comparator)
 /*-------------------------------------------------------------------------*/
 
@@ -249,24 +260,48 @@ static ssize_t twl6030_usb_vbus_show(struct device *dev,
 }
 static DEVICE_ATTR(vbus, 0444, twl6030_usb_vbus_show, NULL);
 
+#if defined(CONFIG_SUMMIT_SMB347_Q)
+void twl6030_usb_ldo_on(void) {
+	struct twl6030_usb *twl = (struct twl6030_usb *)g_twl;
+	twl6030_enable_ldo_input_supply(twl, true);
+	regulator_enable(twl->usb3v3);
+}
+void twl6030_usb_ldo_off(void) {
+	struct twl6030_usb *twl = (struct twl6030_usb *)g_twl;
+	regulator_disable(twl->usb3v3);
+	twl6030_enable_ldo_input_supply(twl, false);
+}
+#endif
+
 static irqreturn_t twl6030_usb_irq(int irq, void *_twl)
 {
 	struct twl6030_usb *twl = _twl;
 	int status = OMAP_MUSB_UNKNOWN;
 	u8 vbus_state, hw_state;
+#ifndef CONFIG_SUMMIT_SMB347_Q
 	unsigned long charger_type = POWER_SUPPLY_TYPE_UNKNOWN;
 	int event;
+#endif
 
 	hw_state = twl6030_readb(twl, TWL6030_MODULE_ID0, STS_HW_CONDITIONS);
 
 	vbus_state = twl6030_readb(twl, TWL_MODULE_MAIN_CHARGE,
 						CONTROLLER_STAT1);
 	if (!(hw_state & STS_USB_ID)) {
+#ifdef CONFIG_SUMMIT_SMB347_Q
+		if (smb347_data) {
+			status = smb347_twl6030_callback((vbus_state & VBUS_DET) ? OMAP_MUSB_VBUS_VALID : OMAP_MUSB_VBUS_OFF,
+					(int)twl->prev_status, smb347_data);
+			if (status == -1)
+				return IRQ_HANDLED;
+		}
+#else
 		if (vbus_state & VBUS_DET) {
 			if (twl->prev_status == OMAP_MUSB_VBUS_VALID)
 				return IRQ_HANDLED;
 			wake_lock(&twl->charger_det_lock);
 			twl6030_enable_ldo_input_supply(twl, true);
+
 			regulator_enable(twl->usb3v3);
 			charger_type = omap_usb2_charger_detect(
 					&twl->comparator);
@@ -298,12 +333,20 @@ static irqreturn_t twl6030_usb_irq(int irq, void *_twl)
 				}
 			}
 		}
+#endif
 		twl->prev_status = status;
 		sysfs_notify(&twl->dev->kobj, NULL, "vbus");
 	}
 
 	return IRQ_HANDLED;
 }
+
+#ifdef CONFIG_SUMMIT_SMB347_Q
+void twl6030_vusb_init(void) {
+	if (g_twl)
+		twl6030_usb_irq(0, g_twl);
+}
+#endif
 
 static irqreturn_t twl6030_usbotg_irq(int irq, void *_twl)
 {
@@ -313,6 +356,15 @@ static irqreturn_t twl6030_usbotg_irq(int irq, void *_twl)
 	hw_state = twl6030_readb(twl, TWL6030_MODULE_ID0, STS_HW_CONDITIONS);
 
 	if (hw_state & STS_USB_ID) {
+#ifdef CONFIG_SUMMIT_SMB347_Q
+		if (smb347_data) {
+			int status = smb347_twl6030_callback(OMAP_MUSB_ID_GROUND, (int)twl->prev_status, smb347_data);
+			if (status == -1)
+				goto exit;
+			else
+				twl->prev_status = status;
+		}
+#else
 		if (twl->prev_status == OMAP_MUSB_ID_GROUND)
 			goto exit;
 		twl->prev_status = OMAP_MUSB_ID_GROUND;
@@ -329,11 +381,22 @@ static irqreturn_t twl6030_usbotg_irq(int irq, void *_twl)
 		 * VBUS detection interrupt.
 		 * Just do sysfs_notify.
 		 */
+#endif
 		sysfs_notify(&twl->dev->kobj, NULL, "vbus");
 	} else  {
+#ifdef CONFIG_SUMMIT_SMB347_Q
+		if (smb347_data) {
+			int status = smb347_twl6030_callback(OMAP_MUSB_ID_FLOAT, (int)twl->prev_status, smb347_data);
+			if (status == -1)
+				goto exit;
+			else
+				twl->prev_status = status;
+		}
+#else
 		if (twl->prev_status != OMAP_MUSB_ID_GROUND)
 			goto exit;
 		twl->prev_status = OMAP_MUSB_ID_FLOAT;
+#endif
 		/*
 		 * NOTE:
 		 * This is workaround for the TWL6032 that miss VBUS
@@ -495,6 +558,10 @@ static int __devinit twl6030_usb_probe(struct platform_device *pdev)
 	twl->asleep = 0;
 	twl6030_enable_irq(twl);
 	dev_info(&pdev->dev, "Initialized TWL6030 USB module\n");
+
+#if defined(CONFIG_SUMMIT_SMB347_Q)
+	g_twl = twl;
+#endif
 
 	return 0;
 }
