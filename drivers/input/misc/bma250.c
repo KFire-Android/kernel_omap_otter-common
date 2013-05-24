@@ -1079,6 +1079,17 @@ static struct attribute_group bma250_attribute_group = {
 	.attrs = bma250_attributes
 };
 
+static int bma250_detect(struct i2c_client *client, struct i2c_board_info *info) {
+	struct i2c_adapter *adapter = client->adapter;
+
+	if (!i2c_check_functionality(adapter, I2C_FUNC_I2C))
+		return -ENODEV;
+
+	strlcpy(info->type, BMA250_DRIVER, I2C_NAME_SIZE);
+
+	return 0;
+}
+
 static int bma250_probe(struct i2c_client *client, const struct i2c_device_id *id) {
 	int err = 0;
 	int tempvalue;
@@ -1283,11 +1294,23 @@ static struct i2c_driver bma250_i2c_driver = {
 	},
 	.probe		= bma250_probe,
 	.remove		= __devexit_p(bma250_remove),
+	.detect		= bma250_detect,
 	.shutdown	= bma250_shutdown,
 	.id_table	= bma250_id,
 };
 
-module_i2c_driver(bma250_i2c_driver);
+static int __init BMA250_init(void)
+{
+	return i2c_add_driver(&bma250_i2c_driver);
+}
+
+static void __exit BMA250_exit(void)
+{
+	i2c_del_driver(&bma250_i2c_driver);
+}
+
+module_init(BMA250_init);
+module_exit(BMA250_exit);
 
 MODULE_AUTHOR("Bosch Sensortec GmbH");
 MODULE_DESCRIPTION("BMA250 driver");
