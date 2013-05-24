@@ -37,6 +37,7 @@
 #include <linux/module.h>
 #include <linux/wakelock.h>
 #include <linux/memblock.h>
+#include <linux/omap_die_governor.h>
 
 #include <mach/hardware.h>
 #include <mach/omap4_ion.h>
@@ -72,7 +73,7 @@
 #include <linux/input/bma250.h>
 #include <linux/power/bq27541_battery.h>
 #include <linux/leds-otter-button.h>
-#include <linux/power/summit_smb347.h>
+#include <linux/power/smb347-otter.h>
 
 #include "omap_ram_console.h"
 #include "common.h"
@@ -244,8 +245,8 @@ static struct otter_button_led_platform_data orange_led_data = {
 };
 
 static struct platform_device orange_led = {
-	.name	= "led-orange-button",
-	.id	= -1,
+	.name	= "leds-otter-button",
+	.id	= 0,
 	.dev	= {
 		.platform_data = &orange_led_data,
 	},
@@ -258,8 +259,8 @@ static struct otter_button_led_platform_data green_led_data = {
 };
 
 static struct platform_device green_led = {
-	.name	= "led-green-button",
-	.id	= -1,
+	.name	= "leds-otter-button",
+	.id	= 1,
 	.dev	= {
 		.platform_data = &green_led_data,
 	},
@@ -286,41 +287,45 @@ static struct platform_device __initdata *sdp4430_devices[] = {
 static struct omap_musb_board_data musb_board_data = {
 	.interface_type		= MUSB_INTERFACE_UTMI,
 	.mode			= MUSB_OTG,
-	.power			= 500,
+	.power			= 200,
 };
 
-static int sdp4430_wifi_power_state;
+/* Initial set of thresholds for different thermal zones */
+static struct omap_thermal_zone thermal_zones[] = {
+	OMAP_THERMAL_ZONE("safe", 0, 25000, 65000, 250, 1000, 400),
+	OMAP_THERMAL_ZONE("monitor", 0, 60000, 80000, 250, 250,	250),
+	OMAP_THERMAL_ZONE("alert", 0, 75000, 90000, 250, 250, 150),
+	OMAP_THERMAL_ZONE("critical", 1, 85000,	115000,	250, 250, 50),
+};
 
-static int wifi_set_power(struct device *dev, int slot, int power_on, int vdd)
-{
-	printk(KERN_WARNING"%s: %d\n", __func__, power_on);
+static struct omap_die_governor_pdata omap_gov_pdata = {
+	.zones = thermal_zones,
+	.zones_num = ARRAY_SIZE(thermal_zones),
+};
 
-	gpio_set_value(GPIO_WIFI_PMENA, power_on);
-
-	sdp4430_wifi_power_state = power_on;
-
-	return 0;
-}
+/* MMC / Wifi */
 
 static struct omap2_hsmmc_info mmc[] = {
 	{
-		.mmc = 2,
-		.caps = MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA | MMC_CAP_1_8V_DDR,
-		.gpio_cd = -EINVAL,
-		.gpio_wp = -EINVAL,
-		.ocr_mask = MMC_VDD_29_30,
-		.nonremovable = true,
+		.mmc		= 2,
+		.caps		= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA | MMC_CAP_1_8V_DDR,
+		.gpio_cd	= -EINVAL,
+		.gpio_wp	= -EINVAL,
+		.ocr_mask	= MMC_VDD_29_30,
+		.nonremovable	= true,
 #ifdef CONFIG_PM_RUNTIME
 		.power_saving	= true,
 #endif
 	},
 	{
-		.mmc = 5,
-		.caps = MMC_CAP_4_BIT_DATA | MMC_CAP_POWER_OFF_CARD,
-		.gpio_cd = -EINVAL,
-		.gpio_wp = -EINVAL,
-		.ocr_mask = MMC_VDD_165_195,
-		.nonremovable = true,
+		.mmc		= 5,
+		.caps		= MMC_CAP_4_BIT_DATA | MMC_CAP_POWER_OFF_CARD,
+		.pm_caps	= MMC_PM_KEEP_POWER,
+		.gpio_cd	= -EINVAL,
+		.gpio_wp	= -EINVAL,
+		.ocr_mask	= MMC_VDD_165_195,
+		.built_in	= 1,
+		.nonremovable	= true,
 	},
 	{}	/* Terminator */
 };
@@ -373,8 +378,8 @@ static int omap4_twl6030_hsmmc_late_init(struct device *dev)
 		pdata->slots[0].card_detect_irq = irq;
 		pdata->slots[0].card_detect = twl6030_mmc_card_detect;
 	}
-	if (pdev->id == 4)
-		pdata->slots[0].set_power = wifi_set_power;
+//	if (pdev->id == 4)
+//		pdata->slots[0].set_power = wifi_set_power;
 
 	return 0;
 }
@@ -428,8 +433,114 @@ static struct bma250_platform_data bma250_pdata = {
 };
 
 static struct bq27541_battery_platform_data bq27541_pdata = {
-	.led_callback	= battery_led_callback,
+	.led_callback		= battery_led_callback,
 };
+
+#if 0
+static int kc1_phydetect_setting[] = {
+/*0*/	FCC_2500mA | PCC_150mA | TC_150mA,
+/*1*/	DC_ICL_1800mA | USBHC_ICL_1800mA,
+/*2*/	SUS_CTRL_BY_REGISTER | BAT_TO_SYS_NORMAL | VFLT_PLUS_200mV | AICL_ENABLE | AIC_TH_4200mV | USB_IN_FIRST | BAT_OV_END_CHARGE,
+/*3*/	PRE_CHG_VOLTAGE_THRESHOLD_3_0 | FLOAT_VOLTAGE_4_2_0,
+/*detect by omap*/
+/*4*/	AUTOMATIC_RECHARGE_ENABLE | CURRENT_TERMINATION_ENABLE | BMD_VIA_THERM_IO | AUTO_RECHARGE_100mV | APSD_DISABLE |
+		NC_APSD_DISABLE | SECONDARY_INPUT_NOT_ACCEPTED_IN_OVLO,
+/*5*/	STAT_ACTIVE_LOW | STAT_CHARGEING_STATE | STAT_DISABLE | NC_INPUT_HC_SETTING | CC_TIMEOUT_DISABLED | PC_TIMEOUT_DISABLED,
+/*6*/	LED_BLINK_DISABLE | CHARGE_EN_I2C_0 | USB_HC_CONTROL_BY_REGISTER | USB_HC_TRI_STATE | CHARGER_ERROR_NO_IRQ |
+		APSD_DONE_IRQ | DCIN_INPUT_PRE_BIAS_ENABLE,
+/*7*/	0X80 | MIN_SYS_3_4_5_V | THERM_MONITOR_VDDCAP | SOFT_COLD_NO_RESPONSE | SOFT_HOT_NO_RESPONSE,
+/*8*/	INOK_OPERATION | USB_2 | VFLT_MINUS_60mV | PC_TO_FC_THRESHOLD_ENABLE | HARD_TEMP_CHARGE_SUSPEND | INOK_ACTIVE_LOW ,
+/*9*/	RID_DISABLE_OTG_I2C_CONTROL | OTG_PIN_ACTIVE_HIGH | LOW_BAT_VOLTAGE_3_5_8_V,
+/*a*/	CCC_700mA | DTRT_130C | OTG_CURRENT_LIMIT_500mA | OTG_BAT_UVLO_THRES_2_7_V,
+/*b*/	0x61,
+/*c*/	TEMP_OUTSIDE_COLD_HOT_HARD_LIMIITS_TRIGGER_IRQ | TEMP_OUTSIDE_COLD_HOT_SOFT_LIMIITS_TRIGGER_IRQ |
+		USB_OVER_VOLTAGE_TRIGGER_IRQ | USB_UNDER_VOLTAGE_TRIGGER_IRQ | AICL_COMPLETE_TRIGGER_IRQ,
+/*d*/	CHARGE_TIMEOUT_TRIGGER_IRQ | TERMINATION_OR_TAPER_CHARGING_TRIGGER_IRQ | FAST_CHARGING_TRIGGER_IRQ | INOK_TRIGGER_IRQ |
+		MISSING_BATTERY_TRIGGER_IRQ | LOW_BATTERY_TRIGGER_IRQ,
+};
+
+static int kc1_chargerdetect_setting[] = {
+// [0] FCC_2500mA | PCC_150mA | TC_250mA
+	(7<<5) | (1<<3) | (5),
+// [1] DC_ICL_1800mA | USBHC_ICL_1800mA
+	(6<<4) | (6),
+// [2] SUS_CTRL_BY_REGISTER | BAT_TO_SYS_NORMAL | VFLT_PLUS_200mV | AICL_ENABLE | AIC_TH_4200mV | USB_IN_FIRST | BAT_OV_END_CHARGE
+	(1<<7) | (0) | (1<<5) | (1<<4) | (0) | (1<<2) | (1<<1),
+// [3] PRE_CHG_VOLTAGE_THRESHOLD_3_0 | FLOAT_VOLTAGE_4_2_0
+	(3<<6) | (35),
+// [4] AUTOMATIC_RECHARGE_ENABLE | CURRENT_TERMINATION_ENABLE | BMD_VIA_THERM_IO | AUTO_RECHARGE_100mV | APSD_ENABLE | NC_APSD_ENABLE | SECONDARY_INPUT_NOT_ACCEPTED_IN_OVLO
+	(0) | (0) | (3<<4) | (1<<3) | (1<<2) | (1<<1) | (0),
+// [5] STAT_ACTIVE_LOW | STAT_CHARGEING_STATE | STAT_ENABLE | NC_INPUT_HC_SETTING | CC_TIMEOUT_764MIN | PC_TIMEOUT_48MIN
+	(0) | (0) | (0) | (1<<4) | (1<<2) | (0),
+// [6] LED_BLINK_DISABLE | EN_PIN_ACTIVE_LOW | USB_HC_CONTROL_BY_PIN | USB_HC_DUAL_STATE | CHARGER_ERROR_NO_IRQ | APSD_DONE_IRQ | DCIN_INPUT_PRE_BIAS_ENABLE
+	(0) | (3<<5) | (1<<4) | (1<<3) | (0) | (1<<1) | (1),
+// [7] 0x80 | MIN_SYS_3_4_5_V | THERM_MONITOR_VDDCAP | THERM_MONITOR_ENABLE | SOFT_COLD_CC_FV_COMPENSATION | SOFT_HOT_CC_FV_COMPENSATION
+	(0x80) | (0) | (1<<5) | (0) | (3<<2) | (3),
+// [8] INOK_OPERATION | USB_2 | VFLT_MINUS_240mV | HARD_TEMP_CHARGE_SUSPEND | PC_TO_FC_THRESHOLD_ENABLE | INOK_ACTIVE_LOW
+	(0) | (0) | (3<<3) | (0) | (0) | (0),
+// [9] RID_DISABLE_OTG_I2C_CONTROL | OTG_PIN_ACTIVE_HIGH | LOW_BAT_VOLTAGE_3_4_6_V
+	(0) | (0) | (14),
+// [A] CCC_700mA | DTRT_130C | OTG_CURRENT_LIMIT_500mA | OTG_BAT_UVLO_THRES_2_7_V
+	(1<<6) | (3<<4) | (2<<2) | (0), 
+// [B]
+	(0x61),
+// [C] AICL_COMPLETE_TRIGGER_IRQ
+	(1<<1),
+// [D] INOK_TRIGGER_IRQ | LOW_BATTERY_TRIGGER_IRQ
+	(1<<2) | (1),
+};
+#endif
+
+#ifdef CONFIG_OTTER
+static int chargerdetect_setting[] = {
+// [0] FCC_2500mA | PCC_150mA | TC_150mA
+	(7<<5) | (1<<3) | (3),
+// [1] DC_ICL_1800mA | USBHC_ICL_1800mA
+	(6<<4) | (6),
+// [2] SUS_CTRL_BY_REGISTER | BAT_TO_SYS_NORMAL | VFLT_PLUS_200mV | AICL_ENABLE | AIC_TH_4200mV | USB_IN_FIRST | BAT_OV_END_CHARGE
+	(1<<7) | (0) | (1<<5) | (1<<4) | (0) | (1<<2) | (1<<1),
+// [3] PRE_CHG_VOLTAGE_THRESHOLD_3_0 | FLOAT_VOLTAGE_4_2_0
+	(3<<6) | (35),
+// [4] AUTOMATIC_RECHARGE_ENABLE | CURRENT_TERMINATION_ENABLE | BMD_VIA_THERM_IO | AUTO_RECHARGE_100mV | APSD_ENABLE | NC_APSD_ENABLE | SECONDARY_INPUT_NOT_ACCEPTED_IN_OVLO
+	(0) | (0) | (3<<4) | (1<<3) | (1<<2) | (1<<1) | (0),
+// [5] STAT_ACTIVE_LOW | STAT_CHARGEING_STATE | STAT_ENABLE | NC_INPUT_HC_SETTING | CC_TIMEOUT_764MIN | PC_TIMEOUT_48MIN
+	(0) | (0) | (0) | (1<<4) | (1<<2) | (0),
+// [6] LED_BLINK_DISABLE | EN_PIN_ACTIVE_LOW | USB_HC_CONTROL_BY_PIN | USB_HC_DUAL_STATE | CHARGER_ERROR_NO_IRQ | APSD_DONE_IRQ | DCIN_INPUT_PRE_BIAS_ENABLE
+	(0) | (3<<5) | (1<<4) | (1<<3) | (0) | (1<<1) | (1),
+// [7] 0x80 | MIN_SYS_3_4_5_V | THERM_MONITOR_VDDCAP | THERM_MONITOR_ENABLE | SOFT_COLD_CC_FV_COMPENSATION | SOFT_HOT_FV_COMPENSATION
+	(0x80) | (0) | (1<<5) | (0) | (3<<2) | (3),
+// [8] INOK_OPERATION | USB_2 | VFLT_MINUS_240mV | HARD_TEMP_CHARGE_SUSPEND | PC_TO_FC_THRESHOLD_ENABLE | INOK_ACTIVE_LOW
+	(0) | (0) | (3<<3) | (0) | (0) | (0),
+// [9] RID_DISABLE_OTG_I2C_CONTROL | OTG_PIN_ACTIVE_HIGH | LOW_BAT_VOLTAGE_3_4_6_V
+	(0) | (0) | (14),
+// [A] CCC_700mA | DTRT_130C | OTG_CURRENT_LIMIT_500mA | OTG_BAT_UVLO_THRES_2_7_V
+	(1<<6) | (3<<4) | (2<<2) | (0), 
+// [B]
+	(0xF5),
+// [C] AICL_COMPLETE_TRIGGER_IRQ
+	(1<<1),
+// [D] INOK_TRIGGER_IRQ | LOW_BATTERY_TRIGGER_IRQ
+	(1<<2) | (1),
+};
+#else
+static int chargerdetect_setting[] = {
+/*0*/	FCC_2500mA | PCC_150mA | TC_150mA,
+/*1*/	DC_ICL_1800mA | USBHC_ICL_1800mA,
+/*2*/	SUS_CTRL_BY_REGISTER | BAT_TO_SYS_NORMAL | VFLT_PLUS_200mV | AICL_ENABLE | AIC_TH_4200mV | USB_IN_FIRST | BAT_OV_END_CHARGE,
+/*3*/	PRE_CHG_VOLTAGE_THRESHOLD_3_0 | FLOAT_VOLTAGE_4_2_0,
+/*4*/	AUTOMATIC_RECHARGE_ENABLE | CURRENT_TERMINATION_ENABLE | BMD_VIA_THERM_IO | AUTO_RECHARGE_100mV | APSD_ENABLE | NC_APSD_ENABLE |
+		SECONDARY_INPUT_NOT_ACCEPTED_IN_OVLO,
+/*5*/	STAT_ACTIVE_LOW | STAT_CHARGEING_STATE | STAT_ENABLE | NC_INPUT_HC_SETTING | CC_TIMEOUT_764MIN | PC_TIMEOUT_48MIN,
+/*6*/	LED_BLINK_DISABLE | EN_PIN_ACTIVE_LOW | USB_HC_CONTROL_BY_PIN | USB_HC_DUAL_STATE | CHARGER_ERROR_NO_IRQ | APSD_DONE_IRQ | DCIN_INPUT_PRE_BIAS_ENABLE,
+/*7*/	0x80 | MIN_SYS_3_4_5_V | THERM_MONITOR_VDDCAP | THERM_MONITOR_ENABLE | SOFT_COLD_CC_FV_COMPENSATION | SOFT_HOT_FV_COMPENSATION,
+/*8*/	INOK_OPERATION | USB_2 | VFLT_MINUS_240mV | HARD_TEMP_CHARGE_SUSPEND | PC_TO_FC_THRESHOLD_ENABLE | INOK_ACTIVE_LOW,
+/*9*/	RID_DISABLE_OTG_I2C_CONTROL | OTG_PIN_ACTIVE_HIGH | LOW_BAT_VOLTAGE_3_4_6_V,
+/*a*/	CCC_700mA | DTRT_130C | OTG_CURRENT_LIMIT_500mA | OTG_BAT_UVLO_THRES_2_7_V,
+/*b*/	0xa6,
+/*c*/	AICL_COMPLETE_TRIGGER_IRQ,
+/*d*/	INOK_TRIGGER_IRQ | LOW_BATTERY_TRIGGER_IRQ,
+};
+#endif
 
 static struct summit_smb347_platform_data smb347_pdata = {
 	.mbid			= 0,
@@ -440,6 +551,10 @@ static struct summit_smb347_platform_data smb347_pdata = {
 	.initial_max_aicl	= 1800,
 	.initial_pre_max_aicl	= 1800,
 	.initial_charge_current	= 2000,
+	.irq_trigger_falling	= true,
+	.irq_set_awake		= true,
+	.charger_setting	= chargerdetect_setting,
+	.charger_setting_skip_flag = true,
 	.led_callback		= battery_led_callback,
 };
 
@@ -472,9 +587,7 @@ static struct i2c_board_info __initdata sdp4430_i2c_3_boardinfo[] = {
 
 static struct i2c_board_info __initdata sdp4430_i2c_4_boardinfo[] = {
 #ifdef CONFIG_INPUT_STK_ALS22x7
-	{ I2C_BOARD_INFO("stk_als22x7_addr1", 0x10), },
-	{ I2C_BOARD_INFO("stk_als22x7_addr2", 0x11), },
-	{ I2C_BOARD_INFO("stk_als22x7_addr3", 0x38), },
+	{ I2C_BOARD_INFO("stk_als22x7", 0x10), },
 #endif
 #ifdef CONFIG_SENSORS_LM75
 	{ I2C_BOARD_INFO("tmp105", 0x49), .platform_data = &lm75_pdata, },
@@ -486,9 +599,7 @@ static struct i2c_board_info __initdata sdp4430_i2c_4_boardinfo[] = {
 
 static struct i2c_board_info __initdata sdp4430_i2c_4_boardinfo_c1c[] = {
 #ifdef CONFIG_INPUT_STK_ALS22x7
-	{ I2C_BOARD_INFO("stk_als22x7_addr1", 0x10), },
-	{ I2C_BOARD_INFO("stk_als22x7_addr2", 0x11), },
-	{ I2C_BOARD_INFO("stk_als22x7_addr3", 0x38), },
+	{ I2C_BOARD_INFO("stk_als22x7", 0x10), },
 #endif
 #ifdef CONFIG_SENSORS_LM75
 	{ I2C_BOARD_INFO("lm75", 0x48), },
@@ -503,9 +614,7 @@ static struct i2c_board_info __initdata sdp4430_i2c_4_boardinfo_dvt[] = {
 	{ I2C_BOARD_INFO("summit_smb347", 0x6), .irq = OMAP_GPIO_IRQ(OMAP4_CHARGER_IRQ), .platform_data = &smb347_pdata, },
 #endif    
 #ifdef CONFIG_INPUT_STK_ALS22x7
-	{ I2C_BOARD_INFO("stk_als22x7_addr1", 0x10), },
-	{ I2C_BOARD_INFO("stk_als22x7_addr2", 0x11), },
-	{ I2C_BOARD_INFO("stk_als22x7_addr3", 0x38), },
+	{ I2C_BOARD_INFO("stk_als22x7", 0x10), },
 #endif
 #ifdef CONFIG_SENSORS_LM75
 	{ I2C_BOARD_INFO("tmp105", 0x49), .platform_data = &lm75_pdata, },
@@ -520,9 +629,7 @@ static struct i2c_board_info __initdata sdp4430_i2c_4_boardinfo_pvt[] = {
 	{ I2C_BOARD_INFO("summit_smb347", 0x6), .irq = OMAP_GPIO_IRQ(OMAP4_CHARGER_IRQ), .platform_data = &smb347_pdata, },
 #endif    
 #ifdef CONFIG_INPUT_STK_ALS22x7
-	{ I2C_BOARD_INFO("stk_als22x7_addr1", 0x10), },
-	{ I2C_BOARD_INFO("stk_als22x7_addr2", 0x11), },
-	{ I2C_BOARD_INFO("stk_als22x7_addr3", 0x38), },
+	{ I2C_BOARD_INFO("stk_als22x7", 0x10), },
 #endif
 #ifdef CONFIG_INPUT_BMA250
 	{ I2C_BOARD_INFO("bma250", 0x18), .platform_data = &bma250_pdata, },
@@ -554,12 +661,6 @@ static void __init omap_i2c_hwspinlock_init(int bus_id, int spinlock_id,
 	}
 }
 
-static struct regulator_consumer_supply vdac_supply[] = {
-	{
-		.supply = "hdmi_vref",
-	},
-};
-
 static struct regulator_init_data sdp4430_vdac = {
 	.constraints = {
 		.min_uV			= 1800000,
@@ -569,8 +670,6 @@ static struct regulator_init_data sdp4430_vdac = {
 		.state_mem		= { .enabled = false, .disabled = true, },
 		.always_on		= true,
 	},
-	.num_consumer_supplies  = ARRAY_SIZE(vdac_supply),
-	.consumer_supplies      = vdac_supply,
 };
 
 static struct regulator_consumer_supply emmc_supply[] = {
@@ -861,13 +960,186 @@ static void __init omap_ilitek_init(void)
 }
 #endif //CONFIG_TOUCHSCREEN_ILITEK
 
+/* BEGIN SERIAL */
+static struct omap_device_pad tablet_uart3_pads[] __initdata = {
+	{
+		.name	= "uart3_cts_rctx.uart3_cts_rctx",
+		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE7,
+	},
+	{
+		.name	= "uart3_rts_sd.uart3_rts_sd",
+		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE7,
+	},
+	{
+		.name	= "uart3_tx_irtx.uart3_tx_irtx",
+		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
+	},
+	{
+		.name	= "uart3_rx_irrx.uart3_rx_irrx",
+		.flags	= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
+		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
+		.idle	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
+	},
+};
+
+static struct omap_uart_port_info tablet_uart_info __initdata = {
+	.dma_enabled = 0,
+	.autosuspend_timeout = -1,
+};
+
+void __init board_serial_init(void)
+{
+//	omap_serial_init_port(&uart3_board_data, &tablet_uart_info);
+}
+/* END SERIAL */
 
 #ifdef CONFIG_OMAP_MUX
 static struct omap_board_mux board_mux[] __initdata = {
+#if 0
+    OMAP4_MUX(ABE_DMIC_CLK1,OMAP_MUX_MODE3 | OMAP_OFF_EN),//+5V ADO_SPEAK_ENABLE
+    OMAP4_MUX(GPMC_AD0, OMAP_MUX_MODE1 | OMAP_PIN_INPUT | OMAP_OFF_EN | OMAP_OFFOUT_EN), // SDMMC2_DAT0
+    OMAP4_MUX(GPMC_AD1, OMAP_MUX_MODE1 | OMAP_PIN_INPUT | OMAP_OFF_EN | OMAP_OFFOUT_EN), // SDMMC2_DAT1
+    OMAP4_MUX(GPMC_AD2, OMAP_MUX_MODE1 | OMAP_PIN_INPUT | OMAP_OFF_EN | OMAP_OFFOUT_EN), // SDMMC2_DAT2
+    OMAP4_MUX(GPMC_AD3, OMAP_MUX_MODE1 | OMAP_PIN_INPUT | OMAP_OFF_EN | OMAP_OFFOUT_EN), // SDMMC2_DAT3
+    OMAP4_MUX(GPMC_AD4, OMAP_MUX_MODE1 | OMAP_PIN_INPUT | OMAP_OFF_EN | OMAP_OFFOUT_EN), // SDMMC2_DAT4
+    OMAP4_MUX(GPMC_AD5, OMAP_MUX_MODE1 | OMAP_PIN_INPUT | OMAP_OFF_EN | OMAP_OFFOUT_EN), // SDMMC2_DAT5
+    OMAP4_MUX(GPMC_AD6, OMAP_MUX_MODE1 | OMAP_PIN_INPUT | OMAP_OFF_EN | OMAP_OFFOUT_EN), // SDMMC2_DAT6
+    OMAP4_MUX(GPMC_AD7, OMAP_MUX_MODE1 | OMAP_PIN_INPUT | OMAP_OFF_EN | OMAP_OFFOUT_EN), // SDMMC2_DAT7
+    OMAP4_MUX(GPMC_AD9, OMAP_MUX_MODE3 | OMAP_PIN_INPUT | OMAP_PULL_ENA | OMAP_PULL_UP),
+    OMAP4_MUX(GPMC_AD10, OMAP_MUX_MODE3 | OMAP_PIN_INPUT | OMAP_PULL_ENA | OMAP_PULL_UP),
+    OMAP4_MUX(GPMC_AD11, OMAP_MUX_MODE3 | OMAP_PIN_INPUT | OMAP_PULL_ENA),
+    OMAP4_MUX(GPMC_AD12, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // gpio 36
+    OMAP4_MUX(GPMC_AD13,OMAP_MUX_MODE3 | OMAP_OFF_EN),//OMAP_RGB_SHTDN
+    OMAP4_MUX(GPMC_AD14, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // gpio 38
+    OMAP4_MUX(GPMC_A18, OMAP_MUX_MODE3), // gpio 42
+    OMAP4_MUX(GPMC_A19, OMAP_MUX_MODE3 | OMAP_PULL_ENA | OMAP_PULL_UP), // gpio 43
+    OMAP4_MUX(GPMC_A20, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // gpio 44
+    OMAP4_MUX(GPMC_A21, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // gpio 45
+    OMAP4_MUX(GPMC_A23,OMAP_MUX_MODE3 | OMAP_OFF_EN),//OMAP_3V_ENABLE ,LCDVCC
+    OMAP4_MUX(GPMC_A24, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // gpio 48
+    OMAP4_MUX(GPMC_A25, OMAP_MUX_MODE3 | OMAP_PIN_INPUT), // gpio 49
+    OMAP4_MUX(GPMC_CLK, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // gpio 55
+    OMAP4_MUX(GPMC_NADV_ALE, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // gpio 56
+    OMAP4_MUX(GPMC_NWE, OMAP_MUX_MODE1 | OMAP_PIN_INPUT | OMAP_OFF_EN | OMAP_OFFOUT_EN), // sdmmc2_cmd
+    OMAP4_MUX(GPMC_NBE0_CLE, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // gpio 59
+    OMAP4_MUX(GPMC_WAIT0, OMAP_MUX_MODE7 | OMAP_PULL_ENA | OMAP_PULL_UP), // gpio 61
+    OMAP4_MUX(GPMC_WAIT1, OMAP_MUX_MODE7 | OMAP_PULL_ENA | OMAP_PULL_UP), // gpio 62
+    OMAP4_MUX(C2C_DATA12, OMAP_MUX_MODE3 | OMAP_OFF_EN ),//Charger en pin
+    OMAP4_MUX(C2C_DATA13, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // gpio 102
+    OMAP4_MUX(UART4_RX, OMAP_MUX_MODE3 | OMAP_OFF_EN | OMAP_OFFOUT_VAL ),//Charger susp pin,
+    OMAP4_MUX(USBB1_ULPITLL_DAT6, OMAP_MUX_MODE1 ),//Backlight GPTimer 10,
+    OMAP4_MUX(C2C_DATA14, OMAP_MUX_MODE3 | OMAP_PIN_INPUT_PULLDOWN ),//gpio 103: MP/ENG Detect,
+    OMAP4_MUX(UNIPRO_TX1, OMAP_MUX_MODE3 | OMAP_PIN_INPUT_PULLDOWN ),//gpio 174: mbid1,
+    OMAP4_MUX(UNIPRO_TY1, OMAP_MUX_MODE3 | OMAP_PIN_INPUT_PULLDOWN ),//gpio 173: mbid0,
+    OMAP4_MUX(UNIPRO_RX1, OMAP_MUX_MODE3 | OMAP_PIN_INPUT_PULLDOWN ),//gpio 177: mbid3,
+    OMAP4_MUX(UNIPRO_RY1, OMAP_MUX_MODE3 | OMAP_PIN_INPUT_PULLDOWN ),//gpio 178: mbid2,
+    OMAP4_MUX(UNIPRO_RX0, OMAP_MUX_MODE3 | OMAP_INPUT_EN ),//gpio 175: LCDid1,
+    OMAP4_MUX(UNIPRO_RY0, OMAP_MUX_MODE3 | OMAP_INPUT_EN ),//gpio 176: LCDid0,
+    OMAP4_MUX(GPMC_NCS0, OMAP_MUX_MODE3 | OMAP_INPUT_EN ),//gpio 50: TPid0,
+    OMAP4_MUX(GPMC_NCS1, OMAP_MUX_MODE3 | OMAP_INPUT_EN ),//gpio 51: TPid1,
+    OMAP4_MUX(UNIPRO_TX0, OMAP_MUX_MODE3 | OMAP_PIN_INPUT_PULLUP ),//gpio 171: Wifi IP select,
+    OMAP4_MUX(UNIPRO_TY0, OMAP_MUX_MODE3 | OMAP_PIN_INPUT_PULLUP ),//gpio 172: Wifi IP select,
+    /* OMAP4_MUX(C2C_DATA11, OMAP_MUX_MODE3 | OMAP_PIN_INPUT | OMAP_WAKEUP_EN |OMAP_PIN_OFF_INPUT_PULLUP),//Power button, same as GPMC_WAIT2*/
+    /* OMAP4_MUX(C2C_DATA15, OMAP_MUX_MODE7 | OMAP_PULL_ENA),//Power button, same as GPMC_NCS7 */
+    OMAP4_MUX(HDMI_HPD, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // HDMI_HDP
+    OMAP4_MUX(HDMI_CEC, OMAP_MUX_MODE7 | OMAP_PULL_ENA | OMAP_PULL_UP), // HDMI_CEC
+    OMAP4_MUX(HDMI_DDC_SCL, OMAP_MUX_MODE7 | OMAP_PULL_ENA | OMAP_PULL_UP), // HDMI_DDC_SCL
+    OMAP4_MUX(HDMI_DDC_SDA, OMAP_MUX_MODE7 | OMAP_PULL_ENA | OMAP_PULL_UP), // HDMI_DDC_SDA
+    OMAP4_MUX(CSI21_DX0, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // CSI21_DX0
+    OMAP4_MUX(CSI21_DY0, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // CSI21_DY0
+    OMAP4_MUX(CSI21_DX1, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // CSI21_DX1
+    OMAP4_MUX(CSI21_DY1, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // CSI21_DY1
+    OMAP4_MUX(CSI21_DX2, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // CSI21_DX2
+    OMAP4_MUX(CSI21_DY2, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // CSI21_DY2
+    OMAP4_MUX(CSI22_DX0, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // CSI22_DX0
+    OMAP4_MUX(CSI22_DY0, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // CSI22_DY0
+    OMAP4_MUX(CSI22_DX1, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // CSI22_DX1
+    OMAP4_MUX(CSI22_DY1, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // CSI22_DY1
+    OMAP4_MUX(CAM_SHUTTER, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // CAM_SHUTTER
+    OMAP4_MUX(CAM_STROBE, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // CAM_STROBE
+    OMAP4_MUX(CAM_GLOBALRESET, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // gpio 83
+    OMAP4_MUX(USBB1_ULPITLL_CLK, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // gpio 84
+    OMAP4_MUX(USBB1_ULPITLL_STP, OMAP_MUX_MODE7 | OMAP_PULL_ENA | OMAP_PULL_UP), // gpio 85
+    OMAP4_MUX(USBB1_ULPITLL_DIR, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // gpio 86
+    OMAP4_MUX(USBB1_ULPITLL_NXT, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // gpio 87
+    OMAP4_MUX(USBB1_ULPITLL_DAT0, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // gpio 88
+    OMAP4_MUX(USBB1_ULPITLL_DAT1, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // gpio 89
+    OMAP4_MUX(USBB1_ULPITLL_DAT2, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // gpio 90
+    OMAP4_MUX(USBB1_ULPITLL_DAT3, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // gpio 91
+    OMAP4_MUX(USBB1_ULPITLL_DAT4, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // gpio 92
+    OMAP4_MUX(USBB1_ULPITLL_DAT5, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // gpio 93
+    OMAP4_MUX(USBB1_ULPITLL_DAT7, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // USBB1_ULPITLL_DAT7
+    OMAP4_MUX(USBB1_HSIC_DATA, OMAP_MUX_MODE7), // USBB1_HSIC_DATA
+    OMAP4_MUX(USBB1_HSIC_STROBE, OMAP_MUX_MODE7), // USBB1_HSIC_STROBE
+    OMAP4_MUX(USBC1_ICUSB_DP, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // USBC1_ICUSB_DP
+    OMAP4_MUX(USBC1_ICUSB_DM, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // USBC1_ICUSB_DM
+    OMAP4_MUX(SDMMC1_CLK, OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP | OMAP_PIN_OFF_INPUT_PULLDOWN), // SDMMC1_CLK
+    OMAP4_MUX(ABE_MCBSP2_CLKX, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // ABE_MCBSP2_CLKX
+    OMAP4_MUX(ABE_MCBSP2_DR, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // ABE_MCBSP2_DR
+    OMAP4_MUX(ABE_MCBSP2_DX, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // ABE_MCBSP2_DX
+    OMAP4_MUX(ABE_MCBSP2_FSX, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // ABE_MCBSP2_FSX
+    OMAP4_MUX(ABE_MCBSP1_CLKX, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // ABE_MCBSP1_CLKX
+    OMAP4_MUX(ABE_MCBSP1_DR, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // ABE_MCBSP1_DR
+    OMAP4_MUX(ABE_MCBSP1_DX, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // ABE_MCBSP1_DX
+    OMAP4_MUX(ABE_MCBSP1_FSX, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // ABE_MCBSP1_FSX
+    OMAP4_MUX(ABE_PDM_UL_DATA, OMAP_MUX_MODE1 | OMAP_PIN_INPUT_PULLDOWN | OMAP_PIN_OFF_OUTPUT_LOW), // ABE_PDM_UL_DATA
+    OMAP4_MUX(ABE_DMIC_DIN1, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // gpio 120
+    OMAP4_MUX(ABE_DMIC_DIN2, OMAP_MUX_MODE3 | OMAP_PULL_ENA), // gpio 121
+    OMAP4_MUX(ABE_DMIC_DIN3, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // ABE_DMIC_DIN3
+    OMAP4_MUX(UART2_CTS, OMAP_MUX_MODE7 | OMAP_PULL_ENA | OMAP_PULL_UP), // UART2_CTS
+    OMAP4_MUX(UART2_RTS, OMAP_MUX_MODE7 | OMAP_PULL_ENA | OMAP_PULL_UP), // UART2_RTS
+    OMAP4_MUX(UART2_RX, OMAP_MUX_MODE7 | OMAP_PULL_ENA | OMAP_PULL_UP), // UART2_RX
+    OMAP4_MUX(UART2_TX, OMAP_MUX_MODE7 | OMAP_PULL_ENA | OMAP_PULL_UP), // UART2_TX
+    OMAP4_MUX(HDQ_SIO, OMAP_MUX_MODE7), // gpio 127
+    OMAP4_MUX(MCSPI1_CS2, OMAP_MUX_MODE7 | OMAP_PULL_ENA | OMAP_PULL_UP), // gpio 139
+    OMAP4_MUX(MCSPI1_CS3, OMAP_MUX_MODE7 | OMAP_PULL_ENA | OMAP_PULL_UP), // gpio 140
+    OMAP4_MUX(UART4_TX, OMAP_MUX_MODE7 | OMAP_PULL_ENA | OMAP_PULL_UP), // gpio 156
+    OMAP4_MUX(USBB2_ULPITLL_CLK, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // gpio 157
+    OMAP4_MUX(USBB2_HSIC_DATA, OMAP_MUX_MODE7), // gpio 169
+    OMAP4_MUX(USBB2_HSIC_STROBE, OMAP_MUX_MODE7), // gpio 170
+    OMAP4_MUX(UNIPRO_TX0, OMAP_MUX_MODE3 | OMAP_PIN_INPUT_PULLUP | OMAP_PIN_OFF_INPUT_PULLDOWN), // gpio 171,for factory rndis
+    OMAP4_MUX(UNIPRO_TY0, OMAP_MUX_MODE3 | OMAP_PIN_INPUT_PULLUP | OMAP_PIN_OFF_INPUT_PULLDOWN), // gpio 172,for factory rndis
+    OMAP4_MUX(FREF_CLK1_OUT, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // fref_clk1_out
+    OMAP4_MUX(DPM_EMU2, OMAP_MUX_MODE7 | OMAP_PULL_ENA), // dpm_emu2
+    OMAP4_MUX(I2C1_SCL, OMAP_MUX_MODE0 | OMAP_INPUT_EN), // I2C1_SCL
+    OMAP4_MUX(I2C1_SDA, OMAP_MUX_MODE0 | OMAP_INPUT_EN), // I2C1_SDA
+    OMAP4_MUX(I2C2_SCL, OMAP_MUX_MODE0 | OMAP_INPUT_EN), // I2C2_SCL
+    OMAP4_MUX(I2C2_SDA, OMAP_MUX_MODE0 | OMAP_INPUT_EN), // I2C2_SDA
+    OMAP4_MUX(MCSPI1_CLK, OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLDOWN | OMAP_PIN_OFF_INPUT_PULLDOWN), // MCSPI1_CLK
+    OMAP4_MUX(MCSPI1_SOMI, OMAP_MUX_MODE0), // MCSPI1_SOMI
+    OMAP4_MUX(MCSPI1_SIMO, OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLDOWN | OMAP_PIN_OFF_INPUT_PULLDOWN), // MCSPI1_SIMO
+    OMAP4_MUX(MCSPI1_CS0, OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLDOWN | OMAP_PIN_OFF_INPUT_PULLDOWN), // MCSPI1_CS0
+    OMAP4_MUX(MCSPI1_CS1, OMAP_MUX_MODE7 | OMAP_INPUT_EN), // MCSPI1_CS1
+
+    OMAP4_MUX(MCSPI4_SOMI, OMAP_MUX_MODE7 | OMAP_PULL_ENA | OMAP_PULL_UP), // MCSPI4_SOMI
+    OMAP4_MUX(DPM_EMU0, OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP), // DPM_EMU0
+    OMAP4_MUX(DPM_EMU1, OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP), // DPM_EMU1
+    OMAP4_MUX(DPM_EMU7, OMAP_MUX_MODE5 | OMAP_PIN_INPUT_PULLDOWN), // DISPC2_HSYNC
+
+    OMAP4_MUX(GPMC_NCS7, OMAP_MUX_MODE7 | OMAP_PULL_ENA),				//gpmc_ncs7=GPIO_104-OMAP_TP_RESET
+    OMAP4_MUX(GPMC_WAIT2, OMAP_MUX_MODE3 | OMAP_PIN_INPUT | OMAP_WAKEUP_EN |OMAP_PIN_OFF_INPUT_PULLUP),		//GPIO_100-ON_BUTTON
+#endif
+    { .reg_offset = OMAP_MUX_TERMINATOR },
+};
+static struct omap_board_mux board_mux_wkup[] __initdata = {
+#if 0
+    OMAP4_MUX(SIM_IO, OMAP_MUX_MODE7 | OMAP_PULL_ENA),
+    OMAP4_MUX(SIM_CLK, OMAP_MUX_MODE7 | OMAP_PULL_ENA),
+    OMAP4_MUX(SIM_RESET, OMAP_MUX_MODE7 | OMAP_PULL_ENA),
+    OMAP4_MUX(SIM_CD, OMAP_MUX_MODE7 | OMAP_PULL_ENA | OMAP_PULL_UP),
+    OMAP4_MUX(SIM_PWRCTRL, OMAP_MUX_MODE7 | OMAP_PULL_ENA),
+    OMAP4_MUX(FREF_CLK3_REQ, OMAP_MUX_MODE7 | OMAP_PULL_ENA),
+    OMAP4_MUX(SR_SCL, OMAP_MUX_MODE0 | OMAP_INPUT_EN),		//No need to use PAD PU
+    OMAP4_MUX(SR_SDA, OMAP_MUX_MODE0 | OMAP_INPUT_EN),		//No need to use PAD PU
+    OMAP4_MUX(FREF_CLK3_OUT, OMAP_MUX_MODE7 | OMAP_PULL_ENA),		//FREF_CLK3_OUT
+    OMAP4_MUX(SYS_PWR_REQ, OMAP_MUX_MODE0 | OMAP_PULL_ENA),		// SYS_PWR_REQ
+    OMAP4_MUX(SYS_BOOT7, OMAP_MUX_MODE3 | OMAP_INPUT_EN),		// GPIO_WK10
+#endif
     { .reg_offset = OMAP_MUX_TERMINATOR },
 };
 #else
 #define board_mux	NULL
+#define board_mux_wkup	NULL
 #endif
 
 static void enable_rtc_gpio(void){
@@ -986,7 +1258,7 @@ static void __init omap_kc1_init(void)
 			&lpddr2_elpida_S4_min_tck, NULL);
 #endif
 
-	omap4_mux_init(board_mux, NULL, package);
+	omap4_mux_init(board_mux, board_mux_wkup, package);
 	omap_create_board_props();
 
 	omap4_i2c_init();
@@ -1003,6 +1275,7 @@ static void __init omap_kc1_init(void)
 #ifdef CONFIG_ION_OMAP
 	omap4_register_ion();
 #endif
+	omap_die_governor_register_pdata(&omap_gov_pdata);
 	platform_add_devices(sdp4430_devices, ARRAY_SIZE(sdp4430_devices));
 
 	gpio_request(0, "sysok");

@@ -271,7 +271,6 @@ obj-$(CONFIG_MACH_OMAP_4430SDP)		+= board-4430sdp.o \
 					   board-44xx-blaze-keypad.o
 
 obj-$(CONFIG_MACH_OMAP_4430_KC1)	+= board-4430kc1-tablet.o \
-					   board-4430kc1-serial.o \
 					   board-4430kc1-tablet-panel.o
 
 obj-$(CONFIG_MACH_OMAP_BLAZE)		+= board-44xx-tablet.o \
