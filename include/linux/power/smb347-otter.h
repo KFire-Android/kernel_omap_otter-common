@@ -14,13 +14,23 @@
 
 struct summit_smb347_platform_data {
 	int	mbid;
+
 	int	pin_en;
 	char	*pin_en_name;
 	int	pin_susp;
 	char	*pin_susp_name;
+
+	bool	use_irq_as_gpio;
+	bool	irq_trigger_falling;
+	bool	irq_set_awake;
+
 	int	initial_max_aicl;
 	int	initial_pre_max_aicl;
 	int	initial_charge_current;
+
+	int	*charger_setting;
+	bool	charger_setting_skip_flag;
+
 	void (*led_callback)(u8 green_value, u8 orange_value);
 };
 
