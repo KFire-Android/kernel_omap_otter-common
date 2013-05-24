@@ -60,7 +60,6 @@
 #include <linux/cdev.h>
 #include <linux/slab.h>
 #include <linux/gpio.h>
-#include <linux/switch.h>
 
 #include <sound/core.h>
 #include <sound/pcm.h>
@@ -73,12 +72,12 @@
 #include <linux/clk.h>
 #include <sound/tlv.h>
 
+
 /******************************************************************************
  * GLOBAL VARIABLES
  *****************************************************************************/
 
 static struct i2c_client *tlv320aic31xx_client;
-static struct aic31xx_priv *aic_priv;
 struct regulator *audio_regulator;
 static struct i2c_board_info tlv320aic31xx_hwmon_info = {
 	I2C_BOARD_INFO("tlv320aic3110", 0x18),
@@ -551,24 +550,6 @@ int aic31xx_mic_check(struct snd_soc_codec *codec)
 
 	mic_status = (regval & BIT6);
 	return mic_status;
-}
-
-void aic31xx_hs_jack_report(struct snd_soc_codec *codec,
-			    struct snd_soc_jack *jack, int report)
-{
-	struct aic31xx_jack_data *hs_jack = &aic_priv->hs_jack;
-
-	if (&hs_jack->sdev != NULL)
-		switch_set_state(&hs_jack->sdev, report);
-}
-
-void aic31xx_hs_jack_detect(struct snd_soc_codec *codec,
-				struct snd_soc_jack *jack, int report)
-{
-	struct aic31xx_jack_data *hs_jack = &aic_priv->hs_jack;
-
-	hs_jack->jack = jack;
-	hs_jack->report = report;
 }
 
 /*
@@ -1856,31 +1837,10 @@ aic31xx_configs aic31xx_reg_init[] = {
 	/* Clock settings */
 	{CLK_REG_1, CODEC_MUX_VALUE},
 
-/* HASHCODE: NEW CODE */
-	/* Switch off PLL while Initiazling Codec */
-	{CLK_REG_2, 0x00},
-	{CLK_REG_3, 0x00},
-	{CLK_REG_4, 0x00},
-	{CLK_REG_5, 0x00},
-	{NDAC_CLK_REG, 0x00},
-	{MDAC_CLK_REG, 0x00},
-	{DAC_OSR_MSB, 0x00},
-	{DAC_OSR_LSB, 0x00},
-/* END NEW CODE */
 	{INTERFACE_SET_REG_1, BCLK_DIR_CTRL},
-/* HASHCODE: NEW CODE */
-	/* Switch off BCLK_N Divider */
-	{BCLK_N_VAL, 0x00},
-/* END NEW CODE */
 
 	{INTERFACE_SET_REG_2, DAC_MOD_CLK_2_BDIV_CLKIN},
-/* HASHCODE: NEW CODE */
-	{INTERFACE_SET_REG_4, 0x10}, /*old value is 0x12 */
-	{INTERFACE_SET_REG_5, 0x00}, /*old value is 0x10 */
-	{DOUT_CTRL, 0x12}, /* old value is 0x02 */
-/* END NEW CODE */
 
-/* EXTRA CODE FOR 3.0 KERNEL */
 	/* POP_REMOVAL: Step_1: Setting HP in weakly driver common mode */
 	{HPL_DRIVER, 0x00},
 	{HPR_DRIVER, 0x00},
@@ -1892,107 +1852,29 @@ aic31xx_configs aic31xx_reg_init[] = {
 
 	/* Step_4: Powering up the HP in Line out mode */
 	{HEADPHONE_DRIVER, HP_DRIVER_ON},
-/* END EXTRA CODE */
+
 	/* Step_5: Reconfiguring the CM to Band Gap mode */
-//	{HP_POP_CTRL, (BIT7 | HP_POWER_UP_76_2_MSEC | HP_DRIVER_3_9_MS |CM_VOLTAGE_FROM_BAND_GAP)},
-	{HP_POP_CTRL, (BIT7 | HP_POWER_UP_6_1_SEC | HP_DRIVER_3_9_MS | CM_VOLTAGE_FROM_BAND_GAP)},
-	{PGA_RAMP_CTRL, 0x70},        /* Speaker Ramp up time scaled to 30.5ms */
+	{HP_POP_CTRL, BIT7 | HP_POWER_UP_76_2_MSEC | HP_DRIVER_3_9_MS \
+					|CM_VOLTAGE_FROM_BAND_GAP},
 
-/* HASHCODE: NEW CODE */
-	{HEADPHONE_DRIVER,0x0C},   /* Turn OFF the Headphone Driver by default and also configure CM Voltage to 1.5V to reduce THD */
-	{CLASSD_SPEAKER_AMP, 0x06},/* Turn OFF the Speaker Driver by default */
-
-	/* DAC Output Mixer Setting */
-	{DAC_MIX_CTRL, RDAC_2_RAMP | LDAC_2_LAMP}, /*For aic31xx this is applicable...enabling DAC
-						     routing through mixer amplifier individually for left & right
-						     DAC..[1][35]... */
-
-	{L_ANLOG_VOL_2_HPL, HP_DEFAULT_VOL},  /* Set volume of left Analog HPL to 0db attenuation [1][36] 0x9E*/
-	{R_ANLOG_VOL_2_HPR, HP_DEFAULT_VOL},  /*Only applicable for 31xx...3120 does not have this register [1][37]*/
-	{L_ANLOG_VOL_2_SPL, SPK_DEFAULT_VOL}, /*Only applicable for 31xx...3120 does not have this register [1][37] 0x80*/
-	{R_ANLOG_VOL_2_SPR, SPK_DEFAULT_VOL}, /*Only applicable for 31xx...3120 does not have this register [1][37]*/
-
-	/* mute HP Driver */
-	{HPL_DRIVER, 0x00}, /* Muting HP_left(31xx)/HP(3120)...in [1][40]*/
-	{HPR_DRIVER, 0x00}, /* Muting HP_right(31xx)..not present in 3120...[1][41]*/
-
-	{HP_DRIVER_CTRL, 0x00},
-
-	/* Configured the Speaker Driver Gain to 6db. */
-	{SPL_DRIVER, 0x00},
-	{SPR_DRIVER, 0x00},
-/* END NEW CODE */
+	/* Speaker Ramp up time scaled to 30.5ms */
+	{PGA_RAMP_CTRL, 0x70},
 
 	/* Headset Detect setting */
 	{INTL_CRTL_REG_1, 0xC0},
-/* HASHCODE: NEW CODE */
-	{GPIO_CRTL_REG_1, 0x00},  /* Old value of 0x14 can be used if Codec GPIO is required for Headset Detect */
-	{MICBIAS_CTRL, 0x0B},
 
-	/* DAC Channels PWR UP */
-	{DAC_CHN_REG, 0x00}, /*Mistral: setting
-			       [0][63] to reset value 0x14 (RDAC_2_RCHN | LDAC_2_LCHN)=> DAC
-			       power=off DAC delta path =left, vol=soft stepping per sample
-			       period...(31xx).*/ /* Unmute DAC channels */
-	{DAC_MUTE_CTRL_REG, 0x0C}, /* DAC are muted by default...[0][64] */
+	/* previous value was 0x01 */
+	{CM_SET, 0x20},
 
-	/* DAC volume setting */
-	{LDAC_VOL, DAC_DEFAULT_VOL}, /* DAC volume set to default value .[0][65]...*/
-
-	{RDAC_VOL, DAC_DEFAULT_VOL}, /* Only applicable for 31xx...3120
-					does not have this register [0][66]*/
-
-	/* ADC Setting */
-	{ADC_DIG_MIC, 0x00},	/*this value will be altered duing power up
-	// Currently configured to use Digital Microphone Input */
-
-	{AGC_CTRL_1, 0x00}, 	/* Previous value was 0xA0, now agc disabled */
-	{AGC_CTRL_2, 0xFE},
-	{AGC_CTRL_3, 0x50},
-	{AGC_CTRL_4, 0xA8},
-	{AGC_CTRL_5, 0x00},
-	{AGC_CTRL_6, 0x00},
-
-	{ADC_PRB_SEL_REG, 0x04},
-
-
-	/* ADC Channel Fine Gain */
-	{ADC_FGA, 0x80},
-	/* ADC channel Coarse Gain */
-	{ADC_CGA, 0x00}, /* 0x00 for 0db */
-	/* ON the KC1 board MIC1LM has been configured */
-	{MIC_GAIN, 0x08}, /* Old Value 0x04 */
-	{ADC_IP_SEL, 0x80}, /* Old value 0x20 */
-/* END NEW CODE */
-
-//	{CM_SET, 0x20}, /* previous value was 0x01 */
-	{CM_SET, 0x00}, /* previous value was 0x20 */
-
-	/* Initial Default configuration for ADC PGA */
-
-/* HASHCODE: NEW CODE */
-	{MIC_PGA, 0x44}, /* 34 dB */
-/* END NEW CODE */
-
-	{HP_SPK_ERR_CTL, 0x03}, /* short circuit protection of HP and Speaker power bits */
-
-/* HASHCODE: NEW CODE */
-	/* DAC PRB configured to PRB_1 */
-	{DAC_PRB_SEL_REG, 0x01},
-/* END NEW CODE */
+	/* short circuit protection of HP and Speaker power bits */
+	{HP_SPK_ERR_CTL, 3},
 
 	/* Headset detection enabled by default and Debounce programmed to 32 ms
 	 * for Headset Detection and 32ms for Headset button-press Detection
 	 */
-	{HEADSET_DETECT, (HP_DEBOUNCE_32_MS | HS_DETECT_EN | HS_BUTTON_PRESS_32_MS)},
+	{HEADSET_DETECT, (HP_DEBOUNCE_32_MS | HS_DETECT_EN | \
+					HS_BUTTON_PRESS_32_MS)},
 
-/* HASHCODE: NEW CODE */
-	/* We will use the internal oscillator for all Programmable Delay Timers used for
-	 * Headphones debounce time. This improves POP reduction.
-	 *
-
-	{TIMER_CLOCK_MCLK_DIVIDER , 0x00},*/
-/* END NEW CODE */
 };
 
 /*
@@ -2002,9 +1884,8 @@ aic31xx_configs aic31xx_reg_init[] = {
  */
 static int aic31xx_probe(struct snd_soc_codec *codec)
 {
-//	struct aic31xx_priv *aic31xx;
+	struct aic31xx_priv *aic31xx;
 	struct i2c_adapter *adapter;
-	struct aic31xx_jack_data *jack;
 
 	int ret = 0, i, size = 0;
 
@@ -2031,25 +1912,25 @@ static int aic31xx_probe(struct snd_soc_codec *codec)
 
 	DBG("##Codec CntrlData %x\n", (unsigned int) codec->control_data);
 
-	aic_priv = kzalloc(sizeof(struct aic31xx_priv), GFP_KERNEL);
+	aic31xx = kzalloc(sizeof(struct aic31xx_priv), GFP_KERNEL);
 
-	if (aic_priv == NULL) {
+	if (aic31xx == NULL) {
 		DBG("aic31xx_probe kzalloc for Codec Private failed..\n");
 		return -ENOMEM;
 	}
 	DBG("aic31xx_probe: Codec Private allocation fine...\n");
 
-	snd_soc_codec_set_drvdata(codec, aic_priv);
+	snd_soc_codec_set_drvdata(codec, aic31xx);
 
 	codec->hw_write = (hw_write_t) i2c_master_send;
 
-	aic_priv->page_no = 0;
-	aic_priv->power_status = 0;
-	aic_priv->mute = 1;
-	aic_priv->headset_connected = 0;
-	aic_priv->playback_status = 0;
-	aic_priv->headset_current_status = 0;
-	aic_priv->i2c_regs_status = 0;
+	aic31xx->page_no = 0;
+	aic31xx->power_status = 0;
+	aic31xx->mute = 1;
+	aic31xx->headset_connected = 0;
+	aic31xx->playback_status = 0;
+	aic31xx->headset_current_status = 0;
+	aic31xx->i2c_regs_status = 0;
 
 	DBG("##Writing default values to Codec Regs..\n");
 
@@ -2076,15 +1957,7 @@ static int aic31xx_probe(struct snd_soc_codec *codec)
 	DBG("##snd_soc_add_controls: ARRAY SIZE : %d\n", size);
 		aic31xx_add_widgets(codec);
 
-	mutex_init(&aic_priv->mutex_codec);
-
-	/* use switch-class based headset reporting if platform requires it */
-	jack = &aic_priv->hs_jack;
-	jack->sdev.name = "h2w";
-	ret = switch_dev_register(&jack->sdev);
-	if (ret) {
-		dev_err(codec->dev, "error registering switch device %d\n", ret);
-	}
+	mutex_init(&aic31xx->mutex_codec);
 
 	DBG("%s: Exiting : %d\n", __func__, ret);
 
@@ -2098,8 +1971,6 @@ static int aic31xx_probe(struct snd_soc_codec *codec)
  */
 static int aic31xx_remove(struct snd_soc_codec *codec)
 {
-	struct aic31xx_data *priv = snd_soc_codec_get_drvdata(codec);
-	struct aic31xx_jack_data *hs_jack = &aic_priv->hs_jack;
 	struct snd_soc_dapm_context *dapm = &codec->dapm;
 	DBG("aic31xx_remove ...\n");
 
@@ -2111,9 +1982,7 @@ static int aic31xx_remove(struct snd_soc_codec *codec)
 	snd_soc_free_pcms(socdev);
 #endif
 	snd_soc_dapm_free(dapm);
-	switch_dev_unregister(&hs_jack->sdev);
-	kfree(priv);
-	aic_priv = NULL;
+	kfree(snd_soc_codec_get_drvdata(codec));
 
 	return 0;
 }

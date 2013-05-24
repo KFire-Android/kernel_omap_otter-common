@@ -31,7 +31,6 @@
 #ifndef _TLV320AIC31xx_H
 #define _TLV320AIC31XX_H
 
-
 #define AIC31XX_VERSION "0.1"
 
 /* #define AIC31x_CODEC_DEBUG 1 */
@@ -437,12 +436,6 @@ struct aic31xx_configs {
 };
 
 
-struct aic31xx_jack_data {
-	struct snd_soc_jack *jack;
-	int report;
-	struct switch_dev sdev;
-};
-
 /*
  *----------------------------------------------------------------------------
  * @struct  dac3100_priv |
@@ -477,7 +470,7 @@ struct aic31xx_priv {
 	u8 record_stream;	/* 1 denotes Capture */
 	struct aic31xx_configs hp_analog_right_vol[120];
 	struct aic31xx_configs hp_analog_left_vol[120];
-	struct aic31xx_jack_data hs_jack;
+
 };
 
 /*
@@ -554,12 +547,5 @@ extern int aic31xx_headset_speaker_path (struct snd_soc_codec *codec, int gpio_s
 extern u8 aic31xx_abe_fixup;
 extern int aic31xx_mic_check(struct snd_soc_codec *codec);
 extern int aic31xx_startup(struct snd_pcm_substream *, struct snd_soc_codec *);
-
-extern void aic31xx_hs_jack_report(struct snd_soc_codec *codec,
-			    struct snd_soc_jack *jack, int report);
-
-extern void aic31xx_hs_jack_detect(struct snd_soc_codec *codec,
-			    struct snd_soc_jack *jack, int report);
-
 
 #endif /* _TLV320AIC31XX_H */

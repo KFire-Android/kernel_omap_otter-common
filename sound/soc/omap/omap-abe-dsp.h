@@ -23,7 +23,6 @@
 
 #ifndef __OMAP_ABE_DSP_H__
 #define __OMAP_ABE_DSP_H__
-#define WLAN_DETECT_GPIO_PIN		54		/* GPIO54 for Wifi detection */
 
 #define ABE_MIXER(x)		(x)
 

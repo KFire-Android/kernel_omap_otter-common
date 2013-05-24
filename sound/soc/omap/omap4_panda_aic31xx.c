@@ -50,11 +50,10 @@
 #include <linux/platform_device.h>
 #include <linux/io.h>
 #include <linux/gpio.h>
+
 #include <linux/clk.h>
 #include <linux/platform_device.h>
 #include <linux/i2c.h>
-#include <linux/switch.h>
-
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
@@ -78,7 +77,7 @@
 // #include "../../fm/fm34.h"
 
 /* Global I2c Client Structure used for registering with I2C Bus */
-//static struct i2c_client *tlv320aic31xx_client;
+static struct i2c_client *tlv320aic31xx_client;
 
 /* Forward Declaration */
 static int Qoo_headset_jack_status_check(void);
@@ -309,12 +308,11 @@ static int omap4_aic31xx_init(struct snd_soc_pcm_runtime *rtd)
 	ret = snd_soc_jack_add_gpios(&hs_jack, ARRAY_SIZE(hs_jack_gpios),
 				     hs_jack_gpios);
 
-	aic31xx_hs_jack_detect(codec, &hs_jack, SND_JACK_HEADSET);
-	Qoo_headset_jack_status_check();
 
 	DBG("%s: Exiting\n", __func__);
 	return ret;
 }
+
 
 /*
  * Qoo_headset_jack_status_check
@@ -322,7 +320,7 @@ static int omap4_aic31xx_init(struct snd_soc_pcm_runtime *rtd)
  */
 static int Qoo_headset_jack_status_check(void)
 {
-	int gpio_status, ret = 0, state = 0;
+	int gpio_status, ret = 0;
 //	struct aic31xx_priv *private_data;
 	struct snd_soc_codec *codec = hs_jack.codec;
 	struct snd_soc_dapm_context *dapm = &codec->dapm;
@@ -333,30 +331,34 @@ static int Qoo_headset_jack_status_check(void)
 		printk(KERN_INFO " codec is  not null\n");
 
 		if (!gpio_status) {
-			state = SND_JACK_HEADSET;
+
 			printk(KERN_INFO "headset connected\n");
 			snd_soc_dapm_disable_pin(dapm, "Speaker Jack");
 			snd_soc_dapm_enable_pin(dapm, "Headphone Jack");
 
 			if (aic31xx_mic_check(codec)) {
-				printk(KERN_INFO "Headset with MIC Detected -- Recording possible.\n");
+
+				printk(KERN_INFO "Headset with MIC Detected \
+							Recording possible.\n");
 				snd_soc_dapm_enable_pin(dapm, "HSMIC");
 			} else {
-				printk(KERN_INFO "Headset without MIC Inserted -- Recording not possible...\n");
+				printk(KERN_INFO "Headset without MIC Inserted \
+						Recording not possible...\n");
 			}
 			ret = snd_soc_dapm_sync(dapm);
 
 		} else {
 			printk(KERN_INFO "headset not connected\n");
-			snd_soc_dapm_enable_pin(dapm,  "Speaker Jack");
+			snd_soc_dapm_enable_pin(dapm,
+							"Speaker Jack");
 			snd_soc_dapm_disable_pin(dapm, "HSMIC");
 			snd_soc_dapm_disable_pin(dapm, "Headphone Jack");
 			ret = snd_soc_dapm_sync(dapm);
 		}
-		aic31xx_hs_jack_report(codec, &hs_jack, !!state);
 	}
+
 	DBG("%s: Exiting\n", __func__);
-	return state;
+	return ret;
 }
 
 /*
@@ -441,6 +443,34 @@ static const char *mm1_be[] = {
 
 static const char *mm_lp_be[] = {
 		OMAP_ABE_BE_MM_EXT0_DL,
+};
+
+/* ABE Port configuration structure introduced within the
+* DAI_LINK Structure as private_data void pointer member
+*/
+t_port_config mm_ext0_config = {
+	/* uplink port configuration */
+	.abe_port_id_ul = MM_EXT_IN_PORT,
+	.serial_id_ul = MCBSP3_RX,
+	.sample_format_ul = STEREO_RSHIFTED_16,
+#ifdef CONFIG_ABE_44100
+	.sample_rate_ul = 44100,
+#else
+	.sample_rate_ul = 48000,
+#endif
+	.bit_reorder_ul = 0,
+
+	/* down link port configuration */
+	.abe_port_id_dl = MM_EXT_OUT_PORT,
+	.serial_id_dl = MCBSP3_TX,
+	.sample_format_dl = STEREO_RSHIFTED_16,
+#ifdef CONFIG_ABE_44100
+	.sample_rate_dl = 44100,
+#else
+	.sample_rate_dl = 48000,
+#endif
+
+	.bit_reorder_dl = 0,
 };
 
 /* DAI_LINK Structure definition with both Front-End and
@@ -530,6 +560,7 @@ static struct snd_soc_dai_link omap4_dai_abe[] = {
 		.be_hw_params_fixup = mcbsp_be_hw_params_fixup,
 		.ops = &omap4_ops,
 		.be_id = OMAP_ABE_DAI_MM_FM,
+		.private_data = &mm_ext0_config,
 		.init = omap4_aic31xx_init,
 		.ignore_suspend = 1,
 	},
@@ -549,6 +580,7 @@ static struct snd_soc_dai_link omap4_dai_abe[] = {
 		.be_hw_params_fixup = mcbsp_be_hw_params_fixup,
 		.ops = &omap4_ops,
 		.be_id = OMAP_ABE_DAI_MM_FM,
+		.private_data = &mm_ext0_config,
 		.ignore_suspend = 1,
 	},
 };
@@ -616,7 +648,7 @@ static void __exit omap4_soc_exit(void)
 				hs_jack_gpios);
 
 	platform_device_unregister(omap4_snd_device);
-//	i2c_unregister_device(tlv320aic31xx_client);
+	i2c_unregister_device(tlv320aic31xx_client);
 }
 module_exit(omap4_soc_exit);
 

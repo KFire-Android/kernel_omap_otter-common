@@ -1410,7 +1410,7 @@ static const struct snd_soc_dapm_widget abe_dapm_widgets[] = {
 
 	/* Virtual MM_EXT_DL Switch TODO: confrm OPP level here */
 	SND_SOC_DAPM_MIXER("DL1 MM_EXT",
-			W_VSWITCH_DL1_MM_EXT, ABE_OPP_25, 0, &mm_ext_dl_switch_controls, 1),
+			W_VSWITCH_DL1_MM_EXT, ABE_OPP_50, 0, &mm_ext_dl_switch_controls, 1),
 
 	/* Virtuals to join our capture sources */
 	SND_SOC_DAPM_MIXER("Sidetone Capture VMixer", SND_SOC_NOPM, 0, 0, NULL, 0),
@@ -2529,8 +2529,8 @@ static int aess_mmap(struct snd_pcm_substream *substream,
 	struct snd_soc_dai *dai = rtd->cpu_dai;
 	int offset, size, err;
 
-//	if (dai->id != ABE_FRONTEND_DAI_LP_MEDIA)
-//		return -EINVAL;
+	if (dai->id != ABE_FRONTEND_DAI_LP_MEDIA)
+		return -EINVAL;
 
 	vma->vm_flags |= VM_IO | VM_RESERVED;
 	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
@@ -2577,8 +2577,6 @@ static int aess_stream_event(struct snd_soc_dapm_context *dapm)
 {
 	struct snd_soc_platform *platform = dapm->platform;
 	struct abe_data *abe = snd_soc_platform_get_drvdata(platform);
-	int gpio_status;
-	gpio_status = gpio_get_value (WLAN_DETECT_GPIO_PIN);
 
 	if (abe->active)
 		aess_set_runtime_opp_level(abe);
@@ -2588,11 +2586,11 @@ static int aess_stream_event(struct snd_soc_dapm_context *dapm)
 	 * enter dpll cascading when all conditions are met:
 	 * - system is in early suspend (screen is off)
 	 * - single stream is active and is LP (ping-pong)
-	 * - OPP is less than 50 (DL1 path only)
+	 * - OPP is 50 or less (DL1 path only)
 	 */
 	if (abe->early_suspended &&
 		(abe_fe_active_count(abe) == 1) &&
-		(abe->opp < 50) && (!gpio_status))
+		(abe->opp <= 50))
 		return omap4_dpll_cascading_blocker_release(abe->dev);
 	else
 		return omap4_dpll_cascading_blocker_hold(abe->dev);
@@ -3032,16 +3030,14 @@ static void abe_early_suspend(struct early_suspend *handler)
 	struct abe_data *abe = container_of(handler, struct abe_data,
 							early_suspend);
 	int active = abe_fe_active_count(abe);
-	int gpio_status;
-	gpio_status = gpio_get_value (WLAN_DETECT_GPIO_PIN);
 
 	/*
 	 * enter dpll cascading when all conditions are met:
 	 * - system is in early suspend (screen is off)
 	 * - single stream is active and is LP (ping-pong)
-	 * - OPP is less than 50 (DL1 path only)
+	 * - OPP is 50 or less (DL1 path only)
 	 */
-	if ((active == 1) && (abe->opp < 50) && !gpio_status)
+	if ((active == 1) && (abe->opp <= 50))
 		omap4_dpll_cascading_blocker_release(abe->dev);
 
 	abe->early_suspended = 1;

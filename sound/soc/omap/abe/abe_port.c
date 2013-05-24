@@ -664,11 +664,6 @@ int omap_abe_enable_data_transfer(struct omap_abe *abe, u32 id)
 		abe->MultiFrame[21][3] = ABE_TASK_ID(C_ABE_FW_TASK_IO_MM_EXT_IN);
 		break;
 	case OMAP_ABE_MM_EXT_OUT_PORT:
-		/* initializes the ABE ATC descriptors in DMEM for BE ports */
-		protocol = &(abe_port[id].protocol);
-		format = abe_port[id].format;
-		omap_abe_init_atc(abe, id);
-		abe_init_io_tasks(id, &format, protocol);
 		abe->MultiFrame[15][0] = ABE_TASK_ID(C_ABE_FW_TASK_IO_MM_EXT_OUT);
 		break;
 	default:

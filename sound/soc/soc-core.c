@@ -885,6 +885,7 @@ int soc_pcm_prepare(struct snd_pcm_substream *substream)
 
 out:
 	mutex_unlock(&rtd->pcm_mutex);
+	printk (KERN_INFO "%s: Exited.. \n", __func__);
 	return ret;
 }
 
@@ -1494,9 +1495,11 @@ static int soc_bind_dai_link(struct snd_soc_card *card, int num)
 	if (rtd->complete)
 		return 1;
 	dev_dbg(card->dev, "binding %s at idx %d\n", dai_link->name, num);
-
+        printk (KERN_INFO "soc_bind_dai_link %s at idx %d\n", dai_link->name, num);
+ 
 	/* do we already have the CPU DAI for this link ? */
 	if (rtd->cpu_dai) {
+		printk (KERN_INFO "cpu_dai already occupied..\n");
 		goto find_codec;
 	}
 	/* no, then find CPU DAI from registered DAIs*/
@@ -1508,6 +1511,7 @@ static int soc_bind_dai_link(struct snd_soc_card *card, int num)
 	}
 	dev_dbg(card->dev, "CPU DAI %s not registered\n",
 			dai_link->cpu_dai_name);
+       printk (KERN_INFO "CPU DAI %s not registered\n", dai_link->cpu_dai_name);
 
 find_codec:
 	/* do we already have the CODEC for this link ? */
@@ -1519,6 +1523,9 @@ find_codec:
 	list_for_each_entry(codec, &codec_list, list) {
 		if (!strcmp(codec->name, dai_link->codec_name)) {
 			rtd->codec = codec;
+
+                        printk (KERN_INFO "codec->name %s dai name %s\n",
+					codec->name, dai_link->codec_name);
 
 			/* CODEC found, so find CODEC DAI from registered DAIs from this CODEC*/
 			list_for_each_entry(codec_dai, &dai_list, list) {
@@ -1562,9 +1569,14 @@ find_platform:
 out:
 	/* mark rtd as complete if we found all 4 of our client devices */
 	if (rtd->codec && rtd->codec_dai && rtd->platform && rtd->cpu_dai) {
+	        printk(KERN_INFO "Found All 4 Client Drivers..\n");
 		rtd->complete = 1;
 		card->num_rtd++;
 	}
+//        printk (KERN_INFO "Codec %x Codec_Dai %x Platform %x CPU_DAI %x\n",
+//		rtd->codec, rtd->codec_dai, rtd->platform, rtd->cpu_dai);
+
+        printk (KERN_INFO "-soc_bind_dai_link RTD %d\n", card->num_rtd);
 	return 1;
 }
 
@@ -1826,6 +1838,7 @@ static int soc_probe_dai_link(struct snd_soc_card *card, int num, int order)
 
 	dev_dbg(card->dev, "probe %s dai link %d late %d\n",
 			card->name, num, order);
+//        printk (KERN_INFO "soc_probe_dai_link %s %d %d\n", card->name, num, order);
 
 	/* config components */
 	codec_dai->codec = codec;
@@ -1836,6 +1849,7 @@ static int soc_probe_dai_link(struct snd_soc_card *card, int num, int order)
 
 	/* set default power off timeout */
 	rtd->pmdown_time = pmdown_time;
+//        printk (KERN_INFO "cpu_dai->probed flag %d\n", cpu_dai->probed);
 
 	/* probe the cpu_dai */
 	if (!cpu_dai->probed &&
@@ -1844,6 +1858,7 @@ static int soc_probe_dai_link(struct snd_soc_card *card, int num, int order)
 			return -ENODEV;
 
 		if (cpu_dai->driver->probe) {
+//                        printk (KERN_INFO "invoking codec driver probe...\n"); 
 			ret = cpu_dai->driver->probe(cpu_dai);
 			if (ret < 0) {
 				printk(KERN_ERR "asoc: failed to probe CPU DAI %s\n",
@@ -1851,11 +1866,15 @@ static int soc_probe_dai_link(struct snd_soc_card *card, int num, int order)
 				module_put(cpu_dai->dev->driver->owner);
 				return ret;
 			}
+//                        printk (KERN_INFO "coming out of codec->driver probe...\n");
 		}
+//                printk (KERN_INFO "codec->driver->probe %x\n", codec->driver->probe);
+
 		cpu_dai->probed = 1;
 		/* mark cpu_dai as probed and add to card cpu_dai list */
 		list_add(&cpu_dai->card_list, &card->dai_dev_list);
 	}
+//        printk (KERN_INFO "platform driver probe %d\n", platform->probed);
 
 	/* probe the CODEC */
 	if (!codec->probed &&
@@ -1898,6 +1917,7 @@ static int soc_probe_dai_link(struct snd_soc_card *card, int num, int order)
 				module_put(codec_dai->dev->driver->owner);
 				return ret;
 			}
+                        printk (KERN_INFO "coming out of codec_dai->driver probe...\n");  
 		}
 
 		/* mark cpu_dai as probed and add to card cpu_dai list */
@@ -2051,12 +2071,17 @@ static void snd_soc_instantiate_card(struct snd_soc_card *card)
 	enum snd_soc_compress_type compress_type;
 	int ret, i, order;
 
+        printk (KERN_INFO "Entered snd_soc_instantiate_card\n");
+
 	mutex_lock(&card->mutex);
 
 	if (card->instantiated) {
 		mutex_unlock(&card->mutex);
+                printk (KERN_INFO "Card already Instantiated.returning..\n"); 
 		return;
 	}
+        printk (KERN_INFO "Invoking soc_bind_dai_link %d from instantiate_card\n",
+			card->num_links);
 
 	/* bind DAIs */
 	for (i = 0; i < card->num_links; i++)
@@ -2067,6 +2092,8 @@ static void snd_soc_instantiate_card(struct snd_soc_card *card)
 		mutex_unlock(&card->mutex);
 		return;
 	}
+
+        printk (KERN_INFO "Calling snd_card_create \n");
 
 	/* initialize the register cache for each available codec */
 	list_for_each_entry(codec, &codec_list, list) {
@@ -2121,12 +2148,17 @@ static void snd_soc_instantiate_card(struct snd_soc_card *card)
 		snd_soc_dapm_new_controls(&card->dapm, card->dapm_widgets,
 					  card->num_dapm_widgets);
 
+//        printk (KERN_INFO "checking Card->probe %x\n", card->probe); 
+
 	/* initialise the sound card only once */
 	if (card->probe) {
 		ret = card->probe(card);
 		if (ret < 0)
 			goto card_probe_error;
 	}
+
+        printk (KERN_INFO "Card NumLinks %d Calling probe_dai_link\n", 
+				card->num_links);
 
 	/* early DAI link probe */
 	for (order = SND_SOC_COMP_ORDER_FIRST; order <= SND_SOC_COMP_ORDER_LAST;
@@ -3719,6 +3751,8 @@ int snd_soc_register_card(struct snd_soc_card *card)
 	if (!card->name || !card->dev)
 		return -EINVAL;
 
+        printk (KERN_INFO "+snd_soc_register_card ...\n");
+
 	dev_set_drvdata(card->dev, card);
 
 	snd_soc_initialize_card_lists(card);
@@ -3732,10 +3766,16 @@ int snd_soc_register_card(struct snd_soc_card *card)
 		return -ENOMEM;
 	card->rtd_aux = &card->rtd[card->num_links];
 
+        printk ("Card NumLinks %d \n", card->num_links);
+
 	for (i = 0; i < card->num_links; i++) {
+	        printk (KERN_INFO "DAI Create runtime %s Dynamic %d\n",
+		card->dai_link[i].name,
+                card->dai_link[i].dynamic );
 		card->rtd[i].dai_link = &card->dai_link[i];
 		if (card->rtd[i].dai_link->dynamic) {
 
+                        printk(KERN_INFO "DAI_link NullCodec Registration..\n");
 			card->rtd[i].dai_link->codec_name = "null-codec";
 			card->rtd[i].dai_link->codec_dai_name = "null-codec-dai";
 
@@ -3750,6 +3790,9 @@ int snd_soc_register_card(struct snd_soc_card *card)
 			continue;
 		}
 		if (card->rtd[i].dai_link->no_codec) {
+                        printk (KERN_INFO "No_Codec %d Registration\n", 
+                            card->rtd[i].dai_link->no_codec);
+
 			card->rtd[i].dai_link->codec_name = "null-codec";
 
 			ret = snd_soc_register_codec(card->dev, &null_codec_drv,
@@ -3770,12 +3813,14 @@ int snd_soc_register_card(struct snd_soc_card *card)
 	mutex_init(&card->dsp_mutex);
 	mutex_init(&card->power_mutex);
 
+        printk (KERN_INFO "Invoking the snd_soc_instantiate_cards..\n");
 	mutex_lock(&client_mutex);
 	list_add(&card->list, &card_list);
 	snd_soc_instantiate_cards();
 	mutex_unlock(&client_mutex);
 
 	dev_dbg(card->dev, "Registered card '%s'\n", card->name);
+        printk(KERN_INFO "-snd_soc_register_card %s\n", card->name);
 
 out:
 	return ret;
@@ -3871,6 +3916,8 @@ int snd_soc_register_dai(struct device *dev,
 	struct snd_soc_dai *dai;
 
 	dev_dbg(dev, "dai register %s\n", dev_name(dev));
+        printk (KERN_INFO "snd_soc_register_dais %s\n", 
+				dev_name(dev));
 
 	dai = kzalloc(sizeof(struct snd_soc_dai), GFP_KERNEL);
 	if (dai == NULL)
@@ -3894,6 +3941,7 @@ int snd_soc_register_dai(struct device *dev,
 	mutex_unlock(&client_mutex);
 
 	pr_debug("Registered DAI '%s'\n", dai->name);
+	printk (KERN_INFO "Registered DAI %s\n", dai->name);
 
 	return 0;
 }
@@ -4113,6 +4161,7 @@ int snd_soc_register_codec(struct device *dev,
 	int ret, i;
 
 	dev_dbg(dev, "codec register %s\n", dev_name(dev));
+        printk (KERN_INFO "+snd_soc_register_codec %s\n", dev_name (dev));
 
 	codec = kzalloc(sizeof(struct snd_soc_codec), GFP_KERNEL);
 	if (codec == NULL)
@@ -4127,6 +4176,7 @@ int snd_soc_register_codec(struct device *dev,
 		kfree(codec);
 		return -ENOMEM;
 	}
+        printk(KERN_INFO "snd_soc_register_codec DRV %x\n", codec_drv);
 
 	if (codec_drv->compress_type)
 		codec->compress_type = codec_drv->compress_type;
@@ -4147,6 +4197,8 @@ int snd_soc_register_codec(struct device *dev,
 	codec->driver = codec_drv;
 	codec->num_dai = num_dai;
 	mutex_init(&codec->mutex);
+        printk (KERN_INFO "snd_soc_register_codec. Configured DRv %x\n",
+		codec->driver);
 
 	/* allocate CODEC register cache */
 	if (codec_drv->reg_cache_size && codec_drv->reg_word_size) {
@@ -4181,20 +4233,25 @@ int snd_soc_register_codec(struct device *dev,
 		fixup_codec_formats(&dai_drv[i].playback);
 		fixup_codec_formats(&dai_drv[i].capture);
 	}
+        printk (KERN_INFO "calling snd_soc_register_dais..\n");
 
 	/* register any DAIs */
 	if (num_dai) {
 		ret = snd_soc_register_dais(dev, dai_drv, num_dai);
-		if (ret < 0)
+		if (ret < 0) {
+			printk ("snd_soc_register_dais failed..%d \n", ret);
 			goto fail;
+		}
 	}
 
+        printk (KERN_INFO "Invoking snd_soc_instantiate_cards...\n");
 	mutex_lock(&client_mutex);
 	list_add(&codec->list, &codec_list);
 	snd_soc_instantiate_cards();
 	mutex_unlock(&client_mutex);
 
 	pr_debug("Registered codec '%s'\n", codec->name);
+        printk (KERN_INFO "-snd_soc_register_codec %s\n", codec->name);
 	return 0;
 
 fail:
@@ -4282,6 +4339,7 @@ static int __init snd_soc_init(void)
 
 	snd_soc_util_init();
 
+        printk (KERN_INFO "snd_soc_init invoked..\n");
 	return platform_driver_register(&soc_driver);
 }
 module_init(snd_soc_init);

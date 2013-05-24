@@ -44,8 +44,7 @@
 #define OMAP_ABE_DAI_DMIC0			7
 #define OMAP_ABE_DAI_DMIC1			8
 #define OMAP_ABE_DAI_DMIC2			9
-#define OMAP_ABE_DAI_VXREC			10
-#define OMAP_ABE_DAI_NUM			11
+#define OMAP_ABE_DAI_NUM			10
 
 #define OMAP_ABE_BE_PDM_DL1		"PDM-DL1"
 #define OMAP_ABE_BE_PDM_UL1		"PDM-UL1"
@@ -60,7 +59,6 @@
 #define OMAP_ABE_BE_DMIC0		"DMIC0"
 #define OMAP_ABE_BE_DMIC1		"DMIC1"
 #define OMAP_ABE_BE_DMIC2		"DMIC2"
-#define OMAP_ABE_BE_VXREC		"VXREC"
 
 #define OMAP_ABE_DL1_NO_PDM		0
 #define OMAP_ABE_DL1_HEADSET_LP		1
@@ -72,4 +70,18 @@
 
 int omap_abe_set_dl1_output(int output);
 
+/* Port connection configuration structure Refer abe_type.h for enums */
+typedef struct 
+{
+	int abe_port_id_ul;	/*Which port id to be connected for  up link */
+	int serial_id_ul;	/*Which mcbsp id is connected to above mentioned port   */
+	int sample_format_ul;	/* ABE format ? */
+	int sample_rate_ul;	/*Sample rate ? */
+	int bit_reorder_ul;	/* 1: transfer LSB first   0: transfer MSB first */
+	int abe_port_id_dl;	/*Which port id to be connected for  down link */
+	int serial_id_dl;	/*Which mcbsp id is connected to above mentioned port   */
+	int sample_format_dl;	/* ABE format ? */
+	int sample_rate_dl;	/* Sample rate ? */
+	int bit_reorder_dl;	/* 1: transfer LSB first   0: transfer MSB first */
+}t_port_config;
 #endif	/* End of __OMAP_MCPDM_H__ */
