@@ -218,7 +218,7 @@ int __init omap4_pm_init(void)
 
 	if (cpu_is_omap44xx())
 		ret = omap4_init_static_deps();
-	else if (soc_is_omap54xx())
+	else if (soc_is_omap54xx() || soc_is_dra7xx())
 		ret = omap5_init_static_deps();
 
 	if (ret) {
