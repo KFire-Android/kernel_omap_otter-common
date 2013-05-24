@@ -572,7 +572,18 @@ static struct i2c_driver stk_als22x7_driver = {
     .id_table = stk_als22x7_id,
 };
 
-module_i2c_driver(stk_als22x7_driver);
+static int __init stk_als22x7_init(void)
+{
+	return i2c_add_driver(&stk_als22x7_driver);
+}
+
+static void __exit stk_als22x7_exit(void)
+{
+	i2c_del_driver(&stk_als22x7_driver);
+}
+
+module_init(stk_als22x7_init);
+module_exit(stk_als22x7_exit);
 
 MODULE_AUTHOR("Patrick Chang <patrick_chang@sitronix.com>,"
 	      "Stephan Kanthak <stylon@gmx.de>");
