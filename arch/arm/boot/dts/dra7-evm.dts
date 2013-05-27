@@ -21,7 +21,12 @@
 
 &i2c1 {
 	clock-frequency = <400000>;
+	tps659038: tps659038@58 {
+		reg = <0x58>;
+	};
 };
+
+/include/ "tps659038.dtsi"
 
 &i2c2 {
 	clock-frequency = <400000>;
