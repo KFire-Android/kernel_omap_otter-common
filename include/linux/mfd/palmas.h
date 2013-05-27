@@ -137,6 +137,7 @@ enum pmic_ids {
 	TWL6035,
 	TWL6037,
 	TPS65913,
+	TPS659038,
 };
 
 enum palmas_regulators {

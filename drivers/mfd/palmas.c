@@ -86,6 +86,49 @@ static const struct mfd_cell palmas_children[] = {
 	}
 };
 
+static const struct mfd_cell tps659038_children[] = {
+	{
+		.name = "tps659038-pmic",
+		.id = PALMAS_PMIC_ID,
+	},
+	{
+		.name = "tps659038-gpio",
+		.id = PALMAS_GPIO_ID,
+	},
+	{
+		.name = "tps659038-leds",
+		.id = PALMAS_LEDS_ID,
+	},
+	{
+		.name = "tps659038-wdt",
+		.id = PALMAS_WDT_ID,
+	},
+	{
+		.name = "tps659038-rtc",
+		.id = PALMAS_RTC_ID,
+	},
+	{
+		.name = "tps659038-pwrbutton",
+		.id = PALMAS_PWRBUTTON_ID,
+	},
+	{
+		.name = "tps659038-gpadc",
+		.id = PALMAS_GPADC_ID,
+	},
+	{
+		.name = "tps659038-resource",
+		.id = PALMAS_RESOURCE_ID,
+	},
+	{
+		.name = "tps659038-clk",
+		.id = PALMAS_CLK_ID,
+	},
+	{
+		.name = "tps659038-pwm",
+		.id = PALMAS_PWM_ID,
+	}
+};
+
 static const struct regmap_config palmas_regmap_config[PALMAS_NUM_CLIENTS] = {
 	{
 		.reg_bits = 8,
@@ -341,10 +384,22 @@ static struct palmas_pmic_data palmas_data = {
 	.has_usb = 1,
 };
 
+static struct palmas_pmic_data tps659038_data = {
+	.irq_chip = &palmas_irq_chip,
+	.regmap_config = palmas_regmap_config,
+	.mfd_cell = tps659038_children,
+	.id = TPS659038,
+	.has_usb = 0,
+};
+
 static const struct of_device_id of_palmas_match_tbl[] = {
 	{
 		.compatible = "ti,palmas",
 		.data = &palmas_data,
+	},
+	{
+		.compatible = "ti,tps659038",
+		.data = &tps659038_data,
 	},
 	{ },
 };
@@ -419,18 +474,23 @@ static int palmas_i2c_probe(struct i2c_client *i2c,
 		}
 	}
 
-	/* Change IRQ into clear on read mode for efficiency */
-	slave = PALMAS_BASE_TO_SLAVE(PALMAS_INTERRUPT_BASE);
-	addr = PALMAS_BASE_TO_REG(PALMAS_INTERRUPT_BASE, PALMAS_INT_CTRL);
-	reg = PALMAS_INT_CTRL_INT_CLEAR;
+	/* Avoid irq requesting for TOS659038 as the IRQ line
+		is only connected to a test point */
+	if (palmas->palmas_id != TPS659038) {
+		/* Change IRQ into clear on read mode for efficiency */
+		slave = PALMAS_BASE_TO_SLAVE(PALMAS_INTERRUPT_BASE);
+		addr = PALMAS_BASE_TO_REG(PALMAS_INTERRUPT_BASE,
+					  PALMAS_INT_CTRL);
+		reg = PALMAS_INT_CTRL_INT_CLEAR;
 
-	regmap_write(palmas->regmap[slave], addr, reg);
+		regmap_write(palmas->regmap[slave], addr, reg);
 
-	ret = regmap_add_irq_chip(palmas->regmap[slave], palmas->irq,
-			IRQF_ONESHOT, 0, pmic_data->irq_chip,
-			&palmas->irq_data);
-	if (ret < 0)
-		goto err;
+		ret = regmap_add_irq_chip(palmas->regmap[slave], palmas->irq,
+				IRQF_ONESHOT, 0, pmic_data->irq_chip,
+				&palmas->irq_data);
+		if (ret < 0)
+			goto err;
+	}
 
 	slave = PALMAS_BASE_TO_SLAVE(PALMAS_PU_PD_OD_BASE);
 	addr = PALMAS_BASE_TO_REG(PALMAS_PU_PD_OD_BASE,
@@ -539,8 +599,11 @@ static int palmas_i2c_probe(struct i2c_client *i2c,
 	children[PALMAS_RESOURCE_ID].pdata_size =
 			sizeof(*pdata->resource_pdata);
 
-	children[PALMAS_USB_ID].platform_data = pdata->usb_pdata;
-	children[PALMAS_USB_ID].pdata_size = sizeof(*pdata->usb_pdata);
+	/* TPS659038 does not have USB */
+	if (pmic_data->has_usb) {
+		children[PALMAS_USB_ID].platform_data = pdata->usb_pdata;
+		children[PALMAS_USB_ID].pdata_size = sizeof(*pdata->usb_pdata);
+	}
 
 	children[PALMAS_CLK_ID].platform_data = pdata->clk_pdata;
 	children[PALMAS_CLK_ID].pdata_size = sizeof(*pdata->clk_pdata);
@@ -580,6 +643,7 @@ static const struct i2c_device_id palmas_i2c_id[] = {
 	{ "twl6035", TWL6035},
 	{ "twl6037", TWL6037},
 	{ "tps65913", TPS65913},
+	{ "tps659038", TPS659038},
 	{ /* end */ }
 };
 MODULE_DEVICE_TABLE(i2c, palmas_i2c_id);
