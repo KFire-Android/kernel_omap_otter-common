@@ -377,7 +377,9 @@ static struct notifier_block irq_notifier_block = {
 
 static void __init irq_pm_init(void)
 {
-	cpu_pm_register_notifier(&irq_notifier_block);
+	/* No OFF mode support on dra7xx */
+	if (!soc_is_dra7xx())
+		cpu_pm_register_notifier(&irq_notifier_block);
 }
 #else
 static void __init irq_pm_init(void)
