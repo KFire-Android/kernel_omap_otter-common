@@ -83,6 +83,10 @@ static inline void am33xx_push_sram_idle(void) {}
 #define OMAP4_SRAM_SIZE		(SZ_64K - SZ_8K)
 /* OMAP5 has 128K */
 #define OMAP5_SRAM_SIZE		SZ_128K
+
+/* DRA7XX has 512K */
+#define DRA7XX_SRAM_SIZE	SZ_512K
+
 /* 16K GP, 52K HS(default) for secure world */
 #define OMAP4_SRAM_GP_RESERVE	SZ_16K
 #ifdef CONFIG_OMAP4_HS_SECURE_SRAM_SIZE
