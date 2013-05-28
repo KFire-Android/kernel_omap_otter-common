@@ -104,6 +104,14 @@ static void __init sr_set_nvalues(struct omap_volt_data *volt_data,
 			v = omap_ctrl_readl(volt_data[i].sr_efuse_offs);
 		}
 
+		if (v == 0) {
+			/*
+			 * If nvalue == 0, check our volt_data for an nvalue override.
+			 */
+			if (volt_data[i].nvalue_override > 0)
+				v = volt_data[i].nvalue_override;
+		}
+
 		/*
 		 * Many OMAP SoCs don't have the eFuse values set.
 		 * For example, pretty much all OMAP3xxx before

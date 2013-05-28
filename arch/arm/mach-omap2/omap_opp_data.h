@@ -89,6 +89,21 @@ struct omap_opp_def {
 	.sr_errminlimit = _errminlimit,				       \
 	.vp_errgain	= _errgain,				       \
 	.opp_sel	= _opp_sel,				       \
+	.nvalue_override= 0,					       \
+}
+
+/*
+ * Initialization wrapper used to define SmartReflex process data
+ * This version sets an override for nvalue
+ */
+#define VOLT_DATA_DEFINE_NVALUE(_v_nom, _efuse_offs, _errminlimit, _errgain, _opp_sel, _nvalue) \
+{								       \
+	.volt_nominal	= _v_nom,				       \
+	.sr_efuse_offs	= _efuse_offs,				       \
+	.sr_errminlimit = _errminlimit,				       \
+	.vp_errgain	= _errgain,				       \
+	.opp_sel	= _opp_sel,				       \
+	.nvalue_override= _nvalue,				       \
 }
 
 #define VOLT_DATA_DEFINE_MARGIN(_v_nom, _v_margin, _efuse_offs, _errminlimit, _errgain, _opp_sel)  \
