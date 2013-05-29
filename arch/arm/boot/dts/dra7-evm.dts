@@ -91,6 +91,11 @@
 			0x238	0x0	/* vout1_d23 OUTPUT | MODE0 */
 		>;
 	};
+	display_layout {
+		compatible = "ti, omap4-dsscomp";
+		ti,num_displays = <2>;
+		ti,default_display = "lcd";
+	};
 };
 
 &i2c1 {

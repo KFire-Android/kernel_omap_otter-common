@@ -46,7 +46,7 @@
 #include "../dss/dss.h"
 
 #include <linux/debugfs.h>
-
+#include <plat/android-display.h>
 
 static DECLARE_WAIT_QUEUE_HEAD(waitq);
 static DEFINE_MUTEX(wait_mtx);
@@ -651,6 +651,13 @@ static int dsscomp_probe(struct platform_device *pdev)
 {
 	int ret;
 	int r = 0;
+	int num_displays = 1;
+	struct device_node *node;
+	struct omap_dss_board_info display_layout_data;
+	struct dsscomp_platform_data dsscomp_config;
+	struct sgx_omaplfb_platform_data omaplfb_plat_data;
+	struct omapfb_platform_data fb_pdata;
+
 	struct dsscomp_dev *cdev = kzalloc(sizeof(*cdev), GFP_KERNEL);
 	if (!cdev) {
 		pr_err("dsscomp: failed to allocate device.\n");
@@ -694,6 +701,33 @@ static int dsscomp_probe(struct platform_device *pdev)
 
 	fill_cache(cdev);
 	fill_platform_info(cdev);
+
+
+	node = of_find_node_by_name(NULL, "display_layout");
+	if (node) {
+		of_property_read_u32(node, "ti,num_displays",
+				&num_displays);
+	}
+
+	memset(&display_layout_data, 0x00, sizeof(display_layout_data));
+	memset(&dsscomp_config, 0x00, sizeof(dsscomp_config));
+	memset(&omaplfb_plat_data, 0x00, sizeof(omaplfb_plat_data));
+	memset(&fb_pdata, 0x00, sizeof(fb_pdata));
+
+	display_layout_data.num_devices	= num_displays;
+	display_layout_data.devices = cdev->displays;
+	display_layout_data.default_device = cdev->displays[0];
+	dsscomp_config.tiler1d_slotsz = SZ_16M;
+	omaplfb_plat_data.num_configs = num_displays;
+	omaplfb_plat_data.configs = NULL;
+	fb_pdata.mem_desc.region_cnt = num_displays;
+
+	omap_android_display_setup(&display_layout_data,
+				&dsscomp_config,
+				&omaplfb_plat_data,
+				&fb_pdata);
+
+	omapfb_set_platform_data(&fb_pdata);
 
 	/* initialize queues */
 	dsscomp_queue_init(cdev);
