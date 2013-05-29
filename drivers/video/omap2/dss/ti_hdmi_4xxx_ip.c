@@ -309,6 +309,7 @@ int ti_hdmi_4xxx_phy_enable(struct hdmi_ip_data *ip_data)
 	void __iomem *phy_base = hdmi_phy_base(ip_data);
 	enum omapdss_version version = omapdss_get_version();
 	unsigned long pclk = ip_data->cfg.timings.pixel_clock;
+	unsigned long dcofreq_min = dss_feat_get_param_max(FEAT_PARAM_DCOFREQ_LOW) / 1000;
 	u16 freqout = 1;
 
 	/*
@@ -340,9 +341,9 @@ int ti_hdmi_4xxx_phy_enable(struct hdmi_ip_data *ip_data)
 		break;
 	case OMAPDSS_VER_OMAP5:
 	case OMAPDSS_VER_DRA7xx:
-		if (pclk < 62500) {
+		if (pclk < dcofreq_min) {
 			freqout = 0;
-		} else if ((pclk >= 62500) && (pclk < 185000)) {
+		} else if ((pclk >= dcofreq_min) && (pclk < 185000)) {
 			freqout = 1;
 		} else {
 			/* clock frequency > 185MHz */

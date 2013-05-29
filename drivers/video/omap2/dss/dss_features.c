@@ -34,7 +34,7 @@ struct dss_reg_field {
 };
 
 struct dss_param_range {
-	int min, max;
+	unsigned long min, max;
 };
 
 struct omap_dss_features {
@@ -459,6 +459,10 @@ static const struct dss_param_range omap2_dss_param_range[] = {
 	 */
 	[FEAT_PARAM_LINEWIDTH]			= { 1, 768 },
 	[FEAT_PARAM_HDMI_PCLK]			= { 0, 0 },
+	[FEAT_PARAM_HDMIPLL_FINT]		= { 0, 0 },
+	[FEAT_PARAM_HDMIPLL_REGM]		= { 0, 0 },
+	[FEAT_PARAM_DCOFREQ_LOW]		= { 0, 0 },
+	[FEAT_PARAM_DCOFREQ_HIGH]		= { 0, 0 },
 };
 
 static const struct dss_param_range omap3_dss_param_range[] = {
@@ -474,6 +478,10 @@ static const struct dss_param_range omap3_dss_param_range[] = {
 	[FEAT_PARAM_DOWNSCALE]			= { 1, 4 },
 	[FEAT_PARAM_LINEWIDTH]			= { 1, 1024 },
 	[FEAT_PARAM_HDMI_PCLK]			= { 0, 0 },
+	[FEAT_PARAM_HDMIPLL_FINT]		= { 0, 0 },
+	[FEAT_PARAM_HDMIPLL_REGM]		= { 0, 0 },
+	[FEAT_PARAM_DCOFREQ_LOW]		= { 0, 0 },
+	[FEAT_PARAM_DCOFREQ_HIGH]		= { 0, 0 },
 };
 
 static const struct dss_param_range omap4_dss_param_range[] = {
@@ -489,6 +497,10 @@ static const struct dss_param_range omap4_dss_param_range[] = {
 	[FEAT_PARAM_DOWNSCALE]			= { 1, 4 },
 	[FEAT_PARAM_LINEWIDTH]			= { 1, 2048 },
 	[FEAT_PARAM_HDMI_PCLK]			= { 1, 185675000 },
+	[FEAT_PARAM_HDMIPLL_FINT]		= { 500000, 2500000 },
+	[FEAT_PARAM_HDMIPLL_REGM]		= { 0, (1 << 12) - 1 },
+	[FEAT_PARAM_DCOFREQ_LOW]		= { 500000000, 1000000000 },
+	[FEAT_PARAM_DCOFREQ_HIGH]		= { 1000000000, 2000000000 },
 };
 
 static const struct dss_param_range omap5_dss_param_range[] = {
@@ -504,6 +516,10 @@ static const struct dss_param_range omap5_dss_param_range[] = {
 	[FEAT_PARAM_DOWNSCALE]			= { 1, 4 },
 	[FEAT_PARAM_LINEWIDTH]			= { 1, 2048 },
 	[FEAT_PARAM_HDMI_PCLK]			= { 1, 186000000 },
+	[FEAT_PARAM_HDMIPLL_FINT]		= { 500000, 2500000 },
+	[FEAT_PARAM_HDMIPLL_REGM]		= { 20, 2046 },
+	[FEAT_PARAM_DCOFREQ_LOW]		= { 750000000, 1500000000 },
+	[FEAT_PARAM_DCOFREQ_HIGH]		= { 1250000000, 2500000000UL },
 };
 
 static const enum dss_feat_id omap2_dss_feat_list[] = {

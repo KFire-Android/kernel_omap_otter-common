@@ -117,6 +117,11 @@ struct hdmi_pll_info {
 	u16 regsd;
 	u16 dcofreq;
 	enum hdmi_clk_refsel refsel;
+
+	/* pll constraints */
+	u32 dco_limit;
+	u32 refclk_min;
+	u32 refclk_max;
 };
 
 struct hdmi_irq_vector {
