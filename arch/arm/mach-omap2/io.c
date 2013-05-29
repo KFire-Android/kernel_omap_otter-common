@@ -659,8 +659,8 @@ void __init omap5_init_late(void)
 #ifdef CONFIG_SOC_DRA7XX
 void __init dra7xx_init_early(void)
 {
-	omap2_set_globals_tap(OMAP54XX_CLASS,
-			      OMAP2_L4_IO_ADDRESS(OMAP54XX_SCM_BASE));
+	omap2_set_globals_tap(DRA7XX_CLASS,
+			      OMAP2_L4_IO_ADDRESS(DRA7XX_TAP_BASE));
 	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(OMAP54XX_SCM_BASE),
 				  OMAP2_L4_IO_ADDRESS(DRA7XX_CTRL_BASE));
 	omap2_set_globals_prm(OMAP2_L4_IO_ADDRESS(OMAP54XX_PRM_BASE));

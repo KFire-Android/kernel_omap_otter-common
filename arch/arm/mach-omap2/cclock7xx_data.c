@@ -40,6 +40,9 @@
 #include "prm-regbits-7xx.h"
 #include "control.h"
 
+#define DRA7_DPLL_ABE_DEFFREQ			361267200
+#define DRA7_DPLL_GMAC_DEFFREQ			1000000000
+
 /* Root clocks */
 
 DEFINE_CLK_FIXED_RATE(atl_clkin0_ck, CLK_IS_ROOT, 0, 0x0);
@@ -2099,6 +2102,15 @@ static struct omap_clk dra7xx_clks[] = {
 static const char *enable_init_clks[] = {
 };
 
+static struct reparent_init_clks reparent_clks[] = {
+	{ .name = "abe_dpll_sys_clk_mux", .parent = "sys_clkin2" },
+};
+
+static struct rate_init_clks rate_clks[] = {
+	{ .name = "dpll_abe_ck", .rate =  DRA7_DPLL_ABE_DEFFREQ },
+	{ .name = "dpll_gmac_ck", .rate =  DRA7_DPLL_GMAC_DEFFREQ },
+};
+
 int __init dra7xx_clk_init(void)
 {
 	u32 cpu_clkflg;
@@ -2127,6 +2139,9 @@ int __init dra7xx_clk_init(void)
 
 	omap2_clk_disable_autoidle_all();
 
+	omap2_clk_reparent_init_clocks(reparent_clks,
+				       ARRAY_SIZE(reparent_clks));
+	omap2_clk_rate_init_clocks(rate_clks, ARRAY_SIZE(rate_clks));
 	omap2_clk_enable_init_clocks(enable_init_clks,
 				     ARRAY_SIZE(enable_init_clks));
 

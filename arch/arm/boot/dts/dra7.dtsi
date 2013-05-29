@@ -91,7 +91,7 @@
 		#address-cells = <1>;
 		#size-cells = <1>;
 		ranges;
-		ti,hwmods = "l3_main_1", "l3_main_2", "l3_main_3";
+		ti,hwmods = "l3_main_1", "l3_main_2";
 
 		counter32k: counter@4ae04000 {
 			compatible = "ti,omap-counter32k";
