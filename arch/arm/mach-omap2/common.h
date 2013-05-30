@@ -300,6 +300,7 @@ extern void omap_reserve(void);
 
 struct omap_hwmod;
 extern int omap_dss_reset(struct omap_hwmod *);
+int __init omapdss_init_of(void);
 
 /* AXI ERROR DEFINES */
 #define AXI_L2_ERROR (1 << 30)

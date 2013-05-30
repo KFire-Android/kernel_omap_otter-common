@@ -37,6 +37,16 @@
 		regulator-boot-on;
 	};
 
+	quart_eth: fixedregulator@1 {
+		compatible = "regulator-fixed";
+		regulator-name = "QUART_ETH";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		gpio = <&gpio5 10 0>;  /* gpio line 138 */
+		enable-active-high;
+		regulator-boot-on;
+	};
+
 	leds {
 		compatible = "gpio-leds";
 		debug0 {
@@ -80,6 +90,32 @@
 		};
 	};
 
+	pwmleds {
+		compatible = "pwm-leds";
+		kpad {
+			label = "omap4::keypad";
+			pwms = <&twl_pwm 0 7812500>;
+			max-brightness = <127>;
+		};
+
+		charging {
+			label = "omap4:green:chrg";
+			pwms = <&twl_pwmled 0 7812500>;
+			max-brightness = <255>;
+		};
+	};
+
+	backlight {
+		compatible = "pwm-backlight";
+		pwms = <&twl_pwm 1 7812500>;
+		brightness-levels = <
+				0 10 20 30 40
+				50 60 70 80 90
+				100 110 120 127
+				>;
+		default-brightness-level = <13>;
+	};
+
 	sound {
 		compatible = "ti,abe-twl6040";
 		ti,model = "SDP4430";
@@ -89,8 +125,13 @@
 
 		ti,mcpdm = <&mcpdm>;
 		ti,dmic = <&dmic>;
+		ti,mcasp = <&mcasp>;
+		ti,mcbsp1 = <&mcbsp1>;
+		ti,mcbsp2 = <&mcbsp2>;
 
 		ti,twl6040 = <&twl6040>;
+
+		ti,aess = <&aess>;
 
 		/* Audio routing */
 		ti,audio-routing =
@@ -112,7 +153,31 @@
 			"AFML", "Line In",
 			"AFMR", "Line In",
 			"DMic", "Digital Mic",
-			"Digital Mic", "Digital Mic1 Bias";
+			"Digital Mic", "Digital Mic1 Bias",
+			"Headset Playback", "PDM_DL1",
+			"Handsfree Playback", "PDM_DL2",
+			"PDM_UL1", "Capture",
+			"40122000.mcbsp Playback", "BT_VX_DL",
+			"BT_VX_UL", "40122000.mcbsp Capture",
+			"40124000.mcbsp Playback", "MM_EXT_DL",
+			"MM_EXT_UL", "40124000.mcbsp Capture",
+			"DMIC0", "omap-dmic-abe.0 Capture",
+			"omap-dmic-abe.0 Capture", "Digital Mic1 Bias",
+			"Digital Mic1 Bias", "Digital Mic 0",
+			"DMIC1", "omap-dmic-abe.1 Capture",
+			"omap-dmic-abe.1 Capture", "Digital Mic1 Bias",
+			"Digital Mic1 Bias", "Digital Mic 1",
+			"DMIC2", "omap-dmic-abe.2 Capture",
+			"omap-dmic-abe.2 Capture", "Digital Mic1 Bias",
+			"Digital Mic1 Bias", "Digital Mic 2";
+	};
+
+	sound_hdmi {
+		compatible = "ti,omap-hdmi-tpd12s015-audio";
+		ti,model = "OMAP4HDMI";
+
+		ti,hdmi_audio = <&hdmi>;
+		ti,level_shifter = <&tpd12s015>;
 	};
 };
 
@@ -278,6 +343,10 @@
 			ti,viblmotor-res = <10>;
 			ti,vibrmotor-res = <10>;
 		};
+		
+		gpo {
+			ti,nr_gpo = <3>;
+		};
 	};
 };
 
@@ -339,6 +408,7 @@
 		interrupt-parent = <&gpio2>;
 		interrupts = <2 8>; /* gpio line 34, low triggered */
 		vdd-supply = <&vdd_eth>;
+		enable-active-high;
 	};
 };
 
@@ -467,4 +537,53 @@
 
 &twl_usb_comparator {
 	usb-supply = <&vusb>;
+};
+
+&dsi1 {
+	lcd {
+		compatible = "tpo,taal";
+
+		lanes = <
+			0       /* clk + */
+			1       /* clk - */
+			2       /* data1 + */
+			3       /* data1 - */
+			4       /* data2 + */
+			5       /* data2 - */
+		>;
+
+		gpios = <&gpio4 6 0>;	/* 102, reset */
+	};
+};
+
+&dsi2 {
+	lcd2 {
+		compatible = "tpo,taal";
+
+		lanes = <
+			0       /* clk + */
+			1       /* clk - */
+			2       /* data1 + */
+			3       /* data1 - */
+			4       /* data2 + */
+			5       /* data2 - */
+		>;
+
+		gpios = <&gpio4 8 0>;	/* 104, reset */
+	};
+};
+
+&hdmi {
+	tpd12s015: tpd12s015 {
+		compatible = "ti,tpd12s015";
+
+		gpios = <&gpio2 28 0>,	/* 60, CT CP HPD */
+			<&gpio2 9 0>,	/* 41, LS OE */
+			<&gpio2 31 0>;	/* 63, HPD */
+
+		hdmi {
+			compatible = "ti,hdmi_panel";
+		};
+
+	};
 };

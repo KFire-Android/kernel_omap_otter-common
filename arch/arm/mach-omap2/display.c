@@ -18,11 +18,15 @@
 #include <linux/string.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
+#include <linux/dma-mapping.h>
 #include <linux/platform_device.h>
 #include <linux/io.h>
 #include <linux/clk.h>
 #include <linux/err.h>
 #include <linux/delay.h>
+#include <linux/of.h>
+#include <linux/of_platform.h>
+#include <linux/platform_data/omap_drm.h>
 
 #include <video/omapdss.h>
 #include "omap_hwmod.h"
@@ -102,6 +106,55 @@ static const struct omap_dss_hwmod_data omap4_dss_hwmod_data[] __initconst = {
 	{ "dss_hdmi", "omapdss_hdmi", -1 },
 };
 
+static struct omap_drm_platform_data platform_drm_data;
+
+#if defined(CONFIG_DRM_OMAP) || defined(CONFIG_DRM_OMAP_MODULE)
+
+static struct platform_device drm_device = {
+	.dev = {
+		.coherent_dma_mask = DMA_BIT_MASK(32),
+		.platform_data = &platform_drm_data,
+	},
+	.name = "omapdrm",
+	.id = 0,
+};
+
+static struct platform_device *omap_drm_device = &drm_device;
+#else
+static struct platform_device *omap_drm_device;
+#endif
+
+static __init int omapdrm_init(void)
+{
+	struct omap_hwmod *oh;
+	int r = 0;
+
+	/* create DRM and DMM device */
+	if (omap_drm_device != NULL) {
+		if (!of_find_compatible_node(NULL, NULL, "ti,omap4-dmm") &&
+			!of_find_compatible_node(NULL, NULL, "ti,omap5-dmm")) {
+
+			/* fallback to search within hwmod data */
+			oh = omap_hwmod_lookup("dmm");
+
+			if (oh)
+				WARN(IS_ERR(omap_device_build(oh->name, -1, oh,
+						NULL, 0, NULL, 0, false)),
+					"Could not build omap_device for %s\n",
+					oh->name);
+		}
+
+		platform_drm_data.omaprev = GET_OMAP_TYPE;
+
+		r = platform_device_register(omap_drm_device);
+
+		if (r < 0)
+			pr_err("Unable to register omapdrm device\n");
+	}
+
+	return r;
+}
+
 static void __init omap4_tpd12s015_mux_pads(void)
 {
 	omap_mux_init_signal("hdmi_cec",
@@ -164,6 +217,36 @@ static int omap4_dsi_mux_pads(int dsi_id, unsigned lanes)
 	return 0;
 }
 
+#define CONTROL_PAD_BASE	0x4A002800
+#define CONTROL_DSIPHY		0x614
+
+static int omap5_dsi_mux_pads(int dsi_id, unsigned lanes)
+{
+	u32 enable_mask, enable_shift, reg;
+	void __iomem *ctrl_pad_base = NULL;
+
+	ctrl_pad_base = ioremap(CONTROL_PAD_BASE, SZ_4K);
+	if (!ctrl_pad_base)
+		return -ENXIO;
+
+	if (dsi_id == 0) {
+		enable_mask = OMAP4_DSI1_LANEENABLE_MASK;
+		enable_shift = OMAP4_DSI1_LANEENABLE_SHIFT;
+	} else if (dsi_id == 1) {
+		enable_mask = OMAP4_DSI2_LANEENABLE_MASK;
+		enable_shift = OMAP4_DSI2_LANEENABLE_SHIFT;
+	} else {
+		return -ENODEV;
+	}
+
+	reg = __raw_readl(ctrl_pad_base + CONTROL_DSIPHY);
+	reg &= ~enable_mask;
+	reg |= (lanes << enable_shift) & enable_mask;
+	__raw_writel(reg, ctrl_pad_base + CONTROL_DSIPHY);
+
+	return 0;
+}
+
 int __init omap_hdmi_init(enum omap_hdmi_flags flags)
 {
 	if (cpu_is_omap44xx()) {
@@ -178,6 +261,8 @@ static int omap_dsi_enable_pads(int dsi_id, unsigned lane_mask)
 {
 	if (cpu_is_omap44xx())
 		return omap4_dsi_mux_pads(dsi_id, lane_mask);
+	else if (soc_is_omap54xx())
+		return omap5_dsi_mux_pads(dsi_id, lane_mask);
 
 	return 0;
 }
@@ -186,6 +271,8 @@ static void omap_dsi_disable_pads(int dsi_id, unsigned lane_mask)
 {
 	if (cpu_is_omap44xx())
 		omap4_dsi_mux_pads(dsi_id, 0);
+	else if (soc_is_omap54xx())
+		omap5_dsi_mux_pads(dsi_id, 0);
 }
 
 static int omap_dss_set_min_bus_tput(struct device *dev, unsigned long tput)
@@ -416,6 +503,44 @@ int __init omap_display_init(struct omap_dss_board_info *board_data)
 		}
 	}
 
+	/* Create devices for HDMI audio drivers */
+	for (i = 0; i < board_data->num_devices; i++) {
+		struct platform_device *au_pdev;
+		struct omap_dss_device *dssdev = board_data->devices[i];
+		bool card_created = false;
+
+		if (dssdev->type != OMAP_DISPLAY_TYPE_HDMI)
+			continue;
+
+		/* We need only one device for the audio card */
+		if (card_created == false) {
+			au_pdev = create_simple_dss_pdev("omap-hdmi-audio-card",
+							 -1, NULL, 0, dss_pdev);
+			if (IS_ERR(au_pdev)) {
+				pr_err("Could not build platform_device for omap-hdmi-audio-card\n");
+				return PTR_ERR(au_pdev);
+			}
+			card_created = true;
+		}
+
+		/* One device for each HDMI connector in the board */
+		au_pdev = create_simple_dss_pdev("hdmi-audio-codec",
+						  dssdev->dev.id,
+						  NULL, 0, dss_pdev);
+		if (IS_ERR(au_pdev)) {
+			pr_err("Could not build platform_device for hdmi-audio-codec\n");
+			return PTR_ERR(au_pdev);
+		}
+
+	}
+
+	/* create DMM and DRM device */
+	r = omapdrm_init();
+	if (r < 0) {
+		pr_err("Unable to register omapdrm device\n");
+		return r;
+	}
+
 	return 0;
 }
 
@@ -563,4 +688,90 @@ int omap_dss_reset(struct omap_hwmod *oh)
 	r = (c == MAX_MODULE_SOFTRESET_WAIT) ? -ETIMEDOUT : 0;
 
 	return r;
+}
+
+static int __init hdmi_init_of(void)
+{
+	if (cpu_is_omap44xx()) {
+		enum omap_hdmi_flags flags;
+
+		/*
+		 * OMAP4460SDP/Blaze and OMAP4430 ES2.3 SDP/Blaze boards and
+		 * later have external pull up on the HDMI I2C lines.
+		 */
+		/* FIXME: Ideally we should know from the DT whether if there is a
+		 * resistor. This could work with PandaES, as it is the only Panda
+		 * with 4460. For SDP, however, there are no dedicated DT files for
+		 * each processor board to know whether the pull-up resistor is
+		 * present.
+		 */
+		if (cpu_is_omap446x() || omap_rev() > OMAP4430_REV_ES2_2)
+			flags = OMAP_HDMI_SDA_SCL_EXTERNAL_PULLUP;
+		else
+			flags = 0;
+
+		omap4_hdmi_mux_pads(flags);
+	}
+
+	return 0;
+}
+
+int __init omapdss_init_of(void)
+{
+	int r;
+	struct platform_device *pdev;
+	struct device_node *node;
+	enum omapdss_version ver;
+
+	static struct omap_dss_board_info board_data = {
+		.dsi_enable_pads = omap_dsi_enable_pads,
+		.dsi_disable_pads = omap_dsi_disable_pads,
+		.get_context_loss_count = omap_pm_get_dev_context_loss_count,
+		.set_min_bus_tput = omap_dss_set_min_bus_tput,
+	};
+
+	ver = omap_display_get_version();
+
+	if (ver == OMAPDSS_VER_UNKNOWN) {
+		pr_err("DSS not supported on this SoC\n");
+		return -ENODEV;
+	}
+
+	board_data.version = ver;
+
+	/* find the main dss node  */
+	node = of_find_node_by_name(NULL, "dss");
+	if (!node)
+		return 0;
+
+	pdev = of_find_device_by_node(node);
+	if (!pdev) {
+		pr_err("Cannot find dss platform device\n");
+		return -EINVAL;
+	}
+
+	r = of_platform_populate(node, NULL, NULL, &pdev->dev);
+	if (r) {
+		pr_err("Failed to populate dss devices\n");
+		return -EINVAL;
+	}
+
+	omap_display_device.dev.platform_data = &board_data;
+
+	r = platform_device_register(&omap_display_device);
+	if (r < 0) {
+		pr_err("Unable to register omapdss device\n");
+		return r;
+	}
+
+	hdmi_init_of();
+
+	/* create omapdrm devices */
+	r = omapdrm_init();
+	if (r < 0) {
+		pr_err("Unable to create omapdrm device\n");
+		return r;
+	}
+
+	return 0;
 }

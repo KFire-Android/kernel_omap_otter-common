@@ -58,8 +58,9 @@ config OMAP2_DSS_VENC
 	  OMAP Video Encoder support for S-Video and composite TV-out.
 
 config OMAP4_DSS_HDMI
-	bool "HDMI support"
+	bool "OMAP4 HDMI support"
         default y
+	select I2C_ALGOBIT
 	help
 	  HDMI Interface. This adds the High Definition Multimedia Interface.
 	  See http://www.hdmi.org/ for HDMI specification.
@@ -67,6 +68,22 @@ config OMAP4_DSS_HDMI
 config OMAP4_DSS_HDMI_AUDIO
 	bool
 
+config OMAP5_DSS_HDMI_AUDIO
+	bool
+	depends on OMAP5_DSS_HDMI
+
+config OMAP5_DSS_HDMI
+	bool "OMAP5 HDMI support"
+	depends on SOC_OMAP5
+	depends on OMAP4_DSS_HDMI
+	default y
+	select PINCTRL_SINGLE
+	select GPIO_PCA953X
+	select MFD_PALMAS
+	select REGULATOR_PALMAS
+	help
+	    HDMI Interface.This add the High Deinition Multimedia Interface.
+	    See http://wwww.hdmi.org/ for HDMI specification.
 config OMAP2_DSS_SDI
 	bool "SDI support"
         default n

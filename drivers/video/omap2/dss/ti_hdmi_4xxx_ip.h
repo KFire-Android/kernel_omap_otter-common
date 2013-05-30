@@ -31,8 +31,11 @@
 #define HDMI_WP_SYSCONFIG			0x10
 #define HDMI_WP_IRQSTATUS_RAW			0x24
 #define HDMI_WP_IRQSTATUS			0x28
-#define HDMI_WP_PWR_CTRL			0x40
 #define HDMI_WP_IRQENABLE_SET			0x2C
+#define HDMI_WP_IRQENABLE_CLR			0x30
+#define HDMI_WP_IRQWAKEEN			0x34
+#define HDMI_WP_PWR_CTRL			0x40
+#define HDMI_WP_DEBOUNCE			0x44
 #define HDMI_WP_VIDEO_CFG			0x50
 #define HDMI_WP_VIDEO_SIZE			0x60
 #define HDMI_WP_VIDEO_TIMING_H			0x68
@@ -50,8 +53,10 @@
 #define HDMI_CORE_SYS_DEV_IDH			0xC
 #define HDMI_CORE_SYS_DEV_REV			0x10
 #define HDMI_CORE_SYS_SRST			0x14
-#define HDMI_CORE_CTRL1				0x20
+#define HDMI_CORE_SYS_SYS_CTRL1			0x20
 #define HDMI_CORE_SYS_SYS_STAT			0x24
+#define HDMI_CORE_SYS_SYS_CTRL3			0x28
+#define HDMI_CORE_SYS_DCTL			0x34
 #define HDMI_CORE_SYS_DE_DLY			0xC8
 #define HDMI_CORE_SYS_DE_CTRL			0xCC
 #define HDMI_CORE_SYS_DE_TOP			0xD0
@@ -59,20 +64,65 @@
 #define HDMI_CORE_SYS_DE_CNTH			0xDC
 #define HDMI_CORE_SYS_DE_LINL			0xE0
 #define HDMI_CORE_SYS_DE_LINH_1			0xE4
+#define HDMI_CORE_SYS_HRES_L			0xE8
+#define HDMI_CORE_SYS_HRES_H			0xEC
+#define HDMI_CORE_SYS_VRES_L			0xF0
+#define HDMI_CORE_SYS_VRES_H			0xF4
+#define HDMI_CORE_SYS_IADJUST			0xF8
+#define HDMI_CORE_SYS_POLDETECT			0xFC
+#define HDMI_CORE_SYS_HWIDTH1			0x110
+#define HDMI_CORE_SYS_HWIDTH2			0x114
+#define HDMI_CORE_SYS_VWIDTH			0x11C
+#define HDMI_CORE_SYS_VID_CTRL			0x120
 #define HDMI_CORE_SYS_VID_ACEN			0x124
 #define HDMI_CORE_SYS_VID_MODE			0x128
+#define HDMI_CORE_SYS_VID_BLANK1		0x12C
+#define HDMI_CORE_SYS_VID_BLANK2		0x130
+#define HDMI_CORE_SYS_VID_BLANK3		0x134
+#define HDMI_CORE_SYS_DC_HEADER			0x138
+#define HDMI_CORE_SYS_VID_DITHER		0x13C
+#define HDMI_CORE_SYS_RGB2XVYCC_CT		0x140
+#define HDMI_CORE_SYS_R2Y_COEFF_LOW		0x144
+#define HDMI_CORE_SYS_R2Y_COEFF_UP		0x148
+#define HDMI_CORE_SYS_G2Y_COEFF_LOW		0x14C
+#define HDMI_CORE_SYS_G2Y_COEFF_UP		0x150
+#define HDMI_CORE_SYS_B2Y_COEFF_LOW		0x154
+#define HDMI_CORE_SYS_B2Y_COEFF_UP		0x158
+#define HDMI_CORE_SYS_R2CB_COEFF_LOW		0x15C
+#define HDMI_CORE_SYS_R2CB_COEFF_UP		0x160
+#define HDMI_CORE_SYS_G2CB_COEFF_LOW		0x164
+#define HDMI_CORE_SYS_G2CB_COEFF_UP		0x168
+#define HDMI_CORE_SYS_B2CB_COEFF_LOW		0x16C
+#define HDMI_CORE_SYS_B2CB_COEFF_UP		0x170
+#define HDMI_CORE_SYS_R2CR_COEFF_LOW		0x174
+#define HDMI_CORE_SYS_R2CR_COEFF_UP		0x178
+#define HDMI_CORE_SYS_G2CR_COEFF_LOW		0x17C
+#define HDMI_CORE_SYS_G2CR_COEFF_UP		0x180
+#define HDMI_CORE_SYS_B2CR_COEFF_LOW		0x184
+#define HDMI_CORE_SYS_B2CR_COEFF_UP		0x188
+#define HDMI_CORE_SYS_RGB_OFFSET_LOW		0x18C
+#define HDMI_CORE_SYS_RGB_OFFSET_UP		0x190
+#define HDMI_CORE_SYS_Y_OFFSET_LOW		0x194
+#define HDMI_CORE_SYS_Y_OFFSET_UP		0x198
+#define HDMI_CORE_SYS_CBCR_OFFSET_LOW		0x19C
+#define HDMI_CORE_SYS_CBCR_OFFSET_UP		0x1A0
 #define HDMI_CORE_SYS_INTR_STATE		0x1C0
 #define HDMI_CORE_SYS_INTR1			0x1C4
 #define HDMI_CORE_SYS_INTR2			0x1C8
 #define HDMI_CORE_SYS_INTR3			0x1CC
 #define HDMI_CORE_SYS_INTR4			0x1D0
-#define HDMI_CORE_SYS_UMASK1			0x1D4
+#define HDMI_CORE_SYS_INTR_UNMASK1		0x1D4
+#define HDMI_CORE_SYS_INTR_UNMASK2		0x1D8
+#define HDMI_CORE_SYS_INTR_UNMASK3		0x1DC
+#define HDMI_CORE_SYS_INTR_UNMASK4		0x1E0
+#define HDMI_CORE_SYS_INTR_CTRL			0x1E4
 #define HDMI_CORE_SYS_TMDS_CTRL			0x208
 
-#define HDMI_CORE_CTRL1_VEN_FOLLOWVSYNC	0x1
-#define HDMI_CORE_CTRL1_HEN_FOLLOWHSYNC	0x1
-#define HDMI_CORE_CTRL1_BSEL_24BITBUS	0x1
-#define HDMI_CORE_CTRL1_EDGE_RISINGEDGE	0x1
+/* value definitions for HDMI_CORE_SYS_SYS_CTRL1 fields */
+#define HDMI_CORE_SYS_SYS_CTRL1_VEN_FOLLOWVSYNC	0x1
+#define HDMI_CORE_SYS_SYS_CTRL1_HEN_FOLLOWHSYNC	0x1
+#define HDMI_CORE_SYS_SYS_CTRL1_BSEL_24BITBUS	0x1
+#define HDMI_CORE_SYS_SYS_CTRL1_EDGE_RISINGEDGE	0x1
 
 /* HDMI DDC E-DID */
 #define HDMI_CORE_DDC_ADDR			0x3B4
@@ -165,6 +215,8 @@
 #define PLLCTRL_CFG1				0xC
 #define PLLCTRL_CFG2				0x10
 #define PLLCTRL_CFG3				0x14
+#define PLLCTRL_SSC_CFG1			0x18
+#define PLLCTRL_SSC_CFG2			0x1C
 #define PLLCTRL_CFG4				0x20
 
 /* HDMI PHY */
@@ -173,12 +225,18 @@
 #define HDMI_TXPHY_DIGITAL_CTRL			0x4
 #define HDMI_TXPHY_POWER_CTRL			0x8
 #define HDMI_TXPHY_PAD_CFG_CTRL			0xC
+#define HDMI_TXPHY_BIST_CONTROL			0x1C
+
+/* Interrupt masks */
+#define HDMI_WP_IRQSTATUS_CORE_MASK                  0x1
 
 #define REG_FLD_MOD(base, idx, val, start, end) \
 	hdmi_write_reg(base, idx, FLD_MOD(hdmi_read_reg(base, idx),\
 							val, start, end))
 #define REG_GET(base, idx, start, end) \
 	FLD_GET(hdmi_read_reg(base, idx), start, end)
+
+
 
 enum hdmi_phy_pwr {
 	HDMI_PHYPWRCMD_OFF = 0,
@@ -285,7 +343,8 @@ enum hdmi_packing_mode {
 
 enum hdmi_core_audio_layout {
 	HDMI_AUDIO_LAYOUT_2CH = 0,
-	HDMI_AUDIO_LAYOUT_8CH = 1
+	HDMI_AUDIO_LAYOUT_8CH = 1,
+	HDMI_AUDIO_LAYOUT_6CH = 2
 };
 
 enum hdmi_core_cts_mode {
@@ -432,5 +491,19 @@ struct hdmi_core_audio_config {
 	bool					en_parallel_aud_input;
 	bool					en_spdif;
 };
+
+void hdmi_wp_video_config_timing(struct hdmi_ip_data *ip_data,
+				 struct omap_video_timings *timings);
+void hdmi_wp_video_config_interface(struct hdmi_ip_data *ip_data);
+void hdmi_wp_video_config_format(struct hdmi_ip_data *ip_data,
+				 struct hdmi_video_format *video_fmt);
+void hdmi_wp_video_init_format(struct hdmi_video_format *video_fmt,
+			       struct omap_video_timings *timings,
+			       struct hdmi_config *param);
+void hdmi_wp_init(struct omap_video_timings *timings,
+		  struct hdmi_video_format *video_fmt,
+		  struct hdmi_irq_vector *irq_enable);
+void hdmi_wp_irq_enable(struct hdmi_ip_data *ip_data,
+			struct hdmi_irq_vector *irq_enable);
 
 #endif

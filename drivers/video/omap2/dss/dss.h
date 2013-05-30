@@ -24,6 +24,7 @@
 #define __OMAP2_DSS_H
 
 #include <linux/interrupt.h>
+#include <linux/i2c.h>
 
 #ifdef pr_fmt
 #undef pr_fmt
@@ -435,7 +436,7 @@ int venc_panel_init(void);
 void venc_panel_exit(void);
 
 /* HDMI */
-#ifdef CONFIG_OMAP4_DSS_HDMI
+#if defined(CONFIG_OMAP4_DSS_HDMI) || defined(CONFIG_OMAP5_DSS_HDMI)
 int hdmi_init_platform_driver(void) __init;
 void hdmi_uninit_platform_driver(void) __exit;
 unsigned long hdmi_get_pixel_clock(void);
@@ -446,6 +447,7 @@ static inline unsigned long hdmi_get_pixel_clock(void)
 	return 0;
 }
 #endif
+struct i2c_adapter *omapdss_hdmi_adapter(void);
 int omapdss_hdmi_display_enable(struct omap_dss_device *dssdev);
 void omapdss_hdmi_display_disable(struct omap_dss_device *dssdev);
 int omapdss_hdmi_core_enable(struct omap_dss_device *dssdev);
@@ -456,9 +458,17 @@ int omapdss_hdmi_display_check_timing(struct omap_dss_device *dssdev,
 					struct omap_video_timings *timings);
 int omapdss_hdmi_read_edid(u8 *buf, int len);
 bool omapdss_hdmi_detect(void);
+int omapdss_hdmi_get_range(void);
+int omapdss_hdmi_set_range(int range);
+int omapdss_hdmi_get_deepcolor(void);
+int omapdss_hdmi_set_deepcolor(struct omap_dss_device *dssdev, int val,
+		bool hdmi_restart);
+int omapdss_hdmi_display_3d_enable(struct omap_dss_device *dssdev,
+					struct s3d_disp_info *info, int code);
 int hdmi_panel_init(void);
 void hdmi_panel_exit(void);
-#ifdef CONFIG_OMAP4_DSS_HDMI_AUDIO
+#if defined(CONFIG_OMAP4_DSS_HDMI_AUDIO) || \
+	defined(CONFIG_OMAP5_DSS_HDMI_AUDIO)
 int hdmi_audio_enable(void);
 void hdmi_audio_disable(void);
 int hdmi_audio_start(void);

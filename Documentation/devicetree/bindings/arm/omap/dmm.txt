@@ -1,0 +1,17 @@
+OMAP Dynamic Memory Manager (DMM) bindings
+
+Required properties:
+- compatible:   Must be "ti,omap4-dmm" for OMAP4 family
+		Must be "ti,omap5-dmm" for OMAP5 family
+- reg:         Contains timer register address range (base address and length)
+- interrupts:  Contains interrupt information (source, etc) for the DMM IRQ
+- ti,hwmods:   Name of the hwmod associated to the counter, which is typically
+		"dmm"
+
+Example:
+
+dmm: dmm@4e000000 {
+	compatible = "ti,omap4-dmm";
+	reg = <0x4e000000 0x800>;
+	ti,hwmods = "dmm";
+};

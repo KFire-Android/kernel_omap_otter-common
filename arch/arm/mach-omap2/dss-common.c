@@ -70,6 +70,9 @@ static struct omap_dss_device  omap4_panda_hdmi_device = {
 	.type = OMAP_DISPLAY_TYPE_HDMI,
 	.channel = OMAP_DSS_CHANNEL_DIGIT,
 	.data = &omap4_panda_hdmi_data,
+	.dev = {
+		.id = -1,
+	},
 };
 
 static struct omap_dss_device *omap4_panda_dss_devices[] = {
@@ -171,6 +174,9 @@ static struct omap_dss_device sdp4430_hdmi_device = {
 	.type = OMAP_DISPLAY_TYPE_HDMI,
 	.channel = OMAP_DSS_CHANNEL_DIGIT,
 	.data = &sdp4430_hdmi_data,
+	.dev = {
+		.id = -1,
+	},
 };
 
 static struct picodlp_panel_data sdp4430_picodlp_pdata = {
