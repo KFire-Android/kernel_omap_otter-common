@@ -1,0 +1,71 @@
+/*
+ * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ */
+/dts-v1/;
+
+/include/ "dra7.dtsi"
+
+/ {
+	model = "TI DRA7";
+	compatible = "ti,dra7-evm", "ti,dra7";
+
+	cpus {
+		cpu@0 {
+			cpu0-supply = <&avs_mpu>;
+		};
+	};
+
+	memory {
+		device_type = "memory";
+		reg = <0x80000000 0x20000000>; /* 512 MB */
+	};
+};
+
+&i2c1 {
+	clock-frequency = <400000>;
+	tps659038: tps659038@58 {
+		reg = <0x58>;
+	};
+};
+
+/include/ "tps659038.dtsi"
+
+&i2c2 {
+	clock-frequency = <400000>;
+};
+
+&i2c3 {
+	clock-frequency = <400000>;
+};
+
+&i2c4 {
+	clock-frequency = <400000>;
+};
+
+&i2c5 {
+	clock-frequency = <400000>;
+};
+
+&avs_mpu {
+	avs-supply = <&smps123_reg>;
+};
+
+&avs_core {
+	avs-supply = <&smps7_reg>;
+};
+
+&avs_gpu {
+	avs-supply = <&smps6_reg>;
+};
+
+&avs_dspeve {
+	avs-supply = <&smps45_reg>;
+};
+
+&avs_iva {
+	avs-supply = <&smps8_reg>;
+};

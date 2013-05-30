@@ -41,6 +41,7 @@ struct palmas {
 	int designrev;
 	int sw_revision;
 
+	int palmas_id;
 	/* IRQ Data */
 	int irq;
 	u32 irq_mask;
@@ -133,6 +134,13 @@ struct palmas_reg_init {
 	 */
 	u8 vsel;
 
+};
+
+enum pmic_ids {
+	TWL6035,
+	TWL6037,
+	TPS65913,
+	TPS659038,
 };
 
 enum palmas_regulators {
@@ -364,6 +372,26 @@ struct palmas_usb {
 	int vbus_enable;
 
 	enum omap_dwc3_vbus_id_status linkstat;
+};
+
+/**
+ * struct palmas_pmic_data -	Maintains the specific data for PMICs of PALMAS
+ *				family
+ * @irq_chip:			regmap_irq_chip specific to individual members
+ *				of PALMAS family.
+ * @regmap_config:		regmap_config specific to the individual members
+ *				of PALMAS family.
+ * @mfd_cell:			mfd cell  specific to the individual members of
+ *				PALMAS family.
+ * @id:				Id of the member of the PALMAS family.
+ * @has_usb:			Flag indicating whether PMIC supports USB
+ */
+struct palmas_pmic_data {
+	struct regmap_irq_chip *irq_chip;
+	const struct regmap_config *regmap_config;
+	const struct mfd_cell *mfd_cell;
+	int id;
+	int has_usb;
 };
 
 #define comparator_to_palmas(x) container_of((x), struct palmas_usb, comparator)
@@ -2828,5 +2856,57 @@ extern int palmas_set_switch_smps10(struct palmas *palmas, int sw);
 #define PALMAS_GPADC_TRIM14					0xD
 #define PALMAS_GPADC_TRIM15					0xE
 #define PALMAS_GPADC_TRIM16					0xF
+
+static inline int palmas_read(struct palmas *palmas, unsigned int base,
+		unsigned int reg, unsigned int *val)
+{
+	unsigned int addr =  PALMAS_BASE_TO_REG(base, reg);
+	int slave_id = PALMAS_BASE_TO_SLAVE(base);
+
+	return regmap_read(palmas->regmap[slave_id], addr, val);
+}
+
+static inline int palmas_write(struct palmas *palmas, unsigned int base,
+		unsigned int reg, unsigned int value)
+{
+	unsigned int addr = PALMAS_BASE_TO_REG(base, reg);
+	int slave_id = PALMAS_BASE_TO_SLAVE(base);
+
+	return regmap_write(palmas->regmap[slave_id], addr, value);
+}
+
+static inline int palmas_bulk_write(struct palmas *palmas, unsigned int base,
+	unsigned int reg, const void *val, size_t val_count)
+{
+	unsigned int addr = PALMAS_BASE_TO_REG(base, reg);
+	int slave_id = PALMAS_BASE_TO_SLAVE(base);
+
+	return regmap_bulk_write(palmas->regmap[slave_id], addr,
+			val, val_count);
+}
+
+static inline int palmas_bulk_read(struct palmas *palmas, unsigned int base,
+		unsigned int reg, void *val, size_t val_count)
+{
+	unsigned int addr = PALMAS_BASE_TO_REG(base, reg);
+	int slave_id = PALMAS_BASE_TO_SLAVE(base);
+
+	return regmap_bulk_read(palmas->regmap[slave_id], addr,
+		val, val_count);
+}
+
+static inline int palmas_update_bits(struct palmas *palmas, unsigned int base,
+	unsigned int reg, unsigned int mask, unsigned int val)
+{
+	unsigned int addr = PALMAS_BASE_TO_REG(base, reg);
+	int slave_id = PALMAS_BASE_TO_SLAVE(base);
+
+	return regmap_update_bits(palmas->regmap[slave_id], addr, mask, val);
+}
+
+static inline int palmas_irq_get_virq(struct palmas *palmas, int irq)
+{
+	return regmap_irq_get_virq(palmas->irq_data, irq);
+}
 
 #endif /*  __LINUX_MFD_PALMAS_H */
