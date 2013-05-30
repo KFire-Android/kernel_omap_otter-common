@@ -102,7 +102,7 @@ static dev_t rpmsg_omx_dev;
 
 /* store all remote omx connection services (usually one per remoteproc) */
 static DEFINE_IDR(rpmsg_omx_services);
-static DEFINE_SPINLOCK(rpmsg_omx_services_lock);
+static DEFINE_MUTEX(rpmsg_omx_services_lock);
 
 #ifdef CONFIG_ION_OMAP
 static int _rpmsg_pa_to_da(struct rpmsg_omx_instance *omx, u32 pa, u32 *da)
@@ -434,13 +434,17 @@ static int rpmsg_omx_connect(struct rpmsg_omx_instance *omx, char *omxname)
 						msecs_to_jiffies(5000));
 
 	mutex_lock(&omx->lock);
-	if (omx->state == OMX_FAIL) {
+	if (omx->state == OMX_CONNECTED) {
+		ret = 0;
+	} else if (omx->state == OMX_FAIL) {
 		ret = -ENXIO;
 	} else if (omx->state == OMX_UNCONNECTED) {
-		if (ret)
+		if (ret) {
 			dev_err(omxserv->dev, "premature wakeup: %d\n", ret);
-		else
+			ret = -EIO;
+		} else {
 			ret = -ETIMEDOUT;
+		}
 	}
 	mutex_unlock(&omx->lock);
 
@@ -858,10 +862,9 @@ static int rpmsg_omx_probe(struct rpmsg_channel *rpdev)
 	struct rpmsg_omx_service *omxserv;
 
 	/* look for an already created omx service */
-	spin_lock(&rpmsg_omx_services_lock);
+	mutex_lock(&rpmsg_omx_services_lock);
 	omxserv = (struct rpmsg_omx_service *)idr_for_each(&rpmsg_omx_services,
 					_match_omx_service, rpdev->id.name);
-	spin_unlock(&rpmsg_omx_services_lock);
 	if (omxserv) {
 		omxserv->rpdev = rpdev;
 		dev_set_drvdata(&rpdev->dev, omxserv);
@@ -870,19 +873,19 @@ static int rpmsg_omx_probe(struct rpmsg_channel *rpdev)
 
 	if (!idr_pre_get(&rpmsg_omx_services, GFP_KERNEL)) {
 		dev_err(&rpdev->dev, "idr_pre_get failes\n");
+		mutex_unlock(&rpmsg_omx_services_lock);
 		return -ENOMEM;
 	}
 
 	omxserv = kzalloc(sizeof(*omxserv), GFP_KERNEL);
 	if (!omxserv) {
 		dev_err(&rpdev->dev, "kzalloc failed\n");
+		mutex_unlock(&rpmsg_omx_services_lock);
 		return -ENOMEM;
 	}
 
 	/* dynamically assign a new minor number */
-	spin_lock(&rpmsg_omx_services_lock);
 	ret = idr_get_new(&rpmsg_omx_services, omxserv, &minor);
-	spin_unlock(&rpmsg_omx_services_lock);
 	if (ret) {
 		dev_err(&rpdev->dev, "failed to idr_get_new: %d\n", ret);
 		goto free_omx;
@@ -919,16 +922,16 @@ serv_up:
 
 	dev_info(omxserv->dev, "new OMX connection srv channel: %u -> %u!\n",
 						rpdev->src, rpdev->dst);
+	mutex_unlock(&rpmsg_omx_services_lock);
 	return 0;
 
 clean_cdev:
 	cdev_del(&omxserv->cdev);
 rem_idr:
-	spin_lock(&rpmsg_omx_services_lock);
 	idr_remove(&rpmsg_omx_services, minor);
-	spin_unlock(&rpmsg_omx_services_lock);
 free_omx:
 	kfree(omxserv);
+	mutex_unlock(&rpmsg_omx_services_lock);
 	return ret;
 }
 
@@ -944,9 +947,9 @@ static void __devexit rpmsg_omx_remove(struct rpmsg_channel *rpdev)
 	if (rproc->state != RPROC_CRASHED) {
 		device_destroy(rpmsg_omx_class, MKDEV(major, omxserv->minor));
 		cdev_del(&omxserv->cdev);
-		spin_lock(&rpmsg_omx_services_lock);
+		mutex_lock(&rpmsg_omx_services_lock);
 		idr_remove(&rpmsg_omx_services, omxserv->minor);
-		spin_unlock(&rpmsg_omx_services_lock);
+		mutex_unlock(&rpmsg_omx_services_lock);
 		kfree(omxserv);
 		return;
 	}

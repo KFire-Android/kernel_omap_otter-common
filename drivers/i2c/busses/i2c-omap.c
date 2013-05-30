@@ -679,9 +679,7 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 	 * completes.
 	 */
 	if (dev->latency)
-		pm_qos_add_request(&dev->pm_qos_request,
-				   PM_QOS_CPU_DMA_LATENCY,
-				   dev->latency);
+		pm_qos_update_request(&dev->pm_qos_request, dev->latency);
 
 	for (i = 0; i < num; i++) {
 		r = omap_i2c_xfer_msg(adap, &msgs[i], (i == (num - 1)));
@@ -690,7 +688,8 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 	}
 
 	if (dev->latency)
-		pm_qos_remove_request(&dev->pm_qos_request);
+		pm_qos_update_request(&dev->pm_qos_request,
+				      PM_QOS_DEFAULT_VALUE);
 
 	if (r == 0)
 		r = num;
@@ -1107,6 +1106,9 @@ omap_i2c_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	dev->pm_qos_request.dev = dev->dev;
+	pm_qos_add_request(&dev->pm_qos_request,
+			   PM_QOS_CPU_DMA_LATENCY,
+			   PM_QOS_DEFAULT_VALUE);
 
 	dev->rev = omap_i2c_read_reg(dev, OMAP_I2C_REV_REG) & 0xff;
 
@@ -1191,6 +1193,7 @@ err_unuse_clocks:
 	pm_runtime_put(dev->dev);
 	pm_runtime_disable(&pdev->dev);
 	platform_set_drvdata(pdev, NULL);
+	pm_qos_remove_request(&dev->pm_qos_request);
 
 	return r;
 }
@@ -1211,6 +1214,7 @@ static int __devexit omap_i2c_remove(struct platform_device *pdev)
 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
 	pm_runtime_put(&pdev->dev);
 	pm_runtime_disable(&pdev->dev);
+	pm_qos_remove_request(&dev->pm_qos_request);
 	return 0;
 }
 
