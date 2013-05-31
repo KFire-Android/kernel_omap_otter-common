@@ -1787,8 +1787,8 @@ static struct omap_hwmod_irq_info dra7xx_mmc1_irqs[] = {
 };
 
 static struct omap_hwmod_dma_info dra7xx_mmc1_sdma_reqs[] = {
-	{ .name = "61", .dma_req = 60 + DRA7XX_DMA_REQ_START },
-	{ .name = "62", .dma_req = 61 + DRA7XX_DMA_REQ_START },
+	{ .name = "tx", .dma_req = 60 + DRA7XX_DMA_REQ_START },
+	{ .name = "rx", .dma_req = 61 + DRA7XX_DMA_REQ_START },
 	{ .dma_req = -1 }
 };
 
@@ -1827,8 +1827,8 @@ static struct omap_hwmod_irq_info dra7xx_mmc2_irqs[] = {
 };
 
 static struct omap_hwmod_dma_info dra7xx_mmc2_sdma_reqs[] = {
-	{ .name = "47", .dma_req = 46 + DRA7XX_DMA_REQ_START },
-	{ .name = "48", .dma_req = 47 + DRA7XX_DMA_REQ_START },
+	{ .name = "tx", .dma_req = 46 + DRA7XX_DMA_REQ_START },
+	{ .name = "rx", .dma_req = 47 + DRA7XX_DMA_REQ_START },
 	{ .dma_req = -1 }
 };
 
