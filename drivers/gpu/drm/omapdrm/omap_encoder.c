@@ -1,5 +1,5 @@
 /*
- * drivers/staging/omapdrm/omap_encoder.c
+ * drivers/gpu/drm/omapdrm/omap_encoder.c
  *
  * Copyright (C) 2011 Texas Instruments
  * Author: Rob Clark <rob@ti.com>
@@ -40,6 +40,13 @@ struct omap_encoder {
 	struct drm_encoder base;
 	struct omap_dss_device *dssdev;
 };
+
+struct omap_dss_device *omap_encoder_get_dssdev(struct drm_encoder *encoder)
+{
+	struct omap_encoder *omap_encoder = to_omap_encoder(encoder);
+
+	return omap_encoder->dssdev;
+}
 
 static void omap_encoder_destroy(struct drm_encoder *encoder)
 {

@@ -34,7 +34,7 @@ struct dss_reg_field {
 };
 
 struct dss_param_range {
-	int min, max;
+	unsigned long min, max;
 };
 
 struct omap_dss_features {
@@ -174,6 +174,20 @@ static const enum omap_display_type omap5_dss_supported_displays[] = {
 	OMAP_DISPLAY_TYPE_DSI,
 };
 
+static const enum omap_display_type dra7xx_dss_supported_displays[] = {
+	/* OMAP_DSS_CHANNEL_LCD */
+	OMAP_DISPLAY_TYPE_DPI,
+
+	/* OMAP_DSS_CHANNEL_DIGIT */
+	OMAP_DISPLAY_TYPE_HDMI | OMAP_DISPLAY_TYPE_DPI,
+
+	/* OMAP_DSS_CHANNEL_LCD2 */
+	OMAP_DISPLAY_TYPE_DPI,
+
+	/* OMAP_DSS_CHANNEL_LCD3 */
+	OMAP_DISPLAY_TYPE_DPI,
+};
+
 static const enum omap_dss_output_id omap2_dss_supported_outputs[] = {
 	/* OMAP_DSS_CHANNEL_LCD */
 	OMAP_DSS_OUTPUT_DPI | OMAP_DSS_OUTPUT_DBI,
@@ -229,6 +243,20 @@ static const enum omap_dss_output_id omap5_dss_supported_outputs[] = {
 	/* OMAP_DSS_CHANNEL_LCD3 */
 	OMAP_DSS_OUTPUT_DPI | OMAP_DSS_OUTPUT_DBI |
 	OMAP_DSS_OUTPUT_DSI2,
+};
+
+static const enum omap_dss_output_id dra7xx_dss_supported_outputs[] = {
+	/* OMAP_DSS_CHANNEL_LCD */
+	OMAP_DSS_OUTPUT_DPI,
+
+	/* OMAP_DSS_CHANNEL_DIGIT */
+	OMAP_DSS_OUTPUT_HDMI | OMAP_DSS_OUTPUT_DPI,
+
+	/* OMAP_DSS_CHANNEL_LCD2 */
+	OMAP_DSS_OUTPUT_DPI | OMAP_DSS_OUTPUT_DPI1,
+
+	/* OMAP_DSS_CHANNEL_LCD3 */
+	OMAP_DSS_OUTPUT_DPI | OMAP_DSS_OUTPUT_DPI2,
 };
 
 static const enum omap_color_mode omap2_dss_supported_color_modes[] = {
@@ -430,6 +458,11 @@ static const struct dss_param_range omap2_dss_param_range[] = {
 	 * scaler cannot scale a image with width more than 768.
 	 */
 	[FEAT_PARAM_LINEWIDTH]			= { 1, 768 },
+	[FEAT_PARAM_HDMI_PCLK]			= { 0, 0 },
+	[FEAT_PARAM_HDMIPLL_FINT]		= { 0, 0 },
+	[FEAT_PARAM_HDMIPLL_REGM]		= { 0, 0 },
+	[FEAT_PARAM_DCOFREQ_LOW]		= { 0, 0 },
+	[FEAT_PARAM_DCOFREQ_HIGH]		= { 0, 0 },
 };
 
 static const struct dss_param_range omap3_dss_param_range[] = {
@@ -444,6 +477,11 @@ static const struct dss_param_range omap3_dss_param_range[] = {
 	[FEAT_PARAM_DSI_FCK]			= { 0, 173000000 },
 	[FEAT_PARAM_DOWNSCALE]			= { 1, 4 },
 	[FEAT_PARAM_LINEWIDTH]			= { 1, 1024 },
+	[FEAT_PARAM_HDMI_PCLK]			= { 0, 0 },
+	[FEAT_PARAM_HDMIPLL_FINT]		= { 0, 0 },
+	[FEAT_PARAM_HDMIPLL_REGM]		= { 0, 0 },
+	[FEAT_PARAM_DCOFREQ_LOW]		= { 0, 0 },
+	[FEAT_PARAM_DCOFREQ_HIGH]		= { 0, 0 },
 };
 
 static const struct dss_param_range omap4_dss_param_range[] = {
@@ -458,6 +496,11 @@ static const struct dss_param_range omap4_dss_param_range[] = {
 	[FEAT_PARAM_DSI_FCK]			= { 0, 170000000 },
 	[FEAT_PARAM_DOWNSCALE]			= { 1, 4 },
 	[FEAT_PARAM_LINEWIDTH]			= { 1, 2048 },
+	[FEAT_PARAM_HDMI_PCLK]			= { 1, 185675000 },
+	[FEAT_PARAM_HDMIPLL_FINT]		= { 500000, 2500000 },
+	[FEAT_PARAM_HDMIPLL_REGM]		= { 0, (1 << 12) - 1 },
+	[FEAT_PARAM_DCOFREQ_LOW]		= { 500000000, 1000000000 },
+	[FEAT_PARAM_DCOFREQ_HIGH]		= { 1000000000, 2000000000 },
 };
 
 static const struct dss_param_range omap5_dss_param_range[] = {
@@ -472,6 +515,11 @@ static const struct dss_param_range omap5_dss_param_range[] = {
 	[FEAT_PARAM_DSI_FCK]			= { 0, 170000000 },
 	[FEAT_PARAM_DOWNSCALE]			= { 1, 4 },
 	[FEAT_PARAM_LINEWIDTH]			= { 1, 2048 },
+	[FEAT_PARAM_HDMI_PCLK]			= { 1, 186000000 },
+	[FEAT_PARAM_HDMIPLL_FINT]		= { 500000, 2500000 },
+	[FEAT_PARAM_HDMIPLL_REGM]		= { 20, 2046 },
+	[FEAT_PARAM_DCOFREQ_LOW]		= { 750000000, 1500000000 },
+	[FEAT_PARAM_DCOFREQ_HIGH]		= { 1250000000, 2500000000UL },
 };
 
 static const enum dss_feat_id omap2_dss_feat_list[] = {
@@ -791,6 +839,27 @@ static const struct omap_dss_features omap5_dss_features = {
 	.burst_size_unit = 16,
 };
 
+/* DRA DSS Features */
+static const struct omap_dss_features dra7xx_dss_features = {
+	.reg_fields = omap5_dss_reg_fields,
+	.num_reg_fields = ARRAY_SIZE(omap5_dss_reg_fields),
+
+	.features = omap5_dss_feat_list,
+	.num_features = ARRAY_SIZE(omap5_dss_feat_list),
+
+	.num_mgrs = 4,
+	.num_ovls = 4,
+	.supported_displays = dra7xx_dss_supported_displays,
+	.supported_outputs = dra7xx_dss_supported_outputs,
+	.supported_color_modes = omap4_dss_supported_color_modes,
+	.overlay_caps = omap4_dss_overlay_caps,
+	.clksrc_names = omap5_dss_clk_source_names,
+	.dss_params = omap5_dss_param_range,
+	.supported_rotation_types = OMAP_DSS_ROT_DMA | OMAP_DSS_ROT_TILER,
+	.buffer_size_unit = 16,
+	.burst_size_unit = 16,
+};
+
 #if defined(CONFIG_OMAP4_DSS_HDMI) || defined(CONFIG_OMAP5_DSS_HDMI)
 /* HDMI OMAP4 Functions*/
 static const struct ti_hdmi_ip_ops omap4_hdmi_functions = {
@@ -861,6 +930,7 @@ void dss_init_hdmi_ip_ops(struct hdmi_ip_data *ip_data,
 		ip_data->ops = &omap4_hdmi_functions;
 		break;
 	case OMAPDSS_VER_OMAP5:
+	case OMAPDSS_VER_DRA7xx:
 		ip_data->ops = &omap5_hdmi_functions;
 		break;
 	default:
@@ -1003,6 +1073,10 @@ void dss_features_init(enum omapdss_version version)
 
 	case OMAPDSS_VER_OMAP5:
 		omap_current_dss_features = &omap5_dss_features;
+		break;
+
+	case OMAPDSS_VER_DRA7xx:
+		omap_current_dss_features = &dra7xx_dss_features;
 		break;
 
 	case OMAPDSS_VER_AM35xx:
