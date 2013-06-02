@@ -1246,7 +1246,7 @@ static struct clk_hw_omap hdmi_div_clk_hw = {
 DEFINE_STRUCT_CLK(hdmi_div_clk, hdmi_dclk_div_parents, apll_pcie_clkvcoldo_ops);
 
 DEFINE_CLK_MUX(hdmi_dpll_clk_mux, abe_dpll_sys_clk_mux_parents, NULL, 0x0,
-	       DRA7XX_CM_CLKSEL_HDMI_CLK_CLKOUTMUX, DRA7XX_CLKSEL_SHIFT,
+	       DRA7XX_CM_CLKSEL_HDMI_PLL_SYS, DRA7XX_CLKSEL_SHIFT,
 	       DRA7XX_CLKSEL_WIDTH, 0x0, NULL);
 
 static struct clk l3_iclk_div;
