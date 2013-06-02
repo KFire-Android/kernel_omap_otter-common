@@ -924,8 +924,10 @@ static void ti_hdmi_5xxx_core_audio_infoframe_cfg
 {
 	void __iomem *core_sys_base = hdmi_core_sys_base(ip_data);
 
+	/* Channel count and coding type fields in AUDICONF0 are swapped */
 	hdmi_write_reg(core_sys_base, HDMI_CORE_FC_AUDICONF0,
-		info_aud->db1_ct_cc);
+		(info_aud->db1_ct_cc & CEA861_AUDIO_INFOFRAME_DB1CC)<<4 |
+		(info_aud->db1_ct_cc & CEA861_AUDIO_INFOFRAME_DB1CT)>>4);
 
 	hdmi_write_reg(core_sys_base, HDMI_CORE_FC_AUDICONF1,
 		info_aud->db2_sf_ss);
