@@ -8,16 +8,16 @@
 /dts-v1/;
 
 /*
- * Following are the carveout addresses and the sizes. SMC is not reserved for now
+ * Following are the carveout addresses and the sizes for ION. SMC is not reserved for now
  * C0000000 - SDRAM+1G
  * BFD00000 - SMC (3MB)
  * BA300000 - ION (90MB)
- * B4300000 - TILER SECURE (96 MB)
+ * B4300000 - TILER SECURE (81 MB)
  * B3400000 - TILER NONSECURE (15 MB)
 */
 /memreserve/ 0xba300000 0x5a00000;
-/memreserve/ 0xb4300000 0x6000000;
-/memreserve/ 0xb3400000 0xf00000;
+/memreserve/ 0xb5200000 0x5100000;
+/memreserve/ 0xb4300000 0xf00000;
 
 /include/ "omap5.dtsi"
 /include/ "samsung_k3pe0e000b.dtsi"
