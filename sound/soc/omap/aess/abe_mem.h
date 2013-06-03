@@ -60,54 +60,80 @@
 #define _ABE_MEM_H_
 
 #include <asm/io.h>
+#include <linux/pm_runtime.h>
 
 /* Distinction between Read and Write from/to ABE memory
  * is useful for simulation tool */
 static inline void omap_abe_mem_write(struct omap_aess *abe, int bank,
 				u32 offset, u32 *src, size_t bytes)
 {
+	pm_runtime_get_sync(abe->dev);
 	memcpy((void __force *)(abe->io_base[bank] + offset), src, bytes);
+	pm_runtime_put_sync(abe->dev);
 }
 
 static inline void omap_abe_mem_read(struct omap_aess *abe, int bank,
 				u32 offset, u32 *dest, size_t bytes)
 {
+	pm_runtime_get_sync(abe->dev);
 	memcpy(dest, (void __force *)(abe->io_base[bank] + offset), bytes);
+	pm_runtime_put_sync(abe->dev);
 }
 
 static inline u32 omap_aess_reg_readl(struct omap_aess *abe, u32 offset)
 {
-	return __raw_readl(abe->io_base[OMAP_ABE_AESS] + offset);
+	u32 ret;
+	pm_runtime_get_sync(abe->dev);
+	ret = __raw_readl(abe->io_base[OMAP_ABE_AESS] + offset);
+	pm_runtime_put_sync(abe->dev);
+	return ret;
 }
 
 static inline void omap_aess_reg_writel(struct omap_aess *abe,
 				u32 offset, u32 val)
 {
+	pm_runtime_get_sync(abe->dev);
 	__raw_writel(val, (abe->io_base[OMAP_ABE_AESS] + offset));
+	pm_runtime_put_sync(abe->dev);
 }
 
 static inline void *omap_abe_reset_mem(struct omap_aess *abe, int bank,
 			u32 offset, size_t bytes)
 {
-	return memset((u32 *)(abe->io_base[bank] + offset), 0, bytes);
+	void *ret;
+	pm_runtime_get_sync(abe->dev);
+	ret = memset((u32 *)(abe->io_base[bank] + offset), 0, bytes);
+	pm_runtime_put_sync(abe->dev);
+	return ret;
 }
 
 static inline void omap_aess_mem_write(struct omap_aess *abe,
 			struct omap_aess_addr addr, u32 *src)
 {
-	memcpy((void __force *)(abe->io_base[addr.bank] + addr.offset), src, addr.bytes);
+	pm_runtime_get_sync(abe->dev);
+	memcpy((void __force *)(abe->io_base[addr.bank] + addr.offset),
+	       src, addr.bytes);
+	pm_runtime_put_sync(abe->dev);
 }
 
 static inline void omap_aess_mem_read(struct omap_aess *abe,
 				struct omap_aess_addr addr, u32 *dest)
 {
-	memcpy(dest, (void __force *)(abe->io_base[addr.bank] + addr.offset), addr.bytes);
+	pm_runtime_get_sync(abe->dev);
+	memcpy(dest, (void __force *)(abe->io_base[addr.bank] + addr.offset),
+	       addr.bytes);
+	pm_runtime_put_sync(abe->dev);
 }
 
 static inline void *omap_aess_reset_mem(struct omap_aess *abe,
 			struct omap_aess_addr addr)
 {
-	return memset((void __force *)(abe->io_base[addr.bank] + addr.offset), 0, addr.bytes);
+	void *ret;
+	pm_runtime_get_sync(abe->dev);
+	ret = memset((void __force *)(abe->io_base[addr.bank] + addr.offset),
+		     0, addr.bytes);
+	pm_runtime_put_sync(abe->dev);
+	return ret;
 }
 
 #endif /*_ABE_MEM_H_*/
