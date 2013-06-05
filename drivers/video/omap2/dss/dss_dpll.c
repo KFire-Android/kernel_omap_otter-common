@@ -352,11 +352,21 @@ static int dpll_power(enum dss_dpll dpll, int state)
 	/* PLL_PWR_CMD = enable both hsdiv and clkout*/
 	REG_FLD_MOD(dpll, CLK_CTRL, state, 31, 30);
 
-	/* PLL_PWR_STATUS: (NOTE: apparently buggy) */
+	/*
+	 * PLL_PWR_STATUS doesn't correctly reflect the power state set on
+	 * DRA7xx. Ignore the reg field and add a small delay for the power
+	 * state to change.
+	 */
+	if (omapdss_get_version() == OMAPDSS_VER_DRA7xx) {
+		msleep(1);
+		return 0;
+	}
+
+	/* PLL_PWR_STATUS */
 	while (FLD_GET(dpll_read_reg(dpll, CLK_CTRL), 29, 28) != state) {
 		if (++t > 1000) {
 			DSSERR("Failed to set DPLL power mode to %d\n", state);
-			/* return -ENODEV; */
+			return -ENODEV;
 			return 0;
 		}
 		udelay(1);
