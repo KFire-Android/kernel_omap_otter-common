@@ -184,6 +184,7 @@ static struct i2c_board_info tlc_i2c_board_info = {
 static int tfc_s9700_probe(struct omap_dss_device *dssdev)
 {
 	struct panel_drv_data *ddata;
+	struct device *i2c_dev;
 	int r;
 
 	ddata = devm_kzalloc(&dssdev->dev, sizeof(*ddata), GFP_KERNEL);
@@ -226,6 +227,11 @@ static int tfc_s9700_probe(struct omap_dss_device *dssdev)
 		return -EINVAL;
 	}
 
+	i2c_dev = &ddata->tlc_client->dev;
+	if (!i2c_dev->driver) {
+		dev_err(&dssdev->dev, "tlc i2c client has no driver\n");
+		return -EINVAL;
+	}
 
 	if (dssdev->phy.dpi.data_lines == 24)
 		ddata->dith = 0;
