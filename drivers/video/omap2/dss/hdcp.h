@@ -24,6 +24,8 @@
 
 #include <linux/ioctl.h>
 #include <linux/types.h>
+#include "ti_hdmi_4xxx_ip.h"
+#include "../dss/dss.h"
 
 /********************************/
 /* Structures related to ioctl  */
@@ -203,7 +205,8 @@ enum hdcp_states {
 
 enum hdmi_states {
         HDMI_STOPPED,
-        HDMI_STARTED
+        HDMI_STARTED,
+	HDMI_POWERED_OFF
 };
 
 struct hdcp_data {
@@ -270,6 +273,7 @@ extern struct hdcp_sha_in sha_input;
 #define HDCP_R0_DELAY           110
 #define HDCP_KSV_TIMEOUT_DELAY  5000
 #define HDCP_REAUTH_DELAY       100
+#define HDCP_POWEROFF_DELAY	10000
 
 /* Event source */
 #define HDCP_SRC_SHIFT          8

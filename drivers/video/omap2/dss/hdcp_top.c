@@ -27,8 +27,6 @@
 #include <linux/completion.h>
 #include <linux/miscdevice.h>
 #include <linux/firmware.h>
-#include "ti_hdmi_4xxx_ip.h"
-#include "../dss/dss.h"
 #include "hdcp.h"
 
 struct hdcp_data hdcp;
@@ -79,11 +77,22 @@ static void hdcp_wq_disable(void)
 
 static void omap4_hdcp_wq_start_authentication(void)
 {
+	struct hdmi_ip_data *ip_data;
         int status = HDCP_OK;
 
         hdcp.hdcp_state = HDCP_AUTHENTICATION_START;
 
         printk(KERN_INFO "HDCP: authentication start\n");
+
+	ip_data = get_hdmi_ip_data();
+
+	if (!ti_hdmi_4xxx_check_rxdet_line(ip_data)) {
+		hdcp.hdmi_state = HDMI_POWERED_OFF;
+		hdcp.retry_cnt = HDCP_INFINITE_REAUTH;
+		hdcp_wq_authentication_failure();
+	} else {
+		hdcp.hdmi_state = HDMI_STARTED;
+	}
 
         /* Step 1 part 1 (until R0 calc delay) */
         status = hdcp_lib_step1_start();
@@ -193,8 +202,14 @@ static void hdcp_wq_authentication_failure(void)
                 hdcp.hdcp_state = HDCP_AUTHENTICATION_START;
                 hdcp.auth_state = HDCP_STATE_AUTH_FAIL_RESTARTING;
 
-                hdcp.pending_wq_event = hdcp_submit_work(HDCP_AUTH_REATT_EVENT,
-                                                         HDCP_REAUTH_DELAY);
+		if (hdcp.hdmi_state != HDMI_POWERED_OFF)
+	                hdcp.pending_wq_event = hdcp_submit_work(
+							HDCP_AUTH_REATT_EVENT,
+							HDCP_REAUTH_DELAY);
+		else
+			hdcp.pending_wq_event = hdcp_submit_work(
+							HDCP_AUTH_REATT_EVENT,
+							HDCP_POWEROFF_DELAY);
         } else {
                 printk(KERN_INFO "HDCP: authentication failed - "
                                  "HDCP disabled\n");
@@ -441,7 +456,11 @@ static void omap4_hdcp_start_frame_cb(void)
 
 static void omap4_hdcp_irq_cb(int status)
 {
+	struct hdmi_ip_data *ip_data;
+
         HDCP_DBG("hdcp_irq_cb() status=%x", status);
+
+	ip_data = get_hdmi_ip_data();
 
         if (!hdcp.hdcp_keys_loaded) {
                 HDCP_DBG("%s: hdcp_keys not loaded = %d",
@@ -467,7 +486,10 @@ static void omap4_hdcp_irq_cb(int status)
                 if (status & HDMI_HPD_LOW) {
                         hdcp_lib_set_encryption(HDCP_ENC_OFF);
                         hdcp_ddc_abort();
-                }
+                } else if (!ti_hdmi_4xxx_check_rxdet_line(ip_data)) {
+			hdcp.hdmi_state = HDMI_POWERED_OFF;
+			hdcp.retry_cnt = HDCP_INFINITE_REAUTH;
+		}
 
                 if (status & HDMI_RI_ERR) {
                         hdcp_lib_set_av_mute(AV_MUTE_SET);

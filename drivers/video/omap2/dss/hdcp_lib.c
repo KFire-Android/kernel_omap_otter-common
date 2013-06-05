@@ -449,52 +449,17 @@ void hdcp_lib_set_encryption(enum encryption_state enc_state)
  */
 void hdcp_lib_set_av_mute(enum av_mute av_mute_state)
 {
+	struct hdmi_ip_data *ip_data;
 	unsigned long flags;
 
 	HDCP_DBG("hdcp_lib_set_av_mute() av_mute=%d", av_mute_state);
 
+	ip_data = get_hdmi_ip_data();
 
 	spin_lock_irqsave(&hdcp.spinlock, flags);
 
-	{
-		u8 RegVal, TimeOutCount = 64;
-
-		RegVal = RD_REG_32(hdcp.hdmi_wp_base_addr + HDMI_CORE_AV_BASE,
-				   HDMI_CORE_AV_PB_CTRL2);
-
-		/* PRguide-GPC: To change the content of the CP_BYTE1 register,
-		 * CP_EN must be zero
-		 * set PB_CTRL2 :: CP_RPT = 0
-		 */
-		WR_FIELD_32(hdcp.hdmi_wp_base_addr + HDMI_CORE_AV_BASE,
-			    HDMI_CORE_AV_PB_CTRL2, 2, 2, 0);
-
-		/* Set/clear AV mute state */
-		WR_REG_32(hdcp.hdmi_wp_base_addr + HDMI_CORE_AV_BASE,
-			  HDMI_CORE_AV_CP_BYTE1, av_mute_state);
-
-		/* FIXME: This loop should be removed */
-		while (TimeOutCount--) {
-			/* Continue in this loop till CP_EN becomes 0,
-			 * prior to TimeOutCount becoming 0 */
-			if (!RD_FIELD_32(hdcp.hdmi_wp_base_addr +
-					 HDMI_CORE_AV_BASE,
-					 HDMI_CORE_AV_PB_CTRL2, 3, 3))
-				break;
-		}
-
-		HDCP_DBG("    timeoutcount=%d", TimeOutCount);
-
-		/* FIXME: why is this if condition required?, according to prg,
-		 * this shall be unconditioanlly */
-		if (TimeOutCount) {
-			/* set PB_CTRL2 :: CP_EN = 1 & CP_RPT = 1 */
-			RegVal = FLD_MOD(RegVal, 0x3, 3, 2);
-
-			WR_REG_32(hdcp.hdmi_wp_base_addr + HDMI_CORE_AV_BASE,
-				  HDMI_CORE_AV_PB_CTRL2, RegVal);
-		}
-	}
+	if (!ti_hdmi_4xxx_set_av_mute(ip_data, av_mute_state))
+		HDCP_ERR("HDCP: Changing AV Mute flag failed\n");
 
 	spin_unlock_irqrestore(&hdcp.spinlock, flags);
 }

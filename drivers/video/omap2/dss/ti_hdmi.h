@@ -342,6 +342,8 @@ int ti_hdmi_4xxx_cec_set_reg_device_list(struct hdmi_ip_data *ip_data,
 	int mask);
 int hdmi_ti_4xxx_wp_get_video_state(struct hdmi_ip_data *ip_data);
 int hdmi_ti_4xxx_set_wait_soft_reset(struct hdmi_ip_data *ip_data);
+int ti_hdmi_4xxx_check_rxdet_line(struct hdmi_ip_data *ip_data);
+int ti_hdmi_4xxx_set_av_mute(struct hdmi_ip_data *ip_data, u8 av_mute_state);
 void ti_hdmi_5xxx_basic_configure(struct hdmi_ip_data *ip_data);
 void ti_hdmi_5xxx_core_dump(struct hdmi_ip_data *ip_data, struct seq_file *s);
 int ti_hdmi_5xxx_read_edid(struct hdmi_ip_data *ip_data,
