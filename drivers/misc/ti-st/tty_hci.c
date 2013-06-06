@@ -147,6 +147,9 @@ int hci_tty_open(struct inode *inod, struct file *file)
 
 	file->private_data = hst;
 
+	skb_queue_head_init(&hst->rx_list);
+	init_waitqueue_head(&hst->data_q);
+
 	for (i = 0; i < MAX_BT_CHNL_IDS; i++) {
 		ti_st_proto[i].priv_data = hst;
 		ti_st_proto[i].max_frame_size = 1026;
@@ -211,9 +214,6 @@ done:
 			return -EIO;
 		}
 	}
-
-	skb_queue_head_init(&hst->rx_list);
-	init_waitqueue_head(&hst->data_q);
 
 	return 0;
 
