@@ -142,6 +142,9 @@ int hci_tty_open(struct inode *inod, struct file *file)
 	pr_info("inside %s (%p, %p)\n", __func__, inod, file);
 
 	hst = kzalloc(sizeof(*hst), GFP_KERNEL);
+	if (!hst)
+		return -ENOMEM;
+
 	file->private_data = hst;
 	hst = file->private_data;
 
