@@ -146,7 +146,6 @@ int hci_tty_open(struct inode *inod, struct file *file)
 		return -ENOMEM;
 
 	file->private_data = hst;
-	hst = file->private_data;
 
 	for (i = 0; i < MAX_BT_CHNL_IDS; i++) {
 		ti_st_proto[i].priv_data = hst;
