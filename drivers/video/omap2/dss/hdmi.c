@@ -1120,10 +1120,12 @@ static irqreturn_t hdmi_irq_handler(int irq, void *arg)
 	if (hdmi.hdmi_cec_irq_cb && (r & HDMI_CEC_INT))
 		hdmi.hdmi_cec_irq_cb();
 
-	if (hdmi.hdmi_hdcp_irq_cb && (r & HDMI_HDCP_INT))
-		hdmi.hdmi_hdcp_irq_cb(HDMI_HPD_HIGH);
+	if (hdmi.hdmi_hdcp_irq_cb)
+		hdmi.hdmi_hdcp_irq_cb(r);
 
-	r = hdmi.ip_data.ops->irq_process(&hdmi.ip_data);
+	if (hdmi.ip_data.ops->irq_process)
+		r = hdmi.ip_data.ops->irq_process(&hdmi.ip_data);
+
 	return IRQ_HANDLED;
 }
 

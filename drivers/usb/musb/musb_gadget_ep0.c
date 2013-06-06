@@ -887,6 +887,37 @@ stall:
 finish:
 				musb_writew(regs, MUSB_CSR0,
 						musb->ackpend);
+
+				/*
+				 * If we are at end of SET_ADDRESS sequence,
+				 * update the address immediately if possible,
+				 * otherwise we may miss packets between
+				 * sending ACK from musb side and musb's next
+				 * interrupt handler firing (in which we update
+				 * the address). At least this fixes next
+				 * USB2.0 ch9 test of USB30CV utility:
+				 * "Addressed state - Device Descriptor test"
+				 */
+				if (musb->set_address && (musb->ackpend &
+							MUSB_CSR0_P_DATAEND) &&
+						(musb->ep0_state ==
+						MUSB_EP0_STAGE_STATUSIN)) {
+					u16 ack_delay = 500;
+
+					while ((musb_readw(regs, MUSB_CSR0) &
+							MUSB_CSR0_P_DATAEND) &&
+							--ack_delay) {
+						cpu_relax();
+						udelay(1);
+					}
+
+					if (ack_delay) {
+						musb->set_address = false;
+						musb_writeb(mbase, MUSB_FADDR,
+								musb->address);
+					}
+				}
+
 				musb->ackpend = 0;
 			}
 		}

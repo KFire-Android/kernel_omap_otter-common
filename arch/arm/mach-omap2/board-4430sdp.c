@@ -61,6 +61,7 @@
 #include <linux/leds-omap4430sdp-display.h>
 #include <linux/omap4_duty_cycle_governor.h>
 #include <plat/rpmsg_resmgr.h>
+#include <plat/android-display.h>
 
 #include "mux.h"
 #include "hsmmc.h"
@@ -1229,6 +1230,62 @@ static struct picodlp_panel_data sdp4430_picodlp_pdata = {
 	.pwrgood_gpio		= 45,
 };
 
+static struct omap_dss_device *dss_devices_hdmi_default_display[] = {
+	&sdp4430_hdmi_device,
+};
+
+/* Allocate ( 18 + 9 ) MB for TILER1D slot size for WUXGA panel, total of
+ * 54 MB of TILER1D
+ */
+static struct dsscomp_platform_data dsscomp_config_hdmi_display = {
+	.tiler1d_slotsz = (SZ_16M + SZ_2M + SZ_8M + SZ_1M),
+};
+
+static struct sgx_omaplfb_config omaplfb_config_sdp4430[] = {
+	{
+		.tiler2d_buffers = 2,
+		.swap_chain_length = 2,
+	},
+	{
+		.vram_buffers = 2,
+		.swap_chain_length = 2,
+	},
+};
+
+static struct sgx_omaplfb_platform_data sdp4430_omaplfb_data = {
+	.num_configs = ARRAY_SIZE(omaplfb_config_sdp4430),
+	.configs = omaplfb_config_sdp4430,
+};
+
+/* HACK: use 2 devices, as expected by DDK */
+static struct sgx_omaplfb_config omaplfb_config_hdmi_default_display[] = {
+	{
+		.vram_buffers = 2,
+		.swap_chain_length = 2,
+	},
+	{
+		.vram_buffers = 2,
+		.swap_chain_length = 2,
+	}
+};
+
+static struct sgx_omaplfb_platform_data omaplfb_plat_data_hdmi_default_display = {
+	.num_configs = ARRAY_SIZE(omaplfb_config_hdmi_default_display),
+	.configs = omaplfb_config_hdmi_default_display,
+};
+
+static struct omap_dss_board_info sdp4430_dss_data_hdmi_default_display = {
+	.num_devices    = ARRAY_SIZE(dss_devices_hdmi_default_display),
+	.devices        = dss_devices_hdmi_default_display,
+	.default_device = &sdp4430_hdmi_device,
+};
+
+static struct omapfb_platform_data sdp4430_fb_pdata = {
+	.mem_desc = {
+		.region_cnt = ARRAY_SIZE(omaplfb_config_hdmi_default_display),
+	},
+};
+
 static void sdp4430_picodlp_init(void)
 {
 	int r;
@@ -1284,6 +1341,25 @@ static struct omap_dss_board_info sdp4430_dss_data = {
 	.default_device	= &sdp4430_lcd_device,
 };
 
+static void __init sdp4430_android_display_setup(void)
+{
+
+	if (omap_android_display_is_default(&sdp4430_hdmi_device))
+	{
+		omap_android_display_setup(
+			&sdp4430_dss_data_hdmi_default_display,
+			&dsscomp_config_hdmi_display,
+			&omaplfb_plat_data_hdmi_default_display,
+			&sdp4430_fb_pdata);
+
+	}
+	else
+		omap_android_display_setup(&sdp4430_dss_data,
+					   NULL,
+					   &sdp4430_omaplfb_data,
+					   &sdp4430_fb_pdata);
+}
+
 static void __init omap_4430sdp_display_init(void)
 {
 	int r;
@@ -1300,8 +1376,12 @@ static void __init omap_4430sdp_display_init(void)
 	platform_device_register(&blaze_disp_led);
 	sdp4430_lcd_init();
 	sdp4430_picodlp_init();
+	omapfb_set_platform_data(&sdp4430_fb_pdata);
 	omap_vram_set_sdram_vram(SDP4430_FB_RAM_SIZE, 0);
-	omap_display_init(&sdp4430_dss_data);
+	if (omap_android_display_is_default(&sdp4430_hdmi_device))
+		omap_display_init(&sdp4430_dss_data_hdmi_default_display);
+	else
+		omap_display_init(&sdp4430_dss_data);
 	/*
 	 * OMAP4460SDP/Blaze and OMAP4430 ES2.3 SDP/Blaze boards and
 	 * later have external pull up on the HDMI I2C lines
@@ -1539,6 +1619,7 @@ static void __init omap_4430sdp_reserve(void)
 	omap_ram_console_init(OMAP_RAM_CONSOLE_START_DEFAULT,
 			OMAP_RAM_CONSOLE_SIZE_DEFAULT);
 	omap_rproc_reserve_cma(RPROC_CMA_OMAP4);
+	sdp4430_android_display_setup();
 	omap4_ion_init();
 	omap_reserve();
 }

@@ -19,6 +19,14 @@
 #include <plat/omap_hwmod.h>
 #include <plat/omap_device.h>
 
+static struct omap_device_pm_latency omap_iommu_latency[] = {
+	{
+		.deactivate_func = omap_device_shutdown_hwmods,
+		.activate_func = omap_device_enable_hwmods,
+		.flags = OMAP_DEVICE_LATENCY_AUTO_ADJUST,
+	},
+};
+
 static int __init omap_iommu_dev_init(struct omap_hwmod *oh, void *unused)
 {
 	struct platform_device *pdev;
@@ -34,7 +42,7 @@ static int __init omap_iommu_dev_init(struct omap_hwmod *oh, void *unused)
 	pdata.pm_constraint = a->pm_constraint;
 
 	pdev = omap_device_build("omap-iommu", i, oh, &pdata, sizeof(pdata),
-				NULL, 0, 0);
+			 omap_iommu_latency, ARRAY_SIZE(omap_iommu_latency), 0);
 	if (IS_ERR(pdev)) {
 		pr_err("%s: device build error: %ld\n",
 				__func__, PTR_ERR(pdev));

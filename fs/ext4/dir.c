@@ -76,8 +76,12 @@ int __ext4_check_dir_entry(const char *function, unsigned int line,
 			   unsigned int offset)
 {
 	const char *error_msg = NULL;
-	const int rlen = ext4_rec_len_from_disk(de->rec_len,
-						dir->i_sb->s_blocksize);
+	int rlen;
+
+	if (!de || !bh || !dir)
+		return 1;
+
+	rlen = ext4_rec_len_from_disk(de->rec_len, dir->i_sb->s_blocksize);
 
 	if (unlikely(rlen < EXT4_DIR_REC_LEN(1)))
 		error_msg = "rec_len is smaller than minimal";

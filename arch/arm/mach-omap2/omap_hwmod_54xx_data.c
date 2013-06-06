@@ -2890,6 +2890,7 @@ static struct omap_hwmod omap54xx_ipu_hwmod = {
 	.name		= "ipu",
 	.class		= &omap54xx_mmu_hwmod_class,
 	.clkdm_name	= "ipu_clkdm",
+	.flags		= HWMOD_INIT_NO_RESET,
 	.mpu_irqs	= omap54xx_ipu_irqs,
 	.rst_lines	= omap54xx_ipu_resets,
 	.rst_lines_cnt	= ARRAY_SIZE(omap54xx_ipu_resets),

@@ -2016,6 +2016,10 @@ void rproc_shutdown(struct rproc *rproc)
 	if (!atomic_dec_and_test(&rproc->power))
 		goto out;
 
+	/* make sure rproc is not offline before powering it off */
+	if (rproc->state == RPROC_OFFLINE)
+		goto out;
+
 	/*
 	 * if autosuspend is enabled we need to cancel possible already
 	 * scheduled runtime suspend. Also, if it is already autosuspended

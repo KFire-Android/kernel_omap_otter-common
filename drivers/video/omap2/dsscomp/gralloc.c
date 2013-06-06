@@ -194,6 +194,23 @@ static bool dsscomp_is_any_device_active(void)
 	return false;
 }
 
+bool dsscomp_check_mflag(struct dsscomp_setup_dispc_data *d)
+{
+	int i;
+
+	if (d->num_ovls < (MAX_OVERLAYS - 1))
+		return false;
+
+	for (i = 0; i < d->num_ovls; i++) {
+		struct dss2_ovl_info *oi = d->ovls + i;
+
+		if ((oi->cfg.ix != OMAP_DSS_WB) && (!oi->cfg.enabled))
+				return false;
+	}
+
+	return true;
+}
+
 int dsscomp_gralloc_queue(struct dsscomp_setup_dispc_data *d,
 			struct tiler_pa_info **pas,
 			bool early_callback,
@@ -217,6 +234,7 @@ int dsscomp_gralloc_queue(struct dsscomp_setup_dispc_data *d,
 	int skip;
 	struct dsscomp_gralloc_t *gsync;
 	struct dss2_rect_t win = { .w = 0 };
+	bool use_mflag = false;
 
 	/* reserve tiler areas if not already done so */
 	dsscomp_gralloc_init(cdev);
@@ -293,10 +311,16 @@ int dsscomp_gralloc_queue(struct dsscomp_setup_dispc_data *d,
 
 	/* create dsscomp objects for set managers (including active ones) */
 	for (ch = 0; ch < MAX_MANAGERS; ch++) {
+		u32 display_ix;
+		struct omap_dss_device *dssdev;
+
 		if (!(mgr_set_mask & (1 << ch)))
 			continue;
 
 		mgr = cdev->mgrs[ch];
+
+		display_ix = get_display_ix(mgr);
+		dssdev = cdev->displays[display_ix];
 
 		comp[ch] = dsscomp_new(mgr);
 		/*HACK: identify each comp to use with WFD invalidation WA*/
@@ -309,6 +333,15 @@ int dsscomp_gralloc_queue(struct dsscomp_setup_dispc_data *d,
 		}
 
 		comp[ch]->must_apply = true;
+
+		if (!win.w && !win.x)
+			win.w = dssdev->panel.timings.x_res;
+		if (!win.h && !win.y)
+			win.h = dssdev->panel.timings.y_res;
+
+		if (((win.w - win.x) * (win.h - win.y)) >= FULLHD_RESOLUTION)
+			use_mflag = dsscomp_check_mflag(d);
+
 		r = dsscomp_setup(comp[ch], d->mode, win);
 		if (r)
 			dev_err(DEV(cdev), "failed to setup comp (%d)\n", r);
@@ -442,6 +475,8 @@ skip_map1d:
 
 		if (oi->cfg.enabled)
 			ovl_new_use_mask[ch] |= 1 << oi->cfg.ix;
+
+		oi->cfg.mflag_en = use_mflag;
 
 		r = dsscomp_set_ovl(comp[ch], oi);
 		if (r)

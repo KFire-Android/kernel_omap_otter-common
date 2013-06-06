@@ -28,6 +28,7 @@
 
 #include <mach/ctrl_module_wkup_44xx.h>
 #include <mach/hardware.h>
+#include <mach/omap-wakeupgen.h>
 
 #include "common.h"
 #include "clockdomain.h"
@@ -1051,6 +1052,8 @@ int __init omap4_pm_init(void)
 
 	if (cpu_is_omap44xx())
 		omap4_syscontrol_setup_regs();
+
+	omap_wakeupgen_init_finish();
 
 	/*
 	 * Work around for OMAP443x Errata i632: "LPDDR2 Corruption After OFF

@@ -34,4 +34,5 @@
 
 extern int __init omap_wakeupgen_init(void);
 extern void __iomem *omap_get_wakeupgen_base(void);
+extern void __init omap_wakeupgen_init_finish(void);
 #endif

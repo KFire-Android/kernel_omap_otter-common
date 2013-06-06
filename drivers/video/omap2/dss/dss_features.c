@@ -867,6 +867,7 @@ static const struct ti_hdmi_ip_ops omap4_hdmi_functions = {
 	.audio_config		=	ti_hdmi_4xxx_audio_config,
 #endif
 	.irq_handler		=	ti_hdmi_4xxx_irq_handler,
+	.irq_process            =       NULL,
 	.cec_get_rx_cmd			=	ti_hdmi_4xxx_cec_get_rx_cmd,
 	.cec_read_rx_cmd		=	ti_hdmi_4xxx_cec_read_rx_cmd,
 	.cec_transmit_cmd		=	ti_hdmi_4xxx_cec_transmit_cmd,
