@@ -52,7 +52,7 @@ DEFINE_CLK_FIXED_RATE(atl_clkin1_ck, CLK_IS_ROOT, 0, 0x0);
 
 DEFINE_CLK_FIXED_RATE(atl_clkin2_ck, CLK_IS_ROOT, 0, 0x0);
 
-DEFINE_CLK_FIXED_RATE(atlclkin3_ck, CLK_IS_ROOT, 0, 0x0);
+DEFINE_CLK_FIXED_RATE(atl_clkin3_ck, CLK_IS_ROOT, 0, 0x0);
 
 DEFINE_CLK_FIXED_RATE(hdmi_clkin_ck, CLK_IS_ROOT, 0, 0x0);
 
@@ -1558,9 +1558,9 @@ DEFINE_CLK_DIVIDER_TABLE(l3instr_ts_gclk_div, "wkupaon_iclk_mux",
 
 static const char *mcasp1_ahclkr_mux_parents[] = {
 	"abe_24m_fclk", "abe_sys_clk_div", "func_24m_clk",
-	"atlclkin3", "atl_clkin2", "atl_clkin1",
-	"atl_clkin0", "sys_clkin2", "ref_clkin0",
-	"ref_clkin1", "ref_clkin2", "ref_clkin3",
+	"atl_clkin3_ck", "atl_clkin2_ck", "atl_clkin1_ck",
+	"atl_clkin0_ck", "sys_clkin2", "ref_clkin0_ck",
+	"ref_clkin1_ck", "ref_clkin2_ck", "ref_clkin3_ck",
 	"mlb_clk", "mlbp_clk",
 };
 
@@ -1695,8 +1695,8 @@ DEFINE_CLK_DIVIDER(qspi_gfclk_div, "qspi_gfclk_mux", &qspi_gfclk_mux, 0x0,
 
 static const char *timer10_gfclk_mux_parents[] = {
 	"timer_sys_clk_div", "sys_32k_ck", "sys_clkin2",
-	"ref_clkin0", "ref_clkin1", "ref_clkin2",
-	"ref_clkin3", "abe_giclk_div", "video1_div_clk",
+	"ref_clkin0_ck", "ref_clkin1_ck", "ref_clkin2_ck",
+	"ref_clkin3_ck", "abe_giclk_div", "video1_div_clk",
 	"video2_div_clk", "hdmi_div_clk",
 };
 
@@ -1742,8 +1742,8 @@ DEFINE_CLK_MUX(timer4_gfclk_mux, timer10_gfclk_mux_parents, NULL, 0x0,
 
 static const char *timer5_gfclk_mux_parents[] = {
 	"timer_sys_clk_div", "sys_32k_ck", "sys_clkin2",
-	"ref_clkin0", "ref_clkin1", "ref_clkin2",
-	"ref_clkin3", "abe_giclk_div", "video1_div_clk",
+	"ref_clkin0_ck", "ref_clkin1_ck", "ref_clkin2_ck",
+	"ref_clkin3_ck", "abe_giclk_div", "video1_div_clk",
 	"video2_div_clk", "hdmi_div_clk", "clkoutmux0_clk_mux",
 };
 
@@ -1831,7 +1831,7 @@ static struct omap_clk dra7xx_clks[] = {
 	CLK(NULL,	"atl_clkin0_ck",		&atl_clkin0_ck,	CK_7XX),
 	CLK(NULL,	"atl_clkin1_ck",		&atl_clkin1_ck,	CK_7XX),
 	CLK(NULL,	"atl_clkin2_ck",		&atl_clkin2_ck,	CK_7XX),
-	CLK(NULL,	"atlclkin3_ck",			&atlclkin3_ck,	CK_7XX),
+	CLK(NULL,	"atl_clkin3_ck",		&atl_clkin3_ck,	CK_7XX),
 	CLK(NULL,	"hdmi_clkin_ck",		&hdmi_clkin_ck,	CK_7XX),
 	CLK(NULL,	"mlb_clkin_ck",			&mlb_clkin_ck,	CK_7XX),
 	CLK(NULL,	"mlbp_clkin_ck",		&mlbp_clkin_ck,	CK_7XX),
