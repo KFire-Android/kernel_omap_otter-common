@@ -840,10 +840,7 @@ static int davinci_mcasp_hw_params(struct snd_pcm_substream *substream,
 	u8 fifo_level;
 	u8 slots = dev->tdm_slots;
 	u8 active_serializers;
-	int channels;
-	struct snd_interval *pcm_channels = hw_param_interval(params,
-					SNDRV_PCM_HW_PARAM_CHANNELS);
-	channels = pcm_channels->min;
+	int channels = params_channels(params);
 
 	active_serializers = (channels + slots - 1) / slots;
 
