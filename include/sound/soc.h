@@ -676,7 +676,14 @@ struct snd_soc_dai_link {
 };
 
 struct snd_soc_codec_conf {
+	/*
+	 * You MUST specify the conf's codec, either by device name,
+	 * or by DT/OF node, but not both.
+	 */
 	const char *dev_name;
+	const struct device_node *codec_of_node;
+
+	struct snd_soc_codec *codec;
 
 	/*
 	 * optional map of kcontrol, widget and path name prefixes that are
