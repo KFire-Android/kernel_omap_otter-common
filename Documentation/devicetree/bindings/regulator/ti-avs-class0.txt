@@ -1,0 +1,66 @@
+Texas Instrument SmartReflex AVS Class 0 Regulator
+
+Required properties:
+- compatible: "ti,avsclass0"
+- reg: Should contain Efuse registers location and length
+- avs-supply: The supply for AVS block
+- efuse-settings: An array of 2-tuples items, and each item consists
+  of Voltage index and efuse offset(from reg) like: <voltage offset>
+	voltage: Voltage index in microvolts (also called nominal voltage)
+	offset: ofset in bytes from base provided in reg
+  NOTE: min_uV, max_uV are pickedup from this list
+
+Optional properties:
+- voltage-tolerance: Specify the voltage tolerance in percentage
+- ti,avsclass0-microvolt-values: Boolean property indicating that the efuse
+  values are in microvolts
+
+Example #1: single rails:
+soc.dtsi:
+avs_mpu: regulator-avs@0x40200000 {
+	compatible = "ti,avsclass0";
+	reg = <0x40200000 0x20>;
+	efuse-settings = <975000 0
+		1075000 4
+		1200000 8>;
+};
+
+avs_core: regulator-avs@0x40300000 {
+	compatible = "ti,avsclass0";
+	reg = <0x40300000 0x20>;
+	efuse-settings = <975000 0
+		1050000 4>;
+};
+
+board.dtsi:
+&avs_mpu {
+		avs-supply = <&vcc>;
+};
+&avs_core {
+		avs-supply = <&smps2>;
+};
+
+Example #2: Ganged (combined) rails:
+soc.dtsi:
+avs_mpu: regulator-avs@0x40200000 {
+	compatible = "ti,avsclass0";
+	reg = <0x40200000 0x20>;
+	efuse-settings = <975000 0
+		1075000 4
+		1200000 8>;
+};
+
+avs_core: regulator-avs@0x40300000 {
+	compatible = "ti,avsclass0";
+	reg = <0x40300000 0x20>;
+	efuse-settings = <975000 0
+		1050000 4>;
+};
+
+board.dtsi:
+&avs_mpu {
+		avs-supply = <&smps3>;
+};
+&avs_core {
+		avs-supply = <&smps3>;
+};

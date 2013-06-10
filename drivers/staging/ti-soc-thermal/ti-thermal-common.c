@@ -38,6 +38,7 @@
 /* common data structures */
 struct ti_thermal_data {
 	struct thermal_zone_device *ti_thermal;
+	struct thermal_zone_device *pcb_tz;
 	struct thermal_cooling_device *cool_dev;
 	struct ti_bandgap *bgp;
 	enum thermal_device_mode mode;
@@ -77,10 +78,12 @@ static inline int ti_thermal_hotspot_temperature(int t, int s, int c)
 static inline int ti_thermal_get_temp(struct thermal_zone_device *thermal,
 				      unsigned long *temp)
 {
+	struct thermal_zone_device *pcb_tz = NULL;
 	struct ti_thermal_data *data = thermal->devdata;
 	struct ti_bandgap *bgp;
 	const struct ti_temp_sensor *s;
-	int ret, tmp, pcb_temp, slope, constant;
+	int ret, tmp, slope, constant;
+	unsigned long pcb_temp;
 
 	if (!data)
 		return 0;
@@ -92,16 +95,22 @@ static inline int ti_thermal_get_temp(struct thermal_zone_device *thermal,
 	if (ret)
 		return ret;
 
-	pcb_temp = 0;
-	/* TODO: Introduce pcb temperature lookup */
+	/* Default constants */
+	slope = s->slope;
+	constant = s->constant;
+
+	pcb_tz = data->pcb_tz;
 	/* In case pcb zone is available, use the extrapolation rule with it */
-	if (pcb_temp) {
-		tmp -= pcb_temp;
-		slope = s->slope_pcb;
-		constant = s->constant_pcb;
-	} else {
-		slope = s->slope;
-		constant = s->constant;
+	if (!IS_ERR_OR_NULL(pcb_tz)) {
+		ret = thermal_zone_get_temp(pcb_tz, &pcb_temp);
+		if (!ret) {
+			tmp -= pcb_temp; /* got a valid PCB temp */
+			slope = s->slope_pcb;
+			constant = s->constant_pcb;
+		} else {
+			dev_err(bgp->dev,
+				"Failed to read PCB state. Using defaults\n");
+		}
 	}
 	*temp = ti_thermal_hotspot_temperature(tmp, slope, constant);
 
@@ -124,9 +133,9 @@ static int ti_thermal_bind(struct thermal_zone_device *thermal,
 
 	id = data->sensor_id;
 
-	/* TODO: bind with min and max states */
 	/* Simple thing, two trips, one passive another critical */
 	return thermal_zone_bind_cooling_device(thermal, 0, cdev,
+	/* bind with min and max states defined by cpu_cooling */
 						THERMAL_NO_LIMIT,
 						THERMAL_NO_LIMIT);
 }
@@ -215,6 +224,31 @@ static int ti_thermal_get_trip_temp(struct thermal_zone_device *thermal,
 	return 0;
 }
 
+/* Get the temperature trend callback functions for thermal zone */
+static int ti_thermal_get_trend(struct thermal_zone_device *thermal,
+				int trip, enum thermal_trend *trend)
+{
+	struct ti_thermal_data *data = thermal->devdata;
+	struct ti_bandgap *bgp;
+	int id, tr, ret = 0;
+
+	bgp = data->bgp;
+	id = data->sensor_id;
+
+	ret = ti_bandgap_get_trend(bgp, id, &tr);
+	if (ret)
+		return ret;
+
+	if (tr > 0)
+		*trend = THERMAL_TREND_RAISING;
+	else if (tr < 0)
+		*trend = THERMAL_TREND_DROPPING;
+	else
+		*trend = THERMAL_TREND_STABLE;
+
+	return 0;
+}
+
 /* Get critical temperature callback functions for thermal zone */
 static int ti_thermal_get_crit_temp(struct thermal_zone_device *thermal,
 				    unsigned long *temp)
@@ -225,7 +259,7 @@ static int ti_thermal_get_crit_temp(struct thermal_zone_device *thermal,
 
 static struct thermal_zone_device_ops ti_thermal_ops = {
 	.get_temp = ti_thermal_get_temp,
-	/* TODO: add .get_trend */
+	.get_trend = ti_thermal_get_trend,
 	.bind = ti_thermal_bind,
 	.unbind = ti_thermal_unbind,
 	.get_mode = ti_thermal_get_mode,
@@ -248,6 +282,7 @@ static struct ti_thermal_data
 	data->sensor_id = id;
 	data->bgp = bgp;
 	data->mode = THERMAL_DEVICE_ENABLED;
+	data->pcb_tz = thermal_zone_get_zone_by_name("pcb");
 	INIT_WORK(&data->thermal_wq, ti_thermal_work);
 
 	return data;
@@ -266,7 +301,6 @@ int ti_thermal_expose_sensor(struct ti_bandgap *bgp, int id,
 	if (!data)
 		return -EINVAL;
 
-	/* TODO: remove TC1 TC2 */
 	/* Create thermal zone */
 	data->ti_thermal = thermal_zone_device_register(domain,
 				OMAP_TRIP_NUMBER, 0, data, &ti_thermal_ops,
@@ -314,6 +348,11 @@ int ti_thermal_register_cpu_cooling(struct ti_bandgap *bgp, int id)
 
 	if (!data)
 		return -EINVAL;
+
+	if (!cpufreq_get_current_driver()) {
+		dev_dbg(bgp->dev, "no cpufreq driver yet\n");
+		return -EPROBE_DEFER;
+	}
 
 	/* Register cooling device */
 	data->cool_dev = cpufreq_cooling_register(cpu_present_mask);

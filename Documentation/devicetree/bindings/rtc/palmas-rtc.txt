@@ -1,0 +1,21 @@
+* palmas and palmas-charger RTC IP block devicetree bindings
+
+Required properties:
+- compatible : Should be from the list
+  ti,twl6035-rtc
+  ti,twl6036-rtc
+  ti,twl6037-rtc
+  ti,tps65913-rtc
+  ti,tps65914-rtc
+  ti,tps80036-rtc
+and also the generic series names
+  ti,palmas-rtc
+
+Examples:
+
+rtc {
+    compatible = "ti,twl6035-rtc", "ti,palmas-rtc";
+    interrupt-parent = <&palmas>;
+    interrupts = <8 0 9 0>;
+    interrupt-name = "alarm-irq", "timer-irq";
+};

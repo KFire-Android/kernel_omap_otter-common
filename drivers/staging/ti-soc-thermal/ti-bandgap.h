@@ -79,6 +79,7 @@
  * @mask_hot_mask: mask to bandgap_mask_ctrl.mask_hot
  * @mask_cold_mask: mask to bandgap_mask_ctrl.mask_cold
  * @mask_sidlemode_mask: mask to bandgap_mask_ctrl.mask_sidlemode
+ * @mask_counter_delay_mask: mask to bandgap_mask_ctrl.mask_counter_delay
  * @mask_freeze_mask: mask to bandgap_mask_ctrl.mask_free
  * @mask_clear_mask: mask to bandgap_mask_ctrl.mask_clear
  * @mask_clear_accum_mask: mask to bandgap_mask_ctrl.mask_clear_accum
@@ -127,6 +128,7 @@ struct temp_sensor_registers {
 	u32	mask_hot_mask;
 	u32	mask_cold_mask;
 	u32	mask_sidlemode_mask; /* not used: but may be needed for pm */
+	u32	mask_counter_delay_mask;
 	u32	mask_freeze_mask;
 	u32	mask_clear_mask; /* not used: but needed for trending */
 	u32	mask_clear_accum_mask; /* not used: but needed for trending */
@@ -310,6 +312,12 @@ struct ti_temp_sensor {
  * TI_BANDGAP_FEATURE_FREEZE_BIT - used when the bandgap device features
  *      a history buffer that its update can be freezed/unfreezed.
  *
+ * TI_BANDGAP_FEATURE_COUNTER_DELAY - used when the bandgap device features
+ *	a delay programming based on distinct values.
+ *
+ * TI_BANDGAP_FEATURE_HISTORY_BUFFER - used when the bandgap device features
+ *	a history buffer of temperatures.
+ *
  * TI_BANDGAP_HAS(b, f) - macro to check if a bandgap device is capable of a
  *      specific feature (above) or not. Return non-zero, if yes.
  */
@@ -321,6 +329,8 @@ struct ti_temp_sensor {
 #define TI_BANDGAP_FEATURE_POWER_SWITCH		BIT(5)
 #define TI_BANDGAP_FEATURE_CLK_CTRL		BIT(6)
 #define TI_BANDGAP_FEATURE_FREEZE_BIT		BIT(7)
+#define TI_BANDGAP_FEATURE_COUNTER_DELAY	BIT(8)
+#define TI_BANDGAP_FEATURE_HISTORY_BUFFER	BIT(9)
 #define TI_BANDGAP_HAS(b, f)			\
 			((b)->conf->features & TI_BANDGAP_FEATURE_ ## f)
 
@@ -372,6 +382,7 @@ int ti_bandgap_read_temperature(struct ti_bandgap *bgp, int id,
 				  int *temperature);
 int ti_bandgap_set_sensor_data(struct ti_bandgap *bgp, int id, void *data);
 void *ti_bandgap_get_sensor_data(struct ti_bandgap *bgp, int id);
+int ti_bandgap_get_trend(struct ti_bandgap *bgp, int id, int *trend);
 
 #ifdef CONFIG_OMAP4_THERMAL
 extern const struct ti_bandgap_data omap4430_data;
@@ -389,4 +400,9 @@ extern const struct ti_bandgap_data omap5430_data;
 #define omap5430_data					NULL
 #endif
 
+#ifdef CONFIG_DRA752_THERMAL
+extern const struct ti_bandgap_data dra752_data;
+#else
+#define dra752_data					NULL
+#endif
 #endif

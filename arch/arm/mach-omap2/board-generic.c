@@ -168,6 +168,7 @@ DT_MACHINE_START(OMAP3_DT, "Generic OMAP3 (Flattened Device Tree)")
 	.init_irq	= omap_intc_of_init,
 	.handle_irq	= omap3_intc_handle_irq,
 	.init_machine	= omap_generic_init,
+	.init_late	= omap3_init_late,
 	.timer		= &omap3_timer,
 	.dt_compat	= omap3_boards_compat,
 	.restart	= omap3xxx_restart,
@@ -185,6 +186,7 @@ DT_MACHINE_START(OMAP3_GP_DT, "Generic OMAP3-GP (Flattened Device Tree)")
 	.init_irq	= omap_intc_of_init,
 	.handle_irq	= omap3_intc_handle_irq,
 	.init_machine	= omap_generic_init,
+	.init_late	= omap3_init_late,
 	.timer		= &omap3_secure_timer,
 	.dt_compat	= omap3_gp_boards_compat,
 	.restart	= omap3xxx_restart,
@@ -249,6 +251,27 @@ DT_MACHINE_START(OMAP5_DT, "Generic OMAP5 (Flattened Device Tree)")
 	.init_late	= omap5_init_late,
 	.timer		= &omap5_timer,
 	.dt_compat	= omap5_boards_compat,
+	.restart	= omap44xx_restart,
+MACHINE_END
+#endif
+
+#ifdef CONFIG_SOC_DRA7XX
+static const char *dra7xx_boards_compat[] __initdata = {
+	"ti,dra7",
+	NULL,
+};
+
+DT_MACHINE_START(DRA7XX_DT, "Generic DRA7XX (Flattened Device Tree)")
+	.reserve	= omap_reserve,
+	.smp		= smp_ops(omap4_smp_ops),
+	.map_io		= omap5_map_io,
+	.init_early	= dra7xx_init_early,
+	.init_irq	= omap_gic_of_init,
+	.handle_irq	= gic_handle_irq,
+	.init_machine	= omap_generic_init,
+	.init_late	= dra7xx_init_late,
+	.timer		= &omap5_timer,
+	.dt_compat	= dra7xx_boards_compat,
 	.restart	= omap44xx_restart,
 MACHINE_END
 #endif

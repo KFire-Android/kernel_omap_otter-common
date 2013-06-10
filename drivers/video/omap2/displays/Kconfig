@@ -46,6 +46,12 @@ config PANEL_PICODLP
 		A mini-projector used in TI's SDP4430 and EVM boards
 		For more info please visit http://www.dlp.com/projector/
 
+config PANEL_TFCS9700
+	tristate "Three Five DPI panel"
+	depends on OMAP2_DSS_DPI && I2C
+	help
+		A TFT LCD DPI panel used on the LCD daughter board of Vayu EVM
+
 config PANEL_TAAL
         tristate "Taal DSI Panel"
         depends on OMAP2_DSS_DSI

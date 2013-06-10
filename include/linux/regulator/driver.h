@@ -281,6 +281,8 @@ struct regulator_dev {
 
 	struct blocking_notifier_head notifier;
 	struct mutex mutex; /* consumer lock */
+	struct task_struct *lock_owner;
+	int lock_count;
 	struct module *owner;
 	struct device dev;
 	struct regulation_constraints *constraints;

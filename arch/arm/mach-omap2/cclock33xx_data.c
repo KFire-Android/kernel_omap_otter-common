@@ -912,7 +912,6 @@ static struct omap_clk am33xx_clks[] = {
 	CLK(NULL,	"dpll_core_m5_ck",	&dpll_core_m5_ck,	CK_AM33XX),
 	CLK(NULL,	"dpll_core_m6_ck",	&dpll_core_m6_ck,	CK_AM33XX),
 	CLK(NULL,	"dpll_mpu_ck",		&dpll_mpu_ck,	CK_AM33XX),
-	CLK("cpu0",	NULL,			&dpll_mpu_ck,	CK_AM33XX),
 	CLK(NULL,	"dpll_mpu_m2_ck",	&dpll_mpu_m2_ck,	CK_AM33XX),
 	CLK(NULL,	"dpll_ddr_ck",		&dpll_ddr_ck,	CK_AM33XX),
 	CLK(NULL,	"dpll_ddr_m2_ck",	&dpll_ddr_m2_ck,	CK_AM33XX),
@@ -979,6 +978,7 @@ static struct omap_clk am33xx_clks[] = {
 	CLK(NULL,	"trace_pmd_clk_mux_ck",	&trace_pmd_clk_mux_ck,	CK_AM33XX),
 	CLK(NULL,	"stm_clk_div_ck",	&stm_clk_div_ck,	CK_AM33XX),
 	CLK(NULL,	"trace_clk_div_ck",	&trace_clk_div_ck,	CK_AM33XX),
+	CLK(NULL,	"clkout2_ck",		&clkout2_ck,	CK_AM33XX),
 };
 
 
@@ -989,6 +989,7 @@ static const char *enable_init_clks[] = {
 	"l4hs_gclk",
 	"l4fw_gclk",
 	"l4ls_gclk",
+	"clkout2_ck",	/* Required for external peripherals like, Audio codecs */
 };
 
 static struct reparent_init_clks reparent_clks[] = {

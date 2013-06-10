@@ -254,17 +254,42 @@ fail:
 
 /*-------------------------------------------------------------------------*/
 
+struct pcf857x_platform_data *of_gpio_pcf857x(struct device *dev)
+{
+	struct pcf857x_platform_data *pdata;
+	int r;
+
+	pdata = devm_kzalloc(dev, sizeof(*pdata), GFP_KERNEL);
+	if (!pdata)
+		return NULL;
+
+	pdata->gpio_base = -1;
+
+	r = of_property_read_u32(dev->of_node, "n_latch", &pdata->n_latch);
+	if (r) {
+		dev_dbg(dev, "couldn't find n-latch, use default\n");
+		pdata->n_latch = ~0;
+	}
+
+	return pdata;
+}
+
 static int pcf857x_probe(struct i2c_client *client,
 			 const struct i2c_device_id *id)
 {
 	struct pcf857x_platform_data	*pdata;
+	struct device_node *node;
 	struct pcf857x			*gpio;
 	int				status;
 
 	pdata = client->dev.platform_data;
-	if (!pdata) {
+	node = client->dev.of_node;
+
+	if (!pdata && node)
+		pdata = of_gpio_pcf857x(&client->dev);
+
+	if (!pdata)
 		dev_dbg(&client->dev, "no platform data\n");
-	}
 
 	/* Allocate, initialize, and register this gpio_chip. */
 	gpio = kzalloc(sizeof *gpio, GFP_KERNEL);
@@ -422,10 +447,30 @@ static int pcf857x_remove(struct i2c_client *client)
 	return status;
 }
 
+static const struct of_device_id pcf857x_dt_ids[] = {
+	{ .compatible = "ti,pcf8574", },
+	{ .compatible = "ti,pcf8574a", },
+	{ .compatible = "ti,pca8574", },
+	{ .compatible = "ti,pca9670", },
+	{ .compatible = "ti,pca9672", },
+	{ .compatible = "ti,pca9674", },
+	{ .compatible = "ti,pcf8575", },
+	{ .compatible = "ti,pca8575", },
+	{ .compatible = "ti,pca9671", },
+	{ .compatible = "ti,pca9673", },
+	{ .compatible = "ti,pca9675", },
+	{ .compatible = "ti,max7328", },
+	{ .compatible = "ti,max7329", },
+	{ }
+};
+
+MODULE_DEVICE_TABLE(of, pcf857x_dt_ids);
+
 static struct i2c_driver pcf857x_driver = {
 	.driver = {
-		.name	= "pcf857x",
-		.owner	= THIS_MODULE,
+		.name 		= "pcf857x",
+		.owner		= THIS_MODULE,
+		.of_match_table	= pcf857x_dt_ids,
 	},
 	.probe	= pcf857x_probe,
 	.remove	= pcf857x_remove,

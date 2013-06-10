@@ -24,6 +24,7 @@
 #define __OMAP2_DSS_H
 
 #include <linux/interrupt.h>
+#include <linux/i2c.h>
 
 #ifdef pr_fmt
 #undef pr_fmt
@@ -100,6 +101,13 @@ enum dss_writeback_channel {
 	DSS_WB_LCD3_MGR =	7,
 };
 
+enum dss_dpll {
+	DSS_DPLL_VIDEO1 = 0,
+	DSS_DPLL_VIDEO2,
+	DSS_DPLL_HDMI,
+	DSS_DPLL_NONE,
+};
+
 struct dss_clock_info {
 	/* rates that we get with dividers below */
 	unsigned long fck;
@@ -139,6 +147,12 @@ struct dsi_clock_info {
 	u16 lp_clk_div;
 };
 
+struct dss_dpll_cinfo {
+	unsigned long fint, clkin, clkout, hsdiv_clk;
+
+	u16 regm, regn, regm_hsdiv;
+};
+
 struct reg_field {
 	u16 reg;
 	u8 high;
@@ -156,6 +170,17 @@ struct dss_lcd_mgr_config {
 	int video_port_width;
 
 	int lcden_sig_polarity;
+};
+
+struct dpi_common_ops {
+	int (*enable) (struct omap_dss_device *dssdev);
+	void (*disable) (struct omap_dss_device *dssdev);
+	void (*set_timings) (struct omap_dss_device *dssdev,
+		struct omap_video_timings *timings);
+	int (*check_timings) (struct omap_dss_device *dssdev,
+		struct omap_video_timings *timings);
+	void (*set_data_lines) (struct omap_dss_device *dssdev,
+		int data_lines);
 };
 
 struct seq_file;
@@ -238,9 +263,10 @@ int dss_init_platform_driver(void) __init;
 void dss_uninit_platform_driver(void);
 
 unsigned long dss_get_dispc_clk_rate(void);
-int dss_dpi_select_source(enum omap_channel channel);
+int dss_dpi_select_source(int module_id, enum omap_channel channel);
 void dss_select_hdmi_venc_clk_source(enum dss_hdmi_venc_clk_source_select);
 enum dss_hdmi_venc_clk_source_select dss_get_hdmi_venc_clk_source(void);
+void dss_use_dpll_lcd(enum omap_channel channel, bool use_dpll);
 const char *dss_get_generic_clk_source_name(enum omap_dss_clk_source clk_src);
 void dss_dump_clocks(struct seq_file *s);
 
@@ -359,8 +385,12 @@ static inline struct platform_device *dsi_get_dsidev_from_id(int module)
 #endif
 
 /* DPI */
-int dpi_init_platform_driver(void) __init;
-void dpi_uninit_platform_driver(void) __exit;
+void dpi_common_set_ops(struct dpi_common_ops *ops);
+int omap_dpi_init_platform_driver(void) __init;
+void omap_dpi_uninit_platform_driver(void) __exit;
+
+int dra7xx_dpi_init_platform_driver(void) __init;
+void dra7xx_dpi_uninit_platform_driver(void) __exit;
 
 /* DISPC */
 int dispc_init_platform_driver(void) __init;
@@ -446,6 +476,7 @@ static inline unsigned long hdmi_get_pixel_clock(void)
 	return 0;
 }
 #endif
+struct i2c_adapter *omapdss_hdmi_adapter(void);
 int omapdss_hdmi_display_enable(struct omap_dss_device *dssdev);
 void omapdss_hdmi_display_disable(struct omap_dss_device *dssdev);
 int omapdss_hdmi_core_enable(struct omap_dss_device *dssdev);
@@ -463,6 +494,8 @@ int omapdss_hdmi_set_deepcolor(struct omap_dss_device *dssdev, int val,
 		bool hdmi_restart);
 int omapdss_hdmi_display_3d_enable(struct omap_dss_device *dssdev,
 					struct s3d_disp_info *info, int code);
+void sel_i2c(void);
+void sel_hdmi(void);
 int hdmi_panel_init(void);
 void hdmi_panel_exit(void);
 #if defined(CONFIG_OMAP4_DSS_HDMI_AUDIO) || \
@@ -490,5 +523,18 @@ static inline void dss_collect_irq_stats(u32 irqstatus, unsigned *irq_arr)
 	}
 }
 #endif
+
+bool dss_dpll_disabled(enum dss_dpll dpll);
+int dss_dpll_calc_clock_div_pck(enum dss_dpll dpll, unsigned long pck_req,
+		struct dss_dpll_cinfo *dpll_cinfo,
+		struct dispc_clock_info *dispc_cinfo);
+int dss_dpll_set_clock_div(enum dss_dpll dpll, struct dss_dpll_cinfo *cinfo);
+void dss_dpll_enable_ctrl(enum dss_dpll dpll, bool enable);
+int dss_dpll_activate(enum dss_dpll dpll);
+void dss_dpll_set_control_mux(enum omap_channel channel, enum dss_dpll dpll);
+void dss_dpll_disable(enum dss_dpll dpll);
+int dss_dpll_configure(struct platform_device *pdev);
+int dss_dpll_configure_ctrl(void);
+void dss_dpll_unconfigure_ctrl(void);
 
 #endif

@@ -31,6 +31,8 @@
 		cpu@0 {
 			compatible = "arm,cortex-a9";
 			next-level-cache = <&L2>;
+			clocks = <&dpll_mpu>;
+			clock-names = "cpu";
 		};
 		cpu@1 {
 			compatible = "arm,cortex-a9";
@@ -101,6 +103,11 @@
 			ti,hwmods = "counter_32k";
 		};
 
+		dpll_mpu: dpll_mpu {
+			#clock-cells = <0>;
+			compatible = "ti,omap-clock";
+		};
+
 		omap4_pmx_core: pinmux@4a100040 {
 			compatible = "ti,omap4-padconf", "pinctrl-single";
 			reg = <0x4a100040 0x0196>;
@@ -116,6 +123,25 @@
 			#size-cells = <0>;
 			pinctrl-single,register-width = <16>;
 			pinctrl-single,function-mask = <0x7fff>;
+		};
+
+		sdma: dma-controller@4a056000 {
+			compatible = "ti,omap4430-sdma";
+			reg = <0x4a056000 0x1000>;
+			interrupts = <0 12 0x4>,
+				     <0 13 0x4>,
+				     <0 14 0x4>,
+				     <0 15 0x4>;
+			#dma-cells = <1>;
+			#dma-channels = <32>;
+			#dma-requests = <127>;
+		};
+
+		dmm: dmm@4e000000 {
+			compatible = "ti,omap4-dmm";
+			reg = <0x4e000000 0x800>;
+			interrupts = <0 113 0x4>;
+			ti,hwmods = "dmm";
 		};
 
 		dss {
@@ -156,18 +182,6 @@
 				vdda_hdmi_dac-supply = <&vdac>;
 				video-source = <1>;
 			};
-                };
-
-		sdma: dma-controller@4a056000 {
-			compatible = "ti,omap4430-sdma";
-			reg = <0x4a056000 0x1000>;
-			interrupts = <0 12 0x4>,
-				     <0 13 0x4>,
-				     <0 14 0x4>,
-				     <0 15 0x4>;
-			#dma-cells = <1>;
-			#dma-channels = <32>;
-			#dma-requests = <127>;
 		};
 
 		gpio1: gpio@4a310000 {

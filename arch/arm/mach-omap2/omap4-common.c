@@ -237,7 +237,10 @@ early_initcall(omap_l2_cache_init);
 
 void __iomem *omap4_get_sar_ram_base(void)
 {
-	return sar_ram_base;
+	if (sar_ram_base)
+		return sar_ram_base;
+	else
+		return NULL;
 }
 
 /*
