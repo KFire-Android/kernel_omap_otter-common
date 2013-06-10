@@ -670,7 +670,7 @@ static void __init omap4_local_timer_init(void)
 OMAP_SYS_TIMER(4, local);
 #endif /* CONFIG_ARCH_OMAP4 */
 
-#ifdef CONFIG_SOC_OMAP5
+#if defined(CONFIG_SOC_OMAP5) || defined(CONFIG_SOC_DRA7XX)
 OMAP_SYS_32K_TIMER_INIT(5, 1, OMAP4_32K_SOURCE, "ti,timer-alwon",
 			2, OMAP5_MPU_SOURCE);
 static void __init omap5_realtime_timer_init(void)

@@ -34,6 +34,8 @@ struct power_state {
 };
 
 static LIST_HEAD(pwrst_list);
+u32 cpu_suspend_state;
+u32 pwrdm_next_state;
 
 #ifdef CONFIG_SUSPEND
 static int omap4_pm_suspend(void)
@@ -62,7 +64,7 @@ static int omap4_pm_suspend(void)
 	 * domain CSWR is not supported by hardware.
 	 * More details can be found in OMAP4430 TRM section 4.3.4.2.
 	 */
-	omap4_mpuss_enter_lowpower(cpu_id, PWRDM_FUNC_PWRST_OFF);
+	omap4_mpuss_enter_lowpower(cpu_id, cpu_suspend_state);
 
 	/* Restore next powerdomain state */
 	list_for_each_entry(pwrst, &pwrst_list, node) {
@@ -109,7 +111,7 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
 	 * XXX This should be replaced by explicit lists of
 	 * powerdomains with specific powerstates to set
 	 */
-	pwrst->next_fpwrst = PWRDM_FUNC_PWRST_CSWR;
+	pwrst->next_fpwrst = pwrdm_next_state;
 	if (!pwrdm_supports_fpwrst(pwrdm, pwrst->next_fpwrst))
 		pwrst->next_fpwrst = PWRDM_FUNC_PWRST_ON;
 	list_add(&pwrst->node, &pwrst_list);
@@ -223,7 +225,7 @@ int __init omap4_pm_init(void)
 
 	if (cpu_is_omap44xx())
 		ret = omap4_init_static_deps();
-	else if (soc_is_omap54xx())
+	else if (soc_is_omap54xx() || soc_is_dra7xx())
 		ret = omap5_init_static_deps();
 
 	if (ret) {
@@ -248,6 +250,14 @@ int __init omap4_pm_init(void)
 
 	if (cpu_is_omap44xx() || soc_is_omap54xx())
 		omap4_idle_init();
+
+	if (soc_is_dra7xx()) {
+		cpu_suspend_state = PWRDM_FUNC_PWRST_ON;
+		pwrdm_next_state = PWRDM_FUNC_PWRST_ON;
+	} else {
+		cpu_suspend_state = PWRDM_FUNC_PWRST_OFF;
+		pwrdm_next_state = PWRDM_FUNC_PWRST_CSWR;
+	}
 
 err2:
 	return ret;

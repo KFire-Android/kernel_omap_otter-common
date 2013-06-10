@@ -1,0 +1,197 @@
+/*
+ * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ */
+/dts-v1/;
+
+/include/ "dra7.dtsi"
+
+/ {
+	model = "TI DRA7";
+	compatible = "ti,dra7-evm", "ti,dra7";
+
+	cpus {
+		cpu@0 {
+			cpu0-supply = <&avs_mpu>;
+		};
+	};
+
+	memory {
+		device_type = "memory";
+		reg = <0x80000000 0x20000000>; /* 512 MB */
+	};
+
+	vmmc2_fixed: fixedregulator-mmc2 {
+		compatible = "regulator-fixed";
+		regulator-name = "vmmc2_fixed";
+		regulator-min-microvolt = <3000000>;
+		regulator-max-microvolt = <3000000>;
+	};
+};
+
+&dra7_pmx_core {
+        pinctrl-names = "default";
+        pinctrl-0 = <
+		&vout1_pins
+	>;
+
+	i2c2_pins: pinmux_i2c2_pins {
+                pinctrl-single,pins = <
+			0x408	0x60000	/* i2c2_sda INPUT | MODE0 */
+			0x40C	0x60000	/* i2c2_scl INPUT | MODE0 */
+                >;
+        };
+
+	vout1_pins: pinmux_vout1_pins {
+		pinctrl-single,pins = <
+			0x1C8	0x0	/* vout1_clk OUTPUT | MODE0 */
+			0x1CC	0x0	/* vout1_de OUTPUT | MODE0 */
+			0x1D0	0x0	/* vout1_fld OUTPUT | MODE0 */
+			0x1D4	0x0	/* vout1_hsync OUTPUT | MODE0 */
+			0x1D8	0x0	/* vout1_vsync OUTPUT | MODE0 */
+			0x1DC	0x0	/* vout1_d0 OUTPUT | MODE0 */
+			0x1E0	0x0	/* vout1_d1 OUTPUT | MODE0 */
+			0x1E4	0x0	/* vout1_d2 OUTPUT | MODE0 */
+			0x1E8	0x0	/* vout1_d3 OUTPUT | MODE0 */
+			0x1EC	0x0	/* vout1_d4 OUTPUT | MODE0 */
+			0x1F0	0x0	/* vout1_d5 OUTPUT | MODE0 */
+			0x1F4	0x0	/* vout1_d6 OUTPUT | MODE0 */
+			0x1F8	0x0	/* vout1_d7 OUTPUT | MODE0 */
+			0x1FC	0x0	/* vout1_d8 OUTPUT | MODE0 */
+			0x200	0x0	/* vout1_d9 OUTPUT | MODE0 */
+			0x204	0x0	/* vout1_d10 OUTPUT | MODE0 */
+			0x208	0x0	/* vout1_d11 OUTPUT | MODE0 */
+			0x20C	0x0	/* vout1_d12 OUTPUT | MODE0 */
+			0x210	0x0	/* vout1_d13 OUTPUT | MODE0 */
+			0x214	0x0	/* vout1_d14 OUTPUT | MODE0 */
+			0x218	0x0	/* vout1_d15 OUTPUT | MODE0 */
+			0x21C	0x0	/* vout1_d16 OUTPUT | MODE0 */
+			0x220	0x0	/* vout1_d17 OUTPUT | MODE0 */
+			0x224	0x0	/* vout1_d18 OUTPUT | MODE0 */
+			0x228	0x0	/* vout1_d19 OUTPUT | MODE0 */
+			0x22C	0x0	/* vout1_d20 OUTPUT | MODE0 */
+			0x230	0x0	/* vout1_d21 OUTPUT | MODE0 */
+			0x234	0x0	/* vout1_d22 OUTPUT | MODE0 */
+			0x238	0x0	/* vout1_d23 OUTPUT | MODE0 */
+		>;
+	};
+};
+
+&i2c1 {
+	clock-frequency = <400000>;
+
+	tps659038: tps659038@58 {
+		reg = <0x58>;
+	};
+
+	pcf_lcd: pcf8575@20 {
+		compatible = "ti,pcf8575";
+		reg = <0x20>;
+		gpio-controller;
+		#gpio-cells = <2>;
+	};
+
+	/* TLC chip for LCD panel power and backlight */
+	tlc59108: tlc59108@40 {
+		compatible = "ti,tlc59108";
+		reg = <0x40>;
+		gpios = <&pcf_lcd 15 0>; /* P15, CON_LCD_PWR_DN */
+	};
+};
+
+/include/ "tps659038.dtsi"
+
+&i2c2 {
+        pinctrl-names = "default";
+        pinctrl-0 = <&i2c2_pins>;
+
+	clock-frequency = <400000>;
+
+	pcf_hdmi: pcf8575@26 {
+		compatible = "ti,pcf8575";
+		reg = <0x26>;
+		gpio-controller;
+		#gpio-cells = <2>;
+	};
+};
+
+&i2c3 {
+	clock-frequency = <400000>;
+};
+
+&i2c4 {
+	clock-frequency = <400000>;
+};
+
+&i2c5 {
+	clock-frequency = <400000>;
+};
+
+&mmc1 {
+	vmmc-supply = <&ldo1_reg>;
+	bus-width = <4>;
+};
+
+&mmc2 {
+	vmmc-supply = <&vmmc2_fixed>;
+	bus-width = <8>;
+	ti,non-removable;
+};
+
+&mmc3 {
+	bus-width = <8>;
+	ti,non-removable;
+	status = "disabled";
+};
+
+&mmc4 {
+	bus-width = <4>;
+	status = "disabled";
+};
+
+&avs_mpu {
+	avs-supply = <&smps123_reg>;
+};
+
+&avs_core {
+	avs-supply = <&smps7_reg>;
+};
+
+&avs_gpu {
+	avs-supply = <&smps6_reg>;
+};
+
+&avs_dspeve {
+	avs-supply = <&smps45_reg>;
+};
+
+&avs_iva {
+	avs-supply = <&smps8_reg>;
+};
+
+&dpi1 {
+	lcd {
+		compatible = "ti,tfc_s9700";
+		tlc = <&tlc59108>;
+		data-lines = <24>;
+	};
+};
+
+&hdmi {
+	tpd12s015: tpd12s015 {
+		compatible = "ti,tpd12s015";
+
+		gpios = <&pcf_hdmi 4 0>,	/* pcf8575@22 P4, CT_CP_HDP */
+			<&pcf_hdmi 5 0>,	/* pcf8575@22 P5, LS_OE */
+			<&gpio7 12 0>;		/* gpio7_12/sp1_cs2, HPD */
+
+		hdmi_ddc = <&i2c2>;
+
+		hdmi-monitor {
+			compatible = "ti,hdmi_panel";
+		};
+	};
+};

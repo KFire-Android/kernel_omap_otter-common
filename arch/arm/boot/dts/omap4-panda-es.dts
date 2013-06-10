@@ -5,9 +5,43 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
+/dts-v1/;
 
-/include/ "omap4-panda.dts"
 /include/ "omap4460.dtsi"
+/include/ "omap4-panda-common.dtsi"
+
+&leds {
+	compatible = "gpio-leds";
+	heartbeat {
+		label = "pandaboard::status1";
+		gpios = <&gpio4 14 0>;
+		linux,default-trigger = "heartbeat";
+	};
+	mmc {
+		label = "pandaboard::status2";
+		gpios = <&gpio1 8 0>;
+		linux,default-trigger = "gpio";
+	};
+};
+
+&led_gpio_pins {
+	pinctrl-single,pins = <
+		0xb6 0x3	/* gpio_110 OUTPUT | MODE 3 */
+	>;
+};
+
+&omap4_pmx_wkup {
+	pinctrl-names = "default";
+	pinctrl-0 = <
+		&led_wkgpio_pins
+	>;
+
+	led_wkgpio_pins: pinmux_leds_wkpins {
+		pinctrl-single,pins = <
+			0x1c 0x3	/* gpio_wk8 OUTPUT | MODE 3 */
+		>;
+	};
+};
 
 /* Audio routing is differnet between PandaBoard4430 and PandaBoardES */
 &sound {

@@ -1,0 +1,35 @@
+* palmas and palmas charger GPIO IP block devicetree bindings
+
+Required properties:
+- compatible : Should be from the list
+  ti,twl6035-gpio
+  ti,twl6036-gpio
+  ti,twl6037-gpio
+  ti,tps65913-gpio
+  ti,tps65914-gpio
+  ti,tps80036-gpio
+
+and also the generic series names
+
+  ti,palmas-gpio
+
+- gpio-controller: mark the device as a GPIO controller
+- gpio-cells = <1>:  GPIO lines are provided.
+- interrupt-controller : palmas has its own internal IRQs
+- #interrupt-cells : should be set to 2 for IRQ number and flags
+  The first cell is the IRQ number.
+  The second cell is the flags, encoded as the trigger masks from
+  Documentation/devicetree/bindings/interrupts.txt
+- interrupt-parent : The parent interrupt controller.
+
+Example:
+
+gpio {
+    compatible = "ti,twl6035-gpio", "ti,palmas-gpio";
+
+    gpio-controller;
+    #gpio-cells = <1>;
+    interrupt-parent = <&palmas>;
+    interrupt-controller;
+    #interrupt-cells = <2>;
+};

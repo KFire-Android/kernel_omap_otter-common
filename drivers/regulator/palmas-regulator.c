@@ -702,6 +702,9 @@ static int palmas_probe(struct platform_device *pdev)
 		case PALMAS_REG_SMPS457:
 			if (!pmic->smps457)
 				continue;
+		case PALMAS_REG_SMPS10:
+			if (palmas->palmas_id == TPS659038)
+				continue;
 		}
 
 		/* Initialise sleep/init values from platform data */
@@ -718,6 +721,7 @@ static int palmas_probe(struct platform_device *pdev)
 
 		switch (id) {
 		case PALMAS_REG_SMPS10:
+
 			pmic->desc[id].n_voltages = PALMAS_SMPS10_NUM_VOLTAGES;
 			pmic->desc[id].ops = &palmas_ops_smps10;
 			pmic->desc[id].vsel_reg =
@@ -855,6 +859,7 @@ static int palmas_remove(struct platform_device *pdev)
 
 static struct of_device_id of_palmas_match_tbl[] = {
 	{ .compatible = "ti,palmas-pmic", },
+	{ .compatible = "ti,tps659038-pmic", },
 	{ /* end */ }
 };
 
