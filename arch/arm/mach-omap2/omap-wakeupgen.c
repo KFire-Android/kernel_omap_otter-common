@@ -549,13 +549,14 @@ void __init omap_wakeupgen_init_finish(void)
 	max_spi_reg = gic_readl(GIC_DIST_CTR, 0) & 0x1f;
 
 	/*
-	 * Set CPU0 GIC backup flag permanently for omap4460 GP,
+	 * Set CPU0 GIC backup flag permanently for omap4460/70 GP,
 	 * this is needed because of the ROM code bug that breaks
 	 * GIC during wakeup from device off. This errata fix also
 	 * clears the GIC save area during init to prevent restoring
 	 * garbage to the GIC.
 	 */
-	if (cpu_is_omap446x() && omap_type() == OMAP2_DEVICE_TYPE_GP)
+	if ((cpu_is_omap446x() || cpu_is_omap447x()) &&
+	    omap_type() == OMAP2_DEVICE_TYPE_GP)
 		pm44xx_errata |= PM_OMAP4_ROM_CPU1_BACKUP_ERRATUM_xxx;
 
 	if (cpu_is_omap44xx() && (omap_type() == OMAP2_DEVICE_TYPE_GP)) {
