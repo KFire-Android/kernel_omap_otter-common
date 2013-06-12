@@ -25,7 +25,7 @@
  *
  * BSD LICENSE
  *
- * Copyright(c) 2010-2012 Texas Instruments Incorporated,
+ * Copyright(c) 2010-2013 Texas Instruments Incorporated,
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -68,129 +68,55 @@
 #include "abe_port.h"
 #include "abe_mem.h"
 #include "abe_dbg.h"
-#include "abe_seq.h"
-
-#define IRQtag_COUNT                                       0x000c
-#define IRQtag_PP                                          0x000d
-#define OMAP_ABE_IRQ_FIFO_MASK ((OMAP_ABE_D_MCUIRQFIFO_SIZE >> 2) - 1)
 
 /**
- * abe_omap_aess_reset_hal - reset the ABE/HAL
- * @abe: Pointer on aess handle
+ * omap_aess_reset_hal - reset the ABE/HAL
+ * @aess: Pointer on aess handle
  *
  * Operations : reset the ABE by reloading the static variables and
  * default AESS registers.
  * Called after a PRCM cold-start reset of ABE
  */
-int omap_aess_reset_hal(struct omap_aess *abe)
+int omap_aess_reset_hal(struct omap_aess *aess)
 {
 	u32 i;
 
 	/* IRQ & DBG circular read pointer in DMEM */
-	abe->irq_dbg_read_ptr = 0;
-
-	/* default = disable the mixer's adaptive gain control */
-	omap_aess_use_compensated_gain(abe, 0);
+	aess->irq_dbg_read_ptr = 0;
 
 	/* reset the default gain values */
 	for (i = 0; i < MAX_NBGAIN_CMEM; i++) {
-		abe->muted_gains_indicator[i] = 0;
-		abe->desired_gains_decibel[i] = (u32) GAIN_MUTE;
-		abe->desired_gains_linear[i] = 0;
-		abe->desired_ramp_delay_ms[i] = 0;
-		abe->muted_gains_decibel[i] = (u32) GAIN_TOOLOW;
+		aess->muted_gains_indicator[i] = 0;
+		aess->desired_gains_decibel[i] = (u32) GAIN_MUTE;
+		aess->desired_gains_linear[i] = 0;
+		aess->desired_ramp_delay_ms[i] = 0;
+		aess->muted_gains_decibel[i] = (u32) GAIN_TOOLOW;
 	}
-	omap_aess_hw_configuration(abe);
+	omap_aess_hw_configuration(aess);
 	return 0;
 }
 EXPORT_SYMBOL(omap_aess_reset_hal);
 
 /**
  * omap_aess_wakeup - Wakeup ABE
- * @abe: Pointer on aess handle
+ * @aess: Pointer on aess handle
  *
  * Wakeup ABE in case of retention
  */
-int omap_aess_wakeup(struct omap_aess *abe)
+int omap_aess_wakeup(struct omap_aess *aess)
 {
 	/* Restart event generator */
-	omap_aess_write_event_generator(abe, EVENT_TIMER);
+	omap_aess_write_event_generator(aess, EVENT_TIMER);
 
 	/* reconfigure DMA Req and MCU Irq visibility */
-	omap_aess_hw_configuration(abe);
+	omap_aess_hw_configuration(aess);
 	return 0;
 }
 EXPORT_SYMBOL(omap_aess_wakeup);
 
 /**
- * omap_aess_monitoring
- * @abe: Pointer on aess handle
- *
- * checks the internal status of ABE and HAL
- */
-static void omap_aess_monitoring(struct omap_aess *abe)
-{
-
-}
-
-/**
- * omap_aess_irq_processing - Process ABE interrupt
- * @abe: Pointer on aess handle
- *
- * This subroutine is call upon reception of "MA_IRQ_99 ABE_MPU_IRQ" Audio
- * back-end interrupt. This subroutine will check the ATC Hrdware, the
- * IRQ_FIFO from the AE and act accordingly. Some IRQ source are originated
- * for the delivery of "end of time sequenced tasks" notifications, some are
- * originated from the Ping-Pong protocols, some are generated from
- * the embedded debugger when the firmware stops on programmable break-points,
- * etc ...
- */
-int omap_aess_irq_processing(struct omap_aess *abe)
-{
-	u32 abe_irq_dbg_write_ptr, i, cmem_src, sm_cm;
-	struct omap_aess_irq_data IRQ_data;
-	struct omap_aess_addr addr;
-
-	/* extract the write pointer index from CMEM memory (INITPTR format) */
-	/* CMEM address of the write pointer in bytes */
-	cmem_src = abe->fw_info->label_id[OMAP_AESS_BUFFER_MCU_IRQ_FIFO_PTR_ID] << 2;
-	omap_abe_mem_read(abe, OMAP_ABE_CMEM, cmem_src,
-			  &sm_cm, sizeof(abe_irq_dbg_write_ptr));
-	/* AESS left-pointer index located on MSBs */
-	abe_irq_dbg_write_ptr = sm_cm >> 16;
-	abe_irq_dbg_write_ptr &= 0xFF;
-	/* loop on the IRQ FIFO content */
-	for (i = 0; i < OMAP_ABE_D_MCUIRQFIFO_SIZE; i++) {
-		/* stop when the FIFO is empty */
-		if (abe_irq_dbg_write_ptr == abe->irq_dbg_read_ptr)
-			break;
-		/* read the IRQ/DBG FIFO */
-		memcpy(&addr, &abe->fw_info->map[OMAP_AESS_DMEM_MCUIRQFIFO_ID],
-		       sizeof(struct omap_aess_addr));
-		addr.offset += (abe->irq_dbg_read_ptr << 2);
-		addr.bytes = sizeof(IRQ_data);
-		omap_aess_mem_read(abe, addr, (u32 *)&IRQ_data);
-		abe->irq_dbg_read_ptr = (abe->irq_dbg_read_ptr + 1) & OMAP_ABE_IRQ_FIFO_MASK;
-		/* select the source of the interrupt */
-		switch (IRQ_data.tag) {
-		case IRQtag_PP:
-			omap_aess_irq_ping_pong(abe);
-			break;
-		case IRQtag_COUNT:
-			/*abe_irq_check_for_sequences(IRQ_data.data);*/
-			omap_aess_monitoring(abe);
-			break;
-		default:
-			break;
-		}
-	}
-	return 0;
-}
-EXPORT_SYMBOL(omap_aess_irq_processing);
-
-/**
  * abe_set_router_configuration
- * @abe: Pointer on aess handle
+ * @aess: Pointer on aess handle
  * @param: list of output index of the route
  *
  * The uplink router takes its input from DMIC (6 samples), AMIC (2 samples)
@@ -210,10 +136,10 @@ EXPORT_SYMBOL(omap_aess_irq_processing);
  * indexes 14 .. 15 = RESERVED (NULL)
  *	ZERO_labelID, ZERO_labelID,
  */
-int omap_aess_set_router_configuration(struct omap_aess *abe, u32 *param)
+int omap_aess_set_router_configuration(struct omap_aess *aess, u32 *param)
 {
-	omap_aess_mem_write(abe,
-			    abe->fw_info->map[OMAP_AESS_DMEM_AUPLINKROUTING_ID],
+	omap_aess_mem_write(aess,
+			    aess->fw_info->map[OMAP_AESS_DMEM_AUPLINKROUTING_ID],
 			    param);
 	return 0;
 }
@@ -221,7 +147,7 @@ EXPORT_SYMBOL(omap_aess_set_router_configuration);
 
 /**
  * abe_set_opp_processing - Set OPP mode for ABE Firmware
- * @abe: Pointer on aess handle
+ * @aess: Pointer on aess handle
  * @opp: OOPP mode
  *
  * New processing network and OPP:
@@ -235,7 +161,7 @@ EXPORT_SYMBOL(omap_aess_set_router_configuration);
  * this switch.
  *
  */
-int omap_aess_set_opp_processing(struct omap_aess *abe, u32 opp)
+int omap_aess_set_opp_processing(struct omap_aess *aess, u32 opp)
 {
 	u32 dOppMode32;
 
@@ -256,8 +182,8 @@ int omap_aess_set_opp_processing(struct omap_aess *abe, u32 opp)
 		break;
 	}
 	/* Write Multiframe inside DMEM */
-	omap_aess_mem_write(abe,
-			    abe->fw_info->map[OMAP_AESS_DMEM_MAXTASKBYTESINSLOT_ID],
+	omap_aess_mem_write(aess,
+			    aess->fw_info->map[OMAP_AESS_DMEM_MAXTASKBYTESINSLOT_ID],
 			    &dOppMode32);
 
 	return 0;

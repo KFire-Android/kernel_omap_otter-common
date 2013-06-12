@@ -57,11 +57,30 @@ static const struct snd_pcm_hardware omap_abe_hardware = {
 	.buffer_bytes_max	= 24 * 1024 * 2,
 };
 
-static void abe_irq_pingpong_subroutine(u32 *sub, u32 *data)
+/*
+ * omap_aess_irq_data
+ *
+ * IRQ FIFO content declaration
+ *	APS interrupts : IRQ_FIFO[31:28] = IRQtag_APS,
+ *		IRQ_FIFO[27:16] = APS_IRQs, IRQ_FIFO[15:0] = loopCounter
+ *	SEQ interrupts : IRQ_FIFO[31:28] OMAP_ABE_IRQTAG_COUNT,
+ *		IRQ_FIFO[27:16] = Count_IRQs, IRQ_FIFO[15:0] = loopCounter
+ *	Ping-Pong Interrupts : IRQ_FIFO[31:28] = OMAP_ABE_IRQTAG_PP,
+ *		IRQ_FIFO[27:16] = PP_MCU_IRQ, IRQ_FIFO[15:0] = loopCounter
+ */
+struct omap_aess_irq_data {
+	unsigned int counter:16;
+	unsigned int data:12;
+	unsigned int tag:4;
+};
+
+#define OMAP_ABE_IRQTAG_COUNT	0x000c
+#define OMAP_ABE_IRQTAG_PP	0x000d
+#define OMAP_ABE_IRQ_FIFO_MASK	((OMAP_ABE_D_MCUIRQFIFO_SIZE >> 2) - 1)
+
+static void abe_irq_pingpong_subroutine(struct snd_pcm_substream *substream, struct omap_abe *abe)
 {
 
-	struct snd_pcm_substream *substream = (struct snd_pcm_substream *)sub;
-	struct omap_abe *abe = (struct omap_abe *)data;
 	u32 dst, n_bytes;
 
 	omap_aess_read_next_ping_pong_buffer(abe->aess, OMAP_ABE_MM_DL_PORT, &dst, &n_bytes);
@@ -76,29 +95,75 @@ static void abe_irq_pingpong_subroutine(u32 *sub, u32 *data)
 	}
 }
 
+
 irqreturn_t abe_irq_handler(int irq, void *dev_id)
 {
 	struct omap_abe *abe = dev_id;
+	struct omap_aess_addr addr;
+	struct omap_aess *aess = abe->aess;
+	struct omap_aess_irq_data IRQ_data;
+	u32 abe_irq_dbg_write_ptr, i, cmem_src, sm_cm;
 
 	pm_runtime_get_sync(abe->dev);
 	omap_aess_clear_irq(abe->aess);
-	omap_aess_irq_processing(abe->aess);
+
+	/* extract the write pointer index from CMEM memory (INITPTR format) */
+	/* CMEM address of the write pointer in bytes */
+	cmem_src = aess->fw_info->label_id[OMAP_AESS_BUFFER_MCU_IRQ_FIFO_PTR_ID] << 2;
+	omap_abe_mem_read(aess, OMAP_ABE_CMEM, cmem_src,
+			  &sm_cm, sizeof(abe_irq_dbg_write_ptr));
+	/* AESS left-pointer index located on MSBs */
+	abe_irq_dbg_write_ptr = sm_cm >> 16;
+	abe_irq_dbg_write_ptr &= 0xFF;
+	/* loop on the IRQ FIFO content */
+	for (i = 0; i < OMAP_ABE_D_MCUIRQFIFO_SIZE; i++) {
+		/* stop when the FIFO is empty */
+		if (abe_irq_dbg_write_ptr == aess->irq_dbg_read_ptr)
+			break;
+		/* read the IRQ/DBG FIFO */
+		memcpy(&addr, &aess->fw_info->map[OMAP_AESS_DMEM_MCUIRQFIFO_ID],
+		       sizeof(struct omap_aess_addr));
+		addr.offset += (aess->irq_dbg_read_ptr << 2);
+		addr.bytes = sizeof(IRQ_data);
+		omap_aess_mem_read(aess, addr, (u32 *)&IRQ_data);
+		aess->irq_dbg_read_ptr = (aess->irq_dbg_read_ptr + 1) & OMAP_ABE_IRQ_FIFO_MASK;
+		/* select the source of the interrupt */
+		switch (IRQ_data.tag) {
+		case OMAP_ABE_IRQTAG_PP:
+			/* first IRQ doesn't represent a buffer transference completion */
+			if (aess->pp_first_irq)
+				aess->pp_first_irq = 0;
+			else
+				aess->pp_buf_id = (aess->pp_buf_id + 1) & 0x03;
+
+			abe_irq_pingpong_subroutine(abe->dai.port[OMAP_ABE_FE_PORT_MM_DL_LP]->substream,
+						    abe);
+
+			break;
+		case OMAP_ABE_IRQTAG_COUNT:
+			/*omap_aess_monitoring(aess);*/
+			break;
+		default:
+			break;
+		}
+
+	}
+
 	pm_runtime_put_sync_suspend(abe->dev);
 	return IRQ_HANDLED;
 }
 
-static int omap_abe_hwrule_period_step(struct snd_pcm_hw_params *params,
+static int omap_abe_hwrule_size_step(struct snd_pcm_hw_params *params,
 					struct snd_pcm_hw_rule *rule)
 {
-	struct snd_interval *period_size = hw_param_interval(params,
-				     SNDRV_PCM_HW_PARAM_PERIOD_SIZE);
 	unsigned int rate = params_rate(params);
 
 	/* 44.1kHz has the same iteration number as 48kHz */
 	rate = (rate == 44100) ? 48000 : rate;
 
 	/* ABE requires chunks of 250us worth of data */
-	return snd_interval_step(period_size, 0, rate / 4000);
+	return snd_interval_step(hw_param_interval(params, rule->var), 0,
+				 rate / 4000);
 }
 
 static int aess_open(struct snd_pcm_substream *substream)
@@ -123,14 +188,19 @@ static int aess_open(struct snd_pcm_substream *substream)
 		break;
 	default:
 		/*
-		 * Period size must be aligned with the Audio Engine
+		 * Period and buffer size must be aligned with the Audio Engine
 		 * processing loop which is 250 us long
 		 */
 		ret = snd_pcm_hw_rule_add(substream->runtime, 0,
 					SNDRV_PCM_HW_PARAM_PERIOD_SIZE,
-					omap_abe_hwrule_period_step,
+					omap_abe_hwrule_size_step,
 					NULL,
 					SNDRV_PCM_HW_PARAM_PERIOD_SIZE, -1);
+		ret = snd_pcm_hw_rule_add(substream->runtime, 0,
+					SNDRV_PCM_HW_PARAM_BUFFER_SIZE,
+					omap_abe_hwrule_size_step,
+					NULL,
+					SNDRV_PCM_HW_PARAM_BUFFER_SIZE, -1);
 		break;
 	}
 
@@ -164,7 +234,7 @@ static int aess_hw_params(struct snd_pcm_substream *substream,
 	struct snd_soc_dai *dai = rtd->cpu_dai;
 	struct omap_aess_data_format format;
 	size_t period_size;
-	u32 dst, param[2];
+	u32 dst;
 	int ret = 0;
 
 	mutex_lock(&abe->mutex);
@@ -176,23 +246,15 @@ static int aess_hw_params(struct snd_pcm_substream *substream,
 
 	format.f = params_rate(params);
 	if (params_format(params) == SNDRV_PCM_FORMAT_S32_LE)
-		format.samp_format = STEREO_MSB;
+		format.samp_format = OMAP_AESS_FORMAT_STEREO_MSB;
 	else
-		format.samp_format = STEREO_16_16;
+		format.samp_format = OMAP_AESS_FORMAT_STEREO_16_16;
 
 	period_size = params_period_bytes(params);
 
-	param[0] = (u32)substream;
-	param[1] = (u32)abe;
-
-	/* Adding ping pong buffer subroutine */
-	omap_aess_plug_subroutine(abe->aess, &abe->aess->seq.irq_pingpong_player_id,
-				(abe_subroutine2) abe_irq_pingpong_subroutine,
-				2, param);
-
 	/* Connect a Ping-Pong cache-flush protocol to MM_DL port */
 	omap_aess_connect_irq_ping_pong_port(abe->aess, OMAP_ABE_MM_DL_PORT, &format,
-				abe->aess->seq.irq_pingpong_player_id,
+				0,
 				period_size, &dst,
 				PING_PONG_WITH_MCU_IRQ);
 

@@ -59,89 +59,9 @@
 #ifndef _ABE_PORT_H_
 #define _ABE_PORT_H_
 
-struct ABE_STask {
-	/* 0 ... Index of called function */
-	u16 iF;
-	/* 2 ... for INITPTR of A0 */
-	u16 A0;
-	/* 4 ... for INITPTR of A1 */
-	u16 A1;
-	/* 6 ... for INITPTR of A2 & A3 */
-	u16 A2_3;
-	/* 8 ... for INITPTR of A4 & A5 */
-	u16 A4_5;
-	/* 10 ... for INITREG of R0, R1, R2, R3 */
-	u16 R;
-	/* 12 */
-	u16 misc0;
-	/* 14 */
-	u16 misc1;
-};
-
-#define ABE_TASK_ID(ID) (OMAP_ABE_D_TASKSLIST_ADDR + sizeof(struct ABE_STask)*(ID))
-
-struct ABE_SIODescriptor {
-	/* 0 */
-	u16 drift_asrc;
-	/* 2 */
-	u16 drift_io;
-	/* 4 "Function index" of XLS sheet "Functions" */
-	u8 io_type_idx;
-	/* 5 1 = MONO or Stereo1616, 2= STEREO, ... */
-	u8 samp_size;
-	/* 6 drift "issues" for ASRC */
-	s16 flow_counter;
-	/* 8 address for IRQ or DMArequests */
-	u16 hw_ctrl_addr;
-	/* 10 DMA request bit-field or IRQ (DSP/MCU) */
-	u8 atc_irq_data;
-	/* 11 0 = Read, 3 = Write */
-	u8 direction_rw;
-	/* 12 */
-	u8 repeat_last_samp;
-	/* 13 12 at 48kHz, ... */
-	u8 nsamp;
-	/* 14 nsamp x samp_size */
-	u8 x_io;
-	/* 15 ON = 0x80, OFF = 0x00 */
-	u8 on_off;
-	/* 16 For Slimbus and TDM purpose */
-	u16 split_addr1;
-	/* 18 */
-	u16 split_addr2;
-	/* 20 */
-	u16 split_addr3;
-	/* 22 */
-	u8 before_f_index;
-	/* 23 */
-	u8 after_f_index;
-	/* 24 SM/CM INITPTR field */
-	u16 smem_addr1;
-	/* 26 in bytes */
-	u16 atc_address1;
-	/* 28 DMIC_ATC_PTR, MCPDM_UL_ATC_PTR, ... */
-	u16 atc_pointer_saved1;
-	/* 30 samp_size (except in TDM or Slimbus) */
-	u8 data_size1;
-	/* 31 "Function index" of XLS sheet "Functions" */
-	u8 copy_f_index1;
-	/* 32 For Slimbus and TDM purpose */
-	u16 smem_addr2;
-	/* 34 */
-	u16 atc_address2;
-	/* 36 */
-	u16 atc_pointer_saved2;
-	/* 38 */
-	u8 data_size2;
-	/* 39 */
-	u8 copy_f_index2;
-};
-
-#ifdef __KERNEL__
 int omap_aess_select_main_port(struct omap_aess *abe, u32 id);
 void omap_aess_build_scheduler_table(struct omap_aess *abe);
 int omap_aess_reset_port(struct omap_aess *abe, u32 id);
 void omap_aess_irq_ping_pong(struct omap_aess *abe);
-#endif
 
 #endif /* _ABE_PORT_H_ */

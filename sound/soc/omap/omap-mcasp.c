@@ -592,7 +592,7 @@ static struct snd_soc_dai_driver omap_mcasp_dai = {
 	.ops = &omap_mcasp_dai_ops,
 };
 
-static int omap_mcasp_probe(struct platform_device *pdev)
+static int asoc_mcasp_probe(struct platform_device *pdev)
 {
 	struct omap_mcasp *mcasp;
 	struct resource *res;
@@ -632,8 +632,9 @@ static int omap_mcasp_probe(struct platform_device *pdev)
 		return mcasp->irq;
 	}
 
-	ret = request_threaded_irq(mcasp->irq, NULL, omap_mcasp_irq_handler,
-				IRQF_ONESHOT, "McASP", mcasp);
+	ret = devm_request_threaded_irq(&pdev->dev, mcasp->irq, NULL,
+					omap_mcasp_irq_handler,
+					IRQF_ONESHOT, "McASP", mcasp);
 	if (ret) {
 		dev_err(mcasp->dev, "IRQ request failed\n");
 		return ret;
@@ -642,8 +643,7 @@ static int omap_mcasp_probe(struct platform_device *pdev)
 	mcasp->fclk = clk_get(&pdev->dev, "fck");
 	if (!mcasp->fclk) {
 		dev_err(mcasp->dev, "cant get fck\n");
-		ret = -ENODEV;
-		goto err_clk;
+		return -ENODEV;
 	}
 
 	pm_runtime_enable(&pdev->dev);
@@ -665,19 +665,16 @@ static int omap_mcasp_probe(struct platform_device *pdev)
 err_dai:
 	pm_runtime_put_sync(&pdev->dev);
 	pm_runtime_disable(&pdev->dev);
-err_clk:
-	free_irq(mcasp->irq, (void *)mcasp);
 	return ret;
 }
 
-static int omap_mcasp_remove(struct platform_device *pdev)
+static int asoc_mcasp_remove(struct platform_device *pdev)
 {
 	struct omap_mcasp *mcasp = dev_get_drvdata(&pdev->dev);
 
 	snd_soc_unregister_dai(&pdev->dev);
 	pm_runtime_disable(&pdev->dev);
 	clk_put(mcasp->fclk);
-	free_irq(mcasp->irq, (void *)mcasp);
 
 	return 0;
 }
@@ -689,13 +686,13 @@ static const struct of_device_id omap_mcasp_of_match[] = {
 MODULE_DEVICE_TABLE(of, omap_mcasp_of_match);
 
 static struct platform_driver omap_mcasp_driver = {
-	.probe		= omap_mcasp_probe,
-	.remove		= omap_mcasp_remove,
 	.driver		= {
 		.name	= "omap-mcasp",
 		.owner	= THIS_MODULE,
 		.of_match_table = omap_mcasp_of_match,
 	},
+	.probe		= asoc_mcasp_probe,
+	.remove		= asoc_mcasp_remove,
 };
 
 static int __init omap_mcasp_init(void)
