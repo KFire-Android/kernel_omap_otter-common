@@ -5,7 +5,7 @@
  *
  * GPL LICENSE SUMMARY
  *
- * Copyright(c) 2010-2012 Texas Instruments Incorporated,
+ * Copyright(c) 2010-2013 Texas Instruments Incorporated,
  * All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -66,9 +66,7 @@
 #include <linux/slab.h>
 #include <linux/io.h>
 
-#include "abe_def.h"
-#include "abe_typ.h"
-#include "abe_ext.h"
+#include "aess-fw.h"
 
 #include <linux/debugfs.h>
 
@@ -112,54 +110,6 @@
 
 #define OMAP_ABE_MAX_PORT_ID	OMAP_ABE_FE_PORT_MM_DL_LP
 
-/* ABE copy function IDs */
-#define OMAP_AESS_COPY_FCT_NULL_ID			0
-#define OMAP_AESS_COPY_FCT_S2D_STEREO_16_16_ID		1
-#define OMAP_AESS_COPY_FCT_S2D_MONO_MSB_ID		2
-#define OMAP_AESS_COPY_FCT_S2D_STEREO_MSB_ID		3
-#define OMAP_AESS_COPY_FCT_S2D_STEREO_RSHIFTED_16_ID	4
-#define OMAP_AESS_COPY_FCT_S2D_MONO_RSHIFTED_16_ID	5
-#define OMAP_AESS_COPY_FCT_D2S_STEREO_16_16_ID		6
-#define OMAP_AESS_COPY_FCT_D2S_MONO_MSB_ID		7
-#define OMAP_AESS_COPY_FCT_D2S_MONO_RSHIFTED_16_ID	8
-#define OMAP_AESS_COPY_FCT_D2S_STEREO_RSHIFTED_16_ID	9
-#define OMAP_AESS_COPY_FCT_D2S_STEREO_MSB_ID		10
-#define OMAP_AESS_COPY_FCT_DMIC_ID			11
-#define OMAP_AESS_COPY_FCT_MCPDM_DL_ID			12
-#define OMAP_AESS_COPY_FCT_MM_UL_ID			13
-#define OMAP_AESS_COPY_FCT_SPLIT_SMEM_ID		14
-#define OMAP_AESS_COPY_FCT_MERGE_SMEM_ID		15
-#define OMAP_AESS_COPY_FCT_SPLIT_TDM_ID			16
-#define OMAP_AESS_COPY_FCT_MERGE_TDM_ID			17
-#define OMAP_AESS_COPY_FCT_ROUTE_MM_UL_ID		18
-#define OMAP_AESS_COPY_FCT_IO_IP_ID			19
-#define OMAP_AESS_COPY_FCT_COPY_UNDERFLOW_ID		20
-#define OMAP_AESS_COPY_FCT_COPY_MCPDM_DL_HF_PDL1_ID	21
-#define OMAP_AESS_COPY_FCT_COPY_MCPDM_DL_HF_PDL2_ID	22
-#define OMAP_AESS_COPY_FCT_S2D_MONO_16_16_ID		23
-#define OMAP_AESS_COPY_FCT_D2S_MONO_16_16_ID		24
-#define OMAP_AESS_COPY_FCT_DMIC_NO_PRESCALE_ID		25
-
-/* ABE buffer IDs */
-#define OMAP_AESS_BUFFER_ZERO_ID		0
-#define OMAP_AESS_BUFFER_DMIC1_L_ID		1
-#define OMAP_AESS_BUFFER_DMIC1_R_ID		2
-#define OMAP_AESS_BUFFER_DMIC2_L_ID		3
-#define OMAP_AESS_BUFFER_DMIC2_R_ID		4
-#define OMAP_AESS_BUFFER_DMIC3_L_ID		5
-#define OMAP_AESS_BUFFER_DMIC3_R_ID		6
-#define OMAP_AESS_BUFFER_BT_UL_L_ID		7
-#define OMAP_AESS_BUFFER_BT_UL_R_ID		8
-#define OMAP_AESS_BUFFER_MM_EXT_IN_L_ID		9
-#define OMAP_AESS_BUFFER_MM_EXT_IN_R_ID		10
-#define OMAP_AESS_BUFFER_AMIC_L_ID		11
-#define OMAP_AESS_BUFFER_AMIC_R_ID		12
-#define OMAP_AESS_BUFFER_VX_REC_L_ID		13
-#define OMAP_AESS_BUFFER_VX_REC_R_ID		14
-#define OMAP_AESS_BUFFER_MCU_IRQ_FIFO_PTR_ID	15
-#define OMAP_AESS_BUFFER_DMIC_ATC_PTR_ID	16
-#define OMAP_AESS_BUFFER_MM_EXT_IN_ID		17
-
 
 #define OMAP_ABE_D_MCUIRQFIFO_SIZE	0x40
 
@@ -173,7 +123,8 @@ struct omap_aess_mapping {
 	struct omap_aess_addr *map;
 	int *fct_id;
 	int *label_id;
-	struct omap_aess_init_task *init_table;
+	int nb_init_task;
+	struct omap_aess_task *init_table;
 	struct omap_aess_port *port;
 	struct omap_aess_port *ping_pong;
 	struct omap_aess_task *dl1_mono_mixer;
@@ -198,6 +149,7 @@ struct omap_abe_port {
 
 	struct list_head list;
 	struct omap_aess *abe;
+	struct snd_pcm_substream *substream;
 
 #ifdef CONFIG_DEBUG_FS
 	struct dentry *debugfs_lstate;
@@ -206,18 +158,13 @@ struct omap_abe_port {
 #endif
 };
 
-struct omap_abe_port *omap_abe_port_open(struct omap_aess *abe, int logical_id);
-void omap_abe_port_close(struct omap_aess *abe, struct omap_abe_port *port);
-int omap_abe_port_enable(struct omap_aess *abe, struct omap_abe_port *port);
-int omap_abe_port_disable(struct omap_aess *abe, struct omap_abe_port *port);
-int omap_abe_port_is_enabled(struct omap_aess *abe, struct omap_abe_port *port);
+struct omap_abe_port *omap_abe_port_open(struct omap_aess *aess, int logical_id);
+void omap_abe_port_close(struct omap_aess *aess, struct omap_abe_port *port);
+int omap_abe_port_enable(struct omap_aess *aess, struct omap_abe_port *port);
+int omap_abe_port_disable(struct omap_aess *aess, struct omap_abe_port *port);
+int omap_abe_port_is_enabled(struct omap_aess *aess, struct omap_abe_port *port);
 struct omap_aess *omap_abe_port_mgr_get(void);
-void omap_abe_port_mgr_put(struct omap_aess *abe);
-
-struct omap_aess_seq {
-	u32 write_pointer;
-	u32 irq_pingpong_player_id;
-};
+void omap_abe_port_mgr_put(struct omap_aess *aess);
 
 /* main ABE structure */
 struct omap_aess {
@@ -225,7 +172,6 @@ struct omap_aess {
 	void __iomem *io_base[5];
 	u32 firmware_version_number;
 	u16 MultiFrame[25][8];
-	u32 compensated_mixer_gain;
 	u8  muted_gains_indicator[MAX_NBGAIN_CMEM];
 	u32 desired_gains_decibel[MAX_NBGAIN_CMEM];
 	u32 muted_gains_decibel[MAX_NBGAIN_CMEM];
@@ -243,10 +189,8 @@ struct omap_aess {
 	u32 size_pingpong;
 	/* number of ping/pong buffer being used */
 	u32 nb_pingpong;
-	struct snd_pcm_substream *substream_pp;
 
 	u32 irq_dbg_read_ptr;
-	struct omap_aess_seq seq;
 	struct omap_aess_mapping *fw_info;
 
 	/* List of open ABE logical ports */
@@ -259,8 +203,6 @@ struct omap_aess {
 	struct dentry *debugfs_root;
 #endif
 };
-
-#include "abe_gain.h"
 
 struct omap_aess_equ {
 	/* type of filter */
@@ -285,77 +227,64 @@ struct omap_aess_equ {
 
 
 struct omap_aess_dma {
-	/* OCP L3 pointer to the first address of the */
 	void *data;
-	/* destination buffer (either DMA or Ping-Pong read/write pointers). */
-	/* address L3 when addressing the DMEM buffer instead of CBPr */
-	void *l3_dmem;
-	/* address L3 translated to L4 the ARM memory space */
-	void *l4_dmem;
-	/* number of iterations for the DMA data moves. */
 	u32 iter;
 };
 
-int omap_aess_set_opp_processing(struct omap_aess *abe, u32 opp);
-int omap_aess_connect_debug_trace(struct omap_aess *abe,
+int omap_aess_set_opp_processing(struct omap_aess *aess, u32 opp);
+int omap_aess_connect_debug_trace(struct omap_aess *aess,
 				  struct omap_aess_dma *dma2);
 
 /* gain */
-int omap_aess_use_compensated_gain(struct omap_aess *abe, int on_off);
-int omap_aess_write_equalizer(struct omap_aess *abe, u32 id,
+int omap_aess_use_compensated_gain(struct omap_aess *aess, int on_off);
+int omap_aess_write_equalizer(struct omap_aess *aess, u32 id,
 			      struct omap_aess_equ *param);
 
-int omap_aess_disable_gain(struct omap_aess *abe, u32 id);
-int omap_aess_enable_gain(struct omap_aess *abe, u32 id);
-int omap_aess_mute_gain(struct omap_aess *abe, u32 id);
-int omap_aess_unmute_gain(struct omap_aess *abe, u32 id);
+int omap_aess_disable_gain(struct omap_aess *aess, u32 id);
+int omap_aess_enable_gain(struct omap_aess *aess, u32 id);
+int omap_aess_mute_gain(struct omap_aess *aess, u32 id);
+int omap_aess_unmute_gain(struct omap_aess *aess, u32 id);
 
-int omap_aess_write_gain(struct omap_aess *abe,	u32 id, s32 f_g);
-int omap_aess_write_mixer(struct omap_aess *abe, u32 id, s32 f_g);
-int omap_aess_read_gain(struct omap_aess *abe, u32 id, u32 *f_g);
-int omap_aess_read_mixer(struct omap_aess *abe, u32 id, u32 *f_g);
+int omap_aess_write_gain(struct omap_aess *aess,	u32 id, s32 f_g);
+int omap_aess_write_mixer(struct omap_aess *aess, u32 id, s32 f_g);
+int omap_aess_read_gain(struct omap_aess *aess, u32 id, u32 *f_g);
+int omap_aess_read_mixer(struct omap_aess *aess, u32 id, u32 *f_g);
 
-int omap_aess_init_mem(struct omap_aess *abe, struct device *dev,
-	void __iomem **_io_base, u32 *fw_header);
-int omap_aess_reset_hal(struct omap_aess *abe);
-int omap_aess_load_fw(struct omap_aess *abe, u32 *firmware);
-int omap_aess_reload_fw(struct omap_aess *abe, u32 *firmware);
+int omap_aess_init_mem(struct omap_aess *aess, struct device *dev,
+	void __iomem **_io_base, const void *fw_config);
+int omap_aess_reset_hal(struct omap_aess *aess);
+int omap_aess_load_fw(struct omap_aess *aess, const void *firmware);
+int omap_aess_reload_fw(struct omap_aess *aess, const void *firmware);
 u32 omap_abe_get_supported_fw_version(void);
 
 /* port */
-int omap_aess_mono_mixer(struct omap_aess *abe, u32 id, u32 on_off);
-int omap_aess_connect_serial_port(struct omap_aess *abe, u32 id,
+int omap_aess_mono_mixer(struct omap_aess *aess, u32 id, u32 on_off);
+void omap_aess_connect_serial_port(struct omap_aess *aess, u32 id,
 				  struct omap_aess_data_format *f,
-				  u32 mcbsp_id);
-int omap_aess_connect_cbpr_dmareq_port(struct omap_aess *abe, u32 id,
+				  u32 mcbsp_id, struct omap_aess_dma *aess_dma);
+void omap_aess_connect_cbpr_dmareq_port(struct omap_aess *aess, u32 id,
 				       struct omap_aess_data_format *f, u32 d,
-				       struct omap_aess_dma *returned_dma_t);
-int omap_aess_read_port_address(struct omap_aess *abe,
-				u32 port, struct omap_aess_dma *dma2);
-int omap_aess_connect_irq_ping_pong_port(struct omap_aess *abe, u32 id,
+				       struct omap_aess_dma *aess_dma);
+int omap_aess_connect_irq_ping_pong_port(struct omap_aess *aess, u32 id,
 					 struct omap_aess_data_format *f,
 					 u32 subroutine_id, u32 size,
 					 u32 *sink, u32 dsp_mcu_flag);
-void omap_aess_write_pdmdl_offset(struct omap_aess *abe, u32 path,
+void omap_aess_write_pdmdl_offset(struct omap_aess *aess, u32 path,
 				  u32 offset_left, u32 offset_right);
-int omap_aess_enable_data_transfer(struct omap_aess *abe, u32 id);
-int omap_aess_disable_data_transfer(struct omap_aess *abe, u32 id);
+int omap_aess_enable_data_transfer(struct omap_aess *aess, u32 id);
+int omap_aess_disable_data_transfer(struct omap_aess *aess, u32 id);
 
 /* core */
-int omap_aess_check_activity(struct omap_aess *abe);
-int omap_aess_wakeup(struct omap_aess *abe);
-int omap_aess_set_router_configuration(struct omap_aess *abe, u32 *param);
-int omap_abe_read_next_ping_pong_buffer(struct omap_aess *abe,
+int omap_aess_check_activity(struct omap_aess *aess);
+int omap_aess_wakeup(struct omap_aess *aess);
+int omap_aess_set_router_configuration(struct omap_aess *aess, u32 *param);
+int omap_abe_read_next_ping_pong_buffer(struct omap_aess *aess,
 					u32 port, u32 *p, u32 *n);
-int omap_aess_read_next_ping_pong_buffer(struct omap_aess *abe,
+int omap_aess_read_next_ping_pong_buffer(struct omap_aess *aess,
 					 u32 port, u32 *p, u32 *n);
-int omap_aess_irq_processing(struct omap_aess *abe);
-int omap_aess_set_ping_pong_buffer(struct omap_aess *abe,
+int omap_aess_irq_processing(struct omap_aess *aess);
+int omap_aess_set_ping_pong_buffer(struct omap_aess *aess,
 				   u32 port, u32 n_bytes);
-int omap_aess_read_offset_from_ping_buffer(struct omap_aess *abe,
+int omap_aess_read_offset_from_ping_buffer(struct omap_aess *aess,
 					   u32 id, u32 *n);
-/* seq */
-int omap_aess_plug_subroutine(struct omap_aess *abe, u32 *id,
-			      abe_subroutine2 f, u32 n, u32 *params);
-
 #endif /* _ABE_H_ */

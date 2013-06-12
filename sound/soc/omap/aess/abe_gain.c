@@ -5,7 +5,7 @@
  *
  * GPL LICENSE SUMMARY
  *
- * Copyright(c) 2010-2012 Texas Instruments Incorporated,
+ * Copyright(c) 2010-2013 Texas Instruments Incorporated,
  * All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -70,11 +70,14 @@
 /*
  * ABE CONST AREA FOR PARAMETERS TRANSLATION
  */
-#define min_mdb (-12000)
-#define max_mdb (3000)
-#define sizeof_db2lin_table (1 + ((max_mdb - min_mdb)/100))
+#define OMAP_AESS_GAIN_MUTED     (0x0001<<0)
+#define OMAP_AESS_GAIN_DISABLED  (0x0001<<1)
 
-static const u32 abe_db2lin_table[sizeof_db2lin_table] = {
+#define OMAP_AESS_GAIN_MIN_MDB	(-12000)
+#define OMAP_AESS_GAIN_MAX_MDB	(3000)
+#define OMAP_AESS_GAIN_DB2LIN_SIZE	(1 + ((OMAP_AESS_GAIN_MAX_MDB - OMAP_AESS_GAIN_MIN_MDB)/100))
+
+static const u32 abe_db2lin_table[OMAP_AESS_GAIN_DB2LIN_SIZE] = {
 	0x00000000,		/* SMEM coding of -120 dB */
 	0x00000000,		/* SMEM coding of -119 dB */
 	0x00000000,		/* SMEM coding of -118 dB */
@@ -267,31 +270,14 @@ static const u32 abe_alpha_iir[64] = {
 };
 
 /**
- * abe_use_compensated_gain
- * @abe: Pointer on aess handle
- * @on_off: Enable dynamic gain compensation.
- *
- * Selects the automatic Mixer's gain management
- * on_off = 1 allows the "abe_write_gain" to adjust the overall
- * gains of the mixer to be tuned not to create saturation
- *
- */
-int omap_aess_use_compensated_gain(struct omap_aess *abe, int on_off)
-{
-	abe->compensated_mixer_gain = on_off;
-	return 0;
-}
-EXPORT_SYMBOL(omap_aess_use_compensated_gain);
-
-/**
- * oamp_abe_write_equalizer
- * @abe: Pointer on aess handle
+ * omap_aess_write_equalizer
+ * @aess: Pointer on aess handle
  * @id: name of the equalizer
  * @param: equalizer coefficients
  *
  * Load the coefficients in CMEM.
  */
-int omap_aess_write_equalizer(struct omap_aess *abe,
+int omap_aess_write_equalizer(struct omap_aess *aess,
 			     u32 id, struct omap_aess_equ *param)
 {
 	struct omap_aess_addr equ_addr;
@@ -300,32 +286,32 @@ int omap_aess_write_equalizer(struct omap_aess *abe,
 	switch (id) {
 	case OMAP_AESS_CMEM_DL1_COEFS_ID:
 		memcpy(&equ_addr,
-		       &abe->fw_info->map[OMAP_AESS_SMEM_DL1_M_EQ_DATA_ID],
+		       &aess->fw_info->map[OMAP_AESS_SMEM_DL1_M_EQ_DATA_ID],
 		       sizeof(struct omap_aess_addr));
 		break;
 	case OMAP_AESS_CMEM_DL2_L_COEFS_ID:
 		memcpy(&equ_addr,
-		       &abe->fw_info->map[OMAP_AESS_SMEM_DL2_M_LR_EQ_DATA_ID],
+		       &aess->fw_info->map[OMAP_AESS_SMEM_DL2_M_LR_EQ_DATA_ID],
 		       sizeof(struct omap_aess_addr));
 		break;
 	case OMAP_AESS_CMEM_DL2_R_COEFS_ID:
 		memcpy(&equ_addr,
-		       &abe->fw_info->map[OMAP_AESS_SMEM_DL2_M_LR_EQ_DATA_ID],
+		       &aess->fw_info->map[OMAP_AESS_SMEM_DL2_M_LR_EQ_DATA_ID],
 		       sizeof(struct omap_aess_addr));
 		break;
 	case OMAP_AESS_CMEM_SDT_COEFS_ID:
 		memcpy(&equ_addr,
-		       &abe->fw_info->map[OMAP_AESS_SMEM_SDT_F_DATA_ID],
+		       &aess->fw_info->map[OMAP_AESS_SMEM_SDT_F_DATA_ID],
 		       sizeof(struct omap_aess_addr));
 		break;
 	case OMAP_AESS_CMEM_96_48_AMIC_COEFS_ID:
 		memcpy(&equ_addr,
-		       &abe->fw_info->map[OMAP_AESS_SMEM_AMIC_96_48_DATA_ID],
+		       &aess->fw_info->map[OMAP_AESS_SMEM_AMIC_96_48_DATA_ID],
 		       sizeof(struct omap_aess_addr));
 		break;
 	case OMAP_AESS_CMEM_96_48_DMIC_COEFS_ID:
 		memcpy(&equ_addr,
-		       &abe->fw_info->map[OMAP_AESS_SMEM_DMIC0_96_48_DATA_ID],
+		       &aess->fw_info->map[OMAP_AESS_SMEM_DMIC0_96_48_DATA_ID],
 		       sizeof(struct omap_aess_addr));
 		/* three DMIC are clear at the same time DMIC0 DMIC1 DMIC2 */
 		equ_addr.bytes *= 3;
@@ -333,14 +319,14 @@ int omap_aess_write_equalizer(struct omap_aess *abe,
 	}
 
 	/* reset SMEM buffers before the coefficients are loaded */
-	omap_aess_reset_mem(abe, equ_addr);
+	omap_aess_reset_mem(aess, equ_addr);
 
 	length = param->equ_length;
 	src = (u32 *)((param->coef).type1);
-	omap_aess_mem_write(abe, abe->fw_info->map[id], src);
+	omap_aess_mem_write(aess, aess->fw_info->map[id], src);
 
 	/* reset SMEM buffers after the coefficients are loaded */
-	omap_aess_reset_mem(abe, equ_addr);
+	omap_aess_reset_mem(aess, equ_addr);
 	return 0;
 }
 EXPORT_SYMBOL(omap_aess_write_equalizer);
@@ -348,26 +334,26 @@ EXPORT_SYMBOL(omap_aess_write_equalizer);
 
 /**
  * omap_aess_disable_gain
- * @abe: Pointer on aess handle
+ * @aess: Pointer on aess handle
  * @id: name of the gain
  *
  * Set gain to silence if not already mute or disable.
  */
-int omap_aess_disable_gain(struct omap_aess *abe, u32 id)
+int omap_aess_disable_gain(struct omap_aess *aess, u32 id)
 {
 	u32 f_g;
 
 	f_g = GAIN_MUTE;
-	if (!(abe->muted_gains_indicator[id] & OMAP_ABE_GAIN_DISABLED)) {
+	if (!(aess->muted_gains_indicator[id] & OMAP_AESS_GAIN_DISABLED)) {
 		/* Check if we are in mute */
-		if (!(abe->muted_gains_indicator[id] &
-		      OMAP_ABE_GAIN_MUTED)) {
-			abe->muted_gains_decibel[id] =
-				abe->desired_gains_decibel[id];
+		if (!(aess->muted_gains_indicator[id] &
+		      OMAP_AESS_GAIN_MUTED)) {
+			aess->muted_gains_decibel[id] =
+				aess->desired_gains_decibel[id];
 			/* mute the gain */
-			omap_aess_write_gain(abe, id, f_g);
+			omap_aess_write_gain(aess, id, f_g);
 		}
-		abe->muted_gains_indicator[id] |= OMAP_ABE_GAIN_DISABLED;
+		aess->muted_gains_indicator[id] |= OMAP_AESS_GAIN_DISABLED;
 	}
 	return 0;
 }
@@ -375,22 +361,22 @@ EXPORT_SYMBOL(omap_aess_disable_gain);
 
 /**
  * omap_aess_enable_gain
- * @abe: Pointer on aess handle
+ * @aess: Pointer on aess handle
  * @id: name of the gain
  *
  * Restore gain if we are in disable mode.
  */
-int omap_aess_enable_gain(struct omap_aess *abe, u32 id)
+int omap_aess_enable_gain(struct omap_aess *aess, u32 id)
 {
 	u32 f_g;
 
-	if ((abe->muted_gains_indicator[id] & OMAP_ABE_GAIN_DISABLED)) {
+	if ((aess->muted_gains_indicator[id] & OMAP_AESS_GAIN_DISABLED)) {
 		/* restore the input parameters for mute/unmute */
-		f_g = abe->muted_gains_decibel[id];
-		abe->muted_gains_indicator[id] &=
-			~OMAP_ABE_GAIN_DISABLED;
+		f_g = aess->muted_gains_decibel[id];
+		aess->muted_gains_indicator[id] &=
+			~OMAP_AESS_GAIN_DISABLED;
 		/* unmute the gain */
-		omap_aess_write_gain(abe, id, f_g);
+		omap_aess_write_gain(aess, id, f_g);
 	}
 	return 0;
 }
@@ -398,43 +384,43 @@ EXPORT_SYMBOL(omap_aess_enable_gain);
 
 /**
  * omap_aess_mute_gain
- * @abe: Pointer on aess handle
+ * @aess: Pointer on aess handle
  * @id: name of the gain
  *
  * Set gain to silence if not already mute.
  */
-int omap_aess_mute_gain(struct omap_aess *abe, u32 id)
+int omap_aess_mute_gain(struct omap_aess *aess, u32 id)
 {
 	u32 f_g;
 
 	f_g = GAIN_MUTE;
-	if (!abe->muted_gains_indicator[id]) {
-		abe->muted_gains_decibel[id] =
-			abe->desired_gains_decibel[id];
+	if (!aess->muted_gains_indicator[id]) {
+		aess->muted_gains_decibel[id] =
+			aess->desired_gains_decibel[id];
 		/* mute the gain */
-		omap_aess_write_gain(abe, id, f_g);
+		omap_aess_write_gain(aess, id, f_g);
 	}
-	abe->muted_gains_indicator[id] |= OMAP_ABE_GAIN_MUTED;
+	aess->muted_gains_indicator[id] |= OMAP_AESS_GAIN_MUTED;
 	return 0;
 }
 EXPORT_SYMBOL(omap_aess_mute_gain);
 /**
  * omap_aess_unmute_gain
- * @abe: Pointer on aess handle
+ * @aess: Pointer on aess handle
  * @id: name of the gain
  *
  * Restore gain after mute.
  */
-int omap_aess_unmute_gain(struct omap_aess *abe, u32 id)
+int omap_aess_unmute_gain(struct omap_aess *aess, u32 id)
 {
 	u32 f_g;
-	if ((abe->muted_gains_indicator[id] & OMAP_ABE_GAIN_MUTED)) {
+	if ((aess->muted_gains_indicator[id] & OMAP_AESS_GAIN_MUTED)) {
 		/* restore the input parameters for mute/unmute */
-		f_g = abe->muted_gains_decibel[id];
-		abe->muted_gains_indicator[id] &=
-			~OMAP_ABE_GAIN_MUTED;
+		f_g = aess->muted_gains_decibel[id];
+		aess->muted_gains_indicator[id] &=
+			~OMAP_AESS_GAIN_MUTED;
 		/* unmute the gain */
-		omap_aess_write_gain(abe, id, f_g);
+		omap_aess_write_gain(aess, id, f_g);
 	}
 	return 0;
 }
@@ -442,7 +428,7 @@ EXPORT_SYMBOL(omap_aess_unmute_gain);
 
 /**
  * omap_aess_write_gain
- * @abe: Pointer on aess handle
+ * @aess: Pointer on aess handle
  * @id: gain name or mixer name
  * @f_g: input gain for the mixer
  *
@@ -452,59 +438,58 @@ EXPORT_SYMBOL(omap_aess_unmute_gain);
  * in mute state". A mixer is disabled with a network reconfiguration
  * corresponding to an OPP value.
  */
-int omap_aess_write_gain(struct omap_aess *abe,
+int omap_aess_write_gain(struct omap_aess *aess,
 			u32 id, s32 f_g)
 {
 	u32 lin_g, mixer_target;
 	s32 gain_index;
 
-	gain_index = ((f_g - min_mdb) / 100);
-	gain_index = maximum(gain_index, 0);
-	gain_index = minimum(gain_index, sizeof_db2lin_table);
+	gain_index = ((f_g - OMAP_AESS_GAIN_MIN_MDB) / 100);
+	gain_index = max(gain_index, 0);
+	gain_index = min(gain_index, OMAP_AESS_GAIN_DB2LIN_SIZE);
 	lin_g = abe_db2lin_table[gain_index];
 	/* save the input parameters for mute/unmute */
-	abe->desired_gains_linear[id] = lin_g;
-	abe->desired_gains_decibel[id] = f_g;
+	aess->desired_gains_linear[id] = lin_g;
+	aess->desired_gains_decibel[id] = f_g;
 
 	/* SMEM address in bytes */
-	mixer_target = abe->fw_info->map[OMAP_AESS_SMEM_GTARGET1_ID].offset;
+	mixer_target = aess->fw_info->map[OMAP_AESS_SMEM_GTARGET1_ID].offset;
 	mixer_target += (id<<2);
 
-	if (!abe->compensated_mixer_gain) {
-		if (!abe->muted_gains_indicator[id])
-			/* load the S_G_Target SMEM table */
-			omap_abe_mem_write(abe, OMAP_ABE_SMEM,
-					   mixer_target, (u32 *)&lin_g,
-					   sizeof(lin_g));
-		else
-			/* update muted gain with new value */
-			abe->muted_gains_decibel[id] = f_g;
-	}
+	if (!aess->muted_gains_indicator[id])
+		/* load the S_G_Target SMEM table */
+		omap_abe_mem_write(aess, OMAP_ABE_SMEM,
+				   mixer_target, (u32 *)&lin_g,
+				   sizeof(lin_g));
+	else
+		/* update muted gain with new value */
+		aess->muted_gains_decibel[id] = f_g;
+
 	return 0;
 }
 EXPORT_SYMBOL(omap_aess_write_gain);
 
 /**
  * omap_aess_write_gain_ramp
- * @abe: Pointer on aess handle
+ * @aess: Pointer on aess handle
  * @id: gain name or mixer name
  * @ramp: Gaim ramp time
  *
  * Loads the gain ramp for the associated gain.
  */
-int omap_aess_write_gain_ramp(struct omap_aess *abe, u32 id, u32 ramp)
+int omap_aess_write_gain_ramp(struct omap_aess *aess, u32 id, u32 ramp)
 {
 	u32 mixer_target;
 	u32 alpha, beta;
 	u32 ramp_index;
 
-	abe->desired_ramp_delay_ms[id] = ramp;
+	aess->desired_ramp_delay_ms[id] = ramp;
 
 	/* SMEM address in bytes */
-	mixer_target = abe->fw_info->map[OMAP_AESS_SMEM_GTARGET1_ID].offset;
+	mixer_target = aess->fw_info->map[OMAP_AESS_SMEM_GTARGET1_ID].offset;
 	mixer_target += (id<<2);
 
-	ramp = maximum(minimum(RAMP_MAXLENGTH, ramp), RAMP_MINLENGTH);
+	ramp = max(min(RAMP_MAXLENGTH, ramp), RAMP_MINLENGTH);
 	/* ramp data should be interpolated in the table instead */
 	ramp_index = 3;
 	if ((RAMP_2MS <= ramp) && (ramp < RAMP_5MS))
@@ -518,17 +503,17 @@ int omap_aess_write_gain_ramp(struct omap_aess *abe, u32 id, u32 ramp)
 	beta = abe_alpha_iir[ramp_index];
 	alpha = abe_1_alpha_iir[ramp_index];
 	/* CMEM bytes address */
-	mixer_target = abe->fw_info->map[OMAP_AESS_CMEM_1_ALPHA_ID].offset;
+	mixer_target = aess->fw_info->map[OMAP_AESS_CMEM_1_ALPHA_ID].offset;
 	/* a pair of gains is updated once in the firmware */
 	mixer_target += ((id) >> 1) << 2;
 	/* load the ramp delay data */
-	omap_abe_mem_write(abe, OMAP_ABE_CMEM, mixer_target,
+	omap_abe_mem_write(aess, OMAP_ABE_CMEM, mixer_target,
 			   (u32 *)&alpha, sizeof(alpha));
 	/* CMEM bytes address */
-	mixer_target = abe->fw_info->map[OMAP_AESS_CMEM_ALPHA_ID].offset;
+	mixer_target = aess->fw_info->map[OMAP_AESS_CMEM_ALPHA_ID].offset;
 	/* a pair of gains is updated once in the firmware */
 	mixer_target += ((id) >> 1) << 2;
-	omap_abe_mem_write(abe, OMAP_ABE_CMEM, mixer_target,
+	omap_abe_mem_write(aess, OMAP_ABE_CMEM, mixer_target,
 			   (u32 *)&beta, sizeof(beta));
 	return 0;
 }
@@ -536,7 +521,7 @@ EXPORT_SYMBOL(omap_aess_write_gain_ramp);
 
 /**
  * omap_aess_write_mixer
- * @abe: Pointer on aess handle
+ * @aess: Pointer on aess handle
  * @id: name of the mixer
  * @f_g: input gain for the mixer
  *
@@ -546,17 +531,17 @@ EXPORT_SYMBOL(omap_aess_write_gain_ramp);
  * gain in mute state". A mixer is disabled with a network reconfiguration
  * corresponding to an OPP value.
  */
-int omap_aess_write_mixer(struct omap_aess *abe, u32 id, s32 f_g)
+int omap_aess_write_mixer(struct omap_aess *aess, u32 id, s32 f_g)
 {
 
-	omap_aess_write_gain(abe, id, f_g);
+	omap_aess_write_gain(aess, id, f_g);
 	return 0;
 }
 EXPORT_SYMBOL(omap_aess_write_mixer);
 
 /**
  * omap_aess_read_gain
- * @abe: Pointer on aess handle
+ * @aess: Pointer on aess handle
  * @id: name of the mixer
  * @f_g: pointer on the gain for the mixer
  *
@@ -566,36 +551,36 @@ EXPORT_SYMBOL(omap_aess_write_mixer);
  * gain in mute state". A mixer is disabled with a network reconfiguration
  * corresponding to an OPP value.
  */
-int omap_aess_read_gain(struct omap_aess *abe, u32 id, u32 *f_g)
+int omap_aess_read_gain(struct omap_aess *aess, u32 id, u32 *f_g)
 {
 	u32 mixer_target, i;
 
 	/* SMEM bytes address */
-	mixer_target = abe->fw_info->map[OMAP_AESS_SMEM_GTARGET1_ID].offset;
+	mixer_target = aess->fw_info->map[OMAP_AESS_SMEM_GTARGET1_ID].offset;
 	mixer_target += (id<<2);
-	if (!abe->muted_gains_indicator[id]) {
+	if (!aess->muted_gains_indicator[id]) {
 		/* load the S_G_Target SMEM table */
-		omap_abe_mem_read(abe, OMAP_ABE_SMEM, mixer_target,
+		omap_abe_mem_read(aess, OMAP_ABE_SMEM, mixer_target,
 				  (u32 *)f_g, sizeof(*f_g));
-		for (i = 0; i < sizeof_db2lin_table; i++) {
+		for (i = 0; i < OMAP_AESS_GAIN_DB2LIN_SIZE; i++) {
 				if (abe_db2lin_table[i] == *f_g)
 					goto found;
 		}
 		*f_g = 0;
 		return -1;
 found:
-		*f_g = (i * 100) + min_mdb;
+		*f_g = (i * 100) + OMAP_AESS_GAIN_MIN_MDB;
 	} else {
 		/* update muted gain with new value */
-		*f_g = abe->muted_gains_decibel[id];
+		*f_g = aess->muted_gains_decibel[id];
 	}
 	return 0;
 }
 EXPORT_SYMBOL(omap_aess_read_gain);
 
 /**
- * abe_read_mixer
- * @abe: Pointer on aess handle
+ * omap_aess_read_mixer
+ * @aess: Pointer on aess handle
  * @id: name of the mixer
  * @f_g: pointer on the gain for the mixer
  *
@@ -605,29 +590,29 @@ EXPORT_SYMBOL(omap_aess_read_gain);
  * gain in mute state". A mixer is disabled with a network reconfiguration
  * corresponding to an OPP value.
  */
-int omap_aess_read_mixer(struct omap_aess *abe, u32 id, u32 *f_g)
+int omap_aess_read_mixer(struct omap_aess *aess, u32 id, u32 *f_g)
 {
-	omap_aess_read_gain(abe, id, f_g);
+	omap_aess_read_gain(aess, id, f_g);
 	return 0;
 }
 EXPORT_SYMBOL(omap_aess_read_mixer);
 
 /**
- * abe_reset_gain_mixer
- * @abe: Pointer on aess handle
+ * omap_aess_reset_gain_mixer
+ * @aess: Pointer on aess handle
  * @id: name of the mixer
  *
  * restart the working gain value of the mixers when a port is enabled
  */
-void omap_aess_reset_gain_mixer(struct omap_aess *abe, u32 id)
+void omap_aess_reset_gain_mixer(struct omap_aess *aess, u32 id)
 {
 	u32 lin_g, mixer_target;
 
 	/* SMEM bytes address for the CURRENT gain values */
-	mixer_target = abe->fw_info->map[OMAP_AESS_SMEM_GCURRENT_ID].offset;
+	mixer_target = aess->fw_info->map[OMAP_AESS_SMEM_GCURRENT_ID].offset;
 	mixer_target += (id<<2);
 	lin_g = 0;
 	/* load the S_G_Target SMEM table */
-	omap_abe_mem_write(abe, OMAP_ABE_SMEM, mixer_target,
+	omap_abe_mem_write(aess, OMAP_ABE_SMEM, mixer_target,
 			   (u32 *)&lin_g, sizeof(lin_g));
 }

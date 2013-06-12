@@ -5,7 +5,7 @@
  *
  * GPL LICENSE SUMMARY
  *
- * Copyright(c) 2010-2012 Texas Instruments Incorporated,
+ * Copyright(c) 2010-2013 Texas Instruments Incorporated,
  * All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -62,19 +62,27 @@
 #include <linux/err.h>
 #include <linux/slab.h>
 
-#include "abe_typ.h"
+#include "aess-fw.h"
 #include "abe.h"
 #include "abe_port.h"
 #include "abe_dbg.h"
 #include "abe_mem.h"
 #include "abe_gain.h"
-#include "abe_seq.h"
-
-#include "abe_def.h"
+#include "abe_aess.h"
 
 /*
  * GLOBAL DEFINITION
  */
+#define ABE_ATC_DMIC_DMA_REQ 1
+#define ABE_ATC_MCPDMDL_DMA_REQ 2
+#define ABE_ATC_MCPDMUL_DMA_REQ 3
+
+/* nb of samples to route */
+#define NBROUTE_UL 16
+
+/* ATC REGISTERS SIZE in bytes */
+#define ABE_ATC_DESC_SIZE 512
+
 #define ATC_SIZE 8		/* 8 bytes per descriptors */
 
 struct omap_abe_atc_desc {
@@ -95,7 +103,7 @@ struct omap_abe_atc_desc {
 	unsigned desen:1;
 };
 
-struct ABE_SPingPongDescriptor {
+struct omap_aess_pingpong_desc {
 	/* 0: [W] asrc output used for the next ASRC call (+/- 1 / 0) */
 	u16 drift_ASRC;
 	/* 2: [W] asrc output used for controlling the number of
@@ -201,36 +209,36 @@ static struct omap_aess_port abe_port[LAST_PORT_ID];	/* list of ABE ports */
 
 static u32 abe_dma_port_iter_factor(struct omap_aess_data_format *f);
 static u32 abe_dma_port_iteration(struct omap_aess_data_format *f);
-void omap_aess_decide_main_port(struct omap_aess *abe);
-int omap_aess_init_io_tasks(struct omap_aess *abe, u32 id,
+void omap_aess_decide_main_port(struct omap_aess *aess);
+int omap_aess_init_io_tasks(struct omap_aess *aess, u32 id,
 			     struct omap_aess_data_format *format,
 			     struct omap_aess_port_protocol *prot);
 void abe_init_dma_t(u32 id, struct omap_aess_port_protocol *prot);
 
-extern void omap_aess_init_asrc_vx_dl(struct omap_aess *abe, s32 dppm);
-extern void omap_aess_init_asrc_vx_ul(struct omap_aess *abe, s32 dppm);
+extern void omap_aess_init_asrc_vx_dl(struct omap_aess *aess, s32 dppm);
+extern void omap_aess_init_asrc_vx_ul(struct omap_aess *aess, s32 dppm);
 
 
 /**
  * omap_aess_reset_port
- * @abe: Pointer on aess handle
+ * @aess: Pointer on aess handle
  * @id: ABE port ID
  *
  * Stop the port activity and reload default parameters on the associated
  * processing features.
  * Clears the internal AE buffers.
  */
-int omap_aess_reset_port(struct omap_aess *abe, u32 id)
+int omap_aess_reset_port(struct omap_aess *aess, u32 id)
 {
-	struct omap_aess_port *port = abe->fw_info->port;
+	struct omap_aess_port *port = aess->fw_info->port;
 
-	abe_port[id] = port[id];
+	memcpy(&abe_port[id], &port[id], sizeof(struct omap_aess_port));
 
 	return 0;
 }
 
 
-static void omap_aess_update_scheduling_table(struct omap_aess *abe,
+static void omap_aess_update_scheduling_table(struct omap_aess *aess,
 					      struct omap_aess_init_task *init_task,
 					      int enable)
 {
@@ -240,29 +248,13 @@ static void omap_aess_update_scheduling_table(struct omap_aess *abe,
 	for (i = 0; i < init_task->nb_task; i++) {
 		task = &init_task->task[i];
 		if (enable)
-			abe->MultiFrame[task->frame][task->slot] = task->task;
+			aess->MultiFrame[task->frame][task->slot] = task->task;
 		else
-			abe->MultiFrame[task->frame][task->slot] = 0;
+			aess->MultiFrame[task->frame][task->slot] = 0;
 	}
 }
 
-static void omap_aess_update_scheduling_table1(struct omap_aess *abe,
-					       struct omap_aess_init_task1 *init_task,
-					       int enable)
-{
-	int i;
-	struct omap_aess_task *task;
-
-	for (i = 0; i < init_task->nb_task; i++) {
-		task = &init_task->task[i];
-		if (enable)
-			abe->MultiFrame[task->frame][task->slot] = task->task;
-		else
-			abe->MultiFrame[task->frame][task->slot] = 0;
-	}
-}
-
-static u32 omap_aess_update_io_task(struct omap_aess *abe,
+static u32 omap_aess_update_io_task(struct omap_aess *aess,
 				    struct omap_aess_io_task *io_task,
 				    int enable)
 {
@@ -272,15 +264,15 @@ static u32 omap_aess_update_io_task(struct omap_aess *abe,
 	for (i = 0; i < io_task->nb_task; i++) {
 		task = &io_task->task[i];
 		if (enable)
-			abe->MultiFrame[task->frame][task->slot] = task->task;
+			aess->MultiFrame[task->frame][task->slot] = task->task;
 		else
-			abe->MultiFrame[task->frame][task->slot] = 0;
+			aess->MultiFrame[task->frame][task->slot] = 0;
 	}
 
 	return io_task->smem;
 }
 
-static u32 omap_aess_update_io_task1(struct omap_aess *abe,
+static u32 omap_aess_update_io_task1(struct omap_aess *aess,
 				     struct omap_aess_io_task1 *io_task,
 				     int enable)
 {
@@ -290,123 +282,128 @@ static u32 omap_aess_update_io_task1(struct omap_aess *abe,
 	for (i = 0; i < io_task->nb_task; i++) {
 		task = &io_task->task[i];
 		if (enable)
-			abe->MultiFrame[task->frame][task->slot] = task->task;
+			aess->MultiFrame[task->frame][task->slot] = task->task;
 		else
-			abe->MultiFrame[task->frame][task->slot] = 0;
+			aess->MultiFrame[task->frame][task->slot] = 0;
 	}
 
 	return io_task->smem;
 }
 
 /**
- * abe_build_scheduler_table
- * @abe: Pointer on aess handle
+ * omap_aess_build_scheduler_table
+ * @aess: Pointer on aess handle
  *
  * Initialize Audio Engine scheduling table for ABE internal
  * processing. The content of the scheduling table is provided
  * by the firmware header. It can be changed according to the
  * ABE graph.
  */
-void omap_aess_build_scheduler_table(struct omap_aess *abe)
+void omap_aess_build_scheduler_table(struct omap_aess *aess)
 {
-	u16 i, n;
+	struct omap_aess_task *task;
 	u16 aUplinkMuxing[NBROUTE_UL];
+	int i, n;
 
 	/* Initialize default scheduling table */
-	memset(abe->MultiFrame, 0, sizeof(abe->MultiFrame));
-	omap_aess_update_scheduling_table(abe, abe->fw_info->init_table, 1);
+	memset(aess->MultiFrame, 0, sizeof(aess->MultiFrame));
 
-	omap_aess_mem_write(abe, abe->fw_info->map[OMAP_AESS_DMEM_MULTIFRAME_ID],
-			    (u32 *)abe->MultiFrame);
+	for (i = 0; i < aess->fw_info->nb_init_task; i++) {
+		task = &aess->fw_info->init_table[i];
+		aess->MultiFrame[task->frame][task->slot] = task->task;
+	}
+
+	omap_aess_mem_write(aess, aess->fw_info->map[OMAP_AESS_DMEM_MULTIFRAME_ID],
+			    (u32 *)aess->MultiFrame);
 
 	/* reset the uplink router */
-	n = abe->fw_info->map[OMAP_AESS_DMEM_AUPLINKROUTING_ID].bytes >> 1;
+	n = aess->fw_info->map[OMAP_AESS_DMEM_AUPLINKROUTING_ID].bytes >> 1;
 	for (i = 0; i < n; i++)
-		aUplinkMuxing[i] = abe->fw_info->label_id[OMAP_AESS_BUFFER_ZERO_ID];
+		aUplinkMuxing[i] = aess->fw_info->label_id[OMAP_AESS_BUFFER_ZERO_ID];
 
-	omap_aess_mem_write(abe,
-			    abe->fw_info->map[OMAP_AESS_DMEM_AUPLINKROUTING_ID],
+	omap_aess_mem_write(aess,
+			    aess->fw_info->map[OMAP_AESS_DMEM_AUPLINKROUTING_ID],
 			    (u32 *)aUplinkMuxing);
 }
 
 /**
  * abe_dma_port_copy_subroutine_id
- * @abe: Pointer on aess handle
+ * @aess: Pointer on aess handle
  * @port_id: ABE port ID
  *
  * returns the index of the function doing the copy in I/O tasks
  */
-static u32 abe_dma_port_copy_subroutine_id(struct omap_aess *abe, u32 port_id)
+static u32 abe_dma_port_copy_subroutine_id(struct omap_aess *aess, u32 port_id)
 {
 	u32 sub_id;
 	if (abe_port[port_id].protocol.direction == ABE_ATC_DIRECTION_IN) {
 		switch (abe_port[port_id].format.samp_format) {
-		case MONO_MSB:
-			sub_id = abe->fw_info->fct_id[OMAP_AESS_COPY_FCT_D2S_MONO_MSB_ID];
+		case OMAP_AESS_FORMAT_MONO_MSB:
+			sub_id = aess->fw_info->fct_id[OMAP_AESS_COPY_FCT_D2S_MONO_MSB_ID];
 			break;
-		case MONO_RSHIFTED_16:
-			sub_id = abe->fw_info->fct_id[OMAP_AESS_COPY_FCT_D2S_MONO_RSHIFTED_16_ID];
+		case OMAP_AESS_FORMAT_MONO_RSHIFTED_16:
+			sub_id = aess->fw_info->fct_id[OMAP_AESS_COPY_FCT_D2S_MONO_RSHIFTED_16_ID];
 			break;
-		case STEREO_RSHIFTED_16:
-			sub_id = abe->fw_info->fct_id[OMAP_AESS_COPY_FCT_D2S_STEREO_RSHIFTED_16_ID];
+		case OMAP_AESS_FORMAT_STEREO_RSHIFTED_16:
+			sub_id = aess->fw_info->fct_id[OMAP_AESS_COPY_FCT_D2S_STEREO_RSHIFTED_16_ID];
 			break;
-		case STEREO_16_16:
-			sub_id = abe->fw_info->fct_id[OMAP_AESS_COPY_FCT_D2S_STEREO_16_16_ID];
+		case OMAP_AESS_FORMAT_STEREO_16_16:
+			sub_id = aess->fw_info->fct_id[OMAP_AESS_COPY_FCT_D2S_STEREO_16_16_ID];
 			break;
-		case MONO_16_16:
-			sub_id = abe->fw_info->fct_id[OMAP_AESS_COPY_FCT_D2S_MONO_16_16_ID];
+		case OMAP_AESS_FORMAT_MONO_16_16:
+			sub_id = aess->fw_info->fct_id[OMAP_AESS_COPY_FCT_D2S_MONO_16_16_ID];
 			break;
-		case STEREO_MSB:
-			sub_id = abe->fw_info->fct_id[OMAP_AESS_COPY_FCT_D2S_STEREO_MSB_ID];
+		case OMAP_AESS_FORMAT_STEREO_MSB:
+			sub_id = aess->fw_info->fct_id[OMAP_AESS_COPY_FCT_D2S_STEREO_MSB_ID];
 			break;
-		case SIX_MSB:
+		case OMAP_AESS_FORMAT_SIX_MSB:
 			if (port_id == OMAP_ABE_DMIC_PORT) {
-				sub_id = abe->fw_info->fct_id[OMAP_AESS_COPY_FCT_DMIC_ID];
+				sub_id = aess->fw_info->fct_id[OMAP_AESS_COPY_FCT_DMIC_ID];
 				break;
 			}
 		default:
-			sub_id = abe->fw_info->fct_id[OMAP_AESS_COPY_FCT_NULL_ID];
+			sub_id = aess->fw_info->fct_id[OMAP_AESS_COPY_FCT_NULL_ID];
 			break;
 		}
 	} else {
 		switch (abe_port[port_id].format.samp_format) {
-		case MONO_MSB:
-			sub_id = abe->fw_info->fct_id[OMAP_AESS_COPY_FCT_S2D_MONO_MSB_ID];
+		case OMAP_AESS_FORMAT_MONO_MSB:
+			sub_id = aess->fw_info->fct_id[OMAP_AESS_COPY_FCT_S2D_MONO_MSB_ID];
 			break;
-		case MONO_RSHIFTED_16:
-			sub_id = abe->fw_info->fct_id[OMAP_AESS_COPY_FCT_S2D_MONO_RSHIFTED_16_ID];
+		case OMAP_AESS_FORMAT_MONO_RSHIFTED_16:
+			sub_id = aess->fw_info->fct_id[OMAP_AESS_COPY_FCT_S2D_MONO_RSHIFTED_16_ID];
 			break;
-		case STEREO_RSHIFTED_16:
-			sub_id = abe->fw_info->fct_id[OMAP_AESS_COPY_FCT_S2D_STEREO_RSHIFTED_16_ID];
+		case OMAP_AESS_FORMAT_STEREO_RSHIFTED_16:
+			sub_id = aess->fw_info->fct_id[OMAP_AESS_COPY_FCT_S2D_STEREO_RSHIFTED_16_ID];
 			break;
-		case STEREO_16_16:
-			sub_id = abe->fw_info->fct_id[OMAP_AESS_COPY_FCT_S2D_STEREO_16_16_ID];
+		case OMAP_AESS_FORMAT_STEREO_16_16:
+			sub_id = aess->fw_info->fct_id[OMAP_AESS_COPY_FCT_S2D_STEREO_16_16_ID];
 			break;
-		case MONO_16_16:
-			sub_id = abe->fw_info->fct_id[OMAP_AESS_COPY_FCT_S2D_MONO_16_16_ID];
+		case OMAP_AESS_FORMAT_MONO_16_16:
+			sub_id = aess->fw_info->fct_id[OMAP_AESS_COPY_FCT_S2D_MONO_16_16_ID];
 			break;
-		case STEREO_MSB:
-			sub_id = abe->fw_info->fct_id[OMAP_AESS_COPY_FCT_S2D_STEREO_MSB_ID];
+		case OMAP_AESS_FORMAT_STEREO_MSB:
+			sub_id = aess->fw_info->fct_id[OMAP_AESS_COPY_FCT_S2D_STEREO_MSB_ID];
 			break;
-		case SIX_MSB:
+		case OMAP_AESS_FORMAT_SIX_MSB:
 			if (port_id == OMAP_ABE_PDM_DL_PORT) {
-				sub_id = abe->fw_info->fct_id[OMAP_AESS_COPY_FCT_MCPDM_DL_ID];
+				sub_id = aess->fw_info->fct_id[OMAP_AESS_COPY_FCT_MCPDM_DL_ID];
 				break;
 			}
 			if (port_id == OMAP_ABE_MM_UL_PORT) {
-				sub_id = abe->fw_info->fct_id[OMAP_AESS_COPY_FCT_MM_UL_ID];
+				sub_id = aess->fw_info->fct_id[OMAP_AESS_COPY_FCT_MM_UL_ID];
 				break;
 			}
-		case THREE_MSB:
-		case FOUR_MSB:
-		case FIVE_MSB:
-		case SEVEN_MSB:
-		case EIGHT_MSB:
-		case NINE_MSB:
-			sub_id = abe->fw_info->fct_id[OMAP_AESS_COPY_FCT_MM_UL_ID];
+		case OMAP_AESS_FORMAT_THREE_MSB:
+		case OMAP_AESS_FORMAT_FOUR_MSB:
+		case OMAP_AESS_FORMAT_FIVE_MSB:
+		case OMAP_AESS_FORMAT_SEVEN_MSB:
+		case OMAP_AESS_FORMAT_EIGHT_MSB:
+		case OMAP_AESS_FORMAT_NINE_MSB:
+			sub_id = aess->fw_info->fct_id[OMAP_AESS_COPY_FCT_MM_UL_ID];
 			break;
 		default:
-			sub_id = abe->fw_info->fct_id[OMAP_AESS_COPY_FCT_NULL_ID];
+			sub_id = aess->fw_info->fct_id[OMAP_AESS_COPY_FCT_NULL_ID];
 			break;
 		}
 	}
@@ -415,161 +412,161 @@ static u32 abe_dma_port_copy_subroutine_id(struct omap_aess *abe, u32 port_id)
 
 /**
  * abe_clean_temporay buffers
- * @abe: Pointer on aess handle
+ * @aess: Pointer on aess handle
  * @id: ABE port ID
  *
  * clear temporary buffers according to the port ID.
  */
-static void omap_aess_clean_temporary_buffers(struct omap_aess *abe, u32 id)
+static void omap_aess_clean_temporary_buffers(struct omap_aess *aess, u32 id)
 {
 	switch (id) {
 	case OMAP_ABE_DMIC_PORT:
-		omap_aess_reset_mem(abe, abe->fw_info->map[OMAP_AESS_DMEM_DMIC_UL_FIFO_ID]);
-		omap_aess_reset_mem(abe, abe->fw_info->map[OMAP_AESS_SMEM_DMIC0_96_48_DATA_ID]);
-		omap_aess_reset_mem(abe, abe->fw_info->map[OMAP_AESS_SMEM_DMIC1_96_48_DATA_ID]);
-		omap_aess_reset_mem(abe, abe->fw_info->map[OMAP_AESS_SMEM_DMIC2_96_48_DATA_ID]);
+		omap_aess_reset_mem(aess, aess->fw_info->map[OMAP_AESS_DMEM_DMIC_UL_FIFO_ID]);
+		omap_aess_reset_mem(aess, aess->fw_info->map[OMAP_AESS_SMEM_DMIC0_96_48_DATA_ID]);
+		omap_aess_reset_mem(aess, aess->fw_info->map[OMAP_AESS_SMEM_DMIC1_96_48_DATA_ID]);
+		omap_aess_reset_mem(aess, aess->fw_info->map[OMAP_AESS_SMEM_DMIC2_96_48_DATA_ID]);
 		/* reset working values of the gain, target gain is preserved */
-		omap_aess_reset_gain_mixer(abe, OMAP_AESS_GAIN_DMIC1_LEFT);
-		omap_aess_reset_gain_mixer(abe, OMAP_AESS_GAIN_DMIC1_RIGHT);
-		omap_aess_reset_gain_mixer(abe, OMAP_AESS_GAIN_DMIC2_LEFT);
-		omap_aess_reset_gain_mixer(abe, OMAP_AESS_GAIN_DMIC2_RIGHT);
-		omap_aess_reset_gain_mixer(abe, OMAP_AESS_GAIN_DMIC3_LEFT);
-		omap_aess_reset_gain_mixer(abe, OMAP_AESS_GAIN_DMIC3_RIGHT);
+		omap_aess_reset_gain_mixer(aess, OMAP_AESS_GAIN_DMIC1_LEFT);
+		omap_aess_reset_gain_mixer(aess, OMAP_AESS_GAIN_DMIC1_RIGHT);
+		omap_aess_reset_gain_mixer(aess, OMAP_AESS_GAIN_DMIC2_LEFT);
+		omap_aess_reset_gain_mixer(aess, OMAP_AESS_GAIN_DMIC2_RIGHT);
+		omap_aess_reset_gain_mixer(aess, OMAP_AESS_GAIN_DMIC3_LEFT);
+		omap_aess_reset_gain_mixer(aess, OMAP_AESS_GAIN_DMIC3_RIGHT);
 		break;
 	case OMAP_ABE_PDM_UL_PORT:
-		omap_aess_reset_mem(abe, abe->fw_info->map[OMAP_AESS_DMEM_MCPDM_UL_FIFO_ID]);
-		omap_aess_reset_mem(abe, abe->fw_info->map[OMAP_AESS_SMEM_AMIC_96_48_DATA_ID]);
+		omap_aess_reset_mem(aess, aess->fw_info->map[OMAP_AESS_DMEM_MCPDM_UL_FIFO_ID]);
+		omap_aess_reset_mem(aess, aess->fw_info->map[OMAP_AESS_SMEM_AMIC_96_48_DATA_ID]);
 		/* reset working values of the gain, target gain is preserved */
-		omap_aess_reset_gain_mixer(abe, OMAP_AESS_GAIN_AMIC_LEFT);
-		omap_aess_reset_gain_mixer(abe, OMAP_AESS_GAIN_AMIC_RIGHT);
+		omap_aess_reset_gain_mixer(aess, OMAP_AESS_GAIN_AMIC_LEFT);
+		omap_aess_reset_gain_mixer(aess, OMAP_AESS_GAIN_AMIC_RIGHT);
 		break;
 	case OMAP_ABE_BT_VX_UL_PORT:
-		omap_aess_reset_mem(abe, abe->fw_info->map[OMAP_AESS_DMEM_BT_UL_FIFO_ID]);
-		omap_aess_reset_mem(abe, abe->fw_info->map[OMAP_AESS_SMEM_BT_UL_ID]);
-		omap_aess_reset_mem(abe, abe->fw_info->map[OMAP_AESS_SMEM_BT_UL_8_48_HP_DATA_ID]);
-		omap_aess_reset_mem(abe, abe->fw_info->map[OMAP_AESS_SMEM_BT_UL_8_48_LP_DATA_ID]);
-		omap_aess_reset_mem(abe, abe->fw_info->map[OMAP_AESS_SMEM_BT_UL_16_48_HP_DATA_ID]);
-		omap_aess_reset_mem(abe, abe->fw_info->map[OMAP_AESS_SMEM_BT_UL_16_48_LP_DATA_ID]);
+		omap_aess_reset_mem(aess, aess->fw_info->map[OMAP_AESS_DMEM_BT_UL_FIFO_ID]);
+		omap_aess_reset_mem(aess, aess->fw_info->map[OMAP_AESS_SMEM_BT_UL_ID]);
+		omap_aess_reset_mem(aess, aess->fw_info->map[OMAP_AESS_SMEM_BT_UL_8_48_HP_DATA_ID]);
+		omap_aess_reset_mem(aess, aess->fw_info->map[OMAP_AESS_SMEM_BT_UL_8_48_LP_DATA_ID]);
+		omap_aess_reset_mem(aess, aess->fw_info->map[OMAP_AESS_SMEM_BT_UL_16_48_HP_DATA_ID]);
+		omap_aess_reset_mem(aess, aess->fw_info->map[OMAP_AESS_SMEM_BT_UL_16_48_LP_DATA_ID]);
 		/* reset working values of the gain, target gain is preserved */
-		omap_aess_reset_gain_mixer(abe, OMAP_AESS_GAIN_BTUL_LEFT);
-		omap_aess_reset_gain_mixer(abe, OMAP_AESS_GAIN_BTUL_RIGHT);
+		omap_aess_reset_gain_mixer(aess, OMAP_AESS_GAIN_BTUL_LEFT);
+		omap_aess_reset_gain_mixer(aess, OMAP_AESS_GAIN_BTUL_RIGHT);
 		break;
 	case OMAP_ABE_MM_UL_PORT:
-		omap_aess_reset_mem(abe, abe->fw_info->map[OMAP_AESS_DMEM_MM_UL_FIFO_ID]);
-		omap_aess_reset_mem(abe, abe->fw_info->map[OMAP_AESS_SMEM_MM_UL_ID]);
+		omap_aess_reset_mem(aess, aess->fw_info->map[OMAP_AESS_DMEM_MM_UL_FIFO_ID]);
+		omap_aess_reset_mem(aess, aess->fw_info->map[OMAP_AESS_SMEM_MM_UL_ID]);
 		break;
 	case OMAP_ABE_MM_UL2_PORT:
-		omap_aess_reset_mem(abe, abe->fw_info->map[OMAP_AESS_DMEM_MM_UL2_FIFO_ID]);
-		omap_aess_reset_mem(abe, abe->fw_info->map[OMAP_AESS_SMEM_MM_UL2_ID]);
+		omap_aess_reset_mem(aess, aess->fw_info->map[OMAP_AESS_DMEM_MM_UL2_FIFO_ID]);
+		omap_aess_reset_mem(aess, aess->fw_info->map[OMAP_AESS_SMEM_MM_UL2_ID]);
 		break;
 	case OMAP_ABE_VX_UL_PORT:
-		omap_aess_reset_mem(abe, abe->fw_info->map[OMAP_AESS_DMEM_VX_UL_FIFO_ID]);
-		omap_aess_reset_mem(abe, abe->fw_info->map[OMAP_AESS_SMEM_VX_UL_ID]);
-		omap_aess_reset_mem(abe, abe->fw_info->map[OMAP_AESS_SMEM_VX_UL_48_8_HP_DATA_ID]);
-		omap_aess_reset_mem(abe, abe->fw_info->map[OMAP_AESS_SMEM_VX_UL_48_8_LP_DATA_ID]);
-		omap_aess_reset_mem(abe, abe->fw_info->map[OMAP_AESS_SMEM_VX_UL_48_16_HP_DATA_ID]);
-		omap_aess_reset_mem(abe, abe->fw_info->map[OMAP_AESS_SMEM_VX_UL_48_16_LP_DATA_ID]);
-		omap_aess_reset_gain_mixer(abe, OMAP_AESS_MIXAUDUL_UPLINK);
+		omap_aess_reset_mem(aess, aess->fw_info->map[OMAP_AESS_DMEM_VX_UL_FIFO_ID]);
+		omap_aess_reset_mem(aess, aess->fw_info->map[OMAP_AESS_SMEM_VX_UL_ID]);
+		omap_aess_reset_mem(aess, aess->fw_info->map[OMAP_AESS_SMEM_VX_UL_48_8_HP_DATA_ID]);
+		omap_aess_reset_mem(aess, aess->fw_info->map[OMAP_AESS_SMEM_VX_UL_48_8_LP_DATA_ID]);
+		omap_aess_reset_mem(aess, aess->fw_info->map[OMAP_AESS_SMEM_VX_UL_48_16_HP_DATA_ID]);
+		omap_aess_reset_mem(aess, aess->fw_info->map[OMAP_AESS_SMEM_VX_UL_48_16_LP_DATA_ID]);
+		omap_aess_reset_gain_mixer(aess, OMAP_AESS_MIXAUDUL_UPLINK);
 		break;
 	case OMAP_ABE_MM_DL_PORT:
-		omap_aess_reset_mem(abe, abe->fw_info->map[OMAP_AESS_DMEM_MM_DL_FIFO_ID]);
-		omap_aess_reset_mem(abe, abe->fw_info->map[OMAP_AESS_SMEM_MM_DL_ID]);
-		omap_aess_reset_mem(abe, abe->fw_info->map[OMAP_AESS_SMEM_MM_DL_44P1_ID]);
-		omap_aess_reset_mem(abe, abe->fw_info->map[OMAP_AESS_SMEM_MM_DL_44P1_XK_ID]);
-		omap_aess_reset_gain_mixer(abe, OMAP_AESS_MIXDL1_MM_DL);
-		omap_aess_reset_gain_mixer(abe, OMAP_AESS_MIXDL2_MM_DL);
+		omap_aess_reset_mem(aess, aess->fw_info->map[OMAP_AESS_DMEM_MM_DL_FIFO_ID]);
+		omap_aess_reset_mem(aess, aess->fw_info->map[OMAP_AESS_SMEM_MM_DL_ID]);
+		omap_aess_reset_mem(aess, aess->fw_info->map[OMAP_AESS_SMEM_MM_DL_44P1_ID]);
+		omap_aess_reset_mem(aess, aess->fw_info->map[OMAP_AESS_SMEM_MM_DL_44P1_XK_ID]);
+		omap_aess_reset_gain_mixer(aess, OMAP_AESS_MIXDL1_MM_DL);
+		omap_aess_reset_gain_mixer(aess, OMAP_AESS_MIXDL2_MM_DL);
 		break;
 	case OMAP_ABE_VX_DL_PORT:
-		omap_aess_reset_mem(abe, abe->fw_info->map[OMAP_AESS_DMEM_VX_DL_FIFO_ID]);
-		omap_aess_reset_mem(abe, abe->fw_info->map[OMAP_AESS_SMEM_VX_DL_ID]);
-		omap_aess_reset_mem(abe, abe->fw_info->map[OMAP_AESS_SMEM_VX_DL_8_48_HP_DATA_ID]);
-		omap_aess_reset_mem(abe, abe->fw_info->map[OMAP_AESS_SMEM_VX_DL_8_48_LP_DATA_ID]);
-		omap_aess_reset_mem(abe, abe->fw_info->map[OMAP_AESS_SMEM_VX_DL_8_48_OSR_LP_DATA_ID]);
-		omap_aess_reset_mem(abe, abe->fw_info->map[OMAP_AESS_SMEM_VX_DL_16_48_HP_DATA_ID]);
-		omap_aess_reset_mem(abe, abe->fw_info->map[OMAP_AESS_SMEM_VX_DL_16_48_LP_DATA_ID]);
-		omap_aess_reset_gain_mixer(abe, OMAP_AESS_MIXDL1_VX_DL);
-		omap_aess_reset_gain_mixer(abe, OMAP_AESS_MIXDL2_VX_DL);
+		omap_aess_reset_mem(aess, aess->fw_info->map[OMAP_AESS_DMEM_VX_DL_FIFO_ID]);
+		omap_aess_reset_mem(aess, aess->fw_info->map[OMAP_AESS_SMEM_VX_DL_ID]);
+		omap_aess_reset_mem(aess, aess->fw_info->map[OMAP_AESS_SMEM_VX_DL_8_48_HP_DATA_ID]);
+		omap_aess_reset_mem(aess, aess->fw_info->map[OMAP_AESS_SMEM_VX_DL_8_48_LP_DATA_ID]);
+		omap_aess_reset_mem(aess, aess->fw_info->map[OMAP_AESS_SMEM_VX_DL_8_48_OSR_LP_DATA_ID]);
+		omap_aess_reset_mem(aess, aess->fw_info->map[OMAP_AESS_SMEM_VX_DL_16_48_HP_DATA_ID]);
+		omap_aess_reset_mem(aess, aess->fw_info->map[OMAP_AESS_SMEM_VX_DL_16_48_LP_DATA_ID]);
+		omap_aess_reset_gain_mixer(aess, OMAP_AESS_MIXDL1_VX_DL);
+		omap_aess_reset_gain_mixer(aess, OMAP_AESS_MIXDL2_VX_DL);
 		break;
 	case OMAP_ABE_TONES_DL_PORT:
-		omap_aess_reset_mem(abe, abe->fw_info->map[OMAP_AESS_DMEM_TONES_DL_FIFO_ID]);
-		omap_aess_reset_mem(abe, abe->fw_info->map[OMAP_AESS_SMEM_TONES_ID]);
-		omap_aess_reset_mem(abe, abe->fw_info->map[OMAP_AESS_SMEM_TONES_44P1_ID]);
-		omap_aess_reset_mem(abe, abe->fw_info->map[OMAP_AESS_SMEM_TONES_44P1_XK_ID]);
-		omap_aess_reset_gain_mixer(abe, OMAP_AESS_MIXDL1_TONES);
-		omap_aess_reset_gain_mixer(abe, OMAP_AESS_MIXDL2_TONES);
+		omap_aess_reset_mem(aess, aess->fw_info->map[OMAP_AESS_DMEM_TONES_DL_FIFO_ID]);
+		omap_aess_reset_mem(aess, aess->fw_info->map[OMAP_AESS_SMEM_TONES_ID]);
+		omap_aess_reset_mem(aess, aess->fw_info->map[OMAP_AESS_SMEM_TONES_44P1_ID]);
+		omap_aess_reset_mem(aess, aess->fw_info->map[OMAP_AESS_SMEM_TONES_44P1_XK_ID]);
+		omap_aess_reset_gain_mixer(aess, OMAP_AESS_MIXDL1_TONES);
+		omap_aess_reset_gain_mixer(aess, OMAP_AESS_MIXDL2_TONES);
 		break;
 	case OMAP_ABE_MCASP_DL_PORT:
-		omap_aess_reset_mem(abe, abe->fw_info->map[OMAP_AESS_DMEM_MCASP_DL_FIFO_ID]);
-		omap_aess_reset_mem(abe, abe->fw_info->map[OMAP_AESS_SMEM_MCASP1_ID]);
+		omap_aess_reset_mem(aess, aess->fw_info->map[OMAP_AESS_DMEM_MCASP_DL_FIFO_ID]);
+		omap_aess_reset_mem(aess, aess->fw_info->map[OMAP_AESS_SMEM_MCASP1_ID]);
 		break;
 	case OMAP_ABE_BT_VX_DL_PORT:
-		omap_aess_reset_mem(abe, abe->fw_info->map[OMAP_AESS_DMEM_BT_DL_FIFO_ID]);
-		omap_aess_reset_mem(abe, abe->fw_info->map[OMAP_AESS_SMEM_BT_DL_ID]);
+		omap_aess_reset_mem(aess, aess->fw_info->map[OMAP_AESS_DMEM_BT_DL_FIFO_ID]);
+		omap_aess_reset_mem(aess, aess->fw_info->map[OMAP_AESS_SMEM_BT_DL_ID]);
 #if !defined(CONFIG_SND_OMAP4_ABE_USE_ALT_FW)
-		omap_aess_reset_mem(abe, abe->fw_info->map[OMAP_AESS_SMEM_BT_DL_8_48_OSR_LP_DATA_ID]);
+		omap_aess_reset_mem(aess, aess->fw_info->map[OMAP_AESS_SMEM_BT_DL_8_48_OSR_LP_DATA_ID]);
 #endif
-		omap_aess_reset_mem(abe, abe->fw_info->map[OMAP_AESS_SMEM_BT_DL_48_8_HP_DATA_ID]);
-		omap_aess_reset_mem(abe, abe->fw_info->map[OMAP_AESS_SMEM_BT_DL_48_8_LP_DATA_ID]);
-		omap_aess_reset_mem(abe, abe->fw_info->map[OMAP_AESS_SMEM_BT_DL_48_16_HP_DATA_ID]);
-		omap_aess_reset_mem(abe, abe->fw_info->map[OMAP_AESS_SMEM_BT_DL_48_16_LP_DATA_ID]);
+		omap_aess_reset_mem(aess, aess->fw_info->map[OMAP_AESS_SMEM_BT_DL_48_8_HP_DATA_ID]);
+		omap_aess_reset_mem(aess, aess->fw_info->map[OMAP_AESS_SMEM_BT_DL_48_8_LP_DATA_ID]);
+		omap_aess_reset_mem(aess, aess->fw_info->map[OMAP_AESS_SMEM_BT_DL_48_16_HP_DATA_ID]);
+		omap_aess_reset_mem(aess, aess->fw_info->map[OMAP_AESS_SMEM_BT_DL_48_16_LP_DATA_ID]);
 		break;
 	case OMAP_ABE_PDM_DL_PORT:
-		omap_aess_reset_mem(abe, abe->fw_info->map[OMAP_AESS_DMEM_MCPDM_DL_FIFO_ID]);
-		omap_aess_reset_mem(abe, abe->fw_info->map[OMAP_AESS_SMEM_DL2_M_LR_EQ_DATA_ID]);
-		omap_aess_reset_mem(abe, abe->fw_info->map[OMAP_AESS_SMEM_DL1_M_EQ_DATA_ID]);
-		omap_aess_reset_mem(abe, abe->fw_info->map[OMAP_AESS_SMEM_EARP_48_96_LP_DATA_ID]);
-		omap_aess_reset_mem(abe, abe->fw_info->map[OMAP_AESS_SMEM_IHF_48_96_LP_DATA_ID]);
-		omap_aess_reset_gain_mixer(abe, OMAP_AESS_GAIN_DL1_LEFT);
-		omap_aess_reset_gain_mixer(abe, OMAP_AESS_GAIN_DL1_RIGHT);
-		omap_aess_reset_gain_mixer(abe, OMAP_AESS_GAIN_DL2_LEFT);
-		omap_aess_reset_gain_mixer(abe, OMAP_AESS_GAIN_DL2_RIGHT);
-		omap_aess_reset_gain_mixer(abe, OMAP_AESS_MIXSDT_UL);
-		omap_aess_reset_gain_mixer(abe, OMAP_AESS_MIXSDT_DL);
+		omap_aess_reset_mem(aess, aess->fw_info->map[OMAP_AESS_DMEM_MCPDM_DL_FIFO_ID]);
+		omap_aess_reset_mem(aess, aess->fw_info->map[OMAP_AESS_SMEM_DL2_M_LR_EQ_DATA_ID]);
+		omap_aess_reset_mem(aess, aess->fw_info->map[OMAP_AESS_SMEM_DL1_M_EQ_DATA_ID]);
+		omap_aess_reset_mem(aess, aess->fw_info->map[OMAP_AESS_SMEM_EARP_48_96_LP_DATA_ID]);
+		omap_aess_reset_mem(aess, aess->fw_info->map[OMAP_AESS_SMEM_IHF_48_96_LP_DATA_ID]);
+		omap_aess_reset_gain_mixer(aess, OMAP_AESS_GAIN_DL1_LEFT);
+		omap_aess_reset_gain_mixer(aess, OMAP_AESS_GAIN_DL1_RIGHT);
+		omap_aess_reset_gain_mixer(aess, OMAP_AESS_GAIN_DL2_LEFT);
+		omap_aess_reset_gain_mixer(aess, OMAP_AESS_GAIN_DL2_RIGHT);
+		omap_aess_reset_gain_mixer(aess, OMAP_AESS_MIXSDT_UL);
+		omap_aess_reset_gain_mixer(aess, OMAP_AESS_MIXSDT_DL);
 		break;
 	case OMAP_ABE_MM_EXT_OUT_PORT:
-		omap_aess_reset_mem(abe, abe->fw_info->map[OMAP_AESS_DMEM_MM_EXT_OUT_FIFO_ID]);
+		omap_aess_reset_mem(aess, aess->fw_info->map[OMAP_AESS_DMEM_MM_EXT_OUT_FIFO_ID]);
 		break;
 	case OMAP_ABE_MM_EXT_IN_PORT:
-		omap_aess_reset_mem(abe, abe->fw_info->map[OMAP_AESS_DMEM_MM_EXT_IN_FIFO_ID]);
+		omap_aess_reset_mem(aess, aess->fw_info->map[OMAP_AESS_DMEM_MM_EXT_IN_FIFO_ID]);
 		break;
 	}
 }
 
 /**
  * omap_aess_disable_enable_dma_request
- * @abe: Pointer on aess handle
+ * @aess: Pointer on aess handle
  * @id: ABE port ID
  * @on_off: Enable/Disable
  *
  * Enable/Disable DMA request associated to a port.
  */
-static void omap_aess_disable_enable_dma_request(struct omap_aess *abe, u32 id,
+static void omap_aess_disable_enable_dma_request(struct omap_aess *aess, u32 id,
 						 u32 on_off)
 {
 	u8 desc_third_word[4], irq_dmareq_field;
-	struct ABE_SIODescriptor sio_desc;
-	struct ABE_SPingPongDescriptor desc_pp;
+	struct omap_aess_io_desc sio_desc;
+	struct omap_aess_pingpong_desc desc_pp;
 	struct omap_aess_addr addr;
 
-	if (abe_port[id].protocol.protocol_switch == PINGPONG_PORT_PROT) {
+	if (abe_port[id].protocol.protocol_switch == OMAP_AESS_PORT_PINGPONG) {
 		irq_dmareq_field = (u8) (on_off *
 			      abe_port[id].protocol.p.prot_pingpong.irq_data);
-		memcpy(&addr, &abe->fw_info->map[OMAP_AESS_DMEM_PINGPONGDESC_ID],
+		memcpy(&addr, &aess->fw_info->map[OMAP_AESS_DMEM_PINGPONGDESC_ID],
 		       sizeof(struct omap_aess_addr));
 		addr.offset += (u32)&(desc_pp.data_size) - (u32)&(desc_pp);
 		addr.bytes = 4;
-		omap_aess_mem_read(abe, addr, (u32 *)desc_third_word);
+		omap_aess_mem_read(aess, addr, (u32 *)desc_third_word);
 		desc_third_word[2] = irq_dmareq_field;
-		omap_aess_mem_write(abe, addr, (u32 *)desc_third_word);
+		omap_aess_mem_write(aess, addr, (u32 *)desc_third_word);
 	} else {
 		/* serial interface: sync ATC with Firmware activity */
-		memcpy(&addr, &abe->fw_info->map[OMAP_AESS_DMEM_IODESCR_ID],
+		memcpy(&addr, &aess->fw_info->map[OMAP_AESS_DMEM_IODESCR_ID],
 		       sizeof(struct omap_aess_addr));
-		addr.offset += id * sizeof(struct ABE_SIODescriptor);
-		addr.bytes = sizeof(struct ABE_SIODescriptor);
-		omap_aess_mem_read(abe, addr, (u32 *)&sio_desc);
+		addr.offset += id * sizeof(struct omap_aess_io_desc);
+		addr.bytes = sizeof(struct omap_aess_io_desc);
+		omap_aess_mem_read(aess, addr, (u32 *)&sio_desc);
 		if (on_off) {
-			if (abe_port[id].protocol.protocol_switch != SERIAL_PORT_PROT)
+			if (abe_port[id].protocol.protocol_switch != OMAP_AESS_PORT_SERIAL)
 				sio_desc.atc_irq_data =
 					(u8) abe_port[id].protocol.p.prot_dmareq.
 					dma_data;
@@ -578,45 +575,45 @@ static void omap_aess_disable_enable_dma_request(struct omap_aess *abe, u32 id,
 			sio_desc.atc_irq_data = 0;
 			sio_desc.on_off = 0;
 		}
-		omap_aess_mem_write(abe, addr, (u32 *)&sio_desc);
+		omap_aess_mem_write(aess, addr, (u32 *)&sio_desc);
 	}
 
 }
 
 /**
  * omap_aess_enable_dma_request
- * @abe: Pointer on aess handle
+ * @aess: Pointer on aess handle
  * @id: ABE port ID
  *
  * Enable DMA request associated to the port ID
  */
-static void omap_aess_enable_dma_request(struct omap_aess *abe, u32 id)
+static void omap_aess_enable_dma_request(struct omap_aess *aess, u32 id)
 {
-	omap_aess_disable_enable_dma_request(abe, id, 1);
+	omap_aess_disable_enable_dma_request(aess, id, 1);
 }
 
 /**
  * omap_aess_disable_dma_request
- * @abe: Pointer on aess handle
+ * @aess: Pointer on aess handle
  * @id: ABE port ID
  *
  * Disable DMA request associated to the port ID
  */
-static void omap_aess_disable_dma_request(struct omap_aess *abe, u32 id)
+static void omap_aess_disable_dma_request(struct omap_aess *aess, u32 id)
 {
-	omap_aess_disable_enable_dma_request(abe, id, 0);
+	omap_aess_disable_enable_dma_request(aess, id, 0);
 }
 
 /**
  * omap_aess_init_atc
- * @abe: Pointer on aess handle
+ * @aess: Pointer on aess handle
  * @id: ABE port ID
  *
  * load the DMEM ATC/AESS descriptor associated to the port ID.
  * ATC is describing the internal flexible FIFO inside the DMEM
  * connected to HW IP (eg McBSP/DMIC/...)
  */
-static void omap_aess_init_atc(struct omap_aess *abe, u32 id)
+static void omap_aess_init_atc(struct omap_aess *aess, u32 id)
 {
 	u8 iter;
 	s32 datasize;
@@ -649,7 +646,7 @@ static void omap_aess_init_atc(struct omap_aess *abe, u32 id)
 		atc_desc.wrpt = 0 + ((JITTER_MARGIN+1) * datasize);
 
 	switch ((abe_port[id]).protocol.protocol_switch) {
-	case SERIAL_PORT_PROT:
+	case OMAP_AESS_PORT_SERIAL:
 		atc_desc.cbdir = (abe_port[id]).protocol.direction;
 		atc_desc.cbsize =
 			(abe_port[id]).protocol.p.prot_serial.buf_size;
@@ -662,22 +659,22 @@ static void omap_aess_init_atc(struct omap_aess *abe, u32 id)
 		atc_desc.destid =
 			abe_atc_dstid[(abe_port[id]).protocol.p.prot_serial.
 				      desc_addr >> 3];
-		omap_abe_mem_write(abe, OMAP_ABE_DMEM,
+		omap_abe_mem_write(aess, OMAP_ABE_DMEM,
 				   (abe_port[id]).protocol.p.prot_serial.desc_addr,
 				   (u32 *)&atc_desc, sizeof(atc_desc));
 		break;
-	case DMIC_PORT_PROT:
+	case OMAP_AESS_PORT_DMIC:
 		atc_desc.cbdir = ABE_ATC_DIRECTION_IN;
 		atc_desc.cbsize = (abe_port[id]).protocol.p.prot_dmic.buf_size;
 		atc_desc.badd =
 			((abe_port[id]).protocol.p.prot_dmic.buf_addr) >> 4;
 		atc_desc.iter = DMIC_ITER;
 		atc_desc.srcid = abe_atc_srcid[ABE_ATC_DMIC_DMA_REQ];
-		omap_abe_mem_write(abe, OMAP_ABE_DMEM,
+		omap_abe_mem_write(aess, OMAP_ABE_DMEM,
 				   (ABE_ATC_DMIC_DMA_REQ*ATC_SIZE),
 				   (u32 *)&atc_desc, sizeof(atc_desc));
 		break;
-	case MCPDMDL_PORT_PROT:
+	case OMAP_AESS_PORT_MCPDMDL:
 		atc_desc.cbdir = ABE_ATC_DIRECTION_OUT;
 		atc_desc.cbsize =
 			(abe_port[id]).protocol.p.prot_mcpdmdl.buf_size;
@@ -685,11 +682,11 @@ static void omap_aess_init_atc(struct omap_aess *abe, u32 id)
 			((abe_port[id]).protocol.p.prot_mcpdmdl.buf_addr) >> 4;
 		atc_desc.iter = MCPDM_DL_ITER;
 		atc_desc.destid = abe_atc_dstid[ABE_ATC_MCPDMDL_DMA_REQ];
-		omap_abe_mem_write(abe, OMAP_ABE_DMEM,
+		omap_abe_mem_write(aess, OMAP_ABE_DMEM,
 				   (ABE_ATC_MCPDMDL_DMA_REQ*ATC_SIZE),
 				   (u32 *)&atc_desc, sizeof(atc_desc));
 		break;
-	case MCPDMUL_PORT_PROT:
+	case OMAP_AESS_PORT_MCPDMUL:
 		atc_desc.cbdir = ABE_ATC_DIRECTION_IN;
 		atc_desc.cbsize =
 			(abe_port[id]).protocol.p.prot_mcpdmul.buf_size;
@@ -697,14 +694,14 @@ static void omap_aess_init_atc(struct omap_aess *abe, u32 id)
 			((abe_port[id]).protocol.p.prot_mcpdmul.buf_addr) >> 4;
 		atc_desc.iter = MCPDM_UL_ITER;
 		atc_desc.srcid = abe_atc_srcid[ABE_ATC_MCPDMUL_DMA_REQ];
-		omap_abe_mem_write(abe, OMAP_ABE_DMEM,
+		omap_abe_mem_write(aess, OMAP_ABE_DMEM,
 				   (ABE_ATC_MCPDMUL_DMA_REQ*ATC_SIZE),
 				   (u32 *)&atc_desc, sizeof(atc_desc));
 		break;
-	case PINGPONG_PORT_PROT:
+	case OMAP_AESS_PORT_PINGPONG:
 		/* software protocol, nothing to do on ATC */
 		break;
-	case DMAREQ_PORT_PROT:
+	case OMAP_AESS_PORT_DMAREQ:
 		atc_desc.cbdir = (abe_port[id]).protocol.direction;
 		atc_desc.cbsize =
 			(abe_port[id]).protocol.p.prot_dmareq.buf_size;
@@ -727,7 +724,7 @@ static void omap_aess_init_atc(struct omap_aess *abe, u32 id)
 				[(abe_port[id]).protocol.p.prot_dmareq.
 				 desc_addr >> 3];
 		}
-		omap_abe_mem_write(abe, OMAP_ABE_DMEM,
+		omap_abe_mem_write(aess, OMAP_ABE_DMEM,
 				   (abe_port[id]).protocol.p.prot_dmareq.desc_addr,
 				   (u32 *)&atc_desc, sizeof(atc_desc));
 		break;
@@ -736,19 +733,19 @@ static void omap_aess_init_atc(struct omap_aess *abe, u32 id)
 
 /**
  * omap_aess_disable_data_transfer
- * @abe: Pointer on aess handle
+ * @aess: Pointer on aess handle
  * @id: ABE port id
  *
  * disables the ATC descriptor and stop IO/port activities
  * disable the IO task (@f = 0)
  * clear ATC DMEM buffer, ATC enabled
  */
-int omap_aess_disable_data_transfer(struct omap_aess *abe, u32 id)
+int omap_aess_disable_data_transfer(struct omap_aess *aess, u32 id)
 {
 
 	switch (id) {
 	case OMAP_ABE_MM_DL_PORT:
-		abe->MultiFrame[18][1] = 0;
+		aess->MultiFrame[18][1] = 0;
 		break;
 	default:
 		break;
@@ -757,12 +754,12 @@ int omap_aess_disable_data_transfer(struct omap_aess *abe, u32 id)
 	/* local host variable status= "port is running" */
 	abe_port[id].status = OMAP_ABE_PORT_ACTIVITY_IDLE;
 	/* disable DMA requests */
-	omap_aess_disable_dma_request(abe, id);
+	omap_aess_disable_dma_request(aess, id);
 	/* disable ATC transfers */
-	omap_aess_init_atc(abe, id);
-	omap_aess_clean_temporary_buffers(abe, id);
+	omap_aess_init_atc(aess, id);
+	omap_aess_clean_temporary_buffers(aess, id);
 	/* select the main port based on the desactivation of this port */
-	omap_aess_decide_main_port(abe);
+	omap_aess_decide_main_port(aess);
 
 	return 0;
 }
@@ -770,21 +767,21 @@ EXPORT_SYMBOL(omap_aess_disable_data_transfer);
 
 /**
  * omap_aess_enable_data_transfer
- * @abe: Pointer on aess handle
+ * @aess: Pointer on aess handle
  * @id: ABE port id
  *
  * enables the ATC descriptor
  * reset ATC pointers
  * enable the IO task (@f <> 0)
  */
-int omap_aess_enable_data_transfer(struct omap_aess *abe, u32 id)
+int omap_aess_enable_data_transfer(struct omap_aess *aess, u32 id)
 {
 	struct omap_aess_port_protocol *protocol;
 	struct omap_aess_data_format format;
 
-	omap_aess_clean_temporary_buffers(abe, id);
+	omap_aess_clean_temporary_buffers(aess, id);
 
-	omap_aess_update_scheduling_table1(abe, &(abe->fw_info->port[id].task), 1);
+	omap_aess_update_scheduling_table(aess, &(aess->fw_info->port[id].task), 1);
 
 	switch (id) {
 	case OMAP_ABE_PDM_UL_PORT:
@@ -793,156 +790,145 @@ int omap_aess_enable_data_transfer(struct omap_aess *abe, u32 id)
 		/* initializes the ABE ATC descriptors in DMEM for BE ports */
 		protocol = &(abe_port[id].protocol);
 		format = abe_port[id].format;
-		omap_aess_init_atc(abe, id);
-		omap_aess_init_io_tasks(abe, id, &format, protocol);
+		omap_aess_init_atc(aess, id);
+		omap_aess_init_io_tasks(aess, id, &format, protocol);
 		break;
 
 	case OMAP_ABE_MM_DL_PORT:
 		protocol = &(abe_port[OMAP_ABE_MM_DL_PORT].protocol);
-		if (protocol->protocol_switch == PINGPONG_PORT_PROT)
-			omap_aess_update_scheduling_table1(abe, &abe->fw_info->ping_pong->task, 1);
+		if (protocol->protocol_switch == OMAP_AESS_PORT_PINGPONG)
+			omap_aess_update_scheduling_table(aess, &aess->fw_info->ping_pong->task, 1);
 		break;
 	default:
 		break;
 	}
 
-	omap_aess_mem_write(abe, abe->fw_info->map[OMAP_AESS_DMEM_MULTIFRAME_ID],
-			    (u32 *)abe->MultiFrame);
+	omap_aess_mem_write(aess, aess->fw_info->map[OMAP_AESS_DMEM_MULTIFRAME_ID],
+			    (u32 *)aess->MultiFrame);
 
 	/* local host variable status= "port is running" */
 	abe_port[id].status = OMAP_ABE_PORT_ACTIVITY_RUNNING;
 	/* enable DMA requests */
-	omap_aess_enable_dma_request(abe, id);
+	omap_aess_enable_dma_request(aess, id);
 	/* select the main port based on the activation of this new port */
-	omap_aess_decide_main_port(abe);
+	omap_aess_decide_main_port(aess);
 
 	return 0;
 }
 EXPORT_SYMBOL(omap_aess_enable_data_transfer);
 
 /**
+ * omap_aess_read_port_address
+ * @aess: Pointer on aess handle
+ * @port: port name
+ * @aess_dma: output pointer to the DMA iteration and data destination pointer
+ *
+ * This API returns the address of the DMA register used on this audio port.
+ * Depending on the protocol being used, adds the base address offset L3
+ * (DMA) or MPU (ARM)
+ */
+static void omap_aess_read_port_address(struct omap_aess *aess, u32 port,
+				 struct omap_aess_dma *aess_dma)
+{
+	struct omap_aess_dma_offset *dma_offset = &abe_port[port].dma;
+
+	switch (abe_port[port].protocol.protocol_switch) {
+	case OMAP_AESS_PORT_PINGPONG:
+		/* return the base address of the buffer in L3 and L4 spaces */
+		aess_dma->data = (void *)(dma_offset->data +
+			ABE_DEFAULT_BASE_ADDRESS_L3 + ABE_DMEM_BASE_OFFSET_MPU);
+		break;
+	case OMAP_AESS_PORT_DMAREQ:
+		/* return the CBPr(L3), DMEM(L3), DMEM(L4) address */
+		aess_dma->data = (void *)(dma_offset->data +
+			ABE_DEFAULT_BASE_ADDRESS_L3 + ABE_ATC_BASE_OFFSET_MPU);
+		break;
+	default:
+		break;
+	}
+	aess_dma->iter = dma_offset->iter;
+}
+
+/**
  * omap_aess_connect_cbpr_dmareq_port
- * @abe: Pointer on aess handle
+ * @aess: Pointer on aess handle
  * @id: port name
  * @f: desired data format
  * @d: desired dma_request line (0..7)
- * @returned_dma_t: returned pointer to the base address of the CBPr register and number of
- *	samples to exchange during a DMA_request.
+ * @aess_dma: returned pointer to the base address of the CBPr register and
+ * 	number of samples to exchange during a DMA_request.
  *
  * enables the data echange between a DMA and the ABE through the
  *	CBPr registers of AESS.
  */
-int omap_aess_connect_cbpr_dmareq_port(struct omap_aess *abe,
-				       u32 id, struct omap_aess_data_format *f,
-				       u32 d,
-				       struct omap_aess_dma *returned_dma_t)
+void omap_aess_connect_cbpr_dmareq_port(struct omap_aess *aess, u32 id,
+					struct omap_aess_data_format *f, u32 d,
+					struct omap_aess_dma *aess_dma)
 {
-	abe_port[id] = ((struct omap_aess_port *)abe->fw_info->port)[id];
-	(abe_port[id]).format = (*f);
-	abe_port[id].protocol.protocol_switch = DMAREQ_PORT_PROT;
+	omap_aess_reset_port(aess, id);
+
+	memcpy(&abe_port[id].format, f, sizeof(*f));
+
+	abe_port[id].protocol.protocol_switch = OMAP_AESS_PORT_DMAREQ;
 	abe_port[id].protocol.p.prot_dmareq.iter = abe_dma_port_iteration(f);
-	abe_port[id].protocol.p.prot_dmareq.dma_addr = ABE_DMASTATUS_RAW;
+	abe_port[id].protocol.p.prot_dmareq.dma_addr = OMAP_AESS_DMASTATUS_RAW;
 	abe_port[id].protocol.p.prot_dmareq.dma_data = (1 << d);
+
 	/* load the dma_t with physical information from AE memory mapping */
-	abe_init_dma_t(id, &((abe_port[id]).protocol));
+	abe_init_dma_t(id, &abe_port[id].protocol);
 
 	/* load the ATC descriptors - disabled */
-	omap_aess_init_atc(abe, id);
+	omap_aess_init_atc(aess, id);
 
 	/* load the micro-task parameters */
-	omap_aess_init_io_tasks(abe,  id, &((abe_port[id]).format),
-				&((abe_port[id]).protocol));
+	omap_aess_init_io_tasks(aess,  id, &abe_port[id].format,
+				&abe_port[id].protocol);
 	abe_port[id].status = OMAP_ABE_PORT_INITIALIZED;
 
-	/* return the dma pointer address */
-	omap_aess_read_port_address(abe, id, returned_dma_t);
-	return 0;
+	if (aess_dma)
+		omap_aess_read_port_address(aess, id, aess_dma);
 }
 EXPORT_SYMBOL(omap_aess_connect_cbpr_dmareq_port);
 
 /**
  * omap_aess_connect_serial_port()
- * @abe: Pointer on aess handle
+ * @aess: Pointer on aess handle
  * @id: port name
  * @f: data format
  * @mcbsp_id: peripheral ID (McBSP #1, #2, #3)
+ * @aess_dma: returned pointer to the base address of the CBPr register and
+ * 	number of samples to exchange during a DMA_request.
  *
  * Operations : enables the data echanges between a McBSP and an ATC buffer in
  * DMEM. This API is used connect 48kHz McBSP streams to MM_DL and 8/16kHz
  * voice streams to VX_UL, VX_DL, BT_VX_UL, BT_VX_DL. It abstracts the
  * abe_write_port API.
  */
-int omap_aess_connect_serial_port(struct omap_aess *abe,
-				  u32 id, struct omap_aess_data_format *f,
-				  u32 mcbsp_id)
+void omap_aess_connect_serial_port(struct omap_aess *aess, u32 id,
+				   struct omap_aess_data_format *f,
+				   u32 mcbsp_id, struct omap_aess_dma *aess_dma)
 {
-	abe_port[id] = ((struct omap_aess_port *)abe->fw_info->port)[id];
-	(abe_port[id]).format = (*f);
-	(abe_port[id]).protocol.protocol_switch = SERIAL_PORT_PROT;
+	omap_aess_reset_port(aess, id);
+
+	memcpy(&abe_port[id].format, f, sizeof(*f));
+
+	abe_port[id].protocol.protocol_switch = OMAP_AESS_PORT_SERIAL;
 	/* McBSP peripheral connected to ATC */
-	(abe_port[id]).protocol.p.prot_serial.desc_addr = mcbsp_id*ATC_SIZE;
+	abe_port[id].protocol.p.prot_serial.desc_addr = mcbsp_id * ATC_SIZE;
 	/* check the iteration of ATC */
-	(abe_port[id]).protocol.p.prot_serial.iter =
-		abe_dma_port_iter_factor(f);
+	abe_port[id].protocol.p.prot_serial.iter = abe_dma_port_iter_factor(f);
 
 	/* load the ATC descriptors - disabled */
-	omap_aess_init_atc(abe, id);
+	omap_aess_init_atc(aess, id);
 	/* load the micro-task parameters */
-	omap_aess_init_io_tasks(abe,  id, &((abe_port[id]).format),
-				&((abe_port[id]).protocol));
+	omap_aess_init_io_tasks(aess,  id, &abe_port[id].format,
+				&abe_port[id].protocol);
 	abe_port[id].status = OMAP_ABE_PORT_INITIALIZED;
 
-	return 0;
+	if (aess_dma)
+		omap_aess_read_port_address(aess, id, aess_dma);
 }
 EXPORT_SYMBOL(omap_aess_connect_serial_port);
-
-/**
- * omap_aess_read_port_address
- * @abe: Pointer on aess handle
- * @port: port name
- * @dma2: output pointer to the DMA iteration and data destination pointer
- *
- * This API returns the address of the DMA register used on this audio port.
- * Depending on the protocol being used, adds the base address offset L3
- * (DMA) or MPU (ARM)
- */
-int omap_aess_read_port_address(struct omap_aess *abe,
-				u32 port, struct omap_aess_dma *dma2)
-{
-	struct omap_aess_dma_offset dma1;
-	u32 protocol_switch;
-
-	dma1 = (abe_port[port]).dma;
-	protocol_switch = abe_port[port].protocol.protocol_switch;
-	switch (protocol_switch) {
-	case PINGPONG_PORT_PROT:
-		/* return the base address of the buffer in L3 and L4 spaces */
-		(*dma2).data = (void *)(dma1.data +
-			ABE_DEFAULT_BASE_ADDRESS_L3 + ABE_DMEM_BASE_OFFSET_MPU);
-		(*dma2).l3_dmem = (void *)(dma1.data +
-			ABE_DEFAULT_BASE_ADDRESS_L3 + ABE_DMEM_BASE_OFFSET_MPU);
-		(*dma2).l4_dmem = (void *)(dma1.data +
-			ABE_DEFAULT_BASE_ADDRESS_L4 + ABE_DMEM_BASE_OFFSET_MPU);
-		break;
-	case DMAREQ_PORT_PROT:
-		/* return the CBPr(L3), DMEM(L3), DMEM(L4) address */
-		(*dma2).data = (void *)(dma1.data +
-			ABE_DEFAULT_BASE_ADDRESS_L3 + ABE_ATC_BASE_OFFSET_MPU);
-		(*dma2).l3_dmem =
-			(void *)((abe_port[port]).protocol.p.prot_dmareq.buf_addr +
-			ABE_DEFAULT_BASE_ADDRESS_L3 + ABE_DMEM_BASE_OFFSET_MPU);
-		(*dma2).l4_dmem =
-			(void *)((abe_port[port]).protocol.p.prot_dmareq.buf_addr +
-			ABE_DEFAULT_BASE_ADDRESS_L4 + ABE_DMEM_BASE_OFFSET_MPU);
-		break;
-	default:
-		break;
-	}
-	(*dma2).iter = (dma1.iter);
-
-	return 0;
-}
-EXPORT_SYMBOL(omap_aess_read_port_address);
 
 /**
  * abe_init_dma_t
@@ -959,7 +945,7 @@ void abe_init_dma_t(u32 id, struct omap_aess_port_protocol *prot)
 	dma.data = 0;
 	dma.iter = 0;
 	switch (prot->protocol_switch) {
-	case PINGPONG_PORT_PROT:
+	case OMAP_AESS_PORT_PINGPONG:
 		for (idx = 0; idx < 32; idx++) {
 			if (((prot->p).prot_pingpong.irq_data) ==
 			    (u32) (1 << idx))
@@ -971,7 +957,7 @@ void abe_init_dma_t(u32 id, struct omap_aess_port_protocol *prot)
 		dma.data = (prot->p).prot_pingpong.buf_addr >> 2;
 		dma.iter = (prot->p).prot_pingpong.buf_size >> 2;
 		break;
-	case DMAREQ_PORT_PROT:
+	case OMAP_AESS_PORT_DMAREQ:
 		for (idx = 0; idx < 32; idx++) {
 			if (((prot->p).prot_dmareq.dma_data) ==
 			    (u32) (1 << idx))
@@ -982,11 +968,10 @@ void abe_init_dma_t(u32 id, struct omap_aess_port_protocol *prot)
 		(prot->p).prot_dmareq.desc_addr =
 			((CBPr_DMA_RTX0 + idx)*ATC_SIZE);
 		break;
-	case SLIMBUS_PORT_PROT:
-	case SERIAL_PORT_PROT:
-	case DMIC_PORT_PROT:
-	case MCPDMDL_PORT_PROT:
-	case MCPDMUL_PORT_PROT:
+	case OMAP_AESS_PORT_SERIAL:
+	case OMAP_AESS_PORT_DMIC:
+	case OMAP_AESS_PORT_MCPDMDL:
+	case OMAP_AESS_PORT_MCPDMUL:
 	default:
 		break;
 	}
@@ -996,20 +981,20 @@ void abe_init_dma_t(u32 id, struct omap_aess_port_protocol *prot)
 
 /**
  * omap_aess_enable_atc
- * @abe: Pointer on aess handle
+ * @aess: Pointer on aess handle
  * @id: port name
  *
  * Enable ATC associated to the port ID
  */
-static void omap_aess_enable_atc(struct omap_aess *abe, u32 id)
+static void omap_aess_enable_atc(struct omap_aess *aess, u32 id)
 {
 	struct omap_abe_atc_desc atc_desc;
 
-	omap_abe_mem_read(abe, OMAP_ABE_DMEM,
+	omap_abe_mem_read(aess, OMAP_ABE_DMEM,
 			  (abe_port[id]).protocol.p.prot_dmareq.desc_addr,
 			  (u32 *)&atc_desc, sizeof(atc_desc));
 	atc_desc.desen = 1;
-	omap_abe_mem_write(abe, OMAP_ABE_DMEM,
+	omap_abe_mem_write(aess, OMAP_ABE_DMEM,
 			   (abe_port[id]).protocol.p.prot_dmareq.desc_addr,
 			   (u32 *)&atc_desc, sizeof(atc_desc));
 
@@ -1017,20 +1002,20 @@ static void omap_aess_enable_atc(struct omap_aess *abe, u32 id)
 
 /**
  * omap_aess_disable_atc
- * @abe: Pointer on aess handle
+ * @aess: Pointer on aess handle
  * @id: port name
  *
  * Enable ATC associated to the port ID
  */
-static void omap_aess_disable_atc(struct omap_aess *abe, u32 id)
+static void omap_aess_disable_atc(struct omap_aess *aess, u32 id)
 {
 	struct omap_abe_atc_desc atc_desc;
 
-	omap_abe_mem_read(abe, OMAP_ABE_DMEM,
+	omap_abe_mem_read(aess, OMAP_ABE_DMEM,
 			  (abe_port[id]).protocol.p.prot_dmareq.desc_addr,
 			  (u32 *)&atc_desc, sizeof(atc_desc));
 	atc_desc.desen = 0;
-	omap_abe_mem_write(abe, OMAP_ABE_DMEM,
+	omap_abe_mem_write(aess, OMAP_ABE_DMEM,
 			   (abe_port[id]).protocol.p.prot_dmareq.desc_addr,
 			   (u32 *)&atc_desc, sizeof(atc_desc));
 
@@ -1038,7 +1023,7 @@ static void omap_aess_disable_atc(struct omap_aess *abe, u32 id)
 
 /**
  * omap_aess_init_io_tasks
- * @abe: Pointer on aess handle
+ * @aess: Pointer on aess handle
  * @id: port name
  * @format: data format being used
  * @prot: protocol being used
@@ -1050,7 +1035,7 @@ static void omap_aess_disable_atc(struct omap_aess *abe, u32 id)
  * For Write to DMEM usually THR1/THR2 = 2/0
  * UP_1/2 =X+1/X-1
  */
-int omap_aess_init_io_tasks(struct omap_aess *abe, u32 id,
+int omap_aess_init_io_tasks(struct omap_aess *aess, u32 id,
 			    struct omap_aess_data_format *format,
 			    struct omap_aess_port_protocol *prot)
 {
@@ -1063,8 +1048,8 @@ int omap_aess_init_io_tasks(struct omap_aess *abe, u32 id,
 	u32 copy_func_index2, atc_desc_address1, atc_desc_address2;
 	struct omap_aess_addr addr;
 
-	if (prot->protocol_switch == PINGPONG_PORT_PROT) {
-		struct ABE_SPingPongDescriptor desc_pp;
+	if (prot->protocol_switch == OMAP_AESS_PORT_PINGPONG) {
+		struct omap_aess_pingpong_desc desc_pp;
 
 		memset(&desc_pp, 0, sizeof(desc_pp));
 
@@ -1074,14 +1059,14 @@ int omap_aess_init_io_tasks(struct omap_aess *abe, u32 id,
 			return -AESS_EINVAL;
 		}
 		if (abe_port[id].format.f == 44100)
-			smem1 = omap_aess_update_io_task1(abe, &(abe->fw_info->ping_pong->tsk_freq[2].task), 1);
+			smem1 = omap_aess_update_io_task1(aess, &(aess->fw_info->ping_pong->tsk_freq[2].task), 1);
 		else
-			smem1 = omap_aess_update_io_task1(abe, &(abe->fw_info->ping_pong->tsk_freq[3].task), 1);
+			smem1 = omap_aess_update_io_task1(aess, &(aess->fw_info->ping_pong->tsk_freq[3].task), 1);
 
 		/* able  interrupt to be generated at the first frame */
 		desc_pp.split_addr1 = 1;
 
-		copy_func_index = (u8) abe_dma_port_copy_subroutine_id(abe, id);
+		copy_func_index = (u8) abe_dma_port_copy_subroutine_id(aess, id);
 		dmareq_addr = abe_port[id].protocol.p.prot_pingpong.irq_addr;
 		dmareq_field = abe_port[id].protocol.p.prot_pingpong.irq_data;
 		datasize = abe_dma_port_iter_factor(format);
@@ -1100,19 +1085,19 @@ int omap_aess_init_io_tasks(struct omap_aess *abe, u32 id,
 		desc_pp.data_size = (u8) datasize;
 		/* address comunicated in Bytes */
 		desc_pp.workbuff_BaseAddr =
-			(u16) (abe->base_address_pingpong[1]);
+			(u16) (aess->base_address_pingpong[1]);
 
 		/* size comunicated in XIO sample */
 		desc_pp.workbuff_Samples = 0;
 		desc_pp.nextbuff0_BaseAddr =
-			(u16) (abe->base_address_pingpong[0]);
+			(u16) (aess->base_address_pingpong[0]);
 		desc_pp.nextbuff1_BaseAddr =
-			(u16) (abe->base_address_pingpong[1]);
-		if (dmareq_addr == ABE_DMASTATUS_RAW) {
+			(u16) (aess->base_address_pingpong[1]);
+		if (dmareq_addr == OMAP_AESS_DMASTATUS_RAW) {
 			desc_pp.nextbuff0_Samples =
-				(u16) ((abe->size_pingpong >> 2) / datasize);
+				(u16) ((aess->size_pingpong >> 2) / datasize);
 			desc_pp.nextbuff1_Samples =
-				(u16) ((abe->size_pingpong >> 2) / datasize);
+				(u16) ((aess->size_pingpong >> 2) / datasize);
 		} else {
 			desc_pp.nextbuff0_Samples = 0;
 			desc_pp.nextbuff1_Samples = 0;
@@ -1122,15 +1107,15 @@ int omap_aess_init_io_tasks(struct omap_aess *abe, u32 id,
 		/* send a DMA req to fill B0 with N samples
 		   abe_block_copy (COPY_FROM_HOST_TO_ABE,
 			ABE_ATC,
-			ABE_DMASTATUS_RAW,
+			OMAP_AESS_DMASTATUS_RAW,
 			&(abe_port[id].protocol.p.prot_pingpong.irq_data),
 			4); */
-		memcpy(&addr, &abe->fw_info->map[OMAP_AESS_DMEM_PINGPONGDESC_ID],
+		memcpy(&addr, &aess->fw_info->map[OMAP_AESS_DMEM_PINGPONGDESC_ID],
 		       sizeof(struct omap_aess_addr));
 		addr.bytes = sizeof(desc_pp);
-		omap_aess_mem_write(abe, addr, (u32 *)&desc_pp);
+		omap_aess_mem_write(aess, addr, (u32 *)&desc_pp);
 	} else {
-		struct ABE_SIODescriptor sio_desc;
+		struct omap_aess_io_desc sio_desc;
 		int idx;
 
 		switch (abe_port[id].format.f) {
@@ -1151,8 +1136,8 @@ int omap_aess_init_io_tasks(struct omap_aess *abe, u32 id,
 
 		memset(&sio_desc, 0, sizeof(sio_desc));
 
-		io_sub_id = ABE_DMASTATUS_RAW;
-		dmareq_addr = ABE_DMASTATUS_RAW;
+		io_sub_id = OMAP_AESS_DMASTATUS_RAW;
+		dmareq_addr = OMAP_AESS_DMASTATUS_RAW;
 		dmareq_field = 0;
 		atc_desc_address1 = 0;
 		atc_desc_address2 = 0;
@@ -1163,57 +1148,45 @@ int omap_aess_init_io_tasks(struct omap_aess *abe, u32 id,
 		datasize = abe_dma_port_iter_factor(format);
 		x_io = (u8) abe_dma_port_iteration(format);
 		nsamp = (x_io / datasize);
-		atc_ptr_saved2 = abe->fw_info->label_id[OMAP_AESS_BUFFER_DMIC_ATC_PTR_ID] + id;
-		atc_ptr_saved = abe->fw_info->label_id[OMAP_AESS_BUFFER_DMIC_ATC_PTR_ID] + id;
+		atc_ptr_saved2 = aess->fw_info->label_id[OMAP_AESS_BUFFER_DMIC_ATC_PTR_ID] + id;
+		atc_ptr_saved = aess->fw_info->label_id[OMAP_AESS_BUFFER_DMIC_ATC_PTR_ID] + id;
 
 		smem1 = abe_port[id].smem_buffer1;
 		smem2 = abe_port[id].smem_buffer2;
 		smem3 = abe_port[id].smem_buffer2;
-		copy_func_index1 = (u8) abe_dma_port_copy_subroutine_id(abe, id);
+		copy_func_index1 = (u8) abe_dma_port_copy_subroutine_id(aess, id);
 
-		before_func_index = abe->fw_info->fct_id[OMAP_AESS_COPY_FCT_NULL_ID];
-		after_func_index = abe->fw_info->fct_id[OMAP_AESS_COPY_FCT_NULL_ID];
-		copy_func_index2 = abe->fw_info->fct_id[OMAP_AESS_COPY_FCT_NULL_ID];
+		before_func_index = aess->fw_info->fct_id[OMAP_AESS_COPY_FCT_NULL_ID];
+		after_func_index = aess->fw_info->fct_id[OMAP_AESS_COPY_FCT_NULL_ID];
+		copy_func_index2 = aess->fw_info->fct_id[OMAP_AESS_COPY_FCT_NULL_ID];
 
 		switch (prot->protocol_switch) {
-		case DMIC_PORT_PROT:
+		case OMAP_AESS_PORT_DMIC:
 			/* DMIC port is read in two steps */
 			x_io = x_io >> 1;
 			nsamp = nsamp >> 1;
 			atc_desc_address1 = (ABE_ATC_DMIC_DMA_REQ*ATC_SIZE);
-			io_sub_id = abe->fw_info->fct_id[OMAP_AESS_COPY_FCT_IO_IP_ID];
+			io_sub_id = aess->fw_info->fct_id[OMAP_AESS_COPY_FCT_IO_IP_ID];
 			break;
-		case MCPDMDL_PORT_PROT:
+		case OMAP_AESS_PORT_MCPDMDL:
 			/* PDMDL port is written to in two steps */
 			x_io = x_io >> 1;
 			atc_desc_address1 = (ABE_ATC_MCPDMDL_DMA_REQ*ATC_SIZE);
-			io_sub_id = abe->fw_info->fct_id[OMAP_AESS_COPY_FCT_IO_IP_ID];
+			io_sub_id = aess->fw_info->fct_id[OMAP_AESS_COPY_FCT_IO_IP_ID];
 			break;
-		case MCPDMUL_PORT_PROT:
+		case OMAP_AESS_PORT_MCPDMUL:
 			atc_desc_address1 = (ABE_ATC_MCPDMUL_DMA_REQ*ATC_SIZE);
-			io_sub_id = abe->fw_info->fct_id[OMAP_AESS_COPY_FCT_IO_IP_ID];
+			io_sub_id = aess->fw_info->fct_id[OMAP_AESS_COPY_FCT_IO_IP_ID];
 			break;
-		case SLIMBUS_PORT_PROT:
-			atc_desc_address1 = abe_port[id].protocol.p.prot_slimbus.desc_addr1;
-			atc_desc_address2 = abe_port[id].protocol.p.prot_slimbus.desc_addr2;
-			copy_func_index2 = abe->fw_info->fct_id[OMAP_AESS_COPY_FCT_NULL_ID];
-			/* @@@@@@
-			   #define SPLIT_SMEM_CFPID 9
-			   #define MERGE_SMEM_CFPID 10
-			   #define SPLIT_TDM_12_CFPID 11
-			   #define MERGE_TDM_12_CFPID 12
-			 */
-			io_sub_id = abe->fw_info->fct_id[OMAP_AESS_COPY_FCT_IO_IP_ID];
-			break;
-		case SERIAL_PORT_PROT:	/* McBSP/McASP */
+		case OMAP_AESS_PORT_SERIAL:	/* McBSP/McASP */
 			atc_desc_address1 = (s16) abe_port[id].protocol.p.prot_serial.desc_addr;
-			io_sub_id = abe->fw_info->fct_id[OMAP_AESS_COPY_FCT_IO_IP_ID];
+			io_sub_id = aess->fw_info->fct_id[OMAP_AESS_COPY_FCT_IO_IP_ID];
 			break;
-		case DMAREQ_PORT_PROT:	/* DMA w/wo CBPr */
+		case OMAP_AESS_PORT_DMAREQ:	/* DMA w/wo CBPr */
 			dmareq_addr = abe_port[id].protocol.p.prot_dmareq.dma_addr;
 			dmareq_field = 0;
 			atc_desc_address1 = abe_port[id].protocol.p.prot_dmareq.desc_addr;
-			io_sub_id = abe->fw_info->fct_id[OMAP_AESS_COPY_FCT_IO_IP_ID];
+			io_sub_id = aess->fw_info->fct_id[OMAP_AESS_COPY_FCT_IO_IP_ID];
 			break;
 		}
 		/* special situation of the PING_PONG protocol which
@@ -1232,13 +1205,13 @@ int omap_aess_init_io_tasks(struct omap_aess *abe, u32 id,
 		 */
 		switch (id) {
 		case OMAP_ABE_VX_DL_PORT:
-			omap_aess_update_scheduling_table1(abe, &(abe->fw_info->port[id].task), 1);
+			omap_aess_update_scheduling_table(aess, &(aess->fw_info->port[id].task), 1);
 
-			smem1 = omap_aess_update_io_task1(abe, &(abe->fw_info->port[id].tsk_freq[idx].task), 1);
+			smem1 = omap_aess_update_io_task1(aess, &(aess->fw_info->port[id].tsk_freq[idx].task), 1);
 			/* check for 8kHz/16kHz */
 			if (idx < 2) {
 				/* ASRC set only for McBSP */
-				if ((prot->protocol_switch == SERIAL_PORT_PROT)) {
+				if ((prot->protocol_switch == OMAP_AESS_PORT_SERIAL)) {
 					if ((abe_port[OMAP_ABE_VX_DL_PORT].status ==
 						OMAP_ABE_PORT_ACTIVITY_IDLE) &&
 					    (abe_port[OMAP_ABE_VX_UL_PORT].status ==
@@ -1246,29 +1219,29 @@ int omap_aess_init_io_tasks(struct omap_aess *abe, u32 id,
 						/* the 1st opened port is VX_DL_PORT
 						 * both VX_UL ASRC and VX_DL ASRC will add/remove sample
 						 * referring to VX_DL flow_counter */
-						omap_aess_update_scheduling_table1(abe, &(abe->fw_info->port[id].tsk_freq[idx].asrc.serial), 1);
+						omap_aess_update_scheduling_table(aess, &(aess->fw_info->port[id].tsk_freq[idx].asrc.serial), 1);
 
 						/* Init VX_UL ASRC & VX_DL ASRC and enable its adaptation */
-						omap_aess_init_asrc_vx_ul(abe, -250);
-						omap_aess_init_asrc_vx_dl(abe, 250);
+						omap_aess_init_asrc_vx_ul(aess, -250);
+						omap_aess_init_asrc_vx_dl(aess, 250);
 					} else {
 						/* Do nothing, Scheduling Table has already been patched */
 					}
 				} else {
 					/* Enable only ASRC on VXDL port*/
-					omap_aess_update_scheduling_table1(abe, &(abe->fw_info->port[id].tsk_freq[idx].asrc.cbpr), 1);
-					omap_aess_init_asrc_vx_dl(abe, 0);
+					omap_aess_update_scheduling_table(aess, &(aess->fw_info->port[id].tsk_freq[idx].asrc.cbpr), 1);
+					omap_aess_init_asrc_vx_dl(aess, 0);
 				}
 			}
 			break;
 		case OMAP_ABE_VX_UL_PORT:
-			omap_aess_update_scheduling_table1(abe, &(abe->fw_info->port[id].task), 1);
+			omap_aess_update_scheduling_table(aess, &(aess->fw_info->port[id].task), 1);
 
-			smem1 = omap_aess_update_io_task1(abe, &(abe->fw_info->port[id].tsk_freq[idx].task), 1);
+			smem1 = omap_aess_update_io_task1(aess, &(aess->fw_info->port[id].tsk_freq[idx].task), 1);
 			/* check for 8kHz/16kHz */
 			if (idx < 2) {
 				/* ASRC set only for McBSP */
-				if ((prot->protocol_switch == SERIAL_PORT_PROT)) {
+				if ((prot->protocol_switch == OMAP_AESS_PORT_SERIAL)) {
 					if ((abe_port[OMAP_ABE_VX_DL_PORT].status ==
 						OMAP_ABE_PORT_ACTIVITY_IDLE) &&
 					    (abe_port[OMAP_ABE_VX_UL_PORT].status ==
@@ -1276,17 +1249,17 @@ int omap_aess_init_io_tasks(struct omap_aess *abe, u32 id,
 						/* the 1st opened port is VX_UL_PORT
 						 * both VX_UL ASRC and VX_DL ASRC will add/remove sample
 						 * referring to VX_UL flow_counter */
-						omap_aess_update_scheduling_table1(abe, &(abe->fw_info->port[id].tsk_freq[idx].asrc.serial), 1);
+						omap_aess_update_scheduling_table(aess, &(aess->fw_info->port[id].tsk_freq[idx].asrc.serial), 1);
 						/* Init VX_UL ASRC & VX_DL ASRC and enable its adaptation */
-						omap_aess_init_asrc_vx_ul(abe, -250);
-						omap_aess_init_asrc_vx_dl(abe, 250);
+						omap_aess_init_asrc_vx_ul(aess, -250);
+						omap_aess_init_asrc_vx_dl(aess, 250);
 					} else {
 						/* Do nothing, Scheduling Table has already been patched */
 					}
 				} else {
 					/* Enable only ASRC on VXUL port*/
-					omap_aess_update_scheduling_table1(abe, &(abe->fw_info->port[id].tsk_freq[idx].asrc.cbpr), 1);
-					omap_aess_init_asrc_vx_ul(abe, 0);
+					omap_aess_update_scheduling_table(aess, &(aess->fw_info->port[id].tsk_freq[idx].asrc.cbpr), 1);
+					omap_aess_init_asrc_vx_ul(aess, 0);
 				}
 			}
 			break;
@@ -1294,15 +1267,15 @@ int omap_aess_init_io_tasks(struct omap_aess *abe, u32 id,
 		case OMAP_ABE_BT_VX_UL_PORT:
 		case OMAP_ABE_MM_DL_PORT:
 		case OMAP_ABE_TONES_DL_PORT:
-			smem1 = omap_aess_update_io_task1(abe, &(abe->fw_info->port[id].tsk_freq[idx].task), 1);
+			smem1 = omap_aess_update_io_task1(aess, &(aess->fw_info->port[id].tsk_freq[idx].task), 1);
 			break;
 		case OMAP_ABE_MM_UL_PORT:
-			copy_func_index1 = abe->fw_info->fct_id[OMAP_AESS_COPY_FCT_MM_UL_ID];
-			before_func_index = abe->fw_info->fct_id[OMAP_AESS_COPY_FCT_ROUTE_MM_UL_ID];
+			copy_func_index1 = aess->fw_info->fct_id[OMAP_AESS_COPY_FCT_MM_UL_ID];
+			before_func_index = aess->fw_info->fct_id[OMAP_AESS_COPY_FCT_ROUTE_MM_UL_ID];
 			break;
 		case OMAP_ABE_MM_EXT_IN_PORT:
 			/* set the SMEM buffer -- programming sequence */
-			smem1 = abe->fw_info->label_id[OMAP_AESS_BUFFER_MM_EXT_IN_ID];
+			smem1 = aess->fw_info->label_id[OMAP_AESS_BUFFER_MM_EXT_IN_ID];
 			break;
 		case OMAP_ABE_PDM_DL_PORT:
 		case OMAP_ABE_PDM_UL_PORT:
@@ -1346,42 +1319,42 @@ int omap_aess_init_io_tasks(struct omap_aess *abe, u32 id,
 		sio_desc.data_size2 = (u8) datasize2;
 		sio_desc.copy_f_index2 = (u8) copy_func_index2;
 
-		memcpy(&addr, &abe->fw_info->map[OMAP_AESS_DMEM_IODESCR_ID],
+		memcpy(&addr, &aess->fw_info->map[OMAP_AESS_DMEM_IODESCR_ID],
 		       sizeof(struct omap_aess_addr));
-		addr.bytes = sizeof(struct ABE_SIODescriptor);
-		addr.offset += (id * sizeof(struct ABE_SIODescriptor));
+		addr.bytes = sizeof(struct omap_aess_io_desc);
+		addr.offset += (id * sizeof(struct omap_aess_io_desc));
 
-		omap_aess_mem_write(abe, addr, (u32 *)&sio_desc);
+		omap_aess_mem_write(aess, addr, (u32 *)&sio_desc);
 
 	}
-	omap_aess_mem_write(abe, abe->fw_info->map[OMAP_AESS_DMEM_MULTIFRAME_ID],
-			    (u32 *)abe->MultiFrame);
+	omap_aess_mem_write(aess, aess->fw_info->map[OMAP_AESS_DMEM_MULTIFRAME_ID],
+			    (u32 *)aess->MultiFrame);
 
 	return 0;
 }
 
 /**
  * omap_aess_select_main_port - Select stynchronization port for Event generator.
- * @abe: Pointer on aess handle
+ * @aess: Pointer on aess handle
  * @id: port name
  *
  * tells the FW which is the reference stream for adjusting
  * the processing on 23/24/25 slots
  */
-int omap_aess_select_main_port(struct omap_aess *abe, u32 id)
+int omap_aess_select_main_port(struct omap_aess *aess, u32 id)
 {
 	u32 selection;
 
 	/* flow control */
-	selection = abe->fw_info->map[OMAP_AESS_DMEM_IODESCR_ID].offset + id * sizeof(struct ABE_SIODescriptor) +
-		offsetof(struct ABE_SIODescriptor, flow_counter);
+	selection = aess->fw_info->map[OMAP_AESS_DMEM_IODESCR_ID].offset + id * sizeof(struct omap_aess_io_desc) +
+		offsetof(struct omap_aess_io_desc, flow_counter);
 	/* when the main port is a sink port from AESS point of view
 	   the sign the firmware task analysis must be changed  */
 	selection &= 0xFFFFL;
 	if (abe_port[id].protocol.direction == ABE_ATC_DIRECTION_IN)
 		selection |= 0x80000;
 
-	omap_aess_mem_write(abe, abe->fw_info->map[OMAP_AESS_DMEM_SLOT23_CTRL_ID],
+	omap_aess_mem_write(aess, aess->fw_info->map[OMAP_AESS_DMEM_SLOT23_CTRL_ID],
 			    &selection);
 	return 0;
 }
@@ -1397,8 +1370,8 @@ int omap_aess_select_main_port(struct omap_aess *abe, u32 id)
  */
 static u32 abe_valid_port_for_synchro(u32 id)
 {
-	if ((abe_port[id].protocol.protocol_switch == DMAREQ_PORT_PROT) ||
-	    (abe_port[id].protocol.protocol_switch == PINGPONG_PORT_PROT) ||
+	if ((abe_port[id].protocol.protocol_switch == OMAP_AESS_PORT_DMAREQ) ||
+	    (abe_port[id].protocol.protocol_switch == OMAP_AESS_PORT_PINGPONG) ||
 	    (abe_port[id].status != OMAP_ABE_PORT_ACTIVITY_RUNNING))
 		return 0;
 	else
@@ -1407,12 +1380,12 @@ static u32 abe_valid_port_for_synchro(u32 id)
 
 /**
  * omap_aess_decide_main_port()  - Decide main port selection for synchronization.
- * @abe: Pointer on aess handle
+ * @aess: Pointer on aess handle
  *
  * Lock up on all ABE port in order to find out the correct port for the
  * Audio Engine synchronization.
  */
-void omap_aess_decide_main_port(struct omap_aess *abe)
+void omap_aess_decide_main_port(struct omap_aess *aess)
 {
 	u32 id, id_not_found;
 
@@ -1426,9 +1399,9 @@ void omap_aess_decide_main_port(struct omap_aess *abe)
 
 	/* if no port is currently activated, the default one is PDM_DL */
 	if (id_not_found)
-		omap_aess_select_main_port(abe, OMAP_ABE_PDM_DL_PORT);
+		omap_aess_select_main_port(aess, OMAP_ABE_PDM_DL_PORT);
 	else
-		omap_aess_select_main_port(abe, abe_port_priority[id]);
+		omap_aess_select_main_port(aess, abe_port_priority[id]);
 }
 
 /**
@@ -1468,34 +1441,34 @@ static void abe_format_switch(struct omap_aess_data_format *f, u32 *iter, u32 *m
 	}
 
 	switch (f->samp_format) {
-	case MONO_MSB:
-	case MONO_RSHIFTED_16:
-	case STEREO_16_16:
+	case OMAP_AESS_FORMAT_MONO_MSB:
+	case OMAP_AESS_FORMAT_MONO_RSHIFTED_16:
+	case OMAP_AESS_FORMAT_STEREO_16_16:
 		*mulfac = 1;
 		break;
-	case STEREO_MSB:
-	case STEREO_RSHIFTED_16:
+	case OMAP_AESS_FORMAT_STEREO_MSB:
+	case OMAP_AESS_FORMAT_STEREO_RSHIFTED_16:
 		*mulfac = 2;
 		break;
-	case THREE_MSB:
+	case OMAP_AESS_FORMAT_THREE_MSB:
 		*mulfac = 3;
 		break;
-	case FOUR_MSB:
+	case OMAP_AESS_FORMAT_FOUR_MSB:
 		*mulfac = 4;
 		break;
-	case FIVE_MSB:
+	case OMAP_AESS_FORMAT_FIVE_MSB:
 		*mulfac = 5;
 		break;
-	case SIX_MSB:
+	case OMAP_AESS_FORMAT_SIX_MSB:
 		*mulfac = 6;
 		break;
-	case SEVEN_MSB:
+	case OMAP_AESS_FORMAT_SEVEN_MSB:
 		*mulfac = 7;
 		break;
-	case EIGHT_MSB:
+	case OMAP_AESS_FORMAT_EIGHT_MSB:
 		*mulfac = 8;
 		break;
-	case NINE_MSB:
+	case OMAP_AESS_FORMAT_NINE_MSB:
 		*mulfac = 9;
 		break;
 	default:
@@ -1503,7 +1476,7 @@ static void abe_format_switch(struct omap_aess_data_format *f, u32 *iter, u32 *m
 		break;
 	}
 	*iter = (n_freq * (*mulfac));
-	if (f->samp_format == MONO_16_16)
+	if (f->samp_format == OMAP_AESS_FORMAT_MONO_16_16)
 		*iter /= 2;
 }
 
@@ -1537,12 +1510,12 @@ static u32 abe_dma_port_iter_factor(struct omap_aess_data_format *f)
 
 /**
  * omap_aess_dma_port_iter_factor
- * @abe: Pointer on aess handle
+ * @aess: Pointer on aess handle
  * @f: port format
  *
  * returns the multiplier factor to apply during data move with DMEM
  */
-static u32 omap_aess_dma_port_iter_factor(struct omap_aess *abe, struct omap_aess_data_format *f)
+static u32 omap_aess_dma_port_iter_factor(struct omap_aess *aess, struct omap_aess_data_format *f)
 {
 	u32 iter, mulfac;
 
@@ -1552,36 +1525,36 @@ static u32 omap_aess_dma_port_iter_factor(struct omap_aess *abe, struct omap_aes
 
 /**
  * omap_aess_mono_mixer
- * @abe: Pointer on aess handle
+ * @aess: Pointer on aess handle
  * @id: name of the mixer (MIXDL1, MIXDL2 or MIXAUDUL)
  * @on_off: enable/disable flag
  *
  * This API Programs DL1Mixer or DL2Mixer to output mono data
  * on both left and right data paths.
  */
-int omap_aess_mono_mixer(struct omap_aess *abe, u32 id, u32 on_off)
+int omap_aess_mono_mixer(struct omap_aess *aess, u32 id, u32 on_off)
 {
 	struct omap_aess_task *task;
 
 	switch (id) {
 	case MIXDL1:
-		task = &abe->fw_info->dl1_mono_mixer[on_off];
+		task = &aess->fw_info->dl1_mono_mixer[on_off];
 		break;
 	case MIXDL2:
-		task = &abe->fw_info->dl2_mono_mixer[on_off];
+		task = &aess->fw_info->dl2_mono_mixer[on_off];
 		break;
 	case MIXAUDUL:
-		task = &abe->fw_info->audul_mono_mixer[on_off];
+		task = &aess->fw_info->audul_mono_mixer[on_off];
 		break;
 	default:
 		return 0;
 		break;
 	}
 
-	abe->MultiFrame[task->frame][task->slot] = task->task;
+	aess->MultiFrame[task->frame][task->slot] = task->task;
 
-	omap_aess_mem_write(abe, abe->fw_info->map[OMAP_AESS_DMEM_MULTIFRAME_ID],
-			    (u32 *)abe->MultiFrame);
+	omap_aess_mem_write(aess, aess->fw_info->map[OMAP_AESS_DMEM_MULTIFRAME_ID],
+			    (u32 *)aess->MultiFrame);
 
 	return 0;
 }
@@ -1589,14 +1562,14 @@ EXPORT_SYMBOL(omap_aess_mono_mixer);
 
 /**
  * omap_aess_check_activity - Check if some ABE activity.
- * @abe: Pointer on aess handle
+ * @aess: Pointer on aess handle
  *
  * Check if any ABE ports are running.
  * return 1: still activity on ABE
  * return 0: no more activity on ABE. Event generator can be stopped
  *
  */
-int omap_aess_check_activity(struct omap_aess *abe)
+int omap_aess_check_activity(struct omap_aess *aess)
 {
 	int i, ret = 0;
 
@@ -1613,7 +1586,7 @@ EXPORT_SYMBOL(omap_aess_check_activity);
 
 /**
  * abe_write_pdmdl_offset - write the desired offset on the DL1/DL2 paths
- * @abe: Pointer on aess handle
+ * @aess: Pointer on aess handle
  * @path: DL1 or DL2 port
  * @offset_left: integer value that will be added on all PDM left samples
  * @offset_right: integer value that will be added on all PDM right samples
@@ -1621,7 +1594,7 @@ EXPORT_SYMBOL(omap_aess_check_activity);
  * Set ABE internal DC offset cancellation parameter for McPDM IP. Value
  * depends on TWL604x triming parameters.
  */
-void omap_aess_write_pdmdl_offset(struct omap_aess *abe, u32 path,
+void omap_aess_write_pdmdl_offset(struct omap_aess *aess, u32 path,
 				  u32 offset_left, u32 offset_right)
 {
 	u32 offset[2];
@@ -1631,10 +1604,10 @@ void omap_aess_write_pdmdl_offset(struct omap_aess *abe, u32 path,
 
 	switch (path) {
 	case 1:
-		omap_aess_mem_write(abe, abe->fw_info->map[OMAP_AESS_SMEM_DC_HS_ID], offset);
+		omap_aess_mem_write(aess, aess->fw_info->map[OMAP_AESS_SMEM_DC_HS_ID], offset);
 		break;
 	case 2:
-		omap_aess_mem_write(abe, abe->fw_info->map[OMAP_AESS_SMEM_DC_HF_ID], offset);
+		omap_aess_mem_write(aess, aess->fw_info->map[OMAP_AESS_SMEM_DC_HF_ID], offset);
 		break;
 	default:
 		break;
@@ -1644,17 +1617,17 @@ EXPORT_SYMBOL(omap_aess_write_pdmdl_offset);
 
 /**
  * oamp_abe_set_ping_pong_buffer
- * @abe: Pointer on aess handle
+ * @aess: Pointer on aess handle
  * @port: ABE port ID
  * @n_bytes: Size of Ping/Pong buffer
  *
  * Updates the next ping-pong buffer with "size" bytes copied from the
  * host processor. This API notifies the FW that the data transfer is done.
  */
-int omap_aess_set_ping_pong_buffer(struct omap_aess *abe, u32 port, u32 n_bytes)
+int omap_aess_set_ping_pong_buffer(struct omap_aess *aess, u32 port, u32 n_bytes)
 {
 	u32 struct_offset, n_samples, datasize, base_and_size;
-	struct ABE_SPingPongDescriptor desc_pp;
+	struct omap_aess_pingpong_desc desc_pp;
 	struct omap_aess_addr addr;
 
 	/* ping_pong is only supported on MM_DL */
@@ -1664,14 +1637,14 @@ int omap_aess_set_ping_pong_buffer(struct omap_aess *abe, u32 port, u32 n_bytes)
 	}
 	/* translates the number of bytes in samples */
 	/* data size in DMEM words */
-	datasize = omap_aess_dma_port_iter_factor(abe, (struct omap_aess_data_format *)&((abe_port[port]).format));
+	datasize = omap_aess_dma_port_iter_factor(aess, (struct omap_aess_data_format *)&((abe_port[port]).format));
 	/* data size in bytes */
 	datasize = datasize << 2;
 	n_samples = n_bytes / datasize;
-	memcpy(&addr, &abe->fw_info->map[OMAP_AESS_DMEM_PINGPONGDESC_ID],
+	memcpy(&addr, &aess->fw_info->map[OMAP_AESS_DMEM_PINGPONGDESC_ID],
 	       sizeof(struct omap_aess_addr));
-	addr.bytes = sizeof(struct ABE_SPingPongDescriptor);
-	omap_aess_mem_read(abe, addr, (u32 *)&desc_pp);
+	addr.bytes = sizeof(struct omap_aess_pingpong_desc);
+	omap_aess_mem_read(aess, addr, (u32 *)&desc_pp);
 	/*
 	 * read the port SIO descriptor and extract the current pointer
 	 * address after reading the counter
@@ -1686,14 +1659,14 @@ int omap_aess_set_ping_pong_buffer(struct omap_aess *abe, u32 port, u32 n_bytes)
 		base_and_size = desc_pp.nextbuff1_BaseAddr;
 	}
 
-	base_and_size = abe->pp_buf_addr[abe->pp_buf_id_next];
-	abe->pp_buf_id_next = (abe->pp_buf_id_next + 1) & 0x03;
+	base_and_size = aess->pp_buf_addr[aess->pp_buf_id_next];
+	aess->pp_buf_id_next = (aess->pp_buf_id_next + 1) & 0x03;
 
 	base_and_size = (base_and_size & 0xFFFFL) + (n_samples << 16);
 
 	addr.offset += struct_offset;
 	addr.bytes = 4;
-	omap_aess_mem_write(abe, addr, (u32 *)&base_and_size);
+	omap_aess_mem_write(aess, addr, (u32 *)&base_and_size);
 
 	return 0;
 }
@@ -1701,7 +1674,7 @@ EXPORT_SYMBOL(omap_aess_set_ping_pong_buffer);
 
 /**
  * omap_aess_read_offset_from_ping_buffer
- * @abe: Pointer on aess handle
+ * @aess: Pointer on aess handle
  * @id: ABE port ID
  * @n:  returned address of the offset
  *	from the ping buffer start address (in samples)
@@ -1709,10 +1682,10 @@ EXPORT_SYMBOL(omap_aess_set_ping_pong_buffer);
  * Computes the current firmware ping pong read pointer location,
  * expressed in samples, as the offset from the start address of ping buffer.
  */
-int omap_aess_read_offset_from_ping_buffer(struct omap_aess *abe,
+int omap_aess_read_offset_from_ping_buffer(struct omap_aess *aess,
 					  u32 id, u32 *n)
 {
-	struct ABE_SPingPongDescriptor desc_pp;
+	struct omap_aess_pingpong_desc desc_pp;
 	struct omap_aess_addr addr;
 
 	/* ping_pong is only supported on MM_DL */
@@ -1721,10 +1694,10 @@ int omap_aess_read_offset_from_ping_buffer(struct omap_aess *abe,
 		return -AESS_EINVAL;
 	} else {
 		/* read the port SIO ping pong descriptor */
-		memcpy(&addr, &abe->fw_info->map[OMAP_AESS_DMEM_PINGPONGDESC_ID],
+		memcpy(&addr, &aess->fw_info->map[OMAP_AESS_DMEM_PINGPONGDESC_ID],
 		       sizeof(struct omap_aess_addr));
-		addr.bytes = sizeof(struct ABE_SPingPongDescriptor);
-		omap_aess_mem_read(abe, addr, (u32 *)&desc_pp);
+		addr.bytes = sizeof(struct omap_aess_pingpong_desc);
+		omap_aess_mem_read(aess, addr, (u32 *)&desc_pp);
 		/* extract the current ping pong buffer read pointer based on
 		   the value of the counter */
 		if ((desc_pp.counter & 0x1) == 0) {
@@ -1737,14 +1710,14 @@ int omap_aess_read_offset_from_ping_buffer(struct omap_aess *abe,
 				desc_pp.workbuff_Samples;
 		}
 		switch (abe_port[OMAP_ABE_MM_DL_PORT].format.samp_format) {
-		case MONO_MSB:
-		case MONO_RSHIFTED_16:
-		case STEREO_16_16:
-			*n +=  abe->pp_buf_id * abe->size_pingpong / 4;
+		case OMAP_AESS_FORMAT_MONO_MSB:
+		case OMAP_AESS_FORMAT_MONO_RSHIFTED_16:
+		case OMAP_AESS_FORMAT_STEREO_16_16:
+			*n +=  aess->pp_buf_id * aess->size_pingpong / 4;
 			break;
-		case STEREO_MSB:
-		case STEREO_RSHIFTED_16:
-			*n += abe->pp_buf_id * abe->size_pingpong / 8;
+		case OMAP_AESS_FORMAT_STEREO_MSB:
+		case OMAP_AESS_FORMAT_STEREO_RSHIFTED_16:
+			*n += aess->pp_buf_id * aess->size_pingpong / 8;
 			break;
 		default:
 			aess_err("Bad data format for Ping-pong buffer");
@@ -1757,43 +1730,18 @@ int omap_aess_read_offset_from_ping_buffer(struct omap_aess *abe,
 EXPORT_SYMBOL(omap_aess_read_offset_from_ping_buffer);
 
 /**
- * omap_aess_irq_ping_pong
- * @abe: Pointer on aess handle
- *
- * Call the respective subroutine depending on the IRQ FIFO content:
- * APS interrupts : IRQ_FIFO[31:28] = IRQtag_APS,
- *	IRQ_FIFO[27:16] = APS_IRQs, IRQ_FIFO[15:0] = loopCounter
- * SEQ interrupts : IRQ_FIFO[31:28] = IRQtag_COUNT,
- *	IRQ_FIFO[27:16] = Count_IRQs, IRQ_FIFO[15:0] = loopCounter
- * Ping-Pong Interrupts : IRQ_FIFO[31:28] = IRQtag_PP,
- *	IRQ_FIFO[27:16] = PP_MCU_IRQ, IRQ_FIFO[15:0] = loopCounter
- */
-void omap_aess_irq_ping_pong(struct omap_aess *abe)
-{
-	/* first IRQ doesn't represent a buffer transference completion */
-	if (abe->pp_first_irq)
-		abe->pp_first_irq = 0;
-	else
-		abe->pp_buf_id = (abe->pp_buf_id + 1) & 0x03;
-
-	omap_aess_call_subroutine(abe, abe->seq.irq_pingpong_player_id,
-				  NOPARAMETER, NOPARAMETER,
-				  NOPARAMETER, NOPARAMETER);
-}
-
-/**
  * omap_aess_read_next_ping_pong_buffer
- * @abe: Pointer on aess handle
+ * @aess: Pointer on aess handle
  * @port: ABE portID
  * @p: Next buffer address (pointer)
  * @n: Next buffer size (pointer)
  *
  * Tell the next base address of the next ping_pong Buffer and its size
  */
-int omap_aess_read_next_ping_pong_buffer(struct omap_aess *abe, u32 port,
+int omap_aess_read_next_ping_pong_buffer(struct omap_aess *aess, u32 port,
 					 u32 *p, u32 *n)
 {
-	struct ABE_SPingPongDescriptor desc_pp;
+	struct omap_aess_pingpong_desc desc_pp;
 	struct omap_aess_addr addr;
 
 	/* ping_pong is only supported on MM_DL */
@@ -1803,10 +1751,10 @@ int omap_aess_read_next_ping_pong_buffer(struct omap_aess *abe, u32 port,
 	}
 	/* read the port SIO descriptor and extract the current pointer
 	   address after reading the counter */
-	memcpy(&addr, &abe->fw_info->map[OMAP_AESS_DMEM_PINGPONGDESC_ID],
+	memcpy(&addr, &aess->fw_info->map[OMAP_AESS_DMEM_PINGPONGDESC_ID],
 	       sizeof(struct omap_aess_addr));
-	addr.bytes = sizeof(struct ABE_SPingPongDescriptor);
-	omap_aess_mem_read(abe, addr, (u32 *)&desc_pp);
+	addr.bytes = sizeof(struct omap_aess_pingpong_desc);
+	omap_aess_mem_read(aess, addr, (u32 *)&desc_pp);
 
 	if ((desc_pp.counter & 0x1) == 0)
 		*p = desc_pp.nextbuff0_BaseAddr;
@@ -1814,7 +1762,7 @@ int omap_aess_read_next_ping_pong_buffer(struct omap_aess *abe, u32 port,
 		*p = desc_pp.nextbuff1_BaseAddr;
 
 	/* translates the number of samples in bytes */
-	*n = abe->size_pingpong;
+	*n = aess->size_pingpong;
 
 	return 0;
 }
@@ -1822,7 +1770,7 @@ EXPORT_SYMBOL(omap_aess_read_next_ping_pong_buffer);
 
 /**
  * omap_aess_init_ping_pong_buffer
- * @abe: Pointer on aess handle
+ * @aess: Pointer on aess handle
  * @id: ABE port ID
  * @size_bytes:size of the ping pong
  * @n_buffers:number of buffers (2 = ping/pong)
@@ -1831,7 +1779,7 @@ EXPORT_SYMBOL(omap_aess_read_next_ping_pong_buffer);
  *
  * Computes the base address of the ping_pong buffers
  */
-static int omap_aess_init_ping_pong_buffer(struct omap_aess *abe,
+static int omap_aess_init_ping_pong_buffer(struct omap_aess *aess,
 					   u32 id, u32 size_bytes,
 					   u32 n_buffers, u32 *p)
 {
@@ -1845,30 +1793,30 @@ static int omap_aess_init_ping_pong_buffer(struct omap_aess *abe,
 		return -AESS_EINVAL;
 	}
 
-	memcpy(&addr, &abe->fw_info->map[OMAP_AESS_DMEM_PING_ID],
+	memcpy(&addr, &aess->fw_info->map[OMAP_AESS_DMEM_PING_ID],
 	       sizeof(struct omap_aess_addr));
 
 	for (i = 0; i < n_buffers; i++) {
 		dmem_addr = addr.offset + (i * size_bytes);
 		/* base addresses of the ping pong buffers in U8 unit */
-		abe->base_address_pingpong[i] = dmem_addr;
+		aess->base_address_pingpong[i] = dmem_addr;
 	}
 
 	for (i = 0; i < 4; i++)
-		abe->pp_buf_addr[i] = addr.offset + (i * size_bytes);
-	abe->pp_buf_id = 0;
-	abe->pp_buf_id_next = 0;
-	abe->pp_first_irq = 1;
+		aess->pp_buf_addr[i] = addr.offset + (i * size_bytes);
+	aess->pp_buf_id = 0;
+	aess->pp_buf_id_next = 0;
+	aess->pp_first_irq = 1;
 
 	/* global data */
-	abe->size_pingpong = size_bytes;
+	aess->size_pingpong = size_bytes;
 	*p = (u32)addr.offset;
 	return 0;
 }
 
 /**
  * omap_aess_connect_irq_ping_pong_port
- * @abe: Pointer on aess handle
+ * @aess: Pointer on aess handle
  * @id: port name
  * @f: desired data format
  * @subroutine_id: index of the call-back subroutine to call
@@ -1883,7 +1831,7 @@ static int omap_aess_init_ping_pong_buffer(struct omap_aess *abe,
  * "abe_set_ping_pong_buffer" to notify the new amount of samples in the
  * pong buffer.
  */
-int omap_aess_connect_irq_ping_pong_port(struct omap_aess *abe,
+int omap_aess_connect_irq_ping_pong_port(struct omap_aess *aess,
 					 u32 id, struct omap_aess_data_format *f,
 					 u32 subroutine_id, u32 size,
 					 u32 *sink, u32 dsp_mcu_flag)
@@ -1896,28 +1844,28 @@ int omap_aess_connect_irq_ping_pong_port(struct omap_aess *abe,
 		return -AESS_EINVAL;
 	}
 
-	memcpy(&addr, &abe->fw_info->map[OMAP_AESS_DMEM_PING_ID],
+	memcpy(&addr, &aess->fw_info->map[OMAP_AESS_DMEM_PING_ID],
 	       sizeof(struct omap_aess_addr));
 
-	abe_port[id] = ((struct omap_aess_port *)abe->fw_info->port)[id];
+	abe_port[id] = ((struct omap_aess_port *)aess->fw_info->port)[id];
 	(abe_port[id]).format = (*f);
-	(abe_port[id]).protocol.protocol_switch = PINGPONG_PORT_PROT;
+	(abe_port[id]).protocol.protocol_switch = OMAP_AESS_PORT_PINGPONG;
 	(abe_port[id]).protocol.p.prot_pingpong.buf_addr = addr.offset;
 	(abe_port[id]).protocol.p.prot_pingpong.buf_size = size;
 	(abe_port[id]).protocol.p.prot_pingpong.irq_data = (1);
-	omap_aess_init_ping_pong_buffer(abe, OMAP_ABE_MM_DL_PORT, size, 2, sink);
+	omap_aess_init_ping_pong_buffer(aess, OMAP_ABE_MM_DL_PORT, size, 2, sink);
 	if (dsp_mcu_flag == PING_PONG_WITH_MCU_IRQ)
 		(abe_port[id]).protocol.p.prot_pingpong.irq_addr =
-			ABE_MCU_IRQSTATUS_RAW;
+			OMAP_AESS_MCU_IRQSTATUS_RAW;
 	if (dsp_mcu_flag == PING_PONG_WITH_DSP_IRQ)
 		(abe_port[id]).protocol.p.prot_pingpong.irq_addr =
-			ABE_DSP_IRQSTATUS_RAW;
+			OMAP_AESS_DSP_IRQSTATUS_RAW;
 	abe_port[id].status = OMAP_ABE_PORT_INITIALIZED;
 
 	/* load the ATC descriptors - disabled */
-	omap_aess_init_atc(abe, id);
+	omap_aess_init_atc(aess, id);
 	/* load the micro-task parameters */
-	omap_aess_init_io_tasks(abe,  id, &((abe_port[id]).format),
+	omap_aess_init_io_tasks(aess,  id, &((abe_port[id]).format),
 				&((abe_port[id]).protocol));
 
 	*sink = (abe_port[id]).protocol.p.prot_pingpong.buf_addr;
