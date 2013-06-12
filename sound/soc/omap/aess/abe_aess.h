@@ -59,17 +59,20 @@
 #ifndef _ABE_AESS_H_
 #define _ABE_AESS_H_
 
-#define AESS_REVISION			0x00
-#define AESS_MCU_IRQSTATUS		0x28
-#define AESS_MCU_IRQENABLE_SET		0x3C
-#define AESS_MCU_IRQENABLE_CLR		0x40
-#define AESS_DMAENABLE_SET		0x60
-#define AESS_DMAENABLE_CLR		0x64
-#define EVENT_GENERATOR_COUNTER		0x68
-#define EVENT_GENERATOR_START		0x6C
-#define EVENT_SOURCE_SELECTION		0x70
-#define AUDIO_ENGINE_SCHEDULER		0x74
-#define AESS_AUTO_GATING_ENABLE		0x7C
+#define OMAP_AESS_REVISION			0x00
+#define OMAP_AESS_MCU_IRQSTATUS_RAW		0x24
+#define OMAP_AESS_MCU_IRQSTATUS			0x28
+#define OMAP_AESS_MCU_IRQENABLE_SET		0x3C
+#define OMAP_AESS_MCU_IRQENABLE_CLR		0x40
+#define OMAP_AESS_DSP_IRQSTATUS_RAW		0x4C
+#define OMAP_AESS_DMAENABLE_SET			0x60
+#define OMAP_AESS_DMAENABLE_CLR			0x64
+#define OMAP_AESS_EVENT_GENERATOR_COUNTER	0x68
+#define OMAP_AESS_EVENT_GENERATOR_START		0x6C
+#define OMAP_AESS_EVENT_SOURCE_SELECTION	0x70
+#define OMAP_AESS_AUDIO_ENGINE_SCHEDULER	0x74
+#define OMAP_AESS_AUTO_GATING_ENABLE		0x7C
+#define OMAP_AESS_DMASTATUS_RAW			0x84
 
 /*
  * AESS_MCU_IRQSTATUS bit field
@@ -105,13 +108,13 @@
 #define EVENT_GENERATOR_COUNTER_44100	(2228-1)
 
 
-int omap_aess_start_event_generator(struct omap_aess *abe);
-int omap_aess_stop_event_generator(struct omap_aess *abe);
-int omap_aess_write_event_generator(struct omap_aess *abe, u32 e);
+int omap_aess_start_event_generator(struct omap_aess *aess);
+int omap_aess_stop_event_generator(struct omap_aess *aess);
+int omap_aess_write_event_generator(struct omap_aess *aess, u32 e);
 
-int omap_aess_disable_irq(struct omap_aess *abe);
-int omap_aess_clear_irq(struct omap_aess *abe);
+int omap_aess_disable_irq(struct omap_aess *aess);
+int omap_aess_clear_irq(struct omap_aess *aess);
 
-void omap_aess_hw_configuration(struct omap_aess *abe);
+void omap_aess_hw_configuration(struct omap_aess *aess);
 
 #endif /* _ABE_AESS_H_ */

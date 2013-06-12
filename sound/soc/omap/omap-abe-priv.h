@@ -210,6 +210,7 @@
 		OMAP_ABE_MIXER_VOLUME, \
 		SOC_CONTROL_TYPE_VOLSW)
 
+#define OMAP_ABE_DMA_RESOURCES	8
 
 #ifdef __KERNEL__
 
@@ -333,6 +334,7 @@ struct omap_abe {
 
 	struct clk *clk;
 	void __iomem *io_base[OMAP_ABE_IO_RESOURCES];
+	int dma_lines[OMAP_ABE_DMA_RESOURCES];
 	int irq;
 	int active;
 	struct mutex mutex;
@@ -353,7 +355,7 @@ struct omap_abe {
 	/* firmware */
 	struct fw_header hdr;
 	u32 *fw_config;
-	u32 *fw_text;
+	const void *fw_data;
 	const struct firmware *fw;
 	int num_equ;
 

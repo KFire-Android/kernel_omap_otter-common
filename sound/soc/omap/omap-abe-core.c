@@ -36,7 +36,6 @@
 
 #include <sound/soc.h>
 #include <sound/soc-fw.h>
-#include <plat/cpu.h>
 #include "../../../arch/arm/mach-omap2/omap-pm.h"
 
 #include "omap-abe-priv.h"
@@ -45,10 +44,6 @@ int abe_opp_stream_event(struct snd_soc_dapm_context *dapm, int event);
 int abe_pm_suspend(struct snd_soc_dai *dai);
 int abe_pm_resume(struct snd_soc_dai *dai);
 
-int abe_mixer_write(struct snd_soc_platform *platform, unsigned int reg,
-		unsigned int val);
-unsigned int abe_mixer_read(struct snd_soc_platform *platform,
-		unsigned int reg);
 irqreturn_t abe_irq_handler(int irq, void *dev_id);
 void abe_init_debugfs(struct omap_abe *abe);
 void abe_cleanup_debugfs(struct omap_abe *abe);
@@ -65,6 +60,34 @@ static const char *abe_memory_bank[5] = {
 	"pmem",
 	"mpu"
 };
+
+/* TODO: map IO directly into ABE memories */
+static unsigned int omap_abe_oppwidget_read(struct snd_soc_platform *platform,
+		unsigned int reg)
+{
+	struct omap_abe *abe = snd_soc_platform_get_drvdata(platform);
+
+	if (reg > OMAP_ABE_NUM_DAPM_REG)
+		return 0;
+
+	dev_dbg(platform->dev, "read R%d (Ox%x) = 0x%x\n",
+			reg, reg, abe->opp.widget[reg]);
+	return abe->opp.widget[reg];
+}
+
+static int omap_abe_oppwidget_write(struct snd_soc_platform *platform, unsigned int reg,
+		unsigned int val)
+{
+	struct omap_abe *abe = snd_soc_platform_get_drvdata(platform);
+
+	if (reg > OMAP_ABE_NUM_DAPM_REG)
+		return 0;
+
+	abe->opp.widget[reg] = val;
+	dev_dbg(platform->dev, "write R%d (Ox%x) = 0x%x\n", reg, reg, val);
+	return 0;
+}
+
 
 static void abe_init_gains(struct omap_aess *abe)
 {
@@ -191,7 +214,7 @@ static int abe_load_fw(struct snd_soc_platform *platform,
 	struct snd_soc_fw_hdr *hdr)
 {
 	struct omap_abe *abe = snd_soc_platform_get_drvdata(platform);
-	const u8 *fw_data = snd_soc_fw_get_data(hdr);
+	const void *fw_data = snd_soc_fw_get_data(hdr);
 
 	/* get firmware and coefficients header info */
 	memcpy(&abe->hdr, fw_data, sizeof(struct fw_header));
@@ -215,11 +238,7 @@ static int abe_load_fw(struct snd_soc_platform *platform,
 	}
 #endif
 	/* store ABE firmware for later context restore */
-	abe->fw_text = kzalloc(hdr->size, GFP_KERNEL);
-	if (abe->fw_text == NULL)
-		return -ENOMEM;
-
-	memcpy(abe->fw_text, fw_data, hdr->size);
+	abe->fw_data = fw_data;
 
 	return 0;
 }
@@ -228,31 +247,23 @@ static int abe_load_config(struct snd_soc_platform *platform,
 	struct snd_soc_fw_hdr *hdr)
 {
 	struct omap_abe *abe = snd_soc_platform_get_drvdata(platform);
-	const u8 *fw_data = snd_soc_fw_get_data(hdr);
+	const void *fw_data = snd_soc_fw_get_data(hdr);
 
 	/* store ABE config for later context restore */
-	abe->fw_config = kzalloc(hdr->size, GFP_KERNEL);
-	if (abe->fw_config == NULL)
-		return -ENOMEM;
-
 	dev_info(abe->dev, "ABE Config size %d bytes\n", hdr->size);
 
-	memcpy(abe->fw_config, fw_data, hdr->size);
+	abe->fw_config = fw_data;
 
 	return 0;
 }
 
 static void abe_free_fw(struct omap_abe *abe)
 {
-	kfree(abe->fw_text);
-	kfree(abe->fw_config);
-
 	/* This below should be done in HAL  - oposite of init_mem()*/
 	if (!abe->aess)
 		return;
 
 	if (abe->aess->fw_info) {
-		kfree(abe->aess->fw_info->init_table);
 		kfree(abe->aess->fw_info);
 	}
 }
@@ -298,8 +309,8 @@ static int abe_probe(struct snd_soc_platform *platform)
 		goto err_fw;
 	}
 
-	ret = request_threaded_irq(abe->irq, NULL, abe_irq_handler,
-				IRQF_ONESHOT, "ABE", (void *)abe);
+	ret = devm_request_threaded_irq(abe->dev, abe->irq, NULL, abe_irq_handler,
+					IRQF_ONESHOT, "ABE", (void *)abe);
 	if (ret) {
 		dev_err(platform->dev, "request for ABE IRQ %d failed %d\n",
 				abe->irq, ret);
@@ -326,7 +337,7 @@ static int abe_probe(struct snd_soc_platform *platform)
 	for (i = 0; i < OMAP_ABE_ROUTES_UL + 2; i++)
 		abe->mixer.route_ul[i] = abe->aess->fw_info->label_id[OMAP_AESS_BUFFER_ZERO_ID];
 
-	omap_aess_load_fw(abe->aess, abe->fw_text);
+	omap_aess_load_fw(abe->aess, abe->fw_data);
 
 	/* "tick" of the audio engine */
 	omap_aess_write_event_generator(abe->aess, EVENT_TIMER);
@@ -341,8 +352,6 @@ static int abe_probe(struct snd_soc_platform *platform)
 
 	return ret;
 
-err_opp:
-	free_irq(abe->irq, (void *)abe);
 err_irq:
 	abe_free_fw(abe);
 err_fw:
@@ -355,7 +364,6 @@ static int abe_remove(struct snd_soc_platform *platform)
 	struct omap_abe *abe = snd_soc_platform_get_drvdata(platform);
 
 	abe_cleanup_debugfs(abe);
-	free_irq(abe->irq, (void *)abe);
 	abe_free_fw(abe);
 	pm_runtime_disable(abe->dev);
 
@@ -368,8 +376,8 @@ static struct snd_soc_platform_driver omap_aess_platform = {
 	.remove		= abe_remove,
 	.suspend	= abe_pm_suspend,
 	.resume		= abe_pm_resume,
-	.read		= abe_mixer_read,
-	.write		= abe_mixer_write,
+	.read		= omap_abe_oppwidget_read,
+	.write		= omap_abe_oppwidget_write,
 	.stream_event	= abe_opp_stream_event,
 };
 
@@ -408,12 +416,11 @@ static int abe_engine_probe(struct platform_device *pdev)
 {
 	struct resource *res;
 	struct omap_abe *abe;
-	int ret = -EINVAL, i;
+	int ret, i;
 
 	abe = devm_kzalloc(&pdev->dev, sizeof(struct omap_abe), GFP_KERNEL);
 	if (abe == NULL)
 		return -ENOMEM;
-	dev_set_drvdata(&pdev->dev, abe);
 
 	for (i = 0; i < OMAP_ABE_IO_RESOURCES; i++) {
 		res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
@@ -421,26 +428,42 @@ static int abe_engine_probe(struct platform_device *pdev)
 		if (res == NULL) {
 			dev_err(&pdev->dev, "no resource %s\n",
 				abe_memory_bank[i]);
-			goto err;
+			return -ENODEV;
 		}
-		abe->io_base[i] = ioremap(res->start, resource_size(res));
-		if (!abe->io_base[i]) {
-			ret = -ENOMEM;
-			goto err;
+		if (!devm_request_mem_region(&pdev->dev, res->start,
+					resource_size(res), abe_memory_bank[i]))
+			return -EBUSY;
+
+		abe->io_base[i] = devm_ioremap(&pdev->dev, res->start,
+					       resource_size(res));
+		if (!abe->io_base[i])
+			return -ENOMEM;
+	}
+
+	for (i = 0; i < OMAP_ABE_DMA_RESOURCES; i++) {
+		char name[8];
+
+		sprintf(name, "fifo%d", i);
+		res = platform_get_resource_byname(pdev, IORESOURCE_DMA, name);
+		if (res == NULL) {
+			dev_err(&pdev->dev, "no resource %s\n", name);
+			return -ENODEV;
 		}
+		abe->dma_lines[i] = res->start;
 	}
 
 	abe->irq = platform_get_irq(pdev, 0);
-	if (abe->irq < 0) {
-		ret = abe->irq;
-		goto err;
-	}
+	if (abe->irq < 0)
+		return abe->irq;
+
+	dev_set_drvdata(&pdev->dev, abe);
 
 #ifdef CONFIG_PM
 	abe->get_context_lost_count = omap_pm_get_dev_context_loss_count;
 	abe->device_scale = NULL;
 #endif
 	abe->dev = &pdev->dev;
+
 	mutex_init(&abe->mutex);
 	mutex_init(&abe->opp.mutex);
 	mutex_init(&abe->opp.req_mutex);
@@ -452,17 +475,9 @@ static int abe_engine_probe(struct platform_device *pdev)
 	put_device(abe->dev);
 
 	ret = request_firmware_nowait(THIS_MODULE, 1, "omap4_abe_new", abe->dev,
-		GFP_KERNEL, pdev, abe_fw_ready);
-	if (ret != 0) {
+				      GFP_KERNEL, pdev, abe_fw_ready);
+	if (!ret)
 		dev_err(abe->dev, "Failed to load firmware %d\n", ret);
-		goto err;
-	}
-
-	return ret;
-
-err:
-	for (--i; i >= 0; i--)
-		iounmap(abe->io_base[i]);
 
 	return ret;
 }
@@ -470,13 +485,13 @@ err:
 static int abe_engine_remove(struct platform_device *pdev)
 {
 	struct omap_abe *abe = dev_get_drvdata(&pdev->dev);
-	int i;
 
 	snd_soc_unregister_dais(&pdev->dev, ARRAY_SIZE(omap_abe_dai));
 	snd_soc_unregister_platform(&pdev->dev);
+
+	abe->fw_data = NULL;
+	abe->fw_config = NULL;
 	release_firmware(abe->fw);
-	for (i = 0; i < OMAP_ABE_IO_RESOURCES; i++)
-		iounmap(abe->io_base[i]);
 
 	return 0;
 }
