@@ -3,7 +3,7 @@
 #define __MFD_AIC31XX_REGISTERS_H__
 
 #define MAKE_REG(book, page, offset) \
-			(unsigned int)((book << 16)|(page << 8)|offset)
+			(unsigned int)((book << 16)|(page << 7)|offset)
 
 /* ****************** Book 0 Registers **************************************/
 /* ****************** AIC31XX has one book only *****************************/
