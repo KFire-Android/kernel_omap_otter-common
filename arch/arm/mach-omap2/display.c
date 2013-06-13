@@ -124,21 +124,24 @@ static struct platform_device *omap_drm_device = &drm_device;
 static struct platform_device *omap_drm_device;
 #endif
 
-static int omapdrm_init(void)
+static __init int omapdrm_init(void)
 {
 	struct omap_hwmod *oh;
-	struct platform_device *dmm_pdev;
 	int r = 0;
 
 	/* create DRM and DMM device */
 	if (omap_drm_device != NULL) {
-		oh = omap_hwmod_lookup("dmm");
-		if (oh) {
-			dmm_pdev = omap_device_build(oh->name, -1, oh, NULL, 0,
-					NULL, 0, false);
-			WARN(IS_ERR(dmm_pdev),
-				"Could not build omap_device for %s\n",
-				oh->name);
+		if (!of_find_compatible_node(NULL, NULL, "ti,omap4-dmm") &&
+			!of_find_compatible_node(NULL, NULL, "ti,omap5-dmm")) {
+
+			/* fallback to search within hwmod data */
+			oh = omap_hwmod_lookup("dmm");
+
+			if (oh)
+				WARN(IS_ERR(omap_device_build(oh->name, -1, oh,
+						NULL, 0, NULL, 0, false)),
+					"Could not build omap_device for %s\n",
+					oh->name);
 		}
 
 		platform_drm_data.omaprev = GET_OMAP_TYPE;
@@ -400,6 +403,8 @@ static enum omapdss_version __init omap_display_get_version(void)
 		return OMAPDSS_VER_OMAP4;
 	else if (soc_is_omap54xx())
 		return OMAPDSS_VER_OMAP5;
+	else if (soc_is_dra7xx())
+		return OMAPDSS_VER_DRA7xx;
 	else
 		return OMAPDSS_VER_UNKNOWN;
 }

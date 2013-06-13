@@ -46,10 +46,8 @@
 
 #include "omap-abe-priv.h"
 
-#define MCPDM_LEGACY_MODE	0x0
-#define MCPDM_ABE_MODE		0x1
-
-#define MCPDM_DAI_MODE_MASK	0x0f
+#define OMAP_MCPDM_LEGACY_DAI	0
+#define OMAP_MCPDM_ABE_DAI	1
 
 struct omap_mcpdm {
 	struct device *dev;
@@ -71,9 +69,9 @@ struct omap_mcpdm {
 	u32 dn_rx_offset;
 
 	int active;
-	int abe_mode;
+	int active_dai;
 
-	struct omap_aess *abe;
+	struct omap_aess *aess;
 	struct omap_abe_port *dl_port;
 	struct omap_abe_port *ul_port;
 };
@@ -268,7 +266,6 @@ static int omap_mcpdm_dai_startup(struct snd_pcm_substream *substream,
 				  struct snd_soc_dai *dai)
 {
 	struct omap_mcpdm *mcpdm = snd_soc_dai_get_drvdata(dai);
-	int dai_abe_mode = dai->id & MCPDM_DAI_MODE_MASK;
 	int ret = 0;
 
 	mutex_lock(&mcpdm->mutex);
@@ -282,18 +279,18 @@ static int omap_mcpdm_dai_startup(struct snd_pcm_substream *substream,
 
 		omap_mcpdm_write(mcpdm, MCPDM_REG_CTRL, ctrl | MCPDM_WD_EN);
 
-		mcpdm->abe_mode = dai_abe_mode;
+		mcpdm->active_dai = dai->id;
 
 		/* McPDM FIFO configuration */
 		mcpdm->dn_threshold = 2;
-		if (mcpdm->abe_mode == MCPDM_LEGACY_MODE)
+		if (dai->id == OMAP_MCPDM_LEGACY_DAI)
 			mcpdm->up_threshold = MCPDM_UP_THRES_MAX - 3;
 		else
 			mcpdm->up_threshold = 2;
-	} else if (mcpdm->abe_mode != dai_abe_mode) {
+	} else if (mcpdm->active_dai != dai->id) {
 		dev_err(mcpdm->dev, "Trying %s, while McPDM is in %s.\n",
-			dai_abe_mode ? "ABE mode" : "Legacy mode",
-			mcpdm->abe_mode ? "ABE mode" : "Legacy mode");
+			dai->id ? "ABE mode" : "Legacy mode",
+			mcpdm->active_dai ? "ABE mode" : "Legacy mode");
 		ret = -EINVAL;
 	}
 
@@ -320,13 +317,13 @@ static void omap_mcpdm_dai_shutdown(struct snd_pcm_substream *substream,
 
 	if (!dai->active) {
 		if (omap_mcpdm_active(mcpdm)) {
-			if (mcpdm->abe_mode == MCPDM_LEGACY_MODE) {
+			if (dai->id == OMAP_MCPDM_LEGACY_DAI) {
 				omap_mcpdm_stop(mcpdm);
 				omap_mcpdm_close_streams(mcpdm);
 			} else {
-				omap_abe_port_disable(mcpdm->abe,
+				omap_abe_port_disable(mcpdm->aess,
 						      mcpdm->dl_port);
-				omap_abe_port_disable(mcpdm->abe,
+				omap_abe_port_disable(mcpdm->aess,
 						      mcpdm->ul_port);
 				usleep_range(250, 300);
 				omap_mcpdm_stop(mcpdm);
@@ -354,7 +351,7 @@ static int omap_mcpdm_dai_hw_params(struct snd_pcm_substream *substream,
 	dma_data = snd_soc_dai_get_dma_data(dai, substream);
 
 	/* ABE DAIs have fixed channels */
-	if ((dai->id & MCPDM_DAI_MODE_MASK) == MCPDM_ABE_MODE) {
+	if (dai->id == OMAP_MCPDM_ABE_DAI) {
 		mcpdm->dn_channels = MCPDM_PDM_DN_MASK | MCPDM_CMD_INT;
 		mcpdm->up_channels = MCPDM_PDM_UPLINK_EN(1) |
 					MCPDM_PDM_UPLINK_EN(2);
@@ -410,17 +407,17 @@ static int omap_mcpdm_prepare(struct snd_pcm_substream *substream,
 	if (omap_mcpdm_active(mcpdm))
 		return 0;
 
-	if (mcpdm->abe_mode == MCPDM_ABE_MODE) {
+	if (dai->id == OMAP_MCPDM_ABE_DAI) {
 		/* Check if ABE McPDM DL is already started */
-		if ((omap_abe_port_is_enabled(mcpdm->abe, mcpdm->dl_port)) ||
-			(omap_abe_port_is_enabled(mcpdm->abe, mcpdm->ul_port)))
+		if ((omap_abe_port_is_enabled(mcpdm->aess, mcpdm->dl_port)) ||
+			(omap_abe_port_is_enabled(mcpdm->aess, mcpdm->ul_port)))
 			return 0;
 
 		omap_abe_pm_get(platform);
 
 		/* start ATC before McPDM IP */
-		omap_abe_port_enable(mcpdm->abe, mcpdm->dl_port);
-		omap_abe_port_enable(mcpdm->abe, mcpdm->ul_port);
+		omap_abe_port_enable(mcpdm->aess, mcpdm->dl_port);
+		omap_abe_port_enable(mcpdm->aess, mcpdm->ul_port);
 
 		/* wait 250us for ABE tick */
 		usleep_range(250, 300);
@@ -445,13 +442,30 @@ static int omap_mcpdm_probe(struct snd_soc_dai *dai)
 	struct omap_mcpdm *mcpdm = snd_soc_dai_get_drvdata(dai);
 	int ret;
 
+	mcpdm->aess = omap_abe_port_mgr_get();
+
+	mcpdm->dl_port = omap_abe_port_open(mcpdm->aess,
+					    OMAP_ABE_BE_PORT_PDM_DL1);
+	if (mcpdm->dl_port == NULL) {
+		omap_abe_port_mgr_put(mcpdm->aess);
+		return -EINVAL;
+	}
+
+	mcpdm->ul_port = omap_abe_port_open(mcpdm->aess,
+					    OMAP_ABE_BE_PORT_PDM_UL1);
+	if (mcpdm->ul_port == NULL) {
+		omap_abe_port_close(mcpdm->aess, mcpdm->dl_port);
+		omap_abe_port_mgr_put(mcpdm->aess);
+		return -EINVAL;
+	}
+
 	pm_runtime_enable(mcpdm->dev);
 
 	/* Disable lines while request is ongoing */
 	pm_runtime_get_sync(mcpdm->dev);
 	omap_mcpdm_write(mcpdm, MCPDM_REG_CTRL, 0x00);
 
-	ret = request_irq(mcpdm->irq, omap_mcpdm_irq_handler,
+	ret = devm_request_irq(mcpdm->dev, mcpdm->irq, omap_mcpdm_irq_handler,
 				0, "McPDM", (void *)mcpdm);
 
 	pm_runtime_put_sync(mcpdm->dev);
@@ -459,6 +473,10 @@ static int omap_mcpdm_probe(struct snd_soc_dai *dai)
 	if (ret) {
 		dev_err(mcpdm->dev, "Request for IRQ failed\n");
 		pm_runtime_disable(mcpdm->dev);
+
+		omap_abe_port_close(mcpdm->aess, mcpdm->dl_port);
+		omap_abe_port_close(mcpdm->aess, mcpdm->ul_port);
+		omap_abe_port_mgr_put(mcpdm->aess);
 	}
 
 	/* Configure McPDM threshold values */
@@ -471,8 +489,11 @@ static int omap_mcpdm_remove(struct snd_soc_dai *dai)
 {
 	struct omap_mcpdm *mcpdm = snd_soc_dai_get_drvdata(dai);
 
-	free_irq(mcpdm->irq, (void *)mcpdm);
 	pm_runtime_disable(mcpdm->dev);
+
+	omap_abe_port_close(mcpdm->aess, mcpdm->dl_port);
+	omap_abe_port_close(mcpdm->aess, mcpdm->ul_port);
+	omap_abe_port_mgr_put(mcpdm->aess);
 
 	return 0;
 }
@@ -480,15 +501,10 @@ static int omap_mcpdm_remove(struct snd_soc_dai *dai)
 #define OMAP_MCPDM_RATES	(SNDRV_PCM_RATE_88200 | SNDRV_PCM_RATE_96000)
 #define OMAP_MCPDM_FORMATS	SNDRV_PCM_FMTBIT_S32_LE
 
-#define MCPDM_LEGACY_DAI	(MCPDM_LEGACY_MODE | (0 << 4))
-#define MCPDM_ABE_DAI_DL1	(MCPDM_ABE_MODE | (1 << 4))
-#define MCPDM_ABE_DAI_DL2	(MCPDM_ABE_MODE | (2 << 4))
-#define MCPDM_ABE_DAI_UL1	(MCPDM_ABE_MODE | (4 << 4))
-
 static struct snd_soc_dai_driver omap_mcpdm_dai[] = {
 {
 	.name = "mcpdm-legacy",
-	.id	= MCPDM_LEGACY_DAI,
+	.id	= OMAP_MCPDM_LEGACY_DAI,
 	.probe = omap_mcpdm_probe,
 	.remove = omap_mcpdm_remove,
 	.probe_order = SND_SOC_COMP_ORDER_LATE,
@@ -509,11 +525,9 @@ static struct snd_soc_dai_driver omap_mcpdm_dai[] = {
 	},
 	.ops = &omap_mcpdm_dai_ops,
 },
-#if defined(CONFIG_SND_OMAP_SOC_ABE) ||\
-	defined(CONFIG_SND_OMAP_SOC_ABE_MODULE)
 {
-	.name = "mcpdm-dl1",
-	.id	= MCPDM_ABE_DAI_DL1,
+	.name = "mcpdm-abe",
+	.id	= OMAP_MCPDM_ABE_DAI,
 	.probe_order = SND_SOC_COMP_ORDER_LATE,
 	.remove_order = SND_SOC_COMP_ORDER_EARLY,
 	.playback = {
@@ -522,26 +536,6 @@ static struct snd_soc_dai_driver omap_mcpdm_dai[] = {
 		.rates = OMAP_MCPDM_RATES,
 		.formats = OMAP_MCPDM_FORMATS,
 	},
-	.ops = &omap_mcpdm_dai_ops,
-},
-{
-	.name = "mcpdm-dl2",
-	.id	= MCPDM_ABE_DAI_DL2,
-	.probe_order = SND_SOC_COMP_ORDER_LATE,
-	.remove_order = SND_SOC_COMP_ORDER_EARLY,
-	.playback = {
-		.channels_min = 1,
-		.channels_max = 2,
-		.rates = OMAP_MCPDM_RATES,
-		.formats = OMAP_MCPDM_FORMATS,
-	},
-	.ops = &omap_mcpdm_dai_ops,
-},
-{
-	.name = "mcpdm-ul1",
-	.id	= MCPDM_ABE_DAI_UL1,
-	.probe_order = SND_SOC_COMP_ORDER_LATE,
-	.remove_order = SND_SOC_COMP_ORDER_EARLY,
 	.capture = {
 		.channels_min = 1,
 		.channels_max = 2,
@@ -550,7 +544,6 @@ static struct snd_soc_dai_driver omap_mcpdm_dai[] = {
 	},
 	.ops = &omap_mcpdm_dai_ops,
 },
-#endif
 };
 
 void omap_mcpdm_configure_dn_offsets(struct snd_soc_pcm_runtime *rtd,
@@ -566,7 +559,7 @@ static int asoc_mcpdm_probe(struct platform_device *pdev)
 {
 	struct omap_mcpdm *mcpdm;
 	struct resource *res;
-	int ret;
+	int ret, nr_dai;
 
 	mcpdm = devm_kzalloc(&pdev->dev, sizeof(struct omap_mcpdm), GFP_KERNEL);
 	if (!mcpdm)
@@ -582,10 +575,6 @@ static int asoc_mcpdm_probe(struct platform_device *pdev)
 
 	omap_mcpdm_dai_dma_params[0].port_addr = res->start + MCPDM_REG_DN_DATA;
 	omap_mcpdm_dai_dma_params[1].port_addr = res->start + MCPDM_REG_UP_DATA;
-
-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	if (res == NULL)
-		return -ENOMEM;
 
 	res = platform_get_resource_byname(pdev, IORESOURCE_DMA, "dn_link");
 	if (!res)
@@ -603,14 +592,11 @@ static int asoc_mcpdm_probe(struct platform_device *pdev)
 	if (res == NULL)
 		return -ENOMEM;
 
-	if (!devm_request_mem_region(&pdev->dev, res->start,
-				     resource_size(res), "McPDM"))
-		return -EBUSY;
-
-	mcpdm->io_base = devm_ioremap(&pdev->dev, res->start,
-				      resource_size(res));
-	if (!mcpdm->io_base)
+	mcpdm->io_base = devm_request_and_ioremap(&pdev->dev, res);
+	if (!mcpdm->io_base) {
+		dev_err(&pdev->dev, "cannot remap\n");
 		return -ENOMEM;
+	}
 
 	mcpdm->irq = platform_get_irq(pdev, 0);
 	if (mcpdm->irq < 0)
@@ -620,50 +606,18 @@ static int asoc_mcpdm_probe(struct platform_device *pdev)
 
 #if defined(CONFIG_SND_OMAP_SOC_ABE) ||\
 	defined(CONFIG_SND_OMAP_SOC_ABE_MODULE)
-
-	mcpdm->abe = omap_abe_port_mgr_get();
-
-	mcpdm->dl_port = omap_abe_port_open(mcpdm->abe,
-					    OMAP_ABE_BE_PORT_PDM_DL1);
-	if (mcpdm->dl_port == NULL) {
-		omap_abe_port_mgr_put(mcpdm->abe);
-		return -EINVAL;
-	}
-
-	mcpdm->ul_port = omap_abe_port_open(mcpdm->abe,
-					    OMAP_ABE_BE_PORT_PDM_UL1);
-	if (mcpdm->ul_port == NULL) {
-		omap_abe_port_close(mcpdm->abe, mcpdm->dl_port);
-		omap_abe_port_mgr_put(mcpdm->abe);
-		return -EINVAL;
-	}
+	nr_dai = ARRAY_SIZE(omap_mcpdm_dai);
+#else
+	nr_dai = 1;
 #endif
-	ret = snd_soc_register_dais(&pdev->dev, omap_mcpdm_dai,
-				    ARRAY_SIZE(omap_mcpdm_dai));
-	if (!ret)
-		return 0;
+	ret = snd_soc_register_dais(&pdev->dev, omap_mcpdm_dai, nr_dai);
 
-#if defined(CONFIG_SND_OMAP_SOC_ABE) ||\
-	defined(CONFIG_SND_OMAP_SOC_ABE_MODULE)
-	omap_abe_port_close(mcpdm->abe, mcpdm->dl_port);
-	omap_abe_port_close(mcpdm->abe, mcpdm->ul_port);
-	omap_abe_port_mgr_put(mcpdm->abe);
-#endif
 	return ret;
 }
 
 static int asoc_mcpdm_remove(struct platform_device *pdev)
 {
-	struct omap_mcpdm *mcpdm = platform_get_drvdata(pdev);
-
 	snd_soc_unregister_dai(&pdev->dev);
-
-#if defined(CONFIG_SND_OMAP_SOC_ABE) ||\
-	defined(CONFIG_SND_OMAP_SOC_ABE_MODULE)
-	omap_abe_port_close(mcpdm->abe, mcpdm->dl_port);
-	omap_abe_port_close(mcpdm->abe, mcpdm->ul_port);
-	omap_abe_port_mgr_put(mcpdm->abe);
-#endif
 
 	return 0;
 }

@@ -20,26 +20,37 @@
 #include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/platform_device.h>
-#include <linux/io.h>
 #include <linux/iio/iio.h>
+#include <linux/of.h>
+#include <linux/of_device.h>
+#include <linux/iio/machine.h>
+#include <linux/iio/driver.h>
+#include <linux/regmap.h>
 
+#include <linux/io.h>
 #include <linux/mfd/ti_am335x_tscadc.h>
 #include <linux/platform_data/ti_am335x_adc.h>
 
 struct tiadc_device {
 	struct ti_tscadc_dev *mfd_tscadc;
 	int channels;
+	char *buf;
+	struct iio_map *map;
 };
 
 static unsigned int tiadc_readl(struct tiadc_device *adc, unsigned int reg)
 {
-	return readl(adc->mfd_tscadc->tscadc_base + reg);
+	unsigned int val;
+
+	val = (unsigned int)-1;
+	regmap_read(adc->mfd_tscadc->regmap_tscadc, reg, &val);
+	return val;
 }
 
 static void tiadc_writel(struct tiadc_device *adc, unsigned int reg,
 					unsigned int val)
 {
-	writel(val, adc->mfd_tscadc->tscadc_base + reg);
+	regmap_write(adc->mfd_tscadc->regmap_tscadc, reg, val);
 }
 
 static void tiadc_step_config(struct tiadc_device *adc_dev)
@@ -72,27 +83,62 @@ static void tiadc_step_config(struct tiadc_device *adc_dev)
 	tiadc_writel(adc_dev, REG_SE, STPENB_STEPENB);
 }
 
-static int tiadc_channel_init(struct iio_dev *indio_dev, int channels)
+static int tiadc_channel_init(struct iio_dev *indio_dev,
+		struct tiadc_device *adc_dev)
 {
 	struct iio_chan_spec *chan_array;
-	int i;
+	struct iio_chan_spec *chan;
+	char *s;
+	int i, len, size, ret;
+	int channels = adc_dev->channels;
 
-	indio_dev->num_channels = channels;
-	chan_array = kcalloc(indio_dev->num_channels,
-			sizeof(struct iio_chan_spec), GFP_KERNEL);
-
+	size = channels * (sizeof(struct iio_chan_spec) + 6);
+	chan_array = kzalloc(size, GFP_KERNEL);
 	if (chan_array == NULL)
 		return -ENOMEM;
 
-	for (i = 0; i < (indio_dev->num_channels); i++) {
-		struct iio_chan_spec *chan = chan_array + i;
+	/* buffer space is after the array */
+	s = (char *)(chan_array + channels);
+	chan = chan_array;
+	for (i = 0; i < channels; i++, chan++, s += len + 1) {
+
+		len = sprintf(s, "AIN%d", i);
+
 		chan->type = IIO_VOLTAGE;
 		chan->indexed = 1;
 		chan->channel = i;
-		chan->info_mask = IIO_CHAN_INFO_RAW_SEPARATE_BIT;
+		chan->datasheet_name = s;
+		chan->scan_type.sign = 'u';
+		chan->scan_type.realbits = 12;
+		chan->scan_type.storagebits = 32;
+		chan->scan_type.shift = 0;
 	}
 
 	indio_dev->channels = chan_array;
+	indio_dev->num_channels = channels;
+
+	size = (channels + 1) * sizeof(struct iio_map);
+	adc_dev->map = kzalloc(size, GFP_KERNEL);
+	if (adc_dev->map == NULL) {
+		kfree(chan_array);
+		return -ENOMEM;
+	}
+
+	for (i = 0; i < indio_dev->num_channels; i++) {
+		adc_dev->map[i].adc_channel_label = chan_array[i].datasheet_name;
+		adc_dev->map[i].consumer_dev_name = "any";
+		adc_dev->map[i].consumer_channel = chan_array[i].datasheet_name;
+	}
+	adc_dev->map[i].adc_channel_label = NULL;
+	adc_dev->map[i].consumer_dev_name = NULL;
+	adc_dev->map[i].consumer_channel = NULL;
+
+	ret = iio_map_array_register(indio_dev, adc_dev->map);
+	if (ret != 0) {
+		kfree(adc_dev->map);
+		kfree(chan_array);
+		return -ENOMEM;
+	}
 
 	return indio_dev->num_channels;
 }
@@ -141,11 +187,12 @@ static int tiadc_probe(struct platform_device *pdev)
 	struct iio_dev		*indio_dev;
 	struct tiadc_device	*adc_dev;
 	struct ti_tscadc_dev	*tscadc_dev = pdev->dev.platform_data;
-	struct mfd_tscadc_board	*pdata;
+	struct mfd_tscadc_board	*pdata = tscadc_dev->dev->platform_data;
+	struct device_node	*node = tscadc_dev->dev->of_node;
 	int			err;
+	u32			val32;
 
-	pdata = tscadc_dev->dev->platform_data;
-	if (!pdata || !pdata->adc_init) {
+	if (!pdata && !node) {
 		dev_err(&pdev->dev, "Could not find platform data\n");
 		return -EINVAL;
 	}
@@ -159,7 +206,22 @@ static int tiadc_probe(struct platform_device *pdev)
 	adc_dev = iio_priv(indio_dev);
 
 	adc_dev->mfd_tscadc = tscadc_dev;
-	adc_dev->channels = pdata->adc_init->adc_channels;
+
+	if (pdata)
+		adc_dev->channels = pdata->adc_init->adc_channels;
+	else {
+		node = of_get_child_by_name(node, "adc");
+		if (!node)
+			return  -EINVAL;
+		else {
+			err = of_property_read_u32(node,
+					"ti,adc-channels", &val32);
+			if (err < 0)
+				goto err_free_device;
+			else
+				adc_dev->channels = val32;
+		}
+	}
 
 	indio_dev->dev.parent = &pdev->dev;
 	indio_dev->name = dev_name(&pdev->dev);
@@ -168,7 +230,7 @@ static int tiadc_probe(struct platform_device *pdev)
 
 	tiadc_step_config(adc_dev);
 
-	err = tiadc_channel_init(indio_dev, adc_dev->channels);
+	err = tiadc_channel_init(indio_dev, adc_dev);
 	if (err < 0)
 		goto err_free_device;
 
@@ -177,6 +239,8 @@ static int tiadc_probe(struct platform_device *pdev)
 		goto err_free_channels;
 
 	platform_set_drvdata(pdev, indio_dev);
+
+	dev_info(&pdev->dev, "Initialized\n");
 
 	return 0;
 

@@ -504,5 +504,19 @@ config REGULATOR_AS3711
 	  This driver provides support for the voltage regulators on the
 	  AS3711 PMIC
 
+config REGULATOR_TIAVSCLASS0
+	tristate "Adaptive Voltage Scaling class 0 support for TI SoCs"
+	depends on ARCH_OMAP2PLUS
+	help
+	  AVS is a power management technique which finely controls the
+	  operating voltage of a device in order to optimize (i.e. reduce)
+	  its power consumption.
+	  At a given operating point, the voltage is adapted depending on
+	  static factors (chip manufacturing process) and this adapted
+	  voltage is made available in an efuse offset.
+	  AVS is also called SmartReflex on OMAP devices.
+
+	  Say Y here to enable Adaptive Voltage Scaling class 0 support.
+
 endif
 

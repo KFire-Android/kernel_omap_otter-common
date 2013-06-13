@@ -459,16 +459,16 @@ static const struct snd_soc_dapm_widget dmic_dapm_widgets[] = {
 
 static const struct snd_soc_dapm_route dmic_audio_map[] = {
 	/* Digital Mics: DMic0, DMic1, DMic2 with bias */
-	{"DMIC0", NULL, "omap-dmic-abe.0 Capture"},
-	{"omap-dmic-abe.0 Capture", NULL, "Digital Mic1 Bias"},
+	{"DMIC0", NULL, "omap-dmic-abe Capture"},
+	{"omap-dmic-abe Capture", NULL, "Digital Mic1 Bias"},
 	{"Digital Mic1 Bias", NULL, "Digital Mic 0"},
 
-	{"DMIC1", NULL, "omap-dmic-abe.1 Capture"},
-	{"omap-dmic-abe.1 Capture", NULL, "Digital Mic1 Bias"},
+	{"DMIC1", NULL, "omap-dmic-abe Capture"},
+	{"omap-dmic-abe Capture", NULL, "Digital Mic1 Bias"},
 	{"Digital Mic1 Bias", NULL, "Digital Mic 1"},
 
-	{"DMIC2", NULL, "omap-dmic-abe.2 Capture"},
-	{"omap-dmic-abe.2 Capture", NULL, "Digital Mic1 Bias"},
+	{"DMIC2", NULL, "omap-dmic-abe Capture"},
+	{"omap-dmic-abe Capture", NULL, "Digital Mic1 Bias"},
 	{"Digital Mic1 Bias", NULL, "Digital Mic 2"},
 };
 
@@ -607,7 +607,7 @@ static struct snd_soc_dai_link abe_be_mcpdm_dai[] = {
 {
 	/* McPDM DL1 - Headset */
 	SND_SOC_DAI_CONNECT("McPDM-DL1", "twl6040-codec", "aess",
-			    "twl6040-dl1", "mcpdm-dl1"),
+			    "twl6040-dl1", "mcpdm-abe"),
 	SND_SOC_DAI_BE_LINK(OMAP_ABE_DAI_PDM_DL1, mcpdm_be_hw_params_fixup),
 	SND_SOC_DAI_OPS(&omap_abe_mcpdm_ops, omap_abe_twl6040_init),
 	SND_SOC_DAI_IGNORE_SUSPEND, SND_SOC_DAI_IGNORE_PMDOWN,
@@ -615,7 +615,7 @@ static struct snd_soc_dai_link abe_be_mcpdm_dai[] = {
 {
 	/* McPDM UL1 - Analog Capture */
 	SND_SOC_DAI_CONNECT("McPDM-UL1", "twl6040-codec", "aess",
-			    "twl6040-ul", "mcpdm-ul1"),
+			    "twl6040-ul", "mcpdm-abe"),
 	SND_SOC_DAI_BE_LINK(OMAP_ABE_DAI_PDM_UL, mcpdm_be_hw_params_fixup),
 	SND_SOC_DAI_OPS(&omap_abe_mcpdm_ops, NULL),
 	SND_SOC_DAI_IGNORE_SUSPEND, SND_SOC_DAI_IGNORE_PMDOWN,
@@ -623,7 +623,7 @@ static struct snd_soc_dai_link abe_be_mcpdm_dai[] = {
 {
 	/* McPDM DL2 - Handsfree */
 	SND_SOC_DAI_CONNECT("McPDM-DL2", "twl6040-codec", "aess",
-			    "twl6040-dl2", "mcpdm-dl2"),
+			    "twl6040-dl2", "mcpdm-abe"),
 	SND_SOC_DAI_BE_LINK(OMAP_ABE_DAI_PDM_DL2, mcpdm_be_hw_params_fixup),
 	SND_SOC_DAI_OPS(&omap_abe_mcpdm_ops, omap_abe_twl6040_dl2_init),
 	SND_SOC_DAI_IGNORE_SUSPEND, SND_SOC_DAI_IGNORE_PMDOWN,
@@ -652,21 +652,21 @@ static struct snd_soc_dai_link abe_be_dmic_dai[] = {
 {
 	/* DMIC0 */
 	SND_SOC_DAI_CONNECT("DMIC-0", "dmic-codec", "aess",
-			    "dmic-hifi", "omap-dmic-abe-dai-0"),
+			    "dmic-hifi", "omap-dmic-abe-dai"),
 	SND_SOC_DAI_BE_LINK(OMAP_ABE_DAI_DMIC0,	dmic_be_hw_params_fixup),
 	SND_SOC_DAI_OPS(&omap_abe_dmic_ops, NULL),
 },
 {
 	/* DMIC1 */
 	SND_SOC_DAI_CONNECT("DMIC-1", "dmic-codec", "aess",
-			    "dmic-hifi", "omap-dmic-abe-dai-1"),
+			    "dmic-hifi", "omap-dmic-abe-dai"),
 	SND_SOC_DAI_BE_LINK(OMAP_ABE_DAI_DMIC1,	dmic_be_hw_params_fixup),
 	SND_SOC_DAI_OPS(&omap_abe_dmic_ops, NULL),
 },
 {
 	/* DMIC2 */
 	SND_SOC_DAI_CONNECT("DMIC-2", "dmic-codec", "aess",
-			    "dmic-hifi", "omap-dmic-abe-dai-2"),
+			    "dmic-hifi", "omap-dmic-abe-dai"),
 	SND_SOC_DAI_BE_LINK(OMAP_ABE_DAI_DMIC2,	dmic_be_hw_params_fixup),
 	SND_SOC_DAI_OPS(&omap_abe_dmic_ops, NULL),
 },

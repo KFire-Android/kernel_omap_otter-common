@@ -59,6 +59,7 @@
 
 /* SCR register bitmasks */
 #define OMAP_UART_SCR_RX_TRIG_GRANU1_MASK		(1 << 7)
+#define OMAP_UART_SCR_TX_TRIG_GRANU1_MASK		(1 << 6)
 #define OMAP_UART_SCR_TX_EMPTY			(1 << 3)
 
 /* FCR register bitmasks */
@@ -160,6 +161,7 @@ struct uart_omap_port {
 	u32			calc_latency;
 	struct work_struct	qos_work;
 	struct pinctrl		*pins;
+	bool			is_suspending;
 };
 
 #define to_uart_omap_port(p)	((container_of((p), struct uart_omap_port, port)))
@@ -212,24 +214,42 @@ static void serial_omap_enable_wakeup(struct uart_omap_port *up, bool enable)
 }
 
 /*
+ * serial_omap_baud_is_mode16 - check if baud rate is MODE16X
+ * @port: uart port info
+ * @baud: baudrate for which mode needs to be determined
+ *
+ * Returns true if baud rate is MODE16X and false if MODE13X
+ * Original table in OMAP TRM named "UART Mode Baud Rates, Divisor Values,
+ * and Error Rates" determines modes not for all common baud rates.
+ * E.g. for 1000000 baud rate mode must be 16x, but according to that
+ * table it's determined as 13x.
+ */
+static bool
+serial_omap_baud_is_mode16(struct uart_port *port, unsigned int baud)
+{
+	unsigned int n13 = port->uartclk / (13 * baud);
+	unsigned int n16 = port->uartclk / (16 * baud);
+	int baudAbsDiff13 = baud - (port->uartclk / (13 * n13));
+	int baudAbsDiff16 = baud - (port->uartclk / (16 * n16));
+	if(baudAbsDiff13 < 0)
+		baudAbsDiff13 = -baudAbsDiff13;
+	if(baudAbsDiff16 < 0)
+		baudAbsDiff16 = -baudAbsDiff16;
+
+	return (baudAbsDiff13 > baudAbsDiff16);
+}
+
+/*
  * serial_omap_get_divisor - calculate divisor value
  * @port: uart port info
  * @baud: baudrate for which divisor needs to be calculated.
- *
- * We have written our own function to get the divisor so as to support
- * 13x mode. 3Mbps Baudrate as an different divisor.
- * Reference OMAP TRM Chapter 17:
- * Table 17-1. UART Mode Baud Rates, Divisor Values, and Error Rates
- * referring to oversampling - divisor value
- * baudrate 460,800 to 3,686,400 all have divisor 13
- * except 3,000,000 which has divisor value 16
  */
 static unsigned int
 serial_omap_get_divisor(struct uart_port *port, unsigned int baud)
 {
 	unsigned int divisor;
 
-	if (baud > OMAP_MODE13X_SPEED && baud != 3000000)
+	if (!serial_omap_baud_is_mode16(port, baud))
 		divisor = 13;
 	else
 		divisor = 16;
@@ -279,9 +299,6 @@ static void transmit_chars(struct uart_omap_port *up, unsigned int lsr)
 {
 	struct circ_buf *xmit = &up->port.state->xmit;
 	int count;
-
-	if (!(lsr & UART_LSR_THRE))
-		return;
 
 	if (up->port.x_char) {
 		serial_out(up, UART_TX, up->port.x_char);
@@ -753,6 +770,8 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
 		cval |= UART_LCR_PARITY;
 	if (!(termios->c_cflag & PARODD))
 		cval |= UART_LCR_EPAR;
+	if (termios->c_cflag & CMSPAR)
+		cval |= UART_LCR_SPAR;
 
 	/*
 	 * Ask the core to calculate the divisor for us.
@@ -822,7 +841,7 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
 	serial_out(up, UART_IER, up->ier);
 	serial_out(up, UART_LCR, cval);		/* reset DLAB */
 	up->lcr = cval;
-	up->scr = OMAP_UART_SCR_TX_EMPTY;
+	up->scr = 0;
 
 	/* FIFOs and DMA Settings */
 
@@ -847,6 +866,15 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
 	/* FIFO ENABLE, DMA MODE */
 
 	up->scr |= OMAP_UART_SCR_RX_TRIG_GRANU1_MASK;
+	/*
+	 * NOTE: Setting OMAP_UART_SCR_RX_TRIG_GRANU1_MASK
+	 * sets Enables the granularity of 1 for TRIGGER RX
+	 * level. Along with setting RX FIFO trigger level
+	 * to 1 (as noted below, 16 characters) and TLR[3:0]
+	 * to zero this will result RX FIFO threshold level
+	 * to 1 character, instead of 16 as noted in comment
+	 * below.
+	 */
 
 	/* Set receive FIFO threshold to 16 characters and
 	 * transmit FIFO threshold to 16 spaces
@@ -892,7 +920,7 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
 	serial_out(up, UART_EFR, up->efr);
 	serial_out(up, UART_LCR, cval);
 
-	if (baud > 230400 && baud != 3000000)
+	if (!serial_omap_baud_is_mode16(port, baud))
 		up->mdr1 = UART_OMAP_MDR1_13X_MODE;
 	else
 		up->mdr1 = UART_OMAP_MDR1_16X_MODE;
@@ -1263,6 +1291,22 @@ static struct uart_driver serial_omap_reg = {
 };
 
 #ifdef CONFIG_PM_SLEEP
+static int serial_omap_prepare(struct device *dev)
+{
+	struct uart_omap_port *up = dev_get_drvdata(dev);
+
+	up->is_suspending = true;
+
+	return 0;
+}
+
+static void serial_omap_complete(struct device *dev)
+{
+	struct uart_omap_port *up = dev_get_drvdata(dev);
+
+	up->is_suspending = false;
+}
+
 static int serial_omap_suspend(struct device *dev)
 {
 	struct uart_omap_port *up = dev_get_drvdata(dev);
@@ -1281,7 +1325,10 @@ static int serial_omap_resume(struct device *dev)
 
 	return 0;
 }
-#endif
+#else
+#define serial_omap_prepare NULL
+#define serial_omap_prepare NULL
+#endif /* CONFIG_PM_SLEEP */
 
 static void omap_serial_fill_features_erratas(struct uart_omap_port *up)
 {
@@ -1567,6 +1614,16 @@ static int serial_omap_runtime_suspend(struct device *dev)
 	struct uart_omap_port *up = dev_get_drvdata(dev);
 	struct omap_uart_port_info *pdata = dev->platform_data;
 
+	/*
+	* When using 'no_console_suspend', the console UART must not be
+	* suspended. Since driver suspend is managed by runtime suspend,
+	* preventing runtime suspend (by returning error) will keep device
+	* active during suspend.
+	*/
+	if (up->is_suspending && !console_suspend_enabled &&
+	    uart_console(&up->port))
+		return -EBUSY;
+
 	if (!up)
 		return -EINVAL;
 
@@ -1617,6 +1674,8 @@ static const struct dev_pm_ops serial_omap_dev_pm_ops = {
 	SET_SYSTEM_SLEEP_PM_OPS(serial_omap_suspend, serial_omap_resume)
 	SET_RUNTIME_PM_OPS(serial_omap_runtime_suspend,
 				serial_omap_runtime_resume, NULL)
+	.prepare        = serial_omap_prepare,
+	.complete       = serial_omap_complete,
 };
 
 #if defined(CONFIG_OF)

@@ -125,6 +125,25 @@
 			pinctrl-single,function-mask = <0x7fff>;
 		};
 
+		sdma: dma-controller@4a056000 {
+			compatible = "ti,omap4430-sdma";
+			reg = <0x4a056000 0x1000>;
+			interrupts = <0 12 0x4>,
+				     <0 13 0x4>,
+				     <0 14 0x4>,
+				     <0 15 0x4>;
+			#dma-cells = <1>;
+			#dma-channels = <32>;
+			#dma-requests = <127>;
+		};
+
+		dmm: dmm@4e000000 {
+			compatible = "ti,omap4-dmm";
+			reg = <0x4e000000 0x800>;
+			interrupts = <0 113 0x4>;
+			ti,hwmods = "dmm";
+		};
+
 		dss {
 			compatible = "ti,omap4-dss";
 			ti,hwmods = "dss_core";
@@ -163,18 +182,6 @@
 				vdda_hdmi_dac-supply = <&vdac>;
 				video-source = <1>;
 			};
-                };
-
-		sdma: dma-controller@4a056000 {
-			compatible = "ti,omap4430-sdma";
-			reg = <0x4a056000 0x1000>;
-			interrupts = <0 12 0x4>,
-				     <0 13 0x4>,
-				     <0 14 0x4>,
-				     <0 15 0x4>;
-			#dma-cells = <1>;
-			#dma-channels = <32>;
-			#dma-requests = <127>;
 		};
 
 		gpio1: gpio@4a310000 {

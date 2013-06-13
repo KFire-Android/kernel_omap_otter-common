@@ -47,7 +47,6 @@
 #define STEPENB_MASK		(0x1FFFF << 0)
 #define STEPENB(val)		((val) << 0)
 #define STPENB_STEPENB		STEPENB(0x1FFFF)
-#define STPENB_STEPENB_TC	STEPENB(0x1FFF)
 
 /* IRQ enable */
 #define IRQENB_HW_PEN		BIT(0)
@@ -73,8 +72,6 @@
 #define STEPCONFIG_INM_ADCREFM	STEPCONFIG_INM(8)
 #define STEPCONFIG_INP_MASK	(0xF << 19)
 #define STEPCONFIG_INP(val)	((val) << 19)
-#define STEPCONFIG_INP_AN2	STEPCONFIG_INP(2)
-#define STEPCONFIG_INP_AN3	STEPCONFIG_INP(3)
 #define STEPCONFIG_INP_AN4	STEPCONFIG_INP(4)
 #define STEPCONFIG_INP_ADCREFM	STEPCONFIG_INP(8)
 #define STEPCONFIG_FIFO1	BIT(26)
@@ -96,7 +93,6 @@
 #define STEPCHARGE_INM_AN1	STEPCHARGE_INM(1)
 #define STEPCHARGE_INP_MASK	(0xF << 19)
 #define STEPCHARGE_INP(val)	((val) << 19)
-#define STEPCHARGE_INP_AN1	STEPCHARGE_INP(1)
 #define STEPCHARGE_RFM_MASK	(3 << 23)
 #define STEPCHARGE_RFM(val)	((val) << 23)
 #define STEPCHARGE_RFM_XNUR	STEPCHARGE_RFM(1)
@@ -118,17 +114,19 @@
 #define CNTRLREG_8WIRE		CNTRLREG_AFE_CTRL(3)
 #define CNTRLREG_TSCENB		BIT(7)
 
+#define XPP			STEPCONFIG_XPP
+#define XNP			STEPCONFIG_XNP
+#define XNN			STEPCONFIG_XNN
+#define YPP			STEPCONFIG_YPP
+#define YPN			STEPCONFIG_YPN
+#define YNN			STEPCONFIG_YNN
+
 #define ADC_CLK			3000000
 #define	MAX_CLK_DIV		7
 #define TOTAL_STEPS		16
 #define TOTAL_CHANNELS		8
 
 #define TSCADC_CELLS		2
-
-enum tscadc_cells {
-	TSC_CELL,
-	ADC_CELL,
-};
 
 struct mfd_tscadc_board {
 	struct tsc_data *tsc_init;
@@ -140,6 +138,9 @@ struct ti_tscadc_dev {
 	struct regmap *regmap_tscadc;
 	void __iomem *tscadc_base;
 	int irq;
+	int used_cells;	/* 0-2 */
+	int tsc_cell;	/* -1 if not used */
+	int adc_cell;	/* -1 if not used */
 	struct mfd_cell cells[TSCADC_CELLS];
 
 	/* tsc device */

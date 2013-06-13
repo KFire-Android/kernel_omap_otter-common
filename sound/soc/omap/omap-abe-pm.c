@@ -230,7 +230,7 @@ int abe_pm_resume(struct snd_soc_dai *dai)
 		}
 	}
 
-	omap_aess_reload_fw(abe->aess, abe->fw_text);
+	omap_aess_reload_fw(abe->aess, abe->fw_data);
 
 	switch (dai->id) {
 	case OMAP_ABE_DAI_PDM_UL:

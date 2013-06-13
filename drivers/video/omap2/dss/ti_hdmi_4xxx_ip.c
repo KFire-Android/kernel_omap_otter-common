@@ -207,6 +207,7 @@ static int hdmi_pll_reset(struct hdmi_ip_data *ip_data)
 		val = 0;
 		break;
 	case OMAPDSS_VER_OMAP5:
+	case OMAPDSS_VER_DRA7xx:
 		val = 1;
 		break;
 	default:
@@ -232,6 +233,9 @@ int ti_hdmi_4xxx_pll_enable(struct hdmi_ip_data *ip_data)
 {
 	u16 r = 0;
 
+	if (omapdss_get_version() == OMAPDSS_VER_DRA7xx)
+		dss_dpll_enable_ctrl(DSS_DPLL_HDMI, true);
+
 	r = hdmi_set_pll_pwr(ip_data, HDMI_PLLPWRCMD_ALLOFF);
 	if (r)
 		return r;
@@ -254,6 +258,9 @@ int ti_hdmi_4xxx_pll_enable(struct hdmi_ip_data *ip_data)
 void ti_hdmi_4xxx_pll_disable(struct hdmi_ip_data *ip_data)
 {
 	hdmi_set_pll_pwr(ip_data, HDMI_PLLPWRCMD_ALLOFF);
+
+	if (omapdss_get_version() == OMAPDSS_VER_DRA7xx)
+		dss_dpll_enable_ctrl(DSS_DPLL_HDMI, false);
 }
 
 static int hdmi_check_hpd_state(struct hdmi_ip_data *ip_data)
@@ -269,21 +276,20 @@ static int hdmi_check_hpd_state(struct hdmi_ip_data *ip_data)
 		r = hdmi_set_phy_pwr(ip_data, HDMI_PHYPWRCMD_TXON);
 	else
 		r = hdmi_set_phy_pwr(ip_data, HDMI_PHYPWRCMD_LDOON);
+
 	/*
-	 * HDMI_WP_PWR_CTRL doesn't seem to reflect the change in power
-	 * states, ignore the error for now
+	 * DRA7xx doesn't show the correct PHY transition changes in the
+	 * WP_PWR_CTRL register, need to investigate
 	 */
-#if 0
+	if (omapdss_get_version() == OMAPDSS_VER_DRA7xx)
+		r = 0;
+
 	if (r) {
 		DSSERR("Failed to %s PHY TX power\n",
 				hpd ? "enable" : "disable");
 		goto err;
 	}
-#endif
-
-#if 0
 err:
-#endif
 	mutex_unlock(&ip_data->lock);
 	return r;
 }
@@ -303,25 +309,19 @@ int ti_hdmi_4xxx_phy_enable(struct hdmi_ip_data *ip_data)
 	void __iomem *phy_base = hdmi_phy_base(ip_data);
 	enum omapdss_version version = omapdss_get_version();
 	unsigned long pclk = ip_data->cfg.timings.pixel_clock;
+	unsigned long dcofreq_min = dss_feat_get_param_max(FEAT_PARAM_DCOFREQ_LOW) / 1000;
 	u16 freqout = 1;
 
 	/*
 	 * In OMAP5, the HFBITCLK must be divided by 2 before issuing the
 	 * HDMI_PHYPWRCMD_LDOON command.
 	 */
-	if (version == OMAPDSS_VER_OMAP5)
+	if (version == OMAPDSS_VER_OMAP5 || version == OMAPDSS_VER_DRA7xx)
 		REG_FLD_MOD(phy_base, HDMI_TXPHY_BIST_CONTROL, 1, 11, 11);
 
 	r = hdmi_set_phy_pwr(ip_data, HDMI_PHYPWRCMD_LDOON);
-
-	/*
-	 * HDMI_WP_PWR_CTRL doesn't seem to reflect the change in power
-	 * states, ignore the error for now
-	 */
-#if 0
 	if (r)
 		return r;
-#endif
 
 	/*
 	 * Read address 0 in order to get the SCP reset done completed
@@ -340,9 +340,10 @@ int ti_hdmi_4xxx_phy_enable(struct hdmi_ip_data *ip_data)
 		freqout = 1;
 		break;
 	case OMAPDSS_VER_OMAP5:
-		if (pclk < 62500) {
+	case OMAPDSS_VER_DRA7xx:
+		if (pclk < dcofreq_min) {
 			freqout = 0;
-		} else if ((pclk >= 62500) && (pclk < 185000)) {
+		} else if ((pclk >= dcofreq_min) && (pclk < 185000)) {
 			freqout = 1;
 		} else {
 			/* clock frequency > 185MHz */
@@ -359,8 +360,10 @@ int ti_hdmi_4xxx_phy_enable(struct hdmi_ip_data *ip_data)
 	/* Write to phy address 1 to start HDMI line (TXVALID and TMDSCLKEN) */
 	hdmi_write_reg(phy_base, HDMI_TXPHY_DIGITAL_CTRL, 0xF0000000);
 
-	/* Setup max LDO voltage */
-	REG_FLD_MOD(phy_base, HDMI_TXPHY_POWER_CTRL, 0xB, 3, 0);
+	/* OMAP5 HDMI PHY has these bits reserved */
+	if (version != OMAPDSS_VER_OMAP5 && version != OMAPDSS_VER_DRA7xx)
+		/* Setup max LDO voltage */
+		REG_FLD_MOD(phy_base, HDMI_TXPHY_POWER_CTRL, 0xB, 3, 0);
 
 	/* Write to phy address 3 to change the polarity control */
 	REG_FLD_MOD(phy_base, HDMI_TXPHY_PAD_CFG_CTRL, 0x1, 27, 27);
@@ -1192,6 +1195,8 @@ void ti_hdmi_4xxx_core_dump(struct hdmi_ip_data *ip_data, struct seq_file *s)
 
 void ti_hdmi_4xxx_phy_dump(struct hdmi_ip_data *ip_data, struct seq_file *s)
 {
+	enum omapdss_version ver = omapdss_get_version();
+
 #define DUMPPHY(r) seq_printf(s, "%-35s %08x\n", #r,\
 		hdmi_read_reg(hdmi_phy_base(ip_data), r))
 
@@ -1199,7 +1204,7 @@ void ti_hdmi_4xxx_phy_dump(struct hdmi_ip_data *ip_data, struct seq_file *s)
 	DUMPPHY(HDMI_TXPHY_DIGITAL_CTRL);
 	DUMPPHY(HDMI_TXPHY_POWER_CTRL);
 	DUMPPHY(HDMI_TXPHY_PAD_CFG_CTRL);
-	if (omapdss_get_version() == OMAPDSS_VER_OMAP5)
+	if (ver == OMAPDSS_VER_OMAP5 || ver == OMAPDSS_VER_DRA7xx)
 		DUMPPHY(HDMI_TXPHY_BIST_CONTROL);
 }
 

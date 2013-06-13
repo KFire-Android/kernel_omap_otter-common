@@ -39,6 +39,12 @@ config OMAP2_DSS_DPI
 	help
 	  DPI Interface. This is the Parallel Display Interface.
 
+config OMAP2_DSS_DRA7XX_DPI
+	bool "DRA75X DPI support"
+	default n
+	help
+	  Vayu DPI Interface. This is the Parallel Display Interface.
+
 config OMAP2_DSS_RFBI
 	bool "RFBI support"
         default n
@@ -60,6 +66,7 @@ config OMAP2_DSS_VENC
 config OMAP4_DSS_HDMI
 	bool "OMAP4 HDMI support"
         default y
+	select I2C_ALGOBIT
 	help
 	  HDMI Interface. This adds the High Definition Multimedia Interface.
 	  See http://www.hdmi.org/ for HDMI specification.

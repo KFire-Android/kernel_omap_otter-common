@@ -1,0 +1,27 @@
+* palmas and palmas-charger resource clock IP block devicetree bindings
+
+Required properties:
+- compatible : Should be from the list
+  ti,twl6035-clk
+  ti,twl6036-clk
+  ti,twl6037-clk
+  ti,tps65913-clk
+  ti,tps65914-clk
+  ti,tps80036-clk
+and also the generic series names
+  ti,palmas-clk
+
+Optional properties:
+- ti,clk32g-mode-sleep		- mode to adopt in pmic sleep 0 - off, 1 - on
+- ti,clkg32kgaudio-mode-sleep	- see above
+
+Example:
+
+clk {
+    compatible = "ti,twl6035-clk", "ti,palmas-clk";
+    ti,clk32kg-mode-sleep = <0>;
+    ti,clk32kgaudio-mode-sleep = <0>;
+    #clock-cells = <1>;
+    clock-frequency = <32000000>;
+    clock-names = "clk32kg", "clk32kgaudio";
+};
