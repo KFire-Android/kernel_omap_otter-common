@@ -56,3 +56,6 @@ Boards:
 
 - OMAP5 EVM : Evaluation Module
   compatible = "ti,omap5-evm", "ti,omap5"
+
+- DRA7 EVM:  Software Developement Board for DRA7XX
+  compatible = "ti,dra7-evm", "ti,dra7"

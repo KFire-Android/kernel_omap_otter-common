@@ -254,3 +254,24 @@ DT_MACHINE_START(OMAP5_DT, "Generic OMAP5 (Flattened Device Tree)")
 	.restart	= omap44xx_restart,
 MACHINE_END
 #endif
+
+#ifdef CONFIG_SOC_DRA7XX
+static const char *dra7xx_boards_compat[] __initdata = {
+	"ti,dra7",
+	NULL,
+};
+
+DT_MACHINE_START(DRA7XX_DT, "Generic DRA7XX (Flattened Device Tree)")
+	.reserve	= omap_reserve,
+	.smp		= smp_ops(omap4_smp_ops),
+	.map_io		= omap5_map_io,
+	.init_early	= dra7xx_init_early,
+	.init_irq	= omap_gic_of_init,
+	.handle_irq	= gic_handle_irq,
+	.init_machine	= omap_generic_init,
+	.init_late	= dra7xx_init_late,
+	.timer		= &omap5_timer,
+	.dt_compat	= dra7xx_boards_compat,
+	.restart	= omap44xx_restart,
+MACHINE_END
+#endif

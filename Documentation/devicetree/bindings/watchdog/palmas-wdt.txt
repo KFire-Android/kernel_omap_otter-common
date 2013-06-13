@@ -1,0 +1,21 @@
+* palmas and palmas-charger Watchdog IP block devicetree bindings
+
+Required properties:
+- compatible : Should be from the list
+  ti,twl6035-wdt
+  ti,twl6036-wdt
+  ti,twl6037-wdt
+  ti,tps65913-wdt
+  ti,tps65914-wdt
+  ti,tps80036-wdt
+and also the generic series names
+  ti,palmas-wdt
+
+Examples:
+
+wdt {
+    compatible = "ti,twl6035-wdt", "ti,palmas-wdt";
+    interrupt-parent = <&palmas>;
+    interrupts = <10 0>;
+    interrupt-name = "watchdog-irq";
+};

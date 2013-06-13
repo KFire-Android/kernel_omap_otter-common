@@ -1,67 +1,82 @@
-Texas Instruments Palmas family
+* palmas and palmas-charger device tree bindings
 
-The Palmas familly are Integrated Power Management Chips.
-These chips are connected to an i2c bus.
-
+The TI palmas family current members :-
+twl6035 (palmas)
+twl6036 (palmas-charger)
+twl6037 (palmas)
+tps65913 (palmas)
+tps65914 (palmas)
+tps80036 (palmas-charger)
 
 Required properties:
-- compatible : Must be "ti,palmas";
-  For Integrated power-management in the palmas series, twl6035, twl6037,
-  tps65913
-- interrupts : This i2c device has an IRQ line connected to the main SoC
-- interrupt-controller : Since the palmas support several interrupts internally,
-  it is considered as an interrupt controller cascaded to the SoC one.
-- #interrupt-cells = <1>;
+- compatible : Should be from the list
+  ti,twl6035
+  ti,twl6036
+  ti,twl6037
+  ti,tps65913
+  ti,tps65914
+  ti,tps80036
+  ti,tps659038
+and also the generic series names
+  ti,palmas
+  ti,palmas-charger
+- interrupt-controller : palmas has its own internal IRQs
+- #interrupt-cells : should be set to 2 for IRQ number and flags
+  The first cell is the IRQ number.
+  The second cell is the flags, encoded as the trigger masks from
+  Documentation/devicetree/bindings/interrupts.txt
 - interrupt-parent : The parent interrupt controller.
 
-Optional node:
-- Child nodes contain in the palmas. The palmas family is made of several
-  variants that support a different number of features.
-  The child nodes will thus depend of the capability of the variant.
-- mux_pad1 if a value is given it will be used for the pad1 mux
-- mux_pad2 if a value us given it will be used for the pad2 mux
-- power_ctrl if a value is given it will be written to the POWER_CTRL register
+Optional properties:
+  ti,mux_padX : set the pad register X (1-2) to the correct muxing for the
+		hardware, if not set will use muxing in OTP.
 
 Example:
-/*
- * Integrated Power Management Chip Palmas
- */
-palmas@48 {
-    compatible = "ti,palmas";
-    reg = <0x48>;
-    interrupts = <39>; /* IRQ_SYS_1N cascaded to gic */
-    interrupt-controller;
-    #interrupt-cells = <1>;
-    interrupt-parent = <&gic>;
-    #address-cells = <1>;
-    #size-cells = <0>;
 
-	ti,mux_pad1 = <0x00>;
-	ti,mux_pad2 = <0x00>;
-	ti,power_ctrl = <0x03>;
+palmas {
+	compatible = "ti,twl6035", "ti,palmas";
+	reg = <0x48>
+	interrupt-parent = <&intc>;
+	interrupt-controller;
+	#interrupt-cells = <2>;
 
-	palmas_pmic {
-		compatible = "ti,palmas_pmic";
-		regulators {
-			smps12_reg: smps12 {
-				regulator-min-microvolt = < 600000>;
-                regulator-max-microvolt = <1500000>;
-				regulator-always-on;
-				regulator-boot-on;
-                ti,warm_sleep = <0>;
-                ti,roof_floor = <0>;
-                ti,mode_sleep = <0>;
-                ti,warm_reset = <0>;
-                ti,tstep = <0>;
-                ti,vsel = <0>;
-			};
-		};
-		ti,ldo6_vibrator = <0>;
+	ti,mux-pad1 = <0>;
+	ti,mux-pad2 = <0>;
+
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	pmic {
+		compatible = "ti,twl6035-pmic", "ti,palmas-pmic";
+		....
+	}
+
+	gpio {
+		compatible = "ti,twl6035-gpio", "ti,palmas-gpio";
+		....
 	};
 
-    palmas_rtc {
-        compatible = "ti,palmas_rtc";
-        interrupts = <8 9>;
-        reg = <0>;
-    };
-};
+	wdt {
+		compatible = "ti,twl6035-wdt", "ti,palmas-wdt";
+		....
+	};
+
+	rtc {
+		compatible = "ti,twl6035-rtc", "ti,palmas-rtc";
+		....
+	};
+
+	pwrbutton {
+		compatible = "ti,twl6035-pwrbutton", "ti,palmas-pwrbutton";
+		....
+	};
+
+	leds {
+		compatible = "ti,twl6035-leds", "ti-palmas-leds";
+	}
+
+	clk {
+		compatible = "ti,twl6035-clk", "ti,palmas-clk";
+		....
+	};
+}

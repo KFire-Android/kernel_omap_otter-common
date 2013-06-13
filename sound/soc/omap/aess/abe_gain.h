@@ -25,7 +25,7 @@
  *
  * BSD LICENSE
  *
- * Copyright(c) 2010-2012 Texas Instruments Incorporated,
+ * Copyright(c) 2010-2013 Texas Instruments Incorporated,
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -59,49 +59,43 @@
 #ifndef _ABE_GAIN_H_
 #define _ABE_GAIN_H_
 
-#include "abe_typ.h"
+#include "aess-fw.h"
 
-#define OMAP_ABE_GAIN_MUTED     (0x0001<<0)
-#define OMAP_ABE_GAIN_DISABLED  (0x0001<<1)
+#define GAIN_MAXIMUM 3000L
+#define GAIN_24dB 2400L
+#define GAIN_18dB 1800L
+#define GAIN_12dB 1200L
+#define GAIN_6dB 600L
+/* default gain = 1 */
+#define GAIN_0dB  0L
+#define GAIN_M6dB -600L
+#define GAIN_M7dB -700L
+#define GAIN_M12dB -1200L
+#define GAIN_M18dB -1800L
+#define GAIN_M24dB -2400L
+#define GAIN_M30dB -3000L
+#define GAIN_M40dB -4000L
+#define GAIN_M50dB -5000L
+/* muted gain = -120 decibels */
+#define MUTE_GAIN -12000L
+#define GAIN_TOOLOW -13000L
+#define GAIN_MUTE MUTE_GAIN
+#define RAMP_MINLENGTH 0L
+/* ramp_t is in milli- seconds */
+#define RAMP_0MS 0L
+#define RAMP_1MS 1L
+#define RAMP_2MS 2L
+#define RAMP_5MS 5L
+#define RAMP_10MS 10L
+#define RAMP_20MS 20L
+#define RAMP_50MS 50L
+#define RAMP_100MS 100L
+#define RAMP_200MS  200L
+#define RAMP_500MS  500L
+#define RAMP_1000MS  1000L
+#define RAMP_MAXLENGTH  10000L
 
-#define OMAP_AESS_GAIN_DMIC1_LEFT    0
-#define OMAP_AESS_GAIN_DMIC1_RIGHT   1
-#define OMAP_AESS_GAIN_DMIC2_LEFT    2
-#define OMAP_AESS_GAIN_DMIC2_RIGHT   3
-#define OMAP_AESS_GAIN_DMIC3_LEFT    4
-#define OMAP_AESS_GAIN_DMIC3_RIGHT   5
-#define OMAP_AESS_GAIN_AMIC_LEFT     6
-#define OMAP_AESS_GAIN_AMIC_RIGHT    7
-#define OMAP_AESS_GAIN_DL1_LEFT      8
-#define OMAP_AESS_GAIN_DL1_RIGHT     9
-#define OMAP_AESS_GAIN_DL2_LEFT     10
-#define OMAP_AESS_GAIN_DL2_RIGHT    11
-#define OMAP_AESS_GAIN_SPLIT_LEFT   12
-#define OMAP_AESS_GAIN_SPLIT_RIGHT  13
-#define OMAP_AESS_MIXDL1_MM_DL      14
-#define OMAP_AESS_MIXDL1_MM_UL2     15
-#define OMAP_AESS_MIXDL1_VX_DL      16
-#define OMAP_AESS_MIXDL1_TONES      17
-#define OMAP_AESS_MIXDL2_MM_DL      18
-#define OMAP_AESS_MIXDL2_MM_UL2     19
-#define OMAP_AESS_MIXDL2_VX_DL      20
-#define OMAP_AESS_MIXDL2_TONES      21
-#define OMAP_AESS_MIXECHO_DL1       22
-#define OMAP_AESS_MIXECHO_DL2       23
-#define OMAP_AESS_MIXSDT_UL         24
-#define OMAP_AESS_MIXSDT_DL         25
-#define OMAP_AESS_MIXVXREC_MM_DL    26
-#define OMAP_AESS_MIXVXREC_TONES    27
-#define OMAP_AESS_MIXVXREC_VX_UL    28
-#define OMAP_AESS_MIXVXREC_VX_DL    29
-#define OMAP_AESS_MIXAUDUL_MM_DL    30
-#define OMAP_AESS_MIXAUDUL_TONES    31
-#define OMAP_AESS_MIXAUDUL_UPLINK   32
-#define OMAP_AESS_MIXAUDUL_VX_DL    33
-#define OMAP_AESS_GAIN_BTUL_LEFT    34
-#define OMAP_AESS_GAIN_BTUL_RIGHT   35
-
-void omap_aess_reset_gain_mixer(struct omap_aess *abe, u32 id);
-int omap_aess_write_gain_ramp(struct omap_aess *abe, u32 id, u32 ramp);
+void omap_aess_reset_gain_mixer(struct omap_aess *aess, u32 id);
+int omap_aess_write_gain_ramp(struct omap_aess *aess, u32 id, u32 ramp);
 
 #endif /* _ABE_GAIN_H_ */

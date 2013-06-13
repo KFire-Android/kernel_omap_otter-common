@@ -1,0 +1,26 @@
+* palmas and palmas-charger Button IP block devicetree bindings
+
+Required properties:
+- compatible : Should be from the list
+  ti,twl6035-pwrbutton
+  ti,twl6036-pwrbutton
+  ti,twl6037-pwrbutton
+  ti,tps65913-pwrbutton
+  ti,tps65914-pwrbutton
+  ti,tps80036-pwrbutton
+and also the generic series names
+  ti,palmas-pwrbutton
+
+- interrupts: the interrupt outputs of the controller.
+- interrupt-names : Should be the name of irq resource. Each interrupt
+  binds its interrupt-name.
+- interrupt-parent : The parent interrupt controller.
+
+Example:
+
+pwrbutton {
+    compatible = "ti,twl6035-pwrbutton", "ti,palmas-pwrbutton";
+    interrupt-parent = <&palmas>;
+    interrupts = <1 0>;
+    interrupt-names = "pwron-irq";
+};

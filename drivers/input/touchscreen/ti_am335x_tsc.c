@@ -26,12 +26,28 @@
 #include <linux/io.h>
 #include <linux/input/ti_am335x_tsc.h>
 #include <linux/delay.h>
+#include <linux/of.h>
+#include <linux/of_device.h>
+#include <linux/regmap.h>
 
 #include <linux/mfd/ti_am335x_tscadc.h>
 
 #define ADCFSM_STEPID		0x10
 #define SEQ_SETTLE		275
 #define MAX_12BIT		((1 << 12) - 1)
+#define TSCADC_DELTA_X		15
+#define TSCADC_DELTA_Y		15
+
+/*
+ * Refer to function regbit_map() to
+ * map the values in the matrix.
+ */
+static int config[4][4] = {
+		{1,	0,	1,	0},
+		{2,	3,	2,	3},
+		{4,	5,	4,	5},
+		{0,	6,	0,	6}
+};
 
 struct titsc {
 	struct input_dev	*input;
@@ -39,42 +55,154 @@ struct titsc {
 	unsigned int		irq;
 	unsigned int		wires;
 	unsigned int		x_plate_resistance;
+	unsigned int		enable_bits;
+	unsigned int		bckup_x;
+	unsigned int		bckup_y;
 	bool			pen_down;
 	int			steps_to_configure;
+	int			config_inp[20];
+	int			bit_xp, bit_xn, bit_yp, bit_yn;
+	int			inp_xp, inp_xn, inp_yp, inp_yn;
 };
 
 static unsigned int titsc_readl(struct titsc *ts, unsigned int reg)
 {
-	return readl(ts->mfd_tscadc->tscadc_base + reg);
+	unsigned int val;
+
+	val = (unsigned int)-1;
+	regmap_read(ts->mfd_tscadc->regmap_tscadc, reg, &val);
+	return val;
 }
 
 static void titsc_writel(struct titsc *tsc, unsigned int reg,
 					unsigned int val)
 {
-	writel(val, tsc->mfd_tscadc->tscadc_base + reg);
+	regmap_write(tsc->mfd_tscadc->regmap_tscadc, reg, val);
+}
+
+/*
+ * Each of the analog lines are mapped
+ * with one or two register bits,
+ * which can be either pulled high/low
+ * depending on the value to be read.
+ */
+static int regbit_map(int val)
+{
+	int map_bits = 0;
+
+	switch (val) {
+	case 1:
+		map_bits = XPP;
+		break;
+	case 2:
+		map_bits = XNP;
+		break;
+	case 3:
+		map_bits = XNN;
+		break;
+	case 4:
+		map_bits = YPP;
+		break;
+	case 5:
+		map_bits = YPN;
+		break;
+	case 6:
+		map_bits = YNN;
+		break;
+	}
+
+	return map_bits;
+}
+
+static int titsc_config_wires(struct titsc *ts_dev)
+{
+	int		analog_line[10], wire_order[10];
+	int		i, temp_bits, err;
+
+	for (i = 0; i < 4; i++) {
+		/*
+		 * Get the order in which TSC wires are attached
+		 * w.r.t. each of the analog input lines on the EVM.
+		 */
+		analog_line[i] = ts_dev->config_inp[i] & 0xF0;
+		analog_line[i] = analog_line[i] >> 4;
+
+		wire_order[i] = ts_dev->config_inp[i] & 0x0F;
+	}
+
+	for (i = 0; i < 4; i++) {
+		switch (wire_order[i]) {
+		case 0:
+			temp_bits = config[analog_line[i]][0];
+			if (temp_bits == 0) {
+				err = -EINVAL;
+				goto ret;
+			} else {
+				ts_dev->bit_xp = regbit_map(temp_bits);
+				ts_dev->inp_xp = analog_line[i];
+				break;
+			}
+		case 1:
+			temp_bits = config[analog_line[i]][1];
+			if (temp_bits == 0) {
+				err = -EINVAL;
+				goto ret;
+			} else {
+				ts_dev->bit_xn = regbit_map(temp_bits);
+				ts_dev->inp_xn = analog_line[i];
+				break;
+			}
+		case 2:
+			temp_bits = config[analog_line[i]][2];
+			if (temp_bits == 0) {
+				err = -EINVAL;
+				goto ret;
+			} else {
+				ts_dev->bit_yp = regbit_map(temp_bits);
+				ts_dev->inp_yp = analog_line[i];
+				break;
+			}
+		case 3:
+			temp_bits = config[analog_line[i]][3];
+			if (temp_bits == 0) {
+				err = -EINVAL;
+				goto ret;
+			} else {
+				ts_dev->bit_yn = regbit_map(temp_bits);
+				ts_dev->inp_yn = analog_line[i];
+				break;
+			}
+		}
+	}
+
+	return 0;
+
+ret:
+	return err;
 }
 
 static void titsc_step_config(struct titsc *ts_dev)
 {
 	unsigned int	config;
+	unsigned int	stepenable = 0;
 	int i, total_steps;
 
 	/* Configure the Step registers */
 	total_steps = 2 * ts_dev->steps_to_configure;
 
 	config = STEPCONFIG_MODE_HWSYNC |
-			STEPCONFIG_AVG_16 | STEPCONFIG_XPP;
+			STEPCONFIG_AVG_16 | ts_dev->bit_xp;
 	switch (ts_dev->wires) {
 	case 4:
-		config |= STEPCONFIG_INP_AN2 | STEPCONFIG_XNN;
+		config |= STEPCONFIG_INP(ts_dev->inp_yp) | ts_dev->bit_xn;
 		break;
 	case 5:
-		config |= STEPCONFIG_YNN |
-				STEPCONFIG_INP_AN4 | STEPCONFIG_XNN |
-				STEPCONFIG_YPP;
+		config |= ts_dev->bit_yn |
+				STEPCONFIG_INP_AN4 | ts_dev->bit_xn |
+				ts_dev->bit_yp;
 		break;
 	case 8:
-		config |= STEPCONFIG_INP_AN2 | STEPCONFIG_XNN;
+		config |= STEPCONFIG_INP(ts_dev->inp_yp) | ts_dev->bit_xn;
 		break;
 	}
 
@@ -85,18 +213,18 @@ static void titsc_step_config(struct titsc *ts_dev)
 
 	config = 0;
 	config = STEPCONFIG_MODE_HWSYNC |
-			STEPCONFIG_AVG_16 | STEPCONFIG_YNN |
+			STEPCONFIG_AVG_16 | ts_dev->bit_yn |
 			STEPCONFIG_INM_ADCREFM | STEPCONFIG_FIFO1;
 	switch (ts_dev->wires) {
 	case 4:
-		config |= STEPCONFIG_YPP;
+		config |= ts_dev->bit_yp | STEPCONFIG_INP(ts_dev->inp_xp);
 		break;
 	case 5:
-		config |= STEPCONFIG_XPP | STEPCONFIG_INP_AN4 |
-				STEPCONFIG_XNP | STEPCONFIG_YPN;
+		config |= ts_dev->bit_xp | STEPCONFIG_INP_AN4 |
+				ts_dev->bit_xn | ts_dev->bit_yp;
 		break;
 	case 8:
-		config |= STEPCONFIG_YPP;
+		config |= ts_dev->bit_yp | STEPCONFIG_INP(ts_dev->inp_xp);
 		break;
 	}
 
@@ -107,9 +235,9 @@ static void titsc_step_config(struct titsc *ts_dev)
 
 	config = 0;
 	/* Charge step configuration */
-	config = STEPCONFIG_XPP | STEPCONFIG_YNN |
+	config = ts_dev->bit_xp | ts_dev->bit_yn |
 			STEPCHARGE_RFP_XPUL | STEPCHARGE_RFM_XNUR |
-			STEPCHARGE_INM_AN1 | STEPCHARGE_INP_AN1;
+			STEPCHARGE_INM_AN1 | STEPCHARGE_INP(ts_dev->inp_yp);
 
 	titsc_writel(ts_dev, REG_CHARGECONFIG, config);
 	titsc_writel(ts_dev, REG_CHARGEDELAY, CHARGEDLY_OPENDLY);
@@ -117,18 +245,23 @@ static void titsc_step_config(struct titsc *ts_dev)
 	config = 0;
 	/* Configure to calculate pressure */
 	config = STEPCONFIG_MODE_HWSYNC |
-			STEPCONFIG_AVG_16 | STEPCONFIG_YPP |
-			STEPCONFIG_XNN | STEPCONFIG_INM_ADCREFM;
+			STEPCONFIG_AVG_16 | ts_dev->bit_yp |
+			ts_dev->bit_xn | STEPCONFIG_INM_ADCREFM |
+			STEPCONFIG_INP(ts_dev->inp_xp);
 	titsc_writel(ts_dev, REG_STEPCONFIG(total_steps + 1), config);
 	titsc_writel(ts_dev, REG_STEPDELAY(total_steps + 1),
 			STEPCONFIG_OPENDLY);
 
-	config |= STEPCONFIG_INP_AN3 | STEPCONFIG_FIFO1;
+	config |= STEPCONFIG_INP(ts_dev->inp_yn) | STEPCONFIG_FIFO1;
 	titsc_writel(ts_dev, REG_STEPCONFIG(total_steps + 2), config);
 	titsc_writel(ts_dev, REG_STEPDELAY(total_steps + 2),
 			STEPCONFIG_OPENDLY);
 
-	titsc_writel(ts_dev, REG_SE, STPENB_STEPENB_TC);
+	for (i = 0; i <= (total_steps + 2); i++)
+		stepenable |= 1 << i;
+	ts_dev->enable_bits = stepenable;
+
+	titsc_writel(ts_dev, REG_SE, ts_dev->enable_bits);
 }
 
 static void titsc_read_coordinates(struct titsc *ts_dev,
@@ -186,23 +319,20 @@ static irqreturn_t titsc_irq(int irq, void *dev)
 	unsigned int x = 0, y = 0;
 	unsigned int z1, z2, z;
 	unsigned int fsm;
-	unsigned int fifo1count, fifo0count;
+	unsigned int diffx = 0, diffy = 0;
 	int i;
 
 	status = titsc_readl(ts_dev, REG_IRQSTATUS);
 	if (status & IRQENB_FIFO0THRES) {
 		titsc_read_coordinates(ts_dev, &x, &y);
 
+		diffx = abs(x - (ts_dev->bckup_x));
+		diffy = abs(y - (ts_dev->bckup_y));
+		ts_dev->bckup_x = x;
+		ts_dev->bckup_y = y;
+
 		z1 = titsc_readl(ts_dev, REG_FIFO0) & 0xfff;
 		z2 = titsc_readl(ts_dev, REG_FIFO1) & 0xfff;
-
-		fifo1count = titsc_readl(ts_dev, REG_FIFO1CNT);
-		for (i = 0; i < fifo1count; i++)
-			titsc_readl(ts_dev, REG_FIFO1);
-
-		fifo0count = titsc_readl(ts_dev, REG_FIFO0CNT);
-		for (i = 0; i < fifo0count; i++)
-			titsc_readl(ts_dev, REG_FIFO0);
 
 		if (ts_dev->pen_down && z1 != 0 && z2 != 0) {
 			/*
@@ -216,7 +346,8 @@ static irqreturn_t titsc_irq(int irq, void *dev)
 			z /= z1;
 			z = (z + 2047) >> 12;
 
-			if (z <= MAX_12BIT) {
+			if ((diffx < TSCADC_DELTA_X) &&
+			(diffy < TSCADC_DELTA_Y) && (z <= MAX_12BIT)) {
 				input_report_abs(input_dev, ABS_X, x);
 				input_report_abs(input_dev, ABS_Y, y);
 				input_report_abs(input_dev, ABS_PRESSURE, z);
@@ -239,6 +370,8 @@ static irqreturn_t titsc_irq(int irq, void *dev)
 		fsm = titsc_readl(ts_dev, REG_ADCFSM);
 		if (fsm == ADCFSM_STEPID) {
 			ts_dev->pen_down = false;
+			ts_dev->bckup_x = 0;
+			ts_dev->bckup_y = 0;
 			input_report_key(input_dev, BTN_TOUCH, 0);
 			input_report_abs(input_dev, ABS_PRESSURE, 0);
 			input_sync(input_dev);
@@ -250,8 +383,76 @@ static irqreturn_t titsc_irq(int irq, void *dev)
 
 	titsc_writel(ts_dev, REG_IRQSTATUS, irqclr);
 
-	titsc_writel(ts_dev, REG_SE, STPENB_STEPENB_TC);
+	titsc_writel(ts_dev, REG_SE, ts_dev->enable_bits);
 	return IRQ_HANDLED;
+}
+
+static int titsc_parse_dt(struct ti_tscadc_dev *tscadc_dev,
+					struct titsc *ts_dev)
+{
+	struct device_node *node = tscadc_dev->dev->of_node;
+	int err, i;
+	u32 val32, wires_conf[4];
+
+	if (!node)
+		return -EINVAL;
+	else {
+		node = of_get_child_by_name(node, "tsc");
+		if (!node)
+			return -EINVAL;
+		else {
+			err = of_property_read_u32(node, "ti,wires", &val32);
+			if (err < 0)
+				goto error_ret;
+			else
+				ts_dev->wires = val32;
+
+			err = of_property_read_u32(node,
+					"ti,x-plate-resistance", &val32);
+			if (err < 0)
+				goto error_ret;
+			else
+				ts_dev->x_plate_resistance = val32;
+
+			err = of_property_read_u32(node,
+					"ti,steps-to-configure", &val32);
+			if (err < 0)
+				goto error_ret;
+			else
+				ts_dev->steps_to_configure = val32;
+
+			err = of_property_read_u32_array(node, "ti,wire-config",
+					wires_conf, ARRAY_SIZE(wires_conf));
+			if (err < 0)
+				goto error_ret;
+			else {
+				for (i = 0; i < ARRAY_SIZE(wires_conf); i++)
+					ts_dev->config_inp[i] = wires_conf[i];
+			}
+		}
+	}
+	return 0;
+
+error_ret:
+	return err;
+}
+
+static int titsc_parse_pdata(struct ti_tscadc_dev *tscadc_dev,
+					struct titsc *ts_dev)
+{
+	struct mfd_tscadc_board	*pdata = tscadc_dev->dev->platform_data;
+
+	if (!pdata)
+		return -EINVAL;
+
+	ts_dev->wires = pdata->tsc_init->wires;
+	ts_dev->x_plate_resistance =
+		pdata->tsc_init->x_plate_resistance;
+	ts_dev->steps_to_configure =
+		pdata->tsc_init->steps_to_configure;
+	memcpy(ts_dev->config_inp, pdata->tsc_init->wire_config,
+		sizeof(pdata->tsc_init->wire_config));
+	return 0;
 }
 
 /*
@@ -263,15 +464,7 @@ static int titsc_probe(struct platform_device *pdev)
 	struct titsc *ts_dev;
 	struct input_dev *input_dev;
 	struct ti_tscadc_dev *tscadc_dev = pdev->dev.platform_data;
-	struct mfd_tscadc_board	*pdata;
 	int err;
-
-	pdata = tscadc_dev->dev->platform_data;
-
-	if (!pdata) {
-		dev_err(&pdev->dev, "Could not find platform data\n");
-		return -EINVAL;
-	}
 
 	/* Allocate memory for device */
 	ts_dev = kzalloc(sizeof(struct titsc), GFP_KERNEL);
@@ -286,9 +479,17 @@ static int titsc_probe(struct platform_device *pdev)
 	ts_dev->mfd_tscadc = tscadc_dev;
 	ts_dev->input = input_dev;
 	ts_dev->irq = tscadc_dev->irq;
-	ts_dev->wires = pdata->tsc_init->wires;
-	ts_dev->x_plate_resistance = pdata->tsc_init->x_plate_resistance;
-	ts_dev->steps_to_configure = pdata->tsc_init->steps_to_configure;
+
+	if (tscadc_dev->dev->platform_data)
+		err = titsc_parse_pdata(tscadc_dev, ts_dev);
+	else
+		err = titsc_parse_dt(tscadc_dev, ts_dev);
+
+	if (err) {
+		dev_err(&pdev->dev, "Could not find platform data\n");
+		err = -EINVAL;
+		goto err_free_mem;
+	}
 
 	err = request_irq(ts_dev->irq, titsc_irq,
 			  0, pdev->dev.driver->name, ts_dev);
@@ -298,6 +499,11 @@ static int titsc_probe(struct platform_device *pdev)
 	}
 
 	titsc_writel(ts_dev, REG_IRQENABLE, IRQENB_FIFO0THRES);
+	err = titsc_config_wires(ts_dev);
+	if (err) {
+		dev_err(&pdev->dev, "wrong i/p wire configuration\n");
+		goto err_free_irq;
+	}
 	titsc_step_config(ts_dev);
 	titsc_writel(ts_dev, REG_FIFO0THR, ts_dev->steps_to_configure);
 
@@ -313,10 +519,15 @@ static int titsc_probe(struct platform_device *pdev)
 
 	/* register to the input system */
 	err = input_register_device(input_dev);
-	if (err)
+	if (err) {
+		dev_err(&pdev->dev, "Failed to register input device\n");
 		goto err_free_irq;
+	}
 
 	platform_set_drvdata(pdev, ts_dev);
+
+	dev_info(&pdev->dev, "Initialized OK\n");
+
 	return 0;
 
 err_free_irq:
@@ -367,6 +578,7 @@ static int titsc_resume(struct device *dev)
 				0x00);
 		titsc_writel(ts_dev, REG_IRQCLR, IRQENB_HW_PEN);
 	}
+	titsc_config_wires(ts_dev);
 	titsc_step_config(ts_dev);
 	titsc_writel(ts_dev, REG_FIFO0THR,
 			ts_dev->steps_to_configure);

@@ -36,7 +36,10 @@
 #include <linux/regulator/consumer.h>
 #include <linux/slab.h>
 #include <linux/of_gpio.h>
+#include <linux/of_i2c.h>
 #include <video/omapdss.h>
+#include <linux/i2c.h>
+#include <linux/i2c-algo-bit.h>
 
 #include "ti_hdmi.h"
 #include "dss.h"
@@ -49,9 +52,6 @@
 #define EDID_DESCRIPTOR_BLOCK1_ADDRESS		0x80
 #define EDID_SIZE_BLOCK0_TIMING_DESCRIPTOR	4
 #define EDID_SIZE_BLOCK1_TIMING_DESCRIPTOR	4
-
-#define HDMI_DEFAULT_REGN 16
-#define HDMI_DEFAULT_REGM2 1
 
 static struct {
 	struct mutex lock;
@@ -67,9 +67,24 @@ static struct {
 	struct clk *sys_clk;
 	struct regulator *vdda_hdmi_dac_reg;
 
+	/* GPIO pins */
 	int ct_cp_hpd_gpio;
 	int ls_oe_gpio;
 	int hpd_gpio;
+
+	/* level shifter state */
+	enum level_shifter_state ls_state;
+
+	/*
+	 * i2c adapter info(this could be either a bitbanged adapter, or a
+	 * 'real' i2c adapter
+	 */
+	struct i2c_adapter *adap;
+
+	/* these are needed in case it's a bitbanged adapter */
+	struct i2c_algo_bit_data bit_data;
+	int scl_pin;
+	int sda_pin;
 
 	struct omap_dss_output output;
 } hdmi;
@@ -326,6 +341,45 @@ static const struct hdmi_config s3d_timings[] = {
 	},
 };
 
+static void hdmi_set_ls_state(enum level_shifter_state state)
+{
+	bool hpd_enable = false;
+	bool ls_enable = false;
+
+	/* return early if we have nothing to do */
+	if (state == hdmi.ls_state)
+		return;
+
+	sel_i2c();
+
+	switch (state) {
+	case LS_HPD_ON:
+		hpd_enable = true;
+		break;
+
+	case LS_ENABLED:
+		hpd_enable = true;
+		ls_enable = true;
+		break;
+
+	case LS_DISABLED:
+	default:
+		break;
+	}
+
+	gpio_set_value_cansleep(hdmi.ct_cp_hpd_gpio, hpd_enable);
+
+	gpio_set_value_cansleep(hdmi.ls_oe_gpio, ls_enable);
+
+	/* wait 300us after asserting CT_CP_HPD for the 5V rail to reach 90% */
+	if (hdmi.ls_state == LS_DISABLED)
+		udelay(300);
+
+	hdmi.ls_state = state;
+
+	sel_hdmi();
+}
+
 static int hdmi_runtime_get(void)
 {
 	int r;
@@ -492,92 +546,123 @@ unsigned long hdmi_get_pixel_clock(void)
 	return hdmi.ip_data.cfg.timings.pixel_clock * 1000;
 }
 
-static void hdmi_compute_pll(struct omap_dss_device *dssdev, int phy,
+static int hdmi_compute_pll(struct omap_dss_device *dssdev, int phy,
 		struct hdmi_pll_info *pi)
 {
 	unsigned long clkin, refclk;
-	enum omapdss_version version = omapdss_get_version();
+	int phy_calc;
+	unsigned long regn_max, regn_min, regm_min, regm_max;
+	unsigned long fint_min, fint_max;
+	unsigned long dco_low_min, dco_high_min;
+	bool found = false;
 	u32 mf;
 
 	clkin = clk_get_rate(hdmi.sys_clk) / 10000;
-	/*
-	 * Input clock is predivided by N + 1
-	 * out put of which is reference clk
-	 */
-	if (dssdev->clocks.hdmi.regn == 0)
-		pi->regn = HDMI_DEFAULT_REGN;
-	else
-		pi->regn = dssdev->clocks.hdmi.regn;
 
-	refclk = clkin / pi->regn;
+	fint_min = dss_feat_get_param_min(FEAT_PARAM_HDMIPLL_FINT) / 10000;
+	fint_max = dss_feat_get_param_max(FEAT_PARAM_HDMIPLL_FINT) / 10000;
 
-	if (dssdev->clocks.hdmi.regm2 == 0) {
-		switch (version)
-		{
-		case OMAPDSS_VER_OMAP4430_ES1:
-		case OMAPDSS_VER_OMAP4430_ES2:
-		case OMAPDSS_VER_OMAP4:
-			pi->regm2 = HDMI_DEFAULT_REGM2;
-			break;
-		case OMAPDSS_VER_OMAP5:
-			if (phy <= 50000)
-				pi->regm2 = 5;
-			else
-				pi->regm2 = 1;
-			break;
-		default:
-			DSSWARN("invalid omapdss version");
-			break;
+	/* clkin limits */
+	/* .62 MHz < CLKIN/REGN < 2.5MHz */
+	regn_min = clkin / fint_max + 1;
+	regn_max = clkin / fint_min;
 
+	/* Fractional limits on REGM */
+	regm_min = dss_feat_get_param_min(FEAT_PARAM_HDMIPLL_REGM);
+	regm_max = dss_feat_get_param_max(FEAT_PARAM_HDMIPLL_REGM);
+
+	/* DCO frequency ranges */
+
+	/* DCO lowest frequency supported */
+	dco_low_min = dss_feat_get_param_min(FEAT_PARAM_DCOFREQ_LOW) / 10000;
+
+	/* Starting frequency of high frequency range(in Mhz) */
+	dco_high_min = dss_feat_get_param_min(FEAT_PARAM_DCOFREQ_HIGH);
+
+	/* set dcofreq to 1 if required clock is > 1.25GHz */
+	pi->dcofreq = phy > (dco_high_min / 10000);
+
+	if (phy < dco_low_min) {
+		/* Calculate CLKOUTLDO - low frequency */
+		for (pi->regn = regn_min; pi->regn < regn_max; pi->regn++) {
+			refclk = clkin / pi->regn;
+
+			regm_min = ((dco_low_min / refclk) < regm_min) ?
+					regm_min : (dco_low_min / refclk);
+
+			for (pi->regm2 = 3; pi->regm2 <= 127; pi->regm2++) {
+				pi->regm = phy * pi->regm2 / refclk;
+				if (pi->regm < regm_min || pi->regm > regm_max)
+					continue;
+
+				pi->regsd = DIV_ROUND_UP((pi->regm * clkin / 100),
+							pi->regn * 250);
+				phy_calc = clkin * pi->regm / pi->regn /
+						pi->regm2;
+
+				if (pi->regsd && pi->regsd < 255 &&
+					phy_calc <= phy) {
+					found = true;
+					break;
+				}
+			}
+
+			if (found)
+				break;
 		}
 	} else {
-		pi->regm2 = dssdev->clocks.hdmi.regm2;
+		pi->regm2 = 1;
+
+		/* CLKDCOLDO - high frequency */
+		for (pi->regn = regn_min; pi->regn < regn_max; pi->regn++) {
+			refclk = clkin / pi->regn;
+			pi->regm = phy / refclk;
+
+			if (pi->regm < regm_min || pi->regm > regm_max)
+				continue;
+
+			pi->regsd = DIV_ROUND_UP((pi->regm * clkin / 100),
+						pi->regn * 250);
+
+			phy_calc = clkin * pi->regm / pi->regn;
+
+			if (pi->regsd < 255 && phy_calc <= phy) {
+				found = true;
+				break;
+			}
+		}
 	}
 
-	/*
-	 * multiplier is pixel_clk/ref_clk
-	 * Multiplying by 100 to avoid fractional part removal
-	 */
-	pi->regm = phy * pi->regm2 / refclk;
+	if (!found) {
+		DSSERR("Failed to find pll settings\n");
+		return 1;
+	}
 
 	/*
 	 * fractional multiplier is remainder of the difference between
 	 * multiplier and actual phy(required pixel clock thus should be
 	 * multiplied by 2^18(262144) divided by the reference clock
 	 */
-	mf = (phy - pi->regm / pi->regm2 * refclk) * 262144;
+	mf = (phy - refclk * pi->regm / pi->regm2) * 262144;
 	pi->regmf = pi->regm2 * mf / refclk;
 
-	/*
-	 * Dcofreq should be set to 1 if required pixel clock
-	 * is greater than 1000MHz
-	 */
-	pi->dcofreq = phy > 1000 * 100;
-	pi->regsd = ((pi->regm * clkin / 10) / (pi->regn * 250) + 5) / 10;
+	if (pi->regmf > 262144)
+		pi->regmf = 0;
 
 	/* Set the reference clock to sysclk reference */
 	pi->refsel = HDMI_REFSEL_SYSCLK;
 
-	DSSDBG("M = %d Mf = %d\n", pi->regm, pi->regmf);
-	DSSDBG("range = %d sd = %d\n", pi->dcofreq, pi->regsd);
+	DSSERR("M = %d Mf = %d\n", pi->regm, pi->regmf);
+	DSSERR("range = %d sd = %d\n", pi->dcofreq, pi->regsd);
+
+	return 0;
 }
 
 static int hdmi_power_on_core(struct omap_dss_device *dssdev)
 {
 	int r;
 
-	if (gpio_cansleep(hdmi.ct_cp_hpd_gpio))
-		gpio_set_value_cansleep(hdmi.ct_cp_hpd_gpio, 1);
-	else
-		gpio_set_value(hdmi.ct_cp_hpd_gpio, 1);
-
-	if (gpio_cansleep(hdmi.ls_oe_gpio))
-		gpio_set_value_cansleep(hdmi.ls_oe_gpio, 1);
-	else
-		gpio_set_value(hdmi.ls_oe_gpio, 1);
-
-	/* wait 300us after CT_CP_HPD for the 5V power output to reach 90% */
-	udelay(300);
+	hdmi_set_ls_state(LS_ENABLED);
 
 	r = regulator_enable(hdmi.vdda_hdmi_dac_reg);
 	if (r)
@@ -595,15 +680,7 @@ static int hdmi_power_on_core(struct omap_dss_device *dssdev)
 err_runtime_get:
 	regulator_disable(hdmi.vdda_hdmi_dac_reg);
 err_vdac_enable:
-	if (gpio_cansleep(hdmi.ct_cp_hpd_gpio))
-		gpio_set_value_cansleep(hdmi.ct_cp_hpd_gpio, 0);
-	else
-		gpio_set_value(hdmi.ct_cp_hpd_gpio, 0);
-
-	if (gpio_cansleep(hdmi.ls_oe_gpio))
-		gpio_set_value_cansleep(hdmi.ls_oe_gpio, 0);
-	else
-		gpio_set_value(hdmi.ls_oe_gpio, 0);
+	hdmi_set_ls_state(LS_HPD_ON);
 	return r;
 }
 
@@ -611,15 +688,8 @@ static void hdmi_power_off_core(struct omap_dss_device *dssdev)
 {
 	hdmi_runtime_put();
 	regulator_disable(hdmi.vdda_hdmi_dac_reg);
-	if (gpio_cansleep(hdmi.ct_cp_hpd_gpio))
-		gpio_set_value_cansleep(hdmi.ct_cp_hpd_gpio, 0);
-	else
-		gpio_set_value(hdmi.ct_cp_hpd_gpio, 0);
 
-	if (gpio_cansleep(hdmi.ls_oe_gpio))
-		gpio_set_value_cansleep(hdmi.ls_oe_gpio, 0);
-	else
-		gpio_set_value(hdmi.ls_oe_gpio, 0);
+	hdmi_set_ls_state(LS_HPD_ON);
 }
 
 static int hdmi_power_on_full(struct omap_dss_device *dssdev)
@@ -644,12 +714,13 @@ static int hdmi_power_on_full(struct omap_dss_device *dssdev)
 		phy = (p->pixel_clock * 125) / 100 ;
 		break;
 	case HDMI_DEEP_COLOR_36BIT:
-		if (p->pixel_clock >= 148500) {
+		phy = (p->pixel_clock * 150) / 100;
+
+		if (phy >= dss_feat_get_param_max(FEAT_PARAM_HDMI_PCLK)) {
 			DSSERR("36 bit deep color not supported for the pixel clock %d\n",
 				p->pixel_clock);
 			goto err_deep_color;
 		}
-		phy = (p->pixel_clock * 150) / 100;
 		break;
 	case HDMI_DEEP_COLOR_24BIT:
 	default:
@@ -657,7 +728,8 @@ static int hdmi_power_on_full(struct omap_dss_device *dssdev)
 		break;
 	}
 
-	hdmi_compute_pll(dssdev, phy, &hdmi.ip_data.pll_data);
+	if (hdmi_compute_pll(dssdev, phy, &hdmi.ip_data.pll_data))
+		goto err_pll_compute;
 
 	hdmi.ip_data.ops->video_disable(&hdmi.ip_data);
 
@@ -669,6 +741,13 @@ static int hdmi_power_on_full(struct omap_dss_device *dssdev)
 	}
 
 	r = hdmi.ip_data.ops->phy_enable(&hdmi.ip_data);
+	/*
+	 * DRA7xx doesn't show the correct PHY transition changes in the
+	 * WP_PWR_CTRL register, need to investigate
+	 */
+	if (omapdss_get_version() == OMAPDSS_VER_DRA7xx)
+		r = 0;
+
 	if (r) {
 		DSSDBG("Failed to start PHY\n");
 		goto err_phy_enable;
@@ -699,6 +778,7 @@ err_vid_enable:
 err_phy_enable:
 	hdmi.ip_data.ops->pll_disable(&hdmi.ip_data);
 err_pll_enable:
+err_pll_compute:
 err_deep_color:
 	hdmi_power_off_core(dssdev);
 	return -EIO;
@@ -920,13 +1000,24 @@ static void hdmi_dump_regs(struct seq_file *s)
 int omapdss_hdmi_read_edid(u8 *buf, int len)
 {
 	int r;
+	enum level_shifter_state restore_state = hdmi.ls_state;
+
+	/* skip if no monitor attached */
+	if (!gpio_get_value(hdmi.hpd_gpio))
+		return -ENODEV;
 
 	mutex_lock(&hdmi.lock);
 
 	r = hdmi_runtime_get();
 	BUG_ON(r);
 
+
+	hdmi_set_ls_state(LS_ENABLED);
+
 	r = hdmi.ip_data.ops->read_edid(&hdmi.ip_data, buf, len);
+
+	/* restore level shifter state */
+	hdmi_set_ls_state(restore_state);
 
 	hdmi_runtime_put();
 	mutex_unlock(&hdmi.lock);
@@ -1342,14 +1433,169 @@ static void __init hdmi_probe_pdata(struct platform_device *pdev)
 	}
 }
 
+struct i2c_adapter *omapdss_hdmi_adapter(void)
+{
+	return hdmi.adap;
+}
+
+static void ddc_set_sda(void *data, int state)
+{
+	if (state)
+		gpio_direction_input(hdmi.sda_pin);
+	else
+		gpio_direction_output(hdmi.sda_pin, 0);
+}
+
+static void ddc_set_scl(void *data, int state)
+{
+	if (state)
+		gpio_direction_input(hdmi.scl_pin);
+	else
+		gpio_direction_output(hdmi.scl_pin, 0);
+}
+
+static int ddc_get_sda(void *data)
+{
+	return gpio_get_value(hdmi.sda_pin);
+}
+
+static int ddc_get_scl(void *data)
+{
+	return gpio_get_value(hdmi.scl_pin);
+}
+
+static int ddc_pre_xfer(struct i2c_adapter *adap)
+{
+	/* don't read if no hdmi connected */
+	if (!gpio_get_value(hdmi.hpd_gpio))
+		return -ENODEV;
+
+	gpio_set_value_cansleep(hdmi.ls_oe_gpio, 1);
+
+	return 0;
+}
+static void ddc_post_xfer(struct i2c_adapter *adap)
+{
+	hdmi_set_ls_state(hdmi.ls_state);
+}
+
+static void ddc_i2c_init(struct platform_device *pdev)
+{
+
+	hdmi.adap = kzalloc(sizeof(*hdmi.adap), GFP_KERNEL);
+
+	if (!hdmi.adap) {
+		pr_err("Failed to allocate i2c adapter\n");
+		return;
+	}
+
+	hdmi.adap->owner = THIS_MODULE;
+	hdmi.adap->class = I2C_CLASS_DDC;
+	hdmi.adap->dev.parent = &pdev->dev;
+	hdmi.adap->algo_data = &hdmi.bit_data;
+	hdmi.adap->algo = &i2c_bit_algo;
+	hdmi.bit_data.udelay = 2;
+	hdmi.bit_data.timeout = HZ/10;
+	hdmi.bit_data.setsda = ddc_set_sda;
+	hdmi.bit_data.setscl = ddc_set_scl;
+	hdmi.bit_data.getsda = ddc_get_sda;
+	hdmi.bit_data.getscl = ddc_get_scl;
+	hdmi.bit_data.pre_xfer = ddc_pre_xfer;
+	hdmi.bit_data.post_xfer = ddc_post_xfer;
+
+	gpio_request(hdmi.sda_pin, "DDC SDA");
+	gpio_request(hdmi.scl_pin, "DDC SCL");
+	snprintf(hdmi.adap->name, sizeof(hdmi.adap->name),
+		"DSS DDC-EDID adapter");
+	if (i2c_add_adapter(hdmi.adap)) {
+		DSSERR("Cannot initialize DDC I2c\n");
+		kfree(hdmi.adap);
+		hdmi.adap = NULL;
+	}
+}
+
+static void init_sel_i2c_hdmi(void)
+{
+	void __iomem *clk_base = ioremap(0x4A009000, SZ_4K);
+	void __iomem *mcasp2_base = ioremap(0x48464000, SZ_1K);
+	void __iomem *pinmux = ioremap(0x4a003600, SZ_1K);
+	u32 val;
+	
+	if (omapdss_get_version() != OMAPDSS_VER_DRA7xx)
+		goto err;
+
+	if (!clk_base || !mcasp2_base || !pinmux)
+		DSSERR("couldn't ioremap for clk or mcasp2\n");
+
+	__raw_writel(0x40000, pinmux + 0xfc);
+	/* sw supervised wkup */
+	__raw_writel(0x2, clk_base + 0x8fc);
+
+	/* enable clock domain */
+	__raw_writel(0x2, clk_base + 0x860);
+
+	/* see what status looks like */
+	val = __raw_readl(clk_base + 0x8fc);
+	printk("CM_L4PER2_CLKSTCTRL %x\n", val);
+
+	/*
+	 * mcasp2 regs should be hopefully accessible, make mcasp2_aclkr
+	 * a gpio, write necessary stuff to MCASP_PFUNC and PDIR
+	 */
+	__raw_writel(0x1 << 29, mcasp2_base + 0x10);
+	__raw_writel(0x1 << 29, mcasp2_base + 0x14);
+
+err:
+	iounmap(clk_base);
+	iounmap(mcasp2_base);
+	iounmap(pinmux);
+}
+
+/* use this to configure the pcf8575@22 to set LS_OE and CT_HPD */
+void sel_i2c(void)
+{
+	void __iomem *base = ioremap(0x48464000, SZ_1K);
+
+	if (omapdss_get_version() != OMAPDSS_VER_DRA7xx)
+		goto err;
+
+	/* PDOUT */
+	__raw_writel(0x0, base + 0x18);
+
+	DSSDBG("PDOUT sel_i2c  %x\n", __raw_readl(base + 0x18));
+
+err:
+	iounmap(base);
+}
+
+/* use this to read edid and detect hpd ? */
+void sel_hdmi(void)
+{
+	void __iomem *base = ioremap(0x48464000, SZ_1K);
+
+	if (omapdss_get_version() != OMAPDSS_VER_DRA7xx)
+		goto err;
+
+	/* PDOUT */
+	__raw_writel(0x20000000, base + 0x18);
+
+	DSSDBG("PDOUT sel_hdmi %x\n", __raw_readl(base + 0x18));
+
+err:
+	iounmap(base);
+}
+
 static void __init hdmi_probe_of(struct platform_device *pdev)
 {
 	struct device_node *node = pdev->dev.of_node;
 	struct device_node *child;
 	struct omap_dss_device *dssdev;
+	struct device_node *adapter_node;
+	struct i2c_adapter *adapter = NULL;
 	int r, gpio;
 	enum omap_channel channel;
 	u32 v;
+	int gpio_count;
 
 	r = of_property_read_u32(node, "video-source", &v);
 	if (r) {
@@ -1367,7 +1613,10 @@ static void __init hdmi_probe_of(struct platform_device *pdev)
 	if (!child)
 		return;
 
-	if (of_gpio_count(node) != 3) {
+	gpio_count = of_gpio_count(node);
+
+	/* OMAP4 derivatives have 3 pins defined, OMAP5 derivatives have 5 */
+	if (gpio_count != 5 && gpio_count != 3) {
 		DSSERR("wrong number of GPIOs\n");
 		return;
 	}
@@ -1394,6 +1643,46 @@ static void __init hdmi_probe_of(struct platform_device *pdev)
 	} else {
 		DSSERR("failed to parse HPD gpio\n");
 		return;
+	}
+
+	adapter_node = of_parse_phandle(node, "hdmi_ddc", 0);
+	if (adapter_node)
+		adapter = of_find_i2c_adapter_by_node(adapter_node);
+
+	/*
+	 * if I2C SCL and SDA pins are defined, parse them, if an adapter is
+	 * present, use the i2c adapter rather than bitbanging i2c. If there
+	 * isn't an adapter either, assume that we are using the hdmi core IP's
+	 * ddc.
+	 */
+	if (gpio_count == 5) {
+		gpio = of_get_gpio(node, 3);
+		if (gpio_is_valid(gpio)) {
+			hdmi.scl_pin = gpio;
+		} else {
+			DSSERR("failed to parse SCL gpio\n");
+			return;
+		}
+
+		gpio = of_get_gpio(node, 4);
+		if (gpio_is_valid(gpio)) {
+			hdmi.sda_pin = gpio;
+		} else {
+			DSSERR("failed to parse SDA gpio\n");
+			return;
+		}
+	} else if (adapter != NULL) {
+		hdmi.adap = adapter;
+
+		/*
+		 * we have SEL_I2C_HDMI pin which acts as a control line to
+		 * a demux which choses the i2c lines to go either to hdmi
+		 * or to the other i2c2 slaves. This line is used as a mcasp2
+		 * gpio. Init the gpio pin so that it can be used to control
+		 * the demux.
+		 */
+		init_sel_i2c_hdmi();
+		sel_i2c();
 	}
 
 	dssdev = dss_alloc_and_init_device(&pdev->dev);
@@ -1546,6 +1835,10 @@ static int __init omapdss_hdmihw_probe(struct platform_device *pdev)
 	else if (pdev->dev.platform_data)
 		hdmi_probe_pdata(pdev);
 
+	/* if i2c pins defined, setup I2C adapter */
+	if (hdmi.scl_pin && hdmi.sda_pin)
+		ddc_i2c_init(pdev);
+
 #if defined(CONFIG_OMAP4_DSS_HDMI_AUDIO) || \
 	defined(CONFIG_OMAP5_DSS_HDMI_AUDIO)
 	r = hdmi_probe_audio(pdev);
@@ -1574,6 +1867,8 @@ static int __exit omapdss_hdmihw_remove(struct platform_device *pdev)
 	if (hdmi.audio_pdev != NULL)
 		platform_device_unregister(hdmi.audio_pdev);
 #endif
+
+	kfree(hdmi.adap);
 
 	device_for_each_child(&pdev->dev, NULL, hdmi_remove_child);
 

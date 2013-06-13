@@ -100,107 +100,77 @@ static inline void hdmi_core_ddc_req_addr(struct hdmi_ip_data *ip_data,
 		REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_OPERATION, 1, 0, 0);
 }
 
-static void hdmi_core_ddc_init(struct hdmi_ip_data *ip_data)
+#define EDID_LENGTH 128
+
+static int read_one_block(u8 *edid, unsigned int block)
 {
-	void __iomem *core_sys_base = hdmi_core_sys_base(ip_data);
+	struct i2c_adapter *adapter = omapdss_hdmi_adapter();
+	unsigned char start = block * EDID_LENGTH;
+	unsigned char segment = block >> 1;
+	unsigned char xfers = segment ? 3 : 2;
 
-	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_SDA_HOLD_ADDR, 0x19, 7, 0);
-
-	/*Mask the interrupts*/
-	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_CTLINT, 0x0, 2, 2);
-	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_CTLINT, 0x0, 6, 6);
-	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_INT, 0x0, 2, 2);
-
-	/* Master clock division */
-	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_DIV, 0x5, 3, 0);
-
-	/* Standard speed counter */
-	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_SS_SCL_HCNT_1_ADDR, 0x0,
-		7, 0);
-	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_SS_SCL_HCNT_0_ADDR, 0x79,
-		7, 0);
-	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_SS_SCL_LCNT_1_ADDR, 0x0,
-		7, 0);
-	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_SS_SCL_LCNT_0_ADDR, 0x91,
-		7, 0);
-
-	/* Fast speed counter*/
-	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_FS_SCL_HCNT_1_ADDR, 0x0,
-		7, 0);
-	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_FS_SCL_HCNT_0_ADDR, 0x0F,
-		7, 0);
-	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_FS_SCL_LCNT_1_ADDR, 0x0,
-		7, 0);
-	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_FS_SCL_LCNT_0_ADDR, 0x21,
-		7, 0);
-
-	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_SLAVE, 0x50, 6, 0);
-	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_SEGADDR, 0x30, 6, 0);
-}
-
-static int hdmi_core_ddc_edid(struct hdmi_ip_data *ip_data,
-					u8 *pedid, int ext)
-{
-	u8 cur_addr = 0;
-	char checksum = 0;
-	void __iomem *core_sys_base = hdmi_core_sys_base(ip_data);
-
-	hdmi_core_ddc_req_addr(ip_data, cur_addr, ext);
-
-	/* Unmask the interrupts*/
-	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_CTLINT, 0x1, 2, 2);
-	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_CTLINT, 0x1, 6, 6);
-	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_INT, 0x1, 2, 2);
-
-	/* FIXME:This is a hack to  read only 128 bytes data with a mdelay
-	 * Ideally the read has to be based on the done interrupt and
-	 * status which is not received thus it is ignored for now
-	 */
-	while (cur_addr < 128) {
-	#if 0
-		if (hdmi_wait_for_bit_change(HDMI_CORE_I2CM_INT,
-						0, 0, 1) != 1) {
-			DSSERR("Failed to recieve done interrupt\n");
-			return -ETIMEDOUT;
+	struct i2c_msg msgs[] = {
+		{
+			.addr = 0x30,
+			.flags = 0,
+			.len = 1,
+			.buf = &segment,
+		},
+		{
+			.addr = 0x50,
+			.flags = 0,
+			.len = 1,
+			.buf = &start,
+		},
+		{
+			.addr = 0x50,
+			.flags = I2C_M_RD,
+			.len = EDID_LENGTH,
+			.buf = edid,
 		}
-	#endif
-		mdelay(1);
-		pedid[cur_addr] = REG_GET(core_sys_base,
-					HDMI_CORE_I2CM_DATAI, 7, 0);
-		DSSDBG("pedid[%d] = %d", cur_addr, pedid[cur_addr]);
-		checksum += pedid[cur_addr++];
-		hdmi_core_ddc_req_addr(ip_data, cur_addr, ext);
-	}
+	};
 
-	return 0;
+	int r, retries = 5;
 
+	if (!adapter)
+		return -ENODEV;
+
+	do {
+		r = i2c_transfer(adapter, &msgs[3 - xfers], xfers);
+
+	} while (r != xfers && --retries);
+
+	return r == xfers ? 0 : -1;
 }
 
 int ti_hdmi_5xxx_read_edid(struct hdmi_ip_data *ip_data,
 				u8 *edid, int len)
 {
-	int r, l;
+	int num_extensions, bytes_read = 0, i;
 
-	if (len < 128)
-		return -EINVAL;
+	/* get base block */
+	if (read_one_block(edid, 0))
+		goto bad;
 
-	hdmi_core_ddc_init(ip_data);
+	num_extensions = edid[0x7e];
+	bytes_read += EDID_LENGTH;
 
-	r = hdmi_core_ddc_edid(ip_data, edid, 0);
-	if (r)
-		return r;
+	for (i = 1; i <= num_extensions; i++) {
+		if (bytes_read >= len)
+			break;
 
-	l = 128;
+		if (read_one_block(edid + EDID_LENGTH * i, i))
+			break;
 
-	if (len >= 128 * 2 && edid[0x7e] > 0) {
-		r = hdmi_core_ddc_edid(ip_data, edid + 0x80, 1);
-		if (r)
-			return r;
-		l += 128;
+		bytes_read += EDID_LENGTH;
+
 	}
 
-	return l;
+	return bytes_read;
+bad:
+	return 0;
 }
+
 void ti_hdmi_5xxx_core_dump(struct hdmi_ip_data *ip_data, struct seq_file *s)
 {
 
