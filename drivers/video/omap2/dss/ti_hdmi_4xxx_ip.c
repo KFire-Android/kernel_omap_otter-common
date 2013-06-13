@@ -902,6 +902,8 @@ int ti_hdmi_4xxx_irq_handler(struct hdmi_ip_data *ip_data)
 			intr3 = hdmi_read_reg(core_base, HDMI_CORE_SYS_INTR3);
 			intr4 = hdmi_read_reg(core_base, HDMI_CORE_SYS_INTR4);
 
+			hdmi_write_reg(core_base, HDMI_CORE_SYS_INTR2, intr2);
+			hdmi_write_reg(core_base, HDMI_CORE_SYS_INTR3, intr3);
 			hdmi_write_reg(core_base, HDMI_CORE_SYS_INTR4, intr4);
 		}
 	}
@@ -1428,6 +1430,38 @@ int ti_hdmi_4xxx_cec_set_reg_device_list(struct hdmi_ip_data *ip_data, int mask)
 	return 0;
 }
 EXPORT_SYMBOL(ti_hdmi_4xxx_cec_set_reg_device_list);
+
+int ti_hdmi_4xxx_check_rxdet_line(struct hdmi_ip_data *ip_data)
+{
+	if (hdmi_wait_for_bit_change(hdmi_phy_base(ip_data),
+					HDMI_TXPHY_PAD_CFG_CTRL,
+					14, 7, 0) != 0)
+		return -ETIMEDOUT;
+
+	return 0;
+}
+EXPORT_SYMBOL(ti_hdmi_4xxx_check_rxdet_line);
+
+int ti_hdmi_4xxx_set_av_mute(struct hdmi_ip_data *ip_data, u8 av_mute_state)
+{
+	void __iomem *av_base = hdmi_av_base(ip_data);
+	u32 val;
+	int r = 0;
+
+	val = av_mute_state >> 4;
+
+	REG_FLD_MOD(av_base, HDMI_CORE_AV_PB_CTRL2, 0x0, 3, 2);
+
+	WR_REG_32(av_base, HDMI_CORE_AV_CP_BYTE1, av_mute_state);
+	if (hdmi_wait_for_bit_change(av_base, HDMI_CORE_AV_AUDO_TXSTAT,
+						    2, 2, val) == val);
+		r = -ETIMEDOUT;
+
+	REG_FLD_MOD(av_base, HDMI_CORE_AV_PB_CTRL2, 0x3, 3, 2);
+
+	return r;
+}
+EXPORT_SYMBOL(ti_hdmi_4xxx_set_av_mute);
 
 
 void ti_hdmi_4xxx_wp_dump(struct hdmi_ip_data *ip_data, struct seq_file *s)
