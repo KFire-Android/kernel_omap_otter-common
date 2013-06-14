@@ -153,9 +153,6 @@ struct mailbox {
 	struct blocking_notifier_head	notifier;
 };
 
-/* TODO: remove this, unused function */
-void mailbox_init_seq(struct mailbox *);
-
 /*
  * mailbox objects registration and de-registration functions with the
  * mailbox core.
