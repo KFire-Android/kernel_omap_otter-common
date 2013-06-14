@@ -385,13 +385,13 @@ int temp_sensor_configure_tcold(struct omap_bandgap *bg_ptr, int id,
 	return temp_sensor_unmask_interrupts(bg_ptr, id, hot, t_cold);
 }
 
-/* This is Tshut Thot config. Call it only if HAS(TSHUT_CONFIG) is set */
-static int temp_sensor_configure_tshut_hot(struct omap_bandgap *bg_ptr,
-					   int id, int tshut_hot)
+/* This is Tshut config. Call it only if HAS(TSHUT_CONFIG) is set */
+static int temp_sensor_configure_tshut(struct omap_bandgap *bg_ptr,
+				       int id, int tshut_cold, int tshut_hot)
 {
 	struct device *cdev = bg_ptr->dev->parent;
 	struct temp_sensor_registers *tsr;
-	u32 reg_val;
+	u32 reg_val = 0;
 	int err;
 
 	/* If not using the HW TSHUT feature, just return success */
@@ -399,38 +399,13 @@ static int temp_sensor_configure_tshut_hot(struct omap_bandgap *bg_ptr,
 		return 0;
 
 	tsr = bg_ptr->conf->sensors[id].registers;
-	err = omap_control_readl(cdev, tsr->tshut_threshold, &reg_val);
-	reg_val &= ~tsr->tshut_hot_mask;
-	reg_val |= tshut_hot << __ffs(tsr->tshut_hot_mask);
-	err |= omap_control_writel(cdev, reg_val, tsr->tshut_threshold);
+	reg_val |= (tshut_cold << __ffs(tsr->tshut_cold_mask)) &
+							tsr->tshut_cold_mask;
+	reg_val |= (tshut_hot << __ffs(tsr->tshut_hot_mask)) &
+							tsr->tshut_hot_mask;
+	err = omap_control_writel(cdev, reg_val, tsr->tshut_threshold);
 	if (err) {
 		dev_err(bg_ptr->dev, "failed to reprogram tshut thot\n");
-		return -EIO;
-	}
-
-	return 0;
-}
-
-/* This is Tshut Tcold config. Call it only if HAS(TSHUT_CONFIG) is set */
-static int temp_sensor_configure_tshut_cold(struct omap_bandgap *bg_ptr,
-					    int id, int tshut_cold)
-{
-	struct device *cdev = bg_ptr->dev->parent;
-	struct temp_sensor_registers *tsr;
-	u32 reg_val;
-	int err;
-
-	/* If not using the HW TSHUT feature, just return success */
-	if (!OMAP_BANDGAP_HAS(bg_ptr, TSHUT_CONFIG))
-		return 0;
-
-	tsr = bg_ptr->conf->sensors[id].registers;
-	err = omap_control_readl(cdev, tsr->tshut_threshold, &reg_val);
-	reg_val &= ~tsr->tshut_cold_mask;
-	reg_val |= tshut_cold << __ffs(tsr->tshut_cold_mask);
-	err |= omap_control_writel(cdev, reg_val, tsr->tshut_threshold);
-	if (err) {
-		dev_err(bg_ptr->dev, "failed to reprogram tshut tcold\n");
 		return -EIO;
 	}
 
@@ -1159,10 +1134,9 @@ int __devinit omap_bandgap_probe(struct platform_device *pdev)
 						tsr->tshut_threshold);
 			}
 
-			temp_sensor_configure_tshut_hot(bg_ptr, i,
-							ts_data->tshut_hot);
-			temp_sensor_configure_tshut_cold(bg_ptr, i,
-							 ts_data->tshut_cold);
+			temp_sensor_configure_tshut(bg_ptr, i,
+						    ts_data->tshut_cold,
+						    ts_data->tshut_hot);
 
 			/*
 			 * Ensure that for OMAP4470 TSHUT is configured
