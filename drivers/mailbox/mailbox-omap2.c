@@ -447,6 +447,10 @@ static int omap2_mbox_probe(struct platform_device *pdev)
 		mbox->name = info->name;
 		mbox->ops = &omap2_mbox_ops;
 		mbox->irq = platform_get_irq(pdev, info->irq_id);
+		if (mbox->irq < 0) {
+			ret = mbox->irq;
+			goto free_privblk;
+		}
 		mbox->irq_flags = IRQF_SHARED;
 		list[i] = mbox++;
 	}
