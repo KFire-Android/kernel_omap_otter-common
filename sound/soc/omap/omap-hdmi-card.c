@@ -74,8 +74,6 @@ static int omap_hdmi_probe(struct platform_device *pdev)
 			return -ENODEV;
 		}
 
-		printk(KERN_ERR "card name is %s", card->name);
-
 		dev_node = of_parse_phandle(node, "ti,hdmi_audio", 0);
 		if (!dev_node) {
 			dev_err(&pdev->dev, "hdmi node is not provided\n");
