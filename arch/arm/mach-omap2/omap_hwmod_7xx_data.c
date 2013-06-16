@@ -1544,12 +1544,20 @@ static struct omap_hwmod dra7xx_mcasp2_hwmod = {
 	},
 };
 
+/* HACK: Taken from UART6 since they're not used in dra7-evm */
+static struct omap_hwmod_dma_info dra7xx_mcasp3_sdma_reqs[] = {
+	{ .name = "tx", .dma_req = 78 + DRA7XX_DMA_REQ_START },
+	{ .name = "rx", .dma_req = 79 + DRA7XX_DMA_REQ_START },
+	{ .dma_req = -1 }
+};
+
 /* mcasp3 */
 static struct omap_hwmod dra7xx_mcasp3_hwmod = {
 	.name		= "mcasp3",
 	.class		= &dra7xx_mcasp_hwmod_class,
 	.clkdm_name	= "l4per2_clkdm",
 	.main_clk	= "mcasp3_ahclkx_mux",
+	.sdma_reqs	= dra7xx_mcasp3_sdma_reqs,
 	.flags		= HWMOD_SWSUP_SIDLE,
 	.prcm = {
 		.omap4 = {
@@ -1592,12 +1600,20 @@ static struct omap_hwmod dra7xx_mcasp5_hwmod = {
 	},
 };
 
+/* HACK: Taken from UART5 since they're not used in dra7-evm */
+static struct omap_hwmod_dma_info dra7xx_mcasp6_sdma_reqs[] = {
+	{ .name = "tx", .dma_req = 62 + DRA7XX_DMA_REQ_START },
+	{ .name = "rx", .dma_req = 63 + DRA7XX_DMA_REQ_START },
+	{ .dma_req = -1 }
+};
+
 /* mcasp6 */
 static struct omap_hwmod dra7xx_mcasp6_hwmod = {
 	.name		= "mcasp6",
 	.class		= &dra7xx_mcasp_hwmod_class,
 	.clkdm_name	= "l4per2_clkdm",
 	.main_clk	= "mcasp6_ahclkx_mux",
+	.sdma_reqs	= dra7xx_mcasp6_sdma_reqs,
 	.flags		= HWMOD_SWSUP_SIDLE,
 	.prcm = {
 		.omap4 = {
