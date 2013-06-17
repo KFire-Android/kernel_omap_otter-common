@@ -669,6 +669,18 @@
 			};
 		};
 
+		atl: atl@0x4843c000 {
+			compatible = "ti,dra7-atl";
+			reg = <0x4843c000 0x3ff>;
+			ti,hwmods = "atl";
+			ti,atclk1-freq = <11289600>;
+			ti,atl1-bws-input = <3>;	/* McASP2 FSX */
+			ti,atl1-aws-input = <15>;	/* McASP6 FSX */
+			ti,atclk2-freq = <5644800>;
+			ti,atl2-bws-input = <3>;	/* McASP2 FSX */
+			ti,atl2-aws-input = <4>;	/* McASP3 FSX */
+		};
+
 		mcasp3: mcasp@48468000 {
 			compatible = "ti,dra7-mcasp-audio";
 			reg = <0x48468000 0x2000>;
