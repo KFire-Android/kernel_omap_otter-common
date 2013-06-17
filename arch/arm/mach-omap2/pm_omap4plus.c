@@ -212,6 +212,15 @@ int __init omap4_pm_init(void)
 
 	pr_info("Power Management for TI OMAP4PLUS devices.\n");
 
+	if (soc_is_dra7xx()) {
+		cpu_suspend_state = PWRDM_POWER_ON;
+		pwrdm_next_state = PWRDM_POWER_ON;
+	} else {
+		cpu_suspend_state = PWRDM_POWER_OFF;
+		pwrdm_next_state = PWRDM_POWER_RET;
+	}
+
+
 	ret = pwrdm_for_each(pwrdms_setup, NULL);
 	if (ret) {
 		pr_err("Failed to setup powerdomains.\n");
@@ -245,14 +254,6 @@ int __init omap4_pm_init(void)
 
 	if (cpu_is_omap44xx() || soc_is_omap54xx())
 		omap4_idle_init();
-
-	if (soc_is_dra7xx()) {
-		cpu_suspend_state = PWRDM_POWER_ON;
-		pwrdm_next_state = PWRDM_POWER_ON;
-	} else {
-		cpu_suspend_state = PWRDM_POWER_OFF;
-		pwrdm_next_state = PWRDM_POWER_RET;
-	}
 
 err2:
 	return ret;
