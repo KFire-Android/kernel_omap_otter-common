@@ -40,7 +40,7 @@
 #include "prm-regbits-7xx.h"
 #include "control.h"
 
-#define DRA7_DPLL_ABE_DEFFREQ			361267200
+#define DRA7_DPLL_ABE_DEFFREQ			180633600
 #define DRA7_DPLL_GMAC_DEFFREQ			1000000000
 #define DRA7_DPLL_USB_DEFFREQ			960000000
 
@@ -2126,6 +2126,7 @@ static struct reparent_init_clks reparent_clks[] = {
 
 static struct rate_init_clks rate_clks[] = {
 	{ .name = "dpll_abe_ck", .rate =  DRA7_DPLL_ABE_DEFFREQ },
+	{ .name = "dpll_abe_m2x2_ck", .rate =  DRA7_DPLL_ABE_DEFFREQ * 2 },
 	{ .name = "dpll_gmac_ck", .rate =  DRA7_DPLL_GMAC_DEFFREQ },
 	{ .name = "dpll_usb_ck", .rate =  DRA7_DPLL_USB_DEFFREQ },
 };
