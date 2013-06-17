@@ -37,6 +37,44 @@
 		};
 	};
 
+	vaudio_1v8: fixedregulator-vaudio-dig {
+		compatible = "regulator-fixed";
+		regulator-name = "vdac_fixed";
+		regulator-min-microvolt = <1800000>;
+		regulator-max-microvolt = <1800000>;
+		regulator-boot-on;
+	};
+
+	vaudio_3v3: fixedregulator-vaudio-anlg {
+		compatible = "regulator-fixed";
+		regulator-name = "vdac_fixed";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		regulator-boot-on;
+	};
+
+	sound {
+		compatible = "ti,dra7-evm-sound";
+		ti,model = "dra7evm";
+
+		/* Audio routing */
+		ti,audio-routing =
+			"LINE1L", "Line In",
+			"LINE1R", "Line In",
+			"MIC3L", "Mic Bias 2V",
+			"MIC3R", "Mic Bias 2V",
+			"Mic Bias 2V", "Main Mic",
+			"Headphone", "HPLOUT",
+			"Headphone", "HPROUT",
+			"Line Out", "LLOUT",
+			"Line Out", "RLOUT";
+
+		/* Media DAI link */
+		ti,media-cpu = <&mcasp3>;
+		ti,media-codec = <&tlv320aic3106>;
+		ti,media-mclk-freq = <5644800>;
+		ti,media-slots = <2>;
+	};
 };
 
 &dra7_pmx_core {
@@ -142,6 +180,15 @@
 		compatible = "ti,tlc59108";
 		reg = <0x40>;
 		gpios = <&pcf_lcd 15 0>; /* P15, CON_LCD_PWR_DN */
+	};
+
+	tlv320aic3106: tlv320aic3106@18 {
+		compatible = "ti,tlv320aic3x";
+		reg = <0x18>;
+		IOVDD-supply = <&vaudio_3v3>;
+		DVDD-supply = <&vaudio_1v8>;
+		AVDD-supply = <&vaudio_3v3>;
+		DRVDD-supply = <&vaudio_3v3>;
 	};
 };
 
