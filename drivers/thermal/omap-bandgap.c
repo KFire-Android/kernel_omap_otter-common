@@ -1328,6 +1328,20 @@ static int omap_bandgap_suspend(struct device *dev)
 static int omap_bandgap_resume(struct device *dev)
 {
 	struct omap_bandgap *bg_ptr = dev_get_drvdata(dev);
+	struct device *cdev = bg_ptr->dev->parent;
+	struct temp_sensor_registers *tsr;
+	u32 i, val = 0;
+
+	/* Disable continuous mode first */
+	if (OMAP_BANDGAP_HAS(bg_ptr, MODE_CONFIG)) {
+		for (i = 0; i < bg_ptr->conf->sensor_count; i++) {
+			tsr = bg_ptr->conf->sensors[i].registers;
+			omap_control_readl(cdev, tsr->bgap_mode_ctrl, &val);
+			val &= ~(1 << __ffs(tsr->mode_ctrl_mask));
+			omap_control_writel(cdev, val, tsr->bgap_mode_ctrl);
+		}
+	}
+
 
 	if (OMAP_BANDGAP_HAS(bg_ptr, CLK_CTRL))
 		clk_enable(bg_ptr->fclock);
