@@ -38,9 +38,18 @@
 #include <plat/dvfs.h>
 
 #include <mach/hardware.h>
+#include <linux/suspend.h>
 
 /* OPP tolerance in percentage */
 #define	OPP_TOLERANCE	4
+
+/*
+ * Custom OMAP cpufreq flags to pass in .target() callback.
+ * This approach allows to sync pm_notifier of OMAP CPUfreq driver and
+ * CPUFreq framework.
+ */
+#define	OMAP_CPUFREQ_LOCK_PREPARE	(0x10)
+#define	OMAP_CPUFREQ_LOCK_COMPLETE	(0x20)
 
 static struct cpufreq_frequency_table *freq_table;
 static atomic_t freq_table_users = ATOMIC_INIT(0);
@@ -56,11 +65,54 @@ static unsigned int current_cooling_level;
 static unsigned int cpu_cooling_level;
 static unsigned int case_cooling_level;
 static bool omap_cpufreq_ready;
+static bool is_locked; /* if true - frequency is locked to suspend_freq*/
+static unsigned long safe_suspend_freq;
+static unsigned long resume_freq;
+
 
 static unsigned int en_therm_freq_print;
 module_param(en_therm_freq_print, uint, 0644);
 MODULE_PARM_DESC(en_therm_freq_print,
 		"Enable Debug prints of CPU Freq change due to thermal");
+
+static int safe_suspend_freq_set(const char *arg, const struct kernel_param *kp)
+{
+	int ret = 0;
+	unsigned long new_safe_suspend_freq;
+
+	ret = kstrtoul(arg, 10, &new_safe_suspend_freq);
+	if (ret) {
+		pr_err("%s: safe_suspend_freq(%lu) set failed %d\n",
+		       __func__, safe_suspend_freq, ret);
+		goto exit;
+	}
+
+	ret = PTR_RET(opp_find_freq_ceil(mpu_dev, &new_safe_suspend_freq));
+	if (ret) {
+		pr_err("%s: Unable to find OPP for freq%ld\n",
+		       __func__, new_safe_suspend_freq);
+		goto exit;
+	}
+
+	safe_suspend_freq = new_safe_suspend_freq;
+
+	if (safe_suspend_freq)
+		pr_warn("%s: suspend will take place at frequency %ld\n",
+			__func__, new_safe_suspend_freq);
+
+exit:
+	return ret;
+}
+
+static struct kernel_param_ops duration_ops = {
+	.set = safe_suspend_freq_set,
+	.get = param_get_uint,
+};
+
+
+late_param_cb(safe_suspend_freq, &duration_ops, &safe_suspend_freq, 0644);
+MODULE_PARM_DESC(safe_suspend_freq,
+		 "Frequency value (OPP) to be used during suspend (if 0 - use current freq)");
 
 static unsigned int omap_getspeed(unsigned int cpu)
 {
@@ -150,6 +202,24 @@ static int omap_target(struct cpufreq_policy *policy,
 	unsigned int i;
 	int ret = 0;
 
+	if (relation & OMAP_CPUFREQ_LOCK_COMPLETE)
+		/* system resumed - unlock cpufreq */
+		is_locked = false;
+
+	if (is_locked) {
+		dev_dbg(mpu_dev, "%s: cpu%d: cpufreq is locked during suspend (target=%d, cur=%d)\n",
+			__func__, policy->cpu, target_freq,
+			omap_getspeed(policy->cpu));
+		return -EINVAL;
+	}
+
+	if (relation & OMAP_CPUFREQ_LOCK_PREPARE)
+		/* system suspending - lock cpufreq */
+		is_locked = true;
+
+	/* remove custom flags */
+	relation &= ~(OMAP_CPUFREQ_LOCK_PREPARE | OMAP_CPUFREQ_LOCK_COMPLETE);
+
 	if (!freq_table) {
 		dev_err(mpu_dev, "%s: cpu%d: no freq table!\n", __func__,
 			policy->cpu);
@@ -159,7 +229,7 @@ static int omap_target(struct cpufreq_policy *policy,
 								relation, &i);
 	if (ret) {
 		dev_dbg(mpu_dev, "%s: cpu%d: no freq match for %d(ret=%d)\n",
-				__func__, policy->cpu, target_freq, ret);
+			__func__, policy->cpu, target_freq, ret);
 		return ret;
 	}
 
@@ -209,10 +279,15 @@ static void omap_thermal_step_freq_down(struct cpufreq_policy *policy)
 		pr_info("%s: temperature too high, starting cpu throtling at max %u\n",
 			__func__, max_thermal);
 
-	cur = omap_getspeed(0);
-	if (cur > max_thermal)
-		omap_cpufreq_scale(policy, max_thermal, cur,
-				   CPUFREQ_RELATION_L);
+	if (!is_locked) {
+		cur = omap_getspeed(0);
+		if (cur > max_thermal)
+			omap_cpufreq_scale(policy, max_thermal, cur,
+					   CPUFREQ_RELATION_L);
+	} else {
+		pr_warn("%s: thermal throttling can't be done while locked\n",
+			__func__);
+	}
 }
 
 /* This function needs to be called with omap_cpufreq_lock held */
@@ -226,9 +301,14 @@ static void omap_thermal_step_freq_up(struct cpufreq_policy *policy)
 		pr_info("%s: temperature reduced, stepping up to %i\n",
 			__func__, current_target_freq);
 
-	cur = omap_getspeed(0);
-	omap_cpufreq_scale(policy, current_target_freq, cur,
-			   CPUFREQ_RELATION_L);
+	if (!is_locked) {
+		cur = omap_getspeed(0);
+		omap_cpufreq_scale(policy, current_target_freq, cur,
+				   CPUFREQ_RELATION_L);
+	} else {
+		pr_warn("%s: thermal throttling can't be done while locked\n",
+			__func__);
+	}
 }
 
 /* This function needs to be called with omap_cpufreq_lock held */
@@ -253,10 +333,15 @@ static void omap_thermal_step_freq(struct cpufreq_policy *policy,
 		pr_info("%s: temperature is changing, starting cpu throtling at max %u\n",
 			__func__, max_thermal);
 
-	cur = omap_getspeed(0);
-	if (cur > max_thermal)
-		omap_cpufreq_scale(policy, max_thermal, cur,
-				   CPUFREQ_RELATION_L);
+	if (!is_locked) {
+		cur = omap_getspeed(0);
+		if (cur > max_thermal)
+			omap_cpufreq_scale(policy, max_thermal, cur,
+					   CPUFREQ_RELATION_L);
+	} else {
+		pr_warn("%s: thermal throttling can't be done while locked\n",
+			__func__);
+	}
 }
 
 /*
@@ -389,9 +474,14 @@ static int duty_cycle_apply_cooling(struct thermal_dev *dev, int max)
 
 	max_thermal = max;
 
-	cur = omap_getspeed(0);
-	omap_cpufreq_scale(&policy, current_target_freq, cur,
-			   CPUFREQ_RELATION_L);
+	if (!is_locked) {
+		cur = omap_getspeed(0);
+		omap_cpufreq_scale(&policy, current_target_freq, cur,
+				   CPUFREQ_RELATION_L);
+	} else {
+		pr_warn("%s: thermal throttling can't be done while locked\n",
+			__func__);
+	}
 
 out:
 	mutex_unlock(&omap_cpufreq_lock);
@@ -495,6 +585,41 @@ static struct freq_attr *omap_cpufreq_attr[] = {
 	NULL,
 };
 
+static int omap_cpufreq_pm_notifier_event(struct notifier_block *this,
+					  unsigned long event, void *ptr)
+{
+	int ret;
+
+	if (safe_suspend_freq) {
+		switch (event) {
+		case PM_SUSPEND_PREPARE:
+			resume_freq = cpufreq_get(0);
+			ret = cpufreq_driver_target(cpufreq_cpu_get(0),
+						    safe_suspend_freq,
+						    CPUFREQ_RELATION_L |
+						    OMAP_CPUFREQ_LOCK_PREPARE);
+			if (ret < 0)
+				return NOTIFY_BAD;
+
+			return NOTIFY_OK;
+
+		case PM_POST_SUSPEND:
+			cpufreq_driver_target(cpufreq_cpu_get(0),
+					      resume_freq,
+					      CPUFREQ_RELATION_L |
+					      OMAP_CPUFREQ_LOCK_COMPLETE);
+
+			return NOTIFY_OK;
+		}
+	}
+
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block omap_cpufreq_pm_notifier = {
+	.notifier_call = omap_cpufreq_pm_notifier_event,
+};
+
 static struct cpufreq_driver omap_driver = {
 	.flags		= CPUFREQ_STICKY,
 	.verify		= omap_verify_speed,
@@ -530,6 +655,8 @@ static int __init omap_cpufreq_init(void)
 		return -EINVAL;
 	}
 
+	register_pm_notifier(&omap_cpufreq_pm_notifier);
+
 	ret = cpufreq_register_driver(&omap_driver);
 	omap_cpufreq_ready = !ret;
 
@@ -557,6 +684,7 @@ static void __exit omap_cpufreq_exit(void)
 	omap_cpufreq_cooling_exit();
 	omap_duty_cooling_exit();
 	cpufreq_unregister_driver(&omap_driver);
+	unregister_pm_notifier(&omap_cpufreq_pm_notifier);
 }
 
 MODULE_DESCRIPTION("cpufreq driver for OMAP SoCs");

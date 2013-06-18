@@ -966,20 +966,6 @@ static int sr_classp5_suspend_noirq(struct omap_sr *sr)
 	 */
 	mutex_lock(&omap_dvfs_lock);
 
-	/* Check if calibration is active at this moment if yes -
-	 * abort suspend.
-	 */
-	if (work_data->work_active) {
-		pr_warn("%s: %s Calibration is active, abort suspend\n",
-			__func__, sr->name);
-		ret = -EBUSY;
-		goto finish_suspend;
-	}
-
-	/*
-	 * Check if current voltage is calibrated if no -
-	 * abort suspend.
-	 */
 	voltdm = sr->voltdm;
 	volt_data = omap_voltage_get_curr_vdata(voltdm);
 	if (IS_ERR_OR_NULL(volt_data)) {
@@ -989,9 +975,25 @@ static int sr_classp5_suspend_noirq(struct omap_sr *sr)
 		goto finish_suspend;
 	}
 
+
+	/*
+	 * Check if calibration is active at this moment if yes -
+	 * abort suspend.
+	 */
+	if (work_data->work_active) {
+		pr_warn("%s: %s Calibration is active, abort suspend (Vnom=%u)\n",
+			__func__, sr->name, volt_data->volt_nominal);
+		ret = -EBUSY;
+		goto finish_suspend;
+	}
+
+	/*
+	 * Check if current voltage is calibrated if no -
+	 * abort suspend.
+	 */
 	if (!volt_data->volt_calibrated) {
-		pr_warn("%s: %s Calibration hasn't been done, abort suspend\n",
-			__func__, sr->name);
+		pr_warn("%s: %s Calibration hasn't been done, abort suspend  (Vnom=%u)\n",
+			__func__, sr->name, volt_data->volt_nominal);
 		ret = -EBUSY;
 		goto finish_suspend;
 	}
