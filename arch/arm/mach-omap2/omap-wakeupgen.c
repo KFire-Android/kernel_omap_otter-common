@@ -452,6 +452,19 @@ bool omap_wakeupgen_check_interrupts(char *report_string)
 
 	for (i = 0; i < spi_irq_banks - 1; i++) {
 		gica = gic_readl(GIC_DIST_PENDING_SET, i + 1);
+
+		/*
+		 * HACK: On OMAP4 GP devices 8th (secure) interrupt
+		 * is constantly pending and thus preventing suspend.
+		 * The source of this interrupt is CONTROL_CORE_SEC_STATUS
+		 * register. This register can't be cleared on GP device
+		 * because it is accessible for write only from secure
+		 * privileged mode. So just ignore 8th interrupt in this check.
+		 */
+		if (i == 0 && cpu_is_omap44xx() &&
+		    (omap_type() == OMAP2_DEVICE_TYPE_GP))
+			gica &= ~(1 << 8);
+
 		wakea_c0 = wakeupgen_readl(i, 0);
 		wakea_c1 = wakeupgen_readl(i, 1);
 
@@ -536,13 +549,14 @@ void __init omap_wakeupgen_init_finish(void)
 	max_spi_reg = gic_readl(GIC_DIST_CTR, 0) & 0x1f;
 
 	/*
-	 * Set CPU0 GIC backup flag permanently for omap4460 GP,
+	 * Set CPU0 GIC backup flag permanently for omap4460/70 GP,
 	 * this is needed because of the ROM code bug that breaks
 	 * GIC during wakeup from device off. This errata fix also
 	 * clears the GIC save area during init to prevent restoring
 	 * garbage to the GIC.
 	 */
-	if (cpu_is_omap446x() && omap_type() == OMAP2_DEVICE_TYPE_GP)
+	if ((cpu_is_omap446x() || cpu_is_omap447x()) &&
+	    omap_type() == OMAP2_DEVICE_TYPE_GP)
 		pm44xx_errata |= PM_OMAP4_ROM_CPU1_BACKUP_ERRATUM_xxx;
 
 	if (cpu_is_omap44xx() && (omap_type() == OMAP2_DEVICE_TYPE_GP)) {
