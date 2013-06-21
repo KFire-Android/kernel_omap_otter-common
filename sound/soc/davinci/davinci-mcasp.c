@@ -937,19 +937,10 @@ static int davinci_mcasp_trigger(struct snd_pcm_substream *substream,
 	case SNDRV_PCM_TRIGGER_RESUME:
 	case SNDRV_PCM_TRIGGER_START:
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
-		ret = pm_runtime_get_sync(dev->dev);
-		if (IS_ERR_VALUE(ret))
-			dev_err(dev->dev, "pm_runtime_get_sync() failed\n");
 		davinci_mcasp_start(dev, substream->stream);
 		break;
 
 	case SNDRV_PCM_TRIGGER_SUSPEND:
-		davinci_mcasp_stop(dev, substream->stream);
-		ret = pm_runtime_put_sync(dev->dev);
-		if (IS_ERR_VALUE(ret))
-			dev_err(dev->dev, "pm_runtime_put_sync() failed\n");
-		break;
-
 	case SNDRV_PCM_TRIGGER_STOP:
 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
 		davinci_mcasp_stop(dev, substream->stream);
@@ -1211,12 +1202,6 @@ static int davinci_mcasp_probe(struct platform_device *pdev)
 
 	pm_runtime_enable(&pdev->dev);
 
-	ret = pm_runtime_get_sync(&pdev->dev);
-	if (IS_ERR_VALUE(ret)) {
-		dev_err(&pdev->dev, "pm_runtime_get_sync() failed\n");
-		return ret;
-	}
-
 	dev->base = devm_ioremap(&pdev->dev, mem->start, resource_size(mem));
 	if (!dev->base) {
 		dev_err(&pdev->dev, "ioremap failed\n");
@@ -1284,7 +1269,6 @@ static int davinci_mcasp_probe(struct platform_device *pdev)
 err_unregister_dai:
 	snd_soc_unregister_dai(&pdev->dev);
 err_release_clk:
-	pm_runtime_put_sync(&pdev->dev);
 	pm_runtime_disable(&pdev->dev);
 	return ret;
 }
@@ -1295,7 +1279,6 @@ static int davinci_mcasp_remove(struct platform_device *pdev)
 	snd_soc_unregister_dai(&pdev->dev);
 	davinci_soc_platform_unregister(&pdev->dev);
 
-	pm_runtime_put_sync(&pdev->dev);
 	pm_runtime_disable(&pdev->dev);
 
 	return 0;
