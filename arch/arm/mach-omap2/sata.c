@@ -569,7 +569,7 @@ void __init omap_sata_init(void)
 	int			oh_cnt = 1;
 
 	/* For now sata init works only for omap5 */
-	if (!soc_is_omap54xx())
+	if (!soc_is_omap54xx() && !soc_is_dra7xx())
 		return;
 
 	sata_pdata.init		= omap_ahci_plat_init;
