@@ -2003,12 +2003,8 @@ int snd_soc_dapm_mixer_update_power(struct snd_soc_dapm_widget *widget,
 }
 EXPORT_SYMBOL_GPL(snd_soc_dapm_mixer_update_power);
 
-/* show dapm widget status in sys fs */
-static ssize_t dapm_widget_show(struct device *dev,
-	struct device_attribute *attr, char *buf)
+static ssize_t dapm_widget_show_codec(struct snd_soc_codec *codec, char *buf)
 {
-	struct snd_soc_pcm_runtime *rtd = dev_get_drvdata(dev);
-	struct snd_soc_codec *codec =rtd->codec;
 	struct snd_soc_dapm_widget *w;
 	int count = 0;
 	char *state = "not set";
@@ -2057,6 +2053,22 @@ static ssize_t dapm_widget_show(struct device *dev,
 		break;
 	}
 	count += sprintf(buf + count, "PM State: %s\n", state);
+
+	return count;
+}
+
+/* show dapm widget status in sys fs */
+static ssize_t dapm_widget_show(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	struct snd_soc_pcm_runtime *rtd = dev_get_drvdata(dev);
+	struct snd_soc_codec *codec;
+	int i, count = 0;
+
+	for (i = 0; i < rtd->num_codecs; i++) {
+		codec = rtd->codecs[i].codec;
+		count += dapm_widget_show_codec(codec, buf + count);
+	}
 
 	return count;
 }
@@ -3470,13 +3482,12 @@ int snd_soc_dapm_link_dai_widgets(struct snd_soc_card *card)
 	return 0;
 }
 
-static void soc_dapm_stream_event(struct snd_soc_pcm_runtime *rtd, int stream,
-	int event)
+static void soc_dapm_stream_event(struct snd_soc_pcm_runtime *rtd,
+				  struct snd_soc_dai *cpu_dai,
+				  struct snd_soc_dai *codec_dai,
+				  int stream, int event)
 {
-
 	struct snd_soc_dapm_widget *w_cpu, *w_codec;
-	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
-	struct snd_soc_dai *codec_dai = rtd->codec_dai;
 
 	if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
 		w_cpu = cpu_dai->playback_widget;
@@ -3542,9 +3553,15 @@ void snd_soc_dapm_stream_event(struct snd_soc_pcm_runtime *rtd, int stream,
 			      int event)
 {
 	struct snd_soc_card *card = rtd->card;
+	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
+	struct snd_soc_dai *codec_dai;
+	int i;
 
 	mutex_lock_nested(&card->dapm_mutex, SND_SOC_DAPM_CLASS_RUNTIME);
-	soc_dapm_stream_event(rtd, stream, event);
+	for (i = 0; i < rtd->num_codecs; i++) {
+		codec_dai = rtd->codecs[i].codec_dai;
+		soc_dapm_stream_event(rtd, cpu_dai, codec_dai, stream, event);
+	}
 	mutex_unlock(&card->dapm_mutex);
 }
 
