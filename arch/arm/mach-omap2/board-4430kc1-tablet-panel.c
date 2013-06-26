@@ -29,7 +29,7 @@
 #include <linux/leds_pwm.h>
 #include <linux/leds.h>
 #include <linux/delay.h>
-#include <linux/o2micro_bl.h>
+// #include <linux/pwm_backlight.h>
 
 #include <linux/i2c/twl.h>
 #include <linux/regulator/machine.h>
@@ -52,7 +52,6 @@
 #define LED_PWM2OFF			0x04
 #define TWL6030_TOGGLE3			0x92
 
-#define DEFAULT_BACKLIGHT_BRIGHTNESS	105
 
 static struct omap_dss_device tablet_lcd_device = {
 	.clocks		= {
@@ -173,22 +172,15 @@ static struct platform_device sdp4430_keypad_led = {
 	},
 };
 
-static struct o2micro_backlight_platform_data kc1_led_data = {
-	.name         = "lcd-backlight",
-	.gpio_en_o2m  = -1,
-	.gpio_vol_o2m = -1,
-	.gpio_en_lcd  = 47,
-	.gpio_cabc_en = -1,
-	.timer        = 10,        /* use GPTimer 10 for backlight */
-	.sysclk       = 38400000,  /* input frequency to the timer, 38.4M */
-	.pwmfreq      = 75000,     /* output frequency from timer (10k on bowser) */
-	.totalsteps   = 256,       /* how many backlight steps for the user, also the max brightness */
-	.initialstep  = DEFAULT_BACKLIGHT_BRIGHTNESS
+static struct omap_pwm_led_platform_data kc1_led_data = {
+	.name		 = "lcd-backlight",
+	.intensity_timer = 10,
+	.def_brightness	 = 0x7F,
 };
 
 static struct platform_device kc1_led_device = {
-	.name   = "o2micro-bl",
-	.id     = -1,
+	.name	= "omap_pwm_led",
+	.id	= -1,
 	.dev	= {
 		.platform_data = &kc1_led_data,
 	},
