@@ -2565,7 +2565,7 @@ static struct omap_hwmod omap44xx_mmu_ipu_hwmod = {
 /* mmu dsp */
 
 static struct omap_mmu_dev_attr mmu_dsp_dev_attr = {
-	.da_start	= 0x0,
+	.da_start	= 0x20000000,
 	.da_end		= 0xfffff000,
 	.nr_tlb_entries = 32,
 };
