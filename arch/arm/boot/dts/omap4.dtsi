@@ -576,6 +576,8 @@
 				compatible = "ti,omap-usb2";
 				reg = <0x4a0ad080 0x58>;
 				ctrl-module = <&omap_control_usb>;
+				wkupclk = "usb_phy_cm_clk32k";
+				optclk = "usb_otg_ss_refclk960m";
 			};
 		};
 
