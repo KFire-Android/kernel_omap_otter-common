@@ -348,8 +348,24 @@ static inline void mcasp_set_ctl_reg(void __iomem *regs, u32 val)
 
 static void mcasp_start_rx(struct davinci_audio_dev *dev)
 {
+	u32 rxfmctl = mcasp_get_reg(dev->base + DAVINCI_MCASP_RXFMCTL_REG);
+
 	mcasp_set_ctl_reg(dev->base + DAVINCI_MCASP_GBLCTLR_REG, RXHCLKRST);
 	mcasp_set_ctl_reg(dev->base + DAVINCI_MCASP_GBLCTLR_REG, RXCLKRST);
+
+	/*
+	 * Enable TX FSG when McASP is in sync mode and is master since the
+	 * TX section provides FSYNC for RX too. TX clk dividers are also
+	 * enabled for cases where ACLKR pin is not connected (typically
+	 * done when AFSR is not used either)
+	 */
+	if (rxfmctl & AFSRE) {
+		mcasp_set_ctl_reg(dev->base + DAVINCI_MCASP_GBLCTLX_REG,
+				  TXHCLKRST);
+		mcasp_set_ctl_reg(dev->base + DAVINCI_MCASP_GBLCTLX_REG,
+				  TXCLKRST);
+	}
+
 	mcasp_set_ctl_reg(dev->base + DAVINCI_MCASP_GBLCTLR_REG, RXSERCLR);
 	mcasp_set_reg(dev->base + DAVINCI_MCASP_RXBUF_REG, 0);
 
@@ -359,6 +375,10 @@ static void mcasp_start_rx(struct davinci_audio_dev *dev)
 
 	mcasp_set_ctl_reg(dev->base + DAVINCI_MCASP_GBLCTLR_REG, RXSMRST);
 	mcasp_set_ctl_reg(dev->base + DAVINCI_MCASP_GBLCTLR_REG, RXFSRST);
+
+	if (rxfmctl & AFSRE)
+		mcasp_set_ctl_reg(dev->base + DAVINCI_MCASP_GBLCTLX_REG,
+				  TXFSRST);
 }
 
 static void mcasp_start_tx(struct davinci_audio_dev *dev)
@@ -431,13 +451,28 @@ static void davinci_mcasp_start(struct davinci_audio_dev *dev, int stream)
 
 static void mcasp_stop_rx(struct davinci_audio_dev *dev)
 {
+	u32 gblctl = mcasp_get_reg(dev->base + DAVINCI_MCASP_GBLCTLX_REG);
+	u32 rxfmctl = mcasp_get_reg(dev->base + DAVINCI_MCASP_RXFMCTL_REG);
+
+	/* Disable TX FSG if RX was the only active user */
+	if ((rxfmctl & AFSRE) && !(gblctl & TXSMRST))
+		mcasp_set_reg(dev->base + DAVINCI_MCASP_GBLCTLX_REG, 0);
+
 	mcasp_set_reg(dev->base + DAVINCI_MCASP_GBLCTLR_REG, 0);
 	mcasp_set_reg(dev->base + DAVINCI_MCASP_RXSTAT_REG, 0xFFFFFFFF);
 }
 
 static void mcasp_stop_tx(struct davinci_audio_dev *dev)
 {
-	mcasp_set_reg(dev->base + DAVINCI_MCASP_GBLCTLX_REG, 0);
+	u32 gblctl = mcasp_get_reg(dev->base + DAVINCI_MCASP_GBLCTLR_REG);
+	u32 rxfmctl = mcasp_get_reg(dev->base + DAVINCI_MCASP_RXFMCTL_REG);
+	u32 val = 0;
+
+	/* Keep FSG active until RX section is stopped too */
+	if ((rxfmctl & AFSRE) && (gblctl & RXSMRST))
+		val =  TXHCLKRST | TXCLKRST | TXFSRST;
+
+	mcasp_set_reg(dev->base + DAVINCI_MCASP_GBLCTLX_REG, val);
 	mcasp_set_reg(dev->base + DAVINCI_MCASP_TXSTAT_REG, 0xFFFFFFFF);
 }
 
