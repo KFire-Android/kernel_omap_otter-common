@@ -797,10 +797,8 @@ struct omap_dss_device {
 		enum omap_dss_dsi_mode dsi_mode;
 		struct omap_dss_dsi_videomode_timings dsi_vm_timings;
 		struct s3d_disp_info s3d_info;
-
 		u32 width_in_um;
 		u32 height_in_um;
-
 	} panel;
 
 	struct {
@@ -1010,6 +1008,8 @@ int dispc_ovl_setup(enum omap_plane plane, const struct omap_overlay_info *oi,
 #define to_dss_driver(x) container_of((x), struct omap_dss_driver, driver)
 #define to_dss_device(x) container_of((x), struct omap_dss_device, dev)
 
+void omapdss_display_get_dimensions(struct omap_dss_device *dssdev,
+                                u32 *width_in_um, u32 *height_in_um);
 void omapdss_dsi_vc_enable_hs(struct omap_dss_device *dssdev, int channel,
 		bool enable);
 int omapdss_dsi_enable_te(struct omap_dss_device *dssdev, bool enable);
