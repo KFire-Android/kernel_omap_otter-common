@@ -82,7 +82,7 @@ static int omap_pcm_hw_params(struct snd_pcm_substream *substream,
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct omap_pcm_dma_data *dma_data;
-	struct dma_slave_config config;
+	struct dma_slave_config config = {0};
 	struct dma_chan *chan;
 	int err = 0;
 
