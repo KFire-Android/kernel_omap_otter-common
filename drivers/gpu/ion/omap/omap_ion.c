@@ -23,6 +23,8 @@
 #include "../ion_priv.h"
 #include "omap_ion_priv.h"
 #include <linux/module.h>
+#include <linux/of.h>
+
 
 struct ion_device *omap_ion_device;
 EXPORT_SYMBOL(omap_ion_device);
@@ -31,6 +33,37 @@ static int num_heaps;
 static struct ion_heap **heaps;
 static struct ion_heap *tiler_heap;
 static struct ion_heap *nonsecure_tiler_heap;
+
+static struct ion_platform_data omap_ion_data = {
+	.nr = 5,
+	.heaps = {
+		{
+			.type = ION_HEAP_TYPE_CARVEOUT,
+			.id = OMAP_ION_HEAP_SECURE_INPUT,
+			.name = "secure_input",
+		},
+		{	.type = OMAP_ION_HEAP_TYPE_TILER,
+			.id = OMAP_ION_HEAP_TILER,
+			.name = "tiler",
+		},
+		{
+			.type = OMAP_ION_HEAP_TYPE_TILER,
+			.id = OMAP_ION_HEAP_NONSECURE_TILER,
+			.name = "nonsecure_tiler",
+		},
+		{
+			.type = ION_HEAP_TYPE_SYSTEM,
+			.id = OMAP_ION_HEAP_SYSTEM,
+			.name = "system",
+		},
+		{
+			.type = OMAP_ION_HEAP_TYPE_TILER_RESERVATION,
+			.id = OMAP_ION_HEAP_TILER_RESERVATION,
+			.name = "tiler_reservation",
+		},
+	},
+};
+
 
 int omap_ion_tiler_alloc(struct ion_client *client,
 			 struct omap_ion_tiler_alloc_data *data)
@@ -81,24 +114,63 @@ static long omap_ion_ioctl(struct ion_client *client, unsigned int cmd,
 
 static int omap_ion_probe(struct platform_device *pdev)
 {
-	struct ion_platform_data *pdata = pdev->dev.platform_data;
 	int err;
 	int i;
-
-	num_heaps = pdata->nr;
-
-	heaps = kzalloc(sizeof(struct ion_heap *)*pdata->nr, GFP_KERNEL);
-
+	struct device_node *node = pdev->dev.of_node;
+	uint omap_ion_heap_secure_input_base = 0;
+	uint omap_ion_heap_tiler_base = 0;
+	uint omap_ion_heap_nonsecure_tiler_base = 0;
+	uint omap_ion_heap_secure_input_size = 0;
+	uint omap_ion_heap_tiler_size = 0;
+	uint omap_ion_heap_nonsecure_tiler_size = 0;
+	
 	omap_ion_device = ion_device_create(omap_ion_ioctl);
 	if (IS_ERR_OR_NULL(omap_ion_device)) {
 		kfree(heaps);
 		return PTR_ERR(omap_ion_device);
 	}
 
+	if (node) {
+		of_property_read_u32(node, "ti,omap_ion_heap_secure_input_base",
+				     &omap_ion_heap_secure_input_base);
+		of_property_read_u32(node, "ti,omap_ion_heap_tiler_base",
+				     &omap_ion_heap_tiler_size);
+		of_property_read_u32(node, "ti,omap_ion_heap_nonsecure_tiler_base",
+				     &omap_ion_heap_nonsecure_tiler_base);
+
+		of_property_read_u32(node, "ti,omap_ion_heap_secure_input_size",
+				     &omap_ion_heap_secure_input_size);
+		of_property_read_u32(node, "ti,omap_ion_heap_tiler_size",
+				     &omap_ion_heap_tiler_size);
+		of_property_read_u32(node, "ti,omap_ion_heap_nonsecure_tiler_size",
+				     &omap_ion_heap_nonsecure_tiler_size);
+	}
+
+	num_heaps = omap_ion_data.nr;
+
+	heaps = kzalloc(sizeof(struct ion_heap *)*num_heaps, GFP_KERNEL);
+	
+
+	for (i = 0; i < num_heaps; i++) {
+		struct ion_platform_heap *heap_data = &omap_ion_data.heaps[i];
+		if (heap_data->type == OMAP_ION_HEAP_TYPE_TILER) {
+			if (heap_data->id == OMAP_ION_HEAP_NONSECURE_TILER) {
+				heap_data->base = omap_ion_heap_nonsecure_tiler_base;
+				heap_data->size = omap_ion_heap_nonsecure_tiler_size;
+			} else {
+				heap_data->base = omap_ion_heap_tiler_base;
+				heap_data->size = omap_ion_heap_tiler_size;
+			}
+		} else if (heap_data->type ==
+				ION_HEAP_TYPE_CARVEOUT && heap_data->id == OMAP_ION_HEAP_SECURE_INPUT) {
+			heap_data->base = omap_ion_heap_secure_input_base;
+			heap_data->size = omap_ion_heap_secure_input_size;
+		}
+	}
+
 	/* create the heaps as specified in the board file */
 	for (i = 0; i < num_heaps; i++) {
-		struct ion_platform_heap *heap_data = &pdata->heaps[i];
-
+		struct ion_platform_heap *heap_data = &omap_ion_data.heaps[i];
 		if (heap_data->type == OMAP_ION_HEAP_TYPE_TILER) {
 			heaps[i] = omap_tiler_heap_create(heap_data);
 			if (heap_data->id == OMAP_ION_HEAP_NONSECURE_TILER)
@@ -109,6 +181,7 @@ static int omap_ion_probe(struct platform_device *pdev)
 				OMAP_ION_HEAP_TYPE_TILER_RESERVATION) {
 			heaps[i] = omap_tiler_heap_create(heap_data);
 		} else {
+			heap_data->size = omap_ion_heap_secure_input_size;
 			heaps[i] = ion_heap_create(heap_data);
 		}
 		if (IS_ERR_OR_NULL(heaps[i])) {
@@ -198,10 +271,18 @@ exit:
 }
 EXPORT_SYMBOL(omap_ion_share_fd_to_buffers);
 
+static const struct of_device_id omap_ion_of_match[] = {
+	{.compatible = "ti,ion-omap", },
+	{ },
+};
+
+
 static struct platform_driver ion_driver = {
 	.probe = omap_ion_probe,
 	.remove = omap_ion_remove,
-	.driver = { .name = "ion-omap" }
+	.driver = { .name = "ion-omap",
+				.of_match_table = omap_ion_of_match
+	}
 };
 
 static int __init ion_init(void)

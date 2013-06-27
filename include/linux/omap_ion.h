@@ -19,6 +19,7 @@
 
 #include <linux/types.h>
 
+
 /**
  * struct omap_ion_tiler_alloc_data - metadata passed from userspace for allocations
  * @w:		width of the allocation

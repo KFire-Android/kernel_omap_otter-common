@@ -7,8 +7,21 @@
  */
 /dts-v1/;
 
+/*
+ * Following are the carveout addresses and the sizes. SMC is not reserved for now
+ * C0000000 - SDRAM+1G
+ * BFD00000 - SMC (3MB)
+ * BA300000 - ION (90MB)
+ * B4300000 - TILER SECURE (96 MB)
+ * B3400000 - TILER NONSECURE (15 MB)
+*/
+/memreserve/ 0xba300000 0x5a00000;
+/memreserve/ 0xb4300000 0x6000000;
+/memreserve/ 0xb3400000 0xf00000;
+
 /include/ "omap5.dtsi"
 /include/ "samsung_k3pe0e000b.dtsi"
+
 
 / {
 	model = "TI OMAP5 uEVM board";
@@ -72,6 +85,19 @@
 		clock-alias = "main_clk";
 		device = <&hsusb2_phy>;
 		clock-frequency = <19200000>; /* 19.2 MHz */
+	};
+
+	ion_config {
+		compatible = "ti,ion-omap";
+		ti,omap_ion_heap_secure_input_base = <0xba300000>;
+		ti,omap_ion_heap_tiler_base = <0xb4300000>;
+		ti,omap_ion_heap_nonsecure_tiler_base = <0xf00000>;
+		/*90 MB*/
+		ti,omap_ion_heap_secure_input_size = <0x5A00000>;
+		/*96 MB*/
+		ti,omap_ion_heap_tiler_size = <0x6000000>;
+		/*15 MB*/
+		ti,omap_ion_heap_nonsecure_tiler_size = <0xF00000>;
 	};
 
 	sound {
