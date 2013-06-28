@@ -103,6 +103,7 @@ int tiler_map_show(struct seq_file *s, void *arg);
 /* pin/unpin */
 int tiler_pin(struct tiler_block *block, struct page **pages,
 		uint32_t npages, uint32_t roll, bool wait);
+int tiler_pin_phys(struct tiler_block *block, u32 *phys_addrs, u32 num_pages);
 int tiler_unpin(struct tiler_block *block);
 
 /* reserve/release */
