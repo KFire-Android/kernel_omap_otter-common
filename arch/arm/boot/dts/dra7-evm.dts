@@ -43,7 +43,15 @@
         pinctrl-names = "default";
         pinctrl-0 = <
 		&vout1_pins
+		&usb_pins
 	>;
+
+	usb_pins: pinmux_usb_pins {
+                pinctrl-single,pins = <
+			0x280	0xc0000	/* DRV1_VBUS SLEW | PULLDEN | MODE0 */
+			0x284	0xc0000	/* DRV2_VBUS SLEW | PULLDEN | MODE0 */
+                >;
+        };
 
 	i2c2_pins: pinmux_i2c2_pins {
                 pinctrl-single,pins = <
