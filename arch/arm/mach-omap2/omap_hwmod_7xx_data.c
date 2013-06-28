@@ -474,6 +474,55 @@ static struct omap_hwmod dra7xx_dma_system_hwmod = {
 };
 
 /*
+ * 'dsp' class
+ * dsp sub-system
+ */
+
+static struct omap_hwmod_class dra7xx_dsp_hwmod_class = {
+	.name   = "dsp",
+};
+
+static struct omap_hwmod_rst_info dra7xx_dsp_resets[] = {
+	{ .name = "dsp", .rst_shift = 0 },
+};
+
+/* dsp1 processor */
+static struct omap_hwmod dra7xx_dsp1_hwmod = {
+	.name		= "dsp1",
+	.class		= &dra7xx_dsp_hwmod_class,
+	.clkdm_name	= "dsp1_clkdm",
+	.rst_lines	= dra7xx_dsp_resets,
+	.rst_lines_cnt	= ARRAY_SIZE(dra7xx_dsp_resets),
+	.main_clk	= "dpll_dsp_m2_ck",
+	.prcm = {
+		.omap4 = {
+			.clkctrl_offs = DRA7XX_CM_DSP1_DSP1_CLKCTRL_OFFSET,
+			.rstctrl_offs = DRA7XX_RM_DSP1_RSTCTRL_OFFSET,
+			.context_offs = DRA7XX_RM_DSP1_DSP1_CONTEXT_OFFSET,
+			.modulemode   = MODULEMODE_HWCTRL,
+		},
+	},
+};
+
+/* dsp2 processor */
+static struct omap_hwmod dra7xx_dsp2_hwmod = {
+	.name		= "dsp2",
+	.class		= &dra7xx_dsp_hwmod_class,
+	.clkdm_name	= "dsp2_clkdm",
+	.rst_lines	= dra7xx_dsp_resets,
+	.rst_lines_cnt	= ARRAY_SIZE(dra7xx_dsp_resets),
+	.main_clk	= "dpll_dsp_m2_ck",
+	.prcm = {
+		.omap4 = {
+			.clkctrl_offs = DRA7XX_CM_DSP2_DSP2_CLKCTRL_OFFSET,
+			.rstctrl_offs = DRA7XX_RM_DSP2_RSTCTRL_OFFSET,
+			.context_offs = DRA7XX_RM_DSP2_DSP2_CONTEXT_OFFSET,
+			.modulemode   = MODULEMODE_HWCTRL,
+		},
+	},
+};
+
+/*
  * 'dss' class
  *
  */
@@ -1251,6 +1300,56 @@ static struct omap_hwmod dra7xx_i2c5_hwmod = {
 		},
 	},
 	.dev_attr	= &i2c_dev_attr,
+};
+
+/*
+ * 'ipu' class
+ * imaging processor unit
+ */
+
+static struct omap_hwmod_class dra7xx_ipu_hwmod_class = {
+	.name	= "ipu",
+};
+
+static struct omap_hwmod_rst_info dra7xx_ipu_resets[] = {
+	{ .name = "cpu0", .rst_shift = 0 },
+	{ .name = "cpu1", .rst_shift = 1 },
+};
+
+/* ipu1 processor */
+static struct omap_hwmod dra7xx_ipu1_hwmod = {
+	.name		= "ipu1",
+	.class		= &dra7xx_ipu_hwmod_class,
+	.clkdm_name	= "ipu1_clkdm",
+	.rst_lines	= dra7xx_ipu_resets,
+	.rst_lines_cnt	= ARRAY_SIZE(dra7xx_ipu_resets),
+	.main_clk	= "dpll_core_h22x2_ck",
+	.prcm = {
+		.omap4 = {
+			.clkctrl_offs = DRA7XX_CM_IPU1_IPU1_CLKCTRL_OFFSET,
+			.rstctrl_offs = DRA7XX_RM_IPU1_RSTCTRL_OFFSET,
+			.context_offs = DRA7XX_RM_IPU1_IPU1_CONTEXT_OFFSET,
+			.modulemode   = MODULEMODE_HWCTRL,
+		},
+	},
+};
+
+/* ipu2 processor */
+static struct omap_hwmod dra7xx_ipu2_hwmod = {
+	.name		= "ipu2",
+	.class		= &dra7xx_ipu_hwmod_class,
+	.clkdm_name	= "ipu2_clkdm",
+	.rst_lines	= dra7xx_ipu_resets,
+	.rst_lines_cnt	= ARRAY_SIZE(dra7xx_ipu_resets),
+	.main_clk	= "dpll_core_h22x2_ck",
+	.prcm = {
+		.omap4 = {
+			.clkctrl_offs = DRA7XX_CM_IPU2_IPU2_CLKCTRL_OFFSET,
+			.rstctrl_offs = DRA7XX_RM_IPU2_RSTCTRL_OFFSET,
+			.context_offs = DRA7XX_RM_IPU2_IPU2_CONTEXT_OFFSET,
+			.modulemode   = MODULEMODE_HWCTRL,
+		},
+	},
 };
 
 /*
@@ -4191,6 +4290,22 @@ static struct omap_hwmod_ocp_if dra7xx_l4_cfg__dma_system = {
 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
 };
 
+/* dsp1 -> l3_main_1 */
+static struct omap_hwmod_ocp_if dra7xx_dsp1__l3_main_1 = {
+	.master		= &dra7xx_dsp1_hwmod,
+	.slave		= &dra7xx_l3_main_1_hwmod,
+	.clk		= "l3_iclk_div",
+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+};
+
+/* dsp2 -> l3_main_1 */
+static struct omap_hwmod_ocp_if dra7xx_dsp2__l3_main_1 = {
+	.master		= &dra7xx_dsp2_hwmod,
+	.slave		= &dra7xx_l3_main_1_hwmod,
+	.clk		= "l3_iclk_div",
+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+};
+
 static struct omap_hwmod_addr_space dra7xx_dss_addrs[] = {
 	{
 		.name		= "family",
@@ -4623,6 +4738,22 @@ static struct omap_hwmod_addr_space dra7xx_mailbox1_addrs[] = {
 		.flags		= ADDR_TYPE_RT
 	},
 	{ }
+};
+
+/* ipu1 -> l3_main_1 */
+static struct omap_hwmod_ocp_if dra7xx_ipu1__l3_main_1 = {
+	.master		= &dra7xx_ipu1_hwmod,
+	.slave		= &dra7xx_l3_main_1_hwmod,
+	.clk		= "l3_iclk_div",
+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+};
+
+/* ipu2 -> l3_main_1 */
+static struct omap_hwmod_ocp_if dra7xx_ipu2__l3_main_1 = {
+	.master		= &dra7xx_ipu2_hwmod,
+	.slave		= &dra7xx_l3_main_1_hwmod,
+	.clk		= "l3_iclk_div",
+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
 };
 
 /* l4_cfg -> mailbox1 */
@@ -6450,6 +6581,8 @@ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
 	&dra7xx_l4_cfg__dma_system,
 	&dra7xx_l3_main_1__dss,
 	&dra7xx_l3_main_1__dispc,
+	&dra7xx_dsp1__l3_main_1,
+	&dra7xx_dsp2__l3_main_1,
 	&dra7xx_l3_main_1__hdmi,
 	&dra7xx_l4_per1__elm,
 	&dra7xx_emif_ocp_fw__emif1,
@@ -6471,6 +6604,8 @@ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
 	&dra7xx_l4_per1__i2c3,
 	&dra7xx_l4_per1__i2c4,
 	&dra7xx_l4_per1__i2c5,
+	&dra7xx_ipu1__l3_main_1,
+	&dra7xx_ipu2__l3_main_1,
 	&dra7xx_l4_cfg__mailbox1,
 	&dra7xx_l4_per3__mailbox2,
 	&dra7xx_l4_per3__mailbox3,
