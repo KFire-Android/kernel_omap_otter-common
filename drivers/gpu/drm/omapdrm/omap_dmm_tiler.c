@@ -535,6 +535,65 @@ bool dmm_is_available(void)
 	return omap_dmm ? true : false;
 }
 
+/* rotation APIs */
+bool is_tiler_addr(uint32_t phys)
+{
+	return phys >= TILVIEW_8BIT && phys < TILVIEW_END;
+}
+EXPORT_SYMBOL(is_tiler_addr);
+
+int tiler_get_fmt(uint32_t phys, enum tiler_fmt *fmt)
+{
+	if (!is_tiler_addr(phys))
+		return 0;
+
+	*fmt = TILER_FMT(phys);
+	return 1;
+}
+EXPORT_SYMBOL(tiler_get_fmt);
+
+void tilview_create(struct tiler_view_t *view, u32 phys, u32 width, u32 height)
+{
+	enum tiler_fmt fmt = TILER_FMT(view->tsptr);
+	BUG_ON(!is_tiler_addr(phys));
+
+	view->tsptr = phys & ~MASK_VIEW;
+	view->bpp = geom[TILER_FMT(phys)].cpp;
+	view->width = width;
+	view->height = height;
+	view->h_inc = view->bpp;
+	view->v_inc = tiler_stride(fmt, view->tsptr);
+}
+EXPORT_SYMBOL(tilview_create);
+
+void tilview_get(struct tiler_view_t *view, struct tiler_block *blk)
+{
+    enum tiler_fmt fmt = TILER_FMT(view->tsptr);
+
+	view->tsptr = tiler_ssptr(blk);
+	view->bpp = geom[TILER_FMT(view->tsptr)].cpp;
+	view->width = blk->width;
+	view->height = blk->height;
+	view->h_inc = view->bpp;
+	view->v_inc = tiler_stride(fmt, view->tsptr);
+}
+EXPORT_SYMBOL(tilview_get);
+
+int tilview_crop(struct tiler_view_t *view, u32 left, u32 top, u32 width,
+		u32 height)
+{
+	/* check for valid crop */
+	if (left + width < left || left + width > view->width ||
+	    top + height < top || top + height > view->height)
+		return -EINVAL;
+
+	view->tsptr += left * view->h_inc + top * view->v_inc;
+	view->width = width;
+	view->height = height;
+	return 0;
+}
+EXPORT_SYMBOL(tilview_crop);
+
 static int omap_dmm_remove(struct platform_device *dev)
 {
 	struct tiler_block *block, *_block;

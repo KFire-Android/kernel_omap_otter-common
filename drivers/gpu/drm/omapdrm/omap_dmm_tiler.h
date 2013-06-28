@@ -38,6 +38,11 @@ struct tiler_block {
 	struct list_head alloc_node;	/* node for global block list */
 	struct tcm_area area;		/* area */
 	enum tiler_fmt fmt;		/* format */
+	uint32_t width;
+	uint32_t height;
+	uint32_t stride;		/* 2D: length of one line in pages
+					   1D: length of buffer rounded to
+						PAGE_SIZE */
 };
 
 /* bits representing the same slot in DMM-TILER hw-block */
@@ -70,6 +75,14 @@ S Y X	Description				Alternate description
 #define MASK_X_INVERT		(1 << 29)
 #define SHIFT_ACC_MODE		27
 #define MASK_ACC_MODE		3
+
+#define VIEW_SIZE		(1u << (CONT_WIDTH_BITS + CONT_HEIGHT_BITS))
+#define VIEW_MASK		(VIEW_SIZE - 1u)
+
+#define MASK_VIEW		(MASK_X_INVERT | MASK_Y_INVERT | MASK_XY_FLIP)
+
+#define TILER_FMT(x)	((enum tiler_fmt) \
+		((x >> SHIFT_ACC_MODE) & MASK_ACC_MODE))
 
 #define MASK(bits) ((1 << (bits)) - 1)
 
@@ -107,6 +120,26 @@ size_t tiler_size(enum tiler_fmt fmt, uint16_t w, uint16_t h);
 size_t tiler_vsize(enum tiler_fmt fmt, uint16_t w, uint16_t h);
 void tiler_align(enum tiler_fmt fmt, uint16_t *w, uint16_t *h);
 bool dmm_is_available(void);
+
+/* rotation */
+/* tiler (image/video frame) view */
+struct tiler_view_t {
+	uint32_t tsptr;		/* tiler space addr */
+	uint32_t width;		/* width */
+	uint32_t height;	/* height */
+	uint32_t bpp;		/* bytes per pixel */
+	int h_inc;		/* horizontal increment */
+	int v_inc;		/* vertical increment */
+};
+
+bool is_tiler_addr(uint32_t phys);
+int tiler_get_fmt(uint32_t phys, enum tiler_fmt *fmt);
+void tilview_create(struct tiler_view_t *view, u32 phys, u32 width, u32 height);
+void tilview_get(struct tiler_view_t *view, struct tiler_block *blk);
+int tilview_crop(struct tiler_view_t *view, u32 left, u32 top, u32 width,
+		u32 height);
+int tilview_rotate(struct tiler_view_t *view, int rotation);
+int tilview_flip(struct tiler_view_t *view, bool flip_x, bool flip_y);
 
 extern struct platform_driver omap_dmm_driver;
 
