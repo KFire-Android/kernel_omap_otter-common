@@ -18,3 +18,11 @@ config ION_OMAP
 	  This option shall be chosen if ion carveout is required
 	  for OMAP4/5. The corresponding board file shall also have
 	  the ion carveout implementation.
+
+config ION_OMAP_USE_DYNAMIC_PAGES
+	bool "Use dynamic memory instead of static reservations"
+	depends on ION_OMAP
+	help
+	  Choose this option to use heap space for ION allocations
+	  instead of the standard memory reservations.
+	  Useful for lower memory boards.
