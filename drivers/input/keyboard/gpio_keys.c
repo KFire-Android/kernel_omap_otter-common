@@ -654,6 +654,20 @@ static int __devinit gpio_keys_probe(struct platform_device *pdev)
 	int i, error;
 	int wakeup = 0;
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+/*SW5, Anvoi, 20111215, Config key VolumeUp/VolumeDown{*/
+    void __iomem *phymux_base = NULL;
+    /* Config GPIO_WK1 as GPIO_1 */
+    phymux_base = ioremap(0x4A100000, 0x1000);
+    __raw_writel(0x15700000, phymux_base + 0x600);
+    iounmap(phymux_base);
+
+    phymux_base = ioremap(0x4A31E000, 0x1000);
+    __raw_writel(0x10000000, phymux_base + 0x600);
+    iounmap(phymux_base);
+/*SW5, Anvoi, 20111215, Config key VolumeUp/VolumeDown}*/
+#endif
+
 	if (!pdata) {
 		error = gpio_keys_get_devtree_pdata(dev, &alt_pdata);
 		if (error)
