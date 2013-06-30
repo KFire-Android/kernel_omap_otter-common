@@ -764,4 +764,22 @@ config INPUT_BU52061_HALLSENSOR
 	help
 	  Say Y here if you want to use hall sensor Rohm BU52061NVX.
 
+config INPUT_MAX44007
+	tristate "MAX44007 ambient light sensor"
+#	depends on I2C
+	help
+	  Say Y here if you want to use proximity sensor max44007.
+#	  through I2C interface.
+
+config INPUT_MAX44007_HYSTERESIS
+	int "ALS Hysteresis (Lux)"
+	depends on (INPUT_MAX44007)
+	default "20"
+	---help---
+	  The amount of change (hysteresis)
+	  before the ALS reports new data.
+	  The units are similar to percentage,
+	  but for faster calculation, they are
+	  in 1/256 parts of the existing Lux.
+
 endif
