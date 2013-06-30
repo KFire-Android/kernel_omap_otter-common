@@ -126,6 +126,50 @@ struct tag_cmdline {
 	char	cmdline[1];	/* this is the minimum size */
 };
 
+#if defined (CONFIG_MACH_OMAP4_BOWSER)
+/* 16 byte id for serial number. "64-bits wasn't enough for us." */
+#define ATAG_SERIAL16	0x5441000a
+
+/* 16 byte id for a board revision. */
+#define ATAG_REVISION16	0x5441000b
+
+/* 16 digit alphanumeric id used for serial numbers, board ids, etc. */
+struct tag_id16 {
+	u8 data[16];
+};
+
+/* mac address / secret */
+#define ATAG_MACADDR	0x5441000c
+
+struct tag_macaddr {
+	u8 secret[32];
+	u8 wifi_addr[16];
+	u8 bt_addr[16];
+};
+
+/* bootmode/postmode variables */
+#define ATAG_BOOTMODE	0x5441000d
+
+struct tag_bootmode {
+   u8 boot[16];
+   u8 post[16];
+};
+
+/* product id variables */
+#define ATAG_PRODUCTID	0x5441000f
+struct tag_productid {
+   u8 pid[32];
+};
+
+#endif // (CONFIG_MACH_OMAP4_BOWSER)
+
+/* Gyro calibration variables */
+#define ATAG_GYROCAL	0x5441000e
+
+struct tag_gyrocal {
+   u8 gyrocal_data[36];
+};
+
 /* acorn RiscPC specific information */
 #define ATAG_ACORN	0x41000101
 
@@ -153,6 +197,13 @@ struct tag {
 		struct tag_initrd	initrd;
 		struct tag_serialnr	serialnr;
 		struct tag_revision	revision;
+#if defined (CONFIG_MACH_OMAP4_BOWSER)
+		struct tag_id16    	id16;
+		struct tag_macaddr	macaddr;
+		struct tag_bootmode	bootmode;
+		struct tag_productid	productid;
+#endif //CONFIG_MACH_OMAP4_BOWSER
+		struct tag_gyrocal	gyrocal;
 		struct tag_videolfb	videolfb;
 		struct tag_cmdline	cmdline;
 

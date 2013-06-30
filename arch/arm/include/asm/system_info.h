@@ -20,6 +20,27 @@ extern unsigned int system_serial_low;
 extern unsigned int system_serial_high;
 extern unsigned int mem_fclk_21285;
 
+#if defined(CONFIG_MACH_OMAP4_BOWSER)
+#define SERIAL16_SIZE	16
+#define REVISION16_SIZE	16
+#define MAC_ADDR_SIZE	16
+#define MAC_SEC_SIZE	32
+#define BOOTMODE_SIZE	16
+#define PRODUCTID_SIZE	32
+
+extern unsigned char system_rev16[REVISION16_SIZE+1];
+extern unsigned char system_serial16[SERIAL16_SIZE+1];
+extern unsigned char system_mac_addr[MAC_ADDR_SIZE+1];
+extern unsigned char system_mac_sec[MAC_SEC_SIZE+1];
+extern unsigned char system_bootmode[BOOTMODE_SIZE+1];
+extern unsigned char system_postmode[BOOTMODE_SIZE+1];
+extern unsigned char system_bt_mac_addr[MAC_ADDR_SIZE+1];
+extern unsigned char system_productid[PRODUCTID_SIZE+1];
+
+#endif //CONFIG_MACH_OMAP4_BOWSER
+#define GYROCAL_SIZE	36
+extern unsigned char system_gyro_cal[GYROCAL_SIZE+1];
+
 extern int __pure cpu_architecture(void);
 
 #endif /* !__ASSEMBLY__ */

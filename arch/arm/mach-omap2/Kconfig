@@ -419,6 +419,49 @@ config OTTER2
 	bool "KFire 2nd Gen (Otter2)"
 	depends on MACH_OMAP_4430_KC1
 
+config MACH_OMAP4_BOWSER
+	bool "OMAP4 based Bowser3 board"
+	default y
+	depends on ARCH_OMAP4
+	select LEDS_OMAP4430_SDP_DISPLAY
+	select LEDS_OMAP4430_SDP_KEYPAD
+	select SENSORS_LM75
+	select INPUT_BH1780
+	select INPUT_BMP085
+	select INPUT_HMC5843
+	select INPUT_SFH7741
+	select INPUT_MISC
+	select HWMON
+	select INPUT_CMA3000
+	select INPUT_CMA3000_I2C
+	select OMAP_PACKAGE_CBL
+	select OMAP_PACKAGE_CBS
+	select REGULATOR_FIXED_VOLTAGE
+	select OMAP_TPS6236X
+	select TOUCHSCREEN_SYNTM12XX
+	select TWL6030_POWEROFF
+	select INPUT_TWL6030_PWRBUTTON
+#	select TWL6040_VIB
+	select OMAP_REBOOT_REASON
+
+config MACH_OMAP4_BOWSER_SUBTYPE_TATE
+        bool "OMAP4 Bowser based Tate sub-type board"
+        select MACH_OMAP4_BOWSER
+        depends on ARCH_OMAP4
+
+config MACH_OMAP4_BOWSER_SUBTYPE_JEM
+        bool "OMAP4 Bowser based Jem sub-type board"
+        select MACH_OMAP4_BOWSER
+        depends on ARCH_OMAP4
+
+config MACH_OMAP4_BOWSER_SUBTYPE_JEM_FTM
+        bool "FTM mode for OMAP4 Bowser based Jem sub-type board"
+        depends on MACH_OMAP4_BOWSER_SUBTYPE_JEM
+
+config USE_AMAZON_DUCATI
+        bool "Ducati settings which are compatible with the stock binary from Amazon"
+        depends on MACH_OMAP4_BOWSER
+
 config MACH_OMAP_BLAZE
 	bool "OMAP 44XX Tablet board"
 	default y
