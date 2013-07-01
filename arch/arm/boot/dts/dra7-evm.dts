@@ -75,6 +75,13 @@
 		ti,media-mclk-freq = <5644800>;
 		ti,media-slots = <2>;
 	};
+
+	sound_hdmi {
+		compatible = "ti,omap-hdmi-tpd12s015-audio";
+		ti,model = "OMAP5HDMI";
+		ti,hdmi_audio = <&hdmi>;
+		ti,level_shifter = <&tpd12s015>;
+	};
 };
 
 &dra7_pmx_core {
