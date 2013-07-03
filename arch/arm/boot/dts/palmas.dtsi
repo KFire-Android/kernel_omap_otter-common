@@ -201,16 +201,16 @@
 			ldo7_reg: ldo7 {
 				/* VDD_VPP: vpp1 */
 				regulator-name = "ldo7";
-				regulator-min-microvolt = <1500000>;
-				regulator-max-microvolt = <1500000>;
-				regulator-always-on;
-				regulator-boot-on;
+				regulator-min-microvolt = <2000000>;
+				regulator-max-microvolt = <2000000>;
 				ti,warm_sleep = <0>;
 				ti,roof_floor = <0>;
 				ti,mode_sleep = <0>;
 				ti,warm_reset = <0>;
 				ti,tstep = <0>;
 				ti,vsel = <0>;
+				/* Only for efuse reprograming! */
+				status = "disabled";
 			};
 
 			ldo8_reg: ldo8 {
