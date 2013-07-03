@@ -114,10 +114,8 @@
 			ldo1_reg: ldo1 {
 				/* VDDAPHY_CAM: vdda_csiport */
 				regulator-name = "ldo1";
-				regulator-min-microvolt = <2800000>;
-				regulator-max-microvolt = <2800000>;
-				regulator-always-on;
-				regulator-boot-on;
+				regulator-min-microvolt = <1500000>;
+				regulator-max-microvolt = <1800000>;
 				ti,warm_sleep = <0>;
 				ti,roof_floor = <0>;
 				ti,mode_sleep = <0>;
