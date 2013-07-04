@@ -40,6 +40,7 @@ struct davinci_audio_dev {
 	u8	version;
 	u16	bclk_lrclk_ratio;
 	unsigned int channels;
+	unsigned int sample_bits;
 
 	/* McASP FIFO related */
 	u8	txnumevt;
