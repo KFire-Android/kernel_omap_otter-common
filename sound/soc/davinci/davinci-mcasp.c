@@ -881,7 +881,7 @@ static int davinci_hw_param(struct davinci_audio_dev *dev, int stream,
 
 	mcasp_clr_bits(dev->base + DAVINCI_MCASP_ACLKXCTL_REG, TX_ASYNC);
 
-	if (dev->version == MCASP_VERSION_4)
+	if (dev->version == MCASP_VERSION_4 && !dev->dat_port)
 		busel = TXSEL;
 
 	/* bit stream is MSB first  with no delay */
@@ -1279,7 +1279,7 @@ nodata:
 
 static int davinci_mcasp_probe(struct platform_device *pdev)
 {
-	struct resource *mem, *ioarea;
+	struct resource *mem, *ioarea, *mem_dat;
 	struct resource *tx_res, *rx_res;
 	struct snd_platform_data *pdata;
 	struct davinci_audio_dev *dev;
@@ -1312,6 +1312,14 @@ static int davinci_mcasp_probe(struct platform_device *pdev)
 	if (!ioarea) {
 		dev_err(&pdev->dev, "Audio region already claimed\n");
 		return -EBUSY;
+	}
+
+	mem_dat = platform_get_resource_byname(pdev, IORESOURCE_MEM, "dat");
+	if (!mem_dat) {
+		dev_info(&pdev->dev, "data port resource not defined, cfg port will be used\n");
+		dev->dat_port = false;
+	} else {
+		dev->dat_port = true;
 	}
 
 	pm_runtime_enable(&pdev->dev);
@@ -1358,7 +1366,10 @@ static int davinci_mcasp_probe(struct platform_device *pdev)
 		}
 
 		dev->dma_params[SNDRV_PCM_STREAM_PLAYBACK] = dma_data;
-		dma_data->port_addr = mem->start + DAVINCI_MCASP_TXBUF_REG;
+		if (mem_dat)
+			dma_data->port_addr = mem_dat->start;
+		else
+			dma_data->port_addr = mem->start + DAVINCI_MCASP_TXBUF_REG;
 		dma_data->dma_req = tx_res->start;
 
 		dma_data = devm_kzalloc(&pdev->dev, sizeof(*dma_data),
@@ -1369,7 +1380,10 @@ static int davinci_mcasp_probe(struct platform_device *pdev)
 		}
 
 		dev->dma_params[SNDRV_PCM_STREAM_CAPTURE] = dma_data;
-		dma_data->port_addr = mem->start + DAVINCI_MCASP_RXBUF_REG;
+		if (mem_dat)
+			dma_data->port_addr = mem_dat->start;
+		else
+			dma_data->port_addr = mem->start + DAVINCI_MCASP_RXBUF_REG;
 		dma_data->dma_req = rx_res->start;
 	} else {
 		struct davinci_pcm_dma_params *dma_data;

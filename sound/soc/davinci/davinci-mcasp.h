@@ -47,6 +47,9 @@ struct davinci_audio_dev {
 	/* McASP FIFO related */
 	u8	txnumevt;
 	u8	rxnumevt;
+
+	/* McASP port related */
+	bool	dat_port;
 };
 
 #endif	/* DAVINCI_MCASP_H */
