@@ -304,6 +304,12 @@
 
 #define DAVINCI_MCASP_NUM_SERIALIZER	16
 
+/*
+ * Timeout value of 1 ms was chosen experimentally to account for the initial
+ * latency to have the first audio sample transferred to AFIFO by DMA
+ */
+#define MCASP_FIFO_FILL_TIMEOUT		1000
+
 static inline void mcasp_set_bits(void __iomem *reg, u32 val)
 {
 	__raw_writel(__raw_readl(reg) | val, reg);
@@ -410,8 +416,11 @@ static void mcasp_start_tx(struct davinci_audio_dev *dev)
 	mcasp_set_reg(dev->base + DAVINCI_MCASP_TXBUF_REG, 0);
 }
 
-static void davinci_mcasp_start(struct davinci_audio_dev *dev, int stream)
+static int davinci_mcasp_start(struct davinci_audio_dev *dev, int stream)
 {
+	int i = 0;
+	u32 val;
+
 	if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
 		if (dev->txnumevt) {	/* enable FIFO */
 			switch (dev->version) {
@@ -426,6 +435,24 @@ static void davinci_mcasp_start(struct davinci_audio_dev *dev, int stream)
 					DAVINCI_MCASP_WFIFOCTL,	FIFO_ENABLE);
 				mcasp_set_bits(dev->base +
 					DAVINCI_MCASP_WFIFOCTL,	FIFO_ENABLE);
+			}
+
+			/*
+			 * Wait until DMA has loaded at least one sample into
+			 * AFIFO to ensure XRUN is not immediately hit
+			 * Implementation has to use udelay since it's executed
+			 * in atomic context (trigger() callback)
+			 */
+			while (++i) {
+				val = mcasp_get_reg(dev->base +
+						    MCASP_VER3_WFIFOSTS);
+				if (val > 0)
+					break;
+
+				if (i > MCASP_FIFO_FILL_TIMEOUT)
+					return -ETIMEDOUT;
+
+				udelay(1);
 			}
 		}
 		mcasp_start_tx(dev);
@@ -447,6 +474,8 @@ static void davinci_mcasp_start(struct davinci_audio_dev *dev, int stream)
 		}
 		mcasp_start_rx(dev);
 	}
+
+	return 0;
 }
 
 static void mcasp_stop_rx(struct davinci_audio_dev *dev)
@@ -967,7 +996,7 @@ static int davinci_mcasp_trigger(struct snd_pcm_substream *substream,
 	case SNDRV_PCM_TRIGGER_RESUME:
 	case SNDRV_PCM_TRIGGER_START:
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
-		davinci_mcasp_start(dev, substream->stream);
+		ret = davinci_mcasp_start(dev, substream->stream);
 		break;
 
 	case SNDRV_PCM_TRIGGER_SUSPEND:
