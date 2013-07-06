@@ -99,7 +99,7 @@ enum usb_device_speed of_usb_get_maximum_speed(struct device_node *np)
 
 	return USB_SPEED_UNKNOWN;
 }
-+EXPORT_SYMBOL_GPL(of_usb_get_maximum_speed);
+EXPORT_SYMBOL_GPL(of_usb_get_maximum_speed);
 
 #endif
 
