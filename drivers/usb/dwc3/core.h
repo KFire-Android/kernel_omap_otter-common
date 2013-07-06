@@ -562,11 +562,6 @@ struct dwc3_hwparams {
 /* HWPARAMS0 */
 #define DWC3_MODE(n)		((n) & 0x7)
 
-#define DWC3_MODE_DEVICE	0
-#define DWC3_MODE_HOST		1
-#define DWC3_MODE_DRD		2
-#define DWC3_MODE_HUB		3
-
 #define DWC3_MDWIDTH(n)		(((n) & 0xff00) >> 8)
 
 /* HWPARAMS1 */

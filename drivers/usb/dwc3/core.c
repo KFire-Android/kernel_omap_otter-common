@@ -369,6 +369,7 @@ static int dwc3_probe(struct platform_device *pdev)
 	void			*mem;
 
 	u8			mode;
+	u8			dt_mode;
 
 	mem = devm_kzalloc(dev, sizeof(*dwc) + DWC3_ALIGN_MASK, GFP_KERNEL);
 	if (!mem) {
@@ -474,15 +475,30 @@ static int dwc3_probe(struct platform_device *pdev)
 		goto err0;
 	}
 
-	if (IS_ENABLED(CONFIG_USB_DWC3_HOST))
-		mode = DWC3_MODE_HOST;
-	else if (IS_ENABLED(CONFIG_USB_DWC3_GADGET))
-		mode = DWC3_MODE_DEVICE;
-	else
-		mode = DWC3_MODE_DRD;
+	mode = USB_DR_MODE_UNKNOWN;
+	if (node)
+		dt_mode = of_usb_get_dr_mode(node);
+
+	if (IS_ENABLED(CONFIG_USB_DWC3_HOST)) {
+		mode = USB_DR_MODE_HOST;
+		if (node && (mode != dt_mode))
+			dev_warn(dev, "dr_mode set to host,check value in DT\n");
+	}
+	else if (IS_ENABLED(CONFIG_USB_DWC3_GADGET)) {
+		mode = USB_DR_MODE_PERIPHERAL;
+		if (node && (mode != dt_mode))
+			dev_warn(dev, "dr_mode set to periph,check value in DT\n");
+	}
+	else if (node)
+		mode = dt_mode;
+
+	if (mode == USB_DR_MODE_UNKNOWN) {
+		mode = USB_DR_MODE_OTG;
+		dev_warn(dev, "dwc3 mode set to otg default\n");
+	}
 
 	switch (mode) {
-	case DWC3_MODE_DEVICE:
+	case USB_DR_MODE_PERIPHERAL:
 		dwc3_set_mode(dwc, DWC3_GCTL_PRTCAP_DEVICE);
 		ret = dwc3_gadget_init(dwc);
 		if (ret) {
@@ -490,7 +506,7 @@ static int dwc3_probe(struct platform_device *pdev)
 			goto err1;
 		}
 		break;
-	case DWC3_MODE_HOST:
+	case USB_DR_MODE_HOST:
 		dwc3_set_mode(dwc, DWC3_GCTL_PRTCAP_HOST);
 		ret = dwc3_host_init(dwc);
 		if (ret) {
@@ -498,7 +514,7 @@ static int dwc3_probe(struct platform_device *pdev)
 			goto err1;
 		}
 		break;
-	case DWC3_MODE_DRD:
+	case USB_DR_MODE_OTG:
 		dwc3_set_mode(dwc, DWC3_GCTL_PRTCAP_OTG);
 		ret = dwc3_host_init(dwc);
 		if (ret) {
@@ -530,13 +546,13 @@ static int dwc3_probe(struct platform_device *pdev)
 
 err2:
 	switch (mode) {
-	case DWC3_MODE_DEVICE:
+	case USB_DR_MODE_PERIPHERAL:
 		dwc3_gadget_exit(dwc);
 		break;
-	case DWC3_MODE_HOST:
+	case USB_DR_MODE_HOST:
 		dwc3_host_exit(dwc);
 		break;
-	case DWC3_MODE_DRD:
+	case USB_DR_MODE_OTG:
 		dwc3_host_exit(dwc);
 		dwc3_gadget_exit(dwc);
 		break;
@@ -567,13 +583,13 @@ static int dwc3_remove(struct platform_device *pdev)
 	dwc3_debugfs_exit(dwc);
 
 	switch (dwc->mode) {
-	case DWC3_MODE_DEVICE:
+	case USB_DR_MODE_PERIPHERAL:
 		dwc3_gadget_exit(dwc);
 		break;
-	case DWC3_MODE_HOST:
+	case USB_DR_MODE_HOST:
 		dwc3_host_exit(dwc);
 		break;
-	case DWC3_MODE_DRD:
+	case USB_DR_MODE_OTG:
 		dwc3_host_exit(dwc);
 		dwc3_gadget_exit(dwc);
 		break;
