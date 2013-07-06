@@ -66,7 +66,41 @@ enum usb_dr_mode of_usb_get_dr_mode(struct device_node *np)
 }
 EXPORT_SYMBOL_GPL(of_usb_get_dr_mode);
 
-#endif
+static const char *const usb_maximum_speed[] = {
+	[USB_SPEED_UNKNOWN]	= "",
+	[USB_SPEED_LOW]		= "lowspeed",
+	[USB_SPEED_FULL]	= "fullspeed",
+	[USB_SPEED_HIGH]	= "highspeed",
+	[USB_SPEED_WIRELESS]	= "wireless",
+	[USB_SPEED_SUPER]	= "superspeed",
+};
 
+/**
+ * of_usb_get_maximum_speed - Get maximum requested speed for a given USB
+ * controller.
+ * @np: Pointer to the given device_node
+ *
+ * The function gets the maximum speed string from property "maximum-speed",
+ * and returns the corresponding enum usb_device_speed.
+ */
+enum usb_device_speed of_usb_get_maximum_speed(struct device_node *np)
+{
+	const char *maximum_speed;
+	int err;
+	int i;
+
+	err = of_property_read_string(np, "maximum-speed", &maximum_speed);
+	if (err < 0)
+		return USB_SPEED_UNKNOWN;
+
+	for (i = 0; i < ARRAY_SIZE(usb_maximum_speed); i++)
+		if (strcmp(maximum_speed, usb_maximum_speed[i]) == 0)
+			return i;
+
+	return USB_SPEED_UNKNOWN;
+}
++EXPORT_SYMBOL_GPL(of_usb_get_maximum_speed);
+
+#endif
 
 MODULE_LICENSE("GPL");
