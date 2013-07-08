@@ -1370,6 +1370,7 @@ static int __spi_async(struct spi_device *spi, struct spi_message *message)
 	 * set for this transfer.
 	 */
 	list_for_each_entry(xfer, &message->transfers, transfer_list) {
+		message->frame_length += xfer->len;
 		if (!xfer->bits_per_word)
 			xfer->bits_per_word = spi->bits_per_word;
 	}
