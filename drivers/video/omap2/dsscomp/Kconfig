@@ -1,7 +1,7 @@
 menuconfig DSSCOMP
 	tristate "OMAP DSS Composition support (EXPERIMENTAL)"
 	depends on EXPERIMENTAL && OMAP2_DSS && DRM_OMAP_DMM_TILER
-	default n
+	default y
 
 	help
 	  Frame composition driver using OMAP DSS2. Allows using
@@ -11,7 +11,7 @@ menuconfig DSSCOMP
 
 config DSSCOMP_DEBUG_LOG
 	bool "Log event timestamps in debugfs"
-	default n
+	default y
 	depends on DEBUG_FS && DSSCOMP
 
 	help
