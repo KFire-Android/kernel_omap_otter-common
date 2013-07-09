@@ -49,7 +49,7 @@
 #error Expected CONFIG_ION_OMAP to be defined
 #endif
 #if defined(CONFIG_DRM_OMAP_DMM_TILER)
-#include <../drivers/staging/omapdrm/omap_dmm_tiler.h>
+#include <../drivers/gpu/drm/omapdrm/omap_dmm_tiler.h>
 #include <../drivers/video/omap2/dsscomp/tiler-utils.h>
 #elif defined(CONFIG_TI_TILER)
 #include <mach/tiler.h>
