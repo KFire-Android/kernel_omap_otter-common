@@ -679,6 +679,9 @@
 				compatible = "ti,omap-usb2";
 				reg = <0x4a084000 0x7c>;
 				ctrl-module = <&omap_control_usb>;
+				wkupclk =  "usb_phy_cm_clk32k";
+				optclk = "usb_otg_ss_refclk960m";
+
 			};
 
 			usb3_phy: usb3phy@4a084400 {
@@ -688,6 +691,8 @@
 				      <0x4a084c00 0x40>;
 				reg-names = "phy_rx", "phy_tx", "pll_ctrl";
 				ctrl-module = <&omap_control_usb>;
+				wkupclk =  "usb_phy_cm_clk32k";
+				optclk = "usb_otg_ss_refclk960m";
 			};
 		};
 
