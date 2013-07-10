@@ -142,9 +142,8 @@
 			ldo3_reg: ldo3 {
 				/* VDDAPHY_MDM: vdda_lli */
 				regulator-name = "ldo3";
-				regulator-min-microvolt = <3000000>;
-				regulator-max-microvolt = <3000000>;
-				regulator-always-on;
+				regulator-min-microvolt = <1500000>;
+				regulator-max-microvolt = <1500000>;
 				regulator-boot-on;
 				ti,warm_sleep = <0>;
 				ti,roof_floor = <0>;
@@ -152,6 +151,8 @@
 				ti,warm_reset = <0>;
 				ti,tstep = <0>;
 				ti,vsel = <0>;
+				/* Only if Modem is used */
+				status = "disabled";
 			};
 
 			ldo4_reg: ldo4 {
