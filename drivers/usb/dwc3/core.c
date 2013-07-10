@@ -420,14 +420,32 @@ static int dwc3_probe(struct platform_device *pdev)
 
 	if (node) {
 		dwc->maximum_speed = of_usb_get_maximum_speed(node);
-
-		dwc->usb2_phy = devm_usb_get_phy_by_phandle(dev, "usb-phy", 0);
-		dwc->usb3_phy = devm_usb_get_phy_by_phandle(dev, "usb-phy", 1);
+		switch (dwc->maximum_speed) {
+		case USB_SPEED_SUPER:
+		case USB_SPEED_UNKNOWN:
+			dwc->usb2_phy = devm_usb_get_phy_by_phandle(dev, "usb-phy", 0);
+			dwc->usb3_phy = devm_usb_get_phy_by_phandle(dev, "usb-phy", 1);
+			break;
+		case USB_SPEED_HIGH:
+		case USB_SPEED_FULL:
+		case USB_SPEED_LOW:
+			dwc->usb2_phy = devm_usb_get_phy_by_phandle(dev, "usb-phy", 0);
+			break;
+		}
 	} else {
 		dwc->maximum_speed = USB_SPEED_UNKNOWN;
-
-		dwc->usb2_phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB2);
-		dwc->usb3_phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB3);
+		switch (dwc->maximum_speed) {
+		case USB_SPEED_SUPER:
+		case USB_SPEED_UNKNOWN:
+			dwc->usb2_phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB2);
+			dwc->usb3_phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB3);
+			break;
+		case USB_SPEED_HIGH:
+		case USB_SPEED_FULL:
+		case USB_SPEED_LOW:
+			dwc->usb2_phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB2);
+			break;
+		}
 	}
 
 	/* default to superspeed if no maximum_speed passed */
@@ -439,9 +457,12 @@ static int dwc3_probe(struct platform_device *pdev)
 		return -EPROBE_DEFER;
 	}
 
-	if (IS_ERR_OR_NULL(dwc->usb3_phy)) {
-		dev_err(dev, "no usb3 phy configured\n");
-		return -EPROBE_DEFER;
+	if (dwc->maximum_speed == USB_SPEED_SUPER) {
+		if (IS_ERR(dwc->usb3_phy)) {
+			ret = PTR_ERR(dwc->usb2_phy);
+			dev_err(dev, "no usb3 phy configured\n");
+			return -EPROBE_DEFER;
+		}
 	}
 
 	usb_phy_set_suspend(dwc->usb2_phy, 0);
