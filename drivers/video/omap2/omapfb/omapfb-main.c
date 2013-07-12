@@ -2709,6 +2709,12 @@ static int __init omapfb_probe(struct platform_device *pdev)
 		r = -EINVAL;
 		goto cleanup;
 	}
+	fbdev->num_overlays = omap_dss_get_num_overlays();
+	for (i = 0; i < fbdev->num_overlays; i++)
+		fbdev->overlays[i] = omap_dss_get_overlay(i);
+	fbdev->num_managers = omap_dss_get_num_overlay_managers();
+	for (i = 0; i < fbdev->num_managers; i++)
+		fbdev->managers[i] = omap_dss_get_overlay_manager(i);
 
 	def_display = NULL;
 
@@ -2738,10 +2744,6 @@ static int __init omapfb_probe(struct platform_device *pdev)
 		dev_err(fbdev->dev, "failed to init overlay connections\n");
 		goto cleanup;
 	}
-
-	fbdev->num_managers = omap_dss_get_num_overlay_managers();
-	for (i = 0; i < fbdev->num_managers; i++)
-		fbdev->managers[i] = omap_dss_get_overlay_manager(i);
 
 	if (def_mode && strlen(def_mode) > 0) {
 		if (omapfb_parse_def_modes(fbdev))
