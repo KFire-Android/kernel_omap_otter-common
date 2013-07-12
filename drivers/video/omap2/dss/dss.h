@@ -203,6 +203,8 @@ void dss_unregister_child_devices(struct device *parent);
 void dss_put_device(struct omap_dss_device *dssdev);
 void dss_copy_device_pdata(struct omap_dss_device *dst,
 		const struct omap_dss_device *src);
+int dss_mgr_blank(struct omap_overlay_manager *mgr,
+		bool wait_for_go);
 
 /* output */
 void dss_register_output(struct omap_dss_output *out);
@@ -211,6 +213,7 @@ void dss_unregister_output(struct omap_dss_output *out);
 /* display */
 int dss_suspend_all_devices(void);
 int dss_resume_all_devices(void);
+
 void dss_disable_all_devices(void);
 
 int display_init_sysfs(struct platform_device *pdev,
@@ -468,6 +471,7 @@ void venc_panel_exit(void);
 #if defined(CONFIG_OMAP4_DSS_HDMI) || defined(CONFIG_OMAP5_DSS_HDMI)
 int hdmi_init_platform_driver(void) __init;
 void hdmi_uninit_platform_driver(void) __exit;
+
 unsigned long hdmi_get_pixel_clock(void);
 #else
 static inline unsigned long hdmi_get_pixel_clock(void)
