@@ -203,6 +203,8 @@ void dss_unregister_child_devices(struct device *parent);
 void dss_put_device(struct omap_dss_device *dssdev);
 void dss_copy_device_pdata(struct omap_dss_device *dst,
 		const struct omap_dss_device *src);
+int dss_mgr_blank(struct omap_overlay_manager *mgr,
+		bool wait_for_go);
 
 /* output */
 void dss_register_output(struct omap_dss_output *out);
@@ -211,6 +213,7 @@ void dss_unregister_output(struct omap_dss_output *out);
 /* display */
 int dss_suspend_all_devices(void);
 int dss_resume_all_devices(void);
+
 void dss_disable_all_devices(void);
 
 int display_init_sysfs(struct platform_device *pdev,
@@ -280,6 +283,7 @@ void dss_sdi_init(int datapairs);
 int dss_sdi_enable(void);
 void dss_sdi_disable(void);
 
+void dss_select_dispc_clk_source(enum omap_dss_clk_source clk_src);
 void dss_select_dsi_clk_source(int dsi_module,
 		enum omap_dss_clk_source clk_src);
 void dss_select_lcd_clk_source(enum omap_channel channel,
@@ -468,6 +472,7 @@ void venc_panel_exit(void);
 #if defined(CONFIG_OMAP4_DSS_HDMI) || defined(CONFIG_OMAP5_DSS_HDMI)
 int hdmi_init_platform_driver(void) __init;
 void hdmi_uninit_platform_driver(void) __exit;
+
 unsigned long hdmi_get_pixel_clock(void);
 #else
 static inline unsigned long hdmi_get_pixel_clock(void)
@@ -496,6 +501,12 @@ int omapdss_hdmi_display_3d_enable(struct omap_dss_device *dssdev,
 					struct s3d_disp_info *info, int code);
 void sel_i2c(void);
 void sel_hdmi(void);
+int omapdss_hdmi_display_set_mode(struct omap_dss_device *dssdev,
+					struct fb_videomode *mode);
+u8 *hdmi_read_valid_edid(void);
+void omapdss_hdmi_clear_edid(void);
+ssize_t omapdss_get_edid(char *buf);
+void hdmi_get_monspecs(struct omap_dss_device *dssdev);
 int hdmi_panel_init(void);
 void hdmi_panel_exit(void);
 #if defined(CONFIG_OMAP4_DSS_HDMI_AUDIO) || \

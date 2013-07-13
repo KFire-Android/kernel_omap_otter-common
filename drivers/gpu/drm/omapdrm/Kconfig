@@ -1,25 +1,39 @@
 
-config DRM_OMAP
+menuconfig DRM_OMAP
 	tristate "OMAP DRM"
-	depends on DRM && !CONFIG_FB_OMAP2
-	depends on ARCH_OMAP2PLUS || ARCH_MULTIPLATFORM
-	depends on OMAP2_DSS
+	depends on ARCH_OMAP2PLUS && DRM
+	default n
+	help
+	  If you want to use the OMAP DRM Display driver and/or DMM/Tiler
+	  driver, enable this.
+
+config DRM_OMAP_DISPLAY
+	tristate "OMAP DRM Display Driver"
+	depends on DRM_OMAP && !CONFIG_FB_OMAP2
 	select DRM_KMS_HELPER
+	select OMAP2_DSS
 	select FB_SYS_FILLRECT
 	select FB_SYS_COPYAREA
 	select FB_SYS_IMAGEBLIT
 	select FB_SYS_FOPS
-	default n
+	select DRM_OMAP_DMM_TILER
+	default y
 	help
 	  DRM display driver for OMAP2/3/4 based boards.
 
 config DRM_OMAP_NUM_CRTCS
+	depends on DRM_OMAP_DISPLAY
 	int "Number of CRTCs"
 	range 1 10
 	default 1  if ARCH_OMAP2 || ARCH_OMAP3
 	default 2  if ARCH_OMAP4
-	depends on DRM_OMAP
 	help
 	  Select the number of video overlays which can be used as framebuffers.
 	  The remaining overlays are reserved for video.
 
+config DRM_OMAP_DMM_TILER
+	tristate "OMAP DMM TILER"
+	depends on DRM_OMAP
+	default y
+	help
+	  Enable the DMM/Tiler driver for OMAP4+ boards.

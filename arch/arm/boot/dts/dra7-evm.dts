@@ -30,6 +30,25 @@
 		regulator-min-microvolt = <3000000>;
 		regulator-max-microvolt = <3000000>;
 	};
+
+	ion_config {
+		compatible = "ti,ion-omap";
+		ti,omap_ion_heap_secure_input_base = <0xba300000>;
+		ti,omap_ion_heap_tiler_base = <0xb4300000>;
+		ti,omap_ion_heap_nonsecure_tiler_base = <0xf00000>;
+		/*90 MB*/
+		ti,omap_ion_heap_secure_input_size = <0x5A00000>;
+		/*96 MB*/
+		ti,omap_ion_heap_tiler_size = <0x6000000>;
+		/*15 MB*/
+		ti,omap_ion_heap_nonsecure_tiler_size = <0xF00000>;
+	};
+
+	ocp {
+		gpu: gpu@0x56000000 {
+		gpu-supply = <&avs_gpu>;
+		};
+	};
 };
 
 &dra7_pmx_core {
@@ -77,6 +96,11 @@
 			0x234	0x0	/* vout1_d22 OUTPUT | MODE0 */
 			0x238	0x0	/* vout1_d23 OUTPUT | MODE0 */
 		>;
+	};
+	display_layout {
+		compatible = "ti, omap4-dsscomp";
+		ti,num_displays = <2>;
+		ti,default_display = "lcd";
 	};
 };
 

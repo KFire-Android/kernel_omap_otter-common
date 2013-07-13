@@ -22,6 +22,8 @@
 #include <linux/kobject.h>
 #include <linux/device.h>
 #include <linux/interrupt.h>
+#include <linux/fb.h>
+#include <sound/asound.h>
 
 #define DISPC_IRQ_FRAMEDONE		(1 << 0)
 #define DISPC_IRQ_VSYNC			(1 << 1)
@@ -105,6 +107,7 @@ enum omap_color_mode {
 	OMAP_DSS_COLOR_RGBX16		= 1 << 16, /* RGBx16 - 4444 */
 	OMAP_DSS_COLOR_ARGB16_1555	= 1 << 17, /* ARGB16 - 1555 */
 	OMAP_DSS_COLOR_XRGB16_1555	= 1 << 18, /* xRGB16 - 1555 */
+	OMAP_DSS_COLOR_BGRA32	= 1 << 19,  /* BGRA32 */
 };
 
 enum omap_dss_load_mode {
@@ -160,6 +163,7 @@ enum omap_display_caps {
 enum omap_dss_display_state {
 	OMAP_DSS_DISPLAY_DISABLED = 0,
 	OMAP_DSS_DISPLAY_ACTIVE,
+	OMAP_DSS_DISPLAY_SUSPENDED,
 };
 
 enum omap_dss_audio_state {
@@ -438,6 +442,102 @@ extern const struct omap_video_timings omap_dss_pal_timings;
 extern const struct omap_video_timings omap_dss_ntsc_timings;
 #endif
 
+enum omapdss_completion_status {
+	DSS_COMPLETION_PROGRAMMED	= (1 << 1),
+	DSS_COMPLETION_DISPLAYED	= (1 << 2),
+
+	DSS_COMPLETION_CHANGED_SET	= (1 << 3),
+	DSS_COMPLETION_CHANGED_CACHE	= (1 << 4),
+	DSS_COMPLETION_CHANGED		= (3 << 3),
+
+	DSS_COMPLETION_RELEASED		= (15 << 5),
+	DSS_COMPLETION_ECLIPSED_SET	= (1 << 5),
+	DSS_COMPLETION_ECLIPSED_CACHE	= (1 << 6),
+	DSS_COMPLETION_ECLIPSED_SHADOW	= (1 << 7),
+	DSS_COMPLETION_TORN		= (1 << 8),
+};
+
+struct omapdss_ovl_cb {
+	/* optional callback method */
+	u32 (*fn)(void *data, int id, int status);
+	void *data;
+	u32 mask;
+};
+
+struct omap_dss_cconv_coefs {
+	s16 ry, rcr, rcb;
+	s16 gy, gcr, gcb;
+	s16 by, bcr, bcb;
+	u16 full_range;
+} __aligned(4);
+
+/* Writeback data structures */
+enum omap_writeback_source {
+	OMAP_WB_LCD1		= 0,
+	OMAP_WB_TV		= 1,
+	OMAP_WB_LCD2		= 2,
+	OMAP_WB_GFX		= 3,
+	OMAP_WB_VID1		= 4,
+	OMAP_WB_VID2		= 5,
+	OMAP_WB_VID3		= 6
+};
+
+enum omap_writeback_capturemode {
+	OMAP_WB_CAPTURE_ALL		= 0x0,
+	OMAP_WB_CAPTURE_1		= 0x1,
+	OMAP_WB_CAPTURE_1_OF_2	= 0x2,
+	OMAP_WB_CAPTURE_1_OF_3	= 0x3,
+	OMAP_WB_CAPTURE_1_OF_4	= 0x4,
+	OMAP_WB_CAPTURE_1_OF_5	= 0x5,
+	OMAP_WB_CAPTURE_1_OF_6	= 0x6,
+	OMAP_WB_CAPTURE_1_OF_7	= 0x7
+};
+
+enum omap_writeback_mode {
+	OMAP_WB_CAPTURE_MODE	= 0x0,
+	OMAP_WB_MEM2MEM_MODE	= 0x1,
+};
+
+struct omap_writeback_info {
+	bool					enabled;
+	bool					info_dirty;
+	enum omap_writeback_source		source;
+	u16					width;
+	u16					height;
+	u16					out_width;
+	u16					out_height;
+	enum omap_color_mode			dss_mode;
+	enum omap_writeback_capturemode		capturemode;
+	/* capture or mem2mem mode */
+	enum omap_writeback_mode		mode;
+	u32					paddr;
+	/* NV12 support*/
+	u32					p_uv_addr;
+	u8					rotation;
+	enum omap_dss_rotation_type		rotation_type;
+	bool force_1d;
+};
+
+struct omap_writeback {
+	struct kobject			kobj;
+	struct list_head		list;
+	bool				info_dirty;
+	int				width;
+	int				height;
+	/* mutex to control access to wb data */
+	struct mutex			lock;
+	struct omap_writeback_info	info;
+	struct completion		wb_completion;
+
+	bool (*check_wb)(struct omap_writeback *wb);
+	int (*set_wb_info)(struct omap_writeback *wb,
+			struct omap_writeback_info *info);
+	void (*get_wb_info)(struct omap_writeback *wb,
+			struct omap_writeback_info *info);
+	int (*register_framedone)(struct omap_writeback *wb);
+	int (*wait_framedone)(struct omap_writeback *wb);
+};
+
 struct omap_dss_cpr_coefs {
 	s16 rr, rg, rb;
 	s16 gr, gg, gb;
@@ -461,7 +561,14 @@ struct omap_overlay_info {
 	u16 out_height;	/* if 0, out_height == height */
 	u8 global_alpha;
 	u8 pre_mult_alpha;
+	u8 wb_source;
 	u8 zorder;
+	u16 min_x_decim, max_x_decim, min_y_decim, max_y_decim;
+
+	struct omapdss_ovl_cb cb;
+	struct omap_dss_cconv_coefs cconv;
+	bool force_1d;
+	bool mflag_en;
 };
 
 struct omap_overlay {
@@ -473,6 +580,7 @@ struct omap_overlay {
 	enum omap_plane id;
 	enum omap_color_mode supported_modes;
 	enum omap_overlay_caps caps;
+	bool enabled;
 
 	/* dynamic fields */
 	struct omap_overlay_manager *manager;
@@ -517,6 +625,8 @@ struct omap_overlay_manager_info {
 
 	bool cpr_enable;
 	struct omap_dss_cpr_coefs cpr_coefs;
+
+	struct omapdss_ovl_cb cb;
 };
 
 struct omap_overlay_manager {
@@ -532,6 +642,12 @@ struct omap_overlay_manager {
 
 	/* dynamic fields */
 	struct omap_dss_output *output;
+
+	/* Overlays associated with the manager */
+	struct omap_overlay *ovls[5];
+
+	/* No of overlays for the manager that requires update */
+	u16 num_ovls;
 
 	/*
 	 * The following functions do not block:
@@ -556,6 +672,11 @@ struct omap_overlay_manager {
 	int (*apply)(struct omap_overlay_manager *mgr);
 	int (*wait_for_go)(struct omap_overlay_manager *mgr);
 	int (*wait_for_vsync)(struct omap_overlay_manager *mgr);
+	int (*blank)(struct omap_overlay_manager *mgr, bool wait_for_vsync);
+	void (*dump_cb)(struct omap_overlay_manager *mgr, struct seq_file *s);
+	int (*set_ovl)(struct omap_overlay_manager *mgr);
+	int (*wb_apply)(struct omap_overlay_manager *mgr,
+		struct omap_writeback *wb);
 
 	struct omap_dss_device *(*get_device)(struct omap_overlay_manager *mgr);
 };
@@ -613,6 +734,8 @@ struct omap_dss_device {
 
 	enum omap_channel channel;
 
+	bool first_vsync;
+
 	union {
 		struct {
 			u8 data_lines;
@@ -666,18 +789,23 @@ struct omap_dss_device {
 			/* regn is one greater than TRM's REGN value */
 			u16 regn;
 			u16 regm2;
+			u32 max_pixclk_khz;
 		} hdmi;
 	} clocks;
 
 	struct {
 		struct omap_video_timings timings;
+		struct fb_monspecs monspecs;
 
 		enum omap_dss_dsi_pixel_format dsi_pix_fmt;
 		enum omap_dss_dsi_mode dsi_mode;
 		struct omap_dss_dsi_videomode_timings dsi_vm_timings;
 		struct s3d_disp_info s3d_info;
-
-	} panel;
+		u32 width_in_um;
+		u32 height_in_um;
+               	u16 fb_xres;
+               	u16 fb_yres;
+ 	} panel;
 
 	struct {
 		u8 pixel_size;
@@ -705,6 +833,8 @@ struct omap_dss_device {
 	struct omap_dss_output *output;
 
 	enum omap_dss_display_state state;
+
+	struct blocking_notifier_head state_notifiers;
 
 	enum omap_dss_audio_state audio_state;
 
@@ -770,8 +900,19 @@ struct omap_dss_driver {
 	int (*set_wss)(struct omap_dss_device *dssdev, u32 wss);
 	u32 (*get_wss)(struct omap_dss_device *dssdev);
 
+	int (*get_modedb)(struct omap_dss_device *dssdev,
+			struct fb_videomode *modedb,
+			int modedb_len);
+	int (*set_mode)(struct omap_dss_device *dssdev,
+			struct fb_videomode *mode);
+
 	int (*read_edid)(struct omap_dss_device *dssdev, u8 *buf, int len);
 	bool (*detect)(struct omap_dss_device *dssdev);
+
+	/* for wrapping around state changes */
+	void (*disable_orig)(struct omap_dss_device *display);
+	int (*enable_orig)(struct omap_dss_device *display);
+
 	/*
 	 * For display drivers that support audio. This encompasses
 	 * HDMI and DisplayPort at the moment.
@@ -879,6 +1020,8 @@ int dispc_ovl_setup(enum omap_plane plane, const struct omap_overlay_info *oi,
 #define to_dss_driver(x) container_of((x), struct omap_dss_driver, driver)
 #define to_dss_device(x) container_of((x), struct omap_dss_device, dev)
 
+void omapdss_display_get_dimensions(struct omap_dss_device *dssdev,
+                                u32 *width_in_um, u32 *height_in_um);
 void omapdss_dsi_vc_enable_hs(struct omap_dss_device *dssdev, int channel,
 		bool enable);
 int omapdss_dsi_enable_te(struct omap_dss_device *dssdev, bool enable);
@@ -932,6 +1075,23 @@ void omapdss_rfbi_set_data_lines(struct omap_dss_device *dssdev,
 		int data_lines);
 void omapdss_rfbi_set_interface_timings(struct omap_dss_device *dssdev,
 		struct rfbi_timings *timings);
+
+int dispc_scaling_decision(enum omap_plane plane, struct omap_overlay_info *oi,
+		enum omap_channel channel,
+		u16 *x_decim, u16 *y_decim, bool *three_tap);
+int omap_dss_manager_unregister_callback(struct omap_overlay_manager *mgr,
+					 struct omapdss_ovl_cb *cb);
+
+/* generic callback handling */
+static inline void dss_ovl_cb(struct omapdss_ovl_cb *cb, int id, int status)
+{
+	if (cb->fn && (cb->mask & status))
+		cb->mask &= cb->fn(cb->data, id, status);
+	if (status & DSS_COMPLETION_RELEASED)
+		cb->mask = 0;
+	if (!cb->mask)
+		cb->fn = NULL;
+}
 
 int omapdss_compat_init(void);
 void omapdss_compat_uninit(void);

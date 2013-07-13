@@ -65,6 +65,10 @@ config OMAP2_DSS_VENC
 
 config OMAP4_DSS_HDMI
 	bool "OMAP4 HDMI support"
+	depends on ARCH_OMAP4 || ANDROID_SWITCH
+	select FB
+	select FB_MODE_HELPERS
+	select FB_OMAP2
         default y
 	select I2C_ALGOBIT
 	help
@@ -87,6 +91,9 @@ config OMAP5_DSS_HDMI
 	select GPIO_PCA953X
 	select MFD_PALMAS
 	select REGULATOR_PALMAS
+	select FB
+	select FB_MODE_HELPERS
+	select FB_OMAP2
 	help
 	    HDMI Interface.This add the High Deinition Multimedia Interface.
 	    See http://wwww.hdmi.org/ for HDMI specification.
@@ -138,5 +145,11 @@ config OMAP2_DSS_SLEEP_AFTER_VENC_RESET
 
 	  This option enables the sleep, and is enabled by default. You can
 	  disable the sleep if it doesn't cause problems on your platform.
+
+config USE_FB_MODE_DB
+	bool "Enable FB mode db support"
+	default y
+	help
+	  Enable FB mode support.
 
 endif
