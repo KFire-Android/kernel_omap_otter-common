@@ -1259,6 +1259,20 @@ static struct clk_hw_omap l3_iclk_div_hw = {
 DEFINE_STRUCT_CLK(l3_iclk_div, mpu_dpll_hs_clk_div_parents,
 		  apll_pcie_clkvcoldo_ops);
 
+static const char *gpu_l3_iclk_parents[] = {
+	"l3_iclk_div",
+};
+
+static struct clk gpu_l3_iclk;
+
+static struct clk_hw_omap gpu_l3_iclk_hw = {
+	.hw = {
+		.clk = &gpu_l3_iclk,
+	},
+};
+
+DEFINE_STRUCT_CLK(gpu_l3_iclk, gpu_l3_iclk_parents, apll_pcie_clkvcoldo_ops);
+
 static const struct clk_div_table l3init_60m_fclk_rates[] = {
 	{ .div = 1, .val = 0 },
 	{ .div = 8, .val = 1 },
@@ -1950,6 +1964,7 @@ static struct omap_clk dra7xx_clks[] = {
 	CLK(NULL,	"hdmi_div_clk",			&hdmi_div_clk,	CK_7XX),
 	CLK(NULL,	"hdmi_dpll_clk_mux",		&hdmi_dpll_clk_mux,	CK_7XX),
 	CLK(NULL,	"l3_iclk_div",			&l3_iclk_div,	CK_7XX),
+	CLK(NULL,	"gpu_l3_iclk",			&gpu_l3_iclk,	CK_7XX),
 	CLK(NULL,	"l3init_60m_fclk",		&l3init_60m_fclk,	CK_7XX),
 	CLK(NULL,	"l4_root_clk_div",		&l4_root_clk_div,	CK_7XX),
 	CLK(NULL,	"mlb_clk",			&mlb_clk,	CK_7XX),

@@ -74,6 +74,7 @@ int dss_init_overlay_managers(struct platform_device *pdev)
 			dss_feat_get_supported_displays(mgr->id);
 		mgr->supported_outputs =
 			dss_feat_get_supported_outputs(mgr->id);
+		mgr->blank = &dss_mgr_blank;
 
 		INIT_LIST_HEAD(&mgr->overlays);
 
@@ -146,7 +147,7 @@ static int dss_mgr_check_zorder(struct omap_overlay_manager *mgr,
 			continue;
 
 		list_for_each_entry(ovl2, &mgr->overlays, list) {
-			if (ovl1 == ovl2)
+			if ((ovl1 == ovl2) || !(ovl1->enabled && ovl2->enabled))
 				continue;
 
 			info2 = overlay_infos[ovl2->id];
