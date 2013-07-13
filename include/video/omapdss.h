@@ -107,6 +107,7 @@ enum omap_color_mode {
 	OMAP_DSS_COLOR_RGBX16		= 1 << 16, /* RGBx16 - 4444 */
 	OMAP_DSS_COLOR_ARGB16_1555	= 1 << 17, /* ARGB16 - 1555 */
 	OMAP_DSS_COLOR_XRGB16_1555	= 1 << 18, /* xRGB16 - 1555 */
+	OMAP_DSS_COLOR_BGRA32	= 1 << 19,  /* BGRA32 */
 };
 
 enum omap_dss_load_mode {
@@ -560,6 +561,7 @@ struct omap_overlay_info {
 	u16 out_height;	/* if 0, out_height == height */
 	u8 global_alpha;
 	u8 pre_mult_alpha;
+	u8 wb_source;
 	u8 zorder;
 	u16 min_x_decim, max_x_decim, min_y_decim, max_y_decim;
 
@@ -787,21 +789,23 @@ struct omap_dss_device {
 			/* regn is one greater than TRM's REGN value */
 			u16 regn;
 			u16 regm2;
+			u32 max_pixclk_khz;
 		} hdmi;
 	} clocks;
 
 	struct {
 		struct omap_video_timings timings;
+		struct fb_monspecs monspecs;
 
 		enum omap_dss_dsi_pixel_format dsi_pix_fmt;
 		enum omap_dss_dsi_mode dsi_mode;
 		struct omap_dss_dsi_videomode_timings dsi_vm_timings;
 		struct s3d_disp_info s3d_info;
-
 		u32 width_in_um;
 		u32 height_in_um;
-
-	} panel;
+               	u16 fb_xres;
+               	u16 fb_yres;
+ 	} panel;
 
 	struct {
 		u8 pixel_size;
@@ -895,6 +899,12 @@ struct omap_dss_driver {
 
 	int (*set_wss)(struct omap_dss_device *dssdev, u32 wss);
 	u32 (*get_wss)(struct omap_dss_device *dssdev);
+
+	int (*get_modedb)(struct omap_dss_device *dssdev,
+			struct fb_videomode *modedb,
+			int modedb_len);
+	int (*set_mode)(struct omap_dss_device *dssdev,
+			struct fb_videomode *mode);
 
 	int (*read_edid)(struct omap_dss_device *dssdev, u8 *buf, int len);
 	bool (*detect)(struct omap_dss_device *dssdev);
@@ -1010,6 +1020,8 @@ int dispc_ovl_setup(enum omap_plane plane, const struct omap_overlay_info *oi,
 #define to_dss_driver(x) container_of((x), struct omap_dss_driver, driver)
 #define to_dss_device(x) container_of((x), struct omap_dss_device, dev)
 
+void omapdss_display_get_dimensions(struct omap_dss_device *dssdev,
+                                u32 *width_in_um, u32 *height_in_um);
 void omapdss_dsi_vc_enable_hs(struct omap_dss_device *dssdev, int channel,
 		bool enable);
 int omapdss_dsi_enable_te(struct omap_dss_device *dssdev, bool enable);

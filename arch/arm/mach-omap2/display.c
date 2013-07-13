@@ -129,8 +129,6 @@ static __init int omapdrm_init(void)
 	struct omap_hwmod *oh;
 	int r = 0;
 
-	/* create DRM and DMM device */
-	if (omap_drm_device != NULL) {
 		if (!of_find_compatible_node(NULL, NULL, "ti,omap4-dmm") &&
 			!of_find_compatible_node(NULL, NULL, "ti,omap5-dmm")) {
 
@@ -143,6 +141,9 @@ static __init int omapdrm_init(void)
 					"Could not build omap_device for %s\n",
 					oh->name);
 		}
+
+	/* create DRM and DMM device */
+	if (omap_drm_device != NULL) {
 
 		platform_drm_data.omaprev = GET_OMAP_TYPE;
 
@@ -427,6 +428,13 @@ int __init omap_display_init(struct omap_dss_board_info *board_data)
 		return -ENODEV;
 	}
 
+	/* create DMM and DRM device */
+	r = omapdrm_init();
+	if (r < 0) {
+		pr_err("Unable to register omapdrm/dmm device\n");
+		return r;
+	}
+
 	board_data->version = ver;
 	board_data->dsi_enable_pads = omap_dsi_enable_pads;
 	board_data->dsi_disable_pads = omap_dsi_disable_pads;
@@ -534,13 +542,6 @@ int __init omap_display_init(struct omap_dss_board_info *board_data)
 			return PTR_ERR(au_pdev);
 		}
 
-	}
-
-	/* create DMM and DRM device */
-	r = omapdrm_init();
-	if (r < 0) {
-		pr_err("Unable to register omapdrm device\n");
-		return r;
 	}
 
 	return 0;
@@ -739,6 +740,13 @@ int __init omapdss_init_of(void)
 		return -ENODEV;
 	}
 
+	/* create omapdrm devices */
+	r = omapdrm_init();
+	if (r < 0) {
+		pr_err("Unable to create omapdrm/dmm device\n");
+		return r;
+	}
+
 	board_data.version = ver;
 
 	/* find the main dss node  */
@@ -767,13 +775,6 @@ int __init omapdss_init_of(void)
 	}
 
 	hdmi_init_of();
-
-	/* create omapdrm devices */
-	r = omapdrm_init();
-	if (r < 0) {
-		pr_err("Unable to create omapdrm device\n");
-		return r;
-	}
 
 	return 0;
 }

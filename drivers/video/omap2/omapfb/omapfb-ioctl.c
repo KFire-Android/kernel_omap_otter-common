@@ -345,6 +345,7 @@ int omapfb_set_update_mode(struct fb_info *fbi,
 
 	return r;
 }
+EXPORT_SYMBOL(omapfb_set_update_mode);
 
 int omapfb_get_update_mode(struct fb_info *fbi,
 		enum omapfb_update_mode *mode)
@@ -367,6 +368,7 @@ int omapfb_get_update_mode(struct fb_info *fbi,
 
 	return 0;
 }
+EXPORT_SYMBOL(omapfb_get_update_mode);
 
 /* XXX this color key handling is a hack... */
 static struct omapfb_color_key omapfb_color_keys[2];
@@ -874,6 +876,7 @@ int omapfb_ioctl(struct fb_info *fbi, unsigned int cmd, unsigned long arg)
 
 	case OMAPFB_GET_DISPLAY_INFO: {
 		u16 xres, yres;
+		u32 w, h;
 
 		DBG("ioctl GET_DISPLAY_INFO\n");
 
@@ -882,26 +885,39 @@ int omapfb_ioctl(struct fb_info *fbi, unsigned int cmd, unsigned long arg)
 			break;
 		}
 
-		display->driver->get_resolution(display, &xres, &yres);
-
+		get_fb_resolution(display, &xres, &yres);
 		p.display_info.xres = xres;
 		p.display_info.yres = yres;
 
-		if (display->driver->get_dimensions) {
-			u32 w, h;
-			display->driver->get_dimensions(display, &w, &h);
-			p.display_info.width = w;
-			p.display_info.height = h;
-		} else {
-			p.display_info.width = 0;
-			p.display_info.height = 0;
-		}
+		omapdss_display_get_dimensions(display, &w, &h);
+		p.display_info.width = w;
+		p.display_info.height = h;
 
 		if (copy_to_user((void __user *)arg, &p.display_info,
 					sizeof(p.display_info)))
 			r = -EFAULT;
 		break;
 	}
+
+	case OMAPFB_ENABLEVSYNC:
+		if (get_user(p.crt, (__u32 __user *)arg)) {
+			r = -EFAULT;
+			break;
+		}
+
+		omapfb_lock(fbdev);
+		fbdev->vsync_active = !!p.crt;
+		if (p.crt)
+			if (display->state == OMAP_DSS_DISPLAY_ACTIVE)
+				omapfb_enable_vsync(fbdev, display->channel,
+					true);
+			else
+				r = -EBUSY;
+		else
+			omapfb_enable_vsync(fbdev, display->channel,
+				false);
+		omapfb_unlock(fbdev);
+		break;
 
 	default:
 		dev_err(fbdev->dev, "Unknown ioctl 0x%x\n", cmd);

@@ -106,6 +106,7 @@ struct hdmi_config {
 	struct hdmi_s3d_info s3d_info;
 	enum hdmi_deep_color_mode deep_color;
 	enum hdmi_range range;
+	struct fb_videomode timingsfb;
 };
 
 /* HDMI PLL structure */
@@ -245,6 +246,7 @@ struct hdmi_ip_data {
 	/* ti_hdmi_4xxx_ip private data. These should be in a separate struct */
 	int hpd_gpio;
 	struct mutex lock;
+	bool set_mode;
 };
 int ti_hdmi_4xxx_phy_enable(struct hdmi_ip_data *ip_data);
 void ti_hdmi_4xxx_phy_disable(struct hdmi_ip_data *ip_data);

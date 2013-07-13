@@ -197,7 +197,7 @@ static struct dmm_txn *dmm_txn_init(struct dmm *dmm, struct tcm *tcm)
  * corresponding slot is cleared (ie. dummy_pa is programmed)
  */
 static void dmm_txn_append(struct dmm_txn *txn, struct pat_area *area,
-		struct page **pages, uint32_t npages, uint32_t roll)
+	struct mem_info *mem, uint32_t npages, uint32_t roll, uint32_t y_offset)
 {
 	dma_addr_t pat_pa = 0;
 	uint32_t *data;
@@ -229,8 +229,19 @@ static void dmm_txn_append(struct dmm_txn *txn, struct pat_area *area,
 		int n = i + roll;
 		if (n >= npages)
 			n -= npages;
-		data[i] = (pages && pages[n]) ?
-			page_to_phys(pages[n]) : engine->dmm->dummy_pa;
+		if (!mem)
+                       data[i] = engine->dmm->dummy_pa;
+		else{
+			if (mem->type == MEMTYPE_PAGES) {
+				data[i] = (mem->pages && mem->pages[n]) ?
+					page_to_phys(mem->pages[n]) :
+					engine->dmm->dummy_pa;
+                       } else {
+                               data[i] = mem->phys_addrs ? mem->phys_addrs[n] :
+                                               engine->dmm->dummy_pa;
+                       }
+               }
+
 	}
 
 	txn->last_pat = pat;
@@ -292,12 +303,13 @@ cleanup:
 /*
  * DMM programming
  */
-static int fill(struct tcm_area *area, struct page **pages,
-		uint32_t npages, uint32_t roll, bool wait)
+static int fill(struct tcm_area *area, struct mem_info *mem, uint32_t npages,
+	uint32_t roll, bool wait)
 {
 	int ret = 0;
 	struct tcm_area slice, area_s;
 	struct dmm_txn *txn;
+	u32 y_offset = 0;
 
 	txn = dmm_txn_init(omap_dmm, area->tcm);
 	if (IS_ERR_OR_NULL(txn))
@@ -309,13 +321,18 @@ static int fill(struct tcm_area *area, struct page **pages,
 				.x1 = slice.p1.x,  .y1 = slice.p1.y,
 		};
 
-		dmm_txn_append(txn, &p_area, pages, npages, roll);
+		dmm_txn_append(txn, &p_area, mem, npages, roll,
+					y_offset);
+
+		if (ret)
+                        goto fail;
 
 		roll += tcm_sizeof(slice);
 	}
 
 	ret = dmm_txn_commit(txn, wait);
 
+fail:
 	return ret;
 }
 
@@ -329,19 +346,38 @@ int tiler_pin(struct tiler_block *block, struct page **pages,
 		uint32_t npages, uint32_t roll, bool wait)
 {
 	int ret;
+	struct mem_info mem;
+	mem.type = MEMTYPE_PAGES;
+	mem.pages = pages;
 
-	ret = fill(&block->area, pages, npages, roll, wait);
+	ret = fill(&block->area, &mem, npages, roll, wait);
 
 	if (ret)
 		tiler_unpin(block);
 
 	return ret;
 }
+EXPORT_SYMBOL(tiler_pin);
 
 int tiler_unpin(struct tiler_block *block)
 {
 	return fill(&block->area, NULL, 0, 0, false);
 }
+EXPORT_SYMBOL(tiler_unpin);
+
+int tiler_pin_phys(struct tiler_block *block, u32 *phys_addrs,
+                       u32 num_pages)
+{
+       int ret;
+       struct mem_info mem;
+
+       mem.type = MEMTYPE_CARVEOUT;
+       mem.phys_addrs = phys_addrs;
+
+       ret = fill(&block->area, &mem, num_pages, 0, true);
+       return ret;
+}
+EXPORT_SYMBOL(tiler_pin_phys);
 
 /*
  * Reserve/release
@@ -349,17 +385,24 @@ int tiler_unpin(struct tiler_block *block)
 struct tiler_block *tiler_reserve_2d(enum tiler_fmt fmt, uint16_t w,
 		uint16_t h, uint16_t align)
 {
-	struct tiler_block *block = kzalloc(sizeof(*block), GFP_KERNEL);
+	struct tiler_block *block;
 	u32 min_align = 128;
 	int ret;
 	unsigned long flags;
 	size_t slot_bytes;
 
-	BUG_ON(!validfmt(fmt));
+	/* check for valid format and overflow for w/h */
+	if (!validfmt(fmt) || !w || !h ||
+		(w > USHRT_MAX - geom[fmt].slot_w) ||
+		(h > USHRT_MAX - geom[fmt].slot_h))
+		return ERR_PTR(-EINVAL);
 
-	/* convert width/height to slots */
-	w = DIV_ROUND_UP(w, geom[fmt].slot_w);
-	h = DIV_ROUND_UP(h, geom[fmt].slot_h);
+	block = kzalloc(sizeof(*block), GFP_KERNEL);
+	if (!block)
+		return ERR_PTR(-ENOMEM);
+
+	block->fmt = fmt;
+	block->stride = round_up(geom[fmt].cpp * w, PAGE_SIZE);
 
 	/* convert alignment to slots */
 	slot_bytes = geom[fmt].slot_w * geom[fmt].cpp;
@@ -367,7 +410,9 @@ struct tiler_block *tiler_reserve_2d(enum tiler_fmt fmt, uint16_t w,
 	align = (align > min_align) ? ALIGN(align, min_align) : min_align;
 	align /= slot_bytes;
 
-	block->fmt = fmt;
+	/* convert width/height to slots */
+	w = DIV_ROUND_UP(w, geom[fmt].slot_w);
+	h = DIV_ROUND_UP(h, geom[fmt].slot_h);
 
 	ret = tcm_reserve_2d(containers[fmt], w, h, align, -1, slot_bytes,
 			&block->area);
@@ -383,6 +428,7 @@ struct tiler_block *tiler_reserve_2d(enum tiler_fmt fmt, uint16_t w,
 
 	return block;
 }
+EXPORT_SYMBOL(tiler_reserve_2d);
 
 struct tiler_block *tiler_reserve_1d(size_t size)
 {
@@ -394,6 +440,7 @@ struct tiler_block *tiler_reserve_1d(size_t size)
 		return ERR_PTR(-ENOMEM);
 
 	block->fmt = TILFMT_PAGE;
+	block->stride = round_up(size, PAGE_SIZE);
 
 	if (tcm_reserve_1d(containers[TILFMT_PAGE], num_pages,
 				&block->area)) {
@@ -407,6 +454,7 @@ struct tiler_block *tiler_reserve_1d(size_t size)
 
 	return block;
 }
+EXPORT_SYMBOL(tiler_reserve_1d);
 
 /* note: if you have pin'd pages, you should have already unpin'd first! */
 int tiler_release(struct tiler_block *block)
@@ -424,6 +472,7 @@ int tiler_release(struct tiler_block *block)
 	kfree(block);
 	return ret;
 }
+EXPORT_SYMBOL(tiler_release);
 
 /*
  * Utils
@@ -489,6 +538,7 @@ dma_addr_t tiler_ssptr(struct tiler_block *block)
 			block->area.p0.x * geom[block->fmt].slot_w,
 			block->area.p0.y * geom[block->fmt].slot_h);
 }
+EXPORT_SYMBOL(tiler_ssptr);
 
 dma_addr_t tiler_tsptr(struct tiler_block *block, uint32_t orient,
 		uint32_t x, uint32_t y)
@@ -503,10 +553,11 @@ dma_addr_t tiler_tsptr(struct tiler_block *block, uint32_t orient,
 
 void tiler_align(enum tiler_fmt fmt, uint16_t *w, uint16_t *h)
 {
-	BUG_ON(!validfmt(fmt));
+	BUG_ON(!validfmt(fmt) || fmt == TILFMT_PAGE);
 	*w = round_up(*w, geom[fmt].slot_w);
 	*h = round_up(*h, geom[fmt].slot_h);
 }
+EXPORT_SYMBOL(tiler_align);
 
 uint32_t tiler_stride(enum tiler_fmt fmt, uint32_t orient)
 {
@@ -517,23 +568,86 @@ uint32_t tiler_stride(enum tiler_fmt fmt, uint32_t orient)
 	else
 		return 1 << (CONT_WIDTH_BITS + geom[fmt].y_shft);
 }
+EXPORT_SYMBOL(tiler_stride);
 
 size_t tiler_size(enum tiler_fmt fmt, uint16_t w, uint16_t h)
 {
 	tiler_align(fmt, &w, &h);
 	return geom[fmt].cpp * w * h;
 }
+EXPORT_SYMBOL(tiler_size);
 
 size_t tiler_vsize(enum tiler_fmt fmt, uint16_t w, uint16_t h)
 {
-	BUG_ON(!validfmt(fmt));
+	BUG_ON(!validfmt(fmt) || fmt == TILFMT_PAGE);
 	return round_up(geom[fmt].cpp * w, PAGE_SIZE) * h;
 }
+EXPORT_SYMBOL(tiler_vsize);
 
 bool dmm_is_available(void)
 {
 	return omap_dmm ? true : false;
 }
+EXPORT_SYMBOL(dmm_is_available);
+
+/* rotation APIs */
+bool is_tiler_addr(uint32_t phys)
+{
+	return phys >= TILVIEW_8BIT && phys < TILVIEW_END;
+}
+EXPORT_SYMBOL(is_tiler_addr);
+
+int tiler_get_fmt(uint32_t phys, enum tiler_fmt *fmt)
+{
+	if (!is_tiler_addr(phys))
+		return 0;
+
+	*fmt = TILER_FMT(phys);
+	return 1;
+}
+EXPORT_SYMBOL(tiler_get_fmt);
+
+void tilview_create(struct tiler_view_t *view, u32 phys, u32 width, u32 height)
+{
+	enum tiler_fmt fmt = TILER_FMT(view->tsptr);
+	BUG_ON(!is_tiler_addr(phys));
+
+	view->tsptr = phys & ~MASK_VIEW;
+	view->bpp = geom[TILER_FMT(phys)].cpp;
+	view->width = width;
+	view->height = height;
+	view->h_inc = view->bpp;
+	view->v_inc = tiler_stride(fmt, view->tsptr);
+}
+EXPORT_SYMBOL(tilview_create);
+
+void tilview_get(struct tiler_view_t *view, struct tiler_block *blk)
+{
+    enum tiler_fmt fmt = TILER_FMT(view->tsptr);
+
+	view->tsptr = tiler_ssptr(blk);
+	view->bpp = geom[TILER_FMT(view->tsptr)].cpp;
+	view->width = blk->width;
+	view->height = blk->height;
+	view->h_inc = view->bpp;
+	view->v_inc = tiler_stride(fmt, view->tsptr);
+}
+EXPORT_SYMBOL(tilview_get);
+
+int tilview_crop(struct tiler_view_t *view, u32 left, u32 top, u32 width,
+		u32 height)
+{
+	/* check for valid crop */
+	if (left + width < left || left + width > view->width ||
+	    top + height < top || top + height > view->height)
+		return -EINVAL;
+
+	view->tsptr += left * view->h_inc + top * view->v_inc;
+	view->width = width;
+	view->height = height;
+	return 0;
+}
+EXPORT_SYMBOL(tilview_crop);
 
 static int omap_dmm_remove(struct platform_device *dev)
 {
@@ -943,6 +1057,7 @@ error:
 
 	return 0;
 }
+EXPORT_SYMBOL(tiler_map_show);
 #endif
 
 #ifdef CONFIG_PM
@@ -1001,6 +1116,23 @@ struct platform_driver omap_dmm_driver = {
 #endif
 	},
 };
+
+static int __init omap_dmm_init(void)
+{
+	return platform_driver_register(&omap_dmm_driver);
+}
+
+static void __exit omap_dmm_exit(void)
+{
+	platform_driver_unregister(&omap_dmm_driver);
+}
+
+#ifdef MODULE
+module_init(omap_dmm_init);
+module_exit(omap_dmm_exit);
+#else
+core_initcall(omap_dmm_init);
+#endif
 
 MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("Andy Gross <andy.gross@ti.com>");

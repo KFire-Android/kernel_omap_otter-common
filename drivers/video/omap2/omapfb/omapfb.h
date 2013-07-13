@@ -30,7 +30,7 @@
 #include <linux/rwsem.h>
 #include <linux/dma-attrs.h>
 #include <linux/dma-mapping.h>
-
+#include <video/omapvrfb.h>
 #include <video/omapdss.h>
 
 #ifdef DEBUG
@@ -107,6 +107,15 @@ struct omapfb2_device {
 	struct omap_overlay_manager *managers[10];
 
 	struct workqueue_struct *auto_update_wq;
+	unsigned num_bpp_overrides;
+	struct {
+		struct omap_dss_device *dssdev;
+		u8 bpp;
+	} bpp_overrides[10];
+
+	bool vsync_active;
+	ktime_t vsync_timestamp;
+	struct work_struct vsync_work;
 };
 
 struct omapfb_colormode {
@@ -141,6 +150,11 @@ void omapfb_stop_auto_update(struct omapfb2_device *fbdev,
 		struct omap_dss_device *display);
 int omapfb_get_update_mode(struct fb_info *fbi, enum omapfb_update_mode *mode);
 int omapfb_set_update_mode(struct fb_info *fbi, enum omapfb_update_mode mode);
+
+int omapfb_enable_vsync(struct omapfb2_device *fbdev, enum omap_channel ch,
+			bool enable);
+void get_fb_resolution(struct omap_dss_device *dssdev,
+		u16 *xres, u16 *yres);
 
 /* find the display connected to this fb, if any */
 static inline struct omap_dss_device *fb2display(struct fb_info *fbi)
