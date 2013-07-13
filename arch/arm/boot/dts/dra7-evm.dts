@@ -30,6 +30,13 @@
 		regulator-min-microvolt = <3000000>;
 		regulator-max-microvolt = <3000000>;
 	};
+
+	ocp {
+		gpu: gpu@0x56000000 {
+			gpu-supply = <&avs_gpu>;
+		};
+	};
+
 };
 
 &dra7_pmx_core {

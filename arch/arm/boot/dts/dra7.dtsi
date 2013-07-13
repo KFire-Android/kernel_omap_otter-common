@@ -113,6 +113,31 @@
 			compatible = "ti,omap-clock";
 		};
 
+		dpll_gpu_m2_ck: dpll_gpu_m2_ck {
+			#clock-cells = <0>;
+			compatible = "ti,omap-clock";
+		};
+
+		dpll_core_h14x2_ck: dpll_core_h14x2_ck {
+			#clock-cells = <0>;
+			compatible = "ti,omap-clock";
+		};
+
+		dpll_per_h14x2_ck: dpll_per_h14x2_ck {
+			#clock-cells = <0>;
+			compatible = "ti,omap-clock";
+		};
+
+		gpu_core_gclk_mux: gpu_core_gclk_mux {
+			#clock-cells = <0>;
+			compatible = "ti,omap-clock";
+		};
+
+		gpu_hyd_gclk_mux: gpu_hyd_gclk_mux {
+			#clock-cells = <0>;
+			compatible = "ti,omap-clock";
+		};
+
 		sdma: dma-controller@4a056000 {
 			compatible = "ti,omap4430-sdma";
 			reg = <0x4a056000 0x1000>;
@@ -358,6 +383,23 @@
 			reg = <0x4e000000 0x800>;
 			interrupts = <0 113 0x4>;
 			ti,hwmods = "dmm";
+		};
+
+		gpu: gpu@0x56000000 {
+			compatible = "ti,omap4-gpu";
+			reg = <0x56000000 0xffff>;
+			interrupts = <0 21 0x4>;
+			ti,hwmods = "gpu";
+			operating-points = <
+				/* kHz    uV */
+				425600  1090000
+				500000  1210000
+				532000  1280000
+				>;
+			clocks = <&dpll_core_h14x2_ck>, <&dpll_per_h14x2_ck>,
+					<&dpll_gpu_m2_ck>, <&gpu_core_gclk_mux>,
+					<&gpu_hyd_gclk_mux>;
+			clock-names = "core", "per", "gpu", "gpu_core", "gpu_hyd";
 		};
 
 		bandgap {
