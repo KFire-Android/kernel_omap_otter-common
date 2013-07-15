@@ -43,6 +43,13 @@
 		/*15 MB*/
 		ti,omap_ion_heap_nonsecure_tiler_size = <0xF00000>;
 	};
+
+	ocp {
+		gpu: gpu@0x56000000 {
+			gpu-supply = <&avs_gpu>;
+		};
+	};
+
 };
 
 &dra7_pmx_core {
