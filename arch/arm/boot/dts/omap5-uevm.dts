@@ -298,7 +298,7 @@
 };
 
 &mmc1 {
-	vmmc-supply = <&vmmcsd_fixed>;
+	vmmc-supply = <&ldo9_reg>;
 	bus-width = <4>;
 };
 
