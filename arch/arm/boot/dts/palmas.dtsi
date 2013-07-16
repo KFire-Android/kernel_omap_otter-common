@@ -88,8 +88,6 @@
 				regulator-name = "smps9";
 				regulator-min-microvolt = <2100000>;
 				regulator-max-microvolt = <2100000>;
-				regulator-always-on;
-				regulator-boot-on;
 				ti,warm_sleep = <0>;
 				ti,roof_floor = <0>;
 				ti,mode_sleep = <0>;
