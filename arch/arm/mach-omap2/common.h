@@ -290,6 +290,7 @@ extern int omap4_twl6030_hsmmc_init(struct omap2_hsmmc_info *controllers);
 
 extern void omap4_reserve(void);
 extern void omap5_reserve(void);
+extern void dra7_reserve(void);
 extern void omap_reserve(void);
 
 struct omap_hwmod;
