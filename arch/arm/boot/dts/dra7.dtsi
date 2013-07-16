@@ -27,9 +27,9 @@
 			compatible = "arm,cortex-a15";
 			operating-points = <
 				/* kHz    uV */
-				/* The OPP_HIGH Only for DVFS enabled Samples Hence commenting*/
+				/* The OPP_HIGH Only for DVFS enabled Samples */
 				1000000	1090000
-				/*	1176000	1210000		*/
+				1176000	1210000
 				>;
 				clocks = <&dpll_mpu>;
 				clock-names = "cpu";
