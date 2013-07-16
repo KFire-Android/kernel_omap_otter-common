@@ -129,16 +129,16 @@
 			ldo2_reg: ldo2 {
 				/* VCC_2V8_DISP: Does not go anywhere */
 				regulator-name = "ldo2";
-				regulator-min-microvolt = <2900000>;
-				regulator-max-microvolt = <2900000>;
-				regulator-always-on;
-				regulator-boot-on;
+				regulator-min-microvolt = <2800000>;
+				regulator-max-microvolt = <2800000>;
 				ti,warm_sleep = <0>;
 				ti,roof_floor = <0>;
 				ti,mode_sleep = <0>;
 				ti,warm_reset = <0>;
 				ti,tstep = <0>;
 				ti,vsel = <0>;
+				/* Unused */
+				status = "disabled";
 			};
 
 			ldo3_reg: ldo3 {
@@ -219,9 +219,8 @@
 			ldo8_reg: ldo8 {
 				/* VDD_3v0: Does not go anywhere */
 				regulator-name = "ldo8";
-				regulator-min-microvolt = <1500000>;
-				regulator-max-microvolt = <1500000>;
-				regulator-always-on;
+				regulator-min-microvolt = <3000000>;
+				regulator-max-microvolt = <3000000>;
 				regulator-boot-on;
 				ti,warm_sleep = <0>;
 				ti,roof_floor = <0>;
@@ -229,6 +228,8 @@
 				ti,warm_reset = <0>;
 				ti,tstep = <0>;
 				ti,vsel = <0>;
+				/* Unused */
+				status = "disabled";
 			};
 
 			ldo9_reg: ldo9 {
