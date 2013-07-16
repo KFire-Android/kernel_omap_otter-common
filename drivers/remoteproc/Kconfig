@@ -12,7 +12,7 @@ config REMOTEPROC
 config OMAP_REMOTEPROC
 	tristate "OMAP remoteproc support"
 	depends on HAS_DMA
-	depends on ARCH_OMAP4 || SOC_OMAP5
+	depends on ARCH_OMAP4 || SOC_OMAP5 || SOC_DRA7XX
 	depends on OMAP_IOMMU
 	depends on CMA
 	select REMOTEPROC
@@ -23,9 +23,9 @@ config OMAP_REMOTEPROC
 	  Support for OMAP's remote processors (dual Cortex-M3/M4
 	  and DSP) via the remote processor framework.
 
-	  Currently only supported on OMAP4.
+	  Currently supported on OMAP4, OMAP5 & DRA7XX SoCs.
 
-	  It gets selected by DSP or IPU OMAP_REMOTEPROC instances,
+	  It gets selected by DSP(2) or IPU(1) OMAP_REMOTEPROC instances,
 	  in order to enable multimedia use-cases to run on your platform
 	  (multimedia codecs are offloaded to remote DSP processors or
 	  remoteproc processors controlling other h/w accelerator devices
@@ -56,6 +56,33 @@ config OMAP_REMOTEPROC_DSP
 
 	  It's safe to say n here if you're not interested in offloading
 	  audio or any other algorithm (by DSP) or just want a bare minimum kernel.
+
+config OMAP_REMOTEPROC_IPU1
+	bool "OMAP remoteproc support for IPU1 (DRA7xx only)"
+	depends on OMAP_REMOTEPROC && SOC_DRA7XX
+	help
+	  Say Y here if you want to enable DRA7xx's IPU1 remote processor.
+
+	  This option controls only the first dual-M4 processor sub-system in
+	  DRA7xx. You would want to say y here usually, as this is the sub
+	  system where some real-time automative stack s/w is offloaded.
+
+	  It's safe to say n here if you're not interested in enabling IPU1
+	  or just want a bare minimum kernel.
+
+config OMAP_REMOTEPROC_DSP2
+	bool "OMAP remoteproc support for DSP2 (DRA7xx only)"
+	depends on OMAP_REMOTEPROC && SOC_DRA7XX
+	help
+	  Say Y here if you want to enable DRA7xx's DSP2 remote processor.
+
+	  This option controls only the DSP2 processor sub-system in DRA7xx.
+	  DSP would typically be used to offload audio codecs or other advanced
+	  processing algorithms.
+
+	  It's safe to say n here if you're not interested in offloading
+	  audio or any other algorithm (by DSP) or just want a bare minimum
+	  kernel.
 
 config STE_MODEM_RPROC
 	tristate "STE-Modem remoteproc support"

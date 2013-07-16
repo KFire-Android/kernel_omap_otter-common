@@ -49,6 +49,10 @@ struct omap_rproc_pdev_data {
 	struct platform_device *pdev;
 };
 
+/* forward declarations */
+static void dra7_ctrl_write_dsp1_boot_addr(u32 bootaddr);
+static void dra7_ctrl_write_dsp2_boot_addr(u32 bootaddr);
+
 /*
  * Temporarily define the CMA base address explicitly.
  *
@@ -61,6 +65,11 @@ struct omap_rproc_pdev_data {
  * XXX: Adjust these values depending on your firmware needs.
  * Placing these in Kconfig is not worth the complexity.
  */
+#define DRA7_RPROC_CMA_BASE_IPU2	(0x95800000)
+#define DRA7_RPROC_CMA_BASE_DSP1	(0x95000000)
+#define DRA7_RPROC_CMA_BASE_DSP2	(0x94800000)
+#define DRA7_RPROC_CMA_BASE_IPU1	(0x94000000)
+
 #define OMAP5_RPROC_CMA_BASE_IPU	(0x95800000)
 #define OMAP5_RPROC_CMA_BASE_DSP	(0x95000000)
 
@@ -71,6 +80,7 @@ struct omap_rproc_pdev_data {
 
 #define OMAP4_RPROC_CMA_SIZE_IPU	(0x7000000)
 #define OMAP5_RPROC_CMA_SIZE_IPU	(0xA400000)
+#define DRA7_RPROC_CMA_SIZE_IPU1	(0x800000)
 
 /*
  * The order of the timers (if there are more) here should be
@@ -113,6 +123,35 @@ static struct omap_rproc_pdata omap4_rproc_data[] = {
 	},
 };
 
+static struct omap_rproc_pdata dra7_rproc_data[] = {
+	{
+		.name		= "dsp1",
+		.firmware	= "dra7-dsp1-fw.xe66",
+		.mbox_name	= "mbox-dsp1",
+		.oh_name	= "dsp1",
+		.set_bootaddr	= dra7_ctrl_write_dsp1_boot_addr,
+	},
+	{
+		.name		= "ipu2",
+		.firmware	= "dra7-ipu2-fw.xem4",
+		.mbox_name	= "mbox-ipu2",
+		.oh_name	= "ipu2",
+	},
+	{
+		.name		= "dsp2",
+		.firmware	= "dra7-dsp2-fw.xe66",
+		.mbox_name	= "mbox-dsp2",
+		.oh_name	= "dsp2",
+		.set_bootaddr	= dra7_ctrl_write_dsp2_boot_addr,
+	},
+	{
+		.name		= "ipu1",
+		.firmware	= "dra7-ipu1-fw.xem4",
+		.mbox_name	= "mbox-ipu1",
+		.oh_name	= "ipu1",
+	},
+};
+
 /*
  * These data structures define the necessary iommu binding information
  * for the respective processor. The listing order should match the
@@ -121,6 +160,13 @@ static struct omap_rproc_pdata omap4_rproc_data[] = {
 static struct omap_iommu_arch_data omap4_rproc_iommu[] = {
 	{ .name = "mmu_dsp" },
 	{ .name = "mmu_ipu" },
+};
+
+static struct omap_iommu_arch_data dra7_rproc_iommu[] = {
+	{ .name = "mmu0_dsp1" },
+	{ .name = "mmu_ipu2" },
+	{ .name = "mmu0_dsp2" },
+	{ .name = "mmu_ipu1" },
 };
 
 /*
@@ -138,6 +184,16 @@ static struct platform_device omap4_dsp = {
 static struct platform_device omap4_ipu = {
 	.name	= "omap-rproc",
 	.id	= 1,
+};
+
+static struct platform_device dra7_dsp2 = {
+	.name	= "omap-rproc",
+	.id	= 2,
+};
+
+static struct platform_device dra7_ipu1 = {
+	.name	= "omap-rproc",
+	.id	= 3,
 };
 
 /*
@@ -183,6 +239,41 @@ static struct omap_rproc_pdev_data omap5_rproc_pdev_data[] = {
 	},
 };
 
+static struct omap_rproc_pdev_data dra7_rproc_pdev_data[] = {
+	{
+#ifdef CONFIG_OMAP_REMOTEPROC_DSP
+		.enabled = 1,
+#endif
+		.pdev = &omap4_dsp,
+		.cma_addr = DRA7_RPROC_CMA_BASE_DSP1,
+		.cma_size = OMAP_RPROC_CMA_SIZE_DSP,
+	},
+	{
+#ifdef CONFIG_OMAP_REMOTEPROC_IPU
+		.enabled = 1,
+#endif
+		.pdev = &omap4_ipu,
+		.cma_addr = DRA7_RPROC_CMA_BASE_IPU2,
+		.cma_size = OMAP5_RPROC_CMA_SIZE_IPU,
+	},
+	{
+#ifdef CONFIG_OMAP_REMOTEPROC_DSP2
+		.enabled = 1,
+#endif
+		.pdev = &dra7_dsp2,
+		.cma_addr = DRA7_RPROC_CMA_BASE_DSP2,
+		.cma_size = OMAP_RPROC_CMA_SIZE_DSP,
+	},
+	{
+#ifdef CONFIG_OMAP_REMOTEPROC_IPU1
+		.enabled = 1,
+#endif
+		.pdev = &dra7_ipu1,
+		.cma_addr = DRA7_RPROC_CMA_BASE_IPU1,
+		.cma_size = DRA7_RPROC_CMA_SIZE_IPU1,
+	},
+};
+
 static struct omap_device_pm_latency omap_rproc_latency[] = {
 	{
 		.deactivate_func = omap_device_idle_hwmods,
@@ -190,6 +281,16 @@ static struct omap_device_pm_latency omap_rproc_latency[] = {
 		.flags = OMAP_DEVICE_LATENCY_AUTO_ADJUST,
 	},
 };
+
+static void dra7_ctrl_write_dsp1_boot_addr(u32 bootaddr)
+{
+	dra7_ctrl_write_dsp_boot_addr(bootaddr, 0);
+}
+
+static void dra7_ctrl_write_dsp2_boot_addr(u32 bootaddr)
+{
+	dra7_ctrl_write_dsp_boot_addr(bootaddr, 1);
+}
 
 /**
  * omap_rproc_device_enable - enable the remoteproc device
@@ -387,6 +488,9 @@ void __init omap_rproc_reserve_cma(int platform_type)
 	} else if (platform_type == RPROC_CMA_OMAP5) {
 		rproc_pdev_data = omap5_rproc_pdev_data;
 		rproc_size = ARRAY_SIZE(omap5_rproc_pdev_data);
+	} else if (platform_type == RPROC_CMA_DRA7) {
+		rproc_pdev_data = dra7_rproc_pdev_data;
+		rproc_size = ARRAY_SIZE(dra7_rproc_pdev_data);
 	} else {
 		pr_err("incompatible machine");
 		return;
@@ -440,6 +544,11 @@ static int __init omap_rproc_init(void)
 		rproc_size = ARRAY_SIZE(omap5_rproc_pdev_data);
 		rproc_data = omap4_rproc_data;
 		rproc_iommu = omap4_rproc_iommu;
+	} else if (soc_is_dra7xx()) {
+		rproc_pdev_data = dra7_rproc_pdev_data;
+		rproc_size = ARRAY_SIZE(dra7_rproc_pdev_data);
+		rproc_data = dra7_rproc_data;
+		rproc_iommu = dra7_rproc_iommu;
 	} else {
 		return 0;
 	}
