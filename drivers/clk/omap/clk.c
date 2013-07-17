@@ -34,8 +34,7 @@ static const struct of_device_id omap_clk_of_match[] = {
  * @data:	unused
  *
  * REVISIT: We assume the following:
- * 1. omap clock names end with _ck
- * 2. omap clock names are under 32 characters in length
+ * 1. omap clock names are under 32 characters in length
  */
 static struct clk *omap_clk_src_get(struct of_phandle_args *clkspec, void *data)
 {
@@ -43,7 +42,7 @@ static struct clk *omap_clk_src_get(struct of_phandle_args *clkspec, void *data)
 	char clk_name[32];
 	struct device_node *np = clkspec->np;
 
-	snprintf(clk_name, 32, "%s_ck", np->name);
+	snprintf(clk_name, 32, "%s", np->name);
 	clk = clk_get(NULL, clk_name);
 	if (IS_ERR(clk))
 		pr_err("%s: could not get clock %s(%ld)\n", __func__,
