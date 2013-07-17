@@ -1993,34 +1993,54 @@ err:
 void sel_i2c(void)
 {
 	void __iomem *base = ioremap(0x48464000, SZ_1K);
+	void __iomem *core_base = ioremap(0x4a003400, SZ_1K);
 
 	if (omapdss_get_version() != OMAPDSS_VER_DRA7xx)
 		goto err;
 
 	/* PDOUT */
 	__raw_writel(0x0, base + 0x18);
-
 	DSSDBG("PDOUT sel_i2c  %x\n", __raw_readl(base + 0x18));
+
+#ifdef CONFIG_OMAP5_DSS_HDMI_DDC
+	/* select I2C scl/sda*/
+	__raw_writel(0x60000, core_base + 0x408);
+	__raw_writel(0x60000, core_base + 0x40c);
+
+	DSSDBG("I2C2_SCL sel_i2c %x\n", __raw_readl(core_base + 0x408));
+	DSSDBG("I2C2_SDA sel_i2c %x\n", __raw_readl(core_base + 0x40C));
+#endif
 
 err:
 	iounmap(base);
+	iounmap(core_base);
 }
 
-/* use this to read edid and detect hpd ? */
+/* use this to select HDMI and read edid over ddc lines*/
 void sel_hdmi(void)
 {
 	void __iomem *base = ioremap(0x48464000, SZ_1K);
+	void __iomem *core_base = ioremap(0x4a003400, SZ_1K);
 
 	if (omapdss_get_version() != OMAPDSS_VER_DRA7xx)
 		goto err;
 
 	/* PDOUT */
 	__raw_writel(0x20000000, base + 0x18);
-
 	DSSDBG("PDOUT sel_hdmi %x\n", __raw_readl(base + 0x18));
+
+#ifdef CONFIG_OMAP5_DSS_HDMI_DDC
+	/* select hdmi ddc scl/sda*/
+	__raw_writel(0x60001, core_base + 0x408);
+	__raw_writel(0x60001, core_base + 0x40c);
+
+	DSSDBG("I2C2_SCL sel_hdmi %x\n", __raw_readl(core_base + 0x408));
+	DSSDBG("I2C2_SDA sel_hdmi %x\n", __raw_readl(core_base + 0x40C));
+#endif
 
 err:
 	iounmap(base);
+	iounmap(core_base);
 }
 
 static void __init hdmi_probe_of(struct platform_device *pdev)
