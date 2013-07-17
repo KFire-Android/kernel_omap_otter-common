@@ -1,6 +1,6 @@
 menuconfig DSSCOMP
 	tristate "OMAP DSS Composition support (EXPERIMENTAL)"
-	depends on EXPERIMENTAL && OMAP2_DSS && DRM_OMAP_DMM_TILER
+	depends on EXPERIMENTAL && OMAP2_DSS && DRM_OMAP_DMM_TILER && ION_OMAP
 	default y
 
 	help
