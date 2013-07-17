@@ -10,7 +10,16 @@ Required properties:
 
 Optional properties:
  - tx-fifo-resize: determines if the FIFO *has* to be reallocated.
-
+ - dr_mode: tells Dual-Role USB controllers that we want to work on a
+ 			particular mode. Valid arguments are "host",
+ 			"peripheral" and "otg". In case this attribute isn't
+ 			passed via DT, USB DRD controllers should default to
+ 			OTG.
+- maximum-speed: tells USB controllers we want to work up to a certain
+			speed. Valid arguments are "superspeed", "highspeed",
+			"fullspeed" and "lowspeed". In case this isn't passed
+			via DT, USB controllers should default to their maximum
+			HW capability.
 This is usually a subnode to DWC3 glue to which it is connected.
 
 dwc3@4a030000 {

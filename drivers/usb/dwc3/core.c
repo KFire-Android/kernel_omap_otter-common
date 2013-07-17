@@ -53,16 +53,13 @@
 #include <linux/usb/otg.h>
 #include <linux/usb/ch9.h>
 #include <linux/usb/gadget.h>
+#include <linux/usb/of.h>
 
 #include "core.h"
 #include "gadget.h"
 #include "io.h"
 
 #include "debug.h"
-
-static char *maximum_speed = "super";
-module_param(maximum_speed, charp, 0);
-MODULE_PARM_DESC(maximum_speed, "Maximum supported speed.");
 
 /* -------------------------------------------------------------------------- */
 
@@ -372,6 +369,7 @@ static int dwc3_probe(struct platform_device *pdev)
 	void			*mem;
 
 	u8			mode;
+	u8			dt_mode;
 
 	mem = devm_kzalloc(dev, sizeof(*dwc) + DWC3_ALIGN_MASK, GFP_KERNEL);
 	if (!mem) {
@@ -421,21 +419,50 @@ static int dwc3_probe(struct platform_device *pdev)
 	}
 
 	if (node) {
-		dwc->usb2_phy = devm_usb_get_phy_by_phandle(dev, "usb-phy", 0);
-		dwc->usb3_phy = devm_usb_get_phy_by_phandle(dev, "usb-phy", 1);
+		dwc->maximum_speed = of_usb_get_maximum_speed(node);
+		switch (dwc->maximum_speed) {
+		case USB_SPEED_SUPER:
+		case USB_SPEED_UNKNOWN:
+			dwc->usb2_phy = devm_usb_get_phy_by_phandle(dev, "usb-phy", 0);
+			dwc->usb3_phy = devm_usb_get_phy_by_phandle(dev, "usb-phy", 1);
+			break;
+		case USB_SPEED_HIGH:
+		case USB_SPEED_FULL:
+		case USB_SPEED_LOW:
+			dwc->usb2_phy = devm_usb_get_phy_by_phandle(dev, "usb-phy", 0);
+			break;
+		}
 	} else {
-		dwc->usb2_phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB2);
-		dwc->usb3_phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB3);
+		dwc->maximum_speed = USB_SPEED_UNKNOWN;
+		switch (dwc->maximum_speed) {
+		case USB_SPEED_SUPER:
+		case USB_SPEED_UNKNOWN:
+			dwc->usb2_phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB2);
+			dwc->usb3_phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB3);
+			break;
+		case USB_SPEED_HIGH:
+		case USB_SPEED_FULL:
+		case USB_SPEED_LOW:
+			dwc->usb2_phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB2);
+			break;
+		}
 	}
+
+	/* default to superspeed if no maximum_speed passed */
+	if (dwc->maximum_speed == USB_SPEED_UNKNOWN)
+		dwc->maximum_speed = USB_SPEED_SUPER;
 
 	if (IS_ERR_OR_NULL(dwc->usb2_phy)) {
 		dev_err(dev, "no usb2 phy configured\n");
 		return -EPROBE_DEFER;
 	}
 
-	if (IS_ERR_OR_NULL(dwc->usb3_phy)) {
-		dev_err(dev, "no usb3 phy configured\n");
-		return -EPROBE_DEFER;
+	if (dwc->maximum_speed == USB_SPEED_SUPER) {
+		if (IS_ERR(dwc->usb3_phy)) {
+			ret = PTR_ERR(dwc->usb2_phy);
+			dev_err(dev, "no usb3 phy configured\n");
+			return -EPROBE_DEFER;
+		}
 	}
 
 	usb_phy_set_suspend(dwc->usb2_phy, 0);
@@ -447,17 +474,6 @@ static int dwc3_probe(struct platform_device *pdev)
 	dwc->regs	= regs;
 	dwc->regs_size	= resource_size(res);
 	dwc->dev	= dev;
-
-	if (!strncmp("super", maximum_speed, 5))
-		dwc->maximum_speed = DWC3_DCFG_SUPERSPEED;
-	else if (!strncmp("high", maximum_speed, 4))
-		dwc->maximum_speed = DWC3_DCFG_HIGHSPEED;
-	else if (!strncmp("full", maximum_speed, 4))
-		dwc->maximum_speed = DWC3_DCFG_FULLSPEED1;
-	else if (!strncmp("low", maximum_speed, 3))
-		dwc->maximum_speed = DWC3_DCFG_LOWSPEED;
-	else
-		dwc->maximum_speed = DWC3_DCFG_SUPERSPEED;
 
 	dwc->needs_fifo_resize = of_property_read_bool(node, "tx-fifo-resize");
 
@@ -480,15 +496,30 @@ static int dwc3_probe(struct platform_device *pdev)
 		goto err0;
 	}
 
-	if (IS_ENABLED(CONFIG_USB_DWC3_HOST))
-		mode = DWC3_MODE_HOST;
-	else if (IS_ENABLED(CONFIG_USB_DWC3_GADGET))
-		mode = DWC3_MODE_DEVICE;
-	else
-		mode = DWC3_MODE_DRD;
+	mode = USB_DR_MODE_UNKNOWN;
+	if (node)
+		dt_mode = of_usb_get_dr_mode(node);
+
+	if (IS_ENABLED(CONFIG_USB_DWC3_HOST)) {
+		mode = USB_DR_MODE_HOST;
+		if (node && (mode != dt_mode))
+			dev_warn(dev, "dr_mode set to host,check value in DT\n");
+	}
+	else if (IS_ENABLED(CONFIG_USB_DWC3_GADGET)) {
+		mode = USB_DR_MODE_PERIPHERAL;
+		if (node && (mode != dt_mode))
+			dev_warn(dev, "dr_mode set to periph,check value in DT\n");
+	}
+	else if (node)
+		mode = dt_mode;
+
+	if (mode == USB_DR_MODE_UNKNOWN) {
+		mode = USB_DR_MODE_OTG;
+		dev_warn(dev, "dwc3 mode set to otg default\n");
+	}
 
 	switch (mode) {
-	case DWC3_MODE_DEVICE:
+	case USB_DR_MODE_PERIPHERAL:
 		dwc3_set_mode(dwc, DWC3_GCTL_PRTCAP_DEVICE);
 		ret = dwc3_gadget_init(dwc);
 		if (ret) {
@@ -496,7 +527,7 @@ static int dwc3_probe(struct platform_device *pdev)
 			goto err1;
 		}
 		break;
-	case DWC3_MODE_HOST:
+	case USB_DR_MODE_HOST:
 		dwc3_set_mode(dwc, DWC3_GCTL_PRTCAP_HOST);
 		ret = dwc3_host_init(dwc);
 		if (ret) {
@@ -504,7 +535,7 @@ static int dwc3_probe(struct platform_device *pdev)
 			goto err1;
 		}
 		break;
-	case DWC3_MODE_DRD:
+	case USB_DR_MODE_OTG:
 		dwc3_set_mode(dwc, DWC3_GCTL_PRTCAP_OTG);
 		ret = dwc3_host_init(dwc);
 		if (ret) {
@@ -536,13 +567,13 @@ static int dwc3_probe(struct platform_device *pdev)
 
 err2:
 	switch (mode) {
-	case DWC3_MODE_DEVICE:
+	case USB_DR_MODE_PERIPHERAL:
 		dwc3_gadget_exit(dwc);
 		break;
-	case DWC3_MODE_HOST:
+	case USB_DR_MODE_HOST:
 		dwc3_host_exit(dwc);
 		break;
-	case DWC3_MODE_DRD:
+	case USB_DR_MODE_OTG:
 		dwc3_host_exit(dwc);
 		dwc3_gadget_exit(dwc);
 		break;
@@ -573,13 +604,13 @@ static int dwc3_remove(struct platform_device *pdev)
 	dwc3_debugfs_exit(dwc);
 
 	switch (dwc->mode) {
-	case DWC3_MODE_DEVICE:
+	case USB_DR_MODE_PERIPHERAL:
 		dwc3_gadget_exit(dwc);
 		break;
-	case DWC3_MODE_HOST:
+	case USB_DR_MODE_HOST:
 		dwc3_host_exit(dwc);
 		break;
-	case DWC3_MODE_DRD:
+	case USB_DR_MODE_OTG:
 		dwc3_host_exit(dwc);
 		dwc3_gadget_exit(dwc);
 		break;
