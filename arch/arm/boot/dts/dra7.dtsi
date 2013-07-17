@@ -31,7 +31,7 @@
 				1000000	1090000
 				1176000	1210000
 				>;
-				clocks = <&dpll_mpu>;
+				clocks = <&dpll_mpu_ck>;
 				clock-names = "cpu";
 			timer {
 				compatible = "arm,armv7-timer";
@@ -108,7 +108,7 @@
 			pinctrl-single,function-mask = <0x3fffffff>;
 		};
 
-		dpll_mpu: dpll_mpu {
+		dpll_mpu_ck: dpll_mpu_ck {
 			#clock-cells = <0>;
 			compatible = "ti,omap-clock";
 		};

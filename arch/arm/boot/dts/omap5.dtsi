@@ -43,7 +43,7 @@
 				1000000	1060000
 				1500000	1250000
 			>;
-			clocks = <&dpll_mpu>;
+			clocks = <&dpll_mpu_ck>;
 			clock-names = "cpu";
 			clock-latency = <300000>; /* From omap-cpufreq driver */
 		};
@@ -104,7 +104,7 @@
 			ti,hwmods = "counter_32k";
 		};
 
-		dpll_mpu: dpll_mpu {
+		dpll_mpu_ck: dpll_mpu_ck {
 			#clock-cells = <0>;
 			compatible = "ti,omap-clock";
 		};
