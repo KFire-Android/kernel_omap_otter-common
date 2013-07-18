@@ -931,7 +931,7 @@ static int omap_iommu_probe(struct platform_device *pdev)
 	int err = -ENODEV;
 	int irq;
 	struct omap_iommu *obj;
-	struct resource *res;
+	struct resource *res, *res1;
 	struct iommu_platform_data *pdata = pdev->dev.platform_data;
 
 	obj = kzalloc(sizeof(*obj) + MMU_REG_SIZE, GFP_KERNEL);
@@ -969,6 +969,23 @@ static int omap_iommu_probe(struct platform_device *pdev)
 		goto err_ioremap;
 	}
 
+	res1 = platform_get_resource_byname(pdev, IORESOURCE_MEM, "dsp_system");
+	if (res1) {
+		/*
+		 * The DSP_SYSTEM space is common across two instances of MMU
+		 * and there is no common object for storing common data, so the
+		 * resource is deliberately not locked using request_mem_region
+		 */
+		obj->syscfgbase = ioremap(res1->start, resource_size(res1));
+		if (!obj->syscfgbase) {
+			err = -ENOMEM;
+			goto err_ioremap2;
+		}
+	} else {
+		dev_dbg(&pdev->dev, "%s does not have a dsp_system space\n",
+					obj->name);
+	}
+
 	irq = platform_get_irq(pdev, 0);
 	if (irq < 0) {
 		err = -ENODEV;
@@ -987,6 +1004,9 @@ static int omap_iommu_probe(struct platform_device *pdev)
 	return 0;
 
 err_irq:
+	if (obj->syscfgbase)
+		iounmap(obj->syscfgbase);
+err_ioremap2:
 	iounmap(obj->regbase);
 err_ioremap:
 	release_mem_region(res->start, resource_size(res));
@@ -1009,6 +1029,8 @@ static int omap_iommu_remove(struct platform_device *pdev)
 	free_irq(irq, obj);
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	release_mem_region(res->start, resource_size(res));
+	if (obj->syscfgbase)
+		iounmap(obj->syscfgbase);
 	iounmap(obj->regbase);
 
 	pm_runtime_disable(obj->dev);
