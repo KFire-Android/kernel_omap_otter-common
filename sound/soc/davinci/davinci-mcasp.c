@@ -232,7 +232,7 @@
  * DAVINCI_MCASP_XRSRCTL_BASE_REG -  Serializer Control Register Bits
  */
 #define MODE(val)	(val)
-#define DISMOD		(val)(val<<2)
+#define DISMOD(val)	(val << 2)
 #define TXSTATE		BIT(4)
 #define RXSTATE		BIT(5)
 #define SRMOD_MASK	3
@@ -767,11 +767,17 @@ static int davinci_hw_common_param(struct davinci_audio_dev *dev, int stream,
 					dev->serial_dir[i]);
 		if (dev->serial_dir[i] == TX_MODE &&
 					tx_ser < max_active_serializers) {
+			mcasp_mod_bits(dev->base + DAVINCI_MCASP_XRSRCTL_REG(i),
+				       DISMOD(dev->tx_dismod), DISMOD(3));
+
 			mcasp_set_bits(dev->base + DAVINCI_MCASP_PDIR_REG,
 					AXR(i));
 			tx_ser++;
 		} else if (dev->serial_dir[i] == RX_MODE &&
 					rx_ser < max_active_serializers) {
+			mcasp_mod_bits(dev->base + DAVINCI_MCASP_XRSRCTL_REG(i),
+				       DISMOD(dev->rx_dismod), DISMOD(3));
+
 			mcasp_clr_bits(dev->base + DAVINCI_MCASP_PDIR_REG,
 					AXR(i));
 			rx_ser++;
@@ -1195,6 +1201,23 @@ static struct snd_platform_data *davinci_mcasp_set_pdata_from_of(
 		pdata->serial_dir = of_serial_dir;
 	}
 
+	of_property_read_u32(np, "ti,tx-inactive-mode", &pdata->tx_dismod);
+
+	of_property_read_u32(np, "ti,rx-inactive-mode", &pdata->rx_dismod);
+
+	/* DISMOD = 1 is a reserved value */
+	if ((pdata->tx_dismod == 1) || (pdata->rx_dismod == 1)) {
+		dev_err(&pdev->dev, "tx/rx-inactive-mode cannot be 1\n");
+		ret = -EINVAL;
+		goto nodata;
+	}
+
+	if ((pdata->tx_dismod > 3) || (pdata->rx_dismod > 3)) {
+		dev_err(&pdev->dev, "invalid tx/rx-inactive-mode\n");
+		ret = -EINVAL;
+		goto nodata;
+	}
+
 	ret = of_property_read_u32(np, "tx-num-evt", &val);
 	if (ret >= 0)
 		pdata->txnumevt = val;
@@ -1275,6 +1298,8 @@ static int davinci_mcasp_probe(struct platform_device *pdev)
 	dev->version = pdata->version;
 	dev->txnumevt = pdata->txnumevt;
 	dev->rxnumevt = pdata->rxnumevt;
+	dev->tx_dismod = pdata->tx_dismod;
+	dev->rx_dismod = pdata->rx_dismod;
 	dev->dev = &pdev->dev;
 
 	dma_data = &dev->dma_params[SNDRV_PCM_STREAM_PLAYBACK];

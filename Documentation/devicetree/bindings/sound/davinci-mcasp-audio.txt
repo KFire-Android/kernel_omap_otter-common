@@ -23,6 +23,10 @@ Optional properties:
 - rx-num-evt : FIFO levels.
 - sram-size-playback : size of sram to be allocated during playback
 - sram-size-capture  : size of sram to be allocated during capture
+- ti,tx-inactive-mode : Transmit pin mode while in an inactive slot (0 - Hi-Z,
+		2 - Low, 3 - High)
+- ti,rx-inactive-mode : Receive pin mode while in an inactive slot (0 - Hi-Z,
+		2 - Low, 3 - High)
 
 Example:
 
@@ -42,4 +46,6 @@ mcasp0: mcasp0@1d00000 {
 			2 0 0 0 >;
 	tx-num-evt = <1>;
 	rx-num-evt = <1>;
+	ti,tx-inactive-mode = <0>; /* 0: Hi-Z, 2: Low, 3: High */
+	ti,rx-inactive-mode = <0>; /* 0: Hi-Z, 2: Low, 3: High */
 };
