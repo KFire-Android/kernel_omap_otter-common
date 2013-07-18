@@ -18,6 +18,10 @@
 #include "sched.h"
 #include "gcioctl.h"
 
+
+/* Hw availability query */
+bool gc_is_hw_present(void);
+
 /* Capability query. */
 void gc_caps(struct gcicaps *gcicaps);
 
