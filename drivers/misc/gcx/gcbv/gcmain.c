@@ -13,9 +13,6 @@
  */
 
 #include "gcbv.h"
-#include <plat/cpu.h>
-#include <plat/omap_hwmod.h>
-
 
 /*******************************************************************************
  * BLTsville interface exposure.
@@ -244,9 +241,10 @@ static int __init mod_init(void)
 {
 	bv_init();
 
-	/* Assign BV function parameters only if SoC contains a GC core */
-	if (cpu_is_omap447x())
+	if (gc_is_hw_present())
 		gcbv_assign();
+	else
+		GCERR("gcx hardware is not present\n");
 
 	return 0;
 }
