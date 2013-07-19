@@ -106,6 +106,7 @@ static irqreturn_t palmas_vbus_wakeup_irq(int irq, void *_palmas_usb)
 	enum omap_dwc3_vbus_id_status status = OMAP_DWC3_UNKNOWN;
 	int slave;
 	unsigned int vbus_line_state, addr;
+	int			  ret = IRQ_NONE;
 
 	slave = PALMAS_BASE_TO_SLAVE(PALMAS_INTERRUPT_BASE);
 	addr = PALMAS_BASE_TO_REG(PALMAS_INTERRUPT_BASE,
@@ -135,10 +136,12 @@ static irqreturn_t palmas_vbus_wakeup_irq(int irq, void *_palmas_usb)
 
 	palmas_usb->linkstat = status;
 	if (status != OMAP_DWC3_UNKNOWN) {
-		return dwc3_omap_mailbox(status);
+		ret = dwc3_omap_mailbox(NULL, status);
+		if (!ret)
+			ret = IRQ_HANDLED;
 	}
 
-	return IRQ_NONE;
+	return ret;
 }
 
 static irqreturn_t palmas_id_wakeup_irq(int irq, void *_palmas_usb)
@@ -146,6 +149,7 @@ static irqreturn_t palmas_id_wakeup_irq(int irq, void *_palmas_usb)
 	enum omap_dwc3_vbus_id_status status = OMAP_DWC3_UNKNOWN;
 	unsigned int		set;
 	struct palmas_usb	*palmas_usb = _palmas_usb;
+	int			ret = IRQ_NONE;
 
 	palmas_usb_read(palmas_usb->palmas, PALMAS_USB_ID_INT_LATCH_SET, &set);
 
@@ -175,7 +179,9 @@ static irqreturn_t palmas_id_wakeup_irq(int irq, void *_palmas_usb)
 
 	palmas_usb->linkstat = status;
 	if (status != OMAP_DWC3_UNKNOWN) {
-		return dwc3_omap_mailbox(status);
+		ret = dwc3_omap_mailbox(NULL, status);
+		if (!ret)
+			ret = IRQ_HANDLED;
 	}
 
 	return IRQ_NONE;

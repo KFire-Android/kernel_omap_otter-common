@@ -40,6 +40,7 @@ struct omap_usb {
 	struct clk		*sys_clk;
 	struct clk		*optclk;
 	u8			is_suspended:1;
+	struct device_node	*control_node;
 };
 
 #define	phy_to_omapusb(x)	container_of((x), struct omap_usb, phy)

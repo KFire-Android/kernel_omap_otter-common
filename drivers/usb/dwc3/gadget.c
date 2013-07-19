@@ -1584,6 +1584,25 @@ static const struct usb_gadget_ops dwc3_gadget_ops = {
 
 /* -------------------------------------------------------------------------- */
 
+static int dwc3_gadget_get_maxpacket_ep0(struct dwc3 *dwc)
+{
+	switch (dwc->maximum_speed) {
+	case USB_SPEED_HIGH:
+	case USB_SPEED_FULL:
+			return 64;
+	case USB_SPEED_LOW:
+			return 8;
+	case USB_SPEED_SUPER:
+	default:
+			return 512;
+	}
+}
+
+static int dwc3_gadget_get_maxpacket(struct dwc3 *dwc)
+{
+	return 1024;
+}
+
 static int dwc3_gadget_init_endpoints(struct dwc3 *dwc)
 {
 	struct dwc3_ep			*dep;
@@ -1609,7 +1628,7 @@ static int dwc3_gadget_init_endpoints(struct dwc3 *dwc)
 		dep->direction = (epnum & 1);
 
 		if (epnum == 0 || epnum == 1) {
-			dep->endpoint.maxpacket = 512;
+			dep->endpoint.maxpacket = dwc3_gadget_get_maxpacket_ep0(dwc);
 			dep->endpoint.maxburst = 1;
 			dep->endpoint.ops = &dwc3_gadget_ep0_ops;
 			if (!epnum)
@@ -1617,7 +1636,7 @@ static int dwc3_gadget_init_endpoints(struct dwc3 *dwc)
 		} else {
 			int		ret;
 
-			dep->endpoint.maxpacket = 1024;
+			dep->endpoint.maxpacket = dwc3_gadget_get_maxpacket(dwc);
 			dep->endpoint.max_streams = 15;
 			dep->endpoint.ops = &dwc3_gadget_ep_ops;
 			list_add_tail(&dep->endpoint.ep_list,

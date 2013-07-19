@@ -139,14 +139,22 @@ static inline void dwc3_omap_writel(void __iomem *base, u32 offset, u32 value)
 	writel(value, base + offset);
 }
 
-int dwc3_omap_mailbox(enum omap_dwc3_vbus_id_status status)
+int dwc3_omap_mailbox(struct device *dev, enum omap_dwc3_vbus_id_status status)
 {
 	u32			val;
-	struct dwc3_omap	*omap = _omap;
+	struct platform_device *pdev;
+	struct dwc3_omap       *omap;
 
-	if (!omap)
+	if (dev) { /* i.e. this is being called from a non palmas driver */
+		pdev = to_platform_device(dev);
+		omap =  platform_get_drvdata(pdev);
+	} else  /* This is being invoked by palmas and the global is needed */
+		omap = _omap;
+
+	if (!omap) {
+		dev_dbg(omap->dev, "not ready , deferring\n");
 		return -EPROBE_DEFER;
-
+	}
 	switch (status) {
 	case OMAP_DWC3_ID_GROUND:
 		dev_dbg(omap->dev, "ID GND\n");
@@ -189,7 +197,7 @@ int dwc3_omap_mailbox(enum omap_dwc3_vbus_id_status status)
 		dev_dbg(omap->dev, "ID float\n");
 	}
 
-	return IRQ_HANDLED;
+	return 0;
 }
 EXPORT_SYMBOL_GPL(dwc3_omap_mailbox);
 
@@ -258,6 +266,22 @@ static u64 dwc3_omap_dma_mask = DMA_BIT_MASK(32);
 static int dwc3_omap_set_dmamask(struct device *dev, void *c)
 {
 	dev->dma_mask = &dwc3_omap_dma_mask;
+	return 0;
+}
+
+static u64 dwc3_omap_dma_mask1 = DMA_BIT_MASK(32);
+
+static int dwc3_omap_set_dmamask1(struct device *dev, void *c)
+{
+	dev->dma_mask = &dwc3_omap_dma_mask1;
+	return 0;
+}
+
+static u64 dwc3_omap_dma_mask2 = DMA_BIT_MASK(32);
+
+static int dwc3_omap_set_dmamask2(struct device *dev, void *c)
+{
+	dev->dma_mask = &dwc3_omap_dma_mask2;
 	return 0;
 }
 
@@ -388,7 +412,14 @@ static int dwc3_omap_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	device_for_each_child(&pdev->dev, NULL, dwc3_omap_set_dmamask);
+	if (strstr(dev_name(dev), "omap_dwc31") != NULL)
+		device_for_each_child(&pdev->dev, NULL, dwc3_omap_set_dmamask1);
+	else
+	if (strstr(dev_name(dev), "omap_dwc32") != NULL)
+		device_for_each_child(&pdev->dev, NULL, dwc3_omap_set_dmamask2);
+	else
+	if (strstr(dev_name(dev), "omap_dwc3") != NULL)
+		device_for_each_child(&pdev->dev, NULL, dwc3_omap_set_dmamask);
 
 	return 0;
 }

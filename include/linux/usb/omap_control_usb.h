@@ -25,6 +25,8 @@ struct omap_control_usb {
 	u32 __iomem *dev_conf;
 	u32 __iomem *otghs_control;
 	u32 __iomem *phy_power;
+	u32 __iomem *ctrl_core_srcomp_north_side;
+	u32 __iomem *dummy_reg;
 
 	struct clk *sys_clk;
 
@@ -43,8 +45,9 @@ enum omap_control_usb_mode {
 };
 
 /* To differentiate ctrl module IP having either mailbox or USB3 PHY power */
-#define	OMAP_CTRL_DEV_TYPE1		0x1
-#define	OMAP_CTRL_DEV_TYPE2		0x2
+#define	OMAP_CTRL_DEV_TYPE1		0x1	/* mailbox */
+#define	OMAP_CTRL_DEV_TYPE2		0x2	/* has a usb2 and usb3 phy */
+#define	OMAP_CTRL_DEV_TYPE3		0x3	/* has only a usb2 phy */
 
 #define	OMAP_CTRL_DEV_PHY_PD		BIT(0)
 
@@ -62,6 +65,8 @@ enum omap_control_usb_mode {
 
 #define	OMAP_CTRL_USB3_PHY_TX_RX_POWERON	0x3
 #define	OMAP_CTRL_USB3_PHY_TX_RX_POWEROFF	0x0
+
+#define OMAP_CTRL_USB_SRCOMP_NORTH_SIDE_PD	BIT(28)
 
 #if IS_ENABLED(CONFIG_OMAP_CONTROL_USB)
 extern struct device *omap_get_control_dev(void);
