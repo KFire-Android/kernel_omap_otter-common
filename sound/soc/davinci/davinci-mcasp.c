@@ -763,12 +763,30 @@ static int davinci_hw_common_param(struct davinci_audio_dev *dev, int stream,
 	return 0;
 }
 
-static void davinci_hw_param(struct davinci_audio_dev *dev, int stream)
+static int davinci_hw_param(struct davinci_audio_dev *dev, int stream,
+			    int channels)
 {
 	int i, active_slots;
+	int total_slots;
+	int active_serializers;
 	u32 mask = 0;
 
-	active_slots = (dev->tdm_slots > 31) ? 32 : dev->tdm_slots;
+	total_slots = (dev->tdm_slots > 31) ? 32 : dev->tdm_slots;
+
+	/*
+	 * If more than one serializer is needed, then use them with
+	 * their specified tdm_slots count. Otherwise, one serializer
+	 * can cope with the transaction using as many slots as channels
+	 * in the stream, requires channels symmetry
+	 */
+	active_serializers = (channels + total_slots - 1) / total_slots;
+	if (active_serializers == 1) {
+		active_slots = channels;
+		dev->channels = channels;
+	} else {
+		active_slots = total_slots;
+	}
+
 	for (i = 0; i < active_slots; i++)
 		mask |= (1 << i);
 
@@ -782,7 +800,7 @@ static void davinci_hw_param(struct davinci_audio_dev *dev, int stream)
 
 		if ((dev->tdm_slots >= 2) && (dev->tdm_slots <= 32))
 			mcasp_mod_bits(dev->base + DAVINCI_MCASP_TXFMCTL_REG,
-					FSXMOD(dev->tdm_slots), FSXMOD(0x1FF));
+					FSXMOD(total_slots), FSXMOD(0x1FF));
 		else
 			printk(KERN_ERR "playback tdm slot %d not supported\n",
 				dev->tdm_slots);
@@ -794,15 +812,17 @@ static void davinci_hw_param(struct davinci_audio_dev *dev, int stream)
 
 		if ((dev->tdm_slots >= 2) && (dev->tdm_slots <= 32))
 			mcasp_mod_bits(dev->base + DAVINCI_MCASP_RXFMCTL_REG,
-					FSRMOD(dev->tdm_slots), FSRMOD(0x1FF));
+					FSRMOD(total_slots), FSRMOD(0x1FF));
 		else
 			printk(KERN_ERR "capture tdm slot %d not supported\n",
 				dev->tdm_slots);
 	}
+
+	return 0;
 }
 
 /* S/PDIF */
-static void davinci_hw_dit_param(struct davinci_audio_dev *dev)
+static int davinci_hw_dit_param(struct davinci_audio_dev *dev)
 {
 	/* Set the TX format : 24 bit right rotation, 32 bit slot, Pad 0
 	   and LSB first */
@@ -827,6 +847,8 @@ static void davinci_hw_dit_param(struct davinci_audio_dev *dev)
 
 	/* Enable the DIT */
 	mcasp_set_bits(dev->base + DAVINCI_MCASP_TXDITCTL_REG, DITEN);
+
+	return 0;
 }
 
 static int davinci_mcasp_hw_params(struct snd_pcm_substream *substream,
@@ -841,6 +863,7 @@ static int davinci_mcasp_hw_params(struct snd_pcm_substream *substream,
 	u8 slots = dev->tdm_slots;
 	u8 active_serializers;
 	int channels = params_channels(params);
+	int ret;
 
 	active_serializers = (channels + slots - 1) / slots;
 
@@ -852,9 +875,12 @@ static int davinci_mcasp_hw_params(struct snd_pcm_substream *substream,
 		fifo_level = dev->rxnumevt * active_serializers;
 
 	if (dev->op_mode == DAVINCI_MCASP_DIT_MODE)
-		davinci_hw_dit_param(dev);
+		ret = davinci_hw_dit_param(dev);
 	else
-		davinci_hw_param(dev, substream->stream);
+		ret = davinci_hw_param(dev, substream->stream, channels);
+
+	if (ret)
+		return ret;
 
 	switch (params_format(params)) {
 	case SNDRV_PCM_FORMAT_U8:
@@ -940,11 +966,28 @@ static int davinci_mcasp_startup(struct snd_pcm_substream *substream,
 	struct davinci_audio_dev *dev = snd_soc_dai_get_drvdata(dai);
 
 	snd_soc_dai_set_dma_data(dai, substream, dev->dma_params);
+
+	/* Apply channels symmetry, needed when using a single serializer */
+	if (dev->channels)
+		snd_pcm_hw_constraint_minmax(substream->runtime,
+					     SNDRV_PCM_HW_PARAM_CHANNELS,
+					     dev->channels, dev->channels);
+
 	return 0;
+}
+
+static void davinci_mcasp_shutdown(struct snd_pcm_substream *substream,
+				   struct snd_soc_dai *dai)
+{
+	struct davinci_audio_dev *dev = snd_soc_dai_get_drvdata(dai);
+
+	if (!dai->active)
+		dev->channels = 0;
 }
 
 static const struct snd_soc_dai_ops davinci_mcasp_dai_ops = {
 	.startup	= davinci_mcasp_startup,
+	.shutdown	= davinci_mcasp_shutdown,
 	.trigger	= davinci_mcasp_trigger,
 	.hw_params	= davinci_mcasp_hw_params,
 	.set_fmt	= davinci_mcasp_set_dai_fmt,
