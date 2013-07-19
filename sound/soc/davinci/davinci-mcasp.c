@@ -802,11 +802,15 @@ static int davinci_hw_param(struct davinci_audio_dev *dev, int stream,
 			    int channels)
 {
 	int i, active_slots;
-	int total_slots;
+	int total_slots = dev->tdm_slots;
 	int active_serializers;
 	u32 mask = 0;
 
-	total_slots = (dev->tdm_slots > 31) ? 32 : dev->tdm_slots;
+	if ((total_slots < 2) || (total_slots > 32)) {
+		dev_err(dev->dev, "tdm slot count %d not supported\n",
+			total_slots);
+		return -EINVAL;
+	}
 
 	/*
 	 * If more than one serializer is needed, then use them with
@@ -827,31 +831,17 @@ static int davinci_hw_param(struct davinci_audio_dev *dev, int stream,
 
 	mcasp_clr_bits(dev->base + DAVINCI_MCASP_ACLKXCTL_REG, TX_ASYNC);
 
-	if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
-		/* bit stream is MSB first  with no delay */
-		/* DSP_B mode */
-		mcasp_set_reg(dev->base + DAVINCI_MCASP_TXTDM_REG, mask);
-		mcasp_set_bits(dev->base + DAVINCI_MCASP_TXFMT_REG, TXORD);
+	/* bit stream is MSB first  with no delay */
+	/* DSP_B mode */
+	mcasp_set_reg(dev->base + DAVINCI_MCASP_TXTDM_REG, mask);
+	mcasp_set_bits(dev->base + DAVINCI_MCASP_TXFMT_REG, TXORD);
+	mcasp_mod_bits(dev->base + DAVINCI_MCASP_TXFMCTL_REG,
+		       FSXMOD(total_slots), FSXMOD(0x1FF));
 
-		if ((dev->tdm_slots >= 2) && (dev->tdm_slots <= 32))
-			mcasp_mod_bits(dev->base + DAVINCI_MCASP_TXFMCTL_REG,
-					FSXMOD(total_slots), FSXMOD(0x1FF));
-		else
-			printk(KERN_ERR "playback tdm slot %d not supported\n",
-				dev->tdm_slots);
-	} else {
-		/* bit stream is MSB first with no delay */
-		/* DSP_B mode */
-		mcasp_set_bits(dev->base + DAVINCI_MCASP_RXFMT_REG, RXORD);
-		mcasp_set_reg(dev->base + DAVINCI_MCASP_RXTDM_REG, mask);
-
-		if ((dev->tdm_slots >= 2) && (dev->tdm_slots <= 32))
-			mcasp_mod_bits(dev->base + DAVINCI_MCASP_RXFMCTL_REG,
-					FSRMOD(total_slots), FSRMOD(0x1FF));
-		else
-			printk(KERN_ERR "capture tdm slot %d not supported\n",
-				dev->tdm_slots);
-	}
+	mcasp_set_reg(dev->base + DAVINCI_MCASP_RXTDM_REG, mask);
+	mcasp_set_bits(dev->base + DAVINCI_MCASP_RXFMT_REG, RXORD);
+	mcasp_mod_bits(dev->base + DAVINCI_MCASP_RXFMCTL_REG,
+		       FSRMOD(total_slots), FSRMOD(0x1FF));
 
 	return 0;
 }
