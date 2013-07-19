@@ -1018,12 +1018,14 @@ static const char *gpu_core_gclk_mux_parents[] = {
 	"dpll_core_h14x2_ck", "dpll_per_h14x2_ck",
 };
 
-DEFINE_CLK_MUX(gpu_core_gclk_mux, gpu_core_gclk_mux_parents, NULL, 0x0,
-	       OMAP54XX_CM_GPU_GPU_CLKCTRL, OMAP54XX_CLKSEL_GPU_CORE_GCLK_SHIFT,
+DEFINE_CLK_MUX(gpu_core_gclk_mux, gpu_core_gclk_mux_parents, NULL,
+	       CLK_SET_RATE_PARENT, OMAP54XX_CM_GPU_GPU_CLKCTRL,
+	       OMAP54XX_CLKSEL_GPU_CORE_GCLK_SHIFT,
 	       OMAP54XX_CLKSEL_GPU_CORE_GCLK_WIDTH, 0x0, NULL);
 
-DEFINE_CLK_MUX(gpu_hyd_gclk_mux, gpu_core_gclk_mux_parents, NULL, 0x0,
-	       OMAP54XX_CM_GPU_GPU_CLKCTRL, OMAP54XX_CLKSEL_GPU_HYD_GCLK_SHIFT,
+DEFINE_CLK_MUX(gpu_hyd_gclk_mux, gpu_core_gclk_mux_parents, NULL,
+	       CLK_SET_RATE_PARENT, OMAP54XX_CM_GPU_GPU_CLKCTRL,
+	       OMAP54XX_CLKSEL_GPU_HYD_GCLK_SHIFT,
 	       OMAP54XX_CLKSEL_GPU_HYD_GCLK_WIDTH, 0x0, NULL);
 
 DEFINE_CLK_DIVIDER(hsi_fclk, "dpll_per_m2x2_ck", &dpll_per_m2x2_ck, 0x0,
