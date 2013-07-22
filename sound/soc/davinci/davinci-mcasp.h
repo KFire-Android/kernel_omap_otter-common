@@ -28,7 +28,7 @@
 #define DAVINCI_MCASP_DIT_DAI	1
 
 struct davinci_audio_dev {
-	struct davinci_pcm_dma_params dma_params[2];
+	void *dma_params[2];
 	void __iomem *base;
 	struct device *dev;
 
@@ -37,12 +37,19 @@ struct davinci_audio_dev {
 	u8	op_mode;
 	u8	num_serializer;
 	u8	*serial_dir;
+	u32	tx_dismod;
+	u32	rx_dismod;
 	u8	version;
 	u16	bclk_lrclk_ratio;
+	unsigned int channels;
+	unsigned int sample_bits;
 
 	/* McASP FIFO related */
 	u8	txnumevt;
 	u8	rxnumevt;
+
+	/* McASP port related */
+	bool	dat_port;
 };
 
 #endif	/* DAVINCI_MCASP_H */

@@ -668,5 +668,45 @@
 				video-source = <1>;
 			};
 		};
+
+		atl: atl@0x4843c000 {
+			compatible = "ti,dra7-atl";
+			reg = <0x4843c000 0x3ff>;
+			ti,hwmods = "atl";
+			ti,atclk1-freq = <11289600>;
+			ti,atl1-bws-input = <3>;	/* McASP2 FSX */
+			ti,atl1-aws-input = <15>;	/* McASP6 FSX */
+			ti,atclk2-freq = <5644800>;
+			ti,atl2-bws-input = <3>;	/* McASP2 FSX */
+			ti,atl2-aws-input = <4>;	/* McASP3 FSX */
+		};
+
+		mcasp3: mcasp@48468000 {
+			compatible = "ti,dra7-mcasp-audio";
+			reg = <0x48468000 0x2000>;
+			interrupts = <0 108 0x4>, /* AREVT */
+				     <0 109 0x4>; /* TXEVT */
+			ti,hwmods = "mcasp3";
+			op-mode = <0>;		/* MCASP_IIS_MODE */
+			tdm-slots = <2>;
+			num-serializer = <4>;
+			serial-dir = <1 2 0 0>;	/* 0:INACTIVE, 1:TX, 2:RX */
+			ti,tx-inactive-mode = <2>; /* 0: Hi-Z, 2: Low, 3: High */
+			ti,rx-inactive-mode = <2>; /* 0: Hi-Z, 2: Low, 3: High */
+		};
+
+		mcasp6: mcasp@48474000 {
+			compatible = "ti,dra7-mcasp-audio";
+			reg = <0x48474000 0x2000>;
+			interrupts = <0 108 0x4>, /* AREVT */
+				     <0 109 0x4>; /* TXEVT */
+			ti,hwmods = "mcasp6";
+			op-mode = <0>;		/* MCASP_IIS_MODE */
+			tdm-slots = <8>;
+			num-serializer = <4>;
+			serial-dir = <1 2 0 0>;	/* 0:INACTIVE, 1:TX, 2:RX */
+			ti,tx-inactive-mode = <2>; /* 0: Hi-Z, 2: Low, 3: High */
+			ti,rx-inactive-mode = <2>; /* 0: Hi-Z, 2: Low, 3: High */
+		};
 	};
 };

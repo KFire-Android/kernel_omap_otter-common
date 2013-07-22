@@ -49,14 +49,88 @@
 		gpu-supply = <&avs_gpu>;
 		};
 	};
+
+	vaudio_1v8: fixedregulator-vaudio-dig {
+		compatible = "regulator-fixed";
+		regulator-name = "vdac_fixed";
+		regulator-min-microvolt = <1800000>;
+		regulator-max-microvolt = <1800000>;
+		regulator-boot-on;
+	};
+
+	vaudio_3v3: fixedregulator-vaudio-anlg {
+		compatible = "regulator-fixed";
+		regulator-name = "vdac_fixed";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		regulator-boot-on;
+	};
+
+	sound {
+		compatible = "ti,dra7-evm-sound";
+		ti,model = "dra7evm";
+
+		/* Audio routing */
+		ti,audio-routing =
+			"LINE1L", "Line In",
+			"LINE1R", "Line In",
+			"MIC3L", "Mic Bias 2V",
+			"MIC3R", "Mic Bias 2V",
+			"Mic Bias 2V", "Main Mic",
+			"Headphone", "HPLOUT",
+			"Headphone", "HPROUT",
+			"Line Out", "LLOUT",
+			"Line Out", "RLOUT";
+
+		/* Media DAI link */
+		ti,media-cpu = <&mcasp3>;
+		ti,media-codec = <&tlv320aic3106>;
+		ti,media-mclk-freq = <5644800>;
+		ti,media-slots = <2>;
+	};
+
+	sound_hdmi {
+		compatible = "ti,omap-hdmi-tpd12s015-audio";
+		ti,model = "OMAP5HDMI";
+		ti,hdmi_audio = <&hdmi>;
+		ti,level_shifter = <&tpd12s015>;
+	};
 };
 
 &dra7_pmx_core {
         pinctrl-names = "default";
         pinctrl-0 = <
+		&atl_pins
+		&mcasp3_pins
+		&mcasp6_pins
 		&vout1_pins
 		&usb_pins
 	>;
+
+	atl_pins: pinmux_atl_pins {
+		pinctrl-single,pins = <
+			0x298 0x00000005	/* xref_clk1.atl_clk1 OUTPUT | MODE5 */
+			0x29c 0x00000005	/* xref_clk2.atl_clk2 OUTPUT | MODE5 */
+		>;
+	};
+
+	mcasp3_pins: pinmux_mcasp3_pins {
+		pinctrl-single,pins = <
+			0x324 0x00000000	/* mcasp3_aclkx.mcasp3_aclkx OUTPUT | MODE0 */
+			0x328 0x00000000	/* mcasp3_fsx.mcasp3_fsx OUTPUT | MODE0 */
+			0x32c 0x00000000	/* mcasp3_axr0.mcasp3_axr0 OUTPUT | MODE0 */
+			0x330 0x00040000	/* mcasp3_axr1.mcasp3_axr1 INPUT | MODE0 */
+		>;
+	};
+
+	mcasp6_pins: pinmux_mcasp6_pins {
+		pinctrl-single,pins = <
+			0x2d4 0x00000001	/* mcasp1_axr8.mcasp6_axr0 OUTPUT | MODE1 */
+			0x2d8 0x00040001	/* mcasp1_axr9.mcasp6_axr1 INPUT | MODE 1 */
+			0x2dc 0x00000001	/* mcasp1_axr10.mcasp6_clkx OUTPUT | MODE1 */
+			0x2e0 0x00000001	/* mcasp1_axr11.mcasp6_fsx OUTPUT | MODE1 */
+		>;
+	};
 
 	usb_pins: pinmux_usb_pins {
                 pinctrl-single,pins = <
@@ -131,6 +205,15 @@
 		compatible = "ti,tlc59108";
 		reg = <0x40>;
 		gpios = <&pcf_lcd 15 0>; /* P15, CON_LCD_PWR_DN */
+	};
+
+	tlv320aic3106: tlv320aic3106@18 {
+		compatible = "ti,tlv320aic3x";
+		reg = <0x18>;
+		IOVDD-supply = <&vaudio_3v3>;
+		DVDD-supply = <&vaudio_1v8>;
+		AVDD-supply = <&vaudio_3v3>;
+		DRVDD-supply = <&vaudio_3v3>;
 	};
 };
 

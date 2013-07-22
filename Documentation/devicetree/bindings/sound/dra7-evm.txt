@@ -1,0 +1,60 @@
+* Texas Instruments DRA7 EVM sound
+
+Required properties:
+- compatible: "ti,dra7-evm-sound"
+- ti,mode: Name of the sound card
+- ti,media-cpu: phandle for the McASP node in media link
+- ti,media-codec: phandle for the analog codec in media link
+- ti,media-mclk-freq: MCLK frequency for the analog codec in media link
+- ti,media-slots: Number of slots
+- ti,audio-routing: List of connections between audio components.
+  Each entry is a pair of strings, the first being the connection's sink,
+  the second being the connection's source.
+
+Available audio endpoints for the audio-routing table:
+
+Board connectors:
+ * Main Mic
+ * Line In
+ * Headphone
+ * Line Out
+
+tlv320aic3x pins:
+ * LLOUT
+ * RLOUT
+ * MONO_LOUT
+ * HPLOUT
+ * HPROUT
+ * HPLCOM
+ * HPCOM
+ * MIC3L
+ * MIC3R
+ * LINE1L
+ * LINE1R
+ * LINE2L
+ * LINE2R
+
+Example:
+
+sound {
+	compatible = "ti,dra7-evm-sound";
+	ti,model = "DRA7-EVM";
+
+	/* Media DAI link */
+	ti,media-cpu = <&mcasp3>;
+	ti,media-codec = <&tlv320aic3106>;
+	ti,media-mclk-freq = <1411200>;
+	ti,media-slots = <2>;
+
+	/* Audio routing */
+	ti,audio-routing =
+			"LINE1L", "Line In",
+			"LINE1R", "Line In",
+			"MIC3L", "Main Mic",
+			"MIC3R", "Main Mic",
+			"Main Mic", "Mic Bias 2V",
+			"Headphone", "HPLOUT",
+			"Headphone", "HPROUT",
+			"Line Out", "LLOUT",
+			"Line Out", "RLOUT";
+};
