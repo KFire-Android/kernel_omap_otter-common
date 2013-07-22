@@ -772,6 +772,7 @@ static int gccmdthread(void *_gccorecontext)
 				GCSETFIELD(0, GCREG_CMD_BUFFER_CTRL,
 					PREFETCH, headcmdbuf->count));
 
+			GCDBG(GCZONE_THREAD, "queue restarted.\n");
 			GCUNLOCK(&gcqueue->queuelock);
 			continue;
 		}
@@ -821,6 +822,7 @@ static int gccmdthread(void *_gccorecontext)
 				GCDBG(GCZONE_THREAD,
 				      "current location @ 0x%08X.\n",
 				      dmapc);
+				GCGPUSTATUS();
 				GCUNLOCK(&gcqueue->queuelock);
 				continue;
 			}
@@ -846,6 +848,7 @@ static int gccmdthread(void *_gccorecontext)
 			if (!list_empty(&gcqueue->queue)) {
 				GCDBG(GCZONE_THREAD,
 				      "aborting shutdown to process events\n");
+				GCGPUSTATUS();
 				GCUNLOCK(&gcqueue->queuelock);
 				continue;
 			}
