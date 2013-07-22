@@ -589,6 +589,10 @@ enum gcerror gcmmu_destroy_context(struct gccorecontext *gccorecontext,
 		gcmmucontext->slavealloc = nextblock;
 	}
 
+	/* Reset the master table. */
+	if (gcmmu->master == gcmmucontext->mmuconfig.raw)
+		gcmmu->master = ~0U;
+
 	/* Free the master table. */
 	gc_free_cached(&gcmmucontext->master);
 
