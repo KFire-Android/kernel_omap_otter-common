@@ -125,6 +125,7 @@ struct dwc3_omap {
 	u32			resource_size;
 
 	u32			dma_status:1;
+	u64			dma_mask;
 };
 
 struct dwc3_omap		*_omap;
@@ -254,11 +255,9 @@ static int dwc3_omap_remove_core(struct device *dev, void *c)
 	return 0;
 }
 
-static u64 dwc3_omap_dma_mask = DMA_BIT_MASK(32);
-
 static int dwc3_omap_set_dmamask(struct device *dev, void *c)
 {
-	dev->dma_mask = &dwc3_omap_dma_mask;
+	dev->dma_mask = c;
 	return 0;
 }
 
@@ -291,6 +290,7 @@ static int dwc3_omap_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 
+	omap->dma_mask = DMA_BIT_MASK(32);
 	platform_set_drvdata(pdev, omap);
 
 	irq = platform_get_irq(pdev, 0);
@@ -389,7 +389,8 @@ static int dwc3_omap_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	device_for_each_child(&pdev->dev, NULL, dwc3_omap_set_dmamask);
+	device_for_each_child(&pdev->dev, &omap->dma_mask,
+		dwc3_omap_set_dmamask);
 
 	return 0;
 }
