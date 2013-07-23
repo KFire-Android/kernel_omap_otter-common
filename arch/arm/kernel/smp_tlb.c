@@ -65,23 +65,6 @@ static inline void ipi_flush_tlb_kernel_range(void *arg)
 	local_flush_tlb_kernel_range(ta->ta_start, ta->ta_end);
 }
 
-#ifdef CONFIG_ARM_ERRATA_798181
-static int erratum_a15_798181(void)
-{
-	unsigned int midr = read_cpuid_id();
-
-	/* Cortex-A15 r0p0..r3p2 affected */
-	if ((midr & 0xff0ffff0) != 0x410fc0f0 || midr > 0x413fc0f2)
-		return 0;
-	return 1;
-}
-#else
-static int erratum_a15_798181(void)
-{
-	return 0;
-}
-#endif
-
 static void ipi_flush_tlb_a15_erratum(void *arg)
 {
 	dmb();
