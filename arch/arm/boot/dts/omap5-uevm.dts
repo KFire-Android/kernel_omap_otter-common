@@ -387,6 +387,8 @@
 /include/ "twl6040.dtsi"
 
 &hdmi {
+	vdda_hdmi_dac-supply = <&ldo4_reg>;
+
 	tpd12s015: tpd12s015 {
 		compatible = "ti,tpd12s015";
 
