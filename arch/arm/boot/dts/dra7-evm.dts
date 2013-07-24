@@ -192,6 +192,7 @@
 	tlv320aic3106: tlv320aic3106@18 {
 		compatible = "ti,tlv320aic3x";
 		reg = <0x18>;
+		adc-settle-ms = <40>;
 		IOVDD-supply = <&vaudio_3v3>;
 		DVDD-supply = <&vaudio_1v8>;
 		AVDD-supply = <&vaudio_3v3>;
