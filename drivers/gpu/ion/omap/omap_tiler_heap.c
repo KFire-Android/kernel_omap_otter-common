@@ -75,7 +75,7 @@ static int omap_tiler_heap_allocate(struct ion_heap *heap,
 		  */
 		info = (struct omap_tiler_info *) flags;
 		if (!info)
-			pr_err("%s: flags argument is not setup\n", __func__);
+			pr_err("%s: flags argument is not setupg\n", __func__);
 		buffer->priv_virt = info;
 		/* Re-update correct flags inside buffer */
 		buffer->flags = info->flags;
@@ -339,9 +339,9 @@ static int omap_tiler_heap_map_user(struct ion_heap *heap,
 	int i, ret = 0;
 	pgprot_t vm_page_prot;
 
-	/* Use writecombined mappings unless on OMAP5.  If OMAP5, use
+	/* Use writecombined mappings unless on OMAP5 or DRA7.  If OMAP5 or DRA7, use
 	shared device due to h/w issue. */
-	if (soc_is_omap54xx())
+	if (soc_is_omap54xx() || soc_is_dra7xx())
 		vm_page_prot = __pgprot_modify(vma->vm_page_prot, L_PTE_MT_MASK,
 						L_PTE_MT_DEV_SHARED);
 	else
