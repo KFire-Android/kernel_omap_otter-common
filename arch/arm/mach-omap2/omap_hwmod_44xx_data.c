@@ -2661,15 +2661,14 @@ static struct omap_hwmod_opt_clk gpio2_opt_clks[] = {
 static struct omap_hwmod omap44xx_gpio2_hwmod = {
 	.name		= "gpio2",
 	.class		= &omap44xx_gpio_hwmod_class,
+#if defined(CONFIG_OTTER) || defined(CONFIG_OTTER2)
+	.flags		= HWMOD_INIT_NO_RESET,
+#else
 	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
+#endif
 	.mpu_irqs	= omap44xx_gpio2_irqs,
 	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_gpio2_irqs),
 	.main_clk	= "gpio2_ick",
-//#if defined(CONFIG_OTTER) || defined(CONFIG_OTTER2)
-/* FIXME-HASH: Need a better check */
-#if 1
-	.flags		= HWMOD_INIT_NO_RESET,
-#endif
 	.prcm = {
 		.omap4 = {
 			.clkctrl_reg = OMAP4430_CM_L4PER_GPIO2_CLKCTRL,
