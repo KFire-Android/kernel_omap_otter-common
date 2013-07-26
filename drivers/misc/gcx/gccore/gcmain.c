@@ -17,12 +17,12 @@
 #include <linux/uaccess.h>
 #include <linux/pm_runtime.h>
 #include <linux/delay.h>
-#include <plat/omap_gcx.h>
 #include <linux/opp.h>
 #include <linux/io.h>
-#include <plat/omap_hwmod.h>
-#include <plat/omap-pm.h>
+#include <linux/platform_data/omap_gcx.h>
 #include "gcmain.h"
+
+
 
 #define GCZONE_NONE		0
 #define GCZONE_ALL		(~0U)
@@ -188,11 +188,12 @@ void gc_write_reg(unsigned int address, unsigned int data)
 
 static void gcpwr_enable_clock(struct gccorecontext *gccorecontext)
 {
-	bool ctxlost;
+	int ctxlost;
 
 	GCENTER(GCZONE_POWER);
 
 	ctxlost = gccorecontext->plat->get_context_loss_count(gccorecontext->device);
+	GCDBG(GCZONE_POWER, "lost count = %d\n", ctxlost);
 
 	if (!gccorecontext->clockenabled) {
 		/* Enable the clock. */
@@ -217,6 +218,7 @@ static void gcpwr_enable_clock(struct gccorecontext *gccorecontext)
 	if (ctxlost || (gccorecontext->gcpower == GCPWR_UNKNOWN))
 		gcpwr_reset(gccorecontext);
 
+
 	GCEXIT(GCZONE_POWER);
 }
 
@@ -235,6 +237,9 @@ static void gcpwr_disable_clock(struct gccorecontext *gccorecontext)
 
 		/* Clock disabled. */
 		gccorecontext->clockenabled = false;
+
+		/* Reset the current pipe. */
+		gccorecontext->gcpipe = GCPWR_UNKNOWN;
 	}
 
 	GCDBG(GCZONE_POWER, "clock %s.\n",
@@ -249,6 +254,9 @@ static void gcpwr_scale(struct gccorecontext *gccorecontext, int index)
 
 	GCENTERARG(GCZONE_FREQSCALE, "index=%d\n", index);
 
+	if (gccorecontext->opp_count == 0)
+		goto exit;
+
 	if ((index < 0) || (index >= gccorecontext->opp_count)) {
 		GCERR("invalid index %d.\n", index);
 		goto exit;
@@ -259,6 +267,7 @@ static void gcpwr_scale(struct gccorecontext *gccorecontext, int index)
 		GCERR("scale interface is not initialized.\n");
 		goto exit;
 	}
+
 
 	if (gccorecontext->cur_freq == gccorecontext->opp_freqs[index])
 		goto exit;
@@ -492,6 +501,13 @@ unsigned int gcpwr_get_speed(void)
 /*******************************************************************************
  * Public API.
  */
+
+bool gc_is_hw_present(void)
+{
+	struct gccorecontext *gccorecontext = &g_context;
+	return gccorecontext->plat->is_hw_present;
+}
+
 
 void gc_caps(struct gcicaps *gcicaps)
 {
@@ -871,22 +887,30 @@ done:
 static int gc_probe(struct platform_device *pdev)
 {
 	struct gccorecontext *gccorecontext = &g_context;
+	int ret;
 
 	GCENTER(GCZONE_PROBE);
 
 	gccorecontext->bb2ddevice = &pdev->dev;
 	gccorecontext->plat = (struct omap_gcx_platform_data *)
 			       pdev->dev.platform_data;
+
+	if (!gccorecontext->plat->is_hw_present) {
+		GCERR("gc_probe failed. gcx hardware is not present\n");
+		return -ENODEV;
+	}
+
 	gccorecontext->regbase = gccorecontext->plat->regbase;
 	gccorecontext->irqline = platform_get_irq(pdev, pdev->id);
 	gccorecontext->device = &pdev->dev;
+
 
 	pm_runtime_enable(gccorecontext->device);
 	gccorecontext->plat->get_context_loss_count(gccorecontext->device);
 
 	gc_probe_opp(pdev);
 
-	pm_runtime_get_sync(gccorecontext->device);
+	ret = pm_runtime_get_sync(gccorecontext->device);
 
 	gccorecontext->gcmodel = gc_read_reg(GC_CHIP_ID_Address);
 	gccorecontext->gcrevision = gc_read_reg(GC_CHIP_REV_Address);
@@ -987,12 +1011,6 @@ static int gc_init(struct gccorecontext *gccorecontext)
 
 	GCENTER(GCZONE_INIT);
 
-	/* check if hardware is available */
-	if (!cpu_is_omap447x()) {
-		GCDBG(GCZONE_INIT, "gcx hardware is not present\n");
-		goto exit;
-	}
-
 	/* Initialize data structutres. */
 	GCLOCK_INIT(&gccorecontext->powerlock);
 	GCLOCK_INIT(&gccorecontext->resetlock);
@@ -1003,19 +1021,19 @@ static int gc_init(struct gccorecontext *gccorecontext)
 	/* Pulse skipping isn't known. */
 	gccorecontext->pulseskipping = -1;
 
-	/* Initialize MMU. */
-	if (gcmmu_init(gccorecontext) != GCERR_NONE) {
-		GCERR("failed to initialize MMU.\n");
-		result = -EINVAL;
-		goto fail;
-	}
-
 	result = platform_driver_register(&plat_drv);
 	if (result < 0) {
 		GCERR("failed to register platform driver.\n");
 		goto fail;
 	}
 	gccorecontext->platdriver = true;
+
+	/* Initialize MMU. */
+	if (gcmmu_init(gccorecontext) != GCERR_NONE) {
+		GCERR("failed to initialize MMU.\n");
+		result = -EINVAL;
+		goto fail;
+	}
 
 #if CONFIG_HAS_EARLYSUSPEND
 	register_early_suspend(&early_suspend_info);
@@ -1031,7 +1049,6 @@ static int gc_init(struct gccorecontext *gccorecontext)
 	/* Create debugfs entry. */
 	gc_debug_init();
 
-exit:
 	GCEXIT(GCZONE_INIT);
 	return 0;
 
@@ -1046,7 +1063,7 @@ static void gc_exit(struct gccorecontext *gccorecontext)
 {
 	GCENTER(GCZONE_INIT);
 
-	if (cpu_is_omap447x()) {
+	if (gc_is_hw_present()) {
 		/* Stop command queue thread. */
 		gcqueue_stop(gccorecontext);
 
@@ -1093,6 +1110,7 @@ static void __exit gc_exit_wrapper(void)
 	gc_exit(&g_context);
 	GCDBG_EXIT();
 }
+
 
 MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("www.vivantecorp.com");
