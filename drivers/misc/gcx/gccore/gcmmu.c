@@ -45,6 +45,8 @@ GCDBG_FILTERDEF(mmu, GCZONE_NONE,
 		"dumpunmap")
 
 
+#define USE_CACHED_MASTER	0
+#define USE_CACHED_SLAVE	0
 /*******************************************************************************
  * Internal definitions.
  */
@@ -180,7 +182,11 @@ static enum gcerror allocate_slave(struct gcmmucontext *gcmmucontext,
 	      prealloccount);
 
 	/* Allocate slave table pool. */
+#if USE_CACHED_SLAVE
 	gcerror = gc_alloc_cached(&block->pages, preallocsize);
+#else
+	gcerror = gc_alloc_noncached(&block->pages, preallocsize);
+#endif
 	if (gcerror != GCERR_NONE) {
 		GCERR("failed to allocate slave page table\n");
 		gcerror = GCERR_SETGRP(gcerror, GCERR_MMU_STLB_ALLOC);
@@ -218,11 +224,16 @@ static enum gcerror allocate_slave(struct gcmmucontext *gcmmucontext,
 			((unsigned char *) logical + GCMMU_STLB_SIZE);
 	}
 
+#if USE_CACHED_MASTER
 	/* Flush CPU cache. */
 	gc_flush_region(gcmmucontext->master.physical,
 			gcmmucontext->master.logical,
 			index.loc.mtlb * sizeof(unsigned int),
 			prealloccount * sizeof(unsigned int));
+#else
+		mb();
+#endif
+
 
 	GCEXIT(GCZONE_MAPPING);
 	return GCERR_NONE;
@@ -499,7 +510,11 @@ enum gcerror gcmmu_create_context(struct gccorecontext *gccorecontext,
 	gcmmucontext->pid = pid;
 
 	/* Allocate MTLB table. */
+#if USE_CACHED_MASTER
 	gcerror = gc_alloc_cached(&gcmmucontext->master, GCMMU_MTLB_SIZE);
+#else
+	gcerror = gc_alloc_noncached(&gcmmucontext->master, GCMMU_MTLB_SIZE);
+#endif
 	if (gcerror != GCERR_NONE) {
 		gcerror = GCERR_SETGRP(gcerror, GCERR_MMU_MTLB_ALLOC);
 		goto exit;
@@ -583,14 +598,26 @@ enum gcerror gcmmu_destroy_context(struct gccorecontext *gccorecontext,
 
 	/* Free slave tables. */
 	while (gcmmucontext->slavealloc != NULL) {
+#if USE_CACHED_SLAVE
 		gc_free_cached(&gcmmucontext->slavealloc->pages);
+#else
+		gc_free_noncached(&gcmmucontext->slavealloc->pages);
+#endif
 		nextblock = gcmmucontext->slavealloc->next;
 		kfree(gcmmucontext->slavealloc);
 		gcmmucontext->slavealloc = nextblock;
 	}
 
+	/* Reset the master table. */
+	if (gcmmu->master == gcmmucontext->mmuconfig.raw)
+		gcmmu->master = ~0U;
+
 	/* Free the master table. */
+#if USE_CACHED_MASTER
 	gc_free_cached(&gcmmucontext->master);
+#else
+	gc_free_noncached(&gcmmucontext->master);
+#endif
 
 	/* Free arenas. */
 	GCLOCK(&gcmmu->lock);
@@ -877,10 +904,14 @@ enum gcerror gcmmu_map(struct gccorecontext *gccorecontext,
 				| GCMMU_STLB_EXCEPTION
 				| GCMMU_STLB_WRITEABLE;
 
+#if USE_CACHED_SLAVE
 		/* Flush CPU cache. */
 		gc_flush_region(slave->physical, slave->logical,
 				index.loc.stlb * sizeof(unsigned int),
 				allocated * sizeof(unsigned int));
+#else
+		mb();
+#endif
 
 		GCDBG(GCZONE_MAPPING, "allocated %d pages at %d.%d\n",
 		      allocated, index.loc.mtlb, index.loc.stlb);
@@ -1029,10 +1060,14 @@ enum gcerror gcmmu_unmap(struct gccorecontext *gccorecontext,
 		for (i = 0; i < freed; i += 1)
 			*stlblogical++ = GCMMU_STLB_ENTRY_VACANT;
 
+#if USE_CACHED_SLAVE
 		/* Flush CPU cache. */
 		gc_flush_region(slave->physical, slave->logical,
 				index.loc.stlb * sizeof(unsigned int),
 				freed * sizeof(unsigned int));
+#else
+		mb();
+#endif
 
 		/* Advance. */
 		slave += 1;
