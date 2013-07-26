@@ -54,6 +54,17 @@
  */
 #define OMAP4_DPLL_USB_DEFFREQ				960000000
 
+/*
+ * OMAP4 IVA DPLL frequency settings. The below values are defined
+ * based on the OPP100 values according to OMAP4430 ES2.x Public TRM
+ * version AN, section "3.6.3.8.7 DPLL_IVA Preferred Settings". The
+ * DPLL locked frequency is 1862.4 MHz (value for DPLL_IVA_X2_CLK),
+ * so the DPLL_IVA_DEFFREQ is half of this value.
+ */
+#define OMAP4_DPLL_IVA_DEFFREQ				931200000
+#define OMAP4_DSP_ROOT_CLK_NOMFREQ			465600000
+#define OMAP4_IVAHD_ROOT_CLK_NOMFREQ			266100000
+
 /* Root clocks */
 
 DEFINE_CLK_FIXED_RATE(extalt_clkin_ck, CLK_IS_ROOT, 59000000, 0x0);
@@ -1999,6 +2010,9 @@ static struct rate_init_clks rate_clks[] = {
 	{ .name = "dpll_abe_ck", .rate = OMAP4_DPLL_ABE_DEFFREQ },
 	{ .name = "dpll_usb_ck", .rate = OMAP4_DPLL_USB_DEFFREQ },
 	{ .name = "dpll_usb_m2_ck", .rate = OMAP4_DPLL_USB_DEFFREQ/2 },
+	{ .name = "dpll_iva_ck", .rate = OMAP4_DPLL_IVA_DEFFREQ },
+	{ .name = "dpll_iva_m4x2_ck", .rate = OMAP4_DSP_ROOT_CLK_NOMFREQ },
+	{ .name = "dpll_iva_m5x2_ck", .rate = OMAP4_IVAHD_ROOT_CLK_NOMFREQ },
 };
 
 static struct reparent_init_clks reparent_clks[] = {
