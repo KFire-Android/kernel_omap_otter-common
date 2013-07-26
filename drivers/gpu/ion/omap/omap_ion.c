@@ -134,7 +134,7 @@ static int omap_ion_probe(struct platform_device *pdev)
 		of_property_read_u32(node, "ti,omap_ion_heap_secure_input_base",
 				     &omap_ion_heap_secure_input_base);
 		of_property_read_u32(node, "ti,omap_ion_heap_tiler_base",
-				     &omap_ion_heap_tiler_size);
+				     &omap_ion_heap_tiler_base);
 		of_property_read_u32(node, "ti,omap_ion_heap_nonsecure_tiler_base",
 				     &omap_ion_heap_nonsecure_tiler_base);
 
