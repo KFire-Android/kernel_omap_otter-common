@@ -689,6 +689,7 @@ end:	return cm;
 u8 *hdmi_read_valid_edid(void)
 {
 	int ret, i;
+	void __iomem *clk_base;
 
 	if (hdmi.edid_set)
 		return hdmi.edid;
@@ -696,10 +697,20 @@ u8 *hdmi_read_valid_edid(void)
 	memset(hdmi.edid, 0, HDMI_EDID_MAX_LENGTH);
 
 	hdmi_runtime_get();
+	/* HACK: TO BE Fixed later
+	 * set DSS clock domain in sw supervised wkup to force DSS_L3_GICLK
+	 */
+	clk_base = ioremap(0x4A009000, SZ_4K);
+	__raw_writel(0x2, clk_base + 0x100);
+	DSSINFO("%s: CM_DSS_CLKSTCTRL %x\n",
+		__func__, __raw_readl(clk_base + 0x100));
 
 	ret = hdmi.ip_data.ops->read_edid(&hdmi.ip_data, hdmi.edid,
 						  HDMI_EDID_MAX_LENGTH);
 
+	/* revert DSS clock domain back to HW_AUTO*/
+	__raw_writel(0x3, clk_base + 0x100);
+	iounmap(clk_base);
 	hdmi_runtime_put();
 
 	for (i = 0; i < HDMI_EDID_MAX_LENGTH; i += 16)
