@@ -378,8 +378,10 @@ static int dra7_snd_add_multichannel_dai_link(struct snd_soc_card *card,
 	snprintf(prop, sizeof(prop), "%s-cpu", prefix);
 	dai_node = of_parse_phandle(node, prop, 0);
 	if (!dai_node) {
-		dev_err(card->dev, "cpu dai node is invalid\n");
-		return -EINVAL;
+		dev_info(card->dev, "no cpu dai node, will be hostless\n");
+		dai_link->cpu_dai_name = "snd-soc-dummy-cpu-dai";
+		dai_link->platform_name = NULL; /* unspecified to use dummy */
+		dai_link->no_host_mode = 1;
 	}
 
 	dai_link->cpu_of_node = dai_node;
@@ -459,6 +461,49 @@ static const struct snd_soc_dapm_widget dra7_snd_dapm_widgets[] = {
 	SND_SOC_DAPM_LINE("JAMR3 Line Out 3", NULL),
 };
 
+
+static int dummy_cpu_dai_set_sysclk(struct snd_soc_dai *dai,
+				    int clk_id, unsigned int freq, int dir)
+{
+	return 0;
+}
+
+static int dummy_cpu_dai_set_clkdiv(struct snd_soc_dai *dai,
+				    int div_id, int div)
+{
+	return 0;
+}
+
+static int dummy_cpu_dai_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
+{
+	return 0;
+}
+
+static struct snd_soc_dai_ops dummy_cpu_dai_ops = {
+	.set_clkdiv = dummy_cpu_dai_set_clkdiv,
+	.set_sysclk = dummy_cpu_dai_set_sysclk,
+	.set_fmt = dummy_cpu_dai_set_fmt,
+};
+
+static struct snd_soc_dai_driver dummy_cpu_dai = {
+	.name = "snd-soc-dummy-cpu-dai",
+	.playback = {
+		.channels_min	= 1,
+		.channels_max	= 8,
+		.rates		= SNDRV_PCM_RATE_44100,
+		.formats	= (SNDRV_PCM_FMTBIT_S16_LE |
+				   SNDRV_PCM_FMTBIT_S32_LE),
+	},
+	.capture = {
+		.channels_min	= 1,
+		.channels_max	= 8,
+		.rates		= SNDRV_PCM_RATE_44100,
+		.formats	= (SNDRV_PCM_FMTBIT_S16_LE |
+				   SNDRV_PCM_FMTBIT_S32_LE),
+	},
+	.ops = &dummy_cpu_dai_ops,
+};
+
 /* Audio machine driver */
 static struct snd_soc_card dra7_snd_card = {
 	.owner = THIS_MODULE,
@@ -480,6 +525,8 @@ static int dra7_snd_probe(struct platform_device *pdev)
 	card_data = devm_kzalloc(&pdev->dev, sizeof(*card_data), GFP_KERNEL);
 	if (card_data == NULL)
 		return -ENOMEM;
+
+	snd_soc_register_dais(&pdev->dev, &dummy_cpu_dai, 1);
 
 	if (!node) {
 		dev_err(card->dev, "missing of_node\n");
@@ -548,6 +595,7 @@ static int dra7_snd_remove(struct platform_device *pdev)
 {
 	struct snd_soc_card *card = platform_get_drvdata(pdev);
 
+	snd_soc_unregister_dai(&pdev->dev);
 	snd_soc_unregister_card(card);
 	snd_soc_card_reset_dai_links(card);
 

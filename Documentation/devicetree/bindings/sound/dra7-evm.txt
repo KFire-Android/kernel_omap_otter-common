@@ -7,7 +7,8 @@ Required properties:
 - ti,media-codec: phandle for the analog codec in media link
 - ti,media-mclk-freq: MCLK frequency for the analog codec in media link
 - ti,media-slots: Number of slots
-- ti,multichannel-cpu: phandle for the McASP node in multichannel link
+- ti,multichannel-cpu: phandle for the McASP node in multichannel link.
+  It can be omitted for cpu dailess mode (DSP-based radio).
 - ti,multichannel-codec-a: phandle for the analog codec instance A
 - ti,multichannel-codec-b: phandle for the analog codec instance B
 - ti,multichannel-codec-c: phandle for the analog codec instance C
