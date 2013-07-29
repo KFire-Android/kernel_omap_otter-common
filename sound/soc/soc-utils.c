@@ -75,7 +75,11 @@ static const struct snd_pcm_hardware dummy_dma_hardware = {
 
 static int dummy_dma_open(struct snd_pcm_substream *substream)
 {
-	snd_soc_set_runtime_hwparams(substream, &dummy_dma_hardware);
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+
+	/* prevent overwriting hostless parameters */
+	if (!rtd->dai_link->no_host_mode)
+		snd_soc_set_runtime_hwparams(substream, &dummy_dma_hardware);
 
 	return 0;
 }
