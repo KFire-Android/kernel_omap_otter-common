@@ -237,7 +237,10 @@ early_initcall(omap_l2_cache_init);
 
 void __iomem *omap4_get_sar_ram_base(void)
 {
-	return sar_ram_base;
+	if (sar_ram_base)
+		return sar_ram_base;
+	else
+		return NULL;
 }
 
 /*
@@ -403,7 +406,7 @@ static int __init omap5_axi_err_init(void)
 
 	ret = request_threaded_irq(OMAP54XX_IRQ_AXI,
 			axi_error_handler, (irq_handler_t) 0,
-			IRQF_DISABLED, "axi-err-irq", 0);
+			IRQF_DISABLED, "axi-err-irq", NULL);
 
 	return ret;
 }

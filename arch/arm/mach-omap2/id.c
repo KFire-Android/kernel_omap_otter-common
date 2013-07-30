@@ -53,7 +53,7 @@ int omap_type(void)
 		val = omap_ctrl_readl(OMAP343X_CONTROL_STATUS);
 	} else if (cpu_is_omap44xx()) {
 		val = omap_ctrl_readl(OMAP4_CTRL_MODULE_CORE_STATUS);
-	} else if (soc_is_omap54xx()) {
+	} else if (soc_is_omap54xx() || soc_is_dra7xx()) {
 		val = omap_ctrl_readl(OMAP5XXX_CONTROL_STATUS);
 		val &= OMAP5_DEVICETYPE_MASK;
 		val >>= 6;
@@ -90,6 +90,8 @@ u8 omap_get_sysboot_value(void)
 		mask |= OMAP2_SYSBOOT_6_MASK | OMAP2_SYSBOOT_7_MASK;
 	} else if (soc_is_omap54xx()) {
 		val = omap_ctrl_readl(OMAP5XXX_CONTROL_STATUS);
+	} else if (soc_is_dra7xx()) {
+		val = omap_ctrl_readl(DRA7XX_BOOTSTRAP_CONTROL);
 	} else {
 		pr_err("Cannot detect omap type!\n");
 	}
@@ -134,7 +136,7 @@ static u16 tap_prod_id;
 
 void omap_get_die_id(struct omap_die_id *odi)
 {
-	if (cpu_is_omap44xx() || soc_is_omap54xx()) {
+	if (cpu_is_omap44xx() || soc_is_omap54xx() || soc_is_dra7xx()) {
 		odi->id_0 = read_tap_reg(OMAP_TAP_DIE_ID_44XX_0);
 		odi->id_1 = read_tap_reg(OMAP_TAP_DIE_ID_44XX_1);
 		odi->id_2 = read_tap_reg(OMAP_TAP_DIE_ID_44XX_2);
@@ -315,6 +317,19 @@ void __init ti81xx_check_features(void)
 	omap3_cpuinfo();
 }
 
+void __init am33xx_check_features(void)
+{
+	u32 status;
+
+	omap_features = OMAP3_HAS_NEON;
+
+	status = omap_ctrl_readl(AM33XX_DEV_FEATURE);
+	if (status & AM33XX_SGX_MASK)
+		omap_features |= OMAP3_HAS_SGX;
+
+	omap3_cpuinfo();
+}
+
 void __init omap3xxx_check_revision(void)
 {
 	u32 cpuid, idcode;
@@ -425,8 +440,22 @@ void __init omap3xxx_check_revision(void)
 		}
 		break;
 	case 0xb944:
-		omap_revision = AM335X_REV_ES1_0;
-		cpu_rev = "1.0";
+		switch (rev) {
+		case 0:
+			omap_revision = AM335X_REV_ES1_0;
+			cpu_rev = "1.0";
+			break;
+		case 1:
+			omap_revision = AM335X_REV_ES2_0;
+			cpu_rev = "2.0";
+			break;
+		case 2:
+		/* FALLTHROUGH */
+		default:
+			omap_revision = AM335X_REV_ES2_1;
+			cpu_rev = "2.1";
+			break;
+		}
 		break;
 	case 0xb8f2:
 		switch (rev) {
@@ -578,6 +607,32 @@ void __init omap5xxx_check_revision(void)
 
 	pr_info("OMAP%04x ES%d.0\n",
 			omap_rev() >> 16, ((omap_rev() >> 12) & 0xf));
+}
+
+void __init dra7xx_check_revision(void)
+{
+	u32 idcode;
+	u16 hawkeye;
+	u8 rev;
+
+	idcode = read_tap_reg(OMAP_TAP_IDCODE);
+	hawkeye = (idcode >> 12) & 0xffff;
+	rev = (idcode >> 28) & 0xff;
+	switch (hawkeye) {
+	case 0xb990:
+		switch (rev) {
+		case 0:
+		default:
+			omap_revision = DRA752_REV_ES1_0;
+		}
+		break;
+	default:
+		/* Unknown. Default to latest silicon revision */
+		omap_revision = DRA752_REV_ES1_0;
+	}
+
+	pr_info("DRA%03x ES%d.%d\n", omap_rev() >> 16,
+		((omap_rev() >> 12) & 0xf), ((omap_rev() >> 8) & 0xf));
 }
 
 /*

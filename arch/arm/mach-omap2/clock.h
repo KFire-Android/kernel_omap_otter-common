@@ -49,6 +49,7 @@ struct omap_clk {
 #define CK_446X		(1 << 8)
 #define CK_AM33XX	(1 << 9)	/* AM33xx specific clocks */
 #define CK_54XX		(1 << 10)	/* OMAP54xx specific clocks */
+#define CK_7XX		(1 << 11)
 
 
 #define CK_34XX		(CK_3430ES1 | CK_3430ES2PLUS)
@@ -64,6 +65,17 @@ struct clockdomain;
 		.parent_names = _parent_array_name,		\
 		.num_parents = ARRAY_SIZE(_parent_array_name),	\
 		.ops = &_clkops_name,				\
+	};
+
+#define DEFINE_STRUCT_CLK_FLAGS(_name, _parent_array_name,	\
+				_clkops_name, _flags)		\
+	static struct clk _name = {				\
+		.name = #_name,					\
+		.hw = &_name##_hw.hw,				\
+		.parent_names = _parent_array_name,		\
+		.num_parents = ARRAY_SIZE(_parent_array_name),	\
+		.ops = &_clkops_name,				\
+		.flags = _flags,				\
 	};
 
 #define DEFINE_STRUCT_CLK_HW_OMAP(_name, _clkdm_name)		\
@@ -163,6 +175,7 @@ struct clockdomain;
 #define RATE_IN_AM33XX		(1 << 8)
 #define RATE_IN_TI814X		(1 << 9)
 #define RATE_IN_54XX		(1 << 10)
+#define RATE_IN_7XX		(1 << 11)
 
 #define RATE_IN_24XX		(RATE_IN_242X | RATE_IN_243X)
 #define RATE_IN_34XX		(RATE_IN_3430ES1 | RATE_IN_3430ES2PLUS)
@@ -353,6 +366,16 @@ struct clk_hw_omap_ops {
 unsigned long omap_fixed_divisor_recalc(struct clk_hw *hw,
 					unsigned long parent_rate);
 
+struct rate_init_clks {
+	const char *name;
+	unsigned long rate;
+};
+
+struct reparent_init_clks {
+	const char *name;
+	const char *parent;
+};
+
 /* CM_CLKSEL2_PLL.CORE_CLK_SRC bits (2XXX) */
 #define CORE_CLK_SRC_32K		0x0
 #define CORE_CLK_SRC_DPLL		0x1
@@ -438,6 +461,8 @@ void omap2_init_clk_hw_omap_clocks(struct clk *clk);
 int omap2_clk_enable_autoidle_all(void);
 int omap2_clk_disable_autoidle_all(void);
 void omap2_clk_enable_init_clocks(const char **clk_names, u8 num_clocks);
+void omap2_clk_rate_init_clocks(struct rate_init_clks *rclks, u8 num);
+void omap2_clk_reparent_init_clocks(struct reparent_init_clks *rclks, u8 num);
 int omap2_clk_switch_mpurate_at_boot(const char *mpurate_ck_name);
 void omap2_clk_print_new_rates(const char *hfclkin_ck_name,
 			       const char *core_ck_name,

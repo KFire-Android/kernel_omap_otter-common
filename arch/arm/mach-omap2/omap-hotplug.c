@@ -22,6 +22,7 @@
 #include "omap-wakeupgen.h"
 #include "common.h"
 #include "powerdomain.h"
+#include "soc.h"
 
 /*
  * platform-specific code to shutdown a CPU
@@ -47,7 +48,10 @@ void __ref omap4_cpu_die(unsigned int cpu)
 		/*
 		 * Enter into low power state
 		 */
-		omap4_hotplug_cpu(cpu, PWRDM_POWER_OFF);
+		if (soc_is_dra7xx())
+			omap4_hotplug_cpu(cpu, PWRDM_POWER_RET);
+		else
+			omap4_hotplug_cpu(cpu, PWRDM_POWER_OFF);
 
 		if (omap_secure_apis_support())
 			boot_cpu = omap_read_auxcoreboot0();
