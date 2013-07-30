@@ -33,6 +33,7 @@
 struct dra7_snd_data {
 	unsigned int media_mclk_freq;
 	int media_slots;
+	int always_on;
 };
 
 static int dra7_mcasp_reparent(struct snd_soc_card *card,
@@ -139,6 +140,20 @@ static struct snd_soc_ops dra7_snd_media_ops = {
 	.hw_params = dra7_snd_media_hw_params,
 };
 
+static int dra7_dai_init(struct snd_soc_pcm_runtime *rtd)
+{
+	struct snd_soc_card *card = rtd->card;
+	struct dra7_snd_data *card_data = snd_soc_card_get_drvdata(card);
+
+	/* Minimize artifacts as much as possible if can be afforded */
+	if (card_data->always_on)
+		rtd->pmdown_time = INT_MAX;
+	else
+		rtd->pmdown_time = 0;
+
+	return 0;
+}
+
 static struct snd_soc_dai_link dra7_snd_dai[] = {
 	{
 		/* Media: McASP3 + tlv320aic3106 */
@@ -146,6 +161,7 @@ static struct snd_soc_dai_link dra7_snd_dai[] = {
 		.codec_dai_name = "tlv320aic3x-hifi",
 		.platform_name = "omap-pcm-audio",
 		.ops = &dra7_snd_media_ops,
+		.init = dra7_dai_init,
 	},
 };
 
@@ -255,6 +271,9 @@ static int dra7_snd_probe(struct platform_device *pdev)
 	}
 
 	snd_soc_card_set_drvdata(card, card_data);
+
+	if (of_find_property(node, "ti,always-on", NULL))
+		card_data->always_on = 1;
 
 	ret = dra7_snd_add_dai_link(card, &dra7_snd_dai[0], "ti,media");
 	if (ret) {

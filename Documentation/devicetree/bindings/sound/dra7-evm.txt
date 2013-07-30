@@ -11,6 +11,10 @@ Required properties:
   Each entry is a pair of strings, the first being the connection's sink,
   the second being the connection's source.
 
+Optional properties:
+- ti,always-on: Keep analog codecs always on to minimize artifacts. Use it
+  if power is not a concern.
+
 Available audio endpoints for the audio-routing table:
 
 Board connectors:
