@@ -41,6 +41,21 @@ enum ion_heap_type {
 	ION_NUM_HEAPS = 16,
 };
 
+/**
+ * enum ion_data_direction - sync operation arguments
+ * @ION_BIDIRECTIONAL:	 memory written to & read from device
+ * @ION_TO_DEVICE: memory going to be transferred to device
+ * @ION_FROM_DEVICE:	 memory populated by device
+ * @ION_NONE:		 None of the above
+ */
+enum ion_data_direction {
+	ION_BIDIRECTIONAL = 0,
+	ION_TO_DEVICE = 1,
+	ION_FROM_DEVICE = 2,
+	ION_NONE = 3,
+};
+
+
 #define ION_HEAP_SYSTEM_MASK		(1 << ION_HEAP_TYPE_SYSTEM)
 #define ION_HEAP_SYSTEM_CONTIG_MASK	(1 << ION_HEAP_TYPE_SYSTEM_CONTIG)
 #define ION_HEAP_CARVEOUT_MASK		(1 << ION_HEAP_TYPE_CARVEOUT)
@@ -273,6 +288,7 @@ struct ion_allocation_data {
 struct ion_fd_data {
 	struct ion_handle *handle;
 	int fd;
+	enum ion_data_direction dir;
 };
 
 /**

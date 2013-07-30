@@ -55,6 +55,7 @@ struct omap_tiler_info {
 	u32 vsize;			/* virtual stride of buffer */
 	u32 vstride;			/* virtual size of buffer */
 	u32 phys_stride;			/* Physical stride of the buffer */
+	u32 flags;			/* Flags specifying cached or not */
 };
 
 static int omap_tiler_heap_allocate(struct ion_heap *heap,
@@ -62,6 +63,8 @@ static int omap_tiler_heap_allocate(struct ion_heap *heap,
 				    unsigned long size, unsigned long align,
 				    unsigned long flags)
 {
+	struct omap_tiler_info *info;
+
 	/* This means the buffer is already allocated and populated, we're getting here because
 	 * of dummy handle creation, so simply return*/	
 	if (size == 0) {
@@ -70,7 +73,12 @@ static int omap_tiler_heap_allocate(struct ion_heap *heap,
 		  * This will be used later on inside map_dma function to create
 		  * the sg list for tiler buffer
 		  */
-		buffer->priv_virt = (void *)flags;
+		info = (struct omap_tiler_info *) flags;
+		if (!info)
+			pr_err("%s: flags argument is not setupg\n", __func__);
+		buffer->priv_virt = info;
+		/* Re-update correct flags inside buffer */
+		buffer->flags = info->flags;
 		return 0;
 	}
 
@@ -174,6 +182,7 @@ int omap_tiler_alloc(struct ion_heap *heap,
 	info->phys_addrs = (u32 *)(info + 1);
 	info->tiler_addrs = info->phys_addrs + n_phys_pages;
 	info->fmt = data->fmt;
+	info->flags = data->flags;
 
 	/* Allocate tiler space
 	   FIXME: we only support PAGE_SIZE alignment right now. */
@@ -330,9 +339,9 @@ static int omap_tiler_heap_map_user(struct ion_heap *heap,
 	int i, ret = 0;
 	pgprot_t vm_page_prot;
 
-	/* Use writecombined mappings unless on OMAP5.  If OMAP5, use
+	/* Use writecombined mappings unless on OMAP5 or DRA7.  If OMAP5 or DRA7, use
 	shared device due to h/w issue. */
-	if (soc_is_omap54xx())
+	if (soc_is_omap54xx() || soc_is_dra7xx())
 		vm_page_prot = __pgprot_modify(vma->vm_page_prot, L_PTE_MT_MASK,
 						L_PTE_MT_DEV_SHARED);
 	else

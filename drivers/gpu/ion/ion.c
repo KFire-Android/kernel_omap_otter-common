@@ -951,7 +951,7 @@ end:
 }
 EXPORT_SYMBOL(ion_import_dma_buf);
 
-static int ion_sync_for_device(struct ion_client *client, int fd)
+static int ion_sync_for_device(struct ion_client *client, int fd, enum ion_data_direction dir)
 {
 	struct dma_buf *dmabuf;
 	struct ion_buffer *buffer;
@@ -969,8 +969,16 @@ static int ion_sync_for_device(struct ion_client *client, int fd)
 	}
 	buffer = dmabuf->priv;
 
-	dma_sync_sg_for_device(NULL, buffer->sg_table->sgl,
-			       buffer->sg_table->nents, DMA_BIDIRECTIONAL);
+	if(dir == ION_FROM_DEVICE)
+		dma_sync_sg_for_device(NULL, buffer->sg_table->sgl,
+				       buffer->sg_table->nents, DMA_FROM_DEVICE);
+	else if(dir == ION_TO_DEVICE)
+		dma_sync_sg_for_device(NULL, buffer->sg_table->sgl,
+				       buffer->sg_table->nents, DMA_TO_DEVICE);
+	else if(dir == ION_BIDIRECTIONAL)
+		dma_sync_sg_for_device(NULL, buffer->sg_table->sgl,
+				       buffer->sg_table->nents, DMA_BIDIRECTIONAL);
+
 	dma_buf_put(dmabuf);
 	return 0;
 }
@@ -1053,7 +1061,7 @@ static long ion_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		if (copy_from_user(&data, (void __user *)arg,
 				   sizeof(struct ion_fd_data)))
 			return -EFAULT;
-		ion_sync_for_device(client, data.fd);
+		ion_sync_for_device(client, data.fd, data.dir);
 		break;
 	}
 	case ION_IOC_CUSTOM:

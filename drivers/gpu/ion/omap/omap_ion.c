@@ -124,19 +124,26 @@ static int omap_ion_probe(struct platform_device *pdev)
 	uint omap_ion_heap_tiler_size = 0;
 	uint omap_ion_heap_nonsecure_tiler_size = 0;
 	
-	omap_ion_device = ion_device_create(omap_ion_ioctl);
-	if (IS_ERR_OR_NULL(omap_ion_device)) {
-		kfree(heaps);
-		return PTR_ERR(omap_ion_device);
-	}
-
 	if (node) {
 		of_property_read_u32(node, "ti,omap_ion_heap_secure_input_base",
 				     &omap_ion_heap_secure_input_base);
 		of_property_read_u32(node, "ti,omap_ion_heap_tiler_base",
-				     &omap_ion_heap_tiler_size);
+				     &omap_ion_heap_tiler_base);
 		of_property_read_u32(node, "ti,omap_ion_heap_nonsecure_tiler_base",
 				     &omap_ion_heap_nonsecure_tiler_base);
+		if (omap_ion_heap_secure_input_base == 0
+			|| omap_ion_heap_tiler_base == 0
+			|| omap_ion_heap_nonsecure_tiler_base == 0) {
+			pr_err("%s: carveout memory address is null. please check dts file\n"
+				"omap_ion_heap_secure_input_base = 0x%x\n"
+				"omap_ion_heap_tiler_base = 0x%x\n"
+				"omap_ion_heap_nonsecure_tiler_base = 0x%x\n"
+				, __func__
+				, omap_ion_heap_secure_input_base
+				, omap_ion_heap_tiler_base
+				, omap_ion_heap_tiler_base);
+			return -EFAULT;
+		}
 
 		of_property_read_u32(node, "ti,omap_ion_heap_secure_input_size",
 				     &omap_ion_heap_secure_input_size);
@@ -144,7 +151,29 @@ static int omap_ion_probe(struct platform_device *pdev)
 				     &omap_ion_heap_tiler_size);
 		of_property_read_u32(node, "ti,omap_ion_heap_nonsecure_tiler_size",
 				     &omap_ion_heap_nonsecure_tiler_size);
+		if (omap_ion_heap_secure_input_size == 0
+			|| omap_ion_heap_tiler_size == 0
+			|| omap_ion_heap_nonsecure_tiler_size == 0) {
+			pr_err("%s: carveout memory address is null. please check dts file\n"
+				"omap_ion_heap_secure_input_size = 0x%x\n"
+				"omap_ion_heap_tiler_size = 0x%x\n"
+				"omap_ion_heap_nonsecure_tiler_size = 0x%x\n"
+				, __func__
+				, omap_ion_heap_secure_input_size
+				, omap_ion_heap_tiler_size
+				, omap_ion_heap_nonsecure_tiler_size);
+			return -EINVAL;
+		}
+
+	} else {
+		pr_err("%s: no matching device tree node\n", __func__);
+		return -ENODEV;
 	}
+
+	omap_ion_device = ion_device_create(omap_ion_ioctl);
+	if (IS_ERR_OR_NULL(omap_ion_device))
+		return PTR_ERR(omap_ion_device);
+
 
 	num_heaps = omap_ion_data.nr;
 
@@ -242,6 +271,7 @@ int omap_ion_share_fd_to_buffers(int fd, struct ion_buffer **buffers,
 	struct ion_handle **handles;
 	struct ion_client *client;
 	int i = 0, ret = 0;
+	int share_fd;
 
 	handles = kzalloc(*num_handles * sizeof(struct ion_handle *),
 			  GFP_KERNEL);
@@ -262,7 +292,8 @@ int omap_ion_share_fd_to_buffers(int fd, struct ion_buffer **buffers,
 
 	for (i = 0; i < *num_handles; i++) {
 		if (handles[i])
-			buffers[i] = ion_share_dma_buf(client, handles[i]);
+			share_fd = ion_share_dma_buf(client, handles[i]);
+			buffers[i] = ion_handle_buffer(handles[i]);
 	}
 
 exit:
