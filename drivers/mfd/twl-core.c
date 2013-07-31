@@ -45,7 +45,9 @@
 #include <plat/cpu.h>
 #endif
 
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 #include <linux/proc_fs.h>
+#endif
 
 /*
  * The TWL4030 "Triton 2" is one of a family of a multi-function "Power
@@ -254,6 +256,7 @@
 #define TWL6030_REG_EPROM_REV	0xdf
 #define TWL6030_REG_JTAGVERNUM	0x87
 
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 /* need to access USB_PRODUCT_ID_LSB to identify which 6030 varient we are */
 #define USB_PRODUCT_ID_LSB	0x02
 
@@ -275,7 +278,7 @@
 #define TURNOFF_DEVOFF_TSHUT 		BIT(3)
 #define TURNOFF_DEVOFF_BCK 		BIT(2)
 #define TURNOFF_DEVOFF_LPK 		BIT(1)
-
+#endif
 
 /*----------------------------------------------------------------------*/
 
@@ -1295,6 +1298,7 @@ static void clocks_init(struct device *dev,
 	if (e < 0)
 		pr_err("%s: clock init err [%d]\n", DRIVER_NAME, e);
 }
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 
 /*----------------------------------------------------------------------*/
 
@@ -1371,15 +1375,17 @@ static void create_twl_proc_files(void)
 		twl_proc_dir_entry->write_proc = NULL;
 	}
 }
-
+#endif
 
 /*----------------------------------------------------------------------*/
 
 #ifdef CONFIG_PM
 static int twl_suspend(struct i2c_client *client, pm_message_t mesg)
 {
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 	/*For low battery wake up function*/
 	twl6030_interrupt_unmask(VLOW_INT_MASK, REG_INT_MSK_STS_A);
+#endif
 	return irq_set_irq_wake(client->irq, 1);
 }
 
@@ -1427,7 +1433,9 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	int ret = 0, features;
 	unsigned long errata = 0;
 	u8 twlrev;
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 	u8 twl_reg = 0;
+#endif
 
 	if (!pdata) {
 		dev_dbg(&client->dev, "no platform data?\n");
@@ -1536,6 +1544,7 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		I2C_SDA_CTRL_PU | I2C_SCL_CTRL_PU);
 		twl_i2c_write_u8(TWL4030_MODULE_INTBR, temp, REG_GPPUPDCTR1);
 	}
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 	if (twl_class_is_6030()) {
 		twl_i2c_write_u8(TWL6030_MODULE_ID0, 0xC0, PHOENIX_MSK_TRANSITION);
 		/*rtc off mode low power,BBSPOR_CFG,VRTC_EN_OFF_STS*/
@@ -1579,6 +1588,8 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		/* Create proc files */
 		create_twl_proc_files();
 	}
+#endif
+
 	status = add_children(pdata, features, errata);
 fail:
 	if (status < 0)
