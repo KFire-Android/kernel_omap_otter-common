@@ -603,11 +603,15 @@ int omap_dm_timer_stop(struct omap_dm_timer *timer)
 		return -EINVAL;
 
 	spin_lock_irqsave(&timer->lock, flags);
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 	if (timer->loses_context) {
-		if (!timer->enabled) {
-			spin_unlock_irqrestore(&timer->lock, flags);
-			return -EINVAL;
-		}
+#endif
+	if (!timer->enabled) {
+		spin_unlock_irqrestore(&timer->lock, flags);
+		return -EINVAL;
+#ifdef CONFIG_MACH_OMAP_4430_KC1
+	}
+#endif
 	}
 
 	pdata = timer->pdev->dev.platform_data;
@@ -736,15 +740,19 @@ int omap_dm_timer_set_match(struct omap_dm_timer *timer, int enable,
 {
 	u32 l;
 	unsigned long flags;
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 	bool was_enabled;
+#endif
 
 	if (!timer)
 		return -EINVAL;
 
 	spin_lock_irqsave(&timer->lock, flags);
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 	was_enabled = timer->enabled;
 	if (!was_enabled)
-		__timer_enable(timer);
+#endif
+	__timer_enable(timer);
 	l = omap_dm_timer_read_reg(timer, OMAP_TIMER_CTRL_REG);
 	if (enable)
 		l |= OMAP_TIMER_CTRL_CE;
@@ -752,8 +760,10 @@ int omap_dm_timer_set_match(struct omap_dm_timer *timer, int enable,
 		l &= ~OMAP_TIMER_CTRL_CE;
 	omap_dm_timer_write_reg(timer, OMAP_TIMER_CTRL_REG, l);
 	omap_dm_timer_write_reg(timer, OMAP_TIMER_MATCH_REG, match);
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 	if (!was_enabled)
-		__timer_disable(timer);
+#endif
+	__timer_disable(timer);
 	spin_unlock_irqrestore(&timer->lock, flags);
 	return 0;
 }
@@ -764,15 +774,19 @@ int omap_dm_timer_set_pwm(struct omap_dm_timer *timer, int def_on,
 {
 	u32 l;
 	unsigned long flags;
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 	bool was_enabled;
+#endif
 
 	if (!timer)
 		return -EINVAL;
 
 	spin_lock_irqsave(&timer->lock, flags);
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 	was_enabled = timer->enabled;
 	if (!was_enabled)
-		__timer_enable(timer);
+#endif
+	__timer_enable(timer);
 	l = omap_dm_timer_read_reg(timer, OMAP_TIMER_CTRL_REG);
 	l &= ~(OMAP_TIMER_CTRL_GPOCFG | OMAP_TIMER_CTRL_SCPWM |
 	       OMAP_TIMER_CTRL_PT | (0x03 << 10));
@@ -782,8 +796,10 @@ int omap_dm_timer_set_pwm(struct omap_dm_timer *timer, int def_on,
 		l |= OMAP_TIMER_CTRL_PT;
 	l |= trigger << 10;
 	omap_dm_timer_write_reg(timer, OMAP_TIMER_CTRL_REG, l);
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 	if (!was_enabled)
-		__timer_disable(timer);
+#endif
+	__timer_disable(timer);
 	spin_unlock_irqrestore(&timer->lock, flags);
 	return 0;
 }

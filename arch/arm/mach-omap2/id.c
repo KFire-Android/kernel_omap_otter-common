@@ -34,9 +34,11 @@ static unsigned int omap_revision;
 u32 omap3_features;
 u32 omap4_features;
 
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 #define MAX_ID_STRING          (4*8 + 4)
 #define DIE_ID_REG_BASE                (L4_44XX_PHYS + 0x2000)
 #define DIE_ID_REG_OFFSET      0x200
+#endif
 
 unsigned int omap_rev(void)
 {
@@ -389,11 +391,13 @@ static void __init omap4_check_revision(void)
 {
 	u32 idcode;
 	u8 rev;
+#ifdef CONFIG_MACH_OMAP_4430_KC1
        u8 *type;
        u32 reg;
  
        u32 id[4] = { 0 };
        u8 id_string[MAX_ID_STRING];
+#endif
 
 	/*
 	 * NOTE: OMAP4460+ uses ramp system for identification and hawkeye
@@ -477,10 +481,8 @@ static void __init omap4_check_revision(void)
 		omap_chip.oc |= CHIP_IS_OMAP4430ES2_3;
 	}
 
-//	pr_info("OMAP%04x ES%d.%d\n", omap_rev() >> 16,
-//		((omap_rev() >> 12) & 0xf), ((omap_rev() >> 8) & 0xf));
-
-               switch (omap_type()) {
+#ifdef CONFIG_MACH_OMAP_4430_KC1
+       switch (omap_type()) {
        case OMAP2_DEVICE_TYPE_GP:
                type = "GP";
                break;
@@ -519,9 +521,10 @@ static void __init omap4_check_revision(void)
                                                id[1], id[0]);
        pr_info("Prod-id  (%s)\n", id_string);
        pr_info("***********************\n");
-       //pr_info("OMAP%04x ES%d.%d\n", omap_rev() >> 16,
-       //      ((omap_rev() >> 12) & 0xf), ((omap_rev() >> 8) & 0xf));
-
+#else
+	pr_info("OMAP%04x ES%d.%d\n", omap_rev() >> 16,
+		((omap_rev() >> 12) & 0xf), ((omap_rev() >> 8) & 0xf));
+#endif
 }
 
 #define OMAP3_SHOW_FEATURE(feat)		\

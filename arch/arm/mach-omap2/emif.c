@@ -28,9 +28,12 @@
 #include <mach/emif.h>
 #include <mach/lpddr2-jedec.h>
 #include <mach/omap4-common.h>
-#include <linux/delay.h>
 
+#ifdef CONFIG_MACH_OMAP_4430_KC1
+#include <linux/delay.h>
 #include "control.h"
+#endif
+
 #include "voltage.h"
 
 /* Utility macro for masking and setting a field in a register/variable */
@@ -64,6 +67,7 @@ static struct omap_device_pm_latency omap_emif_latency[] = {
 	       },
 };
 
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 //add for the Silicon Bandgap Temperature Measurement
 u8 omap4_ctrl_temp_sensor_single_conv(void)
 {
@@ -122,6 +126,7 @@ u8 omap4_ctrl_temp_sensor_single_conv(void)
 	
 	return celsius;
 }
+#endif
 
 /*
  * EMIF Power Management timer for Self Refresh will put the external SDRAM
@@ -981,7 +986,9 @@ static ssize_t emif_temperature_show(struct device *dev,
 				     struct device_attribute *attr, char *buf)
 {
 	u32 temperature;
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 	u8 bandgaptemp = 0;
+#endif
 	if (dev == &(emif[EMIF1].pdev->dev))
 		temperature = emif_temperature_level[EMIF1];
 	else if (dev == &(emif[EMIF2].pdev->dev))
@@ -989,10 +996,12 @@ static ssize_t emif_temperature_show(struct device *dev,
 	else
 		return 0;
 
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 	bandgaptemp = omap4_ctrl_temp_sensor_single_conv();
-	//printk("Bandgap Temp around [%d -40] degree Celsius\n",bandgaptemp);
-
 	return snprintf(buf, 20, "%u\n%u\n", temperature, bandgaptemp);
+#else
+	return snprintf(buf, 20, "%u\n", temperature);
+#endif
 }
 static DEVICE_ATTR(temperature, S_IRUGO, emif_temperature_show, NULL);
 
@@ -1604,6 +1613,7 @@ static void __init setup_lowpower_regs(u32 emif_nr,
 	}
 }
 
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 /*
  * omap_sdram_vendor - identify ddr vendor
  * Identify DDR vendor ID for selecting correct timing parameter 
@@ -1639,6 +1649,7 @@ int omap_sdram_density(void)
 
 	return ddr_density ;
 }
+#endif
 
 /*
  * omap_init_emif_timings - reprogram EMIF timing parameters

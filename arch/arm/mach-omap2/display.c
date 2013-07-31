@@ -71,8 +71,13 @@ static const struct omap_dss_hwmod_data omap4_dss_hwmod_data[] __initdata = {
 	{ "dss_dispc", "omapdss_dispc", -1 },
 	{ "dss_rfbi", "omapdss_rfbi", -1 },
 	{ "dss_venc", "omapdss_venc", -1 },
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 	{ "dss_dsi1", "omapdss_dsi", 0 },
 	{ "dss_dsi2", "omapdss_dsi", 1 },
+#else
+	{ "dss_dsi1", "omapdss_dsi1", -1 },
+	{ "dss_dsi2", "omapdss_dsi2", -1 },
+#endif
 	{ "dss_hdmi", "omapdss_hdmi", -1 },
 };
 
