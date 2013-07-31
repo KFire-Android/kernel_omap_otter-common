@@ -20,10 +20,6 @@
 #include <linux/types.h>
 #include <linux/ioctl.h>
 
-#ifdef CONFIG_LAB126
-#include <linux/metricslog.h>
-#endif
-
 /*
  * The userspace structure for version 1 of the logger_entry ABI.
  * This structure is returned to userspace unless the caller requests
@@ -60,12 +56,6 @@ struct logger_entry {
 #define LOGGER_LOG_SYSTEM	"log_system"	/* system/framework messages */
 #define LOGGER_LOG_MAIN		"log_main"	/* everything else */
 
-#ifdef CONFIG_LAB126
-#define LOGGER_LOG_METRICS	"log_metrics"	        /* metrics logs */
-#define LOGGER_LOG_AMAZON_MAIN	"log_amazon_main"	/* private buffer for amazon signed apk */
-#endif
-
-#define LOGGER_ENTRY_MAX_LEN		(4*1024)
 #define LOGGER_ENTRY_MAX_PAYLOAD	4076
 
 #define __LOGGERIO	0xAE

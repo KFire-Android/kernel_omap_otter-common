@@ -59,10 +59,6 @@
 #include <linux/i2c/twl.h>
 
 #include <linux/thermal_framework.h>
-#ifdef CONFIG_LAB126
-#include <linux/metricslog.h>
-#define THERMO_METRICS_STR_LEN 128
-#endif
 
 #define CONTROL_DEV_CONF                0x300
 #define PHY_PD                          0x1

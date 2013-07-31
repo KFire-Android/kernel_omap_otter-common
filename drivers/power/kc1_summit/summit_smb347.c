@@ -965,10 +965,6 @@ void summit_read_interrupt_c(struct summit_smb347_info *di){
 }
 void summit_read_interrupt_d(struct summit_smb347_info *di){
 	int value = 0;
-#ifdef CONFIG_LAB126
-	char *thermal_metric_prefix = "smb347:def:";
-	char buf[THERMO_METRICS_STR_LEN];
-#endif
 	value = i2c_smbus_read_byte_data(di->client ,
 		SUMMIT_SMB347_INTSTAT_REG_D);
 	if (APSD_COMPLETED_IRQ & value) {
@@ -993,17 +989,9 @@ void summit_read_interrupt_d(struct summit_smb347_info *di){
 	}
 	if (COMPLETE_CHARGE_TIMEOUT_IRQ & value) {
 		dev_dbg(di->dev , "Complete Charge Timeout IRQ\n");
-		if (COMPLETE_CHARGE_TIMEOUT_STATUS & value){
-			snprintf(buf, THERMO_METRICS_STR_LEN,"%scomplete_charge_timeout=1:", thermal_metric_prefix);
-			log_to_metrics(ANDROID_LOG_INFO, "", buf);
-		}
 	}
 	if (PC_TIMEOUT_IRQ & value) {
 		dev_dbg(di->dev , "Pre-Charge Timeout IRQ\n");
-		if (PC_TIMEOUT_STATUS & value){
-			snprintf(buf, THERMO_METRICS_STR_LEN,"%sprecharge_timeout=1:", thermal_metric_prefix);
-			log_to_metrics(ANDROID_LOG_INFO, "", buf);
-		}
 	}
 }
 void summit_read_interrupt_e(struct summit_smb347_info *di){
