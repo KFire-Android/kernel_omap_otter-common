@@ -42,8 +42,10 @@ struct thermal_dev_ops {
 	int (*report_temp) (struct thermal_dev *);
 	int (*set_temp_thresh) (struct thermal_dev *temp_sensor,
 			int min, int max);
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 	int (*set_hot_event) (struct thermal_dev *temp_sensor,
 			int hot_event);
+#endif
 	int (*set_temp_report_rate) (struct thermal_dev *, int rate);
 	/* Cooling agent call backs */
 	int (*cool_device) (struct thermal_dev *, int temp);
@@ -51,9 +53,11 @@ struct thermal_dev_ops {
 	int (*process_temp) (struct thermal_dev *gov,
 				struct list_head *cooling_list,
 				struct thermal_dev *temp_sensor, int temp);
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 	int (*process_hotspot_temp) (struct thermal_dev *tdev);
 	int (*process_avg_temp) (struct thermal_dev *tdev);
 	int (*process_zone) (struct thermal_dev *tdev);
+#endif
 #ifdef CONFIG_THERMAL_FRAMEWORK_DEBUG
 	/* Debugging interface */
 	int (*debug_report) (struct thermal_dev *, struct seq_file *s);
@@ -61,6 +65,7 @@ struct thermal_dev_ops {
 #endif
 };
 
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 /**
  * struct thermal_cooling_action  - Structure for each action to reduce temp.
  * @priority: This action must be taken when there is a message with cooling
@@ -76,6 +81,7 @@ struct thermal_cooling_action {
 	struct dentry *d;
 #endif
 };
+#endif
 
 /**
  * struct thermal_dev  - Structure for each thermal device.
@@ -94,7 +100,9 @@ struct thermal_dev {
 	const char	*domain_name;
 	struct device	*dev;
 	struct thermal_dev_ops *dev_ops;
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 	struct list_head cooling_actions;
+#endif
 	struct list_head node;
 	int 		current_temp;
 	struct thermal_domain	*domain;
@@ -132,6 +140,7 @@ struct thermal_dev {
 	ret;								\
 })
 
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 /**
  * Call the specific call back for a given thermal devices "dev". It will call
  * the call back when it finds the matching entry from the list.
@@ -168,13 +177,16 @@ struct thermal_dev {
 	}								\
 	ret;								\
 })
+#endif
 
 extern int thermal_request_temp(struct thermal_dev *tdev);
 extern int thermal_lookup_temp(const char *domain_name);
 extern int thermal_sensor_set_temp(struct thermal_dev *tdev);
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 extern int thermal_sensor_get_hotspot_temp(struct thermal_dev *tdev);
 extern int thermal_sensor_get_avg_temp(struct thermal_dev *tdev);
 extern int thermal_sensor_get_zone(struct thermal_dev *tdev);
+#endif
 
 /* Registration and unregistration calls for the thermal devices */
 extern int thermal_sensor_dev_register(struct thermal_dev *tdev);
@@ -184,11 +196,13 @@ extern void thermal_cooling_dev_unregister(struct thermal_dev *tdev);
 extern int thermal_governor_dev_register(struct thermal_dev *tdev);
 extern void thermal_governor_dev_unregister(struct thermal_dev *tdev);
 
+#ifdef CONFIG_MACH_OMAP_4430_KC1
  /* Specific to governors */
 #ifdef CONFIG_CASE_TEMP_GOVERNOR
 extern int case_subzone_number;
 #else
 #define case_subzone_number	-1
+#endif
 #endif
 
 #endif /* __LINUX_THERMAL_FRAMEWORK_H__ */
