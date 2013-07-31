@@ -405,7 +405,7 @@
                         utmi-mode = <2>;
                         ranges;
                         dwc3@48890000 {
-                                compatible = "synopsys,dwc3";
+                                compatible = "synopsys,dra7xx-dwc3";
                                 reg = <0x48890000 0xcfff>;
                                 interrupts = <0 76 4>;
                                 usb-phy = <&usb2_phy1>, <&usb3_phy>;
@@ -433,7 +433,7 @@
                         utmi-mode = <1>;
                         ranges;
                         dwc3@488d0000 {
-                                compatible = "synopsys,dwc3";
+                                compatible = "synopsys,dra7xx-dwc3";
                                 reg = <0x488d0000 0xcfff>;
                                 interrupts = <0 78 4>;
                                 usb-phy = <&usb2_phy2>;
