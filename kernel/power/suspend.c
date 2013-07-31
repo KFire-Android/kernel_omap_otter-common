@@ -169,8 +169,6 @@ static int suspend_enter(suspend_state_t state)
 
 	error = syscore_suspend();
 	if (!error) {
-		/* FIXME-HASH: This is set in the removed Kindle Fire power code */
-		// if (!(suspend_test(TEST_CORE) || pm_wakeup_pending() || (omap_readl(0x4A10019C)&0x80000000))) {
 		if (!(suspend_test(TEST_CORE) || pm_wakeup_pending())) {
 			error = suspend_ops->enter(state);
 			events_check_enabled = false;
