@@ -410,7 +410,11 @@ static void enable_be_port(struct snd_soc_pcm_runtime *be,
 			/* MM_EXT connection to McBSP 2 ports */
 			format.f = 48000;
 			format.samp_format = STEREO_RSHIFTED_16;
+#ifdef CONFIG_SND_OMAP_SOC_RY_AIC3110
 			abe_connect_serial_port(MM_EXT_OUT_PORT, &format, MCBSP3_TX);
+#else
+			abe_connect_serial_port(MM_EXT_OUT_PORT, &format, MCBSP2_TX);
+#endif
 			omap_abe_port_enable(abe_priv->abe,
 				abe_priv->port[OMAP_ABE_BE_PORT_MM_EXT_DL]);
 		} else {
@@ -423,7 +427,11 @@ static void enable_be_port(struct snd_soc_pcm_runtime *be,
 			/* MM_EXT connection to McBSP 2 ports */
 			format.f = 48000;
 			format.samp_format = STEREO_RSHIFTED_16;
+#ifdef CONFIG_SND_OMAP_SOC_RY_AIC3110
 			abe_connect_serial_port(MM_EXT_IN_PORT, &format, MCBSP3_RX);
+#else
+			abe_connect_serial_port(MM_EXT_IN_PORT, &format, MCBSP2_RX);
+#endif
 			omap_abe_port_enable(abe_priv->abe,
 				abe_priv->port[OMAP_ABE_BE_PORT_MM_EXT_UL]);
 		}
@@ -959,10 +967,8 @@ static void playback_trigger(struct snd_pcm_substream *substream,
 		break;
 	case SNDRV_PCM_TRIGGER_STOP:
 	case SNDRV_PCM_TRIGGER_SUSPEND:
-
 		/* mute FE port (sensitive to runtime udpates) */
 		mute_fe_port(substream, dai, stream);
-
 		/* does this trigger() apply to the FE ? */
 		if (snd_soc_dsp_is_trigger_for_fe(fe, stream)) {
 			/* disable the transfer */

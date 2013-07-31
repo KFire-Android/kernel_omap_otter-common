@@ -343,6 +343,7 @@ struct snd_pcm_substream *snd_soc_get_dai_substream(struct snd_soc_card *card,
 		const char *dai_link, int stream);
 struct snd_soc_pcm_runtime *snd_soc_get_pcm_runtime(struct snd_soc_card *card,
 		const char *dai_link);
+int snd_soc_card_active_links(struct snd_soc_card *card);
 
 /* Utility functions to get clock rates from various things */
 int snd_soc_calc_frame_size(int sample_size, int channels, int tdm_slots);
@@ -736,12 +737,6 @@ struct snd_soc_dai_link {
 	const char *cpu_dai_name;
 	const char *codec_dai_name;
 
-	/* supported BE */
-	const char **supported_be;
-	int num_be;
-	int fe_playback_channels;
-	int fe_capture_channels;
-
 	struct snd_soc_dsp_link *dsp_link;
 	/* Keep DAI active over suspend */
 	unsigned int ignore_suspend:1;
@@ -768,16 +763,25 @@ struct snd_soc_dai_link {
 	int (*be_hw_params_fixup)(struct snd_soc_pcm_runtime *rtd,
 			struct snd_pcm_hw_params *params);
 
+	/* machine stream operations */
+	struct snd_soc_ops *ops;
+
+#ifdef CONFIG_SND_OMAP_SOC_RY_AIC3110
+	/* supported BE */
+	const char **supported_be;
+	int num_be;
+	int fe_playback_channels;
+	int fe_capture_channels;
+
 	/* Void Pointer struct introduced to maintain
 	* the ABE specific Port Details for OMAP4
 	*/
 	void *private_data;
-	/* machine stream operations */
-	struct snd_soc_ops *ops;
 
 	/* pre and post DAI link activity */
 	int (*pre)(struct snd_pcm_substream *substream);
 	void (*post)(struct snd_pcm_substream *substream);
+#endif
 };
 
 struct snd_soc_codec_conf {
