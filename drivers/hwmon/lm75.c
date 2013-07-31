@@ -27,13 +27,17 @@
 #include <linux/hwmon-sysfs.h>
 #include <linux/err.h>
 #include <linux/mutex.h>
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 #include <linux/irq.h>
 #include <linux/gpio.h>
 #include <linux/interrupt.h>
-//#include <linux/workqueue.h>
+#endif
 #include "lm75.h"
 
+
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 #define OMAP4_LM75_IRQ	60
+#endif
 /*
  * This driver handles the LM75 and compatible digital temperature sensors.
  */
@@ -68,15 +72,19 @@ static const u8 LM75_REG_TEMP[3] = {
 	0x03,		/* max */
 	0x02,		/* hyst */
 };
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 #define LM75_THIGH	 		72000
 #define LM75_TLOW			70000
 #define LM75_TCRITICAL			78000
+#endif
 
 /* Each client has this additional data */
 struct lm75_data {
 	struct device		*hwmon_dev;
 	struct mutex		update_lock;
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 	struct work_struct 		work;
+#endif
 	u8			orig_conf;
 	char			valid;		/* !=0 if registers are valid */
 	unsigned long		last_updated;	/* In jiffies */
@@ -84,7 +92,9 @@ struct lm75_data {
 						   0 = input
 						   1 = max
 						   2 = hyst */
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 	int			irq;
+#endif
 };
 
 static int lm75_read_value(struct i2c_client *client, u8 reg);
@@ -106,13 +116,13 @@ static ssize_t show_temp(struct device *dev, struct device_attribute *da,
 	struct sensor_device_attribute *attr = to_sensor_dev_attr(da);
 	struct lm75_data *data = lm75_update_device(dev);
 
-#if defined(CONFIG_TWL6030_POWEROFF)
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 	/* Driver fail-safe to shut down the system */
 	if (LM75_TEMP_FROM_REG(data->temp[attr->index]) >= LM75_TCRITICAL)
 		twl6030_poweroff();
 #endif
 
-	return sprintf(buf, "%d\nSuccess\n",
+	return sprintf(buf, "%d\n",
 		       LM75_TEMP_FROM_REG(data->temp[attr->index]));
 }
 
@@ -155,6 +165,7 @@ static const struct attribute_group lm75_group = {
 	.attrs = lm75_attributes,
 };
 
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 /*-----------------------------------------------------------------------*/
 
 /* interrupt */
@@ -164,21 +175,16 @@ static void lm75_work(struct work_struct *work)
 		container_of(work, struct lm75_data, work);
 	kobject_uevent(&data->hwmon_dev->kobj, KOBJ_CHANGE);
 	printk("@@@@@@@@@@@@@@@@@@@@@@sending uevent change\n");
-//	mutex_lock(&priv->mutex);
 }
 
 static irqreturn_t lm75_isr(int irq, void *dev_id)
 {
-//	struct ilitek_ts_priv *priv = dev_id;
 	struct lm75_data *data = (struct lm75_data *)dev_id;
-//    	printk("lm75 irq\n");
 	 /* postpone I2C transactions as we are atomic */
 	schedule_work(&data->work);
-//	kobject_uevent(&data->hwmon_dev->kobj, KOBJ_CHANGE);
 	return IRQ_HANDLED;
 }
-
-
+#endif
 
 /*-----------------------------------------------------------------------*/
 
@@ -191,7 +197,9 @@ lm75_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	int status;
 	u8 set_mask, clr_mask;
 	int new;
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 	int error;
+#endif
 
 	if (!i2c_check_functionality(client->adapter,
 			I2C_FUNC_SMBUS_BYTE_DATA | I2C_FUNC_SMBUS_WORD_DATA))
@@ -204,6 +212,7 @@ lm75_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	i2c_set_clientdata(client, data);
 	mutex_init(&data->update_lock);
 
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 	/*leon add for interrupt */
 	INIT_WORK(&data->work, lm75_work);
 	error=gpio_request(OMAP4_LM75_IRQ, "Lm75 IRQ");	
@@ -220,15 +229,19 @@ lm75_probe(struct i2c_client *client, const struct i2c_device_id *id)
     if (error) {
         printk("lm75 request_irq error\n");
     }
+#endif
 	/* Set to LM75 resolution (9 bits, 1/2 degree C) and range.
 	 * Then tweak to be more precise when appropriate.
 	 */
 	set_mask = 0;
+#ifdef CONFIG_MACH_OMAP_4430_KC1
+	clr_mask = (1 << 0)			/* continuous conversions */
+		| (1 << 6) | (1 << 5)		/* 9-bit mode */
+		| (1 << 2) | (1 << 1);
+#else
 	clr_mask = (1 << 0)			/* continuous conversions */
 		| (1 << 6) | (1 << 5);		/* 9-bit mode */
-	// FIXME-HASH: KFire Code
-    /* 9-bit mode */
-    clr_mask = (1 << 0) | (1 << 6) | (1 << 5) | (1 << 2) | (1 << 1);
+#endif
 
 	/* configure as specified */
 	status = lm75_read_value(client, LM75_REG_CONF);
@@ -243,7 +256,7 @@ lm75_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		lm75_write_value(client, LM75_REG_CONF, new);
 	dev_dbg(&client->dev, "Config %02x\n", new);
 
-	// FIXME-HASH REMOVED FOR TESTING
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 	/*Set init value of TEMP_high & TEMP_low */
 	mutex_lock(&data->update_lock);
 	data->temp[1] = LM75_TEMP_TO_REG(LM75_THIGH);
@@ -251,6 +264,7 @@ lm75_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	data->temp[2] = LM75_TEMP_TO_REG(LM75_TLOW);
 	lm75_write_value(client, LM75_REG_TEMP[2], data->temp[2]);
 	mutex_unlock(&data->update_lock);
+#endif
 	/* Register sysfs hooks */
 	status = sysfs_create_group(&client->dev.kobj, &lm75_group);
 	if (status)
@@ -280,7 +294,9 @@ static int lm75_remove(struct i2c_client *client)
 
 	hwmon_device_unregister(data->hwmon_dev);
 	sysfs_remove_group(&client->dev.kobj, &lm75_group);
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 	free_irq(data->irq, data);
+#endif
 	lm75_write_value(client, LM75_REG_CONF, data->orig_conf);
 	kfree(data);
 	return 0;
