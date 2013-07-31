@@ -140,6 +140,34 @@ static inline void dwc3_omap_writel(void __iomem *base, u32 offset, u32 value)
 	writel(value, base + offset);
 }
 
+int dwc3_omap_vbus_connect(struct device *dev)
+{
+	u32			val;
+	struct dwc3_omap	*omap;
+	struct platform_device	*pdev;
+
+	if (!dev)
+		return -ENODEV;
+
+	dev_dbg(omap->dev, "VBUS Connect\n");
+
+	pdev = to_platform_device(dev);
+	omap =  platform_get_drvdata(pdev);
+	if (!omap)
+		return -ENODEV;
+
+	val = dwc3_omap_readl(omap->base, USBOTGSS_UTMI_OTG_STATUS);
+	val &= ~USBOTGSS_UTMI_OTG_STATUS_SESSEND;
+	val |= USBOTGSS_UTMI_OTG_STATUS_IDDIG
+			| USBOTGSS_UTMI_OTG_STATUS_VBUSVALID
+			| USBOTGSS_UTMI_OTG_STATUS_SESSVALID
+			| USBOTGSS_UTMI_OTG_STATUS_POWERPRESENT;
+	dwc3_omap_writel(omap->base, USBOTGSS_UTMI_OTG_STATUS, val);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(dwc3_omap_vbus_connect);
+
 int dwc3_omap_mailbox(enum omap_dwc3_vbus_id_status status)
 {
 	u32			val;
@@ -163,15 +191,7 @@ int dwc3_omap_mailbox(enum omap_dwc3_vbus_id_status status)
 		break;
 
 	case OMAP_DWC3_VBUS_VALID:
-		dev_dbg(omap->dev, "VBUS Connect\n");
-
-		val = dwc3_omap_readl(omap->base, USBOTGSS_UTMI_OTG_STATUS);
-		val &= ~USBOTGSS_UTMI_OTG_STATUS_SESSEND;
-		val |= USBOTGSS_UTMI_OTG_STATUS_IDDIG
-				| USBOTGSS_UTMI_OTG_STATUS_VBUSVALID
-				| USBOTGSS_UTMI_OTG_STATUS_SESSVALID
-				| USBOTGSS_UTMI_OTG_STATUS_POWERPRESENT;
-		dwc3_omap_writel(omap->base, USBOTGSS_UTMI_OTG_STATUS, val);
+		dwc3_omap_vbus_connect(omap->dev);
 		break;
 
 	case OMAP_DWC3_ID_FLOAT:
