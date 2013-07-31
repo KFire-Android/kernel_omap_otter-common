@@ -21,13 +21,18 @@ struct omap_led_platform_data {
 	struct omap_led_config	*leds;
 };
 
+#ifdef CONFIG_LEDS_OMAP4430_SDP_KEYPAD
 extern void omap4430_green_led_set(struct led_classdev *led_cdev,
-        enum led_brightness value);
-extern void omap4430_orange_led_set(struct led_classdev *led_cdev,
         enum led_brightness value);
 extern int omap4430_green_led_set_blink(struct led_classdev *led_cdev, 
         unsigned long *delay_on, unsigned long *delay_off);
+#endif
+
+#ifdef CONFIG_LEDS_OMAP4430_SDP_DISPLAY
+extern void omap4430_orange_led_set(struct led_classdev *led_cdev,
+        enum led_brightness value);
 extern int omap4430_orange_led_set_blink(struct led_classdev *led_cdev, 
         unsigned long *delay_on, unsigned long *delay_off);
+#endif
 
 #endif
