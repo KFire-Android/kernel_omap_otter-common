@@ -78,7 +78,11 @@ static int mmc_schedule_delayed_work(struct delayed_work *work,
 /*
  * Internal function. Flush all scheduled work from the MMC work queue.
  */
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 void mmc_flush_scheduled_work(void)
+#else
+static void mmc_flush_scheduled_work(void)
+#endif
 {
 	flush_workqueue(workqueue);
 }

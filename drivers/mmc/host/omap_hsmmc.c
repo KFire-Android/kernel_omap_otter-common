@@ -252,7 +252,9 @@ struct omap_hsmmc_host {
 	unsigned int		errata;
 
 	struct	omap_mmc_platform_data	*pdata;
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 	int			shutdown;
+#endif
 };
 
 static void omap_hsmmc_status_notify_cb(int card_present, void *dev_id)
@@ -1733,10 +1735,10 @@ static void omap_hsmmc_request(struct mmc_host *mmc, struct mmc_request *req)
 
 	BUG_ON(host->req_in_progress);
 	BUG_ON(host->dma_ch != -1);
-
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 	if (host->shutdown)
 		return;
-
+#endif
 	if (host->protect_card) {
 		if (host->reqs_blocked < 3) {
 			/*
@@ -2427,7 +2429,9 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
 	}
 	host->power_mode = MMC_POWER_OFF;
 	host->flags	= AUTO_CMD12;
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 	host->shutdown = 0;
+#endif
 
 	host->errata = 0;
 	if (cpu_is_omap44xx())
@@ -2852,6 +2856,7 @@ static int omap_hsmmc_runtime_resume(struct device *dev)
 	return 0;
 }
 
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 static void omap_hsmmc_shutdown(struct platform_device *pdev)
 {
 	struct omap_hsmmc_host *host;
@@ -2875,6 +2880,7 @@ static void omap_hsmmc_shutdown(struct platform_device *pdev)
 	   Leave it on the safe side */
 	msleep(1600);
 }
+#endif
 
 static struct dev_pm_ops omap_hsmmc_dev_pm_ops = {
 	.suspend	= omap_hsmmc_suspend,
@@ -2885,7 +2891,9 @@ static struct dev_pm_ops omap_hsmmc_dev_pm_ops = {
 
 static struct platform_driver omap_hsmmc_driver = {
 	.remove		= omap_hsmmc_remove,
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 	.shutdown	= omap_hsmmc_shutdown,
+#endif
 	.driver		= {
 		.name = DRIVER_NAME,
 		.owner = THIS_MODULE,

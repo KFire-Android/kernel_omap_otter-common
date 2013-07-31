@@ -17,7 +17,6 @@
 #include <linux/mmc/card.h>
 #include <linux/mmc/mmc.h>
 
-//qvx_emmc
 #ifdef CONFIG_OTTER
 #include <linux/scatterlist.h>
 #include <asm/io.h>
@@ -30,7 +29,6 @@
 #include "sd_ops.h"
 
 #ifdef CONFIG_OTTER
-#define EMMC		1
 static int RW_OFFSET;
 static int RW_SHIFT;
 #endif
@@ -68,7 +66,7 @@ static const unsigned int tacc_mant[] = {
 		__res & __mask;						\
 	})
 
-#if EMMC //qvx_emmc
+#ifdef CONFIG_OTTER
 static DEFINE_MUTEX(mmc_test_lock);
 
 static int mmc_parse_ext_csd(struct mmc_card *card, u8 *ext_csd)
@@ -156,7 +154,6 @@ static int mmc_parse_ext_csd(struct mmc_card *card, u8 *ext_csd)
 
 static bool mmc_create_gpp(struct mmc_card *card, int gpp1, int gpp2, int gpp3, int gpp4)
 {
-//	int size;
 	int err, base;
 	static u8 *ext_csd_data;
 
@@ -172,19 +169,10 @@ static bool mmc_create_gpp(struct mmc_card *card, int gpp1, int gpp2, int gpp3, 
 	int gp4_size_multi_0 = 0;
 	int gp4_size_multi_1 = 0;
 	int gp4_size_multi_2 = 0;
-//	int enh_size_multi_0 = 1;
-//	int enh_size_multi_1 = 0;
-//	int enh_size_multi_2 = 0;
-//	int enh_start_addr_0 = 0;
-//	int enh_start_addr_1 = 0;
-//	int enh_start_addr_2 = 0;
-//	int enh_start_addr_3 = 0;
 	int enh_attribute = 0x0e;
-//	int addr_offset = 0;
 
 	int enable_erase_greop_def = 1; /* 175 */
 	int gpp_completed = 1; /* 155 */
-//	int densidy = 0;
 
 	ext_csd_data = kmalloc(512, GFP_KERNEL);
 	if (!ext_csd_data) {
@@ -271,7 +259,7 @@ static bool mmc_create_gpp(struct mmc_card *card, int gpp1, int gpp2, int gpp3, 
 	gp4_size_multi_1 = ((gpp4/base)%(256*256))/256;
 	gp4_size_multi_0 = (gpp4/base)%256;
 	printk ("gp4_size_multi_2 = %d, gp4_size_multi_1 = %d, gp4_size_multi_0 = %d\n", gp4_size_multi_2, gp4_size_multi_1, gp4_size_multi_0);
-#if 1
+
 	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
 			EXT_CSD_GP_SIZE_MULT, gp1_size_multi_0, 0);
 	if (err)
@@ -377,7 +365,7 @@ static bool mmc_create_gpp(struct mmc_card *card, int gpp1, int gpp2, int gpp3, 
 		kfree(ext_csd_data);
 		return false;
 	}
-#endif
+
 	kfree(ext_csd_data);
 	return true;
 }
@@ -433,7 +421,6 @@ static bool mmc_write_gpp(struct mmc_card *card, int partition, int offset, cons
 			return false;
 	}
 
-#if 1
 	ext_csd_data = kmalloc(512, GFP_KERNEL);
 	if (!ext_csd_data) {
 		printk(KERN_ERR "%s: could not allocate a buffer to "
@@ -502,7 +489,7 @@ static bool mmc_write_gpp(struct mmc_card *card, int partition, int offset, cons
 		else
 			offset = RW_OFFSET;
 	}
-#endif
+
 	//printk ("Set PARTITION_ACCESS in PARTITION_CONFIG to partition %d\n", partition);
 	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
 			EXT_CSD_PART_CONFIG, gpp_action, 0);
@@ -619,7 +606,7 @@ static bool mmc_read_gpp(struct mmc_card *card, int partition, int offset, char*
 	memset(&cmd, 0, sizeof(struct mmc_command));
 	memset(&data, 0, sizeof(struct mmc_data));
 	memset(test_data_read, 0, sizeof(test_data_read));
-#if 1
+
 	ext_csd_data = kmalloc(512, GFP_KERNEL);
 	if (!ext_csd_data) {
 		printk(KERN_ERR "%s: could not allocate a buffer to "
@@ -685,7 +672,7 @@ static bool mmc_read_gpp(struct mmc_card *card, int partition, int offset, char*
 		else
 			offset = RW_OFFSET;
 	}
-#endif
+
 	//printk ("Set PARTITION_ACCESS in PARTITION_CONFIG to partition %d\n", partition);
 	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
 			EXT_CSD_PART_CONFIG, gpp_action, 0);
@@ -725,15 +712,6 @@ static bool mmc_read_gpp(struct mmc_card *card, int partition, int offset, char*
 		return false;
 	}
 
-#if 0
-	printk("00 ");
-	for (i = 0; i < 512; i++)
-	{
-		printk("%02x ", test_data_read[i]);
-		if ((i%16) == 15)
-			printk("\n%02d ", (i/16) + 1);
-	}
-#endif
 	memcpy(read_data, test_data_read, 512);
 	//printk ("Set PARTITION_ACCESS in PARTITION_CONFIG to default\n");
 	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
@@ -783,27 +761,8 @@ static ssize_t set_emmc_data(struct device *dev, struct device_attribute *attr,
 	}
 	//printk ("READ EXT_CSD first\n");
 	err = mmc_send_ext_csd(card, ext_csd_data);
-#if 0 //with GPP1
-	gpp1_size = ext_csd_data[EXT_CSD_GP_SIZE_MULT+2]*65536 + ext_csd_data[EXT_CSD_GP_SIZE_MULT+1]*256 + ext_csd_data[EXT_CSD_GP_SIZE_MULT]
-			* ext_csd_data[EXT_CSD_HC_WP_GRP_SIZE] * ext_csd_data[EXT_CSD_HC_ERASE_GRP_SIZE] * 512 * 1024;
-	printk ("gpp1_size = %d\n", gpp1_size);
-
-	offset = (gpp1_size-512*1024)/(256*1024);
-
-	if (offset < 0)
-	{
-		mmc_write_gpp(card, 5, 0, buf);
-	}
-	else
-	{
-		mmc_write_gpp(card, 1, offset, buf);
-	}
-#else //only use boot partition 2
 
 	mmc_write_gpp(card, 5, 0, buf);
-#endif
-
-	//mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,EXT_CSD_PART_CONF, 0); //qvx_emmc
 
 	kfree(ext_csd_data);
 	mmc_release_host(card->host);
@@ -844,34 +803,8 @@ static ssize_t get_emmc_data(struct device *dev, struct device_attribute *devatt
 	//mmc_parse_ext_csd(card, ext_csd_data); //qvx_emmc
 
 	read_data = kmalloc(512, GFP_KERNEL);
-#if 0 //with GPP1
-	gpp1_size = ext_csd_data[EXT_CSD_GP_SIZE_MULT+2]*65536 + ext_csd_data[EXT_CSD_GP_SIZE_MULT+1]*256 + ext_csd_data[EXT_CSD_GP_SIZE_MULT]
-			* ext_csd_data[EXT_CSD_HC_WP_GRP_SIZE] * ext_csd_data[EXT_CSD_HC_ERASE_GRP_SIZE] * 512 * 1024;
-	printk ("gpp1_size = %d\n", gpp1_size);
-
-	offset = (gpp1_size-512*1024)/(256*1024);
-
-	if (offset < 0)
-	{
-		err = mmc_read_gpp(card, 5, 0, read_data);
-	}
-	else
-	{
-		err = mmc_read_gpp(card, 1, offset, read_data);
-	}
-	//offset++;
-#else
 
 	err = mmc_read_gpp(card, 5, 0, read_data);
-#endif
-#if 0
-	buf = kmalloc(512, GFP_KERNEL);
-
-	for (i = 0; i < 512; i++)
-	{
-		buf[i] = 0x00;
-	}
-#endif
 	if (err == true)
 	{
 		memcpy(buf, read_data, 512);
@@ -881,16 +814,6 @@ static ssize_t get_emmc_data(struct device *dev, struct device_attribute *devatt
         {
 		printk("Fail to read data\n");
 	}
-
-#if 0
-	printk("00 ");
-	for (i = 0; i < 512; i++){
-		printk("%02x ", buf[i]);
-		if ((i%16) == 15)
-			printk("\n%02d ", (i/16) + 1);
-	}
-	printk("\n");
-#endif
 
 	kfree(ext_csd_data);
 	mmc_release_host(card->host);
@@ -941,11 +864,11 @@ static ssize_t get_offset(struct device *dev, struct device_attribute *devattr,
 	printk("Offset 0x%x\n",RW_OFFSET);
 	return sizeof(RW_OFFSET);
 }
-#endif //EMMC
+#endif //CONFIG_OTTER
 
 /*
-* Given the decoded CSD structure, decode the raw CID to our CID structure.
-*/
+ * Given the decoded CSD structure, decode the raw CID to our CID structure.
+ */
 static int mmc_decode_cid(struct mmc_card *card)
 {
 	u32 *resp = card->raw_cid;
@@ -1247,7 +1170,7 @@ static int mmc_read_ext_csd(struct mmc_card *card, u8 *ext_csd)
 		 * card has the Enhanced area enabled.  If so, export enhanced
 		 * area offset and size to user by adding sysfs interface.
 		 */
-#ifdef CONFIG_OTTER
+#ifndef CONFIG_OTTER2
 		card->ext_csd.raw_partition_support = ext_csd[EXT_CSD_PARTITION_SUPPORT];
 #endif
 		if ((ext_csd[EXT_CSD_PARTITION_SUPPORT] & 0x2) &&
@@ -1295,7 +1218,8 @@ static int mmc_read_ext_csd(struct mmc_card *card, u8 *ext_csd)
 
 	if (card->ext_csd.rev >= 5)
 		card->ext_csd.rel_param = ext_csd[EXT_CSD_WR_REL_PARAM];
-#ifdef CONFIG_OTTER
+
+#ifndef CONFIG_OTTER2
 	card->ext_csd.raw_erased_mem_count = ext_csd[EXT_CSD_ERASED_MEM_CONT];
 #endif
 	if (ext_csd[EXT_CSD_ERASED_MEM_CONT])
@@ -1375,7 +1299,6 @@ out:
 	return err;
 }
 
-
 #ifdef CONFIG_OTTER
 static bool mmc_write_bp1(struct mmc_card *card, int partition, int offset, const char* data)
 {
@@ -1428,7 +1351,6 @@ static bool mmc_write_bp1(struct mmc_card *card, int partition, int offset, cons
 			return false;
 	}
 
-#if 1
 	ext_csd_data = kmalloc(512, GFP_KERNEL);
 	if (!ext_csd_data) {
 		printk(KERN_ERR "%s: could not allocate a buffer to "
@@ -1497,7 +1419,7 @@ static bool mmc_write_bp1(struct mmc_card *card, int partition, int offset, cons
 		else
 			offset = RW_SHIFT;
 	}
-#endif
+
 	//printk ("Set PARTITION_ACCESS in PARTITION_CONFIG to partition %d\n", partition);
 	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
 			EXT_CSD_PART_CONFIG, gpp_action, 0);
@@ -1615,7 +1537,7 @@ static bool mmc_read_bp1(struct mmc_card *card, int partition, int offset, char*
 	memset(&cmd, 0, sizeof(struct mmc_command));
 	memset(&data, 0, sizeof(struct mmc_data));
 	memset(test_data_read, 0, sizeof(test_data_read));
-#if 1
+
 	ext_csd_data = kmalloc(512, GFP_KERNEL);
 	if (!ext_csd_data) {
 		printk(KERN_ERR "%s: could not allocate a buffer to "
@@ -1681,7 +1603,7 @@ static bool mmc_read_bp1(struct mmc_card *card, int partition, int offset, char*
 		else
 			offset = RW_SHIFT;
 	}
-#endif
+
 	//printk ("Set PARTITION_ACCESS in PARTITION_CONFIG to partition %d\n", partition);
 	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
 			EXT_CSD_PART_CONFIG, gpp_action, 0);
@@ -1721,15 +1643,6 @@ static bool mmc_read_bp1(struct mmc_card *card, int partition, int offset, char*
 		return false;
 	}
 
-#if 0
-	printk("00 ");
-	for (i = 0; i < 512; i++)
-	{
-		printk("%02x ", test_data_read[i]);
-		if ((i%16) == 15)
-			printk("\n%02d ", (i/16) + 1);
-	}
-#endif
 	memcpy(read_data, test_data_read, 512);
 	//printk ("Set PARTITION_ACCESS in PARTITION_CONFIG to default\n");
 	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
@@ -1788,34 +1701,8 @@ static ssize_t get_bp1_data(struct device *dev, struct device_attribute *devattr
 	//mmc_parse_ext_csd(card, ext_csd_data); //qvx_emmc
 
 	read_data = kmalloc(512, GFP_KERNEL);
-#if 0 //with GPP1
-	gpp1_size = ext_csd_data[EXT_CSD_GP_SIZE_MULT+2]*65536 + ext_csd_data[EXT_CSD_GP_SIZE_MULT+1]*256 + ext_csd_data[EXT_CSD_GP_SIZE_MULT]
-			* ext_csd_data[EXT_CSD_HC_WP_GRP_SIZE] * ext_csd_data[EXT_CSD_HC_ERASE_GRP_SIZE] * 512 * 1024;
-	printk ("gpp1_size = %d\n", gpp1_size);
-
-	offset = (gpp1_size-512*1024)/(256*1024);
-
-	if (offset < 0)
-	{
-		err = mmc_read_gpp(card, 5, 0, read_data);
-	}
-	else
-	{
-		err = mmc_read_gpp(card, 1, offset, read_data);
-	}
-	//offset++;
-#else
 
 	err = mmc_read_bp1(card, 6, 0, read_data);
-#endif
-#if 0
-	buf = kmalloc(512, GFP_KERNEL);
-
-	for (i = 0; i < 512; i++)
-	{
-		buf[i] = 0x00;
-	}
-#endif
 	if (err == true)
 	{
 		memcpy(buf, read_data, 512);
@@ -1825,16 +1712,6 @@ static ssize_t get_bp1_data(struct device *dev, struct device_attribute *devattr
         {
 		printk("Fail to read data\n");
 	}
-
-#if 0
-	printk("00 ");
-	for (i = 0; i < 512; i++){
-		printk("%02x ", buf[i]);
-		if ((i%16) == 15)
-			printk("\n%02d ", (i/16) + 1);
-	}
-	printk("\n");
-#endif
 
 	kfree(ext_csd_data);
 	mmc_release_host(card->host);
@@ -1868,27 +1745,8 @@ static ssize_t set_bp1_data(struct device *dev, struct device_attribute *attr,
 	}
 	//printk ("READ EXT_CSD first\n");
 	err = mmc_send_ext_csd(card, ext_csd_data);
-#if 0 //with GPP1
-	gpp1_size = ext_csd_data[EXT_CSD_GP_SIZE_MULT+2]*65536 + ext_csd_data[EXT_CSD_GP_SIZE_MULT+1]*256 + ext_csd_data[EXT_CSD_GP_SIZE_MULT]
-			* ext_csd_data[EXT_CSD_HC_WP_GRP_SIZE] * ext_csd_data[EXT_CSD_HC_ERASE_GRP_SIZE] * 512 * 1024;
-	printk ("gpp1_size = %d\n", gpp1_size);
-
-	offset = (gpp1_size-512*1024)/(256*1024);
-
-	if (offset < 0)
-	{
-		mmc_write_gpp(card, 5, 0, buf);
-	}
-	else
-	{
-		mmc_write_gpp(card, 1, offset, buf);
-	}
-#else //only use boot partition 2
 
 	mmc_write_bp1(card, 6, 0, buf);
-#endif
-
-	//mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,EXT_CSD_PART_CONF, 0); //qvx_emmc
 
 	kfree(ext_csd_data);
 	mmc_release_host(card->host);
@@ -1912,7 +1770,7 @@ static ssize_t set_shift(struct device *dev, struct device_attribute *attr,
 	//printk("<ker> set shift 0x%x, %d \n",RW_SHIFT,RW_SHIFT);
 	return sizeof(RW_SHIFT);
 }
-#endif
+#endif // CONFIG_OTTER
 
 MMC_DEV_ATTR(cid, "%08x%08x%08x%08x\n", card->raw_cid[0], card->raw_cid[1],
 	card->raw_cid[2], card->raw_cid[3]);
@@ -1930,17 +1788,15 @@ MMC_DEV_ATTR(serial, "0x%08x\n", card->cid.serial);
 MMC_DEV_ATTR(enhanced_area_offset, "%llu\n",
 		card->ext_csd.enhanced_area_offset);
 MMC_DEV_ATTR(enhanced_area_size, "%u\n", card->ext_csd.enhanced_area_size);
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 MMC_DEV_ATTR(density, "0x%08x\n",card->ext_csd.sectors);
 
-#if EMMC 
-//static DEVICE_ATTR(extcsd, S_IRUGO | S_IWUSR, get_emmc_extcsd, NULL);
-//boot partiton 2 
+#ifdef CONFIG_OTTER
 static DEVICE_ATTR(offset, 0666, get_offset, set_offset);
 static DEVICE_ATTR(bp2, 0666, get_emmc_data, set_emmc_data);
-// boot partition 1 control
 static DEVICE_ATTR(bp1, 0666, get_bp1_data, set_bp1_data);
 static DEVICE_ATTR(shift, 0666, get_shift, set_shift);
-// boot partition 1 control
+#endif
 #endif
 
 static struct attribute *mmc_std_attrs[] = {
@@ -1957,12 +1813,14 @@ static struct attribute *mmc_std_attrs[] = {
 	&dev_attr_serial.attr,
 	&dev_attr_enhanced_area_offset.attr,
 	&dev_attr_enhanced_area_size.attr,
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 	&dev_attr_density.attr,
-#if EMMC 
+#ifdef CONFIG_OTTER
 	&dev_attr_bp2.attr,
 	&dev_attr_offset.attr,
 	&dev_attr_bp1.attr,
 	&dev_attr_shift.attr,
+#endif
 #endif
 	NULL,
 };
@@ -2403,6 +2261,7 @@ static int mmc_sleep(struct mmc_host *host)
 	struct mmc_card *card = host->card;
 	int err = -ENOSYS;
 
+#ifdef CONFIG_MACH_OMAP_4430_KC1
         //If Manufacturer ID is Samsung (0x15), bypass Sleep command transmission as Samsung EMMC goes automatically in sleep mode (HW feature)	
 	if(card->cid.manfid == 0x15)
 		return 0;
@@ -2410,6 +2269,7 @@ static int mmc_sleep(struct mmc_host *host)
 	/* Workaround for Hynix (0x90) */
 	if (card->cid.manfid == 0x90)
 		return 0;
+#endif
 
 	if (card && card->ext_csd.rev >= 3) {
 		err = mmc_card_sleepawake(host, 1);
@@ -2426,6 +2286,7 @@ static int mmc_awake(struct mmc_host *host)
 	struct mmc_card *card = host->card;
 	int err = -ENOSYS;
 
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 	//If Manufacturer ID is Samsung (0x15), bypass Sleep command transmission as Samsung EMMC goes automatically in awake mode(HW feature)	
 	if(card->cid.manfid == 0x15)
 		return 0;
@@ -2433,6 +2294,7 @@ static int mmc_awake(struct mmc_host *host)
 	/* Workaround for Hynix (0x90) */
 	if (card->cid.manfid == 0x90)
 		return 0;
+#endif
 
 	if (card && card->ext_csd.rev >= 3) {
 		err = mmc_card_sleepawake(host, 0);
