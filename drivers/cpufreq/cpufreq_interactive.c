@@ -105,12 +105,20 @@ static enum tune_values {
 static u64 hispeed_freq;
 
 /* Go to hi speed when CPU load at or above this value. */
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 #define DEFAULT_GO_HISPEED_LOAD 85
+#else
+#define DEFAULT_GO_HISPEED_LOAD 95
+#endif
 static unsigned long go_hispeed_load;
 /*
  * The minimum amount of time to spend at a frequency before we can ramp down.
  */
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 #define DEFAULT_MIN_SAMPLE_TIME (80 * USEC_PER_MSEC)
+#else
+#define DEFAULT_MIN_SAMPLE_TIME (20 * USEC_PER_MSEC)
+#endif
 static unsigned long min_sample_time;
 
 /*
@@ -655,7 +663,6 @@ static void cpufreq_interactive_freq_down(struct work_struct *work)
 		mutex_unlock(&set_speed_lock);
 		trace_cpufreq_interactive_down(cpu, pcpu->target_freq,
 					       pcpu->policy->cur);
-
 	}
 }
 
