@@ -103,7 +103,10 @@ struct twl6030_usb {
 
 	/* used to set vbus, in atomic path */
 	struct work_struct	set_vbus_work;
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 	struct delayed_work	enable_irq_work;
+#endif
+
 	int			irq1;
 	int			irq2;
 	unsigned int		usb_cinlimit_mA;
@@ -145,7 +148,8 @@ static inline u8 twl6030_readb(struct twl6030_usb *twl, u8 module, u8 address)
 					module, address, ret);
 	return ret;
 }
-#if 0
+
+#ifndef CONFIG_MACH_OMAP_4430_KC1
 /*-------------------------------------------------------------------------*/
 static int twl6030_set_phy_clk(struct otg_transceiver *x, int on)
 {
@@ -162,6 +166,7 @@ static int twl6030_set_phy_clk(struct otg_transceiver *x, int on)
 	return 0;
 }
 #endif
+
 static int twl6030_phy_init(struct otg_transceiver *x)
 {
 	struct twl6030_usb *twl;
@@ -172,7 +177,11 @@ static int twl6030_phy_init(struct otg_transceiver *x)
 	dev  = twl->dev;
 	pdata = dev->platform_data;
 
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 	if (twl->otg.last_event == USB_EVENT_ID)
+#else
+	if (twl->linkstat == USB_EVENT_ID)
+#endif
 		pdata->phy_power(twl->dev, 1, 1);
 	else
 		pdata->phy_power(twl->dev, 0, 1);
@@ -264,7 +273,11 @@ static ssize_t twl6030_usb_vbus_show(struct device *dev,
 
 	spin_lock_irqsave(&twl->lock, flags);
 
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 	switch (twl->otg.last_event) {
+#else
+	switch (twl->linkstat) {
+#endif
 	case USB_EVENT_VBUS:
 		ret = snprintf(buf, PAGE_SIZE, "vbus\n");
 		break;
@@ -301,18 +314,25 @@ static irqreturn_t twl6030_usb_irq(int irq, void *_twl)
 		return IRQ_HANDLED;
 
 	if ((vbus_state) && !(hw_state & STS_USB_ID)) {
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 		//detect by charger
 		__raw_writel(0x40000000,OMAP2_L4_IO_ADDRESS(0x4a100000 + (0x620)));
-
+#endif
 		/* Program MISC2 register and set bit VUSB_IN_VBAT */
 		misc2_data = twl6030_readb(twl, TWL6030_MODULE_ID0,
-				TWL6030_MISC2);
+						TWL6030_MISC2);
 		misc2_data |= 0x10;
 		twl6030_writeb(twl, TWL6030_MODULE_ID0, misc2_data,
-				TWL6030_MISC2);
+						TWL6030_MISC2);
 
 		regulator_enable(twl->usb3v3);
-		# if 0 //detect by omap
+#ifdef CONFIG_MACH_OMAP_4430_KC1
+		// charger detect
+		status = USB_EVENT_DETECT_SOURCE;
+		twl->otg.default_a = false;
+		twl->asleep = 1;
+		twl->otg.state = OTG_STATE_B_IDLE;
+#else
 		twl6030_phy_suspend(&twl->otg, 0);
 		charger_type = omap4_charger_detect();
 		twl6030_phy_suspend(&twl->otg, 1);
@@ -336,18 +356,13 @@ static irqreturn_t twl6030_usb_irq(int irq, void *_twl)
 			regulator_disable(twl->usb3v3);
 			goto vbus_notify;
 		}
-		#endif
-		status = USB_EVENT_DETECT_SOURCE;
-		twl->otg.default_a = false;
-		twl->asleep = 1;
-		twl->otg.state = OTG_STATE_B_IDLE;
-
+#endif
 		atomic_notifier_call_chain(&twl->otg.notifier,
 				status, &charger_type);
 	}
 	if (!vbus_state) {
 		status = USB_EVENT_NONE;
-#if 0
+#ifndef CONFIG_MACH_OMAP_4430_KC1
 		twl->linkstat = status;
 		twl->otg.last_event = status;
 #endif
@@ -364,7 +379,8 @@ static irqreturn_t twl6030_usb_irq(int irq, void *_twl)
 							TWL6030_MISC2);
 		}
 	}
-#if 0
+
+#ifndef CONFIG_MACH_OMAP_4430_KC1
 vbus_notify:
 #endif
 	sysfs_notify(&twl->dev->kobj, NULL, "vbus");
@@ -402,8 +418,10 @@ static irqreturn_t twl6030_usbotg_irq(int irq, void *_twl)
 			status = USB_EVENT_ID;
 			twl->otg.default_a = true;
 			twl->otg.state = OTG_STATE_A_IDLE;
-//			twl->linkstat = status;
-//			twl->otg.last_event = status;
+#ifndef CONFIG_MACH_OMAP_4430_KC1
+			twl->linkstat = status;
+			twl->otg.last_event = status;
+#endif
 			atomic_notifier_call_chain(&twl->otg.notifier, status,
 							twl->otg.gadget);
 			/*
@@ -483,12 +501,14 @@ unsigned int twl6030_get_usb_max_power(struct otg_transceiver *x)
 	return twl->usb_cinlimit_mA;
 }
 
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 static void otg_enable_irq_work(struct work_struct *data)
 {
 	struct twl6030_usb *twl = container_of(data, struct twl6030_usb,
 								enable_irq_work.work);
 	twl6030_enable_irq(&twl->otg);
 }
+#endif
 static void otg_set_vbus_work(struct work_struct *data)
 {
 	struct twl6030_usb *twl = container_of(data, struct twl6030_usb,
@@ -611,7 +631,9 @@ static int __devinit twl6030_usb_probe(struct platform_device *pdev)
 	ATOMIC_INIT_NOTIFIER_HEAD(&twl->otg.notifier);
 
 	INIT_WORK(&twl->set_vbus_work, otg_set_vbus_work);
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 	INIT_DELAYED_WORK_DEFERRABLE(&twl->enable_irq_work,otg_enable_irq_work);
+#endif
 
 	twl->vbus_enable = false;
 	twl->irq_enabled = true;
@@ -642,8 +664,11 @@ static int __devinit twl6030_usb_probe(struct platform_device *pdev)
 	twl->is_phy_suspended = true;
 	pdata->phy_init(dev);
 	twl6030_phy_suspend(&twl->otg, 0);
-//	twl6030_enable_irq(&twl->otg);
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 	schedule_delayed_work(&twl->enable_irq_work,msecs_to_jiffies(10000));
+#else
+	twl6030_enable_irq(&twl->otg);
+#endif
 	dev_info(&pdev->dev, "Initialized TWL6030 USB module\n");
 
 	return 0;
@@ -667,7 +692,9 @@ static int __exit twl6030_usb_remove(struct platform_device *pdev)
 	pdata->phy_exit(twl->dev);
 	device_remove_file(twl->dev, &dev_attr_vbus);
 	cancel_work_sync(&twl->set_vbus_work);
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 	cancel_delayed_work(&twl->enable_irq_work);
+#endif
 	kfree(twl);
 
 	return 0;

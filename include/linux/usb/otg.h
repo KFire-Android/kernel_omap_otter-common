@@ -38,10 +38,14 @@ enum usb_otg_state {
 enum usb_xceiv_events {
 	USB_EVENT_NONE,         /* no events or cable disconnected */
 	USB_EVENT_VBUS,         /* vbus valid event */
-        USB_EVENT_ID,           /* id was grounded */
-        USB_EVENT_DETECT_SOURCE,       /* UNKNOW Power souce */
+	USB_EVENT_ID,           /* id was grounded */
+#ifdef CONFIG_SUMMIT_SMB347_Q
+	USB_EVENT_DETECT_SOURCE,       /* UNKNOW Power souce */
+#endif
 	USB_EVENT_CHARGER,      /* usb dedicated charger */
+#ifdef CONFIG_SUMMIT_SMB347_Q
 	USB_EVENT_HOST_CHARGER,      /* usb charging downstream charger */
+#endif
 	USB_EVENT_ENUMERATED,   /* gadget driver enumerated */
 };
 

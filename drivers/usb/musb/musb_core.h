@@ -541,7 +541,11 @@ struct musb {
 	 * We added this flag to forcefully disable double
 	 * buffering until we get it working.
 	 */
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 	unsigned                double_buffer_not_ok:1; // __deprecated;
+#else
+	unsigned                double_buffer_not_ok:1 __deprecated;
+#endif
 
 	struct musb_hdrc_config	*config;
 

@@ -330,12 +330,14 @@ static void txstate(struct musb *musb, struct musb_request *req)
 
 	musb_ep = req->ep;
 
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 	/* Check if EP is disabled */
 	if (!musb_ep->desc) {
 		dev_dbg(musb->controller, "ep:%s disabled - ignore request\n",
 						musb_ep->end_point.name);
 		return;
 	}
+#endif
 	/* we shouldn't get here while DMA is active ... but we do ... */
 	if (dma_channel_status(musb_ep->dma) == MUSB_DMA_STATUS_BUSY) {
 		dev_dbg(musb->controller, "dma pending...\n");
@@ -657,12 +659,14 @@ static void rxstate(struct musb *musb, struct musb_request *req)
 		musb_ep = &hw_ep->ep_out;
 
 	len = musb_ep->packet_sz;
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 	/* Check if EP is disabled */
 	if (!musb_ep->desc) {
 		dev_dbg(musb->controller, "ep:%s disabled - ignore request\n",
 					musb_ep->end_point.name);
 		return;
 	}
+#endif
 
 	/* We shouldn't get here while DMA is active, but we do... */
 	if (dma_channel_status(musb_ep->dma) == MUSB_DMA_STATUS_BUSY) {

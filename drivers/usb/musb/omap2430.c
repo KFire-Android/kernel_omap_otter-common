@@ -256,6 +256,7 @@ static void musb_otg_notifier_work(struct work_struct *data_notifier_work)
 
 	kfree(otg_work);
 
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 	/* Protection from unnecessary double events */
 	if (musb->xceiv->last_event == xceiv_event)
 		return;
@@ -268,7 +269,7 @@ static void musb_otg_notifier_work(struct work_struct *data_notifier_work)
 
 	/* Remember current event */
 	musb->xceiv->last_event = xceiv_event;
-
+#endif
 	switch (xceiv_event) {
 	case USB_EVENT_ID:
 		dev_dbg(musb->controller, "ID GND\n");
