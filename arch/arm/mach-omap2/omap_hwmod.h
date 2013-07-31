@@ -451,6 +451,11 @@ struct omap_hwmod_omap4_prcm {
  *     enabled.  This prevents the hwmod code from being able to
  *     enable and reset the IP block early.  XXX Eventually it should
  *     be possible to query the clock framework for this information.
+ * HWMOD_SWSUP_SIDLE_ACT: omap_hwmod code should manually bring the module out of
+ *     idle, but rely on smart-idle to the put it back in idle, so the wakeups
+ *     are still functional (Only known case for now is UART)
+ * HWMOD_ACCESS_DISABLED: this module cannot be accessed and must remain
+ *     disabled.
  */
 #define HWMOD_SWSUP_SIDLE			(1 << 0)
 #define HWMOD_SWSUP_MSTANDBY			(1 << 1)
@@ -462,21 +467,21 @@ struct omap_hwmod_omap4_prcm {
 #define HWMOD_CONTROL_OPT_CLKS_IN_RESET		(1 << 7)
 #define HWMOD_16BIT_REG				(1 << 8)
 #define HWMOD_EXT_OPT_MAIN_CLK			(1 << 9)
+#define HWMOD_SWSUP_SIDLE_ACT			(1 << 10)
+#define HWMOD_ACCESS_DISABLED			(1 << 11)
 
 /*
  * omap_hwmod._int_flags definitions
  * These are for internal use only and are managed by the omap_hwmod code.
  *
  * _HWMOD_NO_MPU_PORT: no path exists for the MPU to write to this module
- * _HWMOD_WAKEUP_ENABLED: set when the omap_hwmod code has enabled ENAWAKEUP
  * _HWMOD_SYSCONFIG_LOADED: set when the OCP_SYSCONFIG value has been cached
  * _HWMOD_SKIP_ENABLE: set if hwmod enabled during init (HWMOD_INIT_NO_IDLE) -
  *     causes the first call to _enable() to only update the pinmux
  */
 #define _HWMOD_NO_MPU_PORT			(1 << 0)
-#define _HWMOD_WAKEUP_ENABLED			(1 << 1)
-#define _HWMOD_SYSCONFIG_LOADED			(1 << 2)
-#define _HWMOD_SKIP_ENABLE			(1 << 3)
+#define _HWMOD_SYSCONFIG_LOADED			(1 << 1)
+#define _HWMOD_SKIP_ENABLE			(1 << 2)
 
 /*
  * omap_hwmod._state definitions
@@ -493,6 +498,8 @@ struct omap_hwmod_omap4_prcm {
 #define _HWMOD_STATE_ENABLED			4
 #define _HWMOD_STATE_IDLE			5
 #define _HWMOD_STATE_DISABLED			6
+/* count of possible states */
+#define _HWMOD_STATE_COUNT			(_HWMOD_STATE_DISABLED + 1)
 
 /**
  * struct omap_hwmod_class - the type of an IP block
@@ -610,6 +617,8 @@ struct omap_hwmod {
 	u8				_postsetup_state;
 };
 
+int omap_hwmod_register_flags(struct omap_hwmod **ohs,
+			      u32 set_flags, u32 clear_flags);
 struct omap_hwmod *omap_hwmod_lookup(const char *name);
 int omap_hwmod_for_each(int (*fn)(struct omap_hwmod *oh, void *data),
 			void *data);
@@ -626,9 +635,6 @@ int omap_hwmod_read_hardreset(struct omap_hwmod *oh, const char *name);
 
 int omap_hwmod_enable_clocks(struct omap_hwmod *oh);
 int omap_hwmod_disable_clocks(struct omap_hwmod *oh);
-
-int omap_hwmod_set_slave_idlemode(struct omap_hwmod *oh, u8 idlemode);
-int omap_hwmod_set_ocp_autoidle(struct omap_hwmod *oh, u8 autoidle);
 
 int omap_hwmod_reset(struct omap_hwmod *oh);
 void omap_hwmod_ocp_barrier(struct omap_hwmod *oh);
@@ -678,7 +684,9 @@ extern int omap2420_hwmod_init(void);
 extern int omap2430_hwmod_init(void);
 extern int omap3xxx_hwmod_init(void);
 extern int omap44xx_hwmod_init(void);
+extern int omap54xx_hwmod_init(void);
 extern int am33xx_hwmod_init(void);
+extern int dra7xx_hwmod_init(void);
 
 extern int __init omap_hwmod_register_links(struct omap_hwmod_ocp_if **ois);
 
