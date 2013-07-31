@@ -2567,6 +2567,9 @@ static int dispc_ovl_setup_common(enum omap_plane plane,
 	if (dss_has_feature(FEAT_MFLAG)) {
 		mflag_en = true;
 		dispc_ovl_set_global_mflag(ovl->id, mflag_en);
+	} else if (plane == OMAP_DSS_GFX) {
+		dispc_enable_arbitration(plane,
+					 channel == OMAP_DSS_CHANNEL_DIGIT);
 	}
 
 		dispc_ovl_set_row_inc(plane, row_inc);
@@ -2595,16 +2598,6 @@ static int dispc_ovl_setup_common(enum omap_plane plane,
 	dispc_ovl_setup_global_alpha(plane, caps, global_alpha);
 
 	dispc_ovl_enable_replication(plane, caps, replication);
-
-	if (plane == OMAP_DSS_GFX) {
-	    if (channel == OMAP_DSS_CHANNEL_DIGIT ||
-		omap_rev() == OMAP5430_REV_ES1_0 ||
-		omap_rev() == OMAP5432_REV_ES1_0)
-		dispc_enable_arbitration(plane, true);
-	    else
-		    dispc_enable_arbitration(plane, false);
-	}
-
 
 	return 0;
 }
