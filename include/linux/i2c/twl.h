@@ -187,11 +187,14 @@ TWL_CLASS_IS(6030, TWL6030_CLASS_ID)
 
 #define TWL6032_SUBCLASS	BIT(4)  /* Phoenix Lite is a varient*/
 
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 /* Added by Hashcode from L27.13.1-Beta Kernel */
 /* TWL6030 control interface  registers */
 #define TWL6030_TOGGLE1			0x90
 #define TWL6030_TOGGLE2			0x91
 #define TWL6030_TOGGLE3			0x92
+#define PHOENIX_MSK_TRANSITION      0x20
+#endif
 
 /*
  * Read and write single 8-bit registers
@@ -256,11 +259,13 @@ int twl6030_unregister_notifier(struct notifier_block *nb,
 				unsigned int events);
 
 /*----------------------------------------------------------------------*/
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 /*
 * PMC Master Module offser
 */
 #define REG_START_CONDITION         0x0
 #define REG_STS_HW_CONDITIONS       0x2
+#endif
 
 /*
  * GPIO Block Register offsets (use TWL4030_MODULE_GPIO)
@@ -434,6 +439,7 @@ int twl6030_unregister_notifier(struct notifier_block *nb,
 #define TWL5031_INTERRUPTS_BCIEDR2	0x6
 #define TWL5031_INTERRUPTS_BCISIHCTRL	0x7
 
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 #define CONTROLLER_INT_MASK	0x00
 #define CONTROLLER_CTRL1	0x01
 #define CONTROLLER_WDG		0x02
@@ -453,6 +459,7 @@ int twl6030_unregister_notifier(struct notifier_block *nb,
 #define CHARGERUSB_CTRLLIMIT2	0x10
 #define ANTICOLLAPSE_CTRL1	0x11
 #define ANTICOLLAPSE_CTRL2	0x12
+#endif
 
 /*----------------------------------------------------------------------*/
 
@@ -500,7 +507,11 @@ int twl6030_unregister_notifier(struct notifier_block *nb,
 
 #define TWL4030_PM_MASTER_GLOBAL_TST		0xb6
 
-#define TWL6030_PHOENIX_DEV_ON			0x25 //0x06
+#ifdef CONFIG_MACH_OMAP_4430_KC1
+#define TWL6030_PHOENIX_DEV_ON			0x25
+#else
+#define TWL6030_PHOENIX_DEV_ON			0x06
+#endif
 
 /*
  * TWL6030 PM Master module register offsets (use TWL_MODULE_PM_MASTER)
@@ -656,10 +667,6 @@ int twl6030_unregister_notifier(struct notifier_block *nb,
 
 struct twl4030_clock_init_data {
 	bool ck32k_lowpwr_enable;
-};
-struct twl6030_qcharger_platform_data{
-    unsigned int interrupt_pin;
-
 };
 
 struct twl4030_bci_platform_data {
@@ -858,7 +865,7 @@ struct twl4030_platform_data {
 	struct twl4030_usb_data			*usb;
 	struct twl4030_power_data		*power;
 	struct twl4030_codec_data		*codec;
-	struct twl6030_qcharger_platform_data    *qcharger;
+
 	/* Common LDO regulators for TWL4030/TWL6030 */
 	struct regulator_init_data		*vdac;
 	struct regulator_init_data		*vaux1;
@@ -1014,5 +1021,5 @@ static inline int twl4030charger_usb_en(int enable) { return 0; }
 #define TWL6032_PREQ1_RES_ASS_A	0xd7
 
 #define TWL6032_ERRATA_DB00119490	(1 << 0)
-#define PHOENIX_MSK_TRANSITION      0x20
+
 #endif /* End of __TWL4030_H */
