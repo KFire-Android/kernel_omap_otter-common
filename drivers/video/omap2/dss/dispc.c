@@ -2385,6 +2385,15 @@ int dispc_ovl_check(enum omap_plane plane, enum omap_channel channel,
 }
 EXPORT_SYMBOL(dispc_ovl_check);
 
+static void dispc_enable_arbitration(enum omap_plane plane, bool enable)
+{
+	DSSDBG("dispc_enable_arbitration %d, %d\n", plane, enable);
+
+	REG_FLD_MOD(DISPC_OVL_ATTRIBUTES(plane), enable ? 1 : 0, 14, 14);
+
+	return;
+}
+
 static int dispc_ovl_setup_common(enum omap_plane plane,
 		enum omap_overlay_caps caps, u32 paddr, u32 p_uv_addr,
 		u16 screen_width, int pos_x, int pos_y, u16 width, u16 height,
@@ -2408,6 +2417,7 @@ static int dispc_ovl_setup_common(enum omap_plane plane,
 	bool ilace = mgr_timings->interlace;
 	unsigned long pclk = dispc_plane_pclk_rate(plane);
 	unsigned long lclk = dispc_plane_lclk_rate(plane);
+	enum omap_channel channel = dispc_ovl_get_channel_out(plane);
 
 	if (paddr == 0)
 		return -EINVAL;
@@ -2537,6 +2547,16 @@ static int dispc_ovl_setup_common(enum omap_plane plane,
 	dispc_ovl_setup_global_alpha(plane, caps, global_alpha);
 
 	dispc_ovl_enable_replication(plane, caps, replication);
+
+	if (plane == OMAP_DSS_GFX) {
+	    if (channel == OMAP_DSS_CHANNEL_DIGIT ||
+		omap_rev() == OMAP5430_REV_ES1_0 ||
+		omap_rev() == OMAP5432_REV_ES1_0)
+		dispc_enable_arbitration(plane, true);
+	    else
+		    dispc_enable_arbitration(plane, false);
+	}
+
 
 	return 0;
 }
