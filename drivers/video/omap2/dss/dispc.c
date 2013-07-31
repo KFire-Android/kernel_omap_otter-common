@@ -1172,6 +1172,48 @@ static u32 dispc_ovl_get_fifo_size(enum omap_plane plane)
 	return size;
 }
 
+static void dispc_ovl_set_mflag_attribute(enum dispc_mflag_ctrl ctrl)
+{
+	REG_FLD_MOD(DISPC_GLOBAL_MFLAG, ctrl, 1, 0);
+}
+
+static void dispc_ovl_set_mflag_start(enum dispc_mflag_start start)
+{
+	REG_FLD_MOD(DISPC_GLOBAL_MFLAG, start, 2, 2);
+}
+
+void dispc_ovl_set_global_mflag(enum omap_plane plane, bool mflag)
+{
+	u32 fifosize;
+	u8 bit;
+
+	/* Set the ARBITRATION bit to give
+	 * highest priority to the pipeline.
+	 * MFLAG is applicable only to high
+	 * priority pipes.
+	 */
+	 if (plane == OMAP_DSS_GFX)
+		bit = 14;
+	 else
+		bit = 23;
+
+	 REG_FLD_MOD(DISPC_OVL_ATTRIBUTES(plane), mflag, bit, bit);
+
+	 dispc_ovl_set_mflag_attribute(DISPC_MFLAG_CTRL_ENABLE);
+	 /* Allows the mflag signal to start at the beginning of each
+	  * frame even if the DMA buffer is empty */
+	 dispc_ovl_set_mflag_start(DISPC_MFLAG_START_ENABLE);
+
+	 fifosize = dispc_ovl_get_fifo_size(plane);
+	 /* As per the simultaion team suggestion, below thesholds are set:
+	  * HT = fifosize * 5/8;
+	  * LT = fifosize * 4/8;
+	  */
+	 dispc_write_reg(DISPC_OVL_MFLAG_THRESHOLD(plane),
+		FLD_VAL((fifosize*5)/8, 31, 16) |
+		FLD_VAL((fifosize*4)/8, 15, 0));
+}
+
 void dispc_ovl_set_fifo_threshold(enum omap_plane plane, u32 low, u32 high)
 {
 	u8 hi_start, hi_end, lo_start, lo_end;
@@ -2401,8 +2443,9 @@ static int dispc_ovl_setup_common(enum omap_plane plane,
 		u8 rotation, bool mirror, u8 zorder, u8 pre_mult_alpha,
 		u8 global_alpha, enum omap_dss_rotation_type rotation_type,
 		bool replication, const struct omap_video_timings *mgr_timings,
-		bool mem_to_mem)
+		bool mem_to_mem, bool mflag_en)
 {
+	struct omap_overlay *ovl = omap_dss_get_overlay(plane);
 	bool five_taps = true;
 	bool fieldmode = 0;
 	int r, cconv = 0;
@@ -2521,7 +2564,12 @@ static int dispc_ovl_setup_common(enum omap_plane plane,
 		dispc_ovl_set_ba1_uv(plane, p_uv_addr + offset1);
 	}
 
-	dispc_ovl_set_row_inc(plane, row_inc);
+	if (dss_has_feature(FEAT_MFLAG)) {
+		mflag_en = true;
+		dispc_ovl_set_global_mflag(ovl->id, mflag_en);
+	}
+
+		dispc_ovl_set_row_inc(plane, row_inc);
 	dispc_ovl_set_pix_inc(plane, pix_inc);
 
 	DSSDBG("%d,%d %dx%d -> %dx%d\n", pos_x, pos_y, in_width,
@@ -2581,7 +2629,8 @@ int dispc_ovl_setup(enum omap_plane plane, const struct omap_overlay_info *oi,
 		oi->screen_width, oi->pos_x, oi->pos_y, oi->width, oi->height,
 		oi->out_width, oi->out_height, oi->color_mode, oi->rotation,
 		oi->mirror, oi->zorder, oi->pre_mult_alpha, oi->global_alpha,
-		oi->rotation_type, replication, mgr_timings, mem_to_mem);
+		oi->rotation_type, replication, mgr_timings, mem_to_mem,
+				   oi->mflag_en);
 
 	return r;
 }
@@ -2611,7 +2660,7 @@ int dispc_wb_setup(const struct omap_dss_writeback_info *wi,
 		wi->buf_width, pos_x, pos_y, in_width, in_height, wi->width,
 		wi->height, wi->color_mode, wi->rotation, wi->mirror, zorder,
 		wi->pre_mult_alpha, global_alpha, wi->rotation_type,
-		replication, mgr_timings, mem_to_mem);
+		replication, mgr_timings, mem_to_mem, false);
 
 	switch (wi->color_mode) {
 	case OMAP_DSS_COLOR_RGB16:
