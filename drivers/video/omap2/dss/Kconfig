@@ -149,4 +149,12 @@ config USE_FB_MODE_DB
 	help
 	  Enable FB mode support.
 
+config SWITCH_STATE
+	bool "Enable hpd switch state"
+	depends on OMAP5_DSS_HDMI
+	default n
+	help
+	  HDMI HDP switch state interface. This adds support for sending
+	  HDMI HPD switch state events to user space.
+
 endif
