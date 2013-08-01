@@ -28,6 +28,7 @@
 #include <linux/slab.h>
 #include <linux/gpio.h>
 #include <linux/of.h>
+#include <linux/switch.h>
 #include <linux/delay.h>
 
 #include "dss.h"
@@ -41,6 +42,7 @@ static struct {
 	/* This protects the panel ops, mainly when accessing the HDMI IP. */
 	struct mutex lock;
 	struct omap_dss_device *dssdev;
+	struct switch_dev hpd_switch;
 	int hpd_gpio;
 	u8 usage;
 #if defined(CONFIG_OMAP4_DSS_HDMI_AUDIO) || \
@@ -482,6 +484,7 @@ static void hdmi_hotplug_detect_worker(struct work_struct *work)
 		state = HPD_STATE_OFF;
 
 	if (state == HPD_STATE_OFF) {
+		switch_set_state(&hdmi.hpd_switch, 0);
 		DSSINFO("%s state = %d\n", __func__, state);
 		if (dssdev->state == OMAP_DSS_DISPLAY_ACTIVE) {
 			hdmi_notify_hpd(dssdev, false);
@@ -532,6 +535,7 @@ static void hdmi_hotplug_detect_worker(struct work_struct *work)
 			}
 			/* We have active hdmi so communicate attach*/
 			hdmi_notify_hpd(dssdev, true);
+			switch_set_state(&hdmi.hpd_switch, 1);
 			DSSERR("%s state = %d\n", __func__, state);
 			goto done;
 		}
@@ -714,7 +718,14 @@ int hdmi_panel_init(void)
 	spin_lock_init(&hdmi.audio_lock);
 #endif
 
+	hdmi.hpd_switch.name = "hdmi";
 	hdmi.usage = 0;
+	r = switch_dev_register(&hdmi.hpd_switch);
+	if (r)
+		goto err_event;
+	/* Init switch state to zero */
+	switch_set_state(&hdmi.hpd_switch, 0);
+
 	my_workq = create_singlethread_workqueue("hdmi_hotplug");
 	if (!my_workq) {
 		r = -EINVAL;
@@ -727,6 +738,8 @@ int hdmi_panel_init(void)
 	return 0;
 
 err_work:
+	switch_dev_unregister(&hdmi.hpd_switch);
+err_event:
 	return r;
 }
 
@@ -734,4 +747,6 @@ void hdmi_panel_exit(void)
 {
 	destroy_workqueue(my_workq);
 	omap_dss_unregister_driver(&hdmi_driver);
+
+	switch_dev_unregister(&hdmi.hpd_switch);
 }
