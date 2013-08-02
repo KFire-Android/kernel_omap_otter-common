@@ -116,4 +116,699 @@
 #define	VPE_CHAN_NUM_CHROMA_OUT		103
 #define	VPE_CHAN_NUM_RGB_OUT		106
 
+/*
+ * a VPDMA address data block payload for a configuration descriptor needs to
+ * have each sub block length as a multiple of 16 bytes. Therefore, the overall
+ * size of the payload also needs to be a multiple of 16 bytes. The sub block
+ * lengths should be ensured to be aligned by the VPDMA user.
+ */
+#define VPDMA_ADB_SIZE_ALIGN		0x0f
+
+/*
+ * data transfer descriptor
+ *
+ * All fields are 32 bits to make them endian neutral
+ */
+struct vpdma_dtd {
+	u32			type_ctl_stride;
+	union {
+		u32		xfer_length_height;
+		u32		w1;
+	};
+	dma_addr_t		start_addr;
+	u32			pkt_ctl;
+	union {
+		u32		frame_width_height;	/* inbound */
+		dma_addr_t	desc_write_addr;	/* outbound */
+	};
+	union {
+		u32		start_h_v;		/* inbound */
+		u32		max_width_height;	/* outbound */
+	};
+	u32			client_attr0;
+	u32			client_attr1;
+};
+
+/* Data Transfer Descriptor specifics */
+#define DTD_NO_NOTIFY		0
+#define DTD_NOTIFY		1
+
+#define DTD_PKT_TYPE		0xa
+#define DTD_DIR_IN		0
+#define DTD_DIR_OUT		1
+
+/* type_ctl_stride */
+#define DTD_DATA_TYPE_MASK	0x3f
+#define DTD_DATA_TYPE_SHFT	26
+#define DTD_NOTIFY_MASK		0x01
+#define DTD_NOTIFY_SHFT		25
+#define DTD_FIELD_MASK		0x01
+#define DTD_FIELD_SHFT		24
+#define DTD_1D_MASK		0x01
+#define DTD_1D_SHFT		23
+#define DTD_EVEN_LINE_SKIP_MASK	0x01
+#define DTD_EVEN_LINE_SKIP_SHFT	20
+#define DTD_ODD_LINE_SKIP_MASK	0x01
+#define DTD_ODD_LINE_SKIP_SHFT	16
+#define DTD_LINE_STRIDE_MASK	0xffff
+#define DTD_LINE_STRIDE_SHFT	0
+
+/* xfer_length_height */
+#define DTD_LINE_LENGTH_MASK	0xffff
+#define DTD_LINE_LENGTH_SHFT	16
+#define DTD_XFER_HEIGHT_MASK	0xffff
+#define DTD_XFER_HEIGHT_SHFT	0
+
+/* pkt_ctl */
+#define DTD_PKT_TYPE_MASK	0x1f
+#define DTD_PKT_TYPE_SHFT	27
+#define DTD_MODE_MASK		0x01
+#define DTD_MODE_SHFT		26
+#define DTD_DIR_MASK		0x01
+#define DTD_DIR_SHFT		25
+#define DTD_CHAN_MASK		0x01ff
+#define DTD_CHAN_SHFT		16
+#define DTD_PRI_MASK		0x0f
+#define DTD_PRI_SHFT		9
+#define DTD_NEXT_CHAN_MASK	0x01ff
+#define DTD_NEXT_CHAN_SHFT	0
+
+/* frame_width_height */
+#define DTD_FRAME_WIDTH_MASK	0xffff
+#define DTD_FRAME_WIDTH_SHFT	16
+#define DTD_FRAME_HEIGHT_MASK	0xffff
+#define DTD_FRAME_HEIGHT_SHFT	0
+
+/* start_h_v */
+#define DTD_H_START_MASK	0xffff
+#define DTD_H_START_SHFT	16
+#define DTD_V_START_MASK	0xffff
+#define DTD_V_START_SHFT	0
+
+#define DTD_DESC_START_SHIFT	5
+#define DTD_WRITE_DESC_MASK	0x01
+#define DTD_WRITE_DESC_SHIFT	2
+#define DTD_DROP_DATA_MASK	0x01
+#define DTD_DROP_DATA_SHIFT	1
+#define DTD_USE_DESC_MASK	0x01
+#define DTD_USE_DESC_SHIFT	0
+
+/* max_width_height */
+#define DTD_MAX_WIDTH_MASK	0x07
+#define DTD_MAX_WIDTH_SHFT	4
+#define DTD_MAX_HEIGHT_MASK	0x07
+#define DTD_MAX_HEIGHT_SHFT	0
+
+/* max width configurations */
+ /* unlimited width */
+#define	MAX_OUT_WIDTH_UNLIMITED		0
+/* as specified in max_size1 reg */
+#define MAX_OUT_WIDTH_REG1		1
+/* as specified in max_size2 reg */
+#define MAX_OUT_WIDTH_REG2		2
+/* as specified in max_size3 reg */
+#define	MAX_OUT_WIDTH_REG3		3
+/* maximum of 352 pixels as width */
+#define MAX_OUT_WIDTH_352		4
+/* maximum of 768 pixels as width */
+#define	MAX_OUT_WIDTH_768		5
+/* maximum of 1280 pixels width */
+#define	MAX_OUT_WIDTH_1280		6
+/* maximum of 1920 pixels as width */
+#define	MAX_OUT_WIDTH_1920		7
+
+/* max height configurations */
+ /* unlimited height */
+#define	MAX_OUT_HEIGHT_UNLIMITED	0
+/* as specified in max_size1 reg */
+#define MAX_OUT_HEIGHT_REG1		1
+/* as specified in max_size2 reg */
+#define MAX_OUT_HEIGHT_REG2		2
+/* as specified in max_size3 reg */
+#define	MAX_OUT_HEIGHT_REG3		3
+/* maximum of 288 lines as height */
+#define MAX_OUT_HEIGHT_288		4
+/* maximum of 576 lines as height */
+#define	MAX_OUT_HEIGHT_576		5
+/* maximum of 720 lines as height */
+#define	MAX_OUT_HEIGHT_720		6
+/* maximum of 1080 lines as height */
+#define	MAX_OUT_HEIGHT_1080		7
+
+
+/*
+ * The following macros may be useful for structure initialization
+ */
+#define DTD_W0(type, notify, field, one_d, even_line_skip,	\
+		odd_line_skip, line_stride)			\
+	((type << DTD_DATA_TYPE_SHFT) |				\
+	(notify << DTD_NOTIFY_SHFT) |				\
+	(field << DTD_FIELD_SHFT) |				\
+	(one_d << DTD_1D_SHFT) |				\
+	(even_line_skip << DTD_EVEN_LINE_SKIP_SHFT) |		\
+	(odd_line_skip << DTD_ODD_LINE_SKIP_SHFT) |		\
+	line_stride)
+
+#define DTD_W1(line_length, xfer_height)			\
+	((line_length << DTD_LINE_LENGTH_SHFT) |		\
+				  xfer_height)
+
+#define DTD_W3(mode, dir, chan, pri, next_chan)	\
+	((DTD_PKT_TYPE << DTD_PKT_TYPE_SHFT) |			\
+	(mode << DTD_MODE_SHFT) |				\
+	(dir << DTD_DIR_SHFT) |					\
+	(chan << DTD_CHAN_SHFT) |				\
+	(pri << DTD_PRI_SHFT) |					\
+	next_chan)
+
+#define DTD_I_W4(width, height)					\
+	((width << DTD_FRAME_WIDTH_SHFT) | height)
+
+#define DTD_O_W4(addr, write, drop, use)			\
+	((addr << DTD_DESC_START_SHIFT) |			\
+	(write << DTD_WRITE_DESC_SHIFT) |			\
+	(drop << DTD_DROP_DATA_SHIFT)	|			\
+	use)
+
+#define DTD_I_W5(h_start, v_start)				\
+	((h_start << DTD_H_START_SHFT) | v_start)
+
+#define DTD_O_W5(max_width, max_height)				\
+	((max_width << DTD_MAX_WIDTH_SHFT) | max_height)
+
+static inline void dtd_set_type_ctl_stride(struct vpdma_dtd *dtd, int type,
+					   bool notify, int field, bool one_d,
+					   bool even_line_skip,
+					   bool odd_line_skip, int line_stride)
+{
+	dtd->type_ctl_stride = DTD_W0(type, notify, field, one_d,
+				      even_line_skip, odd_line_skip,
+				      line_stride);
+}
+
+static inline void dtd_set_xfer_length_height(struct vpdma_dtd *dtd,
+					      int line_length, int xfer_height)
+{
+	dtd->xfer_length_height = DTD_W1(line_length, xfer_height);
+}
+
+static inline void dtd_set_w1(struct vpdma_dtd *dtd, u32 value)
+{
+	dtd->w1 = value;
+}
+
+static inline void dtd_set_start_addr(struct vpdma_dtd *dtd, dma_addr_t addr)
+{
+	dtd->start_addr = addr;
+}
+
+static inline void dtd_set_pkt_ctl(struct vpdma_dtd *dtd, bool mode,
+				   bool dir, int chan, int pri, int next_chan)
+{
+	dtd->pkt_ctl = DTD_W3(mode, dir, chan, pri, next_chan);
+}
+
+static inline void dtd_set_frame_width_height(struct vpdma_dtd *dtd,
+					      int width, int height)
+{
+	dtd->frame_width_height = DTD_I_W4(width, height);
+}
+
+static inline void dtd_set_desc_write_addr(struct vpdma_dtd *dtd,
+			unsigned int addr, bool write_desc, bool drop_data,
+			bool use_desc)
+{
+	dtd->desc_write_addr = DTD_O_W4(addr, write_desc, drop_data, use_desc);
+}
+
+static inline void dtd_set_start_h_v(struct vpdma_dtd *dtd,
+				     int h_start, int v_start)
+{
+	dtd->start_h_v = DTD_I_W5(h_start, v_start);
+}
+
+static inline void dtd_set_max_width_height(struct vpdma_dtd *dtd,
+					    int max_width, int max_height)
+{
+	dtd->max_width_height = DTD_O_W5(max_width, max_height);
+}
+
+static inline void dtd_set_client_attr0(struct vpdma_dtd *dtd, u32 value)
+{
+		dtd->client_attr0 = value;
+}
+
+static inline void dtd_set_client_attr1(struct vpdma_dtd *dtd, u32 value)
+{
+		dtd->client_attr1 = value;
+}
+
+static inline int dtd_get_data_type(struct vpdma_dtd *dtd)
+{
+	return dtd->type_ctl_stride >> DTD_DATA_TYPE_SHFT;
+}
+
+static inline bool dtd_get_notify(struct vpdma_dtd *dtd)
+{
+	return (dtd->type_ctl_stride >> DTD_NOTIFY_SHFT) & DTD_NOTIFY_MASK;
+}
+
+static inline int dtd_get_field(struct vpdma_dtd *dtd)
+{
+	return (dtd->type_ctl_stride >> DTD_FIELD_SHFT) & DTD_FIELD_MASK;
+}
+
+static inline bool dtd_get_1d(struct vpdma_dtd *dtd)
+{
+	return (dtd->type_ctl_stride >> DTD_1D_SHFT) & DTD_1D_MASK;
+}
+
+static inline bool dtd_get_even_line_skip(struct vpdma_dtd *dtd)
+{
+	return (dtd->type_ctl_stride >> DTD_EVEN_LINE_SKIP_SHFT)
+		& DTD_EVEN_LINE_SKIP_MASK;
+}
+
+static inline bool dtd_get_odd_line_skip(struct vpdma_dtd *dtd)
+{
+	return (dtd->type_ctl_stride >> DTD_ODD_LINE_SKIP_SHFT)
+		& DTD_ODD_LINE_SKIP_MASK;
+}
+
+static inline int dtd_get_line_stride(struct vpdma_dtd *dtd)
+{
+	return dtd->type_ctl_stride & DTD_LINE_STRIDE_MASK;
+}
+
+static inline int dtd_get_line_length(struct vpdma_dtd *dtd)
+{
+	return dtd->xfer_length_height >> DTD_LINE_LENGTH_SHFT;
+}
+
+static inline int dtd_get_xfer_height(struct vpdma_dtd *dtd)
+{
+	return dtd->xfer_length_height & DTD_XFER_HEIGHT_MASK;
+}
+
+static inline dma_addr_t dtd_get_start_addr(struct vpdma_dtd *dtd)
+{
+	return (dma_addr_t)dtd->start_addr;
+}
+
+static inline int dtd_get_pkt_type(struct vpdma_dtd *dtd)
+{
+	return dtd->pkt_ctl >> DTD_PKT_TYPE_SHFT;
+}
+
+static inline bool dtd_get_mode(struct vpdma_dtd *dtd)
+{
+	return (dtd->pkt_ctl >> DTD_MODE_SHFT) & DTD_MODE_MASK;
+}
+
+static inline bool dtd_get_dir(struct vpdma_dtd *dtd)
+{
+	return (dtd->pkt_ctl >> DTD_DIR_SHFT) & DTD_DIR_MASK;
+}
+
+static inline int dtd_get_chan(struct vpdma_dtd *dtd)
+{
+	return (dtd->pkt_ctl >> DTD_CHAN_SHFT) & DTD_CHAN_MASK;
+}
+
+static inline int dtd_get_priority(struct vpdma_dtd *dtd)
+{
+	return (dtd->pkt_ctl >> DTD_PRI_SHFT) & DTD_PRI_MASK;
+}
+
+static inline int dtd_get_next_chan(struct vpdma_dtd *dtd)
+{
+	return (dtd->pkt_ctl >> DTD_NEXT_CHAN_SHFT) & DTD_NEXT_CHAN_MASK;
+}
+
+static inline int dtd_get_frame_width(struct vpdma_dtd *dtd)
+{
+	return dtd->frame_width_height >> DTD_FRAME_WIDTH_SHFT;
+}
+
+static inline int dtd_get_frame_height(struct vpdma_dtd *dtd)
+{
+	return dtd->frame_width_height & DTD_FRAME_HEIGHT_MASK;
+}
+
+static inline int dtd_get_desc_write_addr(struct vpdma_dtd *dtd)
+{
+	return dtd->desc_write_addr >> DTD_DESC_START_SHIFT;
+}
+
+static inline bool dtd_get_write_desc(struct vpdma_dtd *dtd)
+{
+	return (dtd->desc_write_addr >> DTD_WRITE_DESC_SHIFT) &
+							DTD_WRITE_DESC_MASK;
+}
+
+static inline bool dtd_get_drop_data(struct vpdma_dtd *dtd)
+{
+	return (dtd->desc_write_addr >> DTD_DROP_DATA_SHIFT) &
+							DTD_DROP_DATA_MASK;
+}
+
+static inline bool dtd_get_use_desc(struct vpdma_dtd *dtd)
+{
+	return dtd->desc_write_addr & DTD_USE_DESC_MASK;
+}
+
+static inline int dtd_get_h_start(struct vpdma_dtd *dtd)
+{
+	return dtd->start_h_v >> DTD_H_START_SHFT;
+}
+
+static inline int dtd_get_v_start(struct vpdma_dtd *dtd)
+{
+	return dtd->start_h_v & DTD_V_START_MASK;
+}
+
+static inline int dtd_get_max_width(struct vpdma_dtd *dtd)
+{
+	return (dtd->max_width_height >> DTD_MAX_WIDTH_SHFT) &
+							DTD_MAX_WIDTH_MASK;
+}
+
+static inline int dtd_get_max_height(struct vpdma_dtd *dtd)
+{
+	return (dtd->max_width_height >> DTD_MAX_HEIGHT_SHFT) &
+							DTD_MAX_HEIGHT_MASK;
+}
+
+/*
+ * configuration descriptor
+ */
+struct vpdma_cfd {
+	union {
+		u32	dest_addr_offset;
+		u32	w0;
+	};
+	union {
+		u32	block_len;		/* in words */
+		u32	w1;
+	};
+	u32		payload_addr;
+	u32		ctl_payload_len;	/* in words */
+};
+
+/* Configuration descriptor specifics */
+
+#define CFD_PKT_TYPE		0xb
+
+#define CFD_DIRECT		1
+#define CFD_INDIRECT		0
+#define CFD_CLS_ADB		0
+#define CFD_CLS_BLOCK		1
+
+/* block_len */
+#define CFD__BLOCK_LEN_MASK	0xffff
+#define CFD__BLOCK_LEN_SHFT	0
+
+/* ctl_payload_len */
+#define CFD_PKT_TYPE_MASK	0x1f
+#define CFD_PKT_TYPE_SHFT	27
+#define CFD_DIRECT_MASK		0x01
+#define CFD_DIRECT_SHFT		26
+#define CFD_CLASS_MASK		0x03
+#define CFD_CLASS_SHFT		24
+#define CFD_DEST_MASK		0xff
+#define CFD_DEST_SHFT		16
+#define CFD_PAYLOAD_LEN_MASK	0xffff
+#define CFD_PAYLOAD_LEN_SHFT	0
+
+#define CFD_W3(direct, cls, dest, payload_len)	\
+	((CFD_PKT_TYPE << CFD_PKT_TYPE_SHFT) |			\
+	(direct << CFD_DIRECT_SHFT) |				\
+	(cls << CFD_CLASS_SHFT) |				\
+	(dest << CFD_DEST_SHFT) |				\
+	payload_len)
+
+static inline void cfd_set_dest_addr_offset(struct vpdma_cfd *cfd, u32 offset)
+{
+	cfd->dest_addr_offset = offset;
+}
+
+static inline void cfd_set_w0(struct vpdma_cfd *cfd, u32 w0)
+{
+	cfd->w0 = w0;
+}
+
+static inline void cfd_set_block_len(struct vpdma_cfd *cfd, int len)
+{
+	cfd->block_len = len;
+}
+
+static inline void cfd_set_w1(struct vpdma_cfd *cfd, u32 w1)
+{
+	cfd->w1 = w1;
+}
+
+static inline void cfd_set_payload_addr(struct vpdma_cfd *cfd, dma_addr_t addr)
+{
+	cfd->payload_addr = (u32)addr;
+}
+
+static inline void cfd_set_pkt_payload_len(struct vpdma_cfd *cfd,
+					   bool direct, int cls, int dest,
+					   int payload_len)
+{
+	cfd->ctl_payload_len = CFD_W3(direct, cls, dest, payload_len);
+}
+
+static inline u32 cfd_get_dest_addr_offset(struct vpdma_cfd *cfd)
+{
+	return cfd->dest_addr_offset;
+}
+
+static inline int cfd_get_block_len(struct vpdma_cfd *cfd)
+{
+	return cfd->block_len;
+}
+
+static inline dma_addr_t cfd_get_payload_addr(struct vpdma_cfd *cfd)
+{
+	return (dma_addr_t)cfd->payload_addr;
+}
+
+static inline int cfd_get_pkt_type(struct vpdma_cfd *cfd)
+{
+	return cfd->ctl_payload_len >> CFD_PKT_TYPE_SHFT;
+}
+
+static inline bool cfd_get_direct(struct vpdma_cfd *cfd)
+{
+	return (cfd->ctl_payload_len >> CFD_DIRECT_SHFT) & CFD_DIRECT_MASK;
+}
+
+static inline bool cfd_get_class(struct vpdma_cfd *cfd)
+{
+	return (cfd->ctl_payload_len >> CFD_CLASS_SHFT) & CFD_CLASS_MASK;
+}
+
+static inline int cfd_get_dest(struct vpdma_cfd *cfd)
+{
+	return (cfd->ctl_payload_len >> CFD_DEST_SHFT) & CFD_DEST_MASK;
+}
+
+static inline int cfd_get_payload_len(struct vpdma_cfd *cfd)
+{
+	return cfd->ctl_payload_len & CFD_PAYLOAD_LEN_MASK;
+}
+
+/*
+ * control descriptor
+ */
+struct vpdma_ctd {
+	union {
+		u32	timer_value;
+		u32	list_addr;
+		u32	w0;
+	};
+	union {
+		u32	pixel_line_count;
+		u32	list_size;
+		u32	w1;
+	};
+	union {
+		u32	event;
+		u32	fid_ctl;
+		u32	w2;
+	};
+	u32		type_source_ctl;
+};
+
+/* control descriptor types */
+#define CTD_TYPE_SYNC_ON_CLIENT		0
+#define CTD_TYPE_SYNC_ON_LIST		1
+#define CTD_TYPE_SYNC_ON_EXT		2
+#define CTD_TYPE_SYNC_ON_CHANNEL	3
+#define CTD_TYPE_CHNG_CLIENT_IRQ	4
+#define CTD_TYPE_SEND_IRQ		5
+#define CTD_TYPE_RELOAD_LIST		6
+#define CTD_TYPE_ABORT_CHANNEL		6
+
+#define CTD_PKT_TYPE		0xc
+
+/* timer_value */
+#define CTD_TIMER_VALUE_MASK	0xffff
+#define CTD_TIMER_VALUE_SHFT	0
+
+/* pixel_line_count */
+#define CTD_PIXEL_COUNT_MASK	0xffff
+#define CTD_PIXEL_COUNT_SHFT	16
+#define CTD_LINE_COUNT_MASK	0xffff
+#define CTD_LINE_COUNT_SHFT	0
+
+/* list_size */
+#define CTD_LIST_SIZE_MASK	0xffff
+#define CTD_LIST_SIZE_SHFT	0
+
+/* event */
+#define CTD_EVENT_MASK		0x0f
+#define CTD_EVENT_SHFT		0
+
+/* fid_ctl */
+#define CTD_FID2_MASK		0x03
+#define CTD_FID2_SHFT		4
+#define CTD_FID1_MASK		0x03
+#define CTD_FID1_SHFT		2
+#define CTD_FID0_MASK		0x03
+#define CTD_FID0_SHFT		0
+
+/* type_source_ctl */
+#define CTD_PKT_TYPE_MASK	0x1f
+#define CTD_PKT_TYPE_SHFT	27
+#define CTD_SOURCE_MASK		0xff
+#define CTD_SOURCE_SHFT		16
+#define CTD_CONTROL_MASK	0x0f
+#define CTD_CONTROL_SHFT	0
+
+#define CTD_W1(pixel_count, line_count)				\
+	((pixel_count << CTD_PIXEL_COUNT_SHFT) | line_count)
+
+#define CTD_W2(fid0, fid1, fid2)				\
+	((fid2 << CTD_FID2_SHFT) | (fid1 << CTD_FID1_SHFT) | fid0)
+
+#define CTD_W3(source, control)			\
+	((CTD_PKT_TYPE << CTD_PKT_TYPE_SHFT) |			\
+	(source << CTD_SOURCE_SHFT) | control)
+
+
+static inline void ctd_set_timer_value(struct vpdma_ctd *ctd, u32 value)
+{
+	ctd->timer_value = value;
+}
+
+static inline void ctd_set_list_addr(struct vpdma_ctd *ctd, dma_addr_t addr)
+{
+	ctd->list_addr = (u32)addr;
+}
+
+static inline void ctd_set_pixel_line_count(struct vpdma_ctd *ctd,
+					    int pixel_count, int line_count)
+{
+	ctd->pixel_line_count = CTD_W1(pixel_count, line_count);
+}
+
+static inline void ctd_set_list_size(struct vpdma_ctd *ctd, int list_size)
+{
+	ctd->list_size = list_size;
+}
+
+static inline void ctd_set_event(struct vpdma_ctd *ctd, int event)
+{
+	ctd->event = event;
+}
+
+static inline void ctd_set_fid_ctl(struct vpdma_ctd *ctd, int fid0, int fid1,
+				   int fid2)
+{
+	ctd->fid_ctl = CTD_W2(fid0, fid1, fid2);
+}
+
+static inline void ctd_set_type_source_ctl(struct vpdma_ctd *ctd,
+					   int source, int control)
+{
+	ctd->type_source_ctl = CTD_W3(source, control);
+}
+
+static inline void ctd_set_w0(struct vpdma_ctd *ctd, u32 w0)
+{
+	ctd->w0 = w0;
+}
+
+static inline void ctd_set_w1(struct vpdma_ctd *ctd, u32 w1)
+{
+	ctd->w1 = w1;
+}
+
+static inline void ctd_set_w2(struct vpdma_ctd *ctd, u32 w2)
+{
+	ctd->w2 = w2;
+}
+
+static inline u32 ctd_get_timer_value(struct vpdma_ctd *ctd)
+{
+	return ctd->timer_value;
+}
+
+static inline dma_addr_t ctd_get_list_addr(struct vpdma_ctd *ctd)
+{
+	return (dma_addr_t)ctd->list_addr;
+}
+
+static inline u32 ctd_get_pixel_count(struct vpdma_ctd *ctd)
+{
+	return ctd->pixel_line_count >> CTD_PIXEL_COUNT_SHFT;
+}
+
+static inline int ctd_get_line_count(struct vpdma_ctd *ctd)
+{
+	return ctd->pixel_line_count & CTD_LINE_COUNT_MASK;
+}
+
+static inline u32 ctd_get_list_size(struct vpdma_ctd *ctd)
+{
+	return ctd->list_size;
+}
+
+static inline int ctd_get_event(struct vpdma_ctd *ctd)
+{
+	return ctd->event & CTD_EVENT_MASK;
+}
+
+static inline int ctd_get_fid2_ctl(struct vpdma_ctd *ctd)
+{
+	return (ctd->fid_ctl >> CTD_FID2_SHFT) & CTD_FID2_MASK;
+}
+
+static inline int ctd_get_fid1_ctl(struct vpdma_ctd *ctd)
+{
+	return (ctd->fid_ctl >> CTD_FID1_SHFT) & CTD_FID1_MASK;
+}
+
+static inline int ctd_get_fid0_ctl(struct vpdma_ctd *ctd)
+{
+	return ctd->fid_ctl & CTD_FID2_MASK;
+}
+
+static inline int ctd_get_pkt_type(struct vpdma_ctd *ctd)
+{
+	return ctd->type_source_ctl >> CTD_PKT_TYPE_SHFT;
+}
+
+static inline int ctd_get_source(struct vpdma_ctd *ctd)
+{
+	return (ctd->type_source_ctl >> CTD_SOURCE_SHFT) & CTD_SOURCE_MASK;
+}
+
+static inline int ctd_get_ctl(struct vpdma_ctd *ctd)
+{
+	return ctd->type_source_ctl & CTD_CONTROL_MASK;
+}
+
 #endif
