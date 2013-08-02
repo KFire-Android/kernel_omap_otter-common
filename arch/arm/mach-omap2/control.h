@@ -258,6 +258,8 @@
 #define OMAP5XXX_CONTROL_STATUS                0x134
 #define OMAP5_DEVICETYPE_MASK          (0x7 << 6)
 
+/* DRA7XX BOOTSTRAP register */
+#define DRA7XX_BOOTSTRAP_CONTROL 0x6C4
 /*
  * REVISIT: This list of registers is not comprehensive - there are more
  * that should be added.
@@ -286,6 +288,8 @@
 
 /* CONTROL_STATUS bits */
 #define OMAP2_DEVICETYPE_MASK		(0x7 << 8)
+#define OMAP2_SYSBOOT_7_MASK		(1 << 7)
+#define OMAP2_SYSBOOT_6_MASK		(1 << 6)
 #define OMAP2_SYSBOOT_5_MASK		(1 << 5)
 #define OMAP2_SYSBOOT_4_MASK		(1 << 4)
 #define OMAP2_SYSBOOT_3_MASK		(1 << 3)
@@ -357,6 +361,11 @@
 #define AM33XX_CONTROL_STATUS_SYSBOOT1_SHIFT		22
 #define AM33XX_CONTROL_STATUS_SYSBOOT1_WIDTH		0x2
 #define AM33XX_CONTROL_STATUS_SYSBOOT1_MASK		(0x3 << 22)
+
+/* DEV Feature register to identify AM33XX features */
+#define AM33XX_DEV_FEATURE		0x604
+#define AM33XX_SGX_SHIFT		29
+#define AM33XX_SGX_MASK			(1 << AM33XX_SGX_SHIFT)
 
 /* CONTROL OMAP STATUS register to identify OMAP3 features */
 #define OMAP3_CONTROL_OMAP_STATUS	0x044c

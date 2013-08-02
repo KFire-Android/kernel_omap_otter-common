@@ -38,6 +38,8 @@
 #include "clock2xxx.h"
 #include "clock3xxx.h"
 #include "clock44xx.h"
+#include "clock54xx.h"
+#include "clock7xx.h"
 #include "omap-pm.h"
 #include "sdrc.h"
 #include "control.h"
@@ -241,9 +243,9 @@ static struct map_desc omap44xx_io_desc[] __initdata = {
 	},
 #ifdef CONFIG_OMAP4_ERRATA_I688
 	{
-		.virtual	= OMAP4_SRAM_VA,
-		.pfn		= __phys_to_pfn(OMAP4_SRAM_PA),
-		.length		= PAGE_SIZE,
+		.virtual	= OMAP4_ERRATA_I688_SRAM_VA,
+		.pfn		= __phys_to_pfn(OMAP4_ERRATA_I688_SRAM_PA),
+		.length		= OMAP4_ERRATA_I688_SIZE,
 		.type		= MT_MEMORY_SO,
 	},
 #endif
@@ -251,7 +253,7 @@ static struct map_desc omap44xx_io_desc[] __initdata = {
 };
 #endif
 
-#ifdef	CONFIG_SOC_OMAP5
+#if defined(CONFIG_SOC_OMAP5) || defined(CONFIG_SOC_DRA7XX)
 static struct map_desc omap54xx_io_desc[] __initdata = {
 	{
 		.virtual	= L3_54XX_VIRT,
@@ -277,6 +279,14 @@ static struct map_desc omap54xx_io_desc[] __initdata = {
 		.length		= L4_PER_54XX_SIZE,
 		.type		= MT_DEVICE,
 	},
+#ifdef CONFIG_OMAP4_ERRATA_I688
+	{
+		.virtual	= OMAP5_ERRATA_I688_SRAM_VA,
+		.pfn		= __phys_to_pfn(OMAP5_ERRATA_I688_SRAM_PA),
+		.length		= OMAP4_ERRATA_I688_SIZE,
+		.type		= MT_MEMORY_SO,
+	},
+#endif
 };
 #endif
 
@@ -325,10 +335,11 @@ void __init omap4_map_io(void)
 }
 #endif
 
-#ifdef CONFIG_SOC_OMAP5
+#if defined(CONFIG_SOC_OMAP5) || defined(CONFIG_SOC_DRA7XX)
 void __init omap5_map_io(void)
 {
 	iotable_init(omap54xx_io_desc, ARRAY_SIZE(omap54xx_io_desc));
+	omap_barriers_init();
 }
 #endif
 /*
@@ -568,7 +579,7 @@ void __init am33xx_init_early(void)
 	omap2_set_globals_prm(AM33XX_L4_WK_IO_ADDRESS(AM33XX_PRCM_BASE));
 	omap2_set_globals_cm(AM33XX_L4_WK_IO_ADDRESS(AM33XX_PRCM_BASE), NULL);
 	omap3xxx_check_revision();
-	ti81xx_check_features();
+	am33xx_check_features();
 	am33xx_voltagedomains_init();
 	am33xx_powerdomains_init();
 	am33xx_clockdomains_init();
@@ -624,7 +635,53 @@ void __init omap5_init_early(void)
 	omap2_set_globals_prcm_mpu(OMAP2_L4_IO_ADDRESS(OMAP54XX_PRCM_MPU_BASE));
 	omap_prm_base_init();
 	omap_cm_base_init();
+	omap44xx_prm_init();
 	omap5xxx_check_revision();
+	omap54xx_voltagedomains_init();
+	omap54xx_powerdomains_init();
+	omap54xx_clockdomains_init();
+	omap54xx_hwmod_init();
+	omap_hwmod_init_postsetup();
+	omap5xxx_clk_init();
+
+}
+
+void __init omap5_init_late(void)
+{
+	omap_mux_late_init();
+	omap2_common_pm_late_init();
+	omap4_pm_init();
+	omap2_clk_enable_autoidle_all();
+}
+#endif
+
+#ifdef CONFIG_SOC_DRA7XX
+void __init dra7xx_init_early(void)
+{
+	omap2_set_globals_tap(DRA7XX_CLASS,
+			      OMAP2_L4_IO_ADDRESS(DRA7XX_TAP_BASE));
+	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(OMAP54XX_SCM_BASE),
+				  OMAP2_L4_IO_ADDRESS(DRA7XX_CTRL_BASE));
+	omap2_set_globals_prm(OMAP2_L4_IO_ADDRESS(OMAP54XX_PRM_BASE));
+	omap2_set_globals_cm(OMAP2_L4_IO_ADDRESS(DRA7XX_CM_CORE_AON_BASE),
+			     OMAP2_L4_IO_ADDRESS(OMAP54XX_CM_CORE_BASE));
+	omap2_set_globals_prcm_mpu(OMAP2_L4_IO_ADDRESS(OMAP54XX_PRCM_MPU_BASE));
+	omap_prm_base_init();
+	omap_cm_base_init();
+	dra7xx_check_revision();
+	omap44xx_prm_init();
+	dra7xx_powerdomains_init();
+	dra7xx_clockdomains_init();
+	dra7xx_hwmod_init();
+	omap_hwmod_init_postsetup();
+	dra7xx_clk_init();
+}
+
+void __init dra7xx_init_late(void)
+{
+	omap2_common_pm_late_init();
+	omap4_pm_init();
+	omap2_clk_enable_autoidle_all();
 }
 #endif
 

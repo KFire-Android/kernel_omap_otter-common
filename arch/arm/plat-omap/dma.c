@@ -701,8 +701,8 @@ int omap_request_dma(int dev_id, const char *dev_name,
 	for (ch = 0; ch < dma_chan_count; ch++) {
 		if (free_ch == -1 && dma_chan[ch].dev_id == -1) {
 			free_ch = ch;
-			if (dev_id == 0)
-				break;
+			/* Exit after first free channel found */
+			break;
 		}
 	}
 	if (free_ch == -1) {
@@ -894,11 +894,12 @@ void omap_start_dma(int lch)
 		int next_lch, cur_lch;
 		char dma_chan_link_map[MAX_LOGICAL_DMA_CH_COUNT];
 
-		dma_chan_link_map[lch] = 1;
 		/* Set the link register of the first channel */
 		enable_lnk(lch);
 
 		memset(dma_chan_link_map, 0, sizeof(dma_chan_link_map));
+		dma_chan_link_map[lch] = 1;
+
 		cur_lch = dma_chan[lch].next_lch;
 		do {
 			next_lch = dma_chan[cur_lch].next_lch;

@@ -59,7 +59,7 @@ static inline int omap3_pm_init(void)
 }
 #endif
 
-#if defined(CONFIG_PM) && defined(CONFIG_ARCH_OMAP4)
+#if defined(CONFIG_PM) && (defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5))
 int omap4_pm_init(void);
 #else
 static inline int omap4_pm_init(void)
@@ -108,13 +108,23 @@ void omap35xx_init_late(void);
 void omap3630_init_late(void);
 void am35xx_init_late(void);
 void ti81xx_init_late(void);
-void omap4430_init_late(void);
+void omap5_init_late(void);
 int omap2_common_pm_late_init(void);
+void dra7xx_init_early(void);
+void dra7xx_init_late(void);
 
 #if defined(CONFIG_SOC_OMAP2420) || defined(CONFIG_SOC_OMAP2430)
 void omap2xxx_restart(char mode, const char *cmd);
 #else
 static inline void omap2xxx_restart(char mode, const char *cmd)
+{
+}
+#endif
+
+#ifdef CONFIG_SOC_AM33XX
+void am33xx_restart(char mode, const char *cmd);
+#else
+static inline void am33xx_restart(char mode, const char *cmd)
 {
 }
 #endif
@@ -127,7 +137,8 @@ static inline void omap3xxx_restart(char mode, const char *cmd)
 }
 #endif
 
-#if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5)
+#if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5) || \
+	defined(CONFIG_SOC_DRA7XX)
 void omap44xx_restart(char mode, const char *cmd);
 #else
 static inline void omap44xx_restart(char mode, const char *cmd)
@@ -242,7 +253,6 @@ extern int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state);
 extern int omap4_finish_suspend(unsigned long cpu_state);
 extern void omap4_cpu_resume(void);
 extern int omap4_hotplug_cpu(unsigned int cpu, unsigned int power_state);
-extern u32 omap4_mpuss_read_prev_context_state(void);
 #else
 static inline int omap4_enter_lowpower(unsigned int cpu,
 					unsigned int power_state)
@@ -270,10 +280,6 @@ static inline int omap4_finish_suspend(unsigned long cpu_state)
 static inline void omap4_cpu_resume(void)
 {}
 
-static inline u32 omap4_mpuss_read_prev_context_state(void)
-{
-	return 0;
-}
 #endif
 
 struct omap_sdrc_params;
@@ -285,6 +291,11 @@ extern void omap_reserve(void);
 
 struct omap_hwmod;
 extern int omap_dss_reset(struct omap_hwmod *);
+
+/* AXI ERROR DEFINES */
+#define AXI_L2_ERROR (1 << 30)
+#define AXI_ASYNC_ERROR (1 << 29)
+#define AXI_ERROR (AXI_L2_ERROR | AXI_ASYNC_ERROR)
 
 /* SoC specific clock initializer */
 extern int (*omap_clk_init)(void);
