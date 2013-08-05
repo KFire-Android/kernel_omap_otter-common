@@ -1544,7 +1544,6 @@ static struct omap_hwmod dra7xx_mcasp2_hwmod = {
 	},
 };
 
-/* HACK: Taken from UART6 since they're not used in dra7-evm */
 static struct omap_hwmod_dma_info dra7xx_mcasp3_sdma_reqs[] = {
 	{ .name = "tx", .dma_req = 78 + DRA7XX_DMA_REQ_START },
 	{ .name = "rx", .dma_req = 79 + DRA7XX_DMA_REQ_START },
@@ -1600,7 +1599,6 @@ static struct omap_hwmod dra7xx_mcasp5_hwmod = {
 	},
 };
 
-/* HACK: Taken from UART5 since they're not used in dra7-evm */
 static struct omap_hwmod_dma_info dra7xx_mcasp6_sdma_reqs[] = {
 	{ .name = "tx", .dma_req = 62 + DRA7XX_DMA_REQ_START },
 	{ .name = "rx", .dma_req = 63 + DRA7XX_DMA_REQ_START },

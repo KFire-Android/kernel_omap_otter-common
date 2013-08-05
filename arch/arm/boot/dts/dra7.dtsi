@@ -684,8 +684,8 @@
 		mcasp3: mcasp@48468000 {
 			compatible = "ti,dra7-mcasp-audio";
 			reg = <0x48468000 0x2000>;
-			interrupts = <0 108 0x4>, /* AREVT */
-				     <0 109 0x4>; /* TXEVT */
+			interrupts = <0 155 0x4>, /* AREVT */
+				     <0 154 0x4>; /* TXEVT */
 			ti,hwmods = "mcasp3";
 			op-mode = <0>;		/* MCASP_IIS_MODE */
 			tdm-slots = <2>;
@@ -698,8 +698,8 @@
 		mcasp6: mcasp@48474000 {
 			compatible = "ti,dra7-mcasp-audio";
 			reg = <0x48474000 0x2000>;
-			interrupts = <0 108 0x4>, /* AREVT */
-				     <0 109 0x4>; /* TXEVT */
+			interrupts = <0 156 0x4>, /* AREVT */
+				     <0 157 0x4>; /* TXEVT */
 			ti,hwmods = "mcasp6";
 			op-mode = <0>;		/* MCASP_IIS_MODE */
 			tdm-slots = <8>;

@@ -33,6 +33,7 @@
 struct dra7_snd_data {
 	unsigned int media_mclk_freq;
 	int media_slots;
+	int always_on;
 };
 
 static int dra7_mcasp_reparent(struct snd_soc_card *card,
@@ -139,6 +140,20 @@ static struct snd_soc_ops dra7_snd_media_ops = {
 	.hw_params = dra7_snd_media_hw_params,
 };
 
+static int dra7_dai_init(struct snd_soc_pcm_runtime *rtd)
+{
+	struct snd_soc_card *card = rtd->card;
+	struct dra7_snd_data *card_data = snd_soc_card_get_drvdata(card);
+
+	/* Minimize artifacts as much as possible if can be afforded */
+	if (card_data->always_on)
+		rtd->pmdown_time = INT_MAX;
+	else
+		rtd->pmdown_time = 0;
+
+	return 0;
+}
+
 static struct snd_soc_dai_link dra7_snd_dai[] = {
 	{
 		/* Media: McASP3 + tlv320aic3106 */
@@ -146,6 +161,7 @@ static struct snd_soc_dai_link dra7_snd_dai[] = {
 		.codec_dai_name = "tlv320aic3x-hifi",
 		.platform_name = "omap-pcm-audio",
 		.ops = &dra7_snd_media_ops,
+		.init = dra7_dai_init,
 	},
 };
 
@@ -230,20 +246,6 @@ static int dra7_snd_probe(struct platform_device *pdev)
 	struct dra7_snd_data *card_data;
 	int ret;
 
-	/*
-	 * HACK: DMA CROSSBAR
-	 * CTRL_CORE_DMA_SYSTEM_DREQ_62_63
-	 *    McASP6 TX: DREQ_139 -> sDMA_62
-	 *    McASP6 RX: DREQ_138 -> sDMA_63
-	 * CTRL_CORE_DMA_SYSTEM_DREQ_78_79
-	 *    McASP3 TX: DREQ_133 -> sDMA_78
-	 *    McASP3 RX: DREQ_132 -> sDMA_79
-	 */
-	void __iomem *dma_sys_dreq = ioremap(0x4A002B78, SZ_1K);
-	__raw_writel(0x008a008b, dma_sys_dreq + 0x7c); /* DREQ_62_63 */
-	__raw_writel(0x00840085, dma_sys_dreq + 0x9c); /* DREQ_78_79 */
-	iounmap(dma_sys_dreq);
-
 	card->dev = &pdev->dev;
 
 	card_data = devm_kzalloc(&pdev->dev, sizeof(*card_data), GFP_KERNEL);
@@ -269,6 +271,9 @@ static int dra7_snd_probe(struct platform_device *pdev)
 	}
 
 	snd_soc_card_set_drvdata(card, card_data);
+
+	if (of_find_property(node, "ti,always-on", NULL))
+		card_data->always_on = 1;
 
 	ret = dra7_snd_add_dai_link(card, &dra7_snd_dai[0], "ti,media");
 	if (ret) {
