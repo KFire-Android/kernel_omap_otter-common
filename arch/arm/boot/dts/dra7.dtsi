@@ -906,7 +906,9 @@
 
 		mcasp6: mcasp@48474000 {
 			compatible = "ti,dra7-mcasp-audio";
-			reg = <0x48474000 0x2000>;
+			reg = <0x48474000 0x2000>,
+				<0x4844c000 0x1000>;
+			reg-names = "cfg","dat";
 			interrupts = <0 156 0x4>, /* AREVT */
 				     <0 157 0x4>; /* TXEVT */
 			ti,hwmods = "mcasp6";
@@ -916,6 +918,8 @@
 			serial-dir = <1 2 0 0>;	/* 0:INACTIVE, 1:TX, 2:RX */
 			ti,tx-inactive-mode = <2>; /* 0: Hi-Z, 2: Low, 3: High */
 			ti,rx-inactive-mode = <2>; /* 0: Hi-Z, 2: Low, 3: High */
+			tx-num-evt = <8>;
+			rx-num-evt = <8>;
 		};
 
 		vpe {
