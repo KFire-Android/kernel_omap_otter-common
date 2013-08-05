@@ -117,6 +117,7 @@
 		&mcasp6_pins
 		&vout1_pins
 		&usb_pins
+		&irq_pins
 	>;
 
 	atl_pins: pinmux_atl_pins {
@@ -142,6 +143,12 @@
 			0x2dc 0x00000001	/* mcasp1_axr10.mcasp6_clkx OUTPUT | MODE1 */
 			0x2e0 0x00000001	/* mcasp1_axr11.mcasp6_fsx OUTPUT | MODE1 */
 		>;
+
+	irq_pins: pinmux_irq_pins {
+                pinctrl-single,pins = <
+			0x420	0x1	/* Wakeup2 INPUT | MODE1 */
+                >;
+        };
 	};
 
 	usb_pins: pinmux_usb_pins {
@@ -226,6 +233,11 @@
 		DVDD-supply = <&vaudio_1v8>;
 		AVDD-supply = <&vaudio_3v3>;
 		DRVDD-supply = <&vaudio_3v3>;
+	};
+
+	qt602240:qt602240@4a {
+		compatible = "atmel,qt602240";
+		reg = <0x4a>;
 	};
 };
 
