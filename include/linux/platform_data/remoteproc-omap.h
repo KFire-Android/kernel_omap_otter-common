@@ -24,7 +24,6 @@ struct platform_device;
  * struct omap_rproc_pdata - omap remoteproc's platform data
  * @name: the remoteproc's name
  * @oh_name: omap hwmod device
- * @oh_name_opt: optional, secondary omap hwmod device
  * @firmware: name of firmware file to load
  * @mbox_name: name of omap mailbox device to use with this rproc
  * @ops: start/stop rproc handlers
@@ -35,7 +34,6 @@ struct platform_device;
 struct omap_rproc_pdata {
 	const char *name;
 	const char *oh_name;
-	const char *oh_name_opt;
 	const char *firmware;
 	const char *mbox_name;
 	const struct rproc_ops *ops;
