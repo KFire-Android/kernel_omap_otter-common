@@ -247,7 +247,7 @@
 		reg = <0x20>;
 		gpio-controller;
 		#gpio-cells = <2>;
-		/* HACK: Using n_latch in cf8575 driver to "drive P10" to not hold ETH0 in reset */		
+		/* HACK: Using n_latch in cf8575 driver to "drive P10" to not hold ETH0 in reset */
 		n_latch = <0xfeff>;
 	};
 
@@ -419,4 +419,14 @@
 	atmel,threshold = <30>;
 	atmel,voltage = <2800000>;
 	atmel,orient = <0x4>;
+};
+&qspi {
+	spi-max-frequency = <48000000>;
+        m25p80@0 {
+                compatible = "s25fl256s1";
+                spi-max-frequency = <48000000>;
+                reg = <0>;
+		spi-cpol;
+		spi-cpha;
+	};
 };
