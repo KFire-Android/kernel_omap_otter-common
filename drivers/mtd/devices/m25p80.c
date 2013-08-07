@@ -336,53 +336,75 @@ static int m25p80_read(struct mtd_info *mtd, loff_t from, size_t len,
 	struct m25p *flash = mtd_to_m25p(mtd);
 	struct spi_transfer t[2];
 	struct spi_message m;
-	uint8_t opcode;
+        u32 page_offset, page_size;
 
 	pr_debug("%s: %s from 0x%08x, len %zd\n", dev_name(&flash->spi->dev),
 			__func__, (u32)from, len);
 
-	spi_message_init(&m);
-	memset(t, 0, (sizeof t));
+        spi_message_init(&m);
+        memset(t, 0, (sizeof t));
 
-	/* NOTE:
-	 * OPCODE_FAST_READ (if available) is faster.
-	 * Should add 1 byte DUMMY_BYTE.
-	 */
-	t[0].tx_buf = flash->command;
-	t[0].len = m25p_cmdsz(flash) + (flash->fast_read ? 1 : 0);
-	spi_message_add_tail(&t[0], &m);
+        t[0].tx_buf = flash->command;
+        t[0].len = m25p_cmdsz(flash);
+        spi_message_add_tail(&t[0], &m);
 
-	t[1].rx_buf = buf;
-	t[1].len = len;
-	spi_message_add_tail(&t[1], &m);
+        t[1].rx_buf = buf;
+        spi_message_add_tail(&t[1], &m);
 
-	mutex_lock(&flash->lock);
+        mutex_lock(&flash->lock);
 
-	/* Wait till previous write/erase is done. */
-	if (wait_till_ready(flash)) {
-		/* REVISIT status return?? */
-		mutex_unlock(&flash->lock);
-		return 1;
-	}
+        /* Wait until finished previous write command. */
+        if (wait_till_ready(flash)) {
+                mutex_unlock(&flash->lock);
+                return 1;
+        }
 
-	/* FIXME switch to OPCODE_FAST_READ.  It's required for higher
-	 * clocks; and at this writing, every chip this driver handles
-	 * supports that opcode.
-	 */
+        /* Set up the opcode in the write buffer. */
+        flash->command[0] = OPCODE_NORM_READ;
+        m25p_addr2cmd(flash, from, flash->command);
 
-	/* Set up the write data buffer. */
-	opcode = flash->fast_read ? OPCODE_FAST_READ : OPCODE_NORM_READ;
-	flash->command[0] = opcode;
-	m25p_addr2cmd(flash, from, flash->command);
+        page_offset = from & (flash->page_size - 1);
 
-	spi_sync(flash->spi, &m);
+        if (page_offset + len <= flash->page_size) {
+                t[1].len = len;
 
-	*retlen = m.actual_length - m25p_cmdsz(flash) -
-			(flash->fast_read ? 1 : 0);
+                spi_sync(flash->spi, &m);
 
-	mutex_unlock(&flash->lock);
+                *retlen = m.actual_length - m25p_cmdsz(flash);
+        } else {
+                u32 i;
 
-	return 0;
+                /* the size of data remaining on the first page */
+                page_size = flash->page_size - page_offset;
+
+                t[1].len = page_size;
+                spi_sync(flash->spi, &m);
+
+                *retlen = m.actual_length - m25p_cmdsz(flash);
+
+                /* write everything in flash->page_size chunks */
+                for (i = page_size; i < len; i += page_size) {
+                        page_size = len - i;
+                        if (page_size > flash->page_size)
+                                page_size = flash->page_size;
+
+                        /* write the next page to flash */
+                        m25p_addr2cmd(flash, from + i, flash->command);
+
+                        t[1].rx_buf = buf + i;
+                        t[1].len = page_size;
+
+                        wait_till_ready(flash);
+
+                        spi_sync(flash->spi, &m);
+
+                        *retlen += m.actual_length - m25p_cmdsz(flash);
+                }
+        }
+
+        mutex_unlock(&flash->lock);
+
+        return 0;
 }
 
 /*
@@ -861,15 +883,9 @@ static int m25p_probe(struct spi_device *spi)
 		}
 	}
 
-	flash = kzalloc(sizeof *flash, GFP_KERNEL);
+	flash = devm_kzalloc(&spi->dev, sizeof *flash, GFP_KERNEL);
 	if (!flash)
 		return -ENOMEM;
-	flash->command = kmalloc(MAX_CMD_SIZE + (flash->fast_read ? 1 : 0),
-					GFP_KERNEL);
-	if (!flash->command) {
-		kfree(flash);
-		return -ENOMEM;
-	}
 
 	flash->spi = spi;
 	mutex_init(&flash->lock);
@@ -931,6 +947,13 @@ static int m25p_probe(struct spi_device *spi)
 #ifdef CONFIG_M25PXX_USE_FAST_READ
 	flash->fast_read = true;
 #endif
+
+        flash->command = kmalloc(MAX_CMD_SIZE + (flash->fast_read ? 1 : 0),
+                                        GFP_KERNEL);
+        if (!flash->command) {
+                kfree(flash);
+                return -ENOMEM;
+        }
 
 	if (info->addr_width)
 		flash->addr_width = info->addr_width;
