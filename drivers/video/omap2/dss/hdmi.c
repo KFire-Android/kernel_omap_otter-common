@@ -2335,6 +2335,9 @@ static int __init omapdss_hdmihw_probe(struct platform_device *pdev)
 		DSSWARN("could not create platform device for audio");
 #endif
 
+	if (hdmi_get_current_hpd())
+		hdmi_panel_hpd_handler(1);
+
 	return 0;
 
 err_panel_init:
