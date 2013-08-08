@@ -21,6 +21,12 @@
 #ifndef _HDMI_H
 #define _HDMI_H
 
+enum level_shifter_state {
+	LS_DISABLED = 0,	/* HPD off, LS off */
+	LS_HPD_ON,		/* HPD on, LS off */
+	LS_ENABLED,		/* HPD on, LS on */
+};
+
 extern struct device_attribute dev_attr_hdmi_timings;
 
 int omapdss_hdmi_display_set_mode2(struct omap_dss_device *dssdev,
@@ -30,5 +36,6 @@ int hdmi_panel_set_mode(struct fb_videomode *vm, int code, int mode);
 int hdmi_panel_hpd_handler(int hpd);
 int hdmi_get_current_hpd(void);
 int hdmi_notify_hpd(struct omap_dss_device *dssdev, bool hpd);
+void hdmi_set_ls_state(enum level_shifter_state state);
 
 #endif

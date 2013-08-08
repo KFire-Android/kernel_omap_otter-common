@@ -355,7 +355,7 @@ static const struct hdmi_config s3d_timings[] = {
 	},
 };
 
-static void hdmi_set_ls_state(enum level_shifter_state state)
+void hdmi_set_ls_state(enum level_shifter_state state)
 {
 	bool hpd_enable = false;
 	bool ls_enable = false;
@@ -391,7 +391,8 @@ static void hdmi_set_ls_state(enum level_shifter_state state)
 
 	hdmi.ls_state = state;
 
-	sel_hdmi();
+	if (ls_enable)
+		sel_hdmi();
 }
 
 static int relaxed_fb_mode_is_equal(const struct fb_videomode *mode1,
@@ -1966,52 +1967,60 @@ static void ddc_i2c_init(struct platform_device *pdev)
 static void init_sel_i2c_hdmi(void)
 {
 	void __iomem *clk_base = ioremap(0x4A009000, SZ_4K);
-	void __iomem *mcasp2_base = ioremap(0x48464000, SZ_1K);
-	void __iomem *pinmux = ioremap(0x4a003600, SZ_1K);
-	u32 val;
+	void __iomem *mcasp8_base = ioremap(0x4847C000, SZ_1K);
 	
 	if (omapdss_get_version() != OMAPDSS_VER_DRA7xx)
 		goto err;
 
-	if (!clk_base || !mcasp2_base || !pinmux)
-		DSSERR("couldn't ioremap for clk or mcasp2\n");
+	if (!clk_base || !mcasp8_base)
+		DSSERR("couldn't ioremap for clk or mcasp8\n");
 
-	__raw_writel(0x40000, pinmux + 0xfc);
-	/* sw supervised wkup */
+	/* set CM_L4PER2_CLKSTCTRL to sw supervised wkup */
 	__raw_writel(0x2, clk_base + 0x8fc);
 
-	/* enable clock domain */
-	__raw_writel(0x2, clk_base + 0x860);
-
-	/* see what status looks like */
-	val = __raw_readl(clk_base + 0x8fc);
-	printk("CM_L4PER2_CLKSTCTRL %x\n", val);
+	/* Enable the MCASP8_AUX_GFCLK[22:23]: 0x0 - use default
+	 * CM_L4PER2_MCASP8_CLKCTRL[1:0]: 0x2 - Enable explicitly
+	 */
+	__raw_writel(0x2, clk_base + 0x890);
+	DSSINFO("%s: CM_L4PER2_CLKSTCTRL 0x%8x\n",
+		__func__, __raw_readl(clk_base + 0x8fc));
 
 	/*
-	 * mcasp2 regs should be hopefully accessible, make mcasp2_aclkr
-	 * a gpio, write necessary stuff to MCASP_PFUNC and PDIR
+	 * make mcasp8_axr2 a gpio and set direction to high
 	 */
-	__raw_writel(0x1 << 29, mcasp2_base + 0x10);
-	__raw_writel(0x1 << 29, mcasp2_base + 0x14);
+	__raw_writel(0x4, mcasp8_base + 0x10); /* MCASP8_PFUNC */
+	__raw_writel(0x4, mcasp8_base + 0x14); /* MCASP8_PDIR */
+	DSSDBG("MCASP8_PFUNC : 0x%x\n", __raw_readl(mcasp8_base + 0x10));
+	DSSDBG("MCASP8_PDIR  : 0x%x\n", __raw_readl(mcasp8_base + 0x14));
 
 err:
 	iounmap(clk_base);
-	iounmap(mcasp2_base);
-	iounmap(pinmux);
+	iounmap(mcasp8_base);
 }
 
 /* use this to configure the pcf8575@22 to set LS_OE and CT_HPD */
 void sel_i2c(void)
 {
-	void __iomem *base = ioremap(0x48464000, SZ_1K);
+	void __iomem *clk_base = ioremap(0x4A009000, SZ_4K);
+	void __iomem *mcasp8_base = ioremap(0x4847C000, SZ_1K);
 	void __iomem *core_base = ioremap(0x4a003400, SZ_1K);
 
 	if (omapdss_get_version() != OMAPDSS_VER_DRA7xx)
 		goto err;
 
-	/* PDOUT */
-	__raw_writel(0x0, base + 0x18);
-	DSSDBG("PDOUT sel_i2c  %x\n", __raw_readl(base + 0x18));
+	/* set CM_L4PER2_CLKSTCTRL to sw supervised wkup */
+	__raw_writel(0x2, clk_base + 0x8fc);
+
+	/* Enable the MCASP8_AUX_GFCLK[22:23]: 0x1- Switch to VIDEO1_CLK
+	 * CM_L4PER2_MCASP8_CLKCTRL[1:0]: 0x2 - Enable explicitly
+	 */
+	__raw_writel(0x400002, clk_base + 0x890);
+	DSSINFO("%s: CM_L4PER2_CLKSTCTRL 0x%8x\n",
+		__func__, __raw_readl(clk_base + 0x8fc));
+
+	/* drive MCASP8_PDOUT to low to select I2C2*/
+	__raw_writel(0x0, mcasp8_base + 0x18);
+	DSSDBG("PDOUT sel_i2c  %x\n", __raw_readl(mcasp8_base + 0x18));
 
 #ifdef CONFIG_OMAP5_DSS_HDMI_DDC
 	/* select I2C scl/sda*/
@@ -2023,22 +2032,23 @@ void sel_i2c(void)
 #endif
 
 err:
-	iounmap(base);
 	iounmap(core_base);
+	iounmap(mcasp8_base);
+	iounmap(clk_base);
 }
 
 /* use this to select HDMI and read edid over ddc lines*/
 void sel_hdmi(void)
 {
-	void __iomem *base = ioremap(0x48464000, SZ_1K);
+	void __iomem *mcasp8_base = ioremap(0x4847C000, SZ_1K);
 	void __iomem *core_base = ioremap(0x4a003400, SZ_1K);
 
 	if (omapdss_get_version() != OMAPDSS_VER_DRA7xx)
 		goto err;
 
-	/* PDOUT */
-	__raw_writel(0x20000000, base + 0x18);
-	DSSDBG("PDOUT sel_hdmi %x\n", __raw_readl(base + 0x18));
+	/* drive MCASP8_PDOUT to high to select HDMI*/
+	__raw_writel(0x4, mcasp8_base + 0x18);
+	DSSDBG("PDOUT sel_hdmi %x\n", __raw_readl(mcasp8_base + 0x18));
 
 #ifdef CONFIG_OMAP5_DSS_HDMI_DDC
 	/* select hdmi ddc scl/sda*/
@@ -2050,8 +2060,8 @@ void sel_hdmi(void)
 #endif
 
 err:
-	iounmap(base);
 	iounmap(core_base);
+	iounmap(mcasp8_base);
 }
 
 static void __init hdmi_probe_of(struct platform_device *pdev)
