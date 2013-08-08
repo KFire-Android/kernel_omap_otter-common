@@ -516,6 +516,7 @@ struct omap_writeback_info {
 	u8					rotation;
 	enum omap_dss_rotation_type		rotation_type;
 	bool force_1d;
+	bool mflag_en;
 };
 
 struct omap_writeback {
