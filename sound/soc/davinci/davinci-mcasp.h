@@ -39,6 +39,7 @@ struct davinci_audio_dev {
 	u8	*serial_dir;
 	u32	tx_dismod;
 	u32	rx_dismod;
+	u32	bit_mask;
 	u8	version;
 	u16	bclk_lrclk_ratio;
 	unsigned int channels;

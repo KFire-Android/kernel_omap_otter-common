@@ -394,6 +394,8 @@ static void mcasp_start_tx(struct davinci_audio_dev *dev)
 	u8 offset = 0, i;
 	u32 cnt;
 
+	mcasp_set_reg(dev->base + DAVINCI_MCASP_TXMASK_REG, dev->bit_mask);
+
 	mcasp_set_ctl_reg(dev->base + DAVINCI_MCASP_GBLCTLX_REG, TXHCLKRST);
 	mcasp_set_ctl_reg(dev->base + DAVINCI_MCASP_GBLCTLX_REG, TXCLKRST);
 	mcasp_set_ctl_reg(dev->base + DAVINCI_MCASP_GBLCTLX_REG, TXSERCLR);
@@ -504,6 +506,19 @@ static void mcasp_stop_tx(struct davinci_audio_dev *dev)
 	/* Keep FSG active until RX section is stopped too */
 	if ((rxfmctl & AFSRE) && (gblctl & RXSMRST))
 		val =  TXHCLKRST | TXCLKRST | TXFSRST;
+
+	/*
+	 * Reset of the state machine, serializer and frame sync generator
+	 * can occur in the middle of a slot which can cause discontinuities
+	 * that may lead to glitches. It can be prevented muting the transmit
+	 * data by masking out all its bits.
+	 * A delay is required to ensure at least one slot uses the new TXMASK,
+	 * the worst case (longest slot) is for 8kHz, mono (125 us).
+	 * Implementation has to use udelay since it's executed in atomic
+	 * context (trigger() callback).
+	 */
+	mcasp_set_reg(dev->base + DAVINCI_MCASP_TXMASK_REG, 0);
+	udelay(125);
 
 	mcasp_set_reg(dev->base + DAVINCI_MCASP_GBLCTLX_REG, val);
 	mcasp_set_reg(dev->base + DAVINCI_MCASP_TXSTAT_REG, 0xFFFFFFFF);
@@ -703,8 +718,9 @@ static int davinci_config_channel_size(struct davinci_audio_dev *dev,
 	u32 fmt;
 	u32 tx_rotate = (word_length / 4) & 0x7;
 	u32 rx_rotate;
-	u32 mask = (1ULL << word_length) - 1;
 	u32 slot_length;
+
+	dev->bit_mask = (1ULL << word_length) - 1;
 
 	/*
 	 * if s BCLK-to-LRCLK ratio has been configured via the set_clkdiv()
@@ -735,10 +751,8 @@ static int davinci_config_channel_size(struct davinci_audio_dev *dev,
 		mcasp_mod_bits(dev->base + DAVINCI_MCASP_RXFMT_REG,
 				RXROT(rx_rotate), RXROT(7));
 		mcasp_set_reg(dev->base + DAVINCI_MCASP_RXMASK_REG,
-				mask);
+				dev->bit_mask);
 	}
-
-	mcasp_set_reg(dev->base + DAVINCI_MCASP_TXMASK_REG, mask);
 
 	return 0;
 }
