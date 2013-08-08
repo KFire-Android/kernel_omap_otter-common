@@ -247,6 +247,8 @@
 		reg = <0x20>;
 		gpio-controller;
 		#gpio-cells = <2>;
+		/* HACK: Using n_latch in cf8575 driver to "drive P10" to not hold ETH0 in reset */		
+		n_latch = <0xfeff>;
 	};
 
 	/* TLC chip for LCD panel power and backlight */
