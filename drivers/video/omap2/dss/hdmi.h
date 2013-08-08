@@ -1,0 +1,32 @@
+/*
+ * hdmi.h
+ *
+ * HDMI interface driver definition
+ *
+ * Copyright (C) 2010-2011 Texas Instruments Incorporated - http://www.ti.com/
+ *
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 as published by
+ * the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+#ifndef _HDMI_H
+#define _HDMI_H
+
+int omapdss_hdmi_display_set_mode2(struct omap_dss_device *dssdev,
+				   struct fb_videomode *vm,
+				   int code, int mode);
+int hdmi_panel_set_mode(struct fb_videomode *vm, int code, int mode);
+int hdmi_panel_hpd_handler(int hpd);
+int hdmi_get_current_hpd(void);
+int hdmi_notify_hpd(struct omap_dss_device *dssdev, bool hpd);
+
+#endif
