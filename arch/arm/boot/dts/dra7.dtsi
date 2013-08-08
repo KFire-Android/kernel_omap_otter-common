@@ -33,6 +33,12 @@
 				>;
 				clocks = <&dpll_mpu_ck>;
 				clock-names = "cpu";
+				/*
+				 * Transition latency reference from omap5.
+				 * TBD: to be instrumented and use the actual
+				 * value at later point of time
+				 */
+				clock-latency = <300000>;
 			timer {
 				compatible = "arm,armv7-timer";
 				/*
