@@ -21,6 +21,21 @@
 #ifndef _TI_HDMI_H
 #define _TI_HDMI_H
 
+/* HDCP interrupts bits */
+#define KSVACCESSINT		(1 << 0x0)
+#define KSVSHA1CALCINT		(1 << 0x1)
+#define KEEPOUTERRORINT		(1 << 0x2)
+#define LOSTARBITRATION		(1 << 0x3)
+#define I2CNACK			(1 << 0x4)
+#define HDCP_FAILED		(1 << 0x6)
+#define HDCP_ENGAGED		(1 << 0x7)
+
+#define HDMI_HDCP_ENABLED	0x1
+#define HDMI_HDCP_FAILED	0x0
+
+
+#define HDMI_HDCP_INT		0x200
+
 struct hdmi_ip_data;
 #if defined(CONFIG_OMAP4_DSS_HDMI_AUDIO) || \
 	defined(CONFIG_OMAP5_DSS_HDMI_AUDIO)
@@ -185,6 +200,19 @@ struct ti_hdmi_ip_ops {
 	int (*irq_core_handler) (struct hdmi_ip_data *ip_data);
 
 	int (*configure_range)(struct hdmi_ip_data *ip_data);
+
+	int (*hdcp_init)(struct hdmi_ip_data *ip_data);
+
+	int (*hdcp_enable) (struct hdmi_ip_data *ip_data);
+
+	int (*hdcp_disable)(struct hdmi_ip_data *ip_data);
+
+	int (*hdcp_status)(struct hdmi_ip_data *ip_data);
+
+	int (*hdcp_int_handler)(struct hdmi_ip_data *ip_data);
+
+	int (*reset_wrapper)(struct hdmi_ip_data *ip_data);
+
 };
 
 /*
@@ -281,10 +309,18 @@ void ti_hdmi_5xxx_audio_stop(struct hdmi_ip_data *ip_data);
 int ti_hdmi_5xxx_audio_config(struct hdmi_ip_data *ip_data,
 		struct omap_dss_audio *audio);
 #endif
+int ti_hdmi_4xxx_check_rxdet_line(struct hdmi_ip_data *ip_data);
+int ti_hdmi_4xxx_set_av_mute(struct hdmi_ip_data *ip_data, u8 av_mute_state);
 void ti_hdmi_5xxx_basic_configure(struct hdmi_ip_data *ip_data);
 void ti_hdmi_5xxx_core_dump(struct hdmi_ip_data *ip_data, struct seq_file *s);
 int ti_hdmi_5xxx_read_edid(struct hdmi_ip_data *ip_data,
 				u8 *edid, int len);
 int ti_hdmi_5xxx_core_irq_handler(struct hdmi_ip_data *ip_data);
+int ti_hdmi_5xxx_irq_handler(struct hdmi_ip_data *ip_data);
 int ti_hdmi_5xxx_configure_range(struct hdmi_ip_data *ip_data);
+int ti_hdmi_5xxx_hdcp_init(struct hdmi_ip_data *ip_data);
+int ti_hdmi_5xxx_hdcp_enable(struct hdmi_ip_data *ip_data);
+int ti_hdmi_5xxx_hdcp_disable(struct hdmi_ip_data *ip_data);
+int ti_hdmi_5xxx_hdcp_int_handler(struct hdmi_ip_data *ip_data);
+int ti_hdmi_5xxx_hdcp_status(struct hdmi_ip_data *ip_data);
 #endif
