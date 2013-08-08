@@ -781,9 +781,6 @@
 		vpe {
 			compatible = "ti,vpe";
 			ti,hwmods = "vpe";
-			reg = <0x489d0000 0xd000>, <0x489dd000 0x400>;
-			reg-names = "vpe", "vpdma";
-			interrupts = <0 158 0x4>;
 			#address-cells = <1>;
 			#size-cells = <0>;
 		};

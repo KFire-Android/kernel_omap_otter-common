@@ -3721,12 +3721,22 @@ static struct omap_hwmod_class dra7xx_vpe_hwmod_class = {
 	.sysc	= &dra7xx_vpe_sysc,
 };
 
+static struct omap_hwmod_irq_info dra7xx_vpe_irqs[] = {
+	/*
+	 * Using a reserved interrupt line, mapping crossbar 354 to the irq line
+	 * in the driver
+	 */
+	{ .irq = 158 + DRA7XX_IRQ_GIC_START },
+	{ .irq = -1 }
+};
+
 /* vpe */
 static struct omap_hwmod dra7xx_vpe_hwmod = {
 	.name		= "vpe",
 	.class		= &dra7xx_vpe_hwmod_class,
 	.clkdm_name	= "vpe_clkdm",
 	.main_clk	= "dpll_core_h23x2_ck",
+	.mpu_irqs	= dra7xx_vpe_irqs,
 	.prcm = {
 		.omap4 = {
 			.clkctrl_offs = DRA7XX_CM_VPE_VPE_CLKCTRL_OFFSET,
@@ -6275,43 +6285,13 @@ static struct omap_hwmod_ocp_if dra7xx_l4_per3__vip3 = {
 
 static struct omap_hwmod_addr_space dra7xx_vpe_addrs[] = {
 	{
-		.name		= "vpe0_vayu_register_inst_0",
+		.name		= "vpe",
 		.pa_start	= 0x489d0000,
-		.pa_end		= 0x489d01ff,
+		.pa_end		= 0x489dcfff,
 		.flags		= ADDR_TYPE_RT
 	},
 	{
-		.name		= "dss_chr_us_register_inst_0",
-		.pa_start	= 0x489d0300,
-		.pa_end		= 0x489d033f,
-	},
-	{
-		.name		= "dss_chr_us_register_inst_1",
-		.pa_start	= 0x489d0400,
-		.pa_end		= 0x489d043f,
-	},
-	{
-		.name		= "dss_chr_us_register_inst_2",
-		.pa_start	= 0x489d0500,
-		.pa_end		= 0x489d053f,
-	},
-	{
-		.name		= "dss_dei_register_inst_0",
-		.pa_start	= 0x489d0600,
-		.pa_end		= 0x489d063f,
-	},
-	{
-		.name		= "dss_sc_m_register_inst_0",
-		.pa_start	= 0x489d0700,
-		.pa_end		= 0x489d077f,
-	},
-	{
-		.name		= "dss_csc_register_inst_0",
-		.pa_start	= 0x489d5700,
-		.pa_end		= 0x489d571f,
-	},
-	{
-		.name		= "hd_dss_centaurus_vpdma_register_inst_0",
+		.name		= "vpdma",
 		.pa_start	= 0x489dd000,
 		.pa_end		= 0x489dd3ff,
 	},
