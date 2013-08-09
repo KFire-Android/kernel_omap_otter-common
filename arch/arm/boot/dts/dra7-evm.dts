@@ -119,6 +119,7 @@
 		&mcasp8_pins
 		&vout1_pins
 		&usb_pins
+		&irq_pins
 	>;
 
 	atl_pins: pinmux_atl_pins {
@@ -144,6 +145,12 @@
 			0x2dc 0x00000001	/* mcasp1_axr10.mcasp6_clkx OUTPUT | MODE1 */
 			0x2e0 0x00000001	/* mcasp1_axr11.mcasp6_fsx OUTPUT | MODE1 */
 		>;
+
+	irq_pins: pinmux_irq_pins {
+                pinctrl-single,pins = <
+			0x420	0x1	/* Wakeup2 INPUT | MODE1 */
+                >;
+        };
 	};
 
 	mcasp8_pins: pinmux_mcasp8_pins {
@@ -199,11 +206,71 @@
 			0x238	0x0	/* vout1_d23 OUTPUT | MODE0 */
 		>;
 	};
+
 	display_layout {
 		compatible = "ti, omap4-dsscomp";
 		ti,num_displays = <2>;
 		ti,default_display = "lcd";
 	};
+
+	cpsw_default_pins: pinmux_cpsw_default_pins {
+		pinctrl-single,pins = <
+			/* Slave 1 */
+			0x250	0x0 /* rgmii1_tclk PIN_OUTPUT | MUX_MODE0 */
+			0x254	0x0 /* rgmii1_tctl PIN_OUTPUT | MUX_MODE0 */
+			0x258	0x0 /* rgmii1_td3 PIN_OUTPUT | MUX_MODE0 */
+			0x25c	0x0 /* rgmii1_td2 PIN_OUTPUT | MUX_MODE0 */
+			0x260	0x0 /* rgmii1_td1 PIN_OUTPUT | MUX_MODE0 */
+			0x264	0x0 /* rgmii1_td0 PIN_OUTPUT | MUX_MODE0 */
+			0x268	0x00040000 /* rgmii1_rclk PIN_INPUT | MUX_MODE0 */
+			0x26c	0x00040000 /* rgmii1_rctl PIN_INPUT | MUX_MODE0 */
+			0x270	0x00040000 /* rgmii1_rd3 PIN_INPUT | MUX_MODE0 */
+			0x274	0x00040000 /* rgmii1_rd2 PIN_INPUT | MUX_MODE0 */
+			0x278	0x00040000 /* rgmii1_rd1 PIN_INPUT | MUX_MODE0 */
+			0x27c	0x00040000 /* rgmii1_rd0 PIN_INPUT | MUX_MODE0 */
+
+			/* Slave 2 */
+			0x198	0x4 /* rgmii2_tclk PIN_OUTPUT | MUX_MODE4 */
+			0x19c	0x4 /* rgmii2_tctl PIN_OUTPUT | MUX_MODE4 */
+			0x1a0	0x4 /* rgmii2_td3 PIN_OUTPUT | MUX_MODE4 */
+			0x1a4	0x4 /* rgmii2_td2 PIN_OUTPUT | MUX_MODE4 */
+			0x1a8	0x4 /* rgmii2_td1 PIN_OUTPUT | MUX_MODE4 */
+			0x1ac	0x4 /* rgmii2_td0 PIN_OUTPUT | MUX_MODE4 */
+			0x1b0	0x00040004 /* rgmii2_rclk PIN_INPUT | MUX_MODE4 */
+			0x1b4	0x00040004 /* rgmii2_rctl PIN_INPUT | MUX_MODE4 */
+			0x1b8	0x00040004 /* rgmii2_rd3 PIN_INPUT | MUX_MODE4 */
+			0x1bc	0x00040004 /* rgmii2_rd2 PIN_INPUT | MUX_MODE4 */
+			0x1c0	0x00040004 /* rgmii2_rd1 PIN_INPUT | MUX_MODE4 */
+			0x1c4	0x00040004 /* rgmii2_rd0 PIN_INPUT | MUX_MODE4 */
+				>;
+		};
+
+	davinci_mdio_default_pins: pinmux_davinci_mdio_default_pins {
+		pinctrl-single,pins = <
+			/* MDIO */
+			0x23c	0x30000 /* mdio_data PIN_OUTPUT_PULLUP | MUX_MODE0 */
+			0x240	0x70000 /* mdio_clk PIN_INPUT_PULLUP | MUX_MODE0 */
+				>;
+		};
+};
+
+&gmac {
+	status="okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&cpsw_default_pins>;
+};
+
+&davinci_mdio {
+	pinctrl-names = "default";
+	pinctrl-0 = <&davinci_mdio_default_pins>;
+};
+
+&cpsw_emac0 {
+	phy_id = <&davinci_mdio>, <2>;
+};
+
+&cpsw_emac1 {
+	phy_id = <&davinci_mdio>, <3>;
 };
 
 &i2c1 {
@@ -218,6 +285,8 @@
 		reg = <0x20>;
 		gpio-controller;
 		#gpio-cells = <2>;
+		/* HACK: Using n_latch in cf8575 driver to "drive P10" to not hold ETH0 in reset */		
+		n_latch = <0xfeff>;
 	};
 
 	/* TLC chip for LCD panel power and backlight */
@@ -235,6 +304,10 @@
 		DVDD-supply = <&vaudio_1v8>;
 		AVDD-supply = <&vaudio_3v3>;
 		DRVDD-supply = <&vaudio_3v3>;
+	};
+
+	mXT244:mXT244@4a {
+		reg = <0x4a>;
 	};
 };
 
@@ -330,4 +403,58 @@
 			compatible = "ti,hdmi_panel";
 		};
 	};
+};
+
+&mXT244 {
+	compatible = "atmel,mXT244";
+	interrupts = <0 119 0x4>;
+
+	atmel,config = <
+	/* MXT244_GEN_COMMAND(6) */
+	0x00 0x00 0x00 0x00 0x00 0x00
+	/* MXT244_GEN_POWER(7) */
+	0x20 0xff 0x32
+	/* MXT244_GEN_ACQUIRE(8) */
+	0x0a 0x00 0x05 0x00 0x00 0x00 0x09 0x23
+	/* MXT244_TOUCH_MULTI(9) */
+	0x00 0x00 0x00 0x13 0x0b 0x00 0x00 0x00 0x02 0x00
+	0x00 0x01 0x01 0x0e 0x0a 0x0a 0x0a 0x0a 0x00 0x00
+	0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+	0x00
+	/* MXT244_TOUCH_KEYARRAY(15) */
+	0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+	0x00
+	/* MXT244_COMMSCONFIG_T18(2) */
+	0x00 0x00
+	/* MXT244_SPT_GPIOPWM(19) */
+	0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+	0x00 0x00 0x00 0x00 0x00 0x00
+	/* MXT244_PROCI_GRIPFACE(20) */
+	0x07 0x00 0x00 0x00 0x00 0x00 0x00 0x50 0x28 0x04
+	0x0f 0x0a
+	/* MXT244_PROCG_NOISE(22) */
+	0x05 0x00 0x00 0x00 0x00 0x00 0x00 0x03 0x23 0x00
+	0x00 0x05 0x0f 0x19 0x23 0x2d 0x03
+	/* MXT244_TOUCH_PROXIMITY(23) */
+	0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+	0x00 0x00 0x00 0x00 0x00
+	/* MXT244_PROCI_ONETOUCH(24) */
+	0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+	0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+	/* MXT244_SPT_SELFTEST(25) */
+	0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+	0x00 0x00 0x00 0x00
+	/* MXT244_PROCI_TWOTOUCH(27) */
+	0x00 0x00 0x00 0x00 0x00 0x00 0x00
+	/* MXT244_SPT_CTECONFIG(28) */
+	0x00 0x00 0x02 0x08 0x10 0x00 >;
+
+	atmel,x_line = <18>;
+	atmel,y_line = <12>;
+	atmel,x_size = <800>;
+	atmel,y_size = <480>;
+	atmel,blen = <0x01>;
+	atmel,threshold = <30>;
+	atmel,voltage = <2800000>;
+	atmel,orient = <0x4>;
 };
