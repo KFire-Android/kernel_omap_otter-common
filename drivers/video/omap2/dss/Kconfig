@@ -97,6 +97,17 @@ config OMAP5_DSS_HDMI
 	help
 	    HDMI Interface.This add the High Deinition Multimedia Interface.
 	    See http://wwww.hdmi.org/ for HDMI specification.
+
+config OMAP5_DSS_HDMI_DDC
+	bool "OMAP5 HDMI DDC support"
+	depends on OMAP5_DSS_HDMI
+	default y
+	help
+	  HDMI DDC interface. This adds support for selecting DDC or I2C2 lines
+	  for HDMI DDC transfer.
+	  EDID can be read using direct I2C commands sent to the external display
+	  over I2C lines or by configuring the DDC registers in the core.
+
 config OMAP2_DSS_SDI
 	bool "SDI support"
         default n

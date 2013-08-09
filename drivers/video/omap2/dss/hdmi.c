@@ -46,6 +46,7 @@
 #include "ti_hdmi.h"
 #include "dss.h"
 #include "dss_features.h"
+#include "hdmi.h"
 
 /* HDMI EDID Length move this */
 #define HDMI_EDID_MAX_LENGTH			512
@@ -354,7 +355,7 @@ static const struct hdmi_config s3d_timings[] = {
 	},
 };
 
-static void hdmi_set_ls_state(enum level_shifter_state state)
+void hdmi_set_ls_state(enum level_shifter_state state)
 {
 	bool hpd_enable = false;
 	bool ls_enable = false;
@@ -390,7 +391,8 @@ static void hdmi_set_ls_state(enum level_shifter_state state)
 
 	hdmi.ls_state = state;
 
-	sel_hdmi();
+	if (ls_enable)
+		sel_hdmi();
 }
 
 static int relaxed_fb_mode_is_equal(const struct fb_videomode *mode1,
@@ -675,6 +677,7 @@ end:	return cm;
 u8 *hdmi_read_valid_edid(void)
 {
 	int ret, i;
+	void __iomem *clk_base;
 
 	if (hdmi.edid_set)
 		return hdmi.edid;
@@ -682,10 +685,20 @@ u8 *hdmi_read_valid_edid(void)
 	memset(hdmi.edid, 0, HDMI_EDID_MAX_LENGTH);
 
 	hdmi_runtime_get();
+	/* HACK: TO BE Fixed later
+	 * set DSS clock domain in sw supervised wkup to force DSS_L3_GICLK
+	 */
+	clk_base = ioremap(0x4A009000, SZ_4K);
+	__raw_writel(0x2, clk_base + 0x100);
+	DSSINFO("%s: CM_DSS_CLKSTCTRL %x\n",
+		__func__, __raw_readl(clk_base + 0x100));
 
 	ret = hdmi.ip_data.ops->read_edid(&hdmi.ip_data, hdmi.edid,
 						  HDMI_EDID_MAX_LENGTH);
 
+	/* revert DSS clock domain back to HW_AUTO*/
+	__raw_writel(0x3, clk_base + 0x100);
+	iounmap(clk_base);
 	hdmi_runtime_put();
 
 	for (i = 0; i < HDMI_EDID_MAX_LENGTH; i += 16)
@@ -1082,7 +1095,20 @@ int omapdss_hdmi_display_check_timing(struct omap_dss_device *dssdev,
 
 #endif
 	return 0;
+}
 
+int omapdss_hdmi_display_set_mode2(struct omap_dss_device *dssdev,
+				   struct fb_videomode *vm,
+				   int code, int mode)
+{
+	hdmi.ip_data.set_mode = true;
+	dssdev->driver->disable(dssdev);
+	hdmi.ip_data.set_mode = false;
+	hdmi.ip_data.cfg.timingsfb = *vm;
+	hdmi.custom_set = 1;
+	hdmi.code = code;
+	hdmi.mode = mode;
+	return dssdev->driver->enable(dssdev);
 }
 
 int omapdss_hdmi_display_set_mode(struct omap_dss_device *dssdev,
@@ -1099,6 +1125,13 @@ int omapdss_hdmi_display_set_mode(struct omap_dss_device *dssdev,
 	hdmi.mode = hdmi.ip_data.cfg.cm.mode;
 	r2 = dssdev->driver->enable(dssdev);
 	return r1 ? : r2;
+}
+
+int hdmi_notify_hpd(struct omap_dss_device *dssdev, bool hpd)
+{
+	if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE)
+		return -1;
+	return hdmi.ip_data.ops->set_phy(&hdmi.ip_data, hpd);
 }
 
 int omapdss_hdmi_display_3d_enable(struct omap_dss_device *dssdev,
@@ -1295,6 +1328,150 @@ bool omapdss_hdmi_detect(void)
 
 	return r == 1;
 }
+
+static ssize_t hdmi_timings_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct fb_videomode *t = &hdmi.ip_data.cfg.timingsfb;
+	return snprintf(buf, PAGE_SIZE,
+			"%u,%u/%u/%u/%u,%u/%u/%u/%u,%c/%c,%s-%u\n",
+			t->pixclock ? (u32)PICOS2KHZ(t->pixclock) : 0,
+			t->xres, t->right_margin, t->left_margin, t->hsync_len,
+			t->yres, t->lower_margin, t->upper_margin, t->vsync_len,
+			(t->sync & FB_SYNC_HOR_HIGH_ACT) ? '+' : '-',
+			(t->sync & FB_SYNC_VERT_HIGH_ACT) ? '+' : '-',
+			hdmi.ip_data.cfg.cm.mode == HDMI_HDMI ? "CEA" : "VESA",
+			hdmi.ip_data.cfg.cm.code);
+}
+
+static ssize_t hdmi_timings_store(struct device *dev,
+		struct device_attribute *attr,
+		const char *buf, size_t size)
+{
+	struct fb_videomode t = { .pixclock = 0 }, c;
+	u32 code, x, y, old_rate, new_rate = 0;
+	int mode = -1, pos = 0, pos2 = 0;
+	char hsync, vsync, ilace;
+	int hpd;
+
+	/* check for timings */
+	if (sscanf(buf, "%u,%u/%u/%u/%u,%u/%u/%u/%u,%c/%c%n",
+		&t.pixclock,
+		&t.xres, &t.right_margin, &t.left_margin, &t.hsync_len,
+		&t.yres, &t.lower_margin, &t.upper_margin, &t.vsync_len,
+		&hsync, &vsync, &pos) >= 11 &&
+		(hsync == '+' || hsync == '-') &&
+		(vsync == '+' || vsync == '-') && t.pixclock) {
+		t.sync = (hsync == '+' ? FB_SYNC_HOR_HIGH_ACT : 0) |
+			(vsync == '+' ? FB_SYNC_VERT_HIGH_ACT : 0);
+		t.pixclock = KHZ2PICOS(t.pixclock);
+		buf += pos;
+		if (*buf == ',')
+			buf++;
+	} else {
+		t.pixclock = 0;
+	}
+
+	/* check for CEA/VESA code/mode */
+	pos = 0;
+	if (sscanf(buf, "CEA-%u%n", &code, &pos) >= 1 &&
+	    code < CEA_MODEDB_SIZE) {
+		mode = HDMI_HDMI;
+		if (t.pixclock)
+			t.flag = cea_modes[code].flag;
+		else
+			t = cea_modes[code];
+	} else if (sscanf(buf, "VESA-%u%n", &code, &pos) >= 1 &&
+		   code < VESA_MODEDB_SIZE) {
+		mode = HDMI_DVI;
+		if (!t.pixclock)
+			t = vesa_modes[code];
+	} else if (!t.pixclock &&
+		   sscanf(buf, "%u*%u%c,%uHz%n",
+			  &t.xres, &t.yres, &ilace, &t.refresh, &pos) >= 4 &&
+		   (ilace == 'p' || ilace == 'i')) {
+
+		/* optional aspect ratio (defaults to 16:9) for 720p */
+		if (sscanf(buf + pos, ",%u:%u%n", &x, &y, &pos2) >= 2 &&
+		      (x * 9 == y * 16 || x * 3 == y * 4) && x) {
+			pos += pos2;
+		} else {
+			x = t.yres >= 720 ? 16 : 4;
+			y = t.yres >= 720 ? 9 : 3;
+		}
+
+		pr_err("looking for %u*%u%c,%uHz,%u:%u\n",
+		       t.xres, t.yres, ilace, t.refresh, x, y);
+		/* CEA shorthand */
+#define RATE(x) ((x) + ((x) % 6 == 5))
+		t.flag = (x * 9 == y * 16) ? FB_FLAG_RATIO_16_9 :
+							FB_FLAG_RATIO_4_3;
+		t.vmode = (ilace == 'i') ? FB_VMODE_INTERLACED :
+							FB_VMODE_NONINTERLACED;
+		for (code = 0; code < CEA_MODEDB_SIZE; code++) {
+			c = cea_modes[code];
+			if (t.xres == c.xres &&
+			    t.yres == c.yres &&
+			    RATE(t.refresh) == RATE(c.refresh) &&
+			    t.vmode == (c.vmode & FB_VMODE_MASK) &&
+			    t.flag == (c.flag &
+				(FB_FLAG_RATIO_16_9 | FB_FLAG_RATIO_4_3)))
+				break;
+		}
+		if (code >= CEA_MODEDB_SIZE)
+			return -EINVAL;
+		mode = HDMI_HDMI;
+		if (t.refresh != c.refresh)
+			new_rate = t.refresh;
+		t = c;
+	} else {
+		mode = HDMI_DVI;
+		code = 0;
+	}
+
+	if (!t.pixclock)
+		return -EINVAL;
+
+	pos2 = 0;
+	if (new_rate || sscanf(buf + pos, ",%uHz%n", &new_rate, &pos2) == 1) {
+		u64 temp;
+		pos += pos2;
+		new_rate = RATE(new_rate) * 1000000 /
+					(1000 + ((new_rate % 6) == 5));
+		old_rate = RATE(t.refresh) * 1000000 /
+					(1000 + ((t.refresh % 6) == 5));
+		pr_err("%u mHz => %u mHz (%u", old_rate, new_rate, t.pixclock);
+		temp = (u64) t.pixclock * old_rate;
+		do_div(temp, new_rate);
+		t.pixclock = temp;
+		pr_err("=>%u)\n", t.pixclock);
+	}
+
+	pr_info("setting %u,%u/%u/%u/%u,%u/%u/%u/%u,%c/%c,%s-%u\n",
+			t.pixclock ? (u32) PICOS2KHZ(t.pixclock) : 0,
+			t.xres, t.right_margin, t.left_margin, t.hsync_len,
+			t.yres, t.lower_margin, t.upper_margin, t.vsync_len,
+			(t.sync & FB_SYNC_HOR_HIGH_ACT) ? '+' : '-',
+			(t.sync & FB_SYNC_VERT_HIGH_ACT) ? '+' : '-',
+			mode == HDMI_HDMI ? "CEA" : "VESA",
+			code);
+
+	hpd = !strncmp(buf + pos, "+hpd", 4);
+	if (hpd) {
+		hdmi.force_timings = true;
+		hdmi_panel_hpd_handler(0);
+		msleep(500);
+		hdmi_panel_set_mode(&t, code, mode);
+		hdmi_panel_hpd_handler(1);
+	} else {
+		size = hdmi_panel_set_mode(&t,
+						code, mode) ? : size;
+	}
+	return size;
+}
+
+DEVICE_ATTR(hdmi_timings, S_IRUGO | S_IWUSR,
+	    hdmi_timings_show, hdmi_timings_store);
 
 int omapdss_hdmi_display_enable(struct omap_dss_device *dssdev)
 {
@@ -1790,72 +1967,101 @@ static void ddc_i2c_init(struct platform_device *pdev)
 static void init_sel_i2c_hdmi(void)
 {
 	void __iomem *clk_base = ioremap(0x4A009000, SZ_4K);
-	void __iomem *mcasp2_base = ioremap(0x48464000, SZ_1K);
-	void __iomem *pinmux = ioremap(0x4a003600, SZ_1K);
-	u32 val;
+	void __iomem *mcasp8_base = ioremap(0x4847C000, SZ_1K);
 	
 	if (omapdss_get_version() != OMAPDSS_VER_DRA7xx)
 		goto err;
 
-	if (!clk_base || !mcasp2_base || !pinmux)
-		DSSERR("couldn't ioremap for clk or mcasp2\n");
+	if (!clk_base || !mcasp8_base)
+		DSSERR("couldn't ioremap for clk or mcasp8\n");
 
-	__raw_writel(0x40000, pinmux + 0xfc);
-	/* sw supervised wkup */
+	/* set CM_L4PER2_CLKSTCTRL to sw supervised wkup */
 	__raw_writel(0x2, clk_base + 0x8fc);
 
-	/* enable clock domain */
-	__raw_writel(0x2, clk_base + 0x860);
-
-	/* see what status looks like */
-	val = __raw_readl(clk_base + 0x8fc);
-	printk("CM_L4PER2_CLKSTCTRL %x\n", val);
+	/* Enable the MCASP8_AUX_GFCLK[22:23]: 0x0 - use default
+	 * CM_L4PER2_MCASP8_CLKCTRL[1:0]: 0x2 - Enable explicitly
+	 */
+	__raw_writel(0x2, clk_base + 0x890);
+	DSSINFO("%s: CM_L4PER2_CLKSTCTRL 0x%8x\n",
+		__func__, __raw_readl(clk_base + 0x8fc));
 
 	/*
-	 * mcasp2 regs should be hopefully accessible, make mcasp2_aclkr
-	 * a gpio, write necessary stuff to MCASP_PFUNC and PDIR
+	 * make mcasp8_axr2 a gpio and set direction to high
 	 */
-	__raw_writel(0x1 << 29, mcasp2_base + 0x10);
-	__raw_writel(0x1 << 29, mcasp2_base + 0x14);
+	__raw_writel(0x4, mcasp8_base + 0x10); /* MCASP8_PFUNC */
+	__raw_writel(0x4, mcasp8_base + 0x14); /* MCASP8_PDIR */
+	DSSDBG("MCASP8_PFUNC : 0x%x\n", __raw_readl(mcasp8_base + 0x10));
+	DSSDBG("MCASP8_PDIR  : 0x%x\n", __raw_readl(mcasp8_base + 0x14));
 
 err:
 	iounmap(clk_base);
-	iounmap(mcasp2_base);
-	iounmap(pinmux);
+	iounmap(mcasp8_base);
 }
 
 /* use this to configure the pcf8575@22 to set LS_OE and CT_HPD */
 void sel_i2c(void)
 {
-	void __iomem *base = ioremap(0x48464000, SZ_1K);
+	void __iomem *clk_base = ioremap(0x4A009000, SZ_4K);
+	void __iomem *mcasp8_base = ioremap(0x4847C000, SZ_1K);
+	void __iomem *core_base = ioremap(0x4a003400, SZ_1K);
 
 	if (omapdss_get_version() != OMAPDSS_VER_DRA7xx)
 		goto err;
 
-	/* PDOUT */
-	__raw_writel(0x0, base + 0x18);
+	/* set CM_L4PER2_CLKSTCTRL to sw supervised wkup */
+	__raw_writel(0x2, clk_base + 0x8fc);
 
-	DSSDBG("PDOUT sel_i2c  %x\n", __raw_readl(base + 0x18));
+	/* Enable the MCASP8_AUX_GFCLK[22:23]: 0x1- Switch to VIDEO1_CLK
+	 * CM_L4PER2_MCASP8_CLKCTRL[1:0]: 0x2 - Enable explicitly
+	 */
+	__raw_writel(0x400002, clk_base + 0x890);
+	DSSINFO("%s: CM_L4PER2_CLKSTCTRL 0x%8x\n",
+		__func__, __raw_readl(clk_base + 0x8fc));
+
+	/* drive MCASP8_PDOUT to low to select I2C2*/
+	__raw_writel(0x0, mcasp8_base + 0x18);
+	DSSDBG("PDOUT sel_i2c  %x\n", __raw_readl(mcasp8_base + 0x18));
+
+#ifdef CONFIG_OMAP5_DSS_HDMI_DDC
+	/* select I2C scl/sda*/
+	__raw_writel(0x60000, core_base + 0x408);
+	__raw_writel(0x60000, core_base + 0x40c);
+
+	DSSDBG("I2C2_SCL sel_i2c %x\n", __raw_readl(core_base + 0x408));
+	DSSDBG("I2C2_SDA sel_i2c %x\n", __raw_readl(core_base + 0x40C));
+#endif
 
 err:
-	iounmap(base);
+	iounmap(core_base);
+	iounmap(mcasp8_base);
+	iounmap(clk_base);
 }
 
-/* use this to read edid and detect hpd ? */
+/* use this to select HDMI and read edid over ddc lines*/
 void sel_hdmi(void)
 {
-	void __iomem *base = ioremap(0x48464000, SZ_1K);
+	void __iomem *mcasp8_base = ioremap(0x4847C000, SZ_1K);
+	void __iomem *core_base = ioremap(0x4a003400, SZ_1K);
 
 	if (omapdss_get_version() != OMAPDSS_VER_DRA7xx)
 		goto err;
 
-	/* PDOUT */
-	__raw_writel(0x20000000, base + 0x18);
+	/* drive MCASP8_PDOUT to high to select HDMI*/
+	__raw_writel(0x4, mcasp8_base + 0x18);
+	DSSDBG("PDOUT sel_hdmi %x\n", __raw_readl(mcasp8_base + 0x18));
 
-	DSSDBG("PDOUT sel_hdmi %x\n", __raw_readl(base + 0x18));
+#ifdef CONFIG_OMAP5_DSS_HDMI_DDC
+	/* select hdmi ddc scl/sda*/
+	__raw_writel(0x60001, core_base + 0x408);
+	__raw_writel(0x60001, core_base + 0x40c);
+
+	DSSDBG("I2C2_SCL sel_hdmi %x\n", __raw_readl(core_base + 0x408));
+	DSSDBG("I2C2_SDA sel_hdmi %x\n", __raw_readl(core_base + 0x40C));
+#endif
 
 err:
-	iounmap(base);
+	iounmap(core_base);
+	iounmap(mcasp8_base);
 }
 
 static void __init hdmi_probe_of(struct platform_device *pdev)
@@ -1863,6 +2069,7 @@ static void __init hdmi_probe_of(struct platform_device *pdev)
 	struct device_node *node = pdev->dev.of_node;
 	struct device_node *child;
 	struct omap_dss_device *dssdev;
+	struct omap_dss_hdmi_data *hdmi_data;
 	struct device_node *adapter_node;
 	struct i2c_adapter *adapter = NULL;
 	int r, gpio;
@@ -1966,6 +2173,13 @@ static void __init hdmi_probe_of(struct platform_device *pdev)
 	dssdev->type = OMAP_DISPLAY_TYPE_HDMI;
 	dssdev->name = child->name;
 	dssdev->channel = channel;
+	hdmi_data = kzalloc(sizeof(*hdmi_data), GFP_KERNEL);
+	if (!hdmi_data)
+		return;
+	hdmi_data->ct_cp_hpd_gpio = hdmi.ct_cp_hpd_gpio;
+	hdmi_data->ls_oe_gpio = hdmi.ls_oe_gpio;
+	hdmi_data->hpd_gpio = hdmi.hpd_gpio;
+	dssdev->data = hdmi_data;
 
 	r = hdmi_init_display(dssdev);
 	if (r) {

@@ -663,6 +663,7 @@ static const enum dss_feat_id omap5_dss_feat_list[] = {
 	FEAT_DSI_PLL_SELFREQDCO,
 	FEAT_DSI_PLL_REFSEL,
 	FEAT_DSI_PHY_DCC,
+	FEAT_MFLAG,
 };
 
 /* OMAP2 DSS Features */
@@ -877,6 +878,7 @@ static const struct ti_hdmi_ip_ops omap4_hdmi_functions = {
 	.dump_core		=	ti_hdmi_4xxx_core_dump,
 	.dump_pll		=	ti_hdmi_4xxx_pll_dump,
 	.dump_phy		=	ti_hdmi_4xxx_phy_dump,
+	.set_phy		=	ti_hdmi_4xxx_set_phy_on_hpd,
 	.irq_handler		=	ti_hdmi_4xxx_irq_handler,
 	.irq_core_handler	=	ti_hdmi_4xxx_core_irq_handler,
 #if defined(CONFIG_OMAP4_DSS_HDMI_AUDIO)
@@ -905,6 +907,7 @@ static const struct ti_hdmi_ip_ops omap5_hdmi_functions = {
 	.pll_enable		=	ti_hdmi_4xxx_pll_enable,
 	.pll_disable		=	ti_hdmi_4xxx_pll_disable,
 	.video_enable		=	ti_hdmi_4xxx_wp_video_start,
+	.set_phy		=	ti_hdmi_4xxx_set_phy_on_hpd,
 	.video_disable		=	ti_hdmi_4xxx_wp_video_stop,
 	.dump_wrapper		=	ti_hdmi_4xxx_wp_dump,
 	.dump_pll		=	ti_hdmi_4xxx_pll_dump,
