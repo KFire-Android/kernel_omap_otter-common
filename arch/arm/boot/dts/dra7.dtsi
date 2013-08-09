@@ -28,8 +28,11 @@
 			operating-points = <
 				/* kHz    uV */
 				/* The OPP_HIGH Only for DVFS enabled Samples */
+				/* OPP_OD need to be enabled only for Refreshed poly fixed Samples */
+				/* dieID reg: 0x4AE0C20C FT_Rev bits[15:8] should be 5 or more to enable OPP_OD */
 				1000000	1090000
 				1176000	1210000
+				1500000 1280000
 				>;
 				clocks = <&dpll_mpu_ck>;
 				clock-names = "cpu";
