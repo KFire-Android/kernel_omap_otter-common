@@ -15,6 +15,9 @@ Optional properties:
 - ti,timer-alwon:	Indicates the timer is in an alway-on power domain.
 - ti,timer-dsp:		Indicates the timer can interrupt the on-chip DSP in
 			addition to the ARM CPU.
+- ti,timer-ipu:		Indicates the timer can interrupt the on-chip IPU (the
+			dual Cortex-M3/Cortex-M4 subsystem on OMAP4/OMAP5) in
+			addition to the ARM CPU.
 - ti,timer-pwm: 	Indicates the timer can generate a PWM output.
 - ti,timer-secure: 	Indicates the timer is reserved on a secure OMAP device
 			and therefore cannot be used by the kernel.

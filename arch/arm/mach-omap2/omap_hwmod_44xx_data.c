@@ -1869,6 +1869,8 @@ static struct omap_mbox_dev_info omap44xx_mailbox_info[] = {
 
 static struct omap_mbox_pdata omap44xx_mailbox_attrs = {
 	.intr_type	= MBOX_INTR_CFG_TYPE2,
+	.num_users	= 3,
+	.num_fifos	= 8,
 	.info_cnt	= ARRAY_SIZE(omap44xx_mailbox_info),
 	.info		= omap44xx_mailbox_info,
 };
@@ -2579,7 +2581,7 @@ static struct omap_hwmod omap44xx_mmu_ipu_hwmod = {
 /* mmu dsp */
 
 static struct omap_mmu_dev_attr mmu_dsp_dev_attr = {
-	.da_start	= 0x0,
+	.da_start	= 0x20000000,
 	.da_end		= 0xfffff000,
 	.nr_tlb_entries = 32,
 };
@@ -3157,6 +3159,16 @@ static struct omap_timer_capability_dev_attr capability_dsp_pwm_dev_attr = {
 	.timer_capability       = OMAP_TIMER_HAS_DSP_IRQ | OMAP_TIMER_HAS_PWM,
 };
 
+/* timers with IPU interrupt dev attribute */
+static struct omap_timer_capability_dev_attr capability_ipu_dev_attr = {
+	.timer_capability       = OMAP_TIMER_HAS_IPU_IRQ,
+};
+
+/* pwm timers with IPU interrupt dev attribute */
+static struct omap_timer_capability_dev_attr capability_ipu_pwm_dev_attr = {
+	.timer_capability       = OMAP_TIMER_HAS_IPU_IRQ | OMAP_TIMER_HAS_PWM,
+};
+
 /* timer1 */
 static struct omap_hwmod_irq_info omap44xx_timer1_irqs[] = {
 	{ .irq = 37 + OMAP44XX_IRQ_GIC_START },
@@ -3221,6 +3233,7 @@ static struct omap_hwmod omap44xx_timer3_hwmod = {
 			.modulemode   = MODULEMODE_SWCTRL,
 		},
 	},
+	.dev_attr	= &capability_ipu_dev_attr,
 };
 
 /* timer4 */
@@ -3242,6 +3255,7 @@ static struct omap_hwmod omap44xx_timer4_hwmod = {
 			.modulemode   = MODULEMODE_SWCTRL,
 		},
 	},
+	.dev_attr	= &capability_ipu_dev_attr,
 };
 
 /* timer5 */
@@ -3352,7 +3366,7 @@ static struct omap_hwmod omap44xx_timer9_hwmod = {
 			.modulemode   = MODULEMODE_SWCTRL,
 		},
 	},
-	.dev_attr	= &capability_pwm_dev_attr,
+	.dev_attr	= &capability_ipu_pwm_dev_attr,
 };
 
 /* timer10 */
@@ -3397,7 +3411,7 @@ static struct omap_hwmod omap44xx_timer11_hwmod = {
 			.modulemode   = MODULEMODE_SWCTRL,
 		},
 	},
-	.dev_attr	= &capability_pwm_dev_attr,
+	.dev_attr	= &capability_ipu_pwm_dev_attr,
 };
 
 /*
