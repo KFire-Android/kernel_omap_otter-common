@@ -574,8 +574,12 @@ int ti_hdmi_5xxx_hdcp_init(struct hdmi_ip_data *ip_data)
 
 int ti_hdmi_5xxx_hdcp_enable(struct hdmi_ip_data *ip_data)
 {
+	bool vsync_pol, hsync_pol;
 	void __iomem *core_sys_base = hdmi_core_sys_base(ip_data);
 	struct hdmi_config *cfg = &ip_data->cfg;
+
+	vsync_pol = (cfg->timings.vsync_level == OMAPDSS_SIG_ACTIVE_HIGH);
+	hsync_pol = (cfg->timings.hsync_level == OMAPDSS_SIG_ACTIVE_HIGH);
 
 	/* Read product ID1 */
 	if (hdmi_read_reg(core_sys_base, HDMI_CORE_PRODUCT_ID1) !=
@@ -597,11 +601,17 @@ int ti_hdmi_5xxx_hdcp_enable(struct hdmi_ip_data *ip_data)
 	/* Set data enable, Hsync and Vsync polarity */
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_A_VIDPOLCFG,
 			1, 4, 4);  /* dataen pol */
+#ifdef CONFIG_USE_FB_MODE_DB
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_A_VIDPOLCFG,
 		!!(cfg->timingsfb.sync & FB_SYNC_VERT_HIGH_ACT), 3, 3);
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_A_VIDPOLCFG,
 		!!(cfg->timingsfb.sync & FB_SYNC_HOR_HIGH_ACT), 1, 1);
-
+#else
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_A_VIDPOLCFG,
+		vsync_pol, 3, 3);
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_A_VIDPOLCFG,
+		hsync_pol, 1, 1);
+#endif
 	/* HDCP only */
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_A_HDCPCFG0,
 			0, 1, 1); /* Disable 1.1 */
