@@ -116,6 +116,18 @@ struct omap_gem_object {
 		uint32_t read_pending;
 		uint32_t read_complete;
 	} *sync;
+
+	struct omap_gem_vm_ops *ops;
+
+	/**
+	 * per-mapper private data..
+	 *
+	 * TODO maybe there can be a more flexible way to store per-mapper
+	 * data.. for now I just keep it simple, and since this is only
+	 * accessible externally via omap_gem_priv()/omap_get_set_priv()
+	 */
+	void *priv[MAX_MAPPERS];
+
 };
 
 static int get_pages(struct drm_gem_object *obj, struct page ***pages);
@@ -303,6 +315,7 @@ uint32_t omap_gem_flags(struct drm_gem_object *obj)
 {
 	return to_omap_bo(obj)->flags;
 }
+EXPORT_SYMBOL(omap_gem_flags);
 
 /** get mmap offset */
 static uint64_t mmap_offset(struct drm_gem_object *obj)
@@ -333,6 +346,7 @@ uint64_t omap_gem_mmap_offset(struct drm_gem_object *obj)
 	mutex_unlock(&obj->dev->struct_mutex);
 	return offset;
 }
+EXPORT_SYMBOL(omap_gem_mmap_offset);
 
 /** get mmap size */
 size_t omap_gem_mmap_size(struct drm_gem_object *obj)
@@ -365,6 +379,7 @@ int omap_gem_tiled_size(struct drm_gem_object *obj, uint16_t *w, uint16_t *h)
 	}
 	return -EINVAL;
 }
+EXPORT_SYMBOL(omap_gem_tiled_size);
 
 /* Normal handling for the case of faulting in non-tiled buffers */
 static int fault_1d(struct drm_gem_object *obj,
@@ -597,6 +612,9 @@ int omap_gem_mmap_obj(struct drm_gem_object *obj,
 		vma->vm_page_prot = vm_get_page_prot(vma->vm_flags);
 	}
 
+	if (omap_obj->ops && omap_obj->ops->mmap)
+		omap_obj->ops->mmap(obj->filp, vma);
+
 	return 0;
 }
 
@@ -824,6 +842,7 @@ fail:
 
 	return ret;
 }
+EXPORT_SYMBOL(omap_gem_get_paddr);
 
 /* Release physical address, when DMA is no longer being performed.. this
  * could potentially unpin and unmap buffers from TILER
@@ -855,6 +874,7 @@ fail:
 	mutex_unlock(&obj->dev->struct_mutex);
 	return ret;
 }
+EXPORT_SYMBOL(omap_gem_put_paddr);
 
 /* Get rotated scanout address (only valid if already pinned), at the
  * specified orientation and x,y offset from top-left corner of buffer
@@ -885,6 +905,7 @@ int omap_gem_tiled_stride(struct drm_gem_object *obj, uint32_t orient)
 		ret = tiler_stride(gem2fmt(omap_obj->flags), orient);
 	return ret;
 }
+EXPORT_SYMBOL(omap_gem_tiled_stride);
 
 /* acquire pages when needed (for example, for DMA where physically
  * contiguous buffer is not required
@@ -934,7 +955,7 @@ int omap_gem_get_pages(struct drm_gem_object *obj, struct page ***pages,
 	mutex_unlock(&obj->dev->struct_mutex);
 	return ret;
 }
-
+EXPORT_SYMBOL(omap_gem_get_pages);
 /* release pages when DMA no longer being performed */
 int omap_gem_put_pages(struct drm_gem_object *obj)
 {
@@ -944,6 +965,7 @@ int omap_gem_put_pages(struct drm_gem_object *obj)
 	 */
 	return 0;
 }
+EXPORT_SYMBOL(omap_gem_put_pages);
 
 /* Get kernel virtual address for CPU access.. this more or less only
  * exists for omap_fbdev.  This should be called with struct_mutex
@@ -1143,17 +1165,20 @@ void omap_gem_op_update(void)
 	sync_op_update();
 	spin_unlock(&sync_lock);
 }
+EXPORT_SYMBOL(omap_gem_op_update);
 
 /* mark the start of read and/or write operation */
 int omap_gem_op_start(struct drm_gem_object *obj, enum omap_gem_op op)
 {
 	return sync_op(obj, op, true);
 }
+EXPORT_SYMBOL(omap_gem_op_start);
 
 int omap_gem_op_finish(struct drm_gem_object *obj, enum omap_gem_op op)
 {
 	return sync_op(obj, op, false);
 }
+EXPORT_SYMBOL(omap_gem_op_finish);
 
 static DECLARE_WAIT_QUEUE_HEAD(sync_event);
 
@@ -1208,6 +1233,7 @@ int omap_gem_op_sync(struct drm_gem_object *obj, enum omap_gem_op op)
 	}
 	return ret;
 }
+EXPORT_SYMBOL(omap_gem_op_sync);
 
 /* call fxn(arg), either synchronously or asynchronously if the op
  * is currently blocked..  fxn() can be called from any context
@@ -1252,6 +1278,7 @@ int omap_gem_op_async(struct drm_gem_object *obj, enum omap_gem_op op,
 
 	return 0;
 }
+EXPORT_SYMBOL(omap_gem_op_async);
 
 /* special API so PVR can update the buffer to use a sync-object allocated
  * from it's sync-obj heap.  Only used for a newly allocated (from PVR's
@@ -1289,6 +1316,7 @@ unlock:
 	spin_unlock(&sync_lock);
 	return ret;
 }
+EXPORT_SYMBOL(omap_gem_set_sync_object);
 
 int omap_gem_init_object(struct drm_gem_object *obj)
 {
@@ -1509,3 +1537,69 @@ void omap_gem_deinit(struct drm_device *dev)
 	 */
 	kfree(usergart);
 }
+
+/****** PLUGIN API specific ******/
+
+/* This constructor is mainly to give plugins a way to wrap their
+ * own allocations
+ */
+struct drm_gem_object *omap_gem_new_ext(struct drm_device *dev,
+		union omap_gem_size gsize, uint32_t flags,
+		dma_addr_t paddr, struct page **pages,
+		struct omap_gem_vm_ops *ops)
+{
+	struct drm_gem_object *obj;
+
+	BUG_ON((flags & OMAP_BO_TILED) && !pages);
+
+	if (paddr)
+		flags |= OMAP_BO_DMA;
+
+	obj = omap_gem_new(dev, gsize, flags | OMAP_BO_EXT_MEM);
+	if (obj) {
+		struct omap_gem_object *omap_obj = to_omap_bo(obj);
+		omap_obj->paddr = paddr;
+		omap_obj->pages = pages;
+		omap_obj->ops = ops;
+	}
+	return obj;
+}
+EXPORT_SYMBOL(omap_gem_new_ext);
+
+void omap_gem_vm_open(struct vm_area_struct *vma)
+{
+	struct drm_gem_object *obj = vma->vm_private_data;
+	struct omap_gem_object *omap_obj = to_omap_bo(obj);
+
+	if (omap_obj->ops && omap_obj->ops->open)
+		omap_obj->ops->open(vma);
+	else
+		drm_gem_vm_open(vma);
+
+}
+
+void omap_gem_vm_close(struct vm_area_struct *vma)
+{
+	struct drm_gem_object *obj = vma->vm_private_data;
+	struct omap_gem_object *omap_obj = to_omap_bo(obj);
+
+	if (omap_obj->ops && omap_obj->ops->close)
+		omap_obj->ops->close(vma);
+	else
+		drm_gem_vm_close(vma);
+
+}
+
+void *omap_gem_priv(struct drm_gem_object *obj, int mapper_id)
+{
+	BUG_ON((mapper_id >= MAX_MAPPERS) || (mapper_id < 0));
+	return to_omap_bo(obj)->priv[mapper_id];
+}
+EXPORT_SYMBOL(omap_gem_priv);
+
+void omap_gem_set_priv(struct drm_gem_object *obj, int mapper_id, void *priv)
+{
+	BUG_ON((mapper_id >= MAX_MAPPERS) || (mapper_id < 0));
+	to_omap_bo(obj)->priv[mapper_id] = priv;
+}
+EXPORT_SYMBOL(omap_gem_set_priv);
