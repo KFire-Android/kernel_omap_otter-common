@@ -406,6 +406,14 @@
 	};
 };
 
+&dsi1 {
+	vdds_dsi-supply = <&ldo4_reg>;
+};
+
+&dsi2 {
+	vdds_dsi-supply = <&ldo4_reg>;
+};
+
 &uart1 {
         pinctrl-names = "default";
         pinctrl-0 = <&uart1_pins>;
