@@ -135,6 +135,39 @@ static struct platform_device panda5_leds_gpio = {
 
 #ifdef CONFIG_OMAP_MUX
 static struct omap_board_mux board_mux[] __initdata = {
+
+#ifdef CONFIG_PANEL_LP_101
+	/* DPI Panel */
+	OMAP5_MUX(RFBI_RE, OMAP_MUX_MODE3),     /* DISPC_PCLK */
+	OMAP5_MUX(RFBI_CS0, OMAP_MUX_MODE3),    /*  DISPC_HSYNC  */
+	OMAP5_MUX(RFBI_WE, OMAP_MUX_MODE3),    /*  DISPC_VSYNC  */
+	OMAP5_MUX(RFBI_A0, OMAP_MUX_MODE3),    /*  DISPC_DE  */
+	OMAP5_MUX(RFBI_DATA0, OMAP_MUX_MODE3),    /*  DISPC_DATA0  */
+	OMAP5_MUX(RFBI_DATA1, OMAP_MUX_MODE3),    /*  DISPC_DATA1  */
+	OMAP5_MUX(RFBI_DATA2, OMAP_MUX_MODE3),    /*  DISPC_DATA2  */
+	OMAP5_MUX(RFBI_DATA3, OMAP_MUX_MODE3),    /*  DISPC_DATA3  */
+	OMAP5_MUX(RFBI_DATA4, OMAP_MUX_MODE3),    /*  DISPC_DATA4  */
+	OMAP5_MUX(RFBI_DATA5, OMAP_MUX_MODE3),    /*  DISPC_DATA5  */
+	OMAP5_MUX(RFBI_DATA6, OMAP_MUX_MODE3),    /*  DISPC_DATA6  */
+	OMAP5_MUX(RFBI_DATA7, OMAP_MUX_MODE3),    /*  DISPC_DATA7  */
+	OMAP5_MUX(RFBI_DATA8, OMAP_MUX_MODE3),    /*  DISPC_DATA8   */
+	OMAP5_MUX(RFBI_DATA9, OMAP_MUX_MODE3),    /*  DISPC_DATA9  */
+	OMAP5_MUX(RFBI_DATA10, OMAP_MUX_MODE3),    /*  DISPC_DATA10  */
+	OMAP5_MUX(RFBI_DATA11, OMAP_MUX_MODE3),    /*  DISPC_DATA11  */
+	OMAP5_MUX(RFBI_DATA12, OMAP_MUX_MODE3),    /*  DISPC_DATA12  */
+	OMAP5_MUX(RFBI_DATA13, OMAP_MUX_MODE3),    /*  DISPC_DATA13  */
+	OMAP5_MUX(RFBI_DATA14, OMAP_MUX_MODE3),    /*  DISPC_DATA14   */
+	OMAP5_MUX(RFBI_DATA15, OMAP_MUX_MODE3),    /*  DISPC_DATA15   */
+	OMAP5_MUX(RFBI_TE_VSYNC0, OMAP_MUX_MODE3),    /*  DISPC_DATA16  */
+	OMAP5_MUX(RFBI_HSYNC0, OMAP_MUX_MODE3),    /*  DISPC_DATA17  */
+	OMAP5_MUX(GPIO6_182, OMAP_MUX_MODE3),    /*  DISPC_DATA18  */
+	OMAP5_MUX(GPIO6_183, OMAP_MUX_MODE3),    /*  DISPC_DATA19  */
+	OMAP5_MUX(GPIO6_184, OMAP_MUX_MODE3),    /*  DISPC_DATA20   */
+	OMAP5_MUX(GPIO6_185, OMAP_MUX_MODE3),    /*  DISPC_DATA21  */
+	OMAP5_MUX(GPIO6_186, OMAP_MUX_MODE3),    /*  DISPC_DATA22  */
+	OMAP5_MUX(GPIO6_187, OMAP_MUX_MODE3),    /*  DISPC_DATA23   */
+#endif
+
 	OMAP5_MUX(FREF_CLK1_OUT, OMAP_PIN_INPUT_PULLUP),
 	OMAP5_MUX(USBB2_HSIC_STROBE, OMAP_PIN_INPUT | OMAP_MUX_MODE0),
 	OMAP5_MUX(USBB2_HSIC_DATA, OMAP_PIN_INPUT | OMAP_MUX_MODE0),
@@ -900,14 +933,48 @@ static struct omap_dss_device omap5panda_hdmi_device = {
 	.data = &omap5panda_hdmi_data,
 };
 
+#ifdef CONFIG_PANEL_LP_101
+static int omap5_panda_enable_dpi(struct omap_dss_device *dssdev)
+{
+	return 0;
+}
+
+static void omap5_panda_disable_dpi(struct omap_dss_device *dssdev)
+{
+}
+
+/* Using generic display panel */
+static struct panel_generic_dpi_data omap5_dpi_panel = {
+	.name			= "generic_lp101",
+	.platform_enable	= omap5_panda_enable_dpi,
+	.platform_disable	= omap5_panda_disable_dpi,
+};
+
+static struct omap_dss_device omap5_panda_dpi_device = {
+	.type			= OMAP_DISPLAY_TYPE_DPI,
+	.name			= "dvi",
+	.driver_name		= "generic_dpi_panel",
+	.data			= &omap5_dpi_panel,
+	.phy.dpi.data_lines	= 24,
+	.channel		= OMAP_DSS_CHANNEL_LCD2,
+};
+#endif
+
 static struct omap_dss_device *omap5panda_dss_devices[] = {
+#ifdef CONFIG_PANEL_LP_101
+	&omap5_panda_dpi_device,
+#endif
 	&omap5panda_hdmi_device,
 };
 
 static struct omap_dss_board_info panda5_dss_data = {
 	.num_devices	= ARRAY_SIZE(omap5panda_dss_devices),
 	.devices	= omap5panda_dss_devices,
-	.default_device	= &omap5panda_hdmi_device,
+#ifdef CONFIG_PANEL_LP_101
+	.default_device	= &omap5_panda_dpi_device,
+#else
+	.default_device = &omap5panda_hdmi_device,
+#endif
 };
 
 static void omap5panda_hdmi_init(void)
