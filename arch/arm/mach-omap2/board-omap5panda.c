@@ -1056,9 +1056,29 @@ static void omap5panda_hdmi_init(void)
 	omap_hdmi_init(0);
 }
 
+static struct dsscomp_platform_data dsscomp_config_hdmi_display = {
+	.tiler1d_slotsz = (SZ_16M + SZ_2M + SZ_8M + SZ_1M),
+};
+
+static struct sgx_omaplfb_config omaplfb_config_hdmi_default_display[] = {
+#ifdef CONFIG_PANEL_LP_101
+	{
+		.tiler2d_buffers = 0,
+		.vram_buffers = 4,
+		.swap_chain_length = 2,
+	},
+#endif
+	{
+		.tiler2d_buffers = 0,
+		.vram_buffers = 4,
+		.swap_chain_length = 2,
+	}
+
+};
+
 static struct omapfb_platform_data panda_fb_pdata = {
 	.mem_desc = {
-		.region_cnt = 1,
+		.region_cnt = ARRAY_SIZE(omaplfb_config_hdmi_default_display),
 		.region = {
 			[0] = {
 				.size = 0,
@@ -1069,8 +1089,8 @@ static struct omapfb_platform_data panda_fb_pdata = {
 
 static void __init omap5panda_display_init(void)
 {
-
 	omapfb_set_platform_data(&panda_fb_pdata);
+	omap_vram_set_sdram_vram(OMAP5_SEVM_FB_RAM_SIZE, 0);
 
 	i2c_register_board_info(0, hdmi_i2c_eeprom,
 			ARRAY_SIZE(hdmi_i2c_eeprom));
@@ -1149,23 +1169,14 @@ struct omap_panda5_panel_data {
 	struct sgx_omaplfb_platform_data *omaplfb_data;
 };
 
-
-static struct sgx_omaplfb_config omaplfb_config_hdmi_default_display[] = {
-	{
-		.tiler2d_buffers = 0,
-		.vram_buffers = 4,
-		.swap_chain_length = 2,
-	}
-};
-
 static struct sgx_omaplfb_platform_data omaplfb_plat_data_hdmi_default_display = {
-	.num_configs = 1,
+	.num_configs =  ARRAY_SIZE(omaplfb_config_hdmi_default_display),
 	.configs = omaplfb_config_hdmi_default_display,
 };
 
 static struct omap_panda5_panel_data panel_data_hdmi_default_display  = {
 	.board_info = &panda5_dss_data,
-	.dsscomp_data = NULL,
+	.dsscomp_data = &dsscomp_config_hdmi_display,
 	.omaplfb_data = &omaplfb_plat_data_hdmi_default_display,
 };
 
