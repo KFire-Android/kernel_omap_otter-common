@@ -90,12 +90,12 @@
 	ion_config {
 		compatible = "ti,ion-omap";
 		ti,omap_ion_heap_secure_input_base = <0xba300000>;
-		ti,omap_ion_heap_tiler_base = <0xb4300000>;
-		ti,omap_ion_heap_nonsecure_tiler_base = <0xf00000>;
+		ti,omap_ion_heap_tiler_base = <0xb5200000>;
+		ti,omap_ion_heap_nonsecure_tiler_base = <0xb4300000>;
 		/*90 MB*/
 		ti,omap_ion_heap_secure_input_size = <0x5A00000>;
-		/*96 MB*/
-		ti,omap_ion_heap_tiler_size = <0x6000000>;
+		/*81 MB*/
+		ti,omap_ion_heap_tiler_size = <0x5100000>;
 		/*15 MB*/
 		ti,omap_ion_heap_nonsecure_tiler_size = <0xF00000>;
 	};
