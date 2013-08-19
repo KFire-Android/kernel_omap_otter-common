@@ -123,6 +123,12 @@
 			default-state = "off";
 		};
 	};
+
+	ocp {
+		gpu: gpu@0x56000000 {
+			gpu-supply = <&smps45_reg>;
+		};
+	};
 };
 
 &omap5_pmx_core {
