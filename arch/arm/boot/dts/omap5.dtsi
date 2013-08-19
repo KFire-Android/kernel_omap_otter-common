@@ -101,6 +101,26 @@
 			compatible = "ti,omap-clock";
 		};
 
+		dpll_core_h14x2_ck: dpll_core_h14x2_ck {
+			#clock-cells = <0>;
+			compatible = "ti,omap-clock";
+		};
+
+		dpll_per_h14x2_ck: dpll_per_h14x2_ck {
+			#clock-cells = <0>;
+			compatible = "ti,omap-clock";
+		};
+
+		gpu_core_gclk_mux: gpu_core_gclk_mux {
+			#clock-cells = <0>;
+			compatible = "ti,omap-clock";
+		};
+
+		gpu_hyd_gclk_mux: gpu_hyd_gclk_mux {
+			#clock-cells = <0>;
+			compatible = "ti,omap-clock";
+		};
+
 		omap5_pmx_core: pinmux@4a002840 {
 			compatible = "ti,omap4-padconf", "pinctrl-single";
 			reg = <0x4a002840 0x01b6>;
@@ -784,6 +804,22 @@
 				vdda_hdmi_dac-supply = <&ldo7_reg>;
 				video-source = <1>;
 			};
+		};
+
+		gpu: gpu@0x56000000 {
+			compatible = "ti,omap4-gpu";
+			reg = <0x56000000 0xffff>;
+			interrupts = <0 21 0x4>;
+			ti,hwmods = "gpu";
+			operating-points = <
+				/* kHz    uV */
+				212700   880000
+				425470  1025000
+				531840  1120000
+				>;
+			clocks = <&dpll_core_h14x2_ck>, <&dpll_per_h14x2_ck>,
+					<&gpu_core_gclk_mux>, <&gpu_hyd_gclk_mux>;
+			clock-names = "core", "per", "gpu_core", "gpu_hyd";
 		};
 
 		bandgap {
