@@ -573,11 +573,23 @@ static void spi_pump_messages(struct kthread_work *work)
 		master->busy = true;
 	spin_unlock_irqrestore(&master->queue_lock, flags);
 
+	if (!was_busy && master->auto_runtime_pm) {
+		ret = pm_runtime_get_sync(master->dev.parent);
+		if (ret < 0) {
+			dev_err(&master->dev, "Failed to power device: %d\n",
+				ret);
+			return;
+		}
+	}
+
 	if (!was_busy && master->prepare_transfer_hardware) {
 		ret = master->prepare_transfer_hardware(master);
 		if (ret) {
 			dev_err(&master->dev,
 				"failed to prepare transfer hardware\n");
+
+			if (master->auto_runtime_pm)
+				pm_runtime_put(master->dev.parent);
 			return;
 		}
 	}
@@ -1370,6 +1382,7 @@ static int __spi_async(struct spi_device *spi, struct spi_message *message)
 	 * set for this transfer.
 	 */
 	list_for_each_entry(xfer, &message->transfers, transfer_list) {
+		message->frame_length += xfer->len;
 		if (!xfer->bits_per_word)
 			xfer->bits_per_word = spi->bits_per_word;
 	}

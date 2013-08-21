@@ -125,6 +125,7 @@ struct dwc3_omap {
 	u32			resource_size;
 
 	u32			dma_status:1;
+	u64			dma_mask;
 };
 
 struct dwc3_omap		*_omap;
@@ -139,17 +140,38 @@ static inline void dwc3_omap_writel(void __iomem *base, u32 offset, u32 value)
 	writel(value, base + offset);
 }
 
-int dwc3_omap_mailbox(struct device *dev, enum omap_dwc3_vbus_id_status status)
+int dwc3_omap_vbus_connect(struct device *dev)
 {
 	u32			val;
-	struct platform_device *pdev;
-	struct dwc3_omap       *omap;
+	struct dwc3_omap	*omap;
+	struct platform_device	*pdev;
 
-	if (dev) { /* i.e. this is being called from a non palmas driver */
-		pdev = to_platform_device(dev);
-		omap =  platform_get_drvdata(pdev);
-	} else  /* This is being invoked by palmas and the global is needed */
-		omap = _omap;
+	if (!dev)
+		return -ENODEV;
+
+	dev_dbg(omap->dev, "VBUS Connect\n");
+
+	pdev = to_platform_device(dev);
+	omap =  platform_get_drvdata(pdev);
+	if (!omap)
+		return -ENODEV;
+
+	val = dwc3_omap_readl(omap->base, USBOTGSS_UTMI_OTG_STATUS);
+	val &= ~USBOTGSS_UTMI_OTG_STATUS_SESSEND;
+	val |= USBOTGSS_UTMI_OTG_STATUS_IDDIG
+			| USBOTGSS_UTMI_OTG_STATUS_VBUSVALID
+			| USBOTGSS_UTMI_OTG_STATUS_SESSVALID
+			| USBOTGSS_UTMI_OTG_STATUS_POWERPRESENT;
+	dwc3_omap_writel(omap->base, USBOTGSS_UTMI_OTG_STATUS, val);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(dwc3_omap_vbus_connect);
+
+int dwc3_omap_mailbox(enum omap_dwc3_vbus_id_status status)
+{
+	u32			val;
+	struct dwc3_omap	*omap = _omap;
 
 	if (!omap) {
 		dev_dbg(omap->dev, "not ready , deferring\n");
@@ -169,15 +191,7 @@ int dwc3_omap_mailbox(struct device *dev, enum omap_dwc3_vbus_id_status status)
 		break;
 
 	case OMAP_DWC3_VBUS_VALID:
-		dev_dbg(omap->dev, "VBUS Connect\n");
-
-		val = dwc3_omap_readl(omap->base, USBOTGSS_UTMI_OTG_STATUS);
-		val &= ~USBOTGSS_UTMI_OTG_STATUS_SESSEND;
-		val |= USBOTGSS_UTMI_OTG_STATUS_IDDIG
-				| USBOTGSS_UTMI_OTG_STATUS_VBUSVALID
-				| USBOTGSS_UTMI_OTG_STATUS_SESSVALID
-				| USBOTGSS_UTMI_OTG_STATUS_POWERPRESENT;
-		dwc3_omap_writel(omap->base, USBOTGSS_UTMI_OTG_STATUS, val);
+		dwc3_omap_vbus_connect(omap->dev);
 		break;
 
 	case OMAP_DWC3_ID_FLOAT:
@@ -261,27 +275,9 @@ static int dwc3_omap_remove_core(struct device *dev, void *c)
 	return 0;
 }
 
-static u64 dwc3_omap_dma_mask = DMA_BIT_MASK(32);
-
 static int dwc3_omap_set_dmamask(struct device *dev, void *c)
 {
-	dev->dma_mask = &dwc3_omap_dma_mask;
-	return 0;
-}
-
-static u64 dwc3_omap_dma_mask1 = DMA_BIT_MASK(32);
-
-static int dwc3_omap_set_dmamask1(struct device *dev, void *c)
-{
-	dev->dma_mask = &dwc3_omap_dma_mask1;
-	return 0;
-}
-
-static u64 dwc3_omap_dma_mask2 = DMA_BIT_MASK(32);
-
-static int dwc3_omap_set_dmamask2(struct device *dev, void *c)
-{
-	dev->dma_mask = &dwc3_omap_dma_mask2;
+	dev->dma_mask = c;
 	return 0;
 }
 
@@ -314,6 +310,7 @@ static int dwc3_omap_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 
+	omap->dma_mask = DMA_BIT_MASK(32);
 	platform_set_drvdata(pdev, omap);
 
 	irq = platform_get_irq(pdev, 0);
@@ -412,14 +409,8 @@ static int dwc3_omap_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	if (strstr(dev_name(dev), "omap_dwc31") != NULL)
-		device_for_each_child(&pdev->dev, NULL, dwc3_omap_set_dmamask1);
-	else
-	if (strstr(dev_name(dev), "omap_dwc32") != NULL)
-		device_for_each_child(&pdev->dev, NULL, dwc3_omap_set_dmamask2);
-	else
-	if (strstr(dev_name(dev), "omap_dwc3") != NULL)
-		device_for_each_child(&pdev->dev, NULL, dwc3_omap_set_dmamask);
+	device_for_each_child(&pdev->dev, &omap->dma_mask,
+		dwc3_omap_set_dmamask);
 
 	return 0;
 }

@@ -405,7 +405,7 @@
                         utmi-mode = <2>;
                         ranges;
                         dwc3@48890000 {
-                                compatible = "synopsys,dwc3";
+                                compatible = "synopsys,dra7xx-dwc3";
                                 reg = <0x48890000 0xcfff>;
                                 interrupts = <0 76 4>;
                                 usb-phy = <&usb2_phy1>, <&usb3_phy>;
@@ -433,7 +433,7 @@
                         utmi-mode = <1>;
                         ranges;
                         dwc3@488d0000 {
-                                compatible = "synopsys,dwc3";
+                                compatible = "synopsys,dra7xx-dwc3";
                                 reg = <0x488d0000 0xcfff>;
                                 interrupts = <0 78 4>;
                                 usb-phy = <&usb2_phy2>;
@@ -632,6 +632,16 @@
 			1250000 16>;
 		};
 
+		qspi: qspi@4b300000 {
+			compatible = "ti,dra7xxx-qspi";
+			reg = <0x4b300000 0x100>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			ti,hwmods = "qspi";
+			interrupts = <0 124 0x4>;
+                        ti,spi-num-cs = <4>;
+		};
+
 		avs_iva: regulator-avs@0x4A0025C4 {
 			compatible = "ti,avsclass0";
 			reg = <0x4A0025C4 0x20>;
@@ -767,5 +777,13 @@
 			ti,tx-inactive-mode = <2>; /* 0: Hi-Z, 2: Low, 3: High */
 			ti,rx-inactive-mode = <2>; /* 0: Hi-Z, 2: Low, 3: High */
 		};
+
+		vpe {
+			compatible = "ti,vpe";
+			ti,hwmods = "vpe";
+			#address-cells = <1>;
+			#size-cells = <0>;
+		};
+
 	};
 };

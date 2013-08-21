@@ -115,6 +115,8 @@ static void __init omap_generic_init(void)
 
 	if (of_machine_is_compatible("ti,omap5"))
 		omap_sata_init();
+	else if (of_machine_is_compatible("ti,dra7"))
+		omap_sata_init();
 }
 
 #ifdef CONFIG_SOC_OMAP2420

@@ -136,7 +136,7 @@ static irqreturn_t palmas_vbus_wakeup_irq(int irq, void *_palmas_usb)
 
 	palmas_usb->linkstat = status;
 	if (status != OMAP_DWC3_UNKNOWN) {
-		ret = dwc3_omap_mailbox(NULL, status);
+		ret = dwc3_omap_mailbox(status);
 		if (!ret)
 			ret = IRQ_HANDLED;
 	}
@@ -179,7 +179,7 @@ static irqreturn_t palmas_id_wakeup_irq(int irq, void *_palmas_usb)
 
 	palmas_usb->linkstat = status;
 	if (status != OMAP_DWC3_UNKNOWN) {
-		ret = dwc3_omap_mailbox(NULL, status);
+		ret = dwc3_omap_mailbox(status);
 		if (!ret)
 			ret = IRQ_HANDLED;
 	}

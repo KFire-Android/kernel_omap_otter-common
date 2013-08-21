@@ -54,6 +54,7 @@
 #include <linux/usb/ch9.h>
 #include <linux/usb/gadget.h>
 #include <linux/usb/of.h>
+#include <linux/usb/dwc3-omap.h>
 
 #include "core.h"
 #include "gadget.h"
@@ -520,6 +521,13 @@ static int dwc3_probe(struct platform_device *pdev)
 
 	switch (mode) {
 	case USB_DR_MODE_PERIPHERAL:
+		/* dra7xx-dwc3 in peripheral mode does not detect
+		 * vbus change event, hence set vbus and session
+		 * to cause connect to host-machine
+		 */
+		if (of_device_is_compatible(node, "synopsys,dra7xx-dwc3"))
+			dwc3_omap_vbus_connect(dwc->dev->parent);
+
 		dwc3_set_mode(dwc, DWC3_GCTL_PRTCAP_DEVICE);
 		ret = dwc3_gadget_init(dwc);
 		if (ret) {
@@ -629,6 +637,9 @@ static int dwc3_remove(struct platform_device *pdev)
 static const struct of_device_id of_dwc3_match[] = {
 	{
 		.compatible = "synopsys,dwc3"
+	},
+	{
+		.compatible = "synopsys,dra7xx-dwc3"
 	},
 	{ },
 };

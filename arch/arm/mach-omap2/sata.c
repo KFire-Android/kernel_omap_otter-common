@@ -46,6 +46,8 @@
 
 #define OMAP_SATA_PLL_CFG1					0x0c
 #define OMAP_SATA_PLL_CFG1_M					625
+/* M value for 20Mhz DRA7XX */
+#define OMAP_SATA_PLL_CFG1_M_DRA7XX				600
 #define OMAP_SATA_PLL_CFG1_M_MASK				0xfff
 #define OMAP_SATA_PLL_CFG1_M_SHIFT				9
 
@@ -112,6 +114,8 @@
 
 /* Enable the 19.2 Mhz frequency */
 #define SATA_PWRCTL_CLK_FREQ					19
+/* Enable the 20 Mhz frequency (specific only to DRA7XX) */
+#define SATA_PWRCTL_CLK_FREQ_DRA7XX				20
 
 /* Enable Tx and Rx phys */
 #define SATA_PWRCTL_CLK_CMD					3
@@ -158,15 +162,23 @@ static void sataphy_pwr_init(void)
 
 static void  sataphy_pwr_on(void)
 {
+	unsigned long sata_pwrctl_clk_freq_value = 0;
+
 	if (!sataphy_pwr) {
 		pr_err("%s: 0x%X not accessible\n", __func__,
 		       OMAP_CTRL_MODULE_CORE);
 		return;
 	}
 
+	/* For DRA7xx, system clock is changed from 19.2M to 20M
+	   Setting clock value depending on the m/c type */
+	if (soc_is_dra7xx())
+		sata_pwrctl_clk_freq_value = SATA_PWRCTL_CLK_FREQ_DRA7XX;
+	else
+		sata_pwrctl_clk_freq_value = SATA_PWRCTL_CLK_FREQ;
 	omap_sata_writel(sataphy_pwr, OMAP_CTRL_SATA_PHY_POWER,
-			 ((SATA_PWRCTL_CLK_FREQ << SATA_PWRCTL_CLK_FREQ_SHIFT)|
-			 (SATA_PWRCTL_CLK_CMD << SATA_PWRCTL_CLK_CMD_SHIFT)));
+		((sata_pwrctl_clk_freq_value << SATA_PWRCTL_CLK_FREQ_SHIFT)|
+		(SATA_PWRCTL_CLK_CMD << SATA_PWRCTL_CLK_CMD_SHIFT)));
 	omap_sata_writel(sataphy_pwr, OMAP_CTRL_SATA_EXT_MODE, 1);
 }
 
@@ -265,6 +277,7 @@ static int sata_dpll_config(struct device *dev, void __iomem *base)
 {
 	u32		reg;
 	unsigned long	timeout;
+	unsigned long	omap_sata_cfg1_m_value = 0;
 
 	/* Make sure ADPLLLJM is out of reset before configuring it */
 	timeout = jiffies + msecs_to_jiffies(10000);
@@ -280,7 +293,16 @@ static int sata_dpll_config(struct device *dev, void __iomem *base)
 	reg  = omap_sata_readl(base, OMAP_SATA_PLL_CFG1);
 	reg &= ~((OMAP_SATA_PLL_CFG1_M_MASK << OMAP_SATA_PLL_CFG1_M_SHIFT) |
 		 (OMAP_SATA_PLL_CFG1_N_MASK << OMAP_SATA_PLL_CFG1_N_SHIFT));
-	reg |= ((OMAP_SATA_PLL_CFG1_M << OMAP_SATA_PLL_CFG1_M_SHIFT) |
+
+	/* For DRA7xx, system clock is changed from 19.2M to 20M
+	   Due to this change, M value for SATA PLL is different from others
+	   Setting SATA PLL M valus depending on the m/c type */
+	if (soc_is_dra7xx())
+		omap_sata_cfg1_m_value = OMAP_SATA_PLL_CFG1_M_DRA7XX;
+	else
+		omap_sata_cfg1_m_value = OMAP_SATA_PLL_CFG1_M;
+
+	reg |= ((omap_sata_cfg1_m_value << OMAP_SATA_PLL_CFG1_M_SHIFT) |
 		(OMAP_SATA_PLL_CFG1_N << OMAP_SATA_PLL_CFG1_N_SHIFT));
 	omap_sata_writel(base, OMAP_SATA_PLL_CFG1, reg);
 
@@ -569,7 +591,7 @@ void __init omap_sata_init(void)
 	int			oh_cnt = 1;
 
 	/* For now sata init works only for omap5 */
-	if (!soc_is_omap54xx())
+	if (!soc_is_omap54xx() && !soc_is_dra7xx())
 		return;
 
 	sata_pdata.init		= omap_ahci_plat_init;
