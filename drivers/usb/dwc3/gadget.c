@@ -53,8 +53,6 @@
 #include "core.h"
 #include "gadget.h"
 #include "io.h"
-#include <linux/usb/dwc3-omap.h>
-#include <linux/platform_data/dwc3-omap.h>
 
 /**
  * dwc3_gadget_set_test_mode - Enables USB2 Test Modes
@@ -1461,12 +1459,6 @@ static int dwc3_gadget_pullup(struct usb_gadget *g, int is_on)
 
 	is_on = !!is_on;
 
-#if defined(CONFIG_SOC_DRA7XX)
-	if (is_on) {
-		if (dwc3_omap_mailbox(dwc->dev->parent, OMAP_DWC3_VBUS_VALID))
-			dev_err(dwc->dev, "Error wrapper may not be initilized\n");
-	}
-#endif
 	spin_lock_irqsave(&dwc->lock, flags);
 	ret = dwc3_gadget_run_stop(dwc, is_on);
 	spin_unlock_irqrestore(&dwc->lock, flags);
