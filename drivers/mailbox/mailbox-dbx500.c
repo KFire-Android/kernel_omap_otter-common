@@ -297,7 +297,6 @@ static irqreturn_t dbx500_mbox_irq_handler(int irq, void *data)
 
 /* 5 mailboxes AP <--> PRCMU */
 static struct mailbox_ops dbx500_mbox_ops = {
-	.type		= MBOX_SHARED_MEM_TYPE,
 	.startup	= dbx500_mbox_startup,
 	.enable_irq	= dbx500_mbox_enable_irq,
 	.disable_irq	= dbx500_mbox_disable_irq,
@@ -325,6 +324,7 @@ struct mailbox mbox0_info = {
 	.id	= 0,
 	.ops	= &dbx500_mbox_ops,
 	.priv	= &mbox0_priv,
+	.irq_flags = IRQF_SHARED | IRQF_NO_SUSPEND,
 };
 
 struct dbx500_mbox_priv mbox1_priv = {
@@ -343,6 +343,7 @@ struct mailbox mbox1_info = {
 	.id	= 1,
 	.ops	= &dbx500_mbox_ops,
 	.priv	= &mbox1_priv,
+	.irq_flags = IRQF_SHARED | IRQF_NO_SUSPEND,
 };
 
 struct dbx500_mbox_priv mbox2_priv = {
@@ -361,6 +362,7 @@ struct mailbox mbox2_info = {
 	.id	= 2,
 	.ops	= &dbx500_mbox_ops,
 	.priv	= &mbox2_priv,
+	.irq_flags = IRQF_SHARED | IRQF_NO_SUSPEND,
 };
 
 struct dbx500_mbox_priv mbox3_priv = {
@@ -379,6 +381,7 @@ struct mailbox mbox3_info = {
 	.id	= 3,
 	.ops	= &dbx500_mbox_ops,
 	.priv	= &mbox3_priv,
+	.irq_flags = IRQF_SHARED | IRQF_NO_SUSPEND,
 };
 
 struct dbx500_mbox_priv mbox4_priv = {
@@ -397,6 +400,7 @@ struct mailbox mbox4_info = {
 	.id	= 4,
 	.ops	= &dbx500_mbox_ops,
 	.priv	= &mbox4_priv,
+	.irq_flags = IRQF_SHARED | IRQF_NO_SUSPEND,
 };
 
 struct dbx500_mbox_priv mbox5_priv = {
@@ -415,18 +419,21 @@ struct mailbox mbox5_info = {
 	.id	= 5,
 	.ops	= &dbx500_mbox_ops,
 	.priv	= &mbox5_priv,
+	.irq_flags = IRQF_SHARED | IRQF_NO_SUSPEND,
 };
 
 struct mailbox mbox6_info = {
 	.name	= "mbox6",
 	.id	= 6,
 	.ops	= &dbx500_mbox_ops,
+	.irq_flags = IRQF_SHARED | IRQF_NO_SUSPEND,
 };
 
 struct mailbox mbox7_info = {
 	.name	= "mbox7",
 	.id	= 7,
 	.ops	= &dbx500_mbox_ops,
+	.irq_flags = IRQF_SHARED | IRQF_NO_SUSPEND,
 };
 
 /* x540 mailbox definition */
@@ -445,6 +452,7 @@ struct mailbox mbox1_upap_info = {
 	.id	= 1,
 	.ops	= &dbx500_mbox_ops,
 	.priv	= &mbox1_upap_priv,
+	.irq_flags = IRQF_SHARED | IRQF_NO_SUSPEND,
 };
 
 struct mailbox *db8500_mboxes[] = { &mbox0_info, &mbox1_info, &mbox2_info,
@@ -472,6 +480,7 @@ static int dbx500_mbox_probe(struct platform_device *pdev)
 	int ret, i, irq;
 	u32 legacy_offset = 0;
 	u32 upap_offset = 0, upap_size = PRCM_MBOX_LEGACY_SIZE;
+	struct mailbox_device *mdev;
 	struct mailbox **list;
 	struct dbx500_plat_data *pdata = dev_get_platdata(&pdev->dev);
 	struct device_node *np = pdev->dev.of_node;
@@ -591,19 +600,31 @@ static int dbx500_mbox_probe(struct platform_device *pdev)
 		}
 	}
 
-	ret = mailbox_register(&pdev->dev, list);
+	mdev = mailbox_device_alloc(&pdev->dev, NULL, 0);
+	if (!mdev) {
+		ret = -ENOMEM;
+		goto irq_free;
+	}
+
+	ret = mailbox_register(mdev, list);
 irq_free:
 	if (ret)
 		free_irq(irq, NULL);
-
+	else
+		platform_set_drvdata(pdev, mdev);
 out:
 	return ret;
 }
 
 static int dbx500_mbox_remove(struct platform_device *pdev)
 {
-	mailbox_unregister();
+	struct mailbox_device *mdev = platform_get_drvdata(pdev);
+
+	mailbox_unregister(mdev);
+	mailbox_device_free(mdev);
 	iounmap(mbox_base);
+	platform_set_drvdata(pdev, NULL);
+
 	return 0;
 }
 

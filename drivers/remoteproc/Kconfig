@@ -1,39 +1,91 @@
-menu "Remoteproc drivers (EXPERIMENTAL)"
+menu "Remoteproc drivers"
 
 # REMOTEPROC gets selected by whoever wants it
 config REMOTEPROC
 	tristate
-	depends on EXPERIMENTAL
 	depends on HAS_DMA
+	select CRC32
 	select FW_LOADER
 	select VIRTIO
 
+# OMAP_REMOTEPROC depends on selection of IPU or DSP instances
 config OMAP_REMOTEPROC
 	tristate "OMAP remoteproc support"
-	depends on EXPERIMENTAL
 	depends on HAS_DMA
-	depends on ARCH_OMAP4
+	depends on ARCH_OMAP4 || SOC_OMAP5 || SOC_DRA7XX
 	depends on OMAP_IOMMU
+	depends on CMA
 	select REMOTEPROC
 	select MAILBOX
 	select OMAP2PLUS_MBOX
 	select RPMSG
 	help
-	  Say y here to support OMAP's remote processors (dual M3
-	  and DSP on OMAP4) via the remote processor framework.
+	  Support for OMAP's remote processors (dual Cortex-M3/M4
+	  and DSP) via the remote processor framework.
 
-	  Currently only supported on OMAP4.
+	  Currently supported on OMAP4, OMAP5 & DRA7XX SoCs.
 
-	  Usually you want to say y here, in order to enable multimedia
-	  use-cases to run on your platform (multimedia codecs are
-	  offloaded to remote DSP processors using this framework).
+	  It gets selected by DSP(2) or IPU(1) OMAP_REMOTEPROC instances,
+	  in order to enable multimedia use-cases to run on your platform
+	  (multimedia codecs are offloaded to remote DSP processors or
+	  remoteproc processors controlling other h/w accelerator devices
+	  using this framework).
+
+config OMAP_REMOTEPROC_IPU
+	bool "OMAP remoteproc support for IPU"
+	depends on OMAP_REMOTEPROC
+	help
+	  Say Y here if you want to enable OMAP's IPU remote processor.
+
+	  This option controls only the dual Cortex-M3/M4 processor sub-system.
+	  You would want to say y here usually, as this is the sub-system where
+	  typically video & imaging codec control s/w is offloaded.
 
 	  It's safe to say n here if you're not interested in multimedia
-	  offloading or just want a bare minimum kernel.
+	  offloading (by IPU) or just want a bare minimum kernel.
+
+config OMAP_REMOTEPROC_DSP
+	bool "OMAP remoteproc support for DSP"
+	depends on OMAP_REMOTEPROC
+	help
+	  Say Y here if you want to enable OMAP's DSP remote processor.
+
+	  This option controls only the DSP processor sub-system. DSP would
+	  typically be used to offload audio codecs or other advanced
+	  processing algorithms.
+
+	  It's safe to say n here if you're not interested in offloading
+	  audio or any other algorithm (by DSP) or just want a bare minimum kernel.
+
+config OMAP_REMOTEPROC_IPU1
+	bool "OMAP remoteproc support for IPU1 (DRA7xx only)"
+	depends on OMAP_REMOTEPROC && SOC_DRA7XX
+	help
+	  Say Y here if you want to enable DRA7xx's IPU1 remote processor.
+
+	  This option controls only the first dual-M4 processor sub-system in
+	  DRA7xx. You would want to say y here usually, as this is the sub
+	  system where some real-time automative stack s/w is offloaded.
+
+	  It's safe to say n here if you're not interested in enabling IPU1
+	  or just want a bare minimum kernel.
+
+config OMAP_REMOTEPROC_DSP2
+	bool "OMAP remoteproc support for DSP2 (DRA7xx only)"
+	depends on OMAP_REMOTEPROC && SOC_DRA7XX
+	help
+	  Say Y here if you want to enable DRA7xx's DSP2 remote processor.
+
+	  This option controls only the DSP2 processor sub-system in DRA7xx.
+	  DSP would typically be used to offload audio codecs or other advanced
+	  processing algorithms.
+
+	  It's safe to say n here if you're not interested in offloading
+	  audio or any other algorithm (by DSP) or just want a bare minimum
+	  kernel.
 
 config STE_MODEM_RPROC
 	tristate "STE-Modem remoteproc support"
-	depends on EXPERIMENTAL
 	depends on HAS_DMA
 	select REMOTEPROC
 	default n
@@ -41,5 +93,28 @@ config STE_MODEM_RPROC
 	  Say y or m here to support STE-Modem shared memory driver.
 	  This can be either built-in or a loadable module.
 	  If unsure say N.
+
+config DA8XX_REMOTEPROC
+	tristate "DA8xx/OMAP-L13x remoteproc support"
+	depends on ARCH_DAVINCI_DA8XX
+	select CMA
+	select REMOTEPROC
+	select RPMSG
+	help
+	  Say y here to support DA8xx/OMAP-L13x remote processors via the
+	  remote processor framework.
+
+	  You want to say y here in order to enable AMP
+	  use-cases to run on your platform (multimedia codecs are
+	  offloaded to remote DSP processors using this framework).
+
+	  This module controls the name of the firmware file that gets
+	  loaded on the DSP.  This file must reside in the /lib/firmware
+	  directory.  It can be specified via the module parameter
+	  da8xx_fw_name=<filename>, and if not specified will default to
+	  "rproc-dsp-fw".
+
+	  It's safe to say n here if you're not interested in multimedia
+	  offloading.
 
 endmenu

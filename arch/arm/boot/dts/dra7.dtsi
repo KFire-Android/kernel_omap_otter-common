@@ -295,6 +295,142 @@
 			clock-frequency = <48000000>;
 		};
 
+		mailbox1: mailbox@4a0f4000 {
+			compatible = "ti,omap4-mailbox";
+			reg = <0x4a0f4000 0x200>;
+			interrupts = <0 26 0x4>;
+			ti,hwmods = "mailbox1";
+			ti,mbox-num-users = <3>;
+			ti,mbox-num-fifos = <8>;
+			#ti,mbox-data-cells = <4>;
+			ti,mbox-names = "mbox1-1", "mbox1-2";
+			ti,mbox-data = <0 1 0 0>, <3 2 0 0>;
+		};
+
+		mailbox2: mailbox@4883a000 {
+			compatible = "ti,omap4-mailbox";
+			reg = <0x4883a000 0x200>;
+			ti,hwmods = "mailbox2";
+			ti,mbox-num-users = <4>;
+			ti,mbox-num-fifos = <12>;
+			#ti,mbox-data-cells = <4>;
+			status = "disabled";
+		};
+
+		mailbox3: mailbox@4883c000 {
+			compatible = "ti,omap4-mailbox";
+			reg = <0x4883c000 0x200>;
+			ti,hwmods = "mailbox3";
+			ti,mbox-num-users = <4>;
+			ti,mbox-num-fifos = <12>;
+			#ti,mbox-data-cells = <4>;
+			status = "disabled";
+		};
+
+		mailbox4: mailbox@4883e000 {
+			compatible = "ti,omap4-mailbox";
+			reg = <0x4883e000 0x200>;
+			ti,hwmods = "mailbox4";
+			ti,mbox-num-users = <4>;
+			ti,mbox-num-fifos = <12>;
+			#ti,mbox-data-cells = <4>;
+			status = "disabled";
+		};
+
+		mailbox5: mailbox@48840000 {
+			compatible = "ti,omap4-mailbox";
+			reg = <0x48840000 0x200>;
+			interrupts = <0 136 0x4>;
+			ti,hwmods = "mailbox5";
+			ti,mbox-num-users = <4>;
+			ti,mbox-num-fifos = <12>;
+			#ti,mbox-data-cells = <4>;
+			ti,mbox-names = "mbox-ipu1", "mbox-dsp1";
+			ti,mbox-data = <6 4 0 2>, <5 1 0 2>;
+		};
+
+		mailbox6: mailbox@48842000 {
+			compatible = "ti,omap4-mailbox";
+			reg = <0x48842000 0x200>;
+			interrupts = <0 141 0x4>;
+			ti,hwmods = "mailbox6";
+			ti,mbox-num-users = <4>;
+			ti,mbox-num-fifos = <12>;
+			#ti,mbox-data-cells = <4>;
+			ti,mbox-names = "mbox-ipu2", "mbox-dsp2";
+			ti,mbox-data = <6 4 0 2>, <5 1 0 2>;
+		};
+
+		mailbox7: mailbox@48844000 {
+			compatible = "ti,omap4-mailbox";
+			reg = <0x48844000 0x200>;
+			ti,hwmods = "mailbox7";
+			ti,mbox-num-users = <4>;
+			ti,mbox-num-fifos = <12>;
+			#ti,mbox-data-cells = <4>;
+			status = "disabled";
+		};
+
+		mailbox8: mailbox@48846000 {
+			compatible = "ti,omap4-mailbox";
+			reg = <0x48846000 0x200>;
+			ti,hwmods = "mailbox8";
+			ti,mbox-num-users = <4>;
+			ti,mbox-num-fifos = <12>;
+			#ti,mbox-data-cells = <4>;
+			status = "disabled";
+		};
+
+		mailbox9: mailbox@4885e000 {
+			compatible = "ti,omap4-mailbox";
+			reg = <0x4885e000 0x200>;
+			ti,hwmods = "mailbox9";
+			ti,mbox-num-users = <4>;
+			ti,mbox-num-fifos = <12>;
+			#ti,mbox-data-cells = <4>;
+			status = "disabled";
+		};
+
+		mailbox10: mailbox@48860000 {
+			compatible = "ti,omap4-mailbox";
+			reg = <0x48860000 0x200>;
+			ti,hwmods = "mailbox10";
+			ti,mbox-num-users = <4>;
+			ti,mbox-num-fifos = <12>;
+			#ti,mbox-data-cells = <4>;
+			status = "disabled";
+		};
+
+		mailbox11: mailbox@48862000 {
+			compatible = "ti,omap4-mailbox";
+			reg = <0x48862000 0x200>;
+			ti,hwmods = "mailbox11";
+			ti,mbox-num-users = <4>;
+			ti,mbox-num-fifos = <12>;
+			#ti,mbox-data-cells = <4>;
+			status = "disabled";
+		};
+
+		mailbox12: mailbox@48864000 {
+			compatible = "ti,omap4-mailbox";
+			reg = <0x48864000 0x200>;
+			ti,hwmods = "mailbox12";
+			ti,mbox-num-users = <4>;
+			ti,mbox-num-fifos = <12>;
+			#ti,mbox-data-cells = <4>;
+			status = "disabled";
+		};
+
+		mailbox13: mailbox@48802000 {
+			compatible = "ti,omap4-mailbox";
+			reg = <0x48802000 0x200>;
+			ti,hwmods = "mailbox13";
+			ti,mbox-num-users = <4>;
+			ti,mbox-num-fifos = <12>;
+			#ti,mbox-data-cells = <4>;
+			status = "disabled";
+		};
+
 		timer1: timer@4ae18000 {
 			compatible = "ti,omap2-timer";
 			reg = <0x4ae18000 0x80>;
@@ -315,6 +451,7 @@
 			reg = <0x48034000 0x80>;
 			interrupts = <0 39 0x4>;
 			ti,hwmods = "timer3";
+			ti,timer-ipu;
 		};
 
 		timer4: timer@48036000 {
@@ -322,6 +459,7 @@
 			reg = <0x48036000 0x80>;
 			interrupts = <0 40 0x4>;
 			ti,hwmods = "timer4";
+			ti,timer-ipu;
 		};
 
 		timer5: timer@48820000 {
@@ -363,6 +501,7 @@
 			reg = <0x4803e000 0x80>;
 			interrupts = <0 45 0x4>;
 			ti,hwmods = "timer9";
+			ti,timer-ipu;
 		};
 
 		timer10: timer@48086000 {
@@ -377,6 +516,7 @@
 			reg = <0x48088000 0x80>;
 			interrupts = <0 47 0x4>;
 			ti,hwmods = "timer11";
+			ti,timer-ipu;
 			ti,timer-pwm;
 		};
 

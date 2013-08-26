@@ -1,7 +1,7 @@
 /*
  * OMAP Remote Processor driver
  *
- * Copyright (C) 2011 Texas Instruments, Inc.
+ * Copyright (C) 2011-2013 Texas Instruments, Inc.
  * Copyright (C) 2011 Google, Inc.
  *
  * Ohad Ben-Cohen <ohad@wizery.com>
@@ -81,6 +81,10 @@ static int omap_rproc_mbox_callback(struct notifier_block *this,
 		dev_info(dev, "received echo reply from %s\n", name);
 		break;
 	default:
+		if (msg_data >= RP_MBOX_END_MSG) {
+			dev_err(dev, "dropping unknown message %x", msg_data);
+			return NOTIFY_DONE;
+		}
 		/* msg contains the index of the triggered vring */
 		if (rproc_vq_interrupt(oproc->rproc, msg_data) == IRQ_NONE)
 			dev_dbg(dev, "no message was found in vqid %d\n",
@@ -148,14 +152,25 @@ static int omap_rproc_start(struct rproc *rproc)
 		goto put_mbox;
 	}
 
+	if (pdata->enable_timers) {
+		ret = pdata->enable_timers(pdev, true);
+		if (ret) {
+			dev_err(dev, "enable_timers failed: %d\n", ret);
+			goto put_mbox;
+		}
+	}
+
 	ret = pdata->device_enable(pdev);
 	if (ret) {
 		dev_err(dev, "omap_device_enable failed: %d\n", ret);
-		goto put_mbox;
+		goto reset_timers;
 	}
 
 	return 0;
 
+reset_timers:
+	if (pdata->disable_timers)
+		pdata->disable_timers(pdev, true);
 put_mbox:
 	mailbox_put(oproc->mbox, &oproc->nb);
 	return ret;
@@ -173,6 +188,12 @@ static int omap_rproc_stop(struct rproc *rproc)
 	ret = pdata->device_shutdown(pdev);
 	if (ret)
 		return ret;
+
+	if (pdata->disable_timers) {
+		ret = pdata->disable_timers(pdev, true);
+		if (ret)
+			return ret;
+	}
 
 	mailbox_put(oproc->mbox, &oproc->nb);
 
