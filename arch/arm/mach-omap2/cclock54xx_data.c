@@ -59,6 +59,18 @@
  */
 #define OMAP5_DPLL_USB_DEFFREQ				960000000
 
+/*
+ * OMAP5 IVA DPLL frequency settings. The recommended maximum DPLL locked
+ * frequency is 2330 MHz for OPP_LOW & OPP_NOM (value for DPLL_IVA_X2_CLK),
+ * so the DPLL_IVA_DEFFREQ is defined to be half of this value. Note that
+ * the value 1164.8 MHz is chosen so that the DPLL can be locked with proper
+ * M & N divider values. The output clock values are based on the OPP_NOM
+ * frequencies for DSP and IVAHD subsystems.
+ */
+#define OMAP5_DPLL_IVA_DEFFREQ				1164800000
+#define OMAP5_DSP_GCLK_NOMFREQ				466000000
+#define OMAP5_IVA_GCLK_NOMFREQ				388300000
+
 /* Root clocks */
 
 DEFINE_CLK_FIXED_RATE(pad_clks_src_ck, CLK_IS_ROOT, 12000000, 0x0);
@@ -1479,6 +1491,9 @@ static struct rate_init_clks rate_clks[] = {
 	{ .name = "dpll_usb_m2_ck", .rate = OMAP5_DPLL_USB_DEFFREQ/2 },
 	{ .name = "dpll_abe_ck", .rate = OMAP5_DPLL_ABE_DEFFREQ },
 	{ .name = "dpll_abe_m2x2_ck", .rate = OMAP5_DPLL_ABE_DEFFREQ * 2 },
+	{ .name = "dpll_iva_ck", .rate = OMAP5_DPLL_IVA_DEFFREQ },
+	{ .name = "dpll_iva_h11x2_ck", .rate = OMAP5_DSP_GCLK_NOMFREQ },
+	{ .name = "dpll_iva_h12x2_ck", .rate = OMAP5_IVA_GCLK_NOMFREQ },
 };
 
 int __init omap5xxx_clk_init(void)

@@ -64,6 +64,7 @@
 #define OMAP_TIMER_HAS_PWM				0x20000000
 #define OMAP_TIMER_NEEDS_RESET				0x10000000
 #define OMAP_TIMER_HAS_DSP_IRQ				0x08000000
+#define OMAP_TIMER_HAS_IPU_IRQ				0x04000000
 
 /*
  * timer errata flags

@@ -1,0 +1,46 @@
+OMAP2+ Mailbox Driver
+
+Required properties:
+- compatible:		Should be one of the following,
+			    "ti,omap2-mailbox" for
+				OMAP2420, OMAP2430, OMAP3430, OMAP3630 SoCs
+			    "ti,omap4-mailbox" for
+				OMAP44xx, OMAP54xx, AM33xx, AM43xx, DRA7xx SoCs
+- reg:			Contains the mailbox register address range (base
+			address and length)
+- interrupts: 		Contains the interrupt information for the mailbox
+			device. The format is dependent on which interrupt
+			controller the OMAP device uses
+- ti,hwmods:		Name of the hwmod associated with the mailbox
+- ti,mbox-num-users:	Number of targets (processor devices) that the mailbox device
+			can interrupt
+- ti,mbox-num-fifos:	Number of h/w fifos within the mailbox device
+- #ti,mbox-data-cells:	Cell size for describing a mailbox
+			(currently should be 4)
+- ti,mbox-names:	Array of the names of the mailboxes
+- ti,mbox-data:		Mailbox descriptor data private to each mailbox. The 4
+			cells represent the following data,
+			  Cell #1 (tx_id) - mailbox fifo id used for
+						transmitting messages
+			  Cell #2 (rx_id) - mailbox fifo id on which messages
+						are received
+			  Cell #3 (irq_id) - irq identifier index number to use
+						from the interrupts data
+			  Cell #4 (usr_id) - mailbox user id for identifying the
+						interrupt into the MPU interrupt
+						controller.
+
+Example:
+
+/* OMAP4 */
+mailbox: mailbox@4a0f4000 {
+	compatible = "ti,omap4-mailbox";
+	reg = <0x4a0f4000 0x200>;
+	interrupts = <0 26 0x4>;
+	ti,hwmods = "mailbox";
+	ti,mbox-num-users = <3>;
+	ti,mbox-num-fifos = <8>;
+	#ti,mbox-data-cells = <4>
+	ti,mbox-names = "mbox-ipu", "mbox-dsp";
+	ti,mbox-data = <0 1 0 0>, <3 2 0 0>;
+};
