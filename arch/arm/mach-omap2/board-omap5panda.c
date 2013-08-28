@@ -77,6 +77,13 @@
 #define HDMI_GPIO_LS_OE		257
 #define GPIO_MSECURE		234	/* MSECURE GPIO */
 
+#define GPIO_VOL_UP		34
+#define GPIO_VOL_DOWN		33
+#define GPIO_USER_1		59
+#define GPIO_USER_2		58
+#define GPIO_USER_3		57
+#define GPIO_USER_4		56
+
 static struct gpio_led panda5_gpio_leds[] = {
 	{
 		.name			= "blue",
@@ -168,6 +175,16 @@ static struct omap_board_mux board_mux[] __initdata = {
 	OMAP5_MUX(GPIO6_187, OMAP_MUX_MODE3),    /*  DISPC_DATA23   */
 #endif
 
+#ifdef CONFIG_HID_NTRIG
+	/*VOL and USER Keys */
+	OMAP5_MUX(C2C_CLKOUT0, OMAP_PIN_INPUT | OMAP_MUX_MODE6),	/*	VOL_DOWN  */
+	OMAP5_MUX(C2C_CLKOUT1, OMAP_PIN_INPUT | OMAP_MUX_MODE6),	 /*  VOL_UP  */
+	OMAP5_MUX(C2C_DATAOUT3, OMAP_PIN_INPUT | OMAP_MUX_MODE6),	  /*  USER_KEY1   */
+	OMAP5_MUX(C2C_DATAOUT2, OMAP_PIN_INPUT | OMAP_MUX_MODE6),	  /*  USER_KEY2  */
+	OMAP5_MUX(C2C_DATAOUT1, OMAP_PIN_INPUT | OMAP_MUX_MODE6),	  /*  USER_KEY3  */
+	OMAP5_MUX(C2C_DATAOUT0, OMAP_PIN_INPUT | OMAP_MUX_MODE6),	  /*  USER_KEY4   */
+#endif
+
 	OMAP5_MUX(FREF_CLK1_OUT, OMAP_PIN_INPUT_PULLUP),
 	OMAP5_MUX(USBB2_HSIC_STROBE, OMAP_PIN_INPUT | OMAP_MUX_MODE0),
 	OMAP5_MUX(USBB2_HSIC_DATA, OMAP_PIN_INPUT | OMAP_MUX_MODE0),
@@ -210,6 +227,62 @@ static struct gpio_keys_button panda5_gpio_keys[] = {
 		.wakeup			= 1,
 		.debounce_interval	= 10,
 	},
+#ifdef CONFIG_HID_NTRIG
+	{
+		.desc			= "volume_up",
+		.type			= EV_KEY,
+		.code			= KEY_VOLUMEUP,
+		.gpio			= GPIO_VOL_UP,
+		.active_low		= 1,
+		.wakeup			= 1,
+		.debounce_interval	= 10,
+	},
+	{
+		.desc			= "volume_down",
+		.type			= EV_KEY,
+		.code			= KEY_VOLUMEDOWN,
+		.gpio			= GPIO_VOL_DOWN,
+		.active_low		= 1,
+		.wakeup			= 1,
+		.debounce_interval	= 10,
+	},
+	{
+		.desc			= "user_key1",
+		.type			= EV_KEY,
+		.code			= KEY_PROG1,
+		.gpio			= GPIO_USER_1,
+		.active_low		= 1,
+		.wakeup			= 1,
+		.debounce_interval	= 10,
+	},
+	{
+		.desc			= "user_key2",
+		.type			= EV_KEY,
+		.code			= KEY_PROG2,
+		.gpio			= GPIO_USER_2,
+		.active_low		= 1,
+		.wakeup			= 1,
+		.debounce_interval	= 10,
+	},
+	{
+		.desc			= "user_key3",
+		.type			= EV_KEY,
+		.code			= KEY_PROG3,
+		.gpio			= GPIO_USER_3,
+		.active_low		= 1,
+		.wakeup			= 1,
+		.debounce_interval	= 10,
+	},
+	{
+		.desc			= "user_key4",
+		.type			= EV_KEY,
+		.code			= KEY_PROG4,
+		.gpio			= GPIO_USER_4,
+		.active_low		= 1,
+		.wakeup			= 1,
+		.debounce_interval	= 10,
+	},
+#endif
 };
 
 static struct gpio_keys_platform_data panda5_gpio_keys_data = {
