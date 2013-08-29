@@ -75,7 +75,11 @@ static const struct snd_pcm_hardware dummy_dma_hardware = {
 
 static int dummy_dma_open(struct snd_pcm_substream *substream)
 {
-	snd_soc_set_runtime_hwparams(substream, &dummy_dma_hardware);
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+
+	/* prevent overwriting hostless parameters */
+	if (!rtd->dai_link->no_host_mode)
+		snd_soc_set_runtime_hwparams(substream, &dummy_dma_hardware);
 
 	return 0;
 }
@@ -92,6 +96,22 @@ static struct snd_soc_platform_driver dummy_platform = {
 static struct snd_soc_codec_driver dummy_codec;
 static struct snd_soc_dai_driver dummy_dai = {
 	.name = "snd-soc-dummy-dai",
+	.playback = {
+		.channels_min	= 1,
+		.channels_max	= UINT_MAX,
+		.rates		= (SNDRV_PCM_RATE_8000_192000 |
+				   SNDRV_PCM_RATE_CONTINUOUS |
+				   SNDRV_PCM_RATE_KNOT),
+		.formats	= ULLONG_MAX,
+	},
+	.capture = {
+		.channels_min	= 1,
+		.channels_max	= UINT_MAX,
+		.rates		= (SNDRV_PCM_RATE_8000_192000 |
+				   SNDRV_PCM_RATE_CONTINUOUS |
+				   SNDRV_PCM_RATE_KNOT),
+		.formats	= ULLONG_MAX,
+	},
 };
 
 static int snd_soc_dummy_probe(struct platform_device *pdev)
