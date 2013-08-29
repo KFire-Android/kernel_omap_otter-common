@@ -68,13 +68,31 @@
 			"Headphone", "HPLOUT",
 			"Headphone", "HPROUT",
 			"Line Out", "LLOUT",
-			"Line Out", "RLOUT";
+			"Line Out", "RLOUT",
+			"J3A LINE1L", "JAMR3 Stereo Aux In",
+			"J3A LINE1R", "JAMR3 Stereo Aux In",
+			"J3B LINE1L", "JAMR3 Mono Mic 1",
+			"J3B LINE1R", "JAMR3 Mono Mic 2",
+			"JAMR3 Line Out 1", "J3A LLOUT",
+			"JAMR3 Line Out 1", "J3A RLOUT",
+			"JAMR3 Line Out 2", "J3B LLOUT",
+			"JAMR3 Line Out 2", "J3B RLOUT",
+			"JAMR3 Line Out 3", "J3C LLOUT",
+			"JAMR3 Line Out 3", "J3C RLOUT";
 
 		/* Media DAI link */
 		ti,media-cpu = <&mcasp3>;
 		ti,media-codec = <&tlv320aic3106>;
 		ti,media-mclk-freq = <5644800>;
 		ti,media-slots = <2>;
+
+		/* Multichannel DAI link */
+		ti,multichannel-cpu = <&mcasp6>;
+		ti,multichannel-codec-a = <&tlv320aic3106a>;
+		ti,multichannel-codec-b = <&tlv320aic3106b>;
+		ti,multichannel-codec-c = <&tlv320aic3106c>;
+		ti,multichannel-slots = <8>;
+		ti,multichannel-mclk-freq = <11289600>;
 	};
 
 	sound_hdmi {
@@ -286,6 +304,33 @@
 		reg = <0x26>;
 		gpio-controller;
 		#gpio-cells = <2>;
+	};
+
+	tlv320aic3106a: tlv320aic3106@18 {
+		compatible = "ti,tlv320aic3x";
+		reg = <0x18>;
+		IOVDD-supply = <&vaudio_3v3>;
+		DVDD-supply = <&vaudio_1v8>;
+		AVDD-supply = <&vaudio_3v3>;
+		DRVDD-supply = <&vaudio_3v3>;
+	};
+
+	tlv320aic3106b: tlv320aic3106@19 {
+		compatible = "ti,tlv320aic3x";
+		reg = <0x19>;
+		IOVDD-supply = <&vaudio_3v3>;
+		DVDD-supply = <&vaudio_1v8>;
+		AVDD-supply = <&vaudio_3v3>;
+		DRVDD-supply = <&vaudio_3v3>;
+	};
+
+	tlv320aic3106c: tlv320aic3106@1a {
+		compatible = "ti,tlv320aic3x";
+		reg = <0x1a>;
+		IOVDD-supply = <&vaudio_3v3>;
+		DVDD-supply = <&vaudio_1v8>;
+		AVDD-supply = <&vaudio_3v3>;
+		DRVDD-supply = <&vaudio_3v3>;
 	};
 };
 

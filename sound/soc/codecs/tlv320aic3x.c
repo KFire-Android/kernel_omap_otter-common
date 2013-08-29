@@ -77,6 +77,7 @@ struct aic3x_priv {
 	enum snd_soc_control_type control_type;
 	struct aic3x_setup_data *setup;
 	unsigned int sysclk;
+	unsigned int tdm_delay;
 	struct list_head list;
 	int master;
 	int gpio_reset;
@@ -1097,10 +1098,43 @@ static int aic3x_set_dai_fmt(struct snd_soc_dai *codec_dai,
 		return -EINVAL;
 	}
 
+	/* TDM requires DSP_B and bit delay to set active slots */
+	if ((fmt & SND_SOC_DAIFMT_FORMAT_MASK) == SND_SOC_DAIFMT_DSP_B)
+		delay = aic3x->tdm_delay;
+
 	/* set iface */
 	snd_soc_write(codec, AIC3X_ASD_INTF_CTRLA, iface_areg);
 	snd_soc_write(codec, AIC3X_ASD_INTF_CTRLB, iface_breg);
 	snd_soc_write(codec, AIC3X_ASD_INTF_CTRLC, delay);
+
+	return 0;
+}
+
+static int aic3x_set_dai_tdm_slot(struct snd_soc_dai *codec_dai,
+				  unsigned int tx_mask, unsigned int rx_mask,
+				  int slots, int slot_width)
+{
+	struct snd_soc_codec *codec = codec_dai->codec;
+	struct aic3x_priv *aic3x = snd_soc_codec_get_drvdata(codec);
+	unsigned int lsb = __ffs(tx_mask);
+
+	if (tx_mask != rx_mask) {
+		dev_err(codec->dev, "tx and rx masks must be symmetric\n");
+		return -EINVAL;
+	}
+
+	/* TDM based on DSP mode requires slots to be adjacent */
+	if ((lsb + 1) != __fls(tx_mask)) {
+		dev_err(codec->dev, "Invalid mask, slots must be adjacent\n");
+		return -EINVAL;
+	}
+
+	aic3x->tdm_delay = lsb * slot_width;
+	snd_soc_write(codec, AIC3X_ASD_INTF_CTRLC, aic3x->tdm_delay);
+
+	/* DOUT in high-impedance on inactive bit clocks */
+	snd_soc_update_bits(codec, AIC3X_ASD_INTF_CTRLA,
+			    DOUT_TRISTATE, DOUT_TRISTATE);
 
 	return 0;
 }
@@ -1242,6 +1276,7 @@ static const struct snd_soc_dai_ops aic3x_dai_ops = {
 	.digital_mute	= aic3x_mute,
 	.set_sysclk	= aic3x_set_dai_sysclk,
 	.set_fmt	= aic3x_set_dai_fmt,
+	.set_tdm_slot	= aic3x_set_dai_tdm_slot,
 };
 
 static struct snd_soc_dai_driver aic3x_dai = {

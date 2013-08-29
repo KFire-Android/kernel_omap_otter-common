@@ -577,6 +577,19 @@ struct snd_soc_platform_driver {
 	int (*bespoke_trigger)(struct snd_pcm_substream *, int);
 };
 
+struct snd_soc_dai_link_codec {
+	const char *codec_name;
+	const struct device_node *codec_of_node;
+	const char *codec_dai_name;
+
+	struct snd_soc_codec *codec;
+	struct snd_soc_dai *codec_dai;
+
+	int (*hw_params_fixup)(struct snd_soc_pcm_runtime *rtd,
+			       struct snd_pcm_hw_params *params);
+	struct snd_pcm_hw_params hw_params;
+};
+
 struct snd_soc_platform {
 	const char *name;
 	int id;
@@ -630,6 +643,10 @@ struct snd_soc_dai_link {
 	const struct device_node *codec_of_node;
 	/* You MUST specify the DAI name within the codec */
 	const char *codec_dai_name;
+
+	struct snd_soc_dai_link_codec *codecs;
+	int num_codecs;
+
 	/*
 	 * You MAY specify the link's platform/PCM/DMA driver, either by
 	 * device name, or by DT/OF node, but not both. Some forms of link
@@ -676,7 +693,14 @@ struct snd_soc_dai_link {
 };
 
 struct snd_soc_codec_conf {
+	/*
+	 * You MUST specify the conf's codec, either by device name,
+	 * or by DT/OF node, but not both.
+	 */
 	const char *dev_name;
+	const struct device_node *codec_of_node;
+
+	struct snd_soc_codec *codec;
 
 	/*
 	 * optional map of kcontrol, widget and path name prefixes that are
@@ -819,6 +843,9 @@ struct snd_soc_pcm_runtime {
 	struct snd_soc_platform *platform;
 	struct snd_soc_dai *codec_dai;
 	struct snd_soc_dai *cpu_dai;
+
+	struct snd_soc_dai_link_codec *codecs;
+	int num_codecs;
 
 	struct delayed_work delayed_work;
 #ifdef CONFIG_DEBUG_FS
