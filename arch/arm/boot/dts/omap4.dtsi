@@ -173,6 +173,8 @@
 				ti,hwmods = "dss_hdmi";
 				vdda_hdmi_dac-supply = <&vdac>;
 				video-source = <1>;
+				vdda_hdmi_microvolt_min = <1800000>;
+				vdda_hdmi_microvolt_max = <1980000>;
 			};
 		};
 

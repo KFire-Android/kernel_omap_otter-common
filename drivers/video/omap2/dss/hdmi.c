@@ -67,6 +67,10 @@ static struct {
 	struct clk *sys_clk;
 	struct regulator *vdda_hdmi_dac_reg;
 
+	/* voltage required by the ip*/
+	u32 microvolt_min;
+	u32 microvolt_max;
+
 	/* GPIO pins */
 	int ct_cp_hpd_gpio;
 	int ls_oe_gpio;
@@ -428,6 +432,11 @@ static int __init hdmi_init_display(struct omap_dss_device *dssdev)
 		if (IS_ERR(reg)) {
 			DSSERR("can't get VDDA_HDMI_DAC regulator\n");
 			return PTR_ERR(reg);
+		}
+
+		r = regulator_set_voltage(reg, hdmi.microvolt_min, hdmi.microvolt_max);
+		if(r) {
+			DSSERR("can't set the voltage regulator");
 		}
 
 		hdmi.vdda_hdmi_dac_reg = reg;
@@ -1594,7 +1603,7 @@ static void __init hdmi_probe_of(struct platform_device *pdev)
 	struct i2c_adapter *adapter = NULL;
 	int r, gpio;
 	enum omap_channel channel;
-	u32 v;
+	u32 v, volt;
 	int gpio_count;
 
 	r = of_property_read_u32(node, "video-source", &v);
@@ -1604,6 +1613,20 @@ static void __init hdmi_probe_of(struct platform_device *pdev)
 	}
 
 	channel = v;
+
+	r = of_property_read_u32(node, "vdda_hdmi_microvolt_min", &volt);
+	if (r) {
+		DSSERR("parsing microvolt_min failed\n");
+		return;
+	}
+	hdmi.microvolt_min = volt;
+
+	r = of_property_read_u32(node, "vdda_hdmi_microvolt_max", &volt);
+	if (r) {
+		DSSERR("parsing microvolt_max failed\n");
+		return;
+	}
+	hdmi.microvolt_max = volt;
 
 	node = of_find_compatible_node(node, NULL, "ti,tpd12s015");
 	if (!node)
