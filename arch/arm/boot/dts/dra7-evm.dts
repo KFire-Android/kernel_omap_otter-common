@@ -397,6 +397,7 @@
 };
 
 &hdmi {
+	vdda_hdmi_dac-supply = <&ldo3_reg>;
 	tpd12s015: tpd12s015 {
 		compatible = "ti,tpd12s015";
 
