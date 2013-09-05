@@ -1,7 +1,7 @@
 /*
  * Remote Processor Framework
  *
- * Copyright (C) 2011 Texas Instruments, Inc.
+ * Copyright (C) 2011-2013 Texas Instruments, Inc.
  * Copyright (C) 2011 Google, Inc.
  *
  * Ohad Ben-Cohen <ohad@wizery.com>
@@ -40,6 +40,7 @@
 #include <linux/crc32.h>
 #include <linux/virtio_ids.h>
 #include <linux/virtio_ring.h>
+#include <linux/platform_device.h>
 #include <asm/byteorder.h>
 
 #include "remoteproc_internal.h"
@@ -1096,6 +1097,28 @@ static void rproc_crash_handler_work(struct work_struct *work)
 	if (!rproc->recovery_disabled)
 		rproc_trigger_recovery(rproc);
 }
+
+/**
+ * rproc_get_platform_id() - return the platform device id
+ * @rproc: handle of a remote processor
+ *
+ * Each rproc device is created from a platform device (based on the
+ * current remoteproc driver implementations). This function retrieves
+ * the platform device id and is useful for clients needing to know an
+ * id for a processor. It is assumed that the platform devices were
+ * created with known ids.
+ *
+ * Return: platform device id associated with the rproc
+ */
+int rproc_get_platform_id(struct rproc *rproc)
+{
+	struct device *dev = rproc->dev.parent;
+	struct platform_device *pdev = to_platform_device(dev);
+
+	/* XXX: perform a sanity check for platform_bus_type */
+	return pdev->id;
+}
+EXPORT_SYMBOL(rproc_get_platform_id);
 
 /**
  * rproc_boot() - boot a remote processor

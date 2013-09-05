@@ -133,6 +133,8 @@ static struct omap_rproc_pdata dra7_rproc_data[] = {
 		.firmware	= "dra7-dsp1-fw.xe66",
 		.mbox_name	= "mbox-dsp1",
 		.oh_name	= "dsp1",
+		.timers		= dsp_timers,
+		.timers_cnt	= ARRAY_SIZE(dsp_timers),
 		.set_bootaddr	= dra7_ctrl_write_dsp1_boot_addr,
 	},
 	{
