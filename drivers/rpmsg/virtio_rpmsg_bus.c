@@ -73,11 +73,13 @@ struct virtproc_info {
 /**
  * struct rpmsg_channel_info - internal channel info representation
  * @name: name of service
+ * @desc: description of service
  * @src: local address
  * @dst: destination address
  */
 struct rpmsg_channel_info {
 	char name[RPMSG_NAME_SIZE];
+	char desc[RPMSG_NAME_SIZE];
 	u32 src;
 	u32 dst;
 };
@@ -131,6 +133,7 @@ field##_show(struct device *dev,					\
 rpmsg_show_attr(name, id.name, "%s\n");
 rpmsg_show_attr(src, src, "0x%x\n");
 rpmsg_show_attr(dst, dst, "0x%x\n");
+rpmsg_show_attr(desc, desc, "%s\n");
 rpmsg_show_attr(announce, announce ? "true" : "false", "%s\n");
 
 /*
@@ -151,6 +154,7 @@ static ssize_t modalias_show(struct device *dev,
 
 static struct device_attribute rpmsg_dev_attrs[] = {
 	__ATTR_RO(name),
+	__ATTR_RO(desc),
 	__ATTR_RO(modalias),
 	__ATTR_RO(dst),
 	__ATTR_RO(src),
@@ -158,7 +162,7 @@ static struct device_attribute rpmsg_dev_attrs[] = {
 	__ATTR_NULL
 };
 
-/* rpmsg devices and drivers are matched using the service name */
+/* rpmsg devices and drivers are matched using the service name only */
 static inline int rpmsg_id_match(const struct rpmsg_channel *rpdev,
 				  const struct rpmsg_device_id *id)
 {
@@ -490,6 +494,9 @@ static int rpmsg_channel_match(struct device *dev, void *data)
 	if (strncmp(chinfo->name, rpdev->id.name, RPMSG_NAME_SIZE))
 		return 0;
 
+	if (strncmp(chinfo->desc, rpdev->desc, RPMSG_NAME_SIZE))
+		return 0;
+
 	/* found a match ! */
 	return 1;
 }
@@ -499,7 +506,7 @@ static int rpmsg_channel_match(struct device *dev, void *data)
  * this function will be used to create both static and dynamic
  * channels.
  */
-static struct rpmsg_channel *rpmsg_create_channel(struct virtproc_info *vrp,
+static struct rpmsg_channel *__rpmsg_create_channel(struct virtproc_info *vrp,
 				struct rpmsg_channel_info *chinfo)
 {
 	struct rpmsg_channel *rpdev;
@@ -511,8 +518,9 @@ static struct rpmsg_channel *rpmsg_create_channel(struct virtproc_info *vrp,
 	if (tmp) {
 		/* decrement the matched device's refcount back */
 		put_device(tmp);
-		dev_err(dev, "channel %s:%x:%x already exist\n",
-				chinfo->name, chinfo->src, chinfo->dst);
+		dev_err(dev, "channel %s:%s:%x:%x already exist\n",
+				chinfo->name, chinfo->desc,
+				chinfo->src, chinfo->dst);
 		return NULL;
 	}
 
@@ -525,6 +533,7 @@ static struct rpmsg_channel *rpmsg_create_channel(struct virtproc_info *vrp,
 	rpdev->vrp = vrp;
 	rpdev->src = chinfo->src;
 	rpdev->dst = chinfo->dst;
+	strncpy(rpdev->desc, chinfo->desc, RPMSG_NAME_SIZE);
 
 	/*
 	 * rpmsg server channels has predefined local address (for now),
@@ -551,11 +560,42 @@ static struct rpmsg_channel *rpmsg_create_channel(struct virtproc_info *vrp,
 	return rpdev;
 }
 
+/**
+ * rpmsg_create_channel - create a rpmsg channel using its name, desc, id and
+ *			  address
+ * @vrp: the virtual processor on which this channel is being created
+ * @name: name of the rpmsg channel
+ * @desc: description of the rpmsg channel
+ * @src: source end-point address for the channel
+ * @dst: destination end-point address for the channel
+ *
+ * This function provides a means to create new rpmsg channels on a particular
+ * virtual processor. The caller supplies the address info, name and descriptor
+ * for the channel. This is useful when creating channels from the host side.
+ *
+ * Return: a pointer to a newly created rpmsg channel device on success,
+ *	   or NULL on failure
+ */
+struct rpmsg_channel *rpmsg_create_channel(struct virtproc_info *vrp,
+					   const char *name, const char *desc,
+					   int src, int dst)
+{
+	struct rpmsg_channel_info chinfo;
+
+	strncpy(chinfo.name, name, sizeof(chinfo.name));
+	strncpy(chinfo.desc, desc, sizeof(chinfo.desc));
+	chinfo.src = src;
+	chinfo.dst = dst;
+
+	return __rpmsg_create_channel(vrp, &chinfo);
+}
+EXPORT_SYMBOL(rpmsg_create_channel);
+
 /*
  * find an existing channel using its name + address properties,
  * and destroy it
  */
-static int rpmsg_destroy_channel(struct virtproc_info *vrp,
+static int __rpmsg_destroy_channel(struct virtproc_info *vrp,
 					struct rpmsg_channel_info *chinfo)
 {
 	struct virtio_device *vdev = vrp->vdev;
@@ -571,6 +611,34 @@ static int rpmsg_destroy_channel(struct virtproc_info *vrp,
 
 	return 0;
 }
+
+/**
+ * rpmsg_destroy_channel - destroy a rpmsg channel
+ * @rpdev: rpmsg channel to be destroyed
+ *
+ * This function is the primary means to destroy a rpmsg channel that was
+ * created from the host-side. This API is strictly intended to be used only
+ * for channels created using the rpmsg_create_channel API.
+ *
+ * Return: 0 on success, or a failure code otherwise
+ */
+int rpmsg_destroy_channel(struct rpmsg_channel *rpdev)
+{
+	struct device *dev;
+	struct virtio_device *vdev = rpmsg_get_virtio_dev(rpdev);
+
+	if (!rpdev || !vdev)
+		return -EINVAL;
+
+	dev = &rpdev->dev;
+	if (dev->bus != &rpmsg_bus || dev->parent != &vdev->dev)
+		return -EINVAL;
+
+	device_unregister(dev);
+
+	return 0;
+}
+EXPORT_SYMBOL(rpmsg_destroy_channel);
 
 /* super simple buffer "allocator" that is just enough for now */
 static void *get_a_tx_buf(struct virtproc_info *vrp)
@@ -755,8 +823,10 @@ int rpmsg_send_offchannel_raw(struct rpmsg_channel *rpdev, u32 src, u32 dst,
 	dev_dbg(dev, "TX From 0x%x, To 0x%x, Len %d, Flags %d, Reserved %d\n",
 					msg->src, msg->dst, msg->len,
 					msg->flags, msg->reserved);
+#if 0
 	print_hex_dump(KERN_DEBUG, "rpmsg_virtio TX: ", DUMP_PREFIX_NONE, 16, 1,
 					msg, sizeof(*msg) + msg->len, true);
+#endif
 
 	sg_init_one(&sg, msg, sizeof(*msg) + len);
 
@@ -782,28 +852,36 @@ out:
 }
 EXPORT_SYMBOL(rpmsg_send_offchannel_raw);
 
-/* called when an rx buffer is used, and it's time to digest a message */
-static void rpmsg_recv_done(struct virtqueue *rvq)
+/**
+ * rpmsg_get_virtio_dev - Get underlying virtio device
+ * @rpdev: the rpmsg channel
+ *
+ * Returns the underlying remoteproc virtio device, if one exists. Returns NULL
+ * otherwise.
+ */
+struct virtio_device *rpmsg_get_virtio_dev(struct rpmsg_channel *rpdev)
 {
-	struct rpmsg_hdr *msg;
-	unsigned int len;
+	if (!rpdev || !rpdev->vrp)
+		return NULL;
+
+	return rpdev->vrp->vdev;
+}
+EXPORT_SYMBOL(rpmsg_get_virtio_dev);
+
+static int rpmsg_recv_single(struct virtproc_info *vrp, struct device *dev,
+			     struct rpmsg_hdr *msg, unsigned int len)
+{
 	struct rpmsg_endpoint *ept;
 	struct scatterlist sg;
-	struct virtproc_info *vrp = rvq->vdev->priv;
-	struct device *dev = &rvq->vdev->dev;
 	int err;
-
-	msg = virtqueue_get_buf(rvq, &len);
-	if (!msg) {
-		dev_err(dev, "uhm, incoming signal, but no used buffer ?\n");
-		return;
-	}
 
 	dev_dbg(dev, "From: 0x%x, To: 0x%x, Len: %d, Flags: %d, Reserved: %d\n",
 					msg->src, msg->dst, msg->len,
 					msg->flags, msg->reserved);
+#if 0
 	print_hex_dump(KERN_DEBUG, "rpmsg_virtio RX: ", DUMP_PREFIX_NONE, 16, 1,
 					msg, sizeof(*msg) + msg->len, true);
+#endif
 
 	/*
 	 * We currently use fixed-sized buffers, so trivially sanitize
@@ -812,7 +890,7 @@ static void rpmsg_recv_done(struct virtqueue *rvq)
 	if (len > RPMSG_BUF_SIZE ||
 		msg->len > (len - sizeof(struct rpmsg_hdr))) {
 		dev_warn(dev, "inbound msg too big: (%d, %d)\n", len, msg->len);
-		return;
+		return -EINVAL;
 	}
 
 	/* use the dst addr to fetch the callback of the appropriate user */
@@ -848,11 +926,42 @@ static void rpmsg_recv_done(struct virtqueue *rvq)
 	err = virtqueue_add_buf(vrp->rvq, &sg, 0, 1, msg, GFP_KERNEL);
 	if (err < 0) {
 		dev_err(dev, "failed to add a virtqueue buffer: %d\n", err);
+		return err;
+	}
+
+	return 0;
+}
+
+/* called when an rx buffer is used, and it's time to digest a message */
+static void rpmsg_recv_done(struct virtqueue *rvq)
+{
+	struct virtproc_info *vrp = rvq->vdev->priv;
+	struct device *dev = &rvq->vdev->dev;
+	struct rpmsg_hdr *msg;
+	unsigned int len, msgs_received = 0;
+	int err;
+
+	msg = virtqueue_get_buf(rvq, &len);
+	if (!msg) {
+		dev_err(dev, "uhm, incoming signal, but no used buffer ?\n");
 		return;
 	}
 
+	while (msg) {
+		err = rpmsg_recv_single(vrp, dev, msg, len);
+		if (err)
+			break;
+
+		msgs_received++;
+
+		msg = virtqueue_get_buf(rvq, &len);
+	};
+
+	dev_dbg(dev, "Received %u messages\n", msgs_received);
+
 	/* tell the remote processor we added another available rx buffer */
-	virtqueue_kick(vrp->rvq);
+	if (msgs_received)
+		virtqueue_kick(vrp->rvq);
 }
 
 /*
@@ -883,9 +992,11 @@ static void rpmsg_ns_cb(struct rpmsg_channel *rpdev, void *data, int len,
 	struct device *dev = &vrp->vdev->dev;
 	int ret;
 
+#if 0
 	print_hex_dump(KERN_DEBUG, "NS announcement: ",
 			DUMP_PREFIX_NONE, 16, 1,
 			data, len, true);
+#endif
 
 	if (len != sizeof(*msg)) {
 		dev_err(dev, "malformed ns msg (%d)\n", len);
@@ -911,17 +1022,19 @@ static void rpmsg_ns_cb(struct rpmsg_channel *rpdev, void *data, int len,
 			msg->name, msg->addr);
 
 	strncpy(chinfo.name, msg->name, sizeof(chinfo.name));
+	strncpy(chinfo.desc, msg->desc, sizeof(chinfo.desc));
 	chinfo.src = RPMSG_ADDR_ANY;
 	chinfo.dst = msg->addr;
 
 	if (msg->flags & RPMSG_NS_DESTROY) {
-		ret = rpmsg_destroy_channel(vrp, &chinfo);
+		ret = __rpmsg_destroy_channel(vrp, &chinfo);
 		if (ret)
-			dev_err(dev, "rpmsg_destroy_channel failed: %d\n", ret);
+			dev_err(dev, "__rpmsg_destroy_channel failed: %d\n",
+					ret);
 	} else {
-		newch = rpmsg_create_channel(vrp, &chinfo);
+		newch = __rpmsg_create_channel(vrp, &chinfo);
 		if (!newch)
-			dev_err(dev, "rpmsg_create_channel failed\n");
+			dev_err(dev, "__rpmsg_create_channel failed\n");
 	}
 }
 
@@ -957,8 +1070,10 @@ static int rpmsg_probe(struct virtio_device *vdev)
 	bufs_va = dma_alloc_coherent(vdev->dev.parent->parent,
 				RPMSG_TOTAL_BUF_SPACE,
 				&vrp->bufs_dma, GFP_KERNEL);
-	if (!bufs_va)
+	if (!bufs_va) {
+		err = -ENOMEM;
 		goto vqs_del;
+	}
 
 	dev_dbg(&vdev->dev, "buffers: va %p, dma 0x%llx\n", bufs_va,
 					(unsigned long long)vrp->bufs_dma);
@@ -1027,8 +1142,6 @@ static void rpmsg_remove(struct virtio_device *vdev)
 	struct virtproc_info *vrp = vdev->priv;
 	int ret;
 
-	vdev->config->reset(vdev);
-
 	ret = device_for_each_child(&vdev->dev, NULL, rpmsg_remove_device);
 	if (ret)
 		dev_warn(&vdev->dev, "can't remove rpmsg device: %d\n", ret);
@@ -1040,6 +1153,7 @@ static void rpmsg_remove(struct virtio_device *vdev)
 	idr_destroy(&vrp->endpoints);
 
 	vdev->config->del_vqs(vrp->vdev);
+	vdev->config->reset(vdev);
 
 	dma_free_coherent(vdev->dev.parent->parent, RPMSG_TOTAL_BUF_SPACE,
 					vrp->rbufs, vrp->bufs_dma);
