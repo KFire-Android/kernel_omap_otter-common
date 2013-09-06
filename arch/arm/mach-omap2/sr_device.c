@@ -115,6 +115,9 @@ static void __init sr_set_nvalues(struct omap_volt_data *volt_data,
 		if (v == 0)
 			continue;
 
+		/* use only 24 bits of data for NVALUERECIPROCAL */
+		v &= 0xFFFFFF;
+
 		nvalue_table[j].nvalue = v;
 		nvalue_table[j].efuse_offs = volt_data[i].sr_efuse_offs;
 		nvalue_table[j].errminlimit = volt_data[i].sr_errminlimit;
