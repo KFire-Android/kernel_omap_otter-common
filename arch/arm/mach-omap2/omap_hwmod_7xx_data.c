@@ -751,6 +751,7 @@ static struct omap_hwmod dra7xx_dss_hdmi_hwmod = {
 	.mpu_irqs	= dra7xx_dss_hdmi_irqs,
 	.sdma_reqs	= dra7xx_dss_hdmi_sdma_reqs,
 	.main_clk	= "dss_48mhz_clk",
+	.flags		= HWMOD_SWSUP_SIDLE_ACT,
 	.prcm = {
 		.omap4 = {
 			.clkctrl_offs = DRA7XX_CM_DSS_DSS_CLKCTRL_OFFSET,
