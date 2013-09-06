@@ -149,6 +149,12 @@
 			default-state = "off";
 		};
 	};
+
+	ocp {
+		gpu: gpu@0x56000000 {
+			gpu-supply = <&smps45_reg>;
+		};
+	};
 };
 
 &omap5_pmx_core {
@@ -407,6 +413,8 @@
 /include/ "twl6040.dtsi"
 
 &hdmi {
+	vdda_hdmi_dac-supply = <&ldo4_reg>;
+
 	tpd12s015: tpd12s015 {
 		compatible = "ti,tpd12s015";
 
@@ -422,6 +430,14 @@
 		};
 
 	};
+};
+
+&dsi1 {
+	vdds_dsi-supply = <&ldo4_reg>;
+};
+
+&dsi2 {
+	vdds_dsi-supply = <&ldo4_reg>;
 };
 
 &uart1 {

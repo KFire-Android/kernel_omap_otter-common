@@ -823,8 +823,9 @@
 			hdmi: hdmi {
 				compatible = "ti,omap4-hdmi", "simple-bus";
 				ti,hwmods = "dss_hdmi";
-				vdda_hdmi_dac-supply = <&ldo3_reg>;
 				video-source = <1>;
+				vdda_hdmi_microvolt_min = <1500000>;
+				vdda_hdmi_microvolt_max = <1800000>;
 			};
 		};
 
