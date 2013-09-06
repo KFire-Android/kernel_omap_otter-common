@@ -28,6 +28,7 @@
  *			with voltage.
  * @vp_errgain:		Error gain value for the voltage processor. This
  *			field also differs according to the voltage/opp.
+ *@abb_vset_efuse:	vset value for efuse
  */
 struct omap_volt_data {
 	u32	volt_nominal;
@@ -39,6 +40,7 @@ struct omap_volt_data {
 	u8	sr_errminlimit;
 	u8	vp_errgain;
 	u8	opp_sel;
+	u16	abb_vset_efuse;
 };
 struct voltagedomain;
 

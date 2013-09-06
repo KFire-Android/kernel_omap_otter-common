@@ -70,6 +70,9 @@ struct omap_abb_common {
  * @enabled: track whether ABB ldo is enabled or disabled
  * @common: pointer to common data for all ABB ldo's
  * @_opp_sel: internally track last programmed state of ABB ldo.  DO NOT USE
+ * @mux_control_reg:	control module register for Actual voltage setting
+ * @mux_control_mask:	field for override of efuse offset
+ * @mux_control_vset_out_mask:	field for override voltage value
  */
 struct omap_abb_instance {
 	u8 setup_offs;
@@ -78,6 +81,10 @@ struct omap_abb_instance {
 	bool enabled;
 	const struct omap_abb_common *common;
 	u8 _opp_sel;
+	void __iomem *mux_control_reg;
+	u32 mux_control_mask;
+	u32 mux_control_vset_out_mask;
+	u16 vset_efuse_data;
 };
 
 extern struct omap_abb_instance omap36xx_abb_mpu;
