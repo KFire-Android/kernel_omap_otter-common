@@ -137,6 +137,7 @@
 		&mcasp3_pins
 		&mcasp6_pins
 		&vout1_pins
+		&vin1a_pins
 		&usb_pins
 		&irq_pins
 		&bt_uart3_pins
@@ -220,6 +221,40 @@
 			0x230	0x0	/* vout1_d21 OUTPUT | MODE0 */
 			0x234	0x0	/* vout1_d22 OUTPUT | MODE0 */
 			0x238	0x0	/* vout1_d23 OUTPUT | MODE0 */
+		>;
+	};
+
+	vin1a_pins: pinmux_vin1a_pins {
+		pinctrl-single,pins = <
+			0x0DC	0x00040000 /* vin1a_clk0 OUTPUT | MODE0 */
+			0x0E4	0x00040000 /* vin1a_de0 OUTPUT | MODE0 */
+			0x0E8	0x00040000 /* vin1a_fld0 OUTPUT | MODE0 */
+			0x0EC	0x00040000 /* vin1a_hsync0	OUTPUT | MODE0 */
+			0x0F0	0x00040000 /* vin1a_vsync0 OUTPUT | MODE0 */
+			0x0F4	0x00040000 /* vin1a_d0	OUTPUT | MODE0 */
+			0x0F8	0x00040000 /* vin1a_d1	OUTPUT | MODE0 */
+			0x0FC	0x00040000 /* vin1a_d2	OUTPUT | MODE0 */
+			0x100	0x00040000 /* vin1a_d3 	OUTPUT | MODE0 */
+			0x104	0x00040000 /* vin1a_d4 	OUTPUT | MODE0 */
+			0x108	0x00040000 /* vin1a_d5	OUTPUT | MODE0 */
+			0x10C	0x00040000 /* vin1a_d6	OUTPUT | MODE0 */
+			0x110	0x00040000 /* vin1a_d7	OUTPUT | MODE0 */
+			0x114	0x00040000 /* vin1a_d8	OUTPUT | MODE0 */
+			0x118	0x00040000 /* vin1a_d9	OUTPUT | MODE0 */
+			0x11C	0x00040000 /* vin1a_d10	OUTPUT | MODE0 */
+			0x120	0x00040000 /* vin1a_d11	OUTPUT | MODE0 */
+			0x124	0x00040000 /* vin1a_d12	OUTPUT | MODE0 */
+			0x128	0x00040000 /* vin1a_d13	OUTPUT | MODE0 */
+			0x12C	0x00040000 /* vin1a_d14	OUTPUT | MODE0 */
+			0x130	0x00040000 /* vin1a_d15	OUTPUT | MODE0 */
+			0x134	0x00040000 /* vin1a_d16	OUTPUT | MODE0 */
+			0x138	0x00040000 /* vin1a_d17	OUTPUT | MODE0 */
+			0x13C	0x00040000 /* vin1a_d18	OUTPUT | MODE0 */
+			0x140	0x00040000 /* vin1a_d19	OUTPUT | MODE0 */
+			0x144	0x00040000 /* vin1a_d20	OUTPUT | MODE0 */
+			0x148	0x00040000 /* vin1a_d21	OUTPUT | MODE0 */
+			0x14C	0x00040000 /* vin1a_d22	OUTPUT | MODE0 */
+			0x150	0x00040000 /* vin1a_d23	OUTPUT | MODE0 */
 		>;
 	};
 
