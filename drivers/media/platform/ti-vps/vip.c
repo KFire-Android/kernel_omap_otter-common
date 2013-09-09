@@ -21,6 +21,7 @@
 #include <media/dra7xx_vip.h>
 
 #include <linux/of_i2c.h>
+#include <media/v4l2-async.h>
 #include <media/v4l2-common.h>
 #include <media/v4l2-ctrls.h>
 #include <media/v4l2-device.h>
@@ -241,7 +242,24 @@ struct vip_shared {
  * There are two vip_dev structure, one for each vip slice: VIP1 & VIP2.
  */
 
+struct vip_subdev_info {
+	const char *name;
+	struct i2c_board_info board_info;
+};
+
+struct vip_config {
+	struct vip_subdev_info *subdev_info;
+	int subdev_count;
+	const char *card_name;
+	struct v4l2_async_subdev **asd;
+	int asd_sizes;
+};
+
+
 struct vip_dev {
+	struct v4l2_async_notifier notifier;
+	struct vip_config	*config;
+	struct v4l2_subdev	*sensor;
 	struct v4l2_device	v4l2_dev;
 	struct vip_shared	*shared;
 	int			slice_id;
@@ -258,7 +276,21 @@ struct vip_dev {
 	struct list_head	vip_bufs;	/* vip_bufs to be DMAed */
 	struct vb2_alloc_ctx	*alloc_ctx;
 	struct vip_port		*ports[VIP_NUM_PORTS];
+
+	int			mux_gpio;
+	int			mux1_sel0_gpio;
+	int			mux1_sel1_gpio;
+	int			mux2_sel0_gpio;
+	int			mux2_sel1_gpio;
+	int			cam_fpd_mux_s0_gpio;
+	int			vin2_s0_gpio;
+	int			ov_pwdn_gpio;
 };
+
+static inline struct vip_dev *notifier_to_vip_dev(struct v4l2_async_notifier *n)
+{
+	return container_of(n, struct vip_dev, notifier);
+}
 
 /*
  * There are two vip_port structures for each vip_dev, one for port A
@@ -914,6 +946,26 @@ static irqreturn_t vip_irq(int irq_vip, void *data)
 /*
  * video ioctls
  */
+static struct v4l2_mbus_framefmt *vip_video_pix_to_mbus(const struct v4l2_pix_format *pix,
+				  struct v4l2_mbus_framefmt *mbus)
+{
+	unsigned int i;
+
+	memset(mbus, 0, sizeof(*mbus));
+	mbus->width = pix->width;
+	mbus->height = pix->height;
+
+	for (i = 0; i < ARRAY_SIZE(vip_formats) - 1; ++i) {
+		if (vip_formats[i].fourcc == pix->pixelformat)
+			break;
+	}
+
+	mbus->code = V4L2_MBUS_FMT_YUYV8_2X8;
+	mbus->colorspace = pix->colorspace;
+	mbus->field = pix->field;
+
+	return mbus;
+}
 
 static int vip_querycap(struct file *file, void *priv,
 			struct v4l2_capability *cap)
@@ -1072,6 +1124,8 @@ static int vip_s_fmt_vid_cap(struct file *file, void *priv,
 	struct vip_port *port = stream->port;
 	struct vip_dev *dev = port->dev;
 	struct vb2_queue *vq = &stream->vb_vidq;
+	struct v4l2_subdev_format sfmt;
+	struct v4l2_mbus_framefmt *mf;
 	int ret;
 
 	ret = vip_try_fmt_vid_cap(file, priv, f);
@@ -1106,6 +1160,19 @@ static int vip_s_fmt_vid_cap(struct file *file, void *priv,
 		f->type, stream->width, stream->height, port->fmt->fourcc);
 
 	set_fmt_params(stream);
+
+	mf = vip_video_pix_to_mbus(&f->fmt.pix, &sfmt.format);
+
+	ret = v4l2_subdev_call(dev->sensor, video, try_mbus_fmt, mf);
+	if (ret) {
+		vip_dprintk(dev, "try_mbus_fmt failed in subdev\n");
+		return ret;
+	}
+	ret = v4l2_subdev_call(dev->sensor, video, s_mbus_fmt, mf);
+	if (ret) {
+		vip_dprintk(dev, "s_mbus_fmt failed in subdev\n");
+		return ret;
+	}
 
 	return 0;
 }
@@ -1643,7 +1710,7 @@ static int find_or_alloc_shared(struct platform_device *pdev, struct vip_dev *de
 	tmp = get_field(pid, VIP_PID_FUNC_MASK, VIP_PID_FUNC_SHIFT);
 
 	if (tmp != VIP_PID_FUNC) {
-		printk(KERN_WARNING "vip: unexpected PID function: 0x%x\n",
+		vip_dprintk(dev, "vip: unexpected PID function: 0x%x\n",
 		       tmp);
 		ret = -ENODEV;
 		goto do_iounmap;
@@ -1688,11 +1755,87 @@ static int vip_runtime_get(struct platform_device *pdev)
 	return r < 0 ? r : 0;
 }
 
+static int vip_async_bound(struct v4l2_async_notifier *notifier,
+			struct v4l2_subdev *subdev,
+			struct v4l2_async_subdev *asd)
+{
+	struct vip_dev *dev = notifier_to_vip_dev(notifier);
+
+	dev->sensor = subdev;
+
+	return 0;
+}
+
+static int vip_async_complete(struct v4l2_async_notifier *notifier)
+{
+	printk(KERN_NOTICE "vip_async_complete\n");
+	return 0;
+}
+
+static struct v4l2_async_subdev ov10635_sd = {
+	.bus_type = V4L2_ASYNC_BUS_I2C,
+	.match.i2c = {
+		.adapter_id = 1,
+		.address = 0x30,
+	},
+};
+
+static struct v4l2_async_subdev *vip_async_subdevs[] = {
+	&ov10635_sd,
+};
+
+static struct vip_config dra7xx_vip_config = {
+	.card_name	= "DRA7XX VIP Driver",
+	.asd		= vip_async_subdevs,
+	.asd_sizes	= 1,
+};
+
+static int ov10635_init_sensor(struct vip_dev *dev)
+{
+	int r;
+
+	struct gpio gpios[] = {
+		{ dev->vin2_s0_gpio, GPIOF_OUT_INIT_LOW,
+			"vin2_s0" },
+		{ dev->cam_fpd_mux_s0_gpio, GPIOF_OUT_INIT_HIGH,
+			"cam_fpd_mux_s0" },
+		{ dev->mux1_sel0_gpio, GPIOF_OUT_INIT_HIGH,
+			"mux1_sel0" },
+		{ dev->mux1_sel1_gpio, GPIOF_OUT_INIT_LOW,
+			"mux1_sel1" },
+		{ dev->mux2_sel0_gpio, GPIOF_OUT_INIT_HIGH,
+			"mux2_sel0" },
+		{ dev->mux2_sel1_gpio, GPIOF_OUT_INIT_LOW,
+			"mux2_sel1" },
+		{ dev->ov_pwdn_gpio, GPIOF_OUT_INIT_LOW,
+			"ov_pwdn" },
+	};
+
+	r = gpio_request_array(gpios, ARRAY_SIZE(gpios));
+	if (r)
+		return r;
+
+	return 0;
+}
+
+static void ov10635_uninit_sensor(struct vip_dev *dev)
+{
+	gpio_free(dev->vin2_s0_gpio);
+	gpio_free(dev->cam_fpd_mux_s0_gpio);
+	gpio_free(dev->mux1_sel0_gpio);
+	gpio_free(dev->mux1_sel1_gpio);
+	gpio_free(dev->mux2_sel0_gpio);
+	gpio_free(dev->mux2_sel1_gpio);
+	gpio_free(dev->ov_pwdn_gpio);
+}
+
 static int vip_probe(struct platform_device *pdev)
 {
+	struct device_node *node = pdev->dev.of_node;
 	struct vip_dev *dev;
 	struct vip_shared *shared;
 	struct resource *res;
+	int gpio;
 	int ret;
 	int irq;
 
@@ -1762,6 +1905,84 @@ static int vip_probe(struct platform_device *pdev)
 	vip_set_standby_mode(shared, VIP_SMART_STANDBY_MODE);
 	vip_set_slice_path(dev, VIP_MULTI_CHANNEL_DATA_SELECT);
 
+	node = of_find_compatible_node(node, NULL, "ti,camera");
+
+	gpio = of_get_gpio(node, 0);
+	if (gpio_is_valid(gpio)) {
+		dev->vin2_s0_gpio = gpio;
+	} else {
+		vip_dprintk(dev, "failed to parse VIN2_S0 gpio\n");
+		return -EINVAL;
+	}
+
+	gpio = of_get_gpio(node, 1);
+	if (gpio_is_valid(gpio)) {
+		dev->cam_fpd_mux_s0_gpio = gpio;
+	} else {
+		vip_dprintk(dev, "failed to parse CAM_FPD_MUX_S0 gpio\n");
+		return -EINVAL;
+	}
+
+	gpio = of_get_gpio(node, 2);
+	if (gpio_is_valid(gpio)) {
+		dev->mux1_sel0_gpio = gpio;
+	} else {
+		vip_dprintk(dev, "failed to parse MUX1_SEL0 gpio\n");
+		return -EINVAL;
+	}
+
+	gpio = of_get_gpio(node, 3);
+	if (gpio_is_valid(gpio)) {
+		dev->mux1_sel1_gpio = gpio;
+	} else {
+		vip_dprintk(dev, "failed to parse MUX1_SEL1 gpio\n");
+		return -EINVAL;
+	}
+
+	gpio = of_get_gpio(node, 4);
+	if (gpio_is_valid(gpio)) {
+		dev->mux2_sel0_gpio = gpio;
+	} else {
+		vip_dprintk(dev, "failed to parse MUX2_SEL0 gpio\n");
+		return -EINVAL;
+	}
+
+	gpio = of_get_gpio(node, 5);
+	if (gpio_is_valid(gpio)) {
+		dev->mux2_sel1_gpio = gpio;
+	} else {
+		vip_dprintk(dev, "failed to parse MUX2_SEL1 gpio\n");
+		return -EINVAL;
+	}
+
+	gpio = of_get_gpio(node, 6);
+	if (gpio_is_valid(gpio)) {
+		dev->ov_pwdn_gpio = gpio;
+	} else {
+		vip_dprintk(dev, "failed to parse OV_PWDN gpio\n");
+		return -EINVAL;
+	}
+
+	ret = ov10635_init_sensor(dev);
+	if (ret) {
+		vip_dprintk(dev, "ov10635 sensor init failed %d\n", ret);
+		return ret;
+	}
+
+	dev->config = &dra7xx_vip_config;
+
+	dev->notifier.subdev = dev->config->asd;
+	dev->notifier.num_subdevs = dev->config->asd_sizes;
+	dev->notifier.bound = vip_async_bound;
+	dev->notifier.complete = vip_async_complete;
+
+	ret = v4l2_async_notifier_register(&dev->v4l2_dev, &dev->notifier);
+	if (ret) {
+		vip_dprintk(dev, "Error registering async notifier\n");
+		ret = -EINVAL;
+		goto probe_subdev_out;
+	}
+
 	return 0;
 
 free_irq:
@@ -1770,6 +1991,8 @@ free_port:
 	free_port(dev->ports[0]);
 dev_unreg:
 	v4l2_device_unregister(&dev->v4l2_dev);
+probe_subdev_out:
+	kfree(dev->sensor);
 err_runtime_get:
 	pm_runtime_disable(&pdev->dev);
 
@@ -1782,6 +2005,8 @@ static int vip_remove(struct platform_device *pdev)
 
 	v4l2_info(&dev->v4l2_dev, "Removing " VIP_MODULE_NAME);
 	free_port(dev->ports[0]);
+	ov10635_uninit_sensor(dev);
+	v4l2_async_notifier_unregister(&dev->notifier);
 	vb2_dma_contig_cleanup_ctx(dev->alloc_ctx);
 	free_irq(dev->irq, dev);
 	remove_shared(dev->shared);
