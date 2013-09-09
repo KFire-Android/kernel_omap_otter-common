@@ -150,7 +150,7 @@ static struct vpe_dei_regs dei_regs = {
  * The port_data structure contains per-port data.
  */
 struct vpe_port_data {
-	enum vpdma_channel channel;	/* VPDMA channel */
+	int channel;	/* VPDMA channel */
 	u8	vb_index;		/* input frame f, f-1, f-2 index */
 	u8	vb_part;		/* plane index for co-panar formats */
 };
@@ -172,51 +172,51 @@ struct vpe_port_data {
 
 static struct vpe_port_data port_data[11] = {
 	[VPE_PORT_LUMA1_IN] = {
-		.channel	= VPE_CHAN_LUMA1_IN,
+		.channel	= VPE_CHAN_NUM_LUMA1_IN,
 		.vb_index	= 0,
 		.vb_part	= VPE_LUMA,
 	},
 	[VPE_PORT_CHROMA1_IN] = {
-		.channel	= VPE_CHAN_CHROMA1_IN,
+		.channel	= VPE_CHAN_NUM_CHROMA1_IN,
 		.vb_index	= 0,
 		.vb_part	= VPE_CHROMA,
 	},
 	[VPE_PORT_LUMA2_IN] = {
-		.channel	= VPE_CHAN_LUMA2_IN,
+		.channel	= VPE_CHAN_NUM_LUMA2_IN,
 		.vb_index	= 1,
 		.vb_part	= VPE_LUMA,
 	},
 	[VPE_PORT_CHROMA2_IN] = {
-		.channel	= VPE_CHAN_CHROMA2_IN,
+		.channel	= VPE_CHAN_NUM_CHROMA2_IN,
 		.vb_index	= 1,
 		.vb_part	= VPE_CHROMA,
 	},
 	[VPE_PORT_LUMA3_IN] = {
-		.channel	= VPE_CHAN_LUMA3_IN,
+		.channel	= VPE_CHAN_NUM_LUMA3_IN,
 		.vb_index	= 2,
 		.vb_part	= VPE_LUMA,
 	},
 	[VPE_PORT_CHROMA3_IN] = {
-		.channel	= VPE_CHAN_CHROMA3_IN,
+		.channel	= VPE_CHAN_NUM_CHROMA3_IN,
 		.vb_index	= 2,
 		.vb_part	= VPE_CHROMA,
 	},
 	[VPE_PORT_MV_IN] = {
-		.channel	= VPE_CHAN_MV_IN,
+		.channel	= VPE_CHAN_NUM_MV_IN,
 	},
 	[VPE_PORT_MV_OUT] = {
-		.channel	= VPE_CHAN_MV_OUT,
+		.channel	= VPE_CHAN_NUM_MV_OUT,
 	},
 	[VPE_PORT_LUMA_OUT] = {
-		.channel	= VPE_CHAN_LUMA_OUT,
+		.channel	= VPE_CHAN_NUM_LUMA_OUT,
 		.vb_part	= VPE_LUMA,
 	},
 	[VPE_PORT_CHROMA_OUT] = {
-		.channel	= VPE_CHAN_CHROMA_OUT,
+		.channel	= VPE_CHAN_NUM_CHROMA_OUT,
 		.vb_part	= VPE_CHROMA,
 	},
 	[VPE_PORT_RGB_OUT] = {
-		.channel	= VPE_CHAN_RGB_OUT,
+		.channel	= VPE_CHAN_NUM_RGB_OUT,
 		.vb_part	= VPE_LUMA,
 	},
 };
@@ -618,29 +618,29 @@ static void set_cfg_and_line_modes(struct vpe_ctx *ctx)
 	insert_field(us3_reg0, cfg_mode, VPE_US_MODE_MASK, VPE_US_MODE_SHIFT);
 
 	/* regs for now */
-	vpdma_set_line_mode(ctx->dev->vpdma, line_mode, VPE_CHAN_CHROMA1_IN);
-	vpdma_set_line_mode(ctx->dev->vpdma, line_mode, VPE_CHAN_CHROMA2_IN);
-	vpdma_set_line_mode(ctx->dev->vpdma, line_mode, VPE_CHAN_CHROMA3_IN);
+	vpdma_set_line_mode(ctx->dev->vpdma, line_mode, VPE_CHAN_NUM_CHROMA1_IN);
+	vpdma_set_line_mode(ctx->dev->vpdma, line_mode, VPE_CHAN_NUM_CHROMA2_IN);
+	vpdma_set_line_mode(ctx->dev->vpdma, line_mode, VPE_CHAN_NUM_CHROMA3_IN);
 
 	/* frame start for input luma */
 	vpdma_set_frame_start_event(ctx->dev->vpdma, VPDMA_FSEVENT_CHANNEL_ACTIVE,
-		VPE_CHAN_LUMA1_IN);
+		VPE_CHAN_NUM_LUMA1_IN);
 	vpdma_set_frame_start_event(ctx->dev->vpdma, VPDMA_FSEVENT_CHANNEL_ACTIVE,
-		VPE_CHAN_LUMA2_IN);
+		VPE_CHAN_NUM_LUMA2_IN);
 	vpdma_set_frame_start_event(ctx->dev->vpdma, VPDMA_FSEVENT_CHANNEL_ACTIVE,
-		VPE_CHAN_LUMA3_IN);
+		VPE_CHAN_NUM_LUMA3_IN);
 
 	/* frame start for input chroma */
 	vpdma_set_frame_start_event(ctx->dev->vpdma, VPDMA_FSEVENT_CHANNEL_ACTIVE,
-		VPE_CHAN_CHROMA1_IN);
+		VPE_CHAN_NUM_CHROMA1_IN);
 	vpdma_set_frame_start_event(ctx->dev->vpdma, VPDMA_FSEVENT_CHANNEL_ACTIVE,
-		VPE_CHAN_CHROMA2_IN);
+		VPE_CHAN_NUM_CHROMA2_IN);
 	vpdma_set_frame_start_event(ctx->dev->vpdma, VPDMA_FSEVENT_CHANNEL_ACTIVE,
-		VPE_CHAN_CHROMA3_IN);
+		VPE_CHAN_NUM_CHROMA3_IN);
 
 	/* frame start for MV in client */
 	vpdma_set_frame_start_event(ctx->dev->vpdma, VPDMA_FSEVENT_CHANNEL_ACTIVE,
-		VPE_CHAN_MV_IN);
+		VPE_CHAN_NUM_MV_IN);
 
 	ctx->load_mmrs = true;
 }
@@ -1074,12 +1074,12 @@ static void device_run(void *priv)
 		add_in_dtd(ctx, VPE_PORT_MV_IN);
 
 	/* sync on channel control descriptors for output ports */
-	vpdma_add_sync_on_channel_ctd(&ctx->desc_list, VPE_CHAN_LUMA_OUT);
+	vpdma_add_sync_on_channel_ctd(&ctx->desc_list, VPE_CHAN_NUM_LUMA_OUT);
 	if (d_q_data->fmt->coplanar)
-		vpdma_add_sync_on_channel_ctd(&ctx->desc_list, VPE_CHAN_CHROMA_OUT);
+		vpdma_add_sync_on_channel_ctd(&ctx->desc_list, VPE_CHAN_NUM_CHROMA_OUT);
 
 	if (ctx->deinterlacing)
-		vpdma_add_sync_on_channel_ctd(&ctx->desc_list, VPE_CHAN_MV_OUT);
+		vpdma_add_sync_on_channel_ctd(&ctx->desc_list, VPE_CHAN_NUM_MV_OUT);
 
 	enable_irqs(ctx);
 
@@ -1787,6 +1787,7 @@ static int vpe_release(struct file *file)
 	mutex_lock(&dev->dev_mutex);
 	free_vbs(ctx);
 	free_mv_buffers(ctx);
+	vpdma_buf_unmap(ctx->dev->vpdma, &ctx->desc_list.buf);
 	vpdma_free_desc_list(&ctx->desc_list);
 	vpdma_buf_free(&ctx->mmr_adb);
 
