@@ -157,11 +157,6 @@ struct vpdma_data_format vpdma_misc_fmts[] = {
 	},
 };
 
-struct vpdma_channel_info {
-	int num;		/* VPDMA channel number */
-	int cstat_offset;	/* client CSTAT register offset */
-};
-
 static int cstat_offset[256] = {
 	[VPE_CHAN_NUM_LUMA1_IN] = VPDMA_DEI_LUMA1_CSTAT,
 	[VPE_CHAN_NUM_CHROMA1_IN] = VPDMA_DEI_CHROMA1_CSTAT,

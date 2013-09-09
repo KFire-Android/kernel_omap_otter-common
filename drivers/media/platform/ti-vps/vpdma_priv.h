@@ -122,6 +122,10 @@
 #define	VPE_CHAN_NUM_CHROMA_OUT		103
 #define	VPE_CHAN_NUM_RGB_OUT		106
 #define VIP1_CHAN_NUM_MULT_PORT_A_SRC0	38
+#define VIP1_CHAN_NUM_MULT_ANC_A_SRC0	70
+#define VIP1_CHAN_NUM_PORT_B_LUMA	104
+#define VIP1_CHAN_NUM_PORT_B_CHROMA	105
+#define VIP1_CHAN_NUM_PORT_A_RGB	106
 
 /*
  * a VPDMA address data block payload for a configuration descriptor needs to
@@ -652,12 +656,12 @@ struct vpdma_ctd {
 #define CTD_TYPE_SYNC_ON_CLIENT		0
 #define CTD_TYPE_SYNC_ON_LIST		1
 #define CTD_TYPE_SYNC_ON_EXT		2
-#define CTD_TYPE_SYNC_ON_CHANNEL	3
-#define CTD_TYPE_CHNG_CLIENT_IRQ	4
-#define CTD_TYPE_SEND_IRQ		5
-#define CTD_TYPE_ABORT_CHANNEL		6
-#define CTD_TYPE_RELOAD_LIST		6
-/* TODO update this */
+#define CTD_TYPE_SYNC_ON_LM_TIMER	3
+#define CTD_TYPE_SYNC_ON_CHANNEL	4
+#define CTD_TYPE_CHNG_CLIENT_IRQ	5
+#define CTD_TYPE_SEND_IRQ		6
+#define CTD_TYPE_RELOAD_LIST		7
+#define CTD_TYPE_ABORT_CHANNEL		8
 
 #define CTD_PKT_TYPE		0xc
 
