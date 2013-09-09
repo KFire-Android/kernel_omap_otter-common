@@ -169,11 +169,13 @@ static int omap_hdmi_dai_hw_params(struct snd_pcm_substream *substream,
 
 	/* Fill the CEA 861 audio infoframe. Refer to the specification
 	 * for details.
-	 * The OMAP HDMI IP requires to use the 8-channel channel code when
+	 * The OMAP4 HDMI IP requires to use the 8-channel channel code when
 	 * transmitting more than two channels.
 	 */
 	if (params_channels(params) == 2)
 		cea.db4_ca = 0x0;
+	else if ((params_channels(params) == 6) && !cpu_is_omap44xx())
+		cea.db4_ca = 0xb;
 	else
 		cea.db4_ca = 0x13;
 	cea.db1_ct_cc = (params_channels(params) - 1)

@@ -29,6 +29,7 @@
  * @vp_errgain:		Error gain value for the voltage processor. This
  *			field also differs according to the voltage/opp.
  * @nvalue_override:	Used as an override for nvalue pulled from efuse registers
+ *@abb_vset_efuse:	vset value for efuse
  */
 struct omap_volt_data {
 	u32	volt_nominal;
@@ -41,6 +42,7 @@ struct omap_volt_data {
 	u8	vp_errgain;
 	u8	opp_sel;
 	u32	nvalue_override;
+	u16	abb_vset_efuse;
 };
 struct voltagedomain;
 

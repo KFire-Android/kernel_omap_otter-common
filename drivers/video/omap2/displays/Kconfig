@@ -101,4 +101,9 @@ config PANEL_OTTER1
         help
           LCD Panel used in KC1 
 
+config PANEL_LP_101
+        tristate "LP101 LCD Panel"
+        depends on OMAP2_DSS_DPI
+        help
+          LCD Panel used in TI's OMAP5 uevm board attachable on LCD2 interface
 endmenu

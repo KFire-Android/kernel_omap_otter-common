@@ -176,6 +176,8 @@ static void dpi_basic_init(struct omap_dss_device *dssdev)
 			OMAP_DSS_LCD_DISPLAY_TFT : OMAP_DSS_LCD_DISPLAY_STN);
 	dispc_mgr_set_tft_data_lines(dssdev->manager->id,
 			dssdev->phy.dpi.data_lines);
+	dss_set_dpi_channel(dssdev->channel);
+
 }
 
 int omapdss_dpi_display_enable(struct omap_dss_device *dssdev)

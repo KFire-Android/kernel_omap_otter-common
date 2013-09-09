@@ -241,6 +241,25 @@ static int __init __maybe_unused opp_def_list_modify_opp(
 	return -EINVAL;
 }
 
+#define ABB_FUSE_VSET_SHIFT	24
+#define ABB_FUSE_VSET_MASK	(0x1F << ABB_FUSE_VSET_SHIFT)
+#define ABB_FUSE_ENABLE_SHIFT	29
+#define ABB_FUSE_ENABLE_MASK	(0x1 << ABB_FUSE_ENABLE_SHIFT)
+void __init omap5_abb_update(struct omap_volt_data *volt_data)
+{
+	while (volt_data->volt_nominal)
+	{
+		u32 val = omap_ctrl_readl(volt_data->sr_efuse_offs);
+		if (val & ABB_FUSE_ENABLE_MASK) {
+			volt_data->opp_sel = OMAP_ABB_FAST_OPP;
+			volt_data->abb_vset_efuse = (val & ABB_FUSE_VSET_MASK) >> ABB_FUSE_VSET_SHIFT;
+		} else {
+			volt_data->opp_sel = OMAP_ABB_NOMINAL_OPP;
+		}
+		volt_data++;
+	}
+}
+
 /**
  * omap5_opp_init() - initialize omap4 opp table
  */
@@ -250,6 +269,9 @@ int __init omap5_opp_init(void)
 
 	if (!cpu_is_omap54xx())
 		return r;
+
+	omap5_abb_update(omap543x_vdd_mpu_volt_data);
+	omap5_abb_update(omap543x_vdd_mm_volt_data);
 
 	/*
 	 * XXX: NOTE: OPP_HIGH is supported on all samples now

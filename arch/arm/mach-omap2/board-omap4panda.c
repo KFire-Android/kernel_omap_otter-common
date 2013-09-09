@@ -44,6 +44,7 @@
 #include <plat/usb.h>
 #include <plat/mmc.h>
 #include <plat/drm.h>
+#include <plat/omap_apps_brd_id.h>
 #include <plat/remoteproc.h>
 #include <video/omap-panel-dvi.h>
 
@@ -593,6 +594,7 @@ static void __init omap4_panda_init(void)
 		pr_err("error setting wl12xx data: %d\n", ret);
 
 	omap4_panda_init_rev();
+	omap_create_board_props();
 	omap4_panda_i2c_init();
 	omap4_register_ion();
 	platform_add_devices(panda_devices, ARRAY_SIZE(panda_devices));

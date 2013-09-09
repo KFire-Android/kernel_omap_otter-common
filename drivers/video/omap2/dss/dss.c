@@ -651,6 +651,11 @@ void dss_set_dac_pwrdn_bgz(bool enable)
 	REG_FLD_MOD(DSS_CONTROL, enable, 5, 5);	/* DAC Power-Down Control */
 }
 
+void dss_set_dpi_channel(int channel)
+{
+	REG_FLD_MOD(DSS_CONTROL, channel, 17, 16);
+}
+
 void dss_select_hdmi_venc_clk_source(enum dss_hdmi_venc_clk_source_select hdmi)
 {
 	/* TV clock is not selectable on OMAP5 */

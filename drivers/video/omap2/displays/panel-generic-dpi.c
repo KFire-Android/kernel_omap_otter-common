@@ -58,6 +58,29 @@ struct panel_config {
 
 /* Panel configurations */
 static struct panel_config generic_dpi_panels[] = {
+
+	/* lp101_panel */
+	{
+		{
+			/* 1280 x 800 @ 60 Hz  Reduced blanking VESA CVT 0.31M3-R */
+			.x_res		= 1280,
+			.y_res		= 800,
+			.pixel_clock	= 85333,
+			.hfp		= 32,
+			.hsw		= 48,
+			.hbp		= 80,
+			.vfp		= 4,
+			.vsw		= 3,
+			.vbp		= 7,
+		},
+		.acbi			= 0x0,
+		.acb			= 0x0,
+		.config			= OMAP_DSS_LCD_TFT,
+		.power_on_delay		= 0,
+		.power_off_delay	= 0,
+		.name			= "generic_lp101",
+	},
+
 	/* generic 720p */
 	{
 		{
