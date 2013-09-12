@@ -32,6 +32,16 @@
 		regulator-max-microvolt = <3000000>;
 	};
 
+	vmmcwl_fixed: fixedregulator-mmcwl {
+		compatible = "regulator-fixed";
+		regulator-name = "vmmcwl_fixed";
+		regulator-min-microvolt = <1800000>;
+		regulator-max-microvolt = <1800000>;
+		gpio = <&gpio5 12 0>;	/* gpio5_140 */
+		startup-delay-us = <70000>;
+		enable-active-high;
+	};
+
 	/* HS USB Port 2 RESET */
 	hsusb2_reset: hsusb2_reset_reg {
 		compatible = "regulator-fixed";
@@ -141,6 +151,11 @@
 	btwilink {
 		compatible = "btwilink";
 	};
+
+	wlcore {
+		compatible = "wlcore";
+		gpio = <14>;
+	};
 };
 
 &omap5_pmx_core {
@@ -157,6 +172,7 @@
 			&tca6424a_pins
 			&palmas_pins
 			&led_gpio_pins
+			&wl_pins
 	>;
 
 	twl6040_pins: pinmux_twl6040_pins {
@@ -301,17 +317,36 @@
 			0x196 0x6	/* uart3_cts_rctx.gpio5_153 OUTPUT | MODE6 */
 		>;
 	};
+
+	wl_pins: pinmux_wl_pins {
+		pinctrl-single,pins = <
+			0x164 0x118	/* WLSDIO_CLK: INPUTENABLE | PULLUP | MODE0 */
+			0x166 0x118	/* WLSDIO_CMD: INPUTENABLE | PULLUP | MODE0 */
+			0x168 0x118	/* WLSDIO_DAT0: INPUTENABLE | PULLUP | MODE0 */
+			0x16a 0x118	/* WLSDIO_DAT1: INPUTENABLE | PULLUP | MODE0 */
+			0x16c 0x118	/* WLSDIO_DAT2: INPUTENABLE | PULLUP | MODE0 */
+			0x16e 0x118	/* WLSDIO_DAT3: INPUTENABLE | PULLUP | MODE0 */
+			0x17c 0x6	/* WLAN_EN: OUTPUT | MODE6 */
+		>;
+	};
 };
 
 &omap5_pmx_wkup {
 	pinctrl-names = "default";
 	pinctrl-0 = <
 			&usbhost_wkup_pins
+			&wlirq_pins
 	>;
 
 	usbhost_wkup_pins: pinmux_usbhost_wkup_pins {
 		pinctrl-single,pins = <
 			0x1A 0x0	/* fref_clk1_out OUTPUT | MODE 7 for USB hub clk */
+		>;
+	};
+
+	wlirq_pins: pinmux_wlirq_pins {
+		pinctrl-single,pins = <
+			0x0 0x4106      /* WLAN_IRQ: INPUT | WAKEUP_ENABLE | MODE 6 */
 		>;
 	};
 };
@@ -328,9 +363,11 @@
 };
 
 &mmc3 {
+	vmmc-supply = <&vmmcwl_fixed>;
 	bus-width = <4>;
+	cap-power-off-card;
+	keep-power-in-suspend;
 	ti,non-removable;
-	status = "disabled";
 };
 
 &mmc4 {
