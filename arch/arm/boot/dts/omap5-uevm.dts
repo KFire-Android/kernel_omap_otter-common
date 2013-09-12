@@ -129,6 +129,18 @@
 			gpu-supply = <&smps45_reg>;
 		};
 	};
+
+	kim {
+		compatible = "kim";
+		nshutdown_gpio = <142>;
+		dev_name = "/dev/ttyO4";
+		flow_cntrl = <1>;
+		baud_rate = <3686400>;
+	};
+
+	btwilink {
+		compatible = "btwilink";
+	};
 };
 
 &omap5_pmx_core {
@@ -247,6 +259,7 @@
 			0x172 0x0	/* uart5_tx.uart5_tx MODE0 */
 			0x174 0x118	/* uart5_cts.uart5_rts INPUT | PULLUP | MODE0 */
 			0x176 0x0	/* uart5_cts.uart5_rts MODE0 */
+			0x180 0x6       /* GPIO5_142 - BT_EN: OUTPUT | MODE6 */
 		>;
 	};
 
