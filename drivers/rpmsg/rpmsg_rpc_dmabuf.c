@@ -457,6 +457,8 @@ phys_addr_t rppc_buffer_lookup(struct rppc_instance *rpc, virt_addr_t uva,
 	}
 
 	buf = rppc_find_dmabuf(rpc, fd);
+	/* HACK: make it NULL deliberately, to import the buffer always */
+	buf = NULL;
 	if (IS_ERR_OR_NULL(buf)) {
 		buf = rppc_alloc_dmabuf(rpc, fd, true);
 		if (IS_ERR(buf))
