@@ -109,29 +109,29 @@ static void rppc_print_msg(struct rppc_instance *rpc, char *prefix,
 	struct device *dev = rpc->rppcdev->dev;
 	u32 i = 0, paramsz = sizeof(*param);
 
-	dev_info(dev, "%s HDR: msg_type = %d msg_len = %d\n",
+	dev_dbg(dev, "%s HDR: msg_type = %d msg_len = %d\n",
 				prefix, hdr->msg_type, hdr->msg_len);
 
 	switch (hdr->msg_type) {
 	case RPPC_MSGTYPE_CREATE_RESP:
 	case RPPC_MSGTYPE_DELETE_RESP:
 		hdl = RPPC_PAYLOAD(buffer, rppc_instance_handle);
-		dev_info(dev, "%s endpoint = %d status = %d\n",
+		dev_dbg(dev, "%s endpoint = %d status = %d\n",
 			      prefix, hdl->endpoint_address, hdl->status);
 		break;
 	case RPPC_MSGTYPE_FUNCTION_INFO:
 		info = RPPC_PAYLOAD(buffer, rppc_query_function);
-		dev_info(dev, "%s (info not yet implemented)\n", prefix);
+		dev_dbg(dev, "%s (info not yet implemented)\n", prefix);
 		break;
 	case RPPC_MSGTYPE_FUNCTION_CALL:
 		packet = RPPC_PAYLOAD(buffer, rppc_packet);
-		dev_info(dev, "%s PACKET: desc = %04x msg_id = %04x flags = %08x func = 0x%08x result = %d size = %u\n",
+		dev_dbg(dev, "%s PACKET: desc = %04x msg_id = %04x flags = %08x func = 0x%08x result = %d size = %u\n",
 				prefix, packet->desc, packet->msg_id,
 				packet->flags, packet->fxn_id,
 				packet->result, packet->data_size);
 		param = (struct rppc_param_data *)packet->data;
 		for (i = 0; i < (packet->data_size / paramsz); i++) {
-			dev_info(dev, "%s param[%u] size = %zu data = %zu (0x%08x)",
+			dev_dbg(dev, "%s param[%u] size = %zu data = %zu (0x%08x)",
 				prefix, i, param[i].size, param[i].data,
 				param[i].data);
 		}
