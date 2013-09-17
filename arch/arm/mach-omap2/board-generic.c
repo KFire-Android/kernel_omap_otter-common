@@ -115,6 +115,8 @@ static void __init omap_generic_init(void)
 
 	if (of_machine_is_compatible("ti,omap5"))
 		omap_sata_init();
+	else if (of_machine_is_compatible("ti,dra7"))
+		omap_sata_init();
 }
 
 #ifdef CONFIG_SOC_OMAP2420
@@ -220,7 +222,7 @@ static const char *omap4_boards_compat[] __initdata = {
 };
 
 DT_MACHINE_START(OMAP4_DT, "Generic OMAP4 (Flattened Device Tree)")
-	.reserve	= omap_reserve,
+	.reserve	= omap4_reserve,
 	.smp		= smp_ops(omap4_smp_ops),
 	.map_io		= omap4_map_io,
 	.init_early	= omap4430_init_early,
@@ -240,8 +242,8 @@ static const char *omap5_boards_compat[] __initdata = {
 	NULL,
 };
 
-DT_MACHINE_START(OMAP5_DT, "Generic OMAP5 (Flattened Device Tree)")
-	.reserve	= omap_reserve,
+DT_MACHINE_START(OMAP5_DT, "OMAP5 Panda board")
+	.reserve	= omap5_reserve,
 	.smp		= smp_ops(omap4_smp_ops),
 	.map_io		= omap5_map_io,
 	.init_early	= omap5_init_early,
@@ -262,7 +264,7 @@ static const char *dra7xx_boards_compat[] __initdata = {
 };
 
 DT_MACHINE_START(DRA7XX_DT, "Jacinto6 evm board")
-	.reserve	= omap_reserve,
+	.reserve	= dra7_reserve,
 	.smp		= smp_ops(omap4_smp_ops),
 	.map_io		= omap5_map_io,
 	.init_early	= dra7xx_init_early,

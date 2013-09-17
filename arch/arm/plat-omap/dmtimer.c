@@ -819,6 +819,8 @@ static int omap_dm_timer_probe(struct platform_device *pdev)
 			timer->capability |= OMAP_TIMER_ALWON;
 		if (of_find_property(dev->of_node, "ti,timer-dsp", NULL))
 			timer->capability |= OMAP_TIMER_HAS_DSP_IRQ;
+		if (of_find_property(dev->of_node, "ti,timer-ipu", NULL))
+			timer->capability |= OMAP_TIMER_HAS_IPU_IRQ;
 		if (of_find_property(dev->of_node, "ti,timer-pwm", NULL))
 			timer->capability |= OMAP_TIMER_HAS_PWM;
 		if (of_find_property(dev->of_node, "ti,timer-secure", NULL))

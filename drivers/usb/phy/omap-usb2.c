@@ -28,6 +28,7 @@
 #include <linux/pm_runtime.h>
 #include <linux/delay.h>
 #include <linux/usb/omap_control_usb.h>
+#include <linux/of_platform.h>
 
 /**
  * omap_usb2_set_comparator - links the comparator present in the sytem with
@@ -123,6 +124,10 @@ static int omap_usb2_probe(struct platform_device *pdev)
 {
 	struct omap_usb			*phy;
 	struct usb_otg			*otg;
+	struct device_node		*node = pdev->dev.of_node;
+	struct device_node		*omap_control_usb_node;
+	struct platform_device		*pdev_control_usb;
+	const char   			*clk_name;
 
 	phy = devm_kzalloc(&pdev->dev, sizeof(*phy), GFP_KERNEL);
 	if (!phy) {
@@ -143,13 +148,28 @@ static int omap_usb2_probe(struct platform_device *pdev)
 	phy->phy.set_suspend	= omap_usb2_suspend;
 	phy->phy.otg		= otg;
 	phy->phy.type		= USB_PHY_TYPE_USB2;
+	omap_control_usb_node   = of_parse_phandle(node, "ctrl-module", 0);
 
-	phy->control_dev = omap_get_control_dev();
+	if (IS_ERR(omap_control_usb_node)) {
+		dev_err(&pdev->dev, "Failed to find ctrl-module\n");
+		return -EPROBE_DEFER;
+	}
+
+	pdev_control_usb = of_find_device_by_node(omap_control_usb_node);
+
+	if (IS_ERR(pdev_control_usb)) {
+		dev_dbg(&pdev->dev, "Attempt to get the platform control usb failed\n");
+		return -EPROBE_DEFER;
+	}
+	phy->control_dev = &pdev_control_usb->dev;
+
 	if (IS_ERR(phy->control_dev)) {
 		dev_dbg(&pdev->dev, "Failed to get control device\n");
 		return -ENODEV;
 	}
-
+	dev_dbg(&pdev->dev, "got control usb name %s\n",
+					dev_name(phy->control_dev));
+	phy->control_node	= omap_control_usb_node;
 	phy->is_suspended	= 1;
 	omap_control_usb_phy_power(phy->control_dev, 0);
 
@@ -159,18 +179,33 @@ static int omap_usb2_probe(struct platform_device *pdev)
 	otg->start_srp		= omap_usb_start_srp;
 	otg->phy		= &phy->phy;
 
-	phy->wkupclk = devm_clk_get(phy->dev, "usb_phy_cm_clk32k");
-	if (IS_ERR(phy->wkupclk)) {
-		dev_err(&pdev->dev, "unable to get usb_phy_cm_clk32k\n");
-		return PTR_ERR(phy->wkupclk);
+
+	of_property_read_string(node, "wkupclk", &clk_name);
+	if (!clk_name) {
+		dev_err(&pdev->dev, "unable to read wkupclk property from dt \n");
+		return -ENODEV;
+	} else {
+		phy->wkupclk = devm_clk_get(phy->dev, clk_name);
+		if (IS_ERR(phy->wkupclk)) {
+			dev_err(&pdev->dev, "unable to get usb_phy wk clk\n");
+			return PTR_ERR(phy->wkupclk);
+		}
 	}
+
 	clk_prepare(phy->wkupclk);
 
-	phy->optclk = devm_clk_get(phy->dev, "usb_otg_ss_refclk960m");
-	if (IS_ERR(phy->optclk))
-		dev_vdbg(&pdev->dev, "unable to get refclk960m\n");
-	else
-		clk_prepare(phy->optclk);
+	of_property_read_string(node, "optclk", &clk_name);
+	if (!clk_name)
+		dev_err(&pdev->dev, "unable to read optclk property from dt\n");
+	else {
+		phy->optclk = devm_clk_get(phy->dev, clk_name);
+		if (IS_ERR(phy->optclk)) {
+			dev_err(&pdev->dev, "unable to get usb_phy opt clk\n");
+			return PTR_ERR(phy->optclk);
+		}
+		else
+			clk_prepare(phy->optclk);
+	}
 
 	usb_add_phy_dev(&phy->phy);
 
@@ -186,6 +221,7 @@ static int omap_usb2_remove(struct platform_device *pdev)
 	struct omap_usb	*phy = platform_get_drvdata(pdev);
 
 	clk_unprepare(phy->wkupclk);
+	of_node_put(phy->control_node);
 	if (!IS_ERR(phy->optclk))
 		clk_unprepare(phy->optclk);
 	usb_remove_phy(&phy->phy);

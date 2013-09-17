@@ -1,0 +1,42 @@
+* Texas Instruments DRA7 Audio Tracking Logic (ATL)
+
+Required properties:
+- compatible: "ti,dra7-atl"
+- ti,hwmods: Name of the hwmod associated with the ATL module
+
+
+Optional properties:
+- ti,atclk<n>-freq: Output clock frequency for ATL instance n.
+		ATL instance is disabled if this property is not set
+- ti,atl<n>-bws-input: ATL baseband word select input for ATL instance n.
+  Possible inputs are:
+	 0 - McASP1 FSR
+	 1 - McASP1 FSX
+	 2 - McASP2 FSR
+	 3 - McASP2 FSX
+	 4 - McASP3 FSX
+	 5 - McASP4 FSX
+	 6 - McASP5 FSX
+	 7 - McASP6 FSX
+	 8 - McASP7 FSX
+	 9 - McASP8 FSX
+	10 - McASP8 AHCLKX
+	11 - XREF_CLK3 input pad
+	12 - XREF_CLK0 input pad
+	13 - XREF_CLK1 input pad
+	14 - XREF_CLK2 input pad
+	15 - OSC1_X1 input pad
+- ti,atl<n>-aws-input: Audio word select input for ATL instance n.
+  Same inputs than BWS.
+
+
+Example:
+
+atl: atl@0x4843c000 {
+	compatible = "ti,dra7-atl";
+	reg = <0x4843c000 0x3ff>;
+	ti,hwmods = "atl";
+	ti,atclk1-freq = <11289600>;	/* 11.2896 MHz */
+	ti,atl1-bws-input = <2>;	/* McASP2 FSR */
+	ti,atl1-aws-input = <4>;	/* McASP3 FSX */
+};

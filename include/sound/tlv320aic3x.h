@@ -53,6 +53,7 @@ struct aic3x_setup_data {
 struct aic3x_pdata {
 	int gpio_reset; /* < 0 if not used */
 	struct aic3x_setup_data *setup;
+	unsigned int adc_settle_ms;
 };
 
 #endif

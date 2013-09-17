@@ -108,21 +108,21 @@ static int omap1_mbox_poll_for_space(struct mailbox *mbox)
 
 /* irq */
 static void
-omap1_mbox_enable_irq(struct mailbox *mbox, mailbox_type_t irq)
+omap1_mbox_enable_irq(struct mailbox *mbox, mailbox_irq_t irq)
 {
 	if (irq == IRQ_RX)
 		enable_irq(mbox->irq);
 }
 
 static void
-omap1_mbox_disable_irq(struct mailbox *mbox, mailbox_type_t irq)
+omap1_mbox_disable_irq(struct mailbox *mbox, mailbox_irq_t irq)
 {
 	if (irq == IRQ_RX)
 		disable_irq(mbox->irq);
 }
 
 static int
-omap1_mbox_is_irq(struct mailbox *mbox, mailbox_type_t irq)
+omap1_mbox_is_irq(struct mailbox *mbox, mailbox_irq_t irq)
 {
 	struct omap_mbox1_priv *priv = (struct omap_mbox1_priv *)mbox->priv;
 
@@ -135,7 +135,6 @@ omap1_mbox_is_irq(struct mailbox *mbox, mailbox_type_t irq)
 }
 
 static struct mailbox_ops omap1_mbox_ops = {
-	.type		= MBOX_HW_FIFO1_TYPE,
 	.read		= omap1_mbox_fifo_read,
 	.write		= omap1_mbox_fifo_write,
 	.empty		= omap1_mbox_fifo_empty,
@@ -173,10 +172,12 @@ static int omap1_mbox_probe(struct platform_device *pdev)
 {
 	struct resource *mem;
 	int ret;
+	struct mailbox_device *mdev;
 	struct mailbox **list;
 
 	list = omap1_mboxes;
 	list[0]->irq = platform_get_irq_byname(pdev, "dsp");
+	list[0]->irq_flags = IRQF_SHARED;
 
 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!mem)
@@ -186,19 +187,34 @@ static int omap1_mbox_probe(struct platform_device *pdev)
 	if (!mbox_base)
 		return -ENOMEM;
 
-	ret = mailbox_register(&pdev->dev, list);
-	if (ret) {
-		iounmap(mbox_base);
-		return ret;
+	mdev = mailbox_device_alloc(&pdev->dev, NULL, 0);
+	if (!mdev) {
+		ret = -ENOMEM;
+		goto unmap_mbox;
 	}
 
+	ret = mailbox_register(mdev, list);
+	if (ret)
+		goto free_mdev;
+	platform_set_drvdata(pdev, mdev);
 	return 0;
+
+free_mdev:
+	mailbox_device_free(mdev);
+unmap_mbox:
+	iounmap(mbox_base);
+	return ret;
 }
 
 static int omap1_mbox_remove(struct platform_device *pdev)
 {
-	mailbox_unregister();
+	struct mailbox_device *mdev = platform_get_drvdata(pdev);
+
+	mailbox_unregister(mdev);
+	mailbox_device_free(mdev);
 	iounmap(mbox_base);
+	platform_set_drvdata(pdev, NULL);
+
 	return 0;
 }
 

@@ -37,13 +37,120 @@
 		};
 	};
 
+	vaudio_1v8: fixedregulator-vaudio-dig {
+		compatible = "regulator-fixed";
+		regulator-name = "vdac_fixed";
+		regulator-min-microvolt = <1800000>;
+		regulator-max-microvolt = <1800000>;
+		regulator-boot-on;
+	};
+
+	vaudio_3v3: fixedregulator-vaudio-anlg {
+		compatible = "regulator-fixed";
+		regulator-name = "vdac_fixed";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		regulator-boot-on;
+	};
+
+	sound {
+		compatible = "ti,dra7-evm-sound";
+		ti,model = "dra7evm";
+		ti,always-on;
+
+		/* Audio routing */
+		ti,audio-routing =
+			"LINE1L", "Line In",
+			"LINE1R", "Line In",
+			"MIC3L", "Mic Bias 2V",
+			"MIC3R", "Mic Bias 2V",
+			"Mic Bias 2V", "Main Mic",
+			"Headphone", "HPLOUT",
+			"Headphone", "HPROUT",
+			"Line Out", "LLOUT",
+			"Line Out", "RLOUT",
+			"J3A LINE1L", "JAMR3 Stereo Aux In",
+			"J3A LINE1R", "JAMR3 Stereo Aux In",
+			"J3B LINE1L", "JAMR3 Mono Mic 1",
+			"J3B LINE1R", "JAMR3 Mono Mic 2",
+			"JAMR3 Line Out 1", "J3A LLOUT",
+			"JAMR3 Line Out 1", "J3A RLOUT",
+			"JAMR3 Line Out 2", "J3B LLOUT",
+			"JAMR3 Line Out 2", "J3B RLOUT",
+			"JAMR3 Line Out 3", "J3C LLOUT",
+			"JAMR3 Line Out 3", "J3C RLOUT";
+
+		/* Media DAI link */
+		ti,media-cpu = <&mcasp3>;
+		ti,media-codec = <&tlv320aic3106>;
+		ti,media-mclk-freq = <5644800>;
+		ti,media-slots = <2>;
+
+		/* Multichannel DAI link */
+		ti,multichannel-cpu = <&mcasp6>;
+		ti,multichannel-codec-a = <&tlv320aic3106a>;
+		ti,multichannel-codec-b = <&tlv320aic3106b>;
+		ti,multichannel-codec-c = <&tlv320aic3106c>;
+		ti,multichannel-slots = <8>;
+		ti,multichannel-mclk-freq = <11289600>;
+	};
+
+	sound_hdmi {
+		compatible = "ti,omap-hdmi-tpd12s015-audio";
+		ti,model = "OMAP5HDMI";
+		ti,hdmi_audio = <&hdmi>;
+		ti,level_shifter = <&tpd12s015>;
+	};
 };
 
 &dra7_pmx_core {
         pinctrl-names = "default";
         pinctrl-0 = <
+		&atl_pins
+		&mcasp3_pins
+		&mcasp6_pins
 		&vout1_pins
+		&usb_pins
+		&irq_pins
 	>;
+
+	atl_pins: pinmux_atl_pins {
+		pinctrl-single,pins = <
+			0x298 0x00000005	/* xref_clk1.atl_clk1 OUTPUT | MODE5 */
+			0x29c 0x00000005	/* xref_clk2.atl_clk2 OUTPUT | MODE5 */
+		>;
+	};
+
+	mcasp3_pins: pinmux_mcasp3_pins {
+		pinctrl-single,pins = <
+			0x324 0x00000000	/* mcasp3_aclkx.mcasp3_aclkx OUTPUT | MODE0 */
+			0x328 0x00000000	/* mcasp3_fsx.mcasp3_fsx OUTPUT | MODE0 */
+			0x32c 0x00000000	/* mcasp3_axr0.mcasp3_axr0 OUTPUT | MODE0 */
+			0x330 0x00040000	/* mcasp3_axr1.mcasp3_axr1 INPUT | MODE0 */
+		>;
+	};
+
+	mcasp6_pins: pinmux_mcasp6_pins {
+		pinctrl-single,pins = <
+			0x2d4 0x00000001	/* mcasp1_axr8.mcasp6_axr0 OUTPUT | MODE1 */
+			0x2d8 0x00040001	/* mcasp1_axr9.mcasp6_axr1 INPUT | MODE 1 */
+			0x2dc 0x00000001	/* mcasp1_axr10.mcasp6_clkx OUTPUT | MODE1 */
+			0x2e0 0x00000001	/* mcasp1_axr11.mcasp6_fsx OUTPUT | MODE1 */
+		>;
+
+	irq_pins: pinmux_irq_pins {
+                pinctrl-single,pins = <
+			0x420	0x1	/* Wakeup2 INPUT | MODE1 */
+                >;
+        };
+	};
+
+	usb_pins: pinmux_usb_pins {
+                pinctrl-single,pins = <
+			0x280	0xc0000	/* DRV1_VBUS SLEW | PULLDEN | MODE0 */
+			0x284	0xc0000	/* DRV2_VBUS SLEW | PULLDEN | MODE0 */
+                >;
+        };
 
 	i2c2_pins: pinmux_i2c2_pins {
                 pinctrl-single,pins = <
@@ -85,6 +192,65 @@
 			0x238	0x0	/* vout1_d23 OUTPUT | MODE0 */
 		>;
 	};
+
+	cpsw_default_pins: pinmux_cpsw_default_pins {
+		pinctrl-single,pins = <
+			/* Slave 1 */
+			0x250	0x0 /* rgmii1_tclk PIN_OUTPUT | MUX_MODE0 */
+			0x254	0x0 /* rgmii1_tctl PIN_OUTPUT | MUX_MODE0 */
+			0x258	0x0 /* rgmii1_td3 PIN_OUTPUT | MUX_MODE0 */
+			0x25c	0x0 /* rgmii1_td2 PIN_OUTPUT | MUX_MODE0 */
+			0x260	0x0 /* rgmii1_td1 PIN_OUTPUT | MUX_MODE0 */
+			0x264	0x0 /* rgmii1_td0 PIN_OUTPUT | MUX_MODE0 */
+			0x268	0x00040000 /* rgmii1_rclk PIN_INPUT | MUX_MODE0 */
+			0x26c	0x00040000 /* rgmii1_rctl PIN_INPUT | MUX_MODE0 */
+			0x270	0x00040000 /* rgmii1_rd3 PIN_INPUT | MUX_MODE0 */
+			0x274	0x00040000 /* rgmii1_rd2 PIN_INPUT | MUX_MODE0 */
+			0x278	0x00040000 /* rgmii1_rd1 PIN_INPUT | MUX_MODE0 */
+			0x27c	0x00040000 /* rgmii1_rd0 PIN_INPUT | MUX_MODE0 */
+
+			/* Slave 2 */
+			0x198	0x4 /* rgmii2_tclk PIN_OUTPUT | MUX_MODE4 */
+			0x19c	0x4 /* rgmii2_tctl PIN_OUTPUT | MUX_MODE4 */
+			0x1a0	0x4 /* rgmii2_td3 PIN_OUTPUT | MUX_MODE4 */
+			0x1a4	0x4 /* rgmii2_td2 PIN_OUTPUT | MUX_MODE4 */
+			0x1a8	0x4 /* rgmii2_td1 PIN_OUTPUT | MUX_MODE4 */
+			0x1ac	0x4 /* rgmii2_td0 PIN_OUTPUT | MUX_MODE4 */
+			0x1b0	0x00040004 /* rgmii2_rclk PIN_INPUT | MUX_MODE4 */
+			0x1b4	0x00040004 /* rgmii2_rctl PIN_INPUT | MUX_MODE4 */
+			0x1b8	0x00040004 /* rgmii2_rd3 PIN_INPUT | MUX_MODE4 */
+			0x1bc	0x00040004 /* rgmii2_rd2 PIN_INPUT | MUX_MODE4 */
+			0x1c0	0x00040004 /* rgmii2_rd1 PIN_INPUT | MUX_MODE4 */
+			0x1c4	0x00040004 /* rgmii2_rd0 PIN_INPUT | MUX_MODE4 */
+				>;
+		};
+
+	davinci_mdio_default_pins: pinmux_davinci_mdio_default_pins {
+		pinctrl-single,pins = <
+			/* MDIO */
+			0x23c	0x30000 /* mdio_data PIN_OUTPUT_PULLUP | MUX_MODE0 */
+			0x240	0x70000 /* mdio_clk PIN_INPUT_PULLUP | MUX_MODE0 */
+				>;
+		};
+};
+
+&gmac {
+	status="okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&cpsw_default_pins>;
+};
+
+&davinci_mdio {
+	pinctrl-names = "default";
+	pinctrl-0 = <&davinci_mdio_default_pins>;
+};
+
+&cpsw_emac0 {
+	phy_id = <&davinci_mdio>, <2>;
+};
+
+&cpsw_emac1 {
+	phy_id = <&davinci_mdio>, <3>;
 };
 
 &i2c1 {
@@ -99,6 +265,8 @@
 		reg = <0x20>;
 		gpio-controller;
 		#gpio-cells = <2>;
+		/* HACK: Using n_latch in cf8575 driver to "drive P10" to not hold ETH0 in reset */
+		n_latch = <0xfeff>;
 	};
 
 	/* TLC chip for LCD panel power and backlight */
@@ -106,6 +274,20 @@
 		compatible = "ti,tlc59108";
 		reg = <0x40>;
 		gpios = <&pcf_lcd 15 0>; /* P15, CON_LCD_PWR_DN */
+	};
+
+	tlv320aic3106: tlv320aic3106@18 {
+		compatible = "ti,tlv320aic3x";
+		reg = <0x18>;
+		adc-settle-ms = <40>;
+		IOVDD-supply = <&vaudio_3v3>;
+		DVDD-supply = <&vaudio_1v8>;
+		AVDD-supply = <&vaudio_3v3>;
+		DRVDD-supply = <&vaudio_3v3>;
+	};
+
+	mXT244:mXT244@4a {
+		reg = <0x4a>;
 	};
 };
 
@@ -122,6 +304,33 @@
 		reg = <0x26>;
 		gpio-controller;
 		#gpio-cells = <2>;
+	};
+
+	tlv320aic3106a: tlv320aic3106@18 {
+		compatible = "ti,tlv320aic3x";
+		reg = <0x18>;
+		IOVDD-supply = <&vaudio_3v3>;
+		DVDD-supply = <&vaudio_1v8>;
+		AVDD-supply = <&vaudio_3v3>;
+		DRVDD-supply = <&vaudio_3v3>;
+	};
+
+	tlv320aic3106b: tlv320aic3106@19 {
+		compatible = "ti,tlv320aic3x";
+		reg = <0x19>;
+		IOVDD-supply = <&vaudio_3v3>;
+		DVDD-supply = <&vaudio_1v8>;
+		AVDD-supply = <&vaudio_3v3>;
+		DRVDD-supply = <&vaudio_3v3>;
+	};
+
+	tlv320aic3106c: tlv320aic3106@1a {
+		compatible = "ti,tlv320aic3x";
+		reg = <0x1a>;
+		IOVDD-supply = <&vaudio_3v3>;
+		DVDD-supply = <&vaudio_1v8>;
+		AVDD-supply = <&vaudio_3v3>;
+		DRVDD-supply = <&vaudio_3v3>;
 	};
 };
 
@@ -188,6 +397,7 @@
 };
 
 &hdmi {
+	vdda_hdmi_dac-supply = <&ldo3_reg>;
 	tpd12s015: tpd12s015 {
 		compatible = "ti,tpd12s015";
 
@@ -200,5 +410,69 @@
 		hdmi-monitor {
 			compatible = "ti,hdmi_panel";
 		};
+	};
+};
+
+&mXT244 {
+	compatible = "atmel,mXT244";
+	interrupts = <0 119 0x4>;
+
+	atmel,config = <
+	/* MXT244_GEN_COMMAND(6) */
+	0x00 0x00 0x00 0x00 0x00 0x00
+	/* MXT244_GEN_POWER(7) */
+	0x20 0xff 0x32
+	/* MXT244_GEN_ACQUIRE(8) */
+	0x0a 0x00 0x05 0x00 0x00 0x00 0x09 0x23
+	/* MXT244_TOUCH_MULTI(9) */
+	0x00 0x00 0x00 0x13 0x0b 0x00 0x00 0x00 0x02 0x00
+	0x00 0x01 0x01 0x0e 0x0a 0x0a 0x0a 0x0a 0x00 0x00
+	0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+	0x00
+	/* MXT244_TOUCH_KEYARRAY(15) */
+	0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+	0x00
+	/* MXT244_COMMSCONFIG_T18(2) */
+	0x00 0x00
+	/* MXT244_SPT_GPIOPWM(19) */
+	0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+	0x00 0x00 0x00 0x00 0x00 0x00
+	/* MXT244_PROCI_GRIPFACE(20) */
+	0x07 0x00 0x00 0x00 0x00 0x00 0x00 0x50 0x28 0x04
+	0x0f 0x0a
+	/* MXT244_PROCG_NOISE(22) */
+	0x05 0x00 0x00 0x00 0x00 0x00 0x00 0x03 0x23 0x00
+	0x00 0x05 0x0f 0x19 0x23 0x2d 0x03
+	/* MXT244_TOUCH_PROXIMITY(23) */
+	0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+	0x00 0x00 0x00 0x00 0x00
+	/* MXT244_PROCI_ONETOUCH(24) */
+	0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+	0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+	/* MXT244_SPT_SELFTEST(25) */
+	0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+	0x00 0x00 0x00 0x00
+	/* MXT244_PROCI_TWOTOUCH(27) */
+	0x00 0x00 0x00 0x00 0x00 0x00 0x00
+	/* MXT244_SPT_CTECONFIG(28) */
+	0x00 0x00 0x02 0x08 0x10 0x00 >;
+
+	atmel,x_line = <18>;
+	atmel,y_line = <12>;
+	atmel,x_size = <800>;
+	atmel,y_size = <480>;
+	atmel,blen = <0x01>;
+	atmel,threshold = <30>;
+	atmel,voltage = <2800000>;
+	atmel,orient = <0x4>;
+};
+&qspi {
+	spi-max-frequency = <48000000>;
+        m25p80@0 {
+                compatible = "s25fl256s1";
+                spi-max-frequency = <48000000>;
+                reg = <0>;
+		spi-cpol;
+		spi-cpha;
 	};
 };

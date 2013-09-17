@@ -22,6 +22,8 @@
 #include <linux/platform_data/omap_ocp2scp.h>
 #include <linux/usb/omap_control_usb.h>
 #include <linux/platform_data/mailbox-omap.h>
+#include <linux/platform_data/omap_gcx.h>
+#include "omap-pm.h"
 
 #include <asm/mach-types.h>
 #include <asm/mach/map.h>
@@ -447,6 +449,70 @@ static void __init omap_init_dmic(void)
 static inline void omap_init_dmic(void) {}
 #endif
 
+static int gcxxx_scale_dev(struct device *dev, unsigned long val);
+static int gcxxx_set_l3_bw(struct device *dev, unsigned long val);
+
+static struct omap_gcx_platform_data omap_gcxxx = {
+	.get_context_loss_count = omap_pm_get_dev_context_loss_count,
+	.scale_dev = gcxxx_scale_dev,
+	.set_bw = gcxxx_set_l3_bw,
+};
+
+struct omap_device_pm_latency omap_gcxxx_latency[] = {
+	{
+		.deactivate_func = omap_device_idle_hwmods,
+		.activate_func   = omap_device_enable_hwmods,
+		.flags = OMAP_DEVICE_LATENCY_AUTO_ADJUST,
+	}
+};
+
+static int gcxxx_scale_dev(struct device *dev, unsigned long val)
+{
+	/*omap_device_scale(dev, val) is not supported, returning with no-op
+	 * for now. */
+	return 0;
+}
+
+static int gcxxx_set_l3_bw(struct device *dev, unsigned long val)
+{
+	return omap_pm_set_min_bus_tput(dev, OCP_INITIATOR_AGENT, val);
+}
+
+int __init gcxxx_init(void)
+{
+	int retval = 0;
+	struct omap_hwmod *oh;
+	struct platform_device *pdev;
+	/*struct omap_device *od;
+	struct device *dev;*/
+	const char *oh_name = "bb2d";
+	const char *dev_name = "gccore";
+
+	/*
+	 * Hwmod lookup will fail in case our platform doesn't support the
+	 * hardware spinlock module, so it is safe to run this initcall
+	 * on all omaps
+	 */
+	oh = omap_hwmod_lookup(oh_name);
+	if (oh == NULL)
+		return -EINVAL;
+
+	omap_gcxxx.regbase = omap_hwmod_get_mpu_rt_va(oh);
+	omap_gcxxx.is_hw_present = (soc_is_omap543x()
+				|| soc_is_dra7xx()) ? true : false;
+	pdev = omap_device_build(dev_name, 0, oh, &omap_gcxxx,
+				sizeof(omap_gcxxx), omap_gcxxx_latency,
+				ARRAY_SIZE(omap_gcxxx_latency), false);
+	if (IS_ERR(pdev)) {
+		pr_err("Can't build omap_device for %s:%s\n", dev_name,
+								oh_name);
+		retval = PTR_ERR(pdev);
+	}
+
+	return retval;
+}
+
+
 #if defined(CONFIG_SND_OMAP_SOC_ABE) || \
 	defined(CONFIG_SND_OMAP_SOC_ABE_MODULE)
 
@@ -682,12 +748,13 @@ static int __init omap2_init_devices(void)
 	 */
 	omap_init_audio();
 	omap_init_camera();
-	omap_init_mbox();
+	gcxxx_init();
 	/* If dtb is there, the devices will be created dynamically */
 	if (!of_have_populated_dt()) {
 		omap_init_control_usb();
 		omap_init_aess();
 		omap_init_dmic();
+		omap_init_mbox();
 		omap_init_mcpdm();
 		omap_init_mcspi();
 		omap_init_mcasp();

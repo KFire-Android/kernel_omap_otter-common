@@ -40,8 +40,12 @@
 #include "prm-regbits-7xx.h"
 #include "control.h"
 
-#define DRA7_DPLL_ABE_DEFFREQ			361267200
+#define DRA7_DPLL_ABE_DEFFREQ			180633600
 #define DRA7_DPLL_GMAC_DEFFREQ			1000000000
+#define DRA7_DPLL_USB_DEFFREQ			960000000
+#define DRA7_DPLL_DSP_DEFFREQ			600000000
+#define DRA7_DPLL_DSP_GFCLK_NOMFREQ		600000000
+#define DRA7_DPLL_EVE_GCLK_NOMFREQ		400000000
 
 /* Root clocks */
 
@@ -51,7 +55,7 @@ DEFINE_CLK_FIXED_RATE(atl_clkin1_ck, CLK_IS_ROOT, 0, 0x0);
 
 DEFINE_CLK_FIXED_RATE(atl_clkin2_ck, CLK_IS_ROOT, 0, 0x0);
 
-DEFINE_CLK_FIXED_RATE(atlclkin3_ck, CLK_IS_ROOT, 0, 0x0);
+DEFINE_CLK_FIXED_RATE(atl_clkin3_ck, CLK_IS_ROOT, 0, 0x0);
 
 DEFINE_CLK_FIXED_RATE(hdmi_clkin_ck, CLK_IS_ROOT, 0, 0x0);
 
@@ -1245,7 +1249,7 @@ static struct clk_hw_omap hdmi_div_clk_hw = {
 DEFINE_STRUCT_CLK(hdmi_div_clk, hdmi_dclk_div_parents, apll_pcie_clkvcoldo_ops);
 
 DEFINE_CLK_MUX(hdmi_dpll_clk_mux, abe_dpll_sys_clk_mux_parents, NULL, 0x0,
-	       DRA7XX_CM_CLKSEL_HDMI_CLK_CLKOUTMUX, DRA7XX_CLKSEL_SHIFT,
+	       DRA7XX_CM_CLKSEL_HDMI_PLL_SYS, DRA7XX_CLKSEL_SHIFT,
 	       DRA7XX_CLKSEL_WIDTH, 0x0, NULL);
 
 static struct clk l3_iclk_div;
@@ -1525,13 +1529,15 @@ static const char *gpu_core_gclk_mux_parents[] = {
 	"dpll_core_h14x2_ck", "dpll_per_h14x2_ck", "dpll_gpu_m2_ck",
 };
 
-DEFINE_CLK_MUX(gpu_core_gclk_mux, gpu_core_gclk_mux_parents, NULL, 0x0,
-	       DRA7XX_CM_GPU_GPU_CLKCTRL, DRA7XX_CLKSEL_CORE_CLK_SHIFT,
-	       DRA7XX_CLKSEL_CORE_CLK_WIDTH, 0x0, NULL);
+DEFINE_CLK_MUX(gpu_core_gclk_mux, gpu_core_gclk_mux_parents, NULL,
+	       CLK_SET_RATE_PARENT, DRA7XX_CM_GPU_GPU_CLKCTRL,
+	       DRA7XX_CLKSEL_CORE_CLK_SHIFT, DRA7XX_CLKSEL_CORE_CLK_WIDTH,
+	       0x0, NULL);
 
-DEFINE_CLK_MUX(gpu_hyd_gclk_mux, gpu_core_gclk_mux_parents, NULL, 0x0,
-	       DRA7XX_CM_GPU_GPU_CLKCTRL, DRA7XX_CLKSEL_HYD_CLK_SHIFT,
-	       DRA7XX_CLKSEL_HYD_CLK_WIDTH, 0x0, NULL);
+DEFINE_CLK_MUX(gpu_hyd_gclk_mux, gpu_core_gclk_mux_parents, NULL,
+	       CLK_SET_RATE_PARENT, DRA7XX_CM_GPU_GPU_CLKCTRL,
+	       DRA7XX_CLKSEL_HYD_CLK_SHIFT, DRA7XX_CLKSEL_HYD_CLK_WIDTH,
+	       0x0, NULL);
 
 static const char *ipu1_gfclk_mux_parents[] = {
 	"dpll_abe_m2x2_ck", "dpll_core_h22x2_ck",
@@ -1555,9 +1561,9 @@ DEFINE_CLK_DIVIDER_TABLE(l3instr_ts_gclk_div, "wkupaon_iclk_mux",
 
 static const char *mcasp1_ahclkr_mux_parents[] = {
 	"abe_24m_fclk", "abe_sys_clk_div", "func_24m_clk",
-	"atlclkin3", "atl_clkin2", "atl_clkin1",
-	"atl_clkin0", "sys_clkin2", "ref_clkin0",
-	"ref_clkin1", "ref_clkin2", "ref_clkin3",
+	"atl_clkin3_ck", "atl_clkin2_ck", "atl_clkin1_ck",
+	"atl_clkin0_ck", "sys_clkin2", "ref_clkin0_ck",
+	"ref_clkin1_ck", "ref_clkin2_ck", "ref_clkin3_ck",
 	"mlb_clk", "mlbp_clk",
 };
 
@@ -1692,8 +1698,8 @@ DEFINE_CLK_DIVIDER(qspi_gfclk_div, "qspi_gfclk_mux", &qspi_gfclk_mux, 0x0,
 
 static const char *timer10_gfclk_mux_parents[] = {
 	"timer_sys_clk_div", "sys_32k_ck", "sys_clkin2",
-	"ref_clkin0", "ref_clkin1", "ref_clkin2",
-	"ref_clkin3", "abe_giclk_div", "video1_div_clk",
+	"ref_clkin0_ck", "ref_clkin1_ck", "ref_clkin2_ck",
+	"ref_clkin3_ck", "abe_giclk_div", "video1_div_clk",
 	"video2_div_clk", "hdmi_div_clk",
 };
 
@@ -1739,8 +1745,8 @@ DEFINE_CLK_MUX(timer4_gfclk_mux, timer10_gfclk_mux_parents, NULL, 0x0,
 
 static const char *timer5_gfclk_mux_parents[] = {
 	"timer_sys_clk_div", "sys_32k_ck", "sys_clkin2",
-	"ref_clkin0", "ref_clkin1", "ref_clkin2",
-	"ref_clkin3", "abe_giclk_div", "video1_div_clk",
+	"ref_clkin0_ck", "ref_clkin1_ck", "ref_clkin2_ck",
+	"ref_clkin3_ck", "abe_giclk_div", "video1_div_clk",
 	"video2_div_clk", "hdmi_div_clk", "clkoutmux0_clk_mux",
 };
 
@@ -1828,7 +1834,7 @@ static struct omap_clk dra7xx_clks[] = {
 	CLK(NULL,	"atl_clkin0_ck",		&atl_clkin0_ck,	CK_7XX),
 	CLK(NULL,	"atl_clkin1_ck",		&atl_clkin1_ck,	CK_7XX),
 	CLK(NULL,	"atl_clkin2_ck",		&atl_clkin2_ck,	CK_7XX),
-	CLK(NULL,	"atlclkin3_ck",			&atlclkin3_ck,	CK_7XX),
+	CLK(NULL,	"atl_clkin3_ck",		&atl_clkin3_ck,	CK_7XX),
 	CLK(NULL,	"hdmi_clkin_ck",		&hdmi_clkin_ck,	CK_7XX),
 	CLK(NULL,	"mlb_clkin_ck",			&mlb_clkin_ck,	CK_7XX),
 	CLK(NULL,	"mlbp_clkin_ck",		&mlbp_clkin_ck,	CK_7XX),
@@ -2123,7 +2129,12 @@ static struct reparent_init_clks reparent_clks[] = {
 
 static struct rate_init_clks rate_clks[] = {
 	{ .name = "dpll_abe_ck", .rate =  DRA7_DPLL_ABE_DEFFREQ },
+	{ .name = "dpll_abe_m2x2_ck", .rate =  DRA7_DPLL_ABE_DEFFREQ * 2 },
 	{ .name = "dpll_gmac_ck", .rate =  DRA7_DPLL_GMAC_DEFFREQ },
+	{ .name = "dpll_usb_ck", .rate =  DRA7_DPLL_USB_DEFFREQ },
+	{ .name = "dpll_dsp_ck", .rate = DRA7_DPLL_DSP_DEFFREQ },
+	{ .name = "dpll_dsp_m2_ck", .rate = DRA7_DPLL_DSP_GFCLK_NOMFREQ },
+	{ .name = "dpll_dsp_m3x2_ck", .rate = DRA7_DPLL_EVE_GCLK_NOMFREQ },
 };
 
 int __init dra7xx_clk_init(void)

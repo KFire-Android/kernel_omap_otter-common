@@ -11,6 +11,8 @@ Optional properties:
 
 - gpio-reset - gpio pin number used for codec reset
 - ai3x-gpio-func - <array of 2 int> - AIC3X_GPIO1 & AIC3X_GPIO2 Functionality
+- adc-settle-ms - Settle time to remove capture glitches caused by ADC power up,
+  mic bias, etc.
 
 Example:
 

@@ -729,7 +729,7 @@ MACHINE_START(OMAP_4430SDP, "OMAP4430 4430SDP board")
 	/* Maintainer: Santosh Shilimkar - Texas Instruments Inc */
 	.atag_offset	= 0x100,
 	.smp		= smp_ops(omap4_smp_ops),
-	.reserve	= omap_reserve,
+	.reserve	= omap4_reserve,
 	.map_io		= omap4_map_io,
 	.init_early	= omap4430_init_early,
 	.init_irq	= gic_init_irq,

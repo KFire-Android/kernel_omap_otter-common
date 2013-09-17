@@ -77,6 +77,7 @@ struct aic3x_priv {
 	enum snd_soc_control_type control_type;
 	struct aic3x_setup_data *setup;
 	unsigned int sysclk;
+	unsigned int tdm_delay;
 	struct list_head list;
 	int master;
 	int gpio_reset;
@@ -85,6 +86,7 @@ struct aic3x_priv {
 #define AIC3X_MODEL_33 1
 #define AIC3X_MODEL_3007 2
 	u16 model;
+	unsigned int adc_settle_ms;
 };
 
 /*
@@ -251,6 +253,16 @@ static const struct soc_enum aic3x_agc_decay_enum[] = {
 	SOC_ENUM_SINGLE(RAGC_CTRL_A, 0, 4, aic3x_agc_decay),
 };
 
+static const char *aic3x_poweron_time[] = {
+	"0us", "10us", "100us", "1ms", "10ms", "50ms", "100ms",
+	"200ms", "400ms", "800ms", "2s", "4s",
+};
+static const char *aic3x_rampup_step[] = { "0ms", "1ms", "2ms", "4ms" };
+static const struct soc_enum aic3x_pop_reduction_enum[] = {
+	SOC_ENUM_SINGLE(HPOUT_POP_REDUCTION, 4, 12, aic3x_poweron_time),
+	SOC_ENUM_SINGLE(HPOUT_POP_REDUCTION, 2, 4, aic3x_rampup_step),
+};
+
 /*
  * DAC digital volumes. From -63.5 to 0 dB in 0.5 dB steps
  */
@@ -391,6 +403,10 @@ static const struct snd_kcontrol_new aic3x_snd_controls[] = {
 	SOC_DOUBLE_R("PGA Capture Switch", LADC_VOL, RADC_VOL, 7, 0x01, 1),
 
 	SOC_ENUM("ADC HPF Cut-off", aic3x_enum[ADC_HPF_ENUM]),
+
+	/* Pop reduction */
+	SOC_ENUM("Output Driver Power-On time", aic3x_pop_reduction_enum[0]),
+	SOC_ENUM("Output Driver Ramp-up step", aic3x_pop_reduction_enum[1]),
 };
 
 /*
@@ -525,6 +541,22 @@ SOC_DAPM_ENUM("Route", aic3x_enum[LINE2L_ENUM]);
 static const struct snd_kcontrol_new aic3x_right_line2_mux_controls =
 SOC_DAPM_ENUM("Route", aic3x_enum[LINE2R_ENUM]);
 
+static int aic3x_adc_event(struct snd_soc_dapm_widget *w,
+			   struct snd_kcontrol *kcontrol, int event)
+{
+	struct aic3x_priv *aic3x = snd_soc_codec_get_drvdata(w->codec);
+
+	/*
+	 * Sleep for a device specific ADC settle time, it accounts
+	 * for any artifacts caused by the ADC power, mic bias, etc.
+	 * Event type has to be POST_PMU.
+	 */
+	if (aic3x->adc_settle_ms)
+		msleep(aic3x->adc_settle_ms);
+
+	return 0;
+}
+
 static const struct snd_soc_dapm_widget aic3x_dapm_widgets[] = {
 	/* Left DAC to Left Outputs */
 	SND_SOC_DAPM_DAC("Left DAC", "Left Playback", DAC_PWR, 7, 0),
@@ -550,7 +582,9 @@ static const struct snd_soc_dapm_widget aic3x_dapm_widgets[] = {
 	SND_SOC_DAPM_PGA("Mono Out", MONOLOPM_CTRL, 0, 0, NULL, 0),
 
 	/* Inputs to Left ADC */
-	SND_SOC_DAPM_ADC("Left ADC", "Left Capture", LINE1L_2_LADC_CTRL, 2, 0),
+	SND_SOC_DAPM_ADC_E("Left ADC", "Left Capture",
+			   LINE1L_2_LADC_CTRL, 2, 0,
+			   aic3x_adc_event, SND_SOC_DAPM_POST_PMU),
 	SND_SOC_DAPM_MIXER("Left PGA Mixer", SND_SOC_NOPM, 0, 0,
 			   &aic3x_left_pga_mixer_controls[0],
 			   ARRAY_SIZE(aic3x_left_pga_mixer_controls)),
@@ -562,8 +596,9 @@ static const struct snd_soc_dapm_widget aic3x_dapm_widgets[] = {
 			 &aic3x_left_line2_mux_controls),
 
 	/* Inputs to Right ADC */
-	SND_SOC_DAPM_ADC("Right ADC", "Right Capture",
-			 LINE1R_2_RADC_CTRL, 2, 0),
+	SND_SOC_DAPM_ADC_E("Right ADC", "Right Capture",
+			   LINE1R_2_RADC_CTRL, 2, 0,
+			   aic3x_adc_event, SND_SOC_DAPM_POST_PMU),
 	SND_SOC_DAPM_MIXER("Right PGA Mixer", SND_SOC_NOPM, 0, 0,
 			   &aic3x_right_pga_mixer_controls[0],
 			   ARRAY_SIZE(aic3x_right_pga_mixer_controls)),
@@ -663,6 +698,8 @@ static const struct snd_soc_dapm_route intercon[] = {
 	/* Left Input */
 	{"Left Line1L Mux", "single-ended", "LINE1L"},
 	{"Left Line1L Mux", "differential", "LINE1L"},
+	{"Right Line1L Mux", "single-ended", "LINE1L"},
+	{"Right Line1L Mux", "differential", "LINE1L"},
 
 	{"Left Line2L Mux", "single-ended", "LINE2L"},
 	{"Left Line2L Mux", "differential", "LINE2L"},
@@ -679,6 +716,8 @@ static const struct snd_soc_dapm_route intercon[] = {
 	/* Right Input */
 	{"Right Line1R Mux", "single-ended", "LINE1R"},
 	{"Right Line1R Mux", "differential", "LINE1R"},
+	{"Left Line1R Mux", "single-ended", "LINE1R"},
+	{"Left Line1R Mux", "differential", "LINE1R"},
 
 	{"Right Line2R Mux", "single-ended", "LINE2R"},
 	{"Right Line2R Mux", "differential", "LINE2R"},
@@ -1059,10 +1098,43 @@ static int aic3x_set_dai_fmt(struct snd_soc_dai *codec_dai,
 		return -EINVAL;
 	}
 
+	/* TDM requires DSP_B and bit delay to set active slots */
+	if ((fmt & SND_SOC_DAIFMT_FORMAT_MASK) == SND_SOC_DAIFMT_DSP_B)
+		delay = aic3x->tdm_delay;
+
 	/* set iface */
 	snd_soc_write(codec, AIC3X_ASD_INTF_CTRLA, iface_areg);
 	snd_soc_write(codec, AIC3X_ASD_INTF_CTRLB, iface_breg);
 	snd_soc_write(codec, AIC3X_ASD_INTF_CTRLC, delay);
+
+	return 0;
+}
+
+static int aic3x_set_dai_tdm_slot(struct snd_soc_dai *codec_dai,
+				  unsigned int tx_mask, unsigned int rx_mask,
+				  int slots, int slot_width)
+{
+	struct snd_soc_codec *codec = codec_dai->codec;
+	struct aic3x_priv *aic3x = snd_soc_codec_get_drvdata(codec);
+	unsigned int lsb = __ffs(tx_mask);
+
+	if (tx_mask != rx_mask) {
+		dev_err(codec->dev, "tx and rx masks must be symmetric\n");
+		return -EINVAL;
+	}
+
+	/* TDM based on DSP mode requires slots to be adjacent */
+	if ((lsb + 1) != __fls(tx_mask)) {
+		dev_err(codec->dev, "Invalid mask, slots must be adjacent\n");
+		return -EINVAL;
+	}
+
+	aic3x->tdm_delay = lsb * slot_width;
+	snd_soc_write(codec, AIC3X_ASD_INTF_CTRLC, aic3x->tdm_delay);
+
+	/* DOUT in high-impedance on inactive bit clocks */
+	snd_soc_update_bits(codec, AIC3X_ASD_INTF_CTRLA,
+			    DOUT_TRISTATE, DOUT_TRISTATE);
 
 	return 0;
 }
@@ -1204,6 +1276,7 @@ static const struct snd_soc_dai_ops aic3x_dai_ops = {
 	.digital_mute	= aic3x_mute,
 	.set_sysclk	= aic3x_set_dai_sysclk,
 	.set_fmt	= aic3x_set_dai_fmt,
+	.set_tdm_slot	= aic3x_set_dai_tdm_slot,
 };
 
 static struct snd_soc_dai_driver aic3x_dai = {
@@ -1474,6 +1547,7 @@ static int aic3x_i2c_probe(struct i2c_client *i2c,
 	if (pdata) {
 		aic3x->gpio_reset = pdata->gpio_reset;
 		aic3x->setup = pdata->setup;
+		aic3x->adc_settle_ms = pdata->adc_settle_ms;
 	} else if (np) {
 		ai3x_setup = devm_kzalloc(&i2c->dev, sizeof(*ai3x_setup),
 								GFP_KERNEL);
@@ -1493,6 +1567,8 @@ static int aic3x_i2c_probe(struct i2c_client *i2c,
 			aic3x->setup = ai3x_setup;
 		}
 
+		of_property_read_u32(np, "adc-settle-ms",
+				     &aic3x->adc_settle_ms);
 	} else {
 		aic3x->gpio_reset = -1;
 	}
