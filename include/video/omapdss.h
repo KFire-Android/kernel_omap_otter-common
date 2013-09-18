@@ -193,6 +193,7 @@ enum omap_overlay_caps {
 	OMAP_DSS_OVL_CAP_ZORDER = 1 << 3,
 	OMAP_DSS_OVL_CAP_POS = 1 << 4,
 	OMAP_DSS_OVL_CAP_REPLICATION = 1 << 5,
+	OMAP_DSS_OVL_CAP_FORCE_1D = 1 << 6,
 };
 
 enum omap_overlay_manager_caps {
