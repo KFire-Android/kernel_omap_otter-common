@@ -370,6 +370,11 @@ static void dispc_error_worker(struct work_struct *work)
 		unsigned bit;
 
 		mgr = omap_dss_get_overlay_manager(i);
+		if ((!mgr) || !(mgr->get_device(mgr))) {
+			DSSERR("mgr or device is NULL\n");
+			break;
+		}
+
 		bit = dispc_mgr_get_sync_lost_irq(i);
 
 		if (bit & errors) {
