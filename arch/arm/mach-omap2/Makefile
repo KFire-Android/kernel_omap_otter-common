@@ -316,3 +316,7 @@ obj-y					+= common-board-devices.o twl-common.o dss-common.o
 # Serial ATA support
 s-ata-$(CONFIG_SATA_AHCI_PLATFORM)	:= sata.o
 obj-y 					+= $(s-ata-m) $(s-ata-y)
+
+ifneq ($(CONFIG_OMAP_REMOTEPROC),)
+obj-y					+= remoteproc.o
+endif

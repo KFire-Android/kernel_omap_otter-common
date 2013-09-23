@@ -7,6 +7,13 @@ Required properties:
 - ti,media-codec: phandle for the analog codec in media link
 - ti,media-mclk-freq: MCLK frequency for the analog codec in media link
 - ti,media-slots: Number of slots
+- ti,multichannel-cpu: phandle for the McASP node in multichannel link.
+  It can be omitted for cpu dailess mode (DSP-based radio).
+- ti,multichannel-codec-a: phandle for the analog codec instance A
+- ti,multichannel-codec-b: phandle for the analog codec instance B
+- ti,multichannel-codec-c: phandle for the analog codec instance C
+- ti,multichannel-slots: number of TDM slots
+- ti,multichannel-mclk-freq: MCLK frequency for the analog codec
 - ti,audio-routing: List of connections between audio components.
   Each entry is a pair of strings, the first being the connection's sink,
   the second being the connection's source.
@@ -22,6 +29,12 @@ Board connectors:
  * Line In
  * Headphone
  * Line Out
+ * JAMR3 Stereo Aux In
+ * JAMR3 Mono Mic 1
+ * JAMR3 Mono Mic 2
+ * JAMR3 Line Out 1
+ * JAMR3 Line Out 2
+ * JAMR3 Line Out 3
 
 tlv320aic3x pins:
  * LLOUT
@@ -38,6 +51,9 @@ tlv320aic3x pins:
  * LINE2L
  * LINE2R
 
+JAMR3 analog codec pins for instances A, B and C are prefixed with
+'J3A', 'J3B' and 'J3C', respectively.
+
 Example:
 
 sound {
@@ -50,6 +66,14 @@ sound {
 	ti,media-mclk-freq = <1411200>;
 	ti,media-slots = <2>;
 
+	/* Multichannel DAI link */
+	ti,multichannel-cpu = <&mcasp6>;
+	ti,multichannel-codec-a = <&tlv320aic3106a>;
+	ti,multichannel-codec-b = <&tlv320aic3106b>;
+	ti,multichannel-codec-c = <&tlv320aic3106c>;
+	ti,multichannel-slots = <16>;
+	ti,multichannel-mclk-freq = <11289600>;
+
 	/* Audio routing */
 	ti,audio-routing =
 			"LINE1L", "Line In",
@@ -60,5 +84,15 @@ sound {
 			"Headphone", "HPLOUT",
 			"Headphone", "HPROUT",
 			"Line Out", "LLOUT",
-			"Line Out", "RLOUT";
+			"Line Out", "RLOUT",
+			"J3A LINE1L", "JAMR3 Stereo Aux In",
+			"J3A LINE1R", "JAMR3 Stereo Aux In",
+			"J3B LINE1L", "JAMR3 Mono Mic 1",
+			"J3B LINE1R", "JAMR3 Mono Mic 2",
+			"JAMR3 Line Out 1", "J3A LLOUT",
+			"JAMR3 Line Out 1", "J3A RLOUT",
+			"JAMR3 Line Out 2", "J3B LLOUT",
+			"JAMR3 Line Out 2", "J3B RLOUT",
+			"JAMR3 Line Out 3", "J3C LLOUT",
+			"JAMR3 Line Out 3", "J3C RLOUT";
 };

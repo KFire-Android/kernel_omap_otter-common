@@ -1019,7 +1019,11 @@ int ti_bandgap_get_trend(struct ti_bandgap *bgp, int id, int *trend)
 	if (ret)
 		goto exit;
 
-	*trend = (t1 - t2) ;
+	/* Set the interval to 1 ms if bandgap counter delay is not set */
+	if (interval == 0)
+		interval = 1;
+
+	*trend = (t1 - t2) / interval;
 
 	dev_dbg(bgp->dev, "The temperatures are t1 = %d and t2 = %d and trend =%d\n",
 		t1, t2, *trend);

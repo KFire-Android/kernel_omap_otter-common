@@ -44,6 +44,12 @@ struct omap_ion_tiler_alloc_data {
 	u32 token;
 };
 
+struct omap_ion_lookup_share_fd {
+	int alloc_fd;
+	int num_fds;
+	int *share_fds;
+};
+
 #ifdef __KERNEL__
 int omap_ion_tiler_alloc(struct ion_client *client,
 			 struct omap_ion_tiler_alloc_data *data);
@@ -62,6 +68,8 @@ int omap_tiler_vinfo(struct ion_client *client,
 int omap_ion_share_fd_to_buffers(int fd, struct ion_buffer **buffers,
 					int *num_handles);
 
+int omap_ion_lookup_share_fd(int fd, int *num_handles, int *shared_fds);
+
 extern struct ion_device *omap_ion_device;
 #endif /* __KERNEL__ */
 
@@ -75,6 +83,7 @@ enum {
 
 enum {
 	OMAP_ION_TILER_ALLOC,
+	OMAP_ION_LOOKUP_SHARE_FD,
 };
 
 /**

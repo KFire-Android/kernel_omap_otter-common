@@ -105,6 +105,25 @@ static long omap_ion_ioctl(struct ion_client *client, unsigned int cmd,
 			return -EFAULT;
 		break;
 	}
+	case OMAP_ION_LOOKUP_SHARE_FD:
+	{
+		struct omap_ion_lookup_share_fd lookup_data;
+		int ret;
+
+		if (copy_from_user(&lookup_data,
+				   (void __user *)arg,
+				   sizeof(lookup_data)))
+					return -EFAULT;
+		ret = omap_ion_lookup_share_fd(lookup_data.alloc_fd,
+						&lookup_data.num_fds,
+						lookup_data.share_fds);
+		if (ret)
+			return ret;
+		if (copy_to_user((void __user *)arg, &lookup_data,
+				 sizeof(lookup_data)))
+			return -EFAULT;
+		break;
+	}
 	default:
 		pr_err("%s: Unknown custom ioctl\n", __func__);
 		return -ENOTTY;
@@ -291,9 +310,10 @@ int omap_ion_share_fd_to_buffers(int fd, struct ion_buffer **buffers,
 	}
 
 	for (i = 0; i < *num_handles; i++) {
-		if (handles[i])
+		if (handles[i]) {
 			share_fd = ion_share_dma_buf(client, handles[i]);
 			buffers[i] = ion_handle_buffer(handles[i]);
+		}
 	}
 
 exit:
@@ -301,6 +321,38 @@ exit:
 	return ret;
 }
 EXPORT_SYMBOL(omap_ion_share_fd_to_buffers);
+
+int omap_ion_lookup_share_fd(int fd, int *num_handles, int *share_fds)
+{
+	struct ion_handle **handles;
+	struct ion_client *client;
+	int i = 0, ret = 0;
+
+	handles = kzalloc(*num_handles * sizeof(struct ion_handle *),
+			  GFP_KERNEL);
+	if (!handles)
+		return -ENOMEM;
+
+	if (export_fd_to_ion_handles) {
+		export_fd_to_ion_handles(fd, &client,
+					 handles, num_handles);
+	} else {
+		pr_err("%s: export_fd_to_ion_handles not initialized",
+		       __func__);
+		ret = -EINVAL;
+		goto exit;
+	}
+
+	for (i = 0; i < *num_handles; i++) {
+		if (handles[i])
+			share_fds[i] = ion_share_dma_buf(client, handles[i]);
+	}
+
+exit:
+	kfree(handles);
+	return ret;
+}
+EXPORT_SYMBOL(omap_ion_lookup_share_fd);
 
 static const struct of_device_id omap_ion_of_match[] = {
 	{.compatible = "ti,ion-omap", },
