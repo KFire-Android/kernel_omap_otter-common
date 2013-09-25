@@ -600,6 +600,7 @@ static void hdmi_uninit_display(struct omap_dss_device *dssdev)
 	gpio_free(hdmi.hpd_gpio);
 }
 
+#ifndef CONFIG_USE_FB_MODE_DB
 static const struct hdmi_config *hdmi_find_timing(
 					const struct hdmi_config *timings_arr,
 					int len)
@@ -690,6 +691,7 @@ static struct hdmi_cm hdmi_get_code(struct omap_video_timings *timing)
 end:	return cm;
 
 }
+#endif
 
 u8 *hdmi_read_valid_edid(void)
 {
