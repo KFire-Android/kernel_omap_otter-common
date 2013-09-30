@@ -62,6 +62,7 @@ struct ti_abb_info {
  * @sr2_en_mask:		setup register- enable mask
  * @opp_change_mask:		control register - mask to trigger LDOVBB change
  * @opp_sel_mask:		control register - mask for mode to operate
+ * @quirk_interleaved_address:	If address is interleaved with other instances.
  */
 struct ti_abb_reg {
 	u32 setup_reg;
@@ -76,6 +77,9 @@ struct ti_abb_reg {
 	/* Control register fields */
 	u32 opp_change_mask;
 	u32 opp_sel_mask;
+
+	/* Quirks */
+	bool quirk_interleaved_address;
 };
 
 /**
@@ -673,9 +677,24 @@ static const struct ti_abb_reg abb_regs_v2 = {
 	.opp_sel_mask		= (0x03 << 0),
 };
 
+static const struct ti_abb_reg abb_regs_v3_quirky = {
+	.control_reg		= 0x00,
+	.setup_reg		= 0x10,
+	.quirk_interleaved_address = true,
+
+	.sr2_wtcnt_value_mask	= (0xff << 8),
+	.fbb_sel_mask		= (0x01 << 2),
+	.rbb_sel_mask		= (0x01 << 1),
+	.sr2_en_mask		= (0x01 << 0),
+
+	.opp_change_mask	= (0x01 << 2),
+	.opp_sel_mask		= (0x03 << 0),
+};
+
 static const struct of_device_id ti_abb_of_match[] = {
 	{.compatible = "ti,abb-v1", .data = &abb_regs_v1},
 	{.compatible = "ti,abb-v2", .data = &abb_regs_v2},
+	{.compatible = "ti,abb-v3", .data = &abb_regs_v3_quirky},
 	{ },
 };
 
@@ -734,7 +753,16 @@ static int ti_abb_probe(struct platform_device *pdev)
 		ret = -ENODEV;
 		goto err;
 	}
-	abb->base = devm_request_and_ioremap(dev, res);
+	/*
+	 * On some platforms such as DRA7, the registers of ABB LDOx is
+	 * interleaved with registers of another ABB LDO!
+	 * We cannot use reserved allocation in these cases.
+	 */
+	if (!abb->regs->quirk_interleaved_address)
+		abb->base = devm_request_and_ioremap(dev, res);
+	else
+		abb->base = devm_ioremap_nocache(dev, res->start,
+						 resource_size(res));
 	if (!abb->base) {
 		dev_err(dev, "Unable to map '%s'\n", pname);
 		ret = -ENOMEM;
