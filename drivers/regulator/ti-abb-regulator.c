@@ -116,6 +116,10 @@ struct ti_abb {
 	int current_info_idx;
 
 	u32 settling_time;
+
+	u32 voltage_tolerance;
+	struct regulator *supply_reg;
+
 };
 
 /**
@@ -316,6 +320,32 @@ out:
 }
 
 /**
+ * ti_abb_set_supplier_voltage() - scales supplier voltage
+ * @abb:	pointer to the ABB instance
+ * @min_uv:	target minimum voltage
+ * @max_uv:	target maximum voltage
+ *
+ * Returns 0 on success, or error code otherwise.
+ */
+static int ti_abb_set_supplier_voltage(struct device *dev,
+					 struct ti_abb *abb, int min_uv)
+{
+	int ret = 0;
+
+	if (!abb->supply_reg)
+		return ret;
+
+	ret = regulator_set_voltage_tol(abb->supply_reg, min_uv,
+					abb->voltage_tolerance);
+	if (ret)
+		dev_err(dev, "%s: failed to scale supply %d <-> %d (%d)\n",
+			__func__, min_uv - abb->voltage_tolerance,
+			min_uv + abb->voltage_tolerance, ret);
+
+	return ret;
+}
+
+/**
  * ti_abb_set_voltage_sel() - regulator accessor function to set ABB LDO
  * @rdev:	regulator device
  * @sel:	selector to index into required ABB LDO settings (maps to
@@ -356,9 +386,16 @@ static int ti_abb_set_voltage_sel(struct regulator_dev *rdev, unsigned sel)
 		return ret;
 	}
 
-	/* If data is exactly the same, then just update index, no change */
 	info = &abb->info[sel];
 	oinfo = &abb->info[abb->current_info_idx];
+
+	if (sel > abb->current_info_idx)
+		ret = ti_abb_set_supplier_voltage(dev, abb,
+						  desc->volt_table[sel]);
+	if (ret)
+		goto out;
+
+	/* If data is exactly the same, then just update index, no change */
 	if (!memcmp(info, oinfo, sizeof(*info))) {
 		dev_dbg(dev, "%s: Same data new idx=%d, old idx=%d\n", __func__,
 			sel, abb->current_info_idx);
@@ -366,15 +403,23 @@ static int ti_abb_set_voltage_sel(struct regulator_dev *rdev, unsigned sel)
 	}
 
 	ret = ti_abb_set_opp(rdev, abb, info);
-
 out:
-	if (!ret)
+
+	if (sel < abb->current_info_idx)
+		ret |= ti_abb_set_supplier_voltage(dev, abb,
+						   desc->volt_table[sel]);
+
+	if (!ret) {
 		abb->current_info_idx = sel;
-	else
+	} else {
+		ti_abb_set_supplier_voltage(dev, abb,
+					    desc->volt_table[abb->current_info_idx]);
 		dev_err_ratelimited(dev,
 				    "%s: Volt[%d] idx[%d] mode[%d] Fail(%d)\n",
 				    __func__, desc->volt_table[sel], sel,
 				    info->opp_sel, ret);
+	}
+
 	return ret;
 }
 
@@ -410,6 +455,41 @@ static int ti_abb_get_voltage_sel(struct regulator_dev *rdev)
 	}
 
 	return abb->current_info_idx;
+}
+
+/**
+ * boot_setup_abb() - setup the ABB as per current voltage
+ * @rdev:	ABB regulator device
+ */
+static void boot_setup_abb(struct regulator_dev *rdev)
+{
+	const struct regulator_desc *desc = rdev->desc;
+	struct ti_abb *abb = rdev_get_drvdata(rdev);
+	struct device *dev = &rdev->dev;
+	int supply_v;
+	int sel;
+
+	if (!desc->n_voltages || !abb->info)
+		return;
+
+	supply_v = regulator_get_voltage(abb->supply_reg);
+
+	/* Possible, no voltage was yet set of supply */
+	if (supply_v < 0)
+		return;
+
+	/* Find a match */
+	for (sel = 0; sel < desc->n_voltages; sel++)
+		if (supply_v == desc->volt_table[sel])
+			break;
+
+	if (sel == desc->n_voltages) {
+		dev_err(dev, "No match for %d\n", supply_v);
+		return;
+	}
+
+	/* Now try to set the new voltage configuration */
+	ti_abb_set_voltage_sel(rdev, sel);
 }
 
 /**
@@ -745,6 +825,17 @@ static int ti_abb_probe(struct platform_device *pdev)
 	}
 	abb->regs = match->data;
 
+	/* Get supply regulator */
+	abb->supply_reg = regulator_get(&pdev->dev, "avs");
+	if (IS_ERR(abb->supply_reg)) {
+		if (PTR_ERR(abb->supply_reg) == -EPROBE_DEFER)
+			return PTR_ERR(abb->supply_reg);
+		abb->supply_reg = NULL;
+	} else {
+		of_property_read_u32(pdev->dev.of_node, "voltage-tolerance",
+				&abb->voltage_tolerance);
+	}
+
 	/* Map ABB resources */
 	pname = "base-address";
 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, pname);
@@ -913,6 +1004,8 @@ skip_opt:
 	/* Enable the ldo if not already done by bootloader */
 	ti_abb_rmw(abb->regs->sr2_en_mask, 1, abb->regs->setup_reg, abb->base);
 
+	/* Setup the ABB for boot configuration */
+	boot_setup_abb(rdev);
 	return 0;
 
 err:

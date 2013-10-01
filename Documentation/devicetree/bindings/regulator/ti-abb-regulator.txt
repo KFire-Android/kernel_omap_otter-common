@@ -61,6 +61,8 @@ Optional Properties:
 		Set to 0 to ignore this.
 	Vset value efuse Mask:	Mandatory if ldo-address is set. Picks up from
 		efuse the value to set in 'ti,ldovbb-vset-mask' at ldo-address.
+- avs-supply:	AVS supply which is provided as next level control.
+- voltage-tolerance:	AVS supply voltage tolerance to be supported.
 
 Example #1: Simplest configuration (no efuse data, hard coded ABB table):
 abb_x: regulator-abb-x {
