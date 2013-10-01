@@ -117,6 +117,11 @@
 			pinctrl-single,function-mask = <0x3fffffff>;
 		};
 
+		sys_clkin1: sys_clkin1 {
+			#clock-cells = <0>;
+			compatible = "ti,omap-clock";
+		};
+
 		dpll_mpu_ck: dpll_mpu_ck {
 			#clock-cells = <0>;
 			compatible = "ti,omap-clock";
@@ -146,6 +151,7 @@
 			#clock-cells = <0>;
 			compatible = "ti,omap-clock";
 		};
+
 
 		sdma: dma-controller@4a056000 {
 			compatible = "ti,omap4430-sdma";
