@@ -30,7 +30,7 @@
 #endif
 
 #define MAX_OVERLAYS	5
-#define MAX_MANAGERS	3
+#define MAX_MANAGERS	4
 #define MAX_DISPLAYS	4
 
 #define DEBUG_OVERLAYS		(1 << 0)
