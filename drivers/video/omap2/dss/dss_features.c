@@ -670,6 +670,7 @@ static const enum dss_feat_id omap4_dss_feat_list[] = {
 
 static const enum dss_feat_id omap5_dss_feat_list[] = {
 	FEAT_MGR_LCD2,
+	FEAT_MGR_LCD3,
 	FEAT_CORE_CLK_DIV,
 	FEAT_LCD_CLK_SRC,
 	FEAT_DSI_DCS_CMD_CONFIG_VC,
