@@ -288,6 +288,9 @@ int dss_dpll_set_clock_div(enum dss_dpll dpll, struct dss_dpll_cinfo *cinfo)
 	l = FLD_MOD(l, 3, 22, 21);	/* REF_SYSCLK = sysclk */
 	dpll_write_reg(dpll, PLL_CONFIGURATION2, l);
 
+	/* program M6 field in PLL_CONFIG3 */
+	dpll_write_reg(dpll, PLL_CONFIGURATION3, cinfo->regm_hsdiv - 1);
+
 	REG_FLD_MOD(dpll, PLL_GO, 1, 0, 0);	/* PLL_GO */
 
 	if (wait_for_bit_change(dpll, PLL_GO, 0, 0) != 0) {
@@ -317,6 +320,7 @@ int dss_dpll_set_clock_div(enum dss_dpll dpll, struct dss_dpll_cinfo *cinfo)
 	l = FLD_MOD(l, 1, 18, 18);	/* PROTO_CLOCK_EN */
 	l = FLD_MOD(l, 0, 19, 19);	/* PROTO_CLOCK_PWDN */
 	l = FLD_MOD(l, 0, 20, 20);	/* HSDIVBYPASS */
+	l = FLD_MOD(l, 1, 23, 23);	/* M6_CLOCK_EN */
 	dpll_write_reg(dpll, PLL_CONFIGURATION2, l);
 
 	DSSDBG("PLL config done\n");
@@ -349,6 +353,7 @@ static void dss_dpll_enable_scp_clk(enum dss_dpll dpll)
 static int dpll_power(enum dss_dpll dpll, int state)
 {
 	int t = 0;
+
 	/* PLL_PWR_CMD = enable both hsdiv and clkout*/
 	REG_FLD_MOD(dpll, CLK_CTRL, state, 31, 30);
 
@@ -464,10 +469,10 @@ void dss_dpll_set_control_mux(enum omap_channel channel, enum dss_dpll dpll)
 
 		switch (dpll) {
 		case DSS_DPLL_VIDEO1:
-			val = 1;
+			val = 0;
 			break;
 		case DSS_DPLL_VIDEO2:
-			val = 0;
+			val = 1;
 			break;
 		default:
 			printk("error in mux config\n");
@@ -479,10 +484,10 @@ void dss_dpll_set_control_mux(enum omap_channel channel, enum dss_dpll dpll)
 
 		switch (dpll) {
 		case DSS_DPLL_VIDEO1:
-			val = 0;
+			val = 1;
 			break;
 		case DSS_DPLL_VIDEO2:
-			val = 1;
+			val = 0;
 			break;
 		default:
 			printk("error in mux config\n");
