@@ -34,6 +34,7 @@
 #include <linux/delay.h>
 #include <linux/slab.h>
 #include <video/omapdss.h>
+#include <linux/of_device.h>
 
 #include <video/omap-panel-generic-dpi.h>
 
@@ -576,7 +577,7 @@ static int generic_dpi_panel_power_on(struct omap_dss_device *dssdev)
 	if (panel_config->power_on_delay)
 		msleep(panel_config->power_on_delay);
 
-	if (panel_data->platform_enable) {
+	if (panel_data && panel_data->platform_enable) {
 		r = panel_data->platform_enable(dssdev);
 		if (r)
 			goto err1;
@@ -598,7 +599,7 @@ static void generic_dpi_panel_power_off(struct omap_dss_device *dssdev)
 	if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE)
 		return;
 
-	if (panel_data->platform_disable)
+	if (panel_data && panel_data->platform_disable)
 		panel_data->platform_disable(dssdev);
 
 	/* wait couple of vsyncs after disabling the LCD */
@@ -608,20 +609,44 @@ static void generic_dpi_panel_power_off(struct omap_dss_device *dssdev)
 	omapdss_dpi_display_disable(dssdev);
 }
 
+static const struct of_device_id dpi_generic_of_match[];
+
 static int generic_dpi_panel_probe(struct omap_dss_device *dssdev)
 {
-	struct panel_generic_dpi_data *panel_data = get_panel_data(dssdev);
+	struct panel_generic_dpi_data *panel_data = NULL;
 	struct panel_config *panel_config = NULL;
 	struct panel_drv_data *drv_data = NULL;
-	int i;
+	int i, datalines, err;
+	const char *panel_name = NULL;
+	const struct of_device_id *of_dev_id;
 
 	dev_dbg(&dssdev->dev, "probe\n");
 
-	if (!panel_data || !panel_data->name)
-		return -EINVAL;
+	if (dssdev->data) {
+		panel_data = get_panel_data(dssdev);
+		panel_name = panel_data->name;
+		if (!panel_data || !panel_data->name)
+			return -EINVAL;
+	} else if (dssdev->dev.of_node) {
+		of_dev_id = of_match_device(dpi_generic_of_match,
+							&dssdev->dev);
+		if (!of_dev_id) {
+			/* We do not expect this to happen */
+			dev_err(&dssdev->dev, "%s: Unable to match device\n",
+								__func__);
+			return -ENODEV;
+		}
+		panel_name = (const char *)of_dev_id->data;
+		err = of_property_read_u32(dssdev->dev.of_node, "data-lines",
+								&datalines);
+		if (err) {
+			dev_err(&dssdev->dev, "failed to parse datalines");
+			return err;
+		}
+	}
 
 	for (i = 0; i < ARRAY_SIZE(generic_dpi_panels); i++) {
-		if (strcmp(panel_data->name, generic_dpi_panels[i].name) == 0) {
+		if (strcmp(panel_name, generic_dpi_panels[i].name) == 0) {
 			panel_config = &generic_dpi_panels[i];
 			break;
 		}
@@ -631,6 +656,7 @@ static int generic_dpi_panel_probe(struct omap_dss_device *dssdev)
 		return -EINVAL;
 
 	dssdev->panel.timings = panel_config->timings;
+	dssdev->phy.dpi.data_lines = datalines;
 
 	drv_data = kzalloc(sizeof(*drv_data), GFP_KERNEL);
 	if (!drv_data)
@@ -642,6 +668,8 @@ static int generic_dpi_panel_probe(struct omap_dss_device *dssdev)
 	mutex_init(&drv_data->lock);
 
 	dev_set_drvdata(&dssdev->dev, drv_data);
+
+	dev_err(&dssdev->dev, "probe %s successful\n", panel_name);
 
 	return 0;
 }
@@ -728,6 +756,54 @@ static int generic_dpi_panel_check_timings(struct omap_dss_device *dssdev,
 
 	return r;
 }
+#if defined(CONFIG_OF)
+static const struct of_device_id dpi_generic_of_match[] = {
+	{.compatible = "ti,sharp_lq",
+					.data = "sharp_lq"},
+	{.compatible = "ti,sharp_ls",
+					.data = "sharp_ls"},
+	{.compatible = "ti,toppoly_tdo35s",
+					.data = "toppoly_tdo35s"},
+	{.compatible = "ti,samsung_lte430wq_f0c",
+					.data = "samsung_lte430wq_f0c"},
+	{.compatible = "ti,seiko_70wvw1tz3",
+					.data = "seiko_70wvw1tz3"},
+	{.compatible = "ti,powertip_ph480272t",
+					.data = "powertip_ph480272t"},
+	{.compatible = "ti,innolux_at070tn83",
+					.data = "innolux_at070tn83"},
+	{.compatible = "ti,nec_nl2432dr22-11b",
+					.data = "nec_nl2432dr22-11b"},
+	{.compatible = "ti,h4",
+					.data = "h4"},
+	{.compatible = "ti,apollon",
+					.data = "apollon"},
+	{.compatible = "ti,focaltech_etm070003dh6",
+					.data = "focaltech_etm070003dh6"},
+	{.compatible = "ti,microtips_umsh_8173md",
+					.data = "microtips_umsh_8173md"},
+	{.compatible = "ti,ortustech_com43h4m10xtc",
+					.data = "ortustech_com43h4m10xtc"},
+	{.compatible = "ti,innolux_at080tn52",
+					.data = "innolux_at080tn52"},
+	{.compatible = "ti,mitsubishi_aa084sb01",
+					.data = "mitsubishi_aa084sb01"},
+	{.compatible = "ti,edt_et0500g0dh6",
+					.data = "edt_et0500g0dh6"},
+	{.compatible = "ti,primeview_pd050vl1",
+					.data = "primeview_pd050vl1"},
+	{.compatible = "ti,primeview_pm070wl4",
+					.data = "primeview_pm070wl4"},
+	{.compatible = "ti,primeview_pd104slf",
+					.data = "primeview_pd104slf"},
+	{},
+};
+
+
+MODULE_DEVICE_TABLE(of, dpi_generic_of_match);
+#else
+#define dpi_generic_of_match NULL
+#endif
 
 static struct omap_dss_driver dpi_driver = {
 	.probe		= generic_dpi_panel_probe,
@@ -743,6 +819,7 @@ static struct omap_dss_driver dpi_driver = {
 	.driver         = {
 		.name   = "generic_dpi_panel",
 		.owner  = THIS_MODULE,
+		.of_match_table = dpi_generic_of_match,
 	},
 };
 
