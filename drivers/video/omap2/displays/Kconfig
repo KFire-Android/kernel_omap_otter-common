@@ -91,4 +91,9 @@ config PANEL_LG_101
 	depends on OMAP2_DSS_DPI && I2C
 	help
 		LCD Panel used in TI's J6 uevm board attachable on LCDX interface
+
+config PANEL_SERLINK
+	tristate "SERLINK"
+	help
+	  This is Serial link
 endmenu
