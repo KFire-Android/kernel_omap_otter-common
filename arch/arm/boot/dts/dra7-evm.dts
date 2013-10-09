@@ -387,6 +387,11 @@
 		compatible = "omnivision,ov10635";
 		reg = <0x30>;
 	};
+
+	lvds_fpd: ds90uh925q@1b {
+		compatible = "ti,ds90uh925q";
+		reg = <0x1b>;
+	};
 };
 
 &i2c3 {
@@ -473,6 +478,8 @@
 		compatible = "ti,lg101";
 		gpios = <&pcf_lcd3 0 0>; /* pcf8575@21 P0, SEL_GPMC_AD_VID_S0 */
 		data-lines = <24>;
+
+		serializer = <&lvds_fpd>;
 	};
 };
 
