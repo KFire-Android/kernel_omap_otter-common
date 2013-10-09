@@ -92,6 +92,7 @@ config SOC_OMAP5
 	select USB_ARCH_HAS_XHCI if USB_SUPPORT
 	select ARCH_NEEDS_CPU_IDLE_COUPLED
 	select PM_OPP if PM
+	select ARM_ERRATA_798181 if SMP
 
 config SOC_DRA7XX
 	bool "TI DRA7XX"
@@ -101,6 +102,7 @@ config SOC_DRA7XX
 	select ARM_GIC
 	select HAVE_SMP
 	select COMMON_CLK
+	select ARM_ERRATA_798181 if SMP
 
 comment "OMAP Core Type"
 	depends on ARCH_OMAP2

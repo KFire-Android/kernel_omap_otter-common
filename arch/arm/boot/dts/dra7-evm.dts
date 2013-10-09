@@ -56,6 +56,21 @@
 		ti,omap_ion_heap_nonsecure_tiler_size = <0xF00000>;
 	};
 
+	vmmcwl_fixed: fixedregulator-mmcwl {
+		compatible = "regulator-fixed";
+		regulator-name = "vmmcwl_fixed";
+		regulator-min-microvolt = <1800000>;
+		regulator-max-microvolt = <1800000>;
+		gpio = <&gpio5 8 0>;	/* gpio5_8 */
+		startup-delay-us = <70000>;
+		enable-active-high;
+	};
+
+	wlcore {
+		compatible = "wlcore";
+		gpio = <135>;
+	};
+
 	ocp {
 		gpu: gpu@0x56000000 {
 		gpu-supply = <&avs_gpu>;
@@ -126,6 +141,18 @@
 		ti,hdmi_audio = <&hdmi>;
 		ti,level_shifter = <&tpd12s015>;
 	};
+
+	kim {
+		compatible = "kim";
+		nshutdown_gpio = <132>;
+		dev_name = "/dev/ttyO2";
+		flow_cntrl = <1>;
+		baud_rate = <115200>;
+	};
+
+	btwilink {
+		compatible = "btwilink";
+	};
 };
 
 &dra7_pmx_core {
@@ -136,8 +163,12 @@
 		&mcasp6_pins
 		&mcasp8_pins
 		&vout1_pins
+		&vin1a_pins
 		&usb_pins
 		&irq_pins
+		&bt_uart3_pins
+		&wl_pins
+		&wlirq_pins
 	>;
 
 	atl_pins: pinmux_atl_pins {
@@ -231,6 +262,40 @@
 		ti,default_display = "lcd";
 	};
 
+	vin1a_pins: pinmux_vin1a_pins {
+		pinctrl-single,pins = <
+			0x0DC	0x00040000 /* vin1a_clk0 OUTPUT | MODE0 */
+			0x0E4	0x00040000 /* vin1a_de0 OUTPUT | MODE0 */
+			0x0E8	0x00040000 /* vin1a_fld0 OUTPUT | MODE0 */
+			0x0EC	0x00040000 /* vin1a_hsync0	OUTPUT | MODE0 */
+			0x0F0	0x00040000 /* vin1a_vsync0 OUTPUT | MODE0 */
+			0x0F4	0x00040000 /* vin1a_d0	OUTPUT | MODE0 */
+			0x0F8	0x00040000 /* vin1a_d1	OUTPUT | MODE0 */
+			0x0FC	0x00040000 /* vin1a_d2	OUTPUT | MODE0 */
+			0x100	0x00040000 /* vin1a_d3 	OUTPUT | MODE0 */
+			0x104	0x00040000 /* vin1a_d4 	OUTPUT | MODE0 */
+			0x108	0x00040000 /* vin1a_d5	OUTPUT | MODE0 */
+			0x10C	0x00040000 /* vin1a_d6	OUTPUT | MODE0 */
+			0x110	0x00040000 /* vin1a_d7	OUTPUT | MODE0 */
+			0x114	0x00040000 /* vin1a_d8	OUTPUT | MODE0 */
+			0x118	0x00040000 /* vin1a_d9	OUTPUT | MODE0 */
+			0x11C	0x00040000 /* vin1a_d10	OUTPUT | MODE0 */
+			0x120	0x00040000 /* vin1a_d11	OUTPUT | MODE0 */
+			0x124	0x00040000 /* vin1a_d12	OUTPUT | MODE0 */
+			0x128	0x00040000 /* vin1a_d13	OUTPUT | MODE0 */
+			0x12C	0x00040000 /* vin1a_d14	OUTPUT | MODE0 */
+			0x130	0x00040000 /* vin1a_d15	OUTPUT | MODE0 */
+			0x134	0x00040000 /* vin1a_d16	OUTPUT | MODE0 */
+			0x138	0x00040000 /* vin1a_d17	OUTPUT | MODE0 */
+			0x13C	0x00040000 /* vin1a_d18	OUTPUT | MODE0 */
+			0x140	0x00040000 /* vin1a_d19	OUTPUT | MODE0 */
+			0x144	0x00040000 /* vin1a_d20	OUTPUT | MODE0 */
+			0x148	0x00040000 /* vin1a_d21	OUTPUT | MODE0 */
+			0x14C	0x00040000 /* vin1a_d22	OUTPUT | MODE0 */
+			0x150	0x00040000 /* vin1a_d23	OUTPUT | MODE0 */
+		>;
+	};
+
 	cpsw_default_pins: pinmux_cpsw_default_pins {
 		pinctrl-single,pins = <
 			/* Slave 1 */
@@ -270,6 +335,34 @@
 			0x240	0x70000 /* mdio_clk PIN_INPUT_PULLUP | MUX_MODE0 */
 				>;
 		};
+
+	bt_uart3_pins: pinmux_bt_uart3_pins {
+		pinctrl-single,pins = <
+			0x3c0 0x60001       /* uart3_rx.spi2_sclk:  INPUT | PULLUP | MODE 1 */
+			0x3c4 0x1           /* uart3_tx.spi2.d1:    OUTPUT |  MODE 1 */
+			0x3c8 0x40001       /* uart3_rts.spi2.c0:   OUTPUT | PULLUP | MODE 1 */
+			0x3cc 0x60001       /* uart3_cts.spi2.d0:   INPUT | MODE 1 */
+			0x2bc 0xE           /* BT_EN.gp5_4:         OUTPUT | MODE 14 */
+		>;
+	};
+
+	wl_pins: pinmux_wl_pins {
+		pinctrl-single,pins = <
+			0x3e8 0x60003	/* MMC4_CLK: INPUTENABLE | PULLUP | MODE3 */
+			0x3ec 0x60003	/* MMC4_CMD: INPUTENABLE | PULLUP | MODE3 */
+			0x3f0 0x60003	/* MMC4_DAT0: INPUTENABLE | PULLUP | MODE3 */
+			0x3f4 0x60003	/* MMC4_DAT1: INPUTENABLE | PULLUP | MODE3 */
+			0x3f8 0x60003	/* MMC4_DAT2: INPUTENABLE | PULLUP | MODE3 */
+			0x3fc 0x60003	/* MMC4_DAT3: INPUTENABLE | PULLUP | MODE3 */
+			0x2cc 0x2000E	/* WLAN_EN: OUTPUT | MODE14 */
+		>;
+	};
+
+	wlirq_pins: pinmux_wlirq_pins {
+		pinctrl-single,pins = <
+			0x2c8 0x106000E	/* WLAN_IRQ: INPUT | WAKEUP_ENABLE | MODE 14 */
+		>;
+	};
 };
 
 &gmac {
@@ -370,6 +463,11 @@
 		AVDD-supply = <&vaudio_3v3>;
 		DRVDD-supply = <&vaudio_3v3>;
 	};
+
+	ov10635: ov10635@30 {
+		compatible = "omnivision,ov10635";
+		reg = <0x30>;
+	};
 };
 
 &i2c3 {
@@ -402,8 +500,11 @@
 };
 
 &mmc4 {
+	vmmc-supply = <&vmmcwl_fixed>;
 	bus-width = <4>;
-	status = "disabled";
+	cap-power-off-card;
+	keep-power-in-suspend;
+	ti,non-removable;
 };
 
 &avs_mpu {
@@ -512,5 +613,22 @@
                 reg = <0>;
 		spi-cpol;
 		spi-cpha;
+	};
+};
+
+&vip1 {
+	camera: camera {
+		compatible = "ti,camera";
+
+		gpios = <&pcf_hdmi 2 0>,
+			<&pcf_hdmi 3 0>,
+			<&gpio4 13 0>,
+			<&gpio4 14 0>,
+			<&gpio4 15 0>,
+			<&gpio4 16 0>,
+			<&gpio6 17 0>;
+
+		ovnode = <&i2c2>;
+		sensor = <&ov10635>;
 	};
 };

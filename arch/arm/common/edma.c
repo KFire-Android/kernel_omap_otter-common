@@ -1398,16 +1398,27 @@ static int edma_of_read_u32_to_s16_array(const struct device_node *np,
 					 size_t sz)
 {
 	int ret;
+	int i;
+	u32 *arr;
 
-	ret = of_property_read_u16_array(np, propname, out_values, sz);
+	arr = kcalloc(sz, sizeof(u32), GFP_KERNEL);
+	if (!arr)
+		return -ENOMEM;
+
+	ret = of_property_read_u32_array(np, propname, arr, sz);
 	if (ret)
-		return ret;
+		goto out;
+
+	for (i = 0; i < sz; i++)
+		out_values[i] = (s16) arr[i];
 
 	/* Terminate it */
-	*out_values++ = -1;
-	*out_values++ = -1;
+	out_values[sz++] = -1;
+	out_values[sz++] = -1;
 
-	return 0;
+out:
+	kfree(arr);
+	return ret;
 }
 
 static int edma_xbar_event_map(struct device *dev,

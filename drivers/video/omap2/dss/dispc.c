@@ -2445,7 +2445,6 @@ static int dispc_ovl_setup_common(enum omap_plane plane,
 		bool replication, const struct omap_video_timings *mgr_timings,
 		bool mem_to_mem, bool mflag_en)
 {
-	struct omap_overlay *ovl = omap_dss_get_overlay(plane);
 	bool five_taps = true;
 	bool fieldmode = 0;
 	int r, cconv = 0;
@@ -2566,7 +2565,7 @@ static int dispc_ovl_setup_common(enum omap_plane plane,
 
 	if (dss_has_feature(FEAT_MFLAG)) {
 		mflag_en = true;
-		dispc_ovl_set_global_mflag(ovl->id, mflag_en);
+		dispc_ovl_set_global_mflag(plane, mflag_en);
 	} else if (plane == OMAP_DSS_GFX) {
 		dispc_enable_arbitration(plane,
 					 channel == OMAP_DSS_CHANNEL_DIGIT);

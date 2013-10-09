@@ -1,0 +1,14 @@
+* Texas Instrument WiLink module
+
+Wilink module is a combo wireless connectivity sdio card based on
+Texas Instrument's wl18xx solution.
+It is a 4-wire, 1.8V, embedded sdio wlan device with an external irq
+line and is power-controlled by a gpio-based fixed regulator.
+
+Required properties:
+- compatible: "wlcore, kim, btwilink"
+- irq : The interrupt number of the out-of-band interrupt line which is connected to the wilink module
+- gpio: In case an gpio-irq is used, this field should hold the relevant gpio number.
+  Only one of the two (gpio/irq) should be specified, according to the platform
+- flow_cntrl: Field to enabl/disable use of flow control
+- baud_rate: baud rate to use while using BT uart controller

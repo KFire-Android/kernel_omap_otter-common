@@ -430,7 +430,18 @@ static inline void local_flush_tlb_kernel_page(unsigned long kaddr)
 	}
 }
 
+#include <asm/cputype.h>
 #ifdef CONFIG_ARM_ERRATA_798181
+static inline int erratum_a15_798181(void)
+{
+	unsigned int midr = read_cpuid_id();
+
+	/* Cortex-A15 r0p0..r3p2 affected */
+	if ((midr & 0xff0ffff0) != 0x410fc0f0 || midr > 0x413fc0f2)
+		return 0;
+	return 1;
+}
+
 static inline void dummy_flush_tlb_a15_erratum(void)
 {
 	/*
@@ -440,6 +451,11 @@ static inline void dummy_flush_tlb_a15_erratum(void)
 	dsb();
 }
 #else
+static inline int erratum_a15_798181(void)
+{
+	return 0;
+}
+
 static inline void dummy_flush_tlb_a15_erratum(void)
 {
 }

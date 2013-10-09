@@ -731,7 +731,7 @@ static struct omap_hwmod_class dra7xx_hdmi_hwmod_class = {
 
 /* dss_hdmi */
 static struct omap_hwmod_irq_info dra7xx_dss_hdmi_irqs[] = {
-	{ .irq = 96 + DRA7XX_IRQ_GIC_START },
+	{ .irq = 101 + DRA7XX_IRQ_GIC_START },
 	{ .irq = -1 }
 };
 
@@ -2140,8 +2140,8 @@ static struct omap_hwmod_irq_info dra7xx_mmc4_irqs[] = {
 };
 
 static struct omap_hwmod_dma_info dra7xx_mmc4_sdma_reqs[] = {
-	{ .name = "57", .dma_req = 56 + DRA7XX_DMA_REQ_START },
-	{ .name = "58", .dma_req = 57 + DRA7XX_DMA_REQ_START },
+	{ .name = "tx", .dma_req = 56 + DRA7XX_DMA_REQ_START },
+	{ .name = "rx", .dma_req = 57 + DRA7XX_DMA_REQ_START },
 	{ .dma_req = -1 }
 };
 
