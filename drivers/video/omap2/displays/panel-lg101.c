@@ -24,6 +24,7 @@
 #include <linux/of_i2c.h>
 #include <linux/of.h>
 #include <linux/regmap.h>
+#include <linux/i2c/lvds-serlink.h>
 
 #include <video/omapdss.h>
 #include <video/omap-panel-lg101.h>
@@ -33,7 +34,7 @@ static const struct omap_video_timings lg101_default_timings = {
 	.x_res		= 1280,
 	.y_res		= 800,
 
-	.pixel_clock	= 85333,
+	.pixel_clock	= 69333,
 
 	.hfp		= 32,
 	.hsw		= 48,
@@ -46,7 +47,7 @@ static const struct omap_video_timings lg101_default_timings = {
 	.vsync_level	= OMAPDSS_SIG_ACTIVE_LOW,
 	.hsync_level	= OMAPDSS_SIG_ACTIVE_LOW,
 	.data_pclk_edge = OMAPDSS_DRIVE_SIG_RISING_EDGE,
-	.de_level		= OMAPDSS_SIG_ACTIVE_HIGH,
+	.de_level	= OMAPDSS_SIG_ACTIVE_HIGH,
 	.sync_pclk_edge = OMAPDSS_DRIVE_SIG_OPPOSITE_EDGES,
 };
 
@@ -55,12 +56,23 @@ struct panel_drv_data {
 	struct mutex lock;
 	int p_gpio;
 	int dith;
+	struct i2c_client *ser_i2c_client;
+	struct i2c_client *deser_i2c_client;
 };
 
+static int send_i2c_cmd(struct i2c_client *client, int cmd, void *arg)
+{
+	int status = 0;
+	if (client && client->driver && client->driver->command)
+		status = client->driver->command(client, cmd, arg);
+
+	return status;
+}
 static int lg101_power_on(struct omap_dss_device *dssdev)
 {
 	struct panel_drv_data *ddata = dev_get_drvdata(&dssdev->dev);
 	int r;
+	u8 data;
 
 	if (dssdev->state == OMAP_DSS_DISPLAY_ACTIVE)
 		return 0;
@@ -75,6 +87,49 @@ static int lg101_power_on(struct omap_dss_device *dssdev)
 	r = omapdss_dpi_display_enable(dssdev);
 	if (r)
 		goto err0;
+
+	r = send_i2c_cmd(ddata->ser_i2c_client, SER_RESET, NULL);
+	if (r < 0) {
+		dev_err(&dssdev->dev, "failed to reset serializer ...");
+		goto err0;
+	}
+	dev_err(&dssdev->dev, "Serializer Reset done...");
+
+	r = send_i2c_cmd(ddata->ser_i2c_client, SER_CONFIGURE, NULL);
+	if (r < 0) {
+		dev_err(&dssdev->dev, "configure serializer failed ...");
+		goto err0;
+	}
+	dev_err(&dssdev->dev, "Serializer configuration done...");
+
+	r = send_i2c_cmd(ddata->ser_i2c_client, SER_VALIDATE_PCLK, NULL);
+	if (r < 0) {
+		dev_err(&dssdev->dev, "PCLK not present ...");
+		goto err0;
+	}
+	dev_err(&dssdev->dev, "PCLK detection done...");
+
+	r = send_i2c_cmd(ddata->ser_i2c_client, SER_GET_I2C_ADDR, NULL);
+	if ((r < 0) || (r != ddata->ser_i2c_client->addr)) {
+		dev_err(&dssdev->dev, "couldn't read i2c serializer address ...");
+		goto err0;
+	}
+	dev_err(&dssdev->dev, "Serializer i2c addr %x ...", r);
+
+	r = send_i2c_cmd(ddata->ser_i2c_client, SER_VALIDATE_LINK, NULL);
+	if (r != 1) {
+		dev_err(&dssdev->dev, "link not preset ...");
+		goto err0;
+	}
+	dev_err(&dssdev->dev, "Link detected ...");
+
+	r = send_i2c_cmd(ddata->ser_i2c_client, SER_GET_DES_I2C_ADDR,
+								(void *)&data);
+	if (r < 0) {
+		dev_err(&dssdev->dev, "couldn't read i2c deserializer address ...");
+		goto err0;
+	}
+	dev_err(&dssdev->dev, "Deserilizer i2c addr %x\n", data);
 
 	return 0;
 err0:
@@ -124,6 +179,11 @@ static int lg101_probe_of(struct omap_dss_device *dssdev,
 		return r;
 	}
 	dssdev->phy.dpi.data_lines = datalines;
+
+	/* Get I2c node of serializer */
+	node = of_parse_phandle(node, "serializer", 0);
+	if (node)
+		ddata->ser_i2c_client = of_find_i2c_device_by_node(node);
 
 	return 0;
 }
