@@ -96,4 +96,9 @@ config PANEL_SERLINK
 	tristate "SERLINK"
 	help
 	  This is Serial link
+
+config PANEL_DSERLINK
+	tristate "DSERLINK"
+	help
+	  This is de-serial link
 endmenu
