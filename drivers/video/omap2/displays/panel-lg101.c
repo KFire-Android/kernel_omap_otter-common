@@ -25,6 +25,9 @@
 #include <linux/of.h>
 #include <linux/regmap.h>
 #include <linux/i2c/lvds-serlink.h>
+#include <linux/i2c/lvds-de-serlink.h>
+#include <linux/of_platform.h>
+#include <linux/platform_device.h>
 
 #include <video/omapdss.h>
 #include <video/omap-panel-lg101.h>
@@ -34,7 +37,7 @@ static const struct omap_video_timings lg101_default_timings = {
 	.x_res		= 1280,
 	.y_res		= 800,
 
-	.pixel_clock	= 69333,
+	.pixel_clock	= 67333,
 
 	.hfp		= 32,
 	.hsw		= 48,
@@ -125,11 +128,65 @@ static int lg101_power_on(struct omap_dss_device *dssdev)
 
 	r = send_i2c_cmd(ddata->ser_i2c_client, SER_GET_DES_I2C_ADDR,
 								(void *)&data);
-	if (r < 0) {
+	if ((r < 0) || (data != ddata->deser_i2c_client->addr)) {
 		dev_err(&dssdev->dev, "couldn't read i2c deserializer address ...");
 		goto err0;
 	}
-	dev_err(&dssdev->dev, "Deserilizer i2c addr %x\n", data);
+	dev_err(&dssdev->dev, "Deserilizer i2c addr %x", data);
+
+	r = send_i2c_cmd(ddata->ser_i2c_client, SER_REG_DUMP,
+							NULL);
+	if (r < 0) {
+		dev_err(&dssdev->dev, "couldn't read serializer sts ...");
+		goto err0;
+	}
+	dev_err(&dssdev->dev, "Serializer status dump");
+
+	/* --------- Deserializer -------------- */
+	r = send_i2c_cmd(ddata->deser_i2c_client, DSER_RESET, NULL);
+	if (r < 0) {
+		dev_err(&dssdev->dev, "failed to reset de serializer ...");
+		goto err0;
+	}
+	dev_err(&dssdev->dev, "DeSerializer Reset done...");
+
+	r = send_i2c_cmd(ddata->deser_i2c_client, DSER_EN_BC, NULL);
+	if (r < 0) {
+		dev_err(&dssdev->dev, "failed to enable back channel ...");
+		goto err0;
+	}
+	dev_err(&dssdev->dev, "DeSerializer back channel enabled ...");
+
+	r = send_i2c_cmd(ddata->deser_i2c_client, DSER_GET_I2C_ADDR, NULL);
+	if ((r < 0) || (r != ddata->deser_i2c_client->addr)) {
+		dev_err(&dssdev->dev, "couldn't read i2c de serializer address ...");
+		goto err0;
+	}
+	dev_err(&dssdev->dev, "Deserializer i2c addr %x ...", r);
+
+	r = send_i2c_cmd(ddata->deser_i2c_client, DSER_GET_SER_I2C_ADDR,
+								(void *)&data);
+	if ((r < 0) || (data != ddata->ser_i2c_client->addr)) {
+		dev_err(&dssdev->dev, "failed to get serializer id ...");
+		goto err0;
+	}
+	dev_err(&dssdev->dev, "Serilizer i2c addr %x\n", data);
+
+	r = send_i2c_cmd(ddata->deser_i2c_client, DSER_CONFIGURE,
+								NULL);
+	if (r < 0) {
+		dev_err(&dssdev->dev, "failed to configure deserializer...");
+		goto err0;
+	}
+	dev_err(&dssdev->dev, "Deserilizer configuration done ...\n");
+
+	r = send_i2c_cmd(ddata->deser_i2c_client, DSER_REG_DUMP,
+							NULL);
+	if (r < 0) {
+		dev_err(&dssdev->dev, "couldn't read deserializer sts ...");
+		goto err0;
+	}
+	dev_err(&dssdev->dev, "Deserializer status dump");
 
 	return 0;
 err0:
@@ -180,10 +237,30 @@ static int lg101_probe_of(struct omap_dss_device *dssdev,
 	}
 	dssdev->phy.dpi.data_lines = datalines;
 
+	/* make sure the child nodes are probed */
+	r = of_platform_populate(dssdev->dev.of_node, NULL, NULL, &dssdev->dev);
+	if (r < 0) {
+		dev_err(&dssdev->dev, "failed to populate child devices");
+		return r;
+	}
+	dev_err(&dssdev->dev, "child device populate");
+
 	/* Get I2c node of serializer */
-	node = of_parse_phandle(node, "serializer", 0);
+	node = of_parse_phandle(dssdev->dev.of_node, "serializer", 0);
 	if (node)
 		ddata->ser_i2c_client = of_find_i2c_device_by_node(node);
+	else
+		return -EINVAL;
+	dev_err(&dssdev->dev, "Serial I2C ID %x", ddata->ser_i2c_client->addr);
+
+	/* Get I2c node of dserializer */
+	node = of_parse_phandle(dssdev->dev.of_node, "dserializer", 0);
+	if (node)
+		ddata->deser_i2c_client = of_find_i2c_device_by_node(node);
+	else
+		return -EINVAL;
+	dev_err(&dssdev->dev, "DeSerial I2C ID %x",
+					ddata->deser_i2c_client->addr);
 
 	return 0;
 }
@@ -229,7 +306,7 @@ static int lg101_probe(struct omap_dss_device *dssdev)
 
 	dev_set_drvdata(&dssdev->dev, ddata);
 
-	dev_dbg(&dssdev->dev, "lg101_probe probe sucessful..\n");
+	dev_err(&dssdev->dev, "lg101_probe probe sucessful..\n");
 
 	return 0;
 }
