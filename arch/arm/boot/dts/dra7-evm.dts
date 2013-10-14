@@ -392,6 +392,11 @@
 		compatible = "ti,ds90uh925q";
 		reg = <0x1b>;
 	};
+
+	lvds_fpd1: ds90uh928q@2c {
+		compatible = "ti,ds90uh928q";
+		reg = <0x2c>;
+	};
 };
 
 &i2c3 {
@@ -480,6 +485,7 @@
 		data-lines = <24>;
 
 		serializer = <&lvds_fpd>;
+		dserializer = <&lvds_fpd1>;
 	};
 };
 
