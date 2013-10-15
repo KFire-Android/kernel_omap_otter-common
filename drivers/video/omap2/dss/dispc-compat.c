@@ -409,6 +409,9 @@ static void dispc_error_worker(struct work_struct *work)
 		}
 	}
 
+	if (errors & DISPC_IRQ_WBINCOMPLETE)
+		DSSERR("WB FIFO flushed before completion\n");
+
 	spin_lock_irqsave(&dispc_compat.irq_lock, flags);
 	dispc_compat.irq_error_mask |= errors;
 	_omap_dispc_set_irqs();

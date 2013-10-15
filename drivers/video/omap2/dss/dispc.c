@@ -48,12 +48,6 @@
 /* DISPC */
 #define DISPC_SZ_REGS			SZ_4K
 
-enum omap_burst_size {
-	BURST_SIZE_X2 = 0,
-	BURST_SIZE_X4 = 1,
-	BURST_SIZE_X8 = 2,
-};
-
 #define REG_GET(idx, start, end) \
 	FLD_GET(dispc_read_reg(idx), start, end)
 
@@ -1008,6 +1002,32 @@ void dispc_wb_set_channel_in(enum dss_writeback_channel channel)
 	REG_FLD_MOD(DISPC_OVL_ATTRIBUTES(plane), channel, 18, 16);
 }
 
+void dispc_set_wb_channel_out(enum omap_plane plane)
+{
+	int shift;
+	u32 val;
+
+	switch (plane) {
+	case OMAP_DSS_GFX:
+		shift = 8;
+		break;
+	case OMAP_DSS_VIDEO1:
+	case OMAP_DSS_VIDEO2:
+	case OMAP_DSS_VIDEO3:
+		shift = 16;
+		break;
+	default:
+		BUG();
+		return;
+	}
+
+	val = dispc_read_reg(DISPC_OVL_ATTRIBUTES(plane));
+	val = FLD_MOD(val, 0, shift, shift);
+	val = FLD_MOD(val, 3, 31, 30);
+
+	dispc_write_reg(DISPC_OVL_ATTRIBUTES(plane), val);
+}
+
 static void dispc_ovl_set_burst_size(enum omap_plane plane,
 		enum omap_burst_size burst_size)
 {
@@ -1101,8 +1121,7 @@ static void dispc_ovl_enable_replication(enum omap_plane plane,
 	REG_FLD_MOD(DISPC_OVL_ATTRIBUTES(plane), enable, shift, shift);
 }
 
-static void dispc_mgr_set_size(enum omap_channel channel, u16 width,
-		u16 height)
+void dispc_mgr_set_size(enum omap_channel channel, u16 width, u16 height)
 {
 	u32 val;
 
