@@ -923,6 +923,38 @@
 			rx-num-evt = <8>;
 		};
 
+		vip1: vip@0x48970000 {
+                        compatible = "ti,vip1";
+			reg = <0x48970000 0x10000>,
+			      <0x4897d000 0x1000>;
+			reg-names = "vip","vpdma";
+                        ti,hwmods = "vip1";
+			interrupts = <0 152 0x4>,
+				     <0 153 0x4>;
+                        #address-cells = <1>;
+                        #size-cells = <0>;
+		};
+
+		vip2: vip@0x48990000 {
+                        compatible = "ti,vip2";
+			reg = <0x48990000 0x10000>;
+                        ti,hwmods = "vip2";
+			interrupts = <0 154 0x4>,
+				     <0 155 0x4>;
+                        #address-cells = <1>;
+                        #size-cells = <0>;
+                };
+
+		vip3: vip@0x489b0000 {
+                        compatible = "ti,vip3";
+			reg = <0x489b0000 0x10000>;
+                        ti,hwmods = "vip3";
+			interrupts = <0 156 0x4>,
+				     <0 157 0x4>;
+                        #address-cells = <1>;
+                        #size-cells = <0>;
+		};
+
 		vpe {
 			compatible = "ti,vpe";
 			ti,hwmods = "vpe";
