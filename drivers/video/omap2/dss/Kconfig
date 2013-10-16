@@ -108,14 +108,6 @@ config OMAP5_DSS_HDMI_DDC
 	  EDID can be read using direct I2C commands sent to the external display
 	  over I2C lines or by configuring the DDC registers in the core.
 
-config OMAP4_HDCP_SUPPORT
-	bool "OMAP4 HDCP support"
-	depends on OMAP4_DSS_HDMI
-	default n
-	help
-	  High-bandwidth Digital Content Protection (HDCP).
-	  This option required for OMAP4 HDCP support.
-
 config OMAP2_DSS_SDI
 	bool "SDI support"
         default n
