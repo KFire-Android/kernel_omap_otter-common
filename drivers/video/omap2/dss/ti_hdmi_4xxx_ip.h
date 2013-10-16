@@ -24,8 +24,6 @@
 #include <linux/string.h>
 #include <video/omapdss.h>
 #include "ti_hdmi.h"
-#define HDMI_HPD_LOW            0x10
-#define HDMI_HPD_HIGH           0x20
 
 /* HDMI Wrapper */
 
