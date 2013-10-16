@@ -43,7 +43,6 @@
 #include <linux/i2c.h>
 #include <linux/i2c-algo-bit.h>
 
-#include "ti_hdmi_4xxx_ip.h"
 #include "ti_hdmi.h"
 #include "dss.h"
 #include "dss_features.h"
@@ -102,10 +101,6 @@ static struct {
 	struct i2c_algo_bit_data bit_data;
 	int scl_pin;
 	int sda_pin;
-
-	void (*hdmi_start_frame_cb)(void);
-	bool (*hdmi_power_on_cb)(void);
-	void (*hdmi_hdcp_irq_cb)(int);
 
 	struct omap_dss_output output;
 } hdmi;
@@ -523,7 +518,7 @@ void hdmi_get_monspecs(struct omap_dss_device *dssdev)
 
 }
 
-int hdmi_runtime_get(void)
+static int hdmi_runtime_get(void)
 {
 	int r;
 
@@ -537,7 +532,7 @@ int hdmi_runtime_get(void)
 	return 0;
 }
 
-void hdmi_runtime_put(void)
+static void hdmi_runtime_put(void)
 {
 	int r;
 
@@ -716,7 +711,7 @@ u8 *hdmi_read_valid_edid(void)
 	hdmi_runtime_put();
 
 	for (i = 0; i < HDMI_EDID_MAX_LENGTH; i += 16)
-		DSSINFO("edid[%03x] = %02x %02x %02x %02x %02x %02x %02x %02x "
+		DSSDBG("edid[%03x] = %02x %02x %02x %02x %02x %02x %02x %02x "\
 			"%02x %02x %02x %02x %02x %02x %02x %02x\n", i,
 			hdmi.edid[i], hdmi.edid[i + 1], hdmi.edid[i + 2],
 			hdmi.edid[i + 3], hdmi.edid[i + 4], hdmi.edid[i + 5],
@@ -856,20 +851,6 @@ static int hdmi_compute_pll(struct omap_dss_device *dssdev, int phy,
 	return 0;
 }
 
-static void hdmi_load_hdcp_keys(struct omap_dss_device *dssdev)
-{
-	DSSDBG("hdmi_load_hdcp_keys\n");
-	if (hdmi.hdmi_power_on_cb()) {
-		if (omapdss_get_version() == OMAPDSS_VER_OMAP4) {
-			/* load the keys and reset the wrapper to populate
-			 * the AKSV registers
-			 */
-			hdmi.ip_data.ops->reset_wrapper(&hdmi.ip_data);
-			DSSINFO("HDMI_WRAPPER RESET DONE\n");
-		}
-	}
-}
-
 static int hdmi_power_on_core(struct omap_dss_device *dssdev)
 {
 	int r;
@@ -966,8 +947,6 @@ static int hdmi_power_on_full(struct omap_dss_device *dssdev)
 
 	hdmi.ip_data.ops->video_disable(&hdmi.ip_data);
 
-	hdmi_load_hdcp_keys(dssdev);
-
 	/* config the PLL and PHY hdmi_set_pll_pwrfirst */
 	r = hdmi.ip_data.ops->pll_enable(&hdmi.ip_data);
 	if (r) {
@@ -1013,10 +992,6 @@ static int hdmi_power_on_full(struct omap_dss_device *dssdev)
 	if (r)
 		goto err_vid_enable;
 
-	if (hdmi.hdmi_start_frame_cb &&
-		hdmi.custom_set)
-		(*hdmi.hdmi_start_frame_cb)();
-
 	r = dss_mgr_enable(mgr);
 	if (r)
 		goto err_mgr_enable;
@@ -1040,14 +1015,7 @@ static void hdmi_power_off_full(struct omap_dss_device *dssdev)
 {
 	struct omap_overlay_manager *mgr = dssdev->output->manager;
 
-	if ((omapdss_get_version() == OMAPDSS_VER_OMAP4)
-	    && hdmi.hdmi_hdcp_irq_cb)
-		hdmi.hdmi_hdcp_irq_cb(HDMI_HPD_LOW);
-
 	dss_mgr_disable(mgr);
-
-	if (hdmi.ip_data.ops->hdcp_disable)
-		hdmi.ip_data.ops->hdcp_disable(&hdmi.ip_data);
 
 	hdmi.ip_data.ops->video_disable(&hdmi.ip_data);
 	hdmi.ip_data.ops->phy_disable(&hdmi.ip_data);
@@ -1056,22 +1024,6 @@ static void hdmi_power_off_full(struct omap_dss_device *dssdev)
 	hdmi.ip_data.cfg.deep_color = HDMI_DEEP_COLOR_24BIT;
 
 	hdmi_power_off_core(dssdev);
-}
-
-void omapdss_hdmi_register_hdcp_callbacks(void (*hdmi_start_frame_cb)(void),
-				bool (*hdmi_power_on_cb)(void),
-				void (*hdmi_hdcp_irq_cb)(int))
-{
-	hdmi.hdmi_start_frame_cb = hdmi_start_frame_cb;
-	hdmi.hdmi_power_on_cb = hdmi_power_on_cb;
-	hdmi.hdmi_hdcp_irq_cb = hdmi_hdcp_irq_cb;
-}
-
-
-
-struct hdmi_ip_data *get_hdmi_ip_data(void)
-{
-	return &hdmi.ip_data;
 }
 
 int omapdss_hdmi_set_deepcolor(struct omap_dss_device *dssdev, int val,
@@ -1642,9 +1594,6 @@ static irqreturn_t hdmi_irq_handler(int irq, void *arg)
 
 	r = hdmi.ip_data.ops->irq_handler(&hdmi.ip_data);
 	DSSDBG("Received HDMI IRQ = %08x\n", r);
-
-	if (hdmi.hdmi_hdcp_irq_cb && (r & HDMI_HDCP_INT))
-		hdmi.hdmi_hdcp_irq_cb(HDMI_HPD_HIGH);
 
 	r = hdmi.ip_data.ops->irq_core_handler(&hdmi.ip_data);
 	DSSDBG("Received HDMI core IRQ = %08x\n", r);
@@ -2375,15 +2324,11 @@ static int __init omapdss_hdmihw_probe(struct platform_device *pdev)
 	pm_runtime_enable(&pdev->dev);
 
 	hdmi.hdmi_irq = platform_get_irq(pdev, 0);
-	disable_irq(hdmi.hdmi_irq);
-	r = devm_request_threaded_irq(&pdev->dev, hdmi.hdmi_irq, NULL,
-				      hdmi_irq_handler, IRQF_ONESHOT,
-				      dev_name(&pdev->dev), NULL);
+	r = request_irq(hdmi.hdmi_irq, hdmi_irq_handler, 0, "OMAP HDMI", NULL);
 	if (r < 0) {
 		pr_err("hdmi: request_irq %s failed\n", pdev->name);
 		return -EINVAL;
 	}
-	enable_irq(hdmi.hdmi_irq);
 
 	r = hdmi_panel_init();
 	if (r) {
