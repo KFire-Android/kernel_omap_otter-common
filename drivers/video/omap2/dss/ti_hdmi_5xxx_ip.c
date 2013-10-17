@@ -27,6 +27,7 @@
 #include <linux/delay.h>
 #include <linux/string.h>
 #include <linux/seq_file.h>
+#include <drm/drm_edid.h>
 #if defined(CONFIG_OMAP5_DSS_HDMI_AUDIO)
 #include <sound/asound.h>
 #include <sound/asoundef.h>
@@ -34,6 +35,12 @@
 
 #include "ti_hdmi_5xxx_ip.h"
 #include "dss.h"
+
+#define HDMI_CORE_PRODUCT_ID1_HDCP 0xC1
+#define HDMI_CORE_A_HDCPCFG0_HDCP_EN_MASK 0x4
+
+#define RETRY_CNT		3
+#define HDMI_CORE_A_HDCPOBS0_HDCPENABLED (1 << 0)
 
 static const struct csc_table csc_table_deepcolor[4] = {
 	/* HDMI_DEEP_COLOR_24BIT */
@@ -66,6 +73,11 @@ static inline u32 hdmi_read_reg(void __iomem *base_addr,
 	return __raw_readl(base_addr + idx);
 }
 
+static inline void __iomem *hdmi_wp_base(struct hdmi_ip_data *ip_data)
+{
+	return ip_data->base_wp;
+}
+
 static inline void __iomem *hdmi_core_sys_base(struct hdmi_ip_data *ip_data)
 {
 	return ip_data->base_core;
@@ -84,6 +96,7 @@ static inline int hdmi_wait_for_bit_change(void __iomem *base_addr,
 	return val;
 }
 
+#ifdef CONFIG_OMAP5_DSS_HDMI_DDC
 static inline void hdmi_core_ddc_req_addr(struct hdmi_ip_data *ip_data,
 						u8 addr, int ext)
 {
@@ -100,8 +113,82 @@ static inline void hdmi_core_ddc_req_addr(struct hdmi_ip_data *ip_data,
 		REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_OPERATION, 1, 0, 0);
 }
 
-#define EDID_LENGTH 128
+static void hdmi_core_ddc_init(struct hdmi_ip_data *ip_data)
+{
+	void __iomem *core_sys_base = hdmi_core_sys_base(ip_data);
 
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_SDA_HOLD_ADDR, 0x18, 7, 0);
+
+	/*Mask the interrupts*/
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_CTLINT, 0x0, 2, 2);
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_CTLINT, 0x0, 6, 6);
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_INT, 0x0, 2, 2);
+
+	/* Master clock division */
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_DIV, 0x5, 3, 0);
+
+	/* Standard speed counter */
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_SS_SCL_HCNT_1_ADDR, 0x0,
+		7, 0);
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_SS_SCL_HCNT_0_ADDR, 0x6C,
+		7, 0);
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_SS_SCL_LCNT_1_ADDR, 0x0,
+		7, 0);
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_SS_SCL_LCNT_0_ADDR, 0x7F,
+		7, 0);
+
+	/* Fast speed counter*/
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_FS_SCL_HCNT_1_ADDR, 0x0,
+		7, 0);
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_FS_SCL_HCNT_0_ADDR, 0x0F,
+		7, 0);
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_FS_SCL_LCNT_1_ADDR, 0x0,
+		7, 0);
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_FS_SCL_LCNT_0_ADDR, 0x21,
+		7, 0);
+
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_SLAVE, 0x50, 6, 0);
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_SEGADDR, 0x30, 6, 0);
+}
+
+static int hdmi_core_ddc_edid(struct hdmi_ip_data *ip_data,
+					u8 *pedid, int ext)
+{
+	u8 cur_addr = 0;
+	char checksum = 0;
+	void __iomem *core_sys_base = hdmi_core_sys_base(ip_data);
+
+	hdmi_core_ddc_req_addr(ip_data, cur_addr, ext);
+
+	/* Unmask the interrupts*/
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_CTLINT, 0x1, 2, 2);
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_CTLINT, 0x1, 6, 6);
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_INT, 0x1, 2, 2);
+
+	/* FIXME:This is a hack to  read only 128 bytes data with a mdelay
+	 * Ideally the read has to be based on the done interrupt and
+	 * status which is not received thus it is ignored for now
+	 */
+	while (cur_addr < 128) {
+	#if 0
+		if (hdmi_wait_for_bit_change(core_sys_base, HDMI_CORE_I2CM_INT,
+						0, 0, 1) != 1) {
+			DSSERR("Failed to recieve done interrupt\n");
+			return -ETIMEDOUT;
+		}
+	#endif
+		mdelay(1);
+		pedid[cur_addr] = REG_GET(core_sys_base,
+					HDMI_CORE_I2CM_DATAI, 7, 0);
+		DSSDBG("pedid[%d] = %x", cur_addr, pedid[cur_addr]);
+		checksum += pedid[cur_addr++];
+		hdmi_core_ddc_req_addr(ip_data, cur_addr, ext);
+	}
+
+	return 0;
+
+}
+#else
 static int read_one_block(u8 *edid, unsigned int block)
 {
 	struct i2c_adapter *adapter = omapdss_hdmi_adapter();
@@ -142,32 +229,57 @@ static int read_one_block(u8 *edid, unsigned int block)
 
 	return r == xfers ? 0 : -1;
 }
+#endif
 
 int ti_hdmi_5xxx_read_edid(struct hdmi_ip_data *ip_data,
 				u8 *edid, int len)
 {
-	int num_extensions, bytes_read = 0, i;
+#ifdef CONFIG_OMAP5_DSS_HDMI_DDC
+	int r, n, i;
+	int max_ext_blocks = (len / 128) - 1;
 
+	if (len < 128)
+		return -EINVAL;
+
+	hdmi_core_ddc_init(ip_data);
+
+	r = hdmi_core_ddc_edid(ip_data, edid, 0);
+	if (r)
+		return r;
+	else {
+		/*Multiblock read*/
+		n = edid[0x7e];
+
+		if (n > max_ext_blocks)
+			n = max_ext_blocks;
+		for (i = 1; i <= n; i++) {
+			r = hdmi_core_ddc_edid(ip_data,
+					edid + i*EDID_LENGTH, i);
+			if (r)
+				return r;
+		}
+	}
+
+#else
+	int num_extensions, bytes_read = 0, i;
 	/* get base block */
 	if (read_one_block(edid, 0))
-		goto bad;
+		return -EINVAL;
 
 	num_extensions = edid[0x7e];
 	bytes_read += EDID_LENGTH;
 
 	for (i = 1; i <= num_extensions; i++) {
 		if (bytes_read >= len)
-			break;
+			return -EINVAL;
 
 		if (read_one_block(edid + EDID_LENGTH * i, i))
-			break;
+			return -EINVAL;
 
 		bytes_read += EDID_LENGTH;
-
 	}
 
-	return bytes_read;
-bad:
+#endif
 	return 0;
 }
 
@@ -329,6 +441,7 @@ static void hdmi_core_video_config(struct hdmi_ip_data *ip_data,
 	/* Set hsync, vsync and data-enable polarity  */
 	r = hdmi_read_reg(core_sys_base, HDMI_CORE_FC_INVIDCONF);
 
+	r = FLD_MOD(r, cfg->hdcp_keepout, 7, 7);
 	r = FLD_MOD(r, vsync_pol, 6, 6);
 	r = FLD_MOD(r, hsync_pol, 5, 5);
 	r = FLD_MOD(r, cfg->data_enable_pol, 4, 4);
@@ -444,6 +557,128 @@ static void hdmi_core_config_csc(struct hdmi_ip_data *ip_data)
 
 	/* CSC_COLORDEPTH */
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_CSC_SCALE, clr_depth, 7, 4);
+}
+
+int ti_hdmi_5xxx_hdcp_init(struct hdmi_ip_data *ip_data)
+{
+	void __iomem *core_sys_base = hdmi_core_sys_base(ip_data);
+
+	DSSDBG("hdcp_initialize\n");
+
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_A_HDCPCFG0, 0, 2, 2);
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_A_VIDPOLCFG, 1, 4, 4);
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_A_HDCPCFG1, 1, 1, 1);
+
+	return 0;
+}
+
+int ti_hdmi_5xxx_hdcp_enable(struct hdmi_ip_data *ip_data)
+{
+	bool vsync_pol, hsync_pol;
+	void __iomem *core_sys_base = hdmi_core_sys_base(ip_data);
+	struct hdmi_config *cfg = &ip_data->cfg;
+
+	vsync_pol = (cfg->timings.vsync_level == OMAPDSS_SIG_ACTIVE_HIGH);
+	hsync_pol = (cfg->timings.hsync_level == OMAPDSS_SIG_ACTIVE_HIGH);
+
+	/* Read product ID1 */
+	if (hdmi_read_reg(core_sys_base, HDMI_CORE_PRODUCT_ID1) !=
+		HDMI_CORE_PRODUCT_ID1_HDCP) {
+		DSSDBG("HDCP is not present.\n");
+		return -EACCES;
+	}
+
+	if (hdmi_read_reg(core_sys_base, HDMI_CORE_A_HDCPCFG0) &
+		HDMI_CORE_A_HDCPCFG0_HDCP_EN_MASK) {
+		DSSDBG("HDCP already enabled\n");
+		return 0;
+	}
+
+	/* Select DVI or HDMI */
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_A_HDCPCFG0,
+			ip_data->cfg.cm.mode, 0, 0);
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_INVIDCONF, 1, 7, 7);
+	/* Set data enable, Hsync and Vsync polarity */
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_A_VIDPOLCFG,
+			1, 4, 4);  /* dataen pol */
+#ifdef CONFIG_USE_FB_MODE_DB
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_A_VIDPOLCFG,
+		!!(cfg->timingsfb.sync & FB_SYNC_VERT_HIGH_ACT), 3, 3);
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_A_VIDPOLCFG,
+		!!(cfg->timingsfb.sync & FB_SYNC_HOR_HIGH_ACT), 1, 1);
+#else
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_A_VIDPOLCFG,
+		vsync_pol, 3, 3);
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_A_VIDPOLCFG,
+		hsync_pol, 1, 1);
+#endif
+	/* HDCP only */
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_A_HDCPCFG0,
+			0, 1, 1); /* Disable 1.1 */
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_A_HDCPCFG0,
+			1, 4, 4); /* Ri check */
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_A_HDCPCFG0,
+			0, 6, 6); /* I2C fast mode */
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_A_HDCPCFG0,
+			0, 7, 7); /* Enhanced Link verification */
+
+	/* fixed */
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_A_HDCPCFG0, 0, 3, 3); /* Av Mute */
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_A_HDCPCFG0,
+			0, 5, 5); /* By pass encryption */
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_A_HDCPCFG1,
+			0, 1, 1); /* disable encryption */
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_A_VIDPOLCFG,
+			0x00, 5, 6); /* video color encryption */
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_A_OESSWCFG,
+			64 , 7, 0); /* video color encryption */
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_A_HDCPCFG1,
+			1, 2, 2); /* Encode packet header */
+
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_A_HDCPCFG1,
+			0, 3, 3); /* SHA1 KSV */
+	/* Reset HDCP engine */
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_A_HDCPCFG1,
+			0, 0, 0); /* swreset */
+
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_A_HDCPCFG0,
+			1, 2, 2); /* rxdetect */
+	return 0;
+
+}
+
+int ti_hdmi_5xxx_hdcp_disable(struct hdmi_ip_data *ip_data)
+{
+	void __iomem *core_sys_base = hdmi_core_sys_base(ip_data);
+
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_A_HDCPCFG0, 0, 2, 2);
+
+	return 0;
+
+}
+
+int ti_hdmi_5xxx_hdcp_int_handler(struct hdmi_ip_data *ip_data)
+{
+	u32 intr;
+	void __iomem *core_sys_base = hdmi_core_sys_base(ip_data);
+
+	intr = hdmi_read_reg(core_sys_base, HDMI_CORE_A_APIINTSTAT);
+
+	if (intr & KSVSHA1CALCINT) {
+		/* request memory access */
+		REG_FLD_MOD(core_sys_base, HDMI_CORE_A_KSVMEMCTRL, 1, 0, 0);
+		REG_FLD_MOD(core_sys_base, HDMI_CORE_A_APIINTCLR, 1, 1, 1);
+	} else if (intr & KSVACCESSINT) {
+		/* request granted */
+		REG_FLD_MOD(core_sys_base, HDMI_CORE_A_APIINTCLR, 1, 0, 0);
+	} else {
+		REG_FLD_MOD(core_sys_base, HDMI_CORE_A_APIINTCLR, intr, 7, 0);
+	}
+
+	if (intr)
+		DSSDBG("HDCP Interrupt : 0x%x\n", intr);
+
+	return intr;
 }
 
 static void hdmi_core_config_video_sampler(struct hdmi_ip_data *ip_data)
@@ -633,6 +868,7 @@ static void hdmi_core_mask_interrupts(struct hdmi_ip_data *ip_data)
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_AUD_D010, 0x0, 7, 0);
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_AUD_GP_MASK, 0x3, 1, 0);
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_HDCP_MASK, 0x0, 7, 0);
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_A_APIINTMSK, 0xff, 7, 0);
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_CEC_MASK, 0xff, 7, 0);
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_INT, 0x1, 7, 0);
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_CTLINT, 0xff, 7, 0);
@@ -642,7 +878,50 @@ static void hdmi_core_enable_interrupts(struct hdmi_ip_data *ip_data)
 {
 	void __iomem *core_sys_base = hdmi_core_sys_base(ip_data);
 	/* Unmute interrupts */
-	REG_FLD_MOD(core_sys_base, HDMI_CORE_IH_MUTE, 0x0, 1, 0);
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_A_APIINTMSK, 0x00, 7, 0);
+}
+
+int ti_hdmi_5xxx_irq_handler(struct hdmi_ip_data *ip_data)
+{
+	u32 val = 0, r = 0;
+	u32 temp = 0;
+	void __iomem *wp_base = hdmi_wp_base(ip_data);
+
+	val = hdmi_read_reg(wp_base, HDMI_WP_IRQSTATUS);
+	if (val & HDMI_WP_IRQSTATUS_CORE) {
+		temp = hdmi_read_reg(hdmi_core_sys_base(ip_data),
+			HDMI_CORE_A_APIINTSTAT);
+
+		if (temp)
+			r |= HDMI_HDCP_INT;
+
+	}
+	/* Ack other interrupts if any */
+	hdmi_write_reg(wp_base, HDMI_WP_IRQSTATUS, val);
+	/* flush posted write */
+	hdmi_read_reg(wp_base, HDMI_WP_IRQSTATUS);
+
+	return r;
+
+}
+
+int ti_hdmi_5xxx_hdcp_status(struct hdmi_ip_data *ip_data)
+{
+	int status = HDMI_HDCP_FAILED;
+	int val = 0;
+	void __iomem *core_sys_base = hdmi_core_sys_base(ip_data);
+
+	if (!core_sys_base) {
+		DSSERR("null pointer hit while getting hdmi base address\n");
+		return status;
+	}
+
+	val = hdmi_read_reg(core_sys_base, HDMI_CORE_A_HDCPOBS0);
+
+	if (val & HDMI_CORE_A_HDCPOBS0_HDCPENABLED)
+		status = HDMI_HDCP_ENABLED;
+
+	return status;
 }
 
 int ti_hdmi_5xxx_core_irq_handler(struct hdmi_ip_data *ip_data)
@@ -722,6 +1001,7 @@ void ti_hdmi_5xxx_basic_configure(struct hdmi_ip_data *ip_data)
 	irq_enable.fifo_underflow = 1;
 	irq_enable.ocp_timeout = 1;
 
+	irq_enable.core = 1;
 	hdmi_wp_irq_enable(ip_data, &irq_enable);
 
 	/*
@@ -729,6 +1009,7 @@ void ti_hdmi_5xxx_basic_configure(struct hdmi_ip_data *ip_data)
 	 * set software reset in the core
 	 */
 	v_core_cfg.packet_mode = HDMI_PACKETMODE24BITPERPIXEL;
+	v_core_cfg.hdcp_keepout = 1;
 
 	hdmi_core_video_config(ip_data, &v_core_cfg);
 

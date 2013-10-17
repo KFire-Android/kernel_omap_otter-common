@@ -263,20 +263,20 @@ void ti_hdmi_4xxx_pll_disable(struct hdmi_ip_data *ip_data)
 		dss_dpll_enable_ctrl(DSS_DPLL_HDMI, false);
 }
 
-static int hdmi_check_hpd_state(struct hdmi_ip_data *ip_data)
+int ti_hdmi_4xxx_set_phy_on_hpd(struct hdmi_ip_data *ip_data, bool hpd)
 {
-	bool hpd;
-	int r;
+	int r = 0;
 
 	mutex_lock(&ip_data->lock);
 
-	hpd = gpio_get_value(ip_data->hpd_gpio);
+	if (hpd == ip_data->phy_tx_enabled)
+		goto err;
+	ip_data->set_mode = false;
 
 	if (hpd)
 		r = hdmi_set_phy_pwr(ip_data, HDMI_PHYPWRCMD_TXON);
 	else
 		r = hdmi_set_phy_pwr(ip_data, HDMI_PHYPWRCMD_LDOON);
-
 	/*
 	 * DRA7xx doesn't show the correct PHY transition changes in the
 	 * WP_PWR_CTRL register, need to investigate
@@ -289,18 +289,10 @@ static int hdmi_check_hpd_state(struct hdmi_ip_data *ip_data)
 				hpd ? "enable" : "disable");
 		goto err;
 	}
+	ip_data->phy_tx_enabled = hpd;
 err:
 	mutex_unlock(&ip_data->lock);
 	return r;
-}
-
-static irqreturn_t hpd_irq_handler(int irq, void *data)
-{
-	struct hdmi_ip_data *ip_data = data;
-
-	hdmi_check_hpd_state(ip_data);
-
-	return IRQ_HANDLED;
 }
 
 int ti_hdmi_4xxx_phy_enable(struct hdmi_ip_data *ip_data)
@@ -311,6 +303,7 @@ int ti_hdmi_4xxx_phy_enable(struct hdmi_ip_data *ip_data)
 	unsigned long pclk = ip_data->cfg.timings.pixel_clock;
 	unsigned long dcofreq_min = dss_feat_get_param_max(FEAT_PARAM_DCOFREQ_LOW) / 1000;
 	u16 freqout = 1;
+	bool hpd;
 
 	/*
 	 * In OMAP5, the HFBITCLK must be divided by 2 before issuing the
@@ -320,8 +313,15 @@ int ti_hdmi_4xxx_phy_enable(struct hdmi_ip_data *ip_data)
 		REG_FLD_MOD(phy_base, HDMI_TXPHY_BIST_CONTROL, 1, 11, 11);
 
 	r = hdmi_set_phy_pwr(ip_data, HDMI_PHYPWRCMD_LDOON);
+
+	/*
+	 * HDMI_WP_PWR_CTRL doesn't seem to reflect the change in power
+	 * states, ignore the error for now
+	 */
+#if 0
 	if (r)
 		return r;
+#endif
 
 	/*
 	 * Read address 0 in order to get the SCP reset done completed
@@ -368,19 +368,10 @@ int ti_hdmi_4xxx_phy_enable(struct hdmi_ip_data *ip_data)
 	/* Write to phy address 3 to change the polarity control */
 	REG_FLD_MOD(phy_base, HDMI_TXPHY_PAD_CFG_CTRL, 0x1, 27, 27);
 
-	r = request_threaded_irq(gpio_to_irq(ip_data->hpd_gpio),
-				 NULL, hpd_irq_handler,
-				 IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING |
-				 IRQF_ONESHOT, "hpd", ip_data);
-	if (r) {
-		DSSERR("HPD IRQ request failed\n");
-		hdmi_set_phy_pwr(ip_data, HDMI_PHYPWRCMD_OFF);
-		return r;
-	}
+	hpd = gpio_get_value(ip_data->hpd_gpio);
 
-	r = hdmi_check_hpd_state(ip_data);
+	r = ti_hdmi_4xxx_set_phy_on_hpd(ip_data, hpd);
 	if (r) {
-		free_irq(gpio_to_irq(ip_data->hpd_gpio), ip_data);
 		hdmi_set_phy_pwr(ip_data, HDMI_PHYPWRCMD_OFF);
 		return r;
 	}
@@ -390,9 +381,9 @@ int ti_hdmi_4xxx_phy_enable(struct hdmi_ip_data *ip_data)
 
 void ti_hdmi_4xxx_phy_disable(struct hdmi_ip_data *ip_data)
 {
-	free_irq(gpio_to_irq(ip_data->hpd_gpio), ip_data);
 
 	hdmi_set_phy_pwr(ip_data, HDMI_PHYPWRCMD_OFF);
+	ip_data->phy_tx_enabled = false;
 }
 
 static int hdmi_core_ddc_init(struct hdmi_ip_data *ip_data)
@@ -889,21 +880,44 @@ int ti_hdmi_4xxx_core_irq_handler(struct hdmi_ip_data *ip_data)
 
 int ti_hdmi_4xxx_irq_handler(struct hdmi_ip_data *ip_data)
 {
-	u32 val = 0;
+	u32 val = 0, r = 0;
+	u32 core_state = 0;
+	u32 intr2 = 0, intr3 = 0, intr4 = 0;
 	void __iomem *wp_base = hdmi_wp_base(ip_data);
+	void __iomem *core_base = hdmi_core_sys_base(ip_data);
 
 	pr_debug("Enter hdmi_ti_4xxx_irq_handler\n");
 
 	val = hdmi_read_reg(wp_base, HDMI_WP_IRQSTATUS);
-	if (val & HDMI_WP_IRQSTATUS_CORE_MASK)
+	if (val & HDMI_WP_IRQSTATUS_CORE_MASK) {
 		pr_debug("HDMI_WP_IRQSTATUS = 0x%x\n", val);
+		core_state = hdmi_read_reg(core_base, HDMI_CORE_SYS_INTR_STATE);
+		if (core_state & 0x1) {
+			intr2 = hdmi_read_reg(core_base, HDMI_CORE_SYS_INTR2);
+			intr3 = hdmi_read_reg(core_base, HDMI_CORE_SYS_INTR3);
+			intr4 = hdmi_read_reg(core_base, HDMI_CORE_SYS_INTR4);
+
+			hdmi_write_reg(core_base, HDMI_CORE_SYS_INTR2, intr2);
+			hdmi_write_reg(core_base, HDMI_CORE_SYS_INTR3, intr3);
+			hdmi_write_reg(core_base, HDMI_CORE_SYS_INTR4, intr4);
+		}
+	}
+
+	if (intr2 & HDMI_CORE_SYSTEM_INTR2__BCAP)
+		r |= HDMI_BCAP;
+
+	if (intr3 & HDMI_CORE_SYSTEM_INTR3__RI_ERR)
+		r |= HDMI_RI_ERR;
+
+	if (intr4 & HDMI_CORE_SYSTEM_INTR4_CEC)
+		r |= HDMI_CEC_INT;
 
 	/* Ack other interrupts if any */
 	hdmi_write_reg(wp_base, HDMI_WP_IRQSTATUS, val);
 	/* flush posted write */
 	hdmi_read_reg(wp_base, HDMI_WP_IRQSTATUS);
 
-	return val;
+	return r;
 }
 
 void ti_hdmi_4xxx_basic_configure(struct hdmi_ip_data *ip_data)
@@ -983,6 +997,38 @@ void ti_hdmi_4xxx_basic_configure(struct hdmi_ip_data *ip_data)
 	repeat_cfg.audio_pkt_repeat = HDMI_PACKETREPEATON;
 	hdmi_core_av_packet_config(ip_data, repeat_cfg);
 }
+
+int ti_hdmi_4xxx_check_rxdet_line(struct hdmi_ip_data *ip_data)
+{
+	if (hdmi_wait_for_bit_change(hdmi_phy_base(ip_data),
+					HDMI_TXPHY_PAD_CFG_CTRL,
+					14, 7, 0) != 0)
+		return -ETIMEDOUT;
+
+	return 0;
+}
+EXPORT_SYMBOL(ti_hdmi_4xxx_check_rxdet_line);
+
+int ti_hdmi_4xxx_set_av_mute(struct hdmi_ip_data *ip_data, u8 av_mute_state)
+{
+	void __iomem *av_base = hdmi_av_base(ip_data);
+	u32 val;
+	int r = 0;
+
+	val = av_mute_state >> 4;
+
+	REG_FLD_MOD(av_base, HDMI_CORE_AV_PB_CTRL2, 0x0, 3, 2);
+
+	hdmi_write_reg(av_base, HDMI_CORE_AV_CP_BYTE1, av_mute_state);
+	if (hdmi_wait_for_bit_change(av_base, HDMI_CORE_AV_AUDO_TXSTAT,
+						    2, 2, val) == val)
+		r = -ETIMEDOUT;
+
+	REG_FLD_MOD(av_base, HDMI_CORE_AV_PB_CTRL2, 0x3, 3, 2);
+
+	return r;
+}
+EXPORT_SYMBOL(ti_hdmi_4xxx_set_av_mute);
 
 void ti_hdmi_4xxx_wp_dump(struct hdmi_ip_data *ip_data, struct seq_file *s)
 {

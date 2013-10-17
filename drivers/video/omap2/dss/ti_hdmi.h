@@ -21,17 +21,28 @@
 #ifndef _TI_HDMI_H
 #define _TI_HDMI_H
 
+#include <linux/fb.h>
+
+/* HDCP interrupts bits */
+#define KSVACCESSINT		(1 << 0x0)
+#define KSVSHA1CALCINT		(1 << 0x1)
+#define KEEPOUTERRORINT		(1 << 0x2)
+#define LOSTARBITRATION		(1 << 0x3)
+#define I2CNACK			(1 << 0x4)
+#define HDCP_FAILED		(1 << 0x6)
+#define HDCP_ENGAGED		(1 << 0x7)
+
+#define HDMI_HDCP_ENABLED	0x1
+#define HDMI_HDCP_FAILED	0x0
+
+
+#define HDMI_HDCP_INT		0x200
+
 struct hdmi_ip_data;
 #if defined(CONFIG_OMAP4_DSS_HDMI_AUDIO) || \
 	defined(CONFIG_OMAP5_DSS_HDMI_AUDIO)
 struct hdmi_audio_dma;
 #endif
-
-enum level_shifter_state {
-	LS_DISABLED = 0,        /* HPD off, LS off */
-	LS_HPD_ON,              /* HPD on, LS off */
-	LS_ENABLED,             /* HPD on, LS on */
-};
 
 enum hdmi_pll_pwr {
 	HDMI_PLLPWRCMD_ALLOFF = 0,
@@ -106,6 +117,7 @@ struct hdmi_config {
 	struct hdmi_s3d_info s3d_info;
 	enum hdmi_deep_color_mode deep_color;
 	enum hdmi_range range;
+	struct fb_videomode timingsfb;
 };
 
 /* HDMI PLL structure */
@@ -168,6 +180,7 @@ struct ti_hdmi_ip_ops {
 
 	void (*dump_phy)(struct hdmi_ip_data *ip_data, struct seq_file *s);
 
+	int (*set_phy)(struct hdmi_ip_data *ip_data, bool hpd);
 #if defined(CONFIG_OMAP4_DSS_HDMI_AUDIO) || \
 	defined(CONFIG_OMAP5_DSS_HDMI_AUDIO)
 	int (*audio_enable)(struct hdmi_ip_data *ip_data);
@@ -189,6 +202,19 @@ struct ti_hdmi_ip_ops {
 	int (*irq_core_handler) (struct hdmi_ip_data *ip_data);
 
 	int (*configure_range)(struct hdmi_ip_data *ip_data);
+
+	int (*hdcp_init)(struct hdmi_ip_data *ip_data);
+
+	int (*hdcp_enable) (struct hdmi_ip_data *ip_data);
+
+	int (*hdcp_disable)(struct hdmi_ip_data *ip_data);
+
+	int (*hdcp_status)(struct hdmi_ip_data *ip_data);
+
+	int (*hdcp_int_handler)(struct hdmi_ip_data *ip_data);
+
+	int (*reset_wrapper)(struct hdmi_ip_data *ip_data);
+
 };
 
 /*
@@ -245,6 +271,8 @@ struct hdmi_ip_data {
 	/* ti_hdmi_4xxx_ip private data. These should be in a separate struct */
 	int hpd_gpio;
 	struct mutex lock;
+	bool set_mode;
+	bool phy_tx_enabled;
 };
 int ti_hdmi_4xxx_phy_enable(struct hdmi_ip_data *ip_data);
 void ti_hdmi_4xxx_phy_disable(struct hdmi_ip_data *ip_data);
@@ -261,6 +289,7 @@ void ti_hdmi_4xxx_wp_dump(struct hdmi_ip_data *ip_data, struct seq_file *s);
 void ti_hdmi_4xxx_pll_dump(struct hdmi_ip_data *ip_data, struct seq_file *s);
 void ti_hdmi_4xxx_core_dump(struct hdmi_ip_data *ip_data, struct seq_file *s);
 void ti_hdmi_4xxx_phy_dump(struct hdmi_ip_data *ip_data, struct seq_file *s);
+int ti_hdmi_4xxx_set_phy_on_hpd(struct hdmi_ip_data *ip_data, bool hpd);
 #if defined(CONFIG_OMAP4_DSS_HDMI_AUDIO) || \
 	defined(CONFIG_OMAP5_DSS_HDMI_AUDIO)
 int hdmi_compute_acr(u32 sample_freq, u32 *n, u32 *cts);
@@ -282,10 +311,18 @@ void ti_hdmi_5xxx_audio_stop(struct hdmi_ip_data *ip_data);
 int ti_hdmi_5xxx_audio_config(struct hdmi_ip_data *ip_data,
 		struct omap_dss_audio *audio);
 #endif
+int ti_hdmi_4xxx_check_rxdet_line(struct hdmi_ip_data *ip_data);
+int ti_hdmi_4xxx_set_av_mute(struct hdmi_ip_data *ip_data, u8 av_mute_state);
 void ti_hdmi_5xxx_basic_configure(struct hdmi_ip_data *ip_data);
 void ti_hdmi_5xxx_core_dump(struct hdmi_ip_data *ip_data, struct seq_file *s);
 int ti_hdmi_5xxx_read_edid(struct hdmi_ip_data *ip_data,
 				u8 *edid, int len);
+int ti_hdmi_5xxx_irq_handler(struct hdmi_ip_data *ip_data);
 int ti_hdmi_5xxx_core_irq_handler(struct hdmi_ip_data *ip_data);
 int ti_hdmi_5xxx_configure_range(struct hdmi_ip_data *ip_data);
+int ti_hdmi_5xxx_hdcp_init(struct hdmi_ip_data *ip_data);
+int ti_hdmi_5xxx_hdcp_enable(struct hdmi_ip_data *ip_data);
+int ti_hdmi_5xxx_hdcp_disable(struct hdmi_ip_data *ip_data);
+int ti_hdmi_5xxx_hdcp_int_handler(struct hdmi_ip_data *ip_data);
+int ti_hdmi_5xxx_hdcp_status(struct hdmi_ip_data *ip_data);
 #endif
