@@ -45,6 +45,8 @@ struct hdmi_ip_data *get_hdmi_ip_data(void);
 void omapdss_hdmi_register_hdcp_callbacks(void (*hdmi_start_frame_cb)(void),
 					bool (*hdmi_power_on_cb)(void),
 					void (*hdmi_hdcp_irq_cb)(int));
+bool omapdss_hdmi_get_force_timings(void);
+void omapdss_hdmi_reset_force_timings(void);
 
 #ifdef CONFIG_USE_FB_MODE_DB
 int omapdss_hdmi_display_set_mode(struct omap_dss_device *dssdev,

@@ -1397,6 +1397,16 @@ bool omapdss_hdmi_detect(void)
 }
 
 #ifdef CONFIG_USE_FB_MODE_DB
+bool omapdss_hdmi_get_force_timings(void)
+{
+	return hdmi.force_timings;
+}
+
+void omapdss_hdmi_reset_force_timings(void)
+{
+	hdmi.force_timings = false;
+}
+
 static ssize_t hdmi_timings_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {

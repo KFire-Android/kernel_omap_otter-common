@@ -58,13 +58,23 @@ static struct {
 
 int hdmi_get_current_hpd(void)
 {
+#ifndef CONFIG_USE_FB_MODE_DB
 	return gpio_get_value(hdmi.hpd_gpio);
+#else
+	bool force_timings = omapdss_hdmi_get_force_timings();
+	pr_info("%s ==> force_timings = %d\n", __func__, force_timings);
+	return force_timings ? force_timings : gpio_get_value(hdmi.hpd_gpio);
+#endif
 }
 
 static irqreturn_t hpd_enable_handler(int irq, void *ptr)
 {
 	int hpd = hdmi_get_current_hpd();
 	pr_info("hpd %d\n", hpd);
+
+#ifdef CONFIG_USE_FB_MODE_DB
+	omapdss_hdmi_reset_force_timings();
+#endif
 
 	hdmi_panel_hpd_handler(hpd);
 
@@ -536,7 +546,11 @@ static void hdmi_hotplug_detect_worker(struct work_struct *work)
 			hdmi_set_ls_state(LS_ENABLED);
 			/* Read EDID before we turn on the HDMI */
 			DSSERR("%s state = %d\n", __func__, state);
-			if (hdmi_read_valid_edid()) {
+			if (hdmi_read_valid_edid()
+#ifdef CONFIG_USE_FB_MODE_DB
+			    || omapdss_hdmi_get_force_timings()
+#endif
+			    ) {
 #ifdef CONFIG_USE_FB_MODE_DB
 				/* get monspecs from edid */
 				hdmi_get_monspecs(dssdev);
