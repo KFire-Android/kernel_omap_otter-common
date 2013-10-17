@@ -1095,7 +1095,20 @@ int omapdss_hdmi_display_check_timing(struct omap_dss_device *dssdev,
 
 #endif
 	return 0;
+}
 
+int omapdss_hdmi_display_set_mode2(struct omap_dss_device *dssdev,
+				   struct fb_videomode *vm,
+				   int code, int mode)
+{
+	hdmi.ip_data.set_mode = true;
+	dssdev->driver->disable(dssdev);
+	hdmi.ip_data.set_mode = false;
+	hdmi.ip_data.cfg.timingsfb = *vm;
+	hdmi.custom_set = 1;
+	hdmi.code = code;
+	hdmi.mode = mode;
+	return dssdev->driver->enable(dssdev);
 }
 
 #ifdef CONFIG_USE_FB_MODE_DB
@@ -1115,6 +1128,13 @@ int omapdss_hdmi_display_set_mode(struct omap_dss_device *dssdev,
 	return r1 ? : r2;
 }
 #endif
+
+int hdmi_notify_hpd(struct omap_dss_device *dssdev, bool hpd)
+{
+	if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE)
+		return -1;
+	return hdmi.ip_data.ops->set_phy(&hdmi.ip_data, hpd);
+}
 
 int omapdss_hdmi_display_3d_enable(struct omap_dss_device *dssdev,
 					struct s3d_disp_info *info, int code)
@@ -1879,6 +1899,7 @@ static void __init hdmi_probe_of(struct platform_device *pdev)
 	struct device_node *node = pdev->dev.of_node;
 	struct device_node *child;
 	struct omap_dss_device *dssdev;
+	struct omap_dss_hdmi_data *hdmi_data;
 	struct device_node *adapter_node;
 	struct i2c_adapter *adapter = NULL;
 	int r, gpio;
@@ -1996,6 +2017,13 @@ static void __init hdmi_probe_of(struct platform_device *pdev)
 	dssdev->type = OMAP_DISPLAY_TYPE_HDMI;
 	dssdev->name = child->name;
 	dssdev->channel = channel;
+	hdmi_data = kzalloc(sizeof(*hdmi_data), GFP_KERNEL);
+	if (!hdmi_data)
+		return;
+	hdmi_data->ct_cp_hpd_gpio = hdmi.ct_cp_hpd_gpio;
+	hdmi_data->ls_oe_gpio = hdmi.ls_oe_gpio;
+	hdmi_data->hpd_gpio = hdmi.hpd_gpio;
+	dssdev->data = hdmi_data;
 
 	r = hdmi_init_display(dssdev);
 	if (r) {
@@ -2150,6 +2178,9 @@ static int __init omapdss_hdmihw_probe(struct platform_device *pdev)
 	if (r)
 		DSSWARN("could not create platform device for audio");
 #endif
+
+	if (hdmi_get_current_hpd())
+		hdmi_panel_hpd_handler(1);
 
 	return 0;
 

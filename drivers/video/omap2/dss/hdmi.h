@@ -23,6 +23,14 @@
 
 #include <linux/fb.h>
 
+int omapdss_hdmi_display_set_mode2(struct omap_dss_device *dssdev,
+				   struct fb_videomode *vm,
+				   int code, int mode);
+int hdmi_panel_set_mode(struct fb_videomode *vm, int code, int mode);
+int hdmi_panel_hpd_handler(int hpd);
+int hdmi_get_current_hpd(void);
+int hdmi_notify_hpd(struct omap_dss_device *dssdev, bool hpd);
+
 #ifdef CONFIG_USE_FB_MODE_DB
 int omapdss_hdmi_display_set_mode(struct omap_dss_device *dssdev,
 					struct fb_videomode *mode);
