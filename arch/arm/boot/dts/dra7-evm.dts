@@ -27,7 +27,7 @@
 
 	cpus {
 		cpu@0 {
-			cpu0-supply = <&avs_mpu>;
+			cpu0-supply = <&abb_mpu>;
 		};
 	};
 
@@ -73,7 +73,7 @@
 
 	ocp {
 		gpu: gpu@0x56000000 {
-		gpu-supply = <&avs_gpu>;
+		gpu-supply = <&abb_gpu>;
 		};
 	};
 

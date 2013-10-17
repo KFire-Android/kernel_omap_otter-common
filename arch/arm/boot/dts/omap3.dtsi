@@ -75,6 +75,11 @@
 			ti,hwmods = "counter_32k";
 		};
 
+		sysclk: sys {
+			#clock-cells = <0>;
+			compatible = "ti,omap-clock";
+		};
+
 		dpll1: dpll1 {
 			#clock-cells = <0>;
 			compatible = "ti,omap-clock";
