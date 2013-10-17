@@ -71,7 +71,8 @@ int omapfb_mode_to_dss_mode(struct fb_var_screeninfo *var,
                        enum omap_color_mode *mode);
 struct omap_video_timings;
 void omapfb_fb2dss_timings(struct fb_videomode *fb_timings,
-			struct omap_video_timings *dss_timings);
+				struct omap_video_timings *dss_timings);
 void omapfb_dss2fb_timings(struct omap_video_timings *dss_timings,
-			struct fb_videomode *fb_timings);
+				struct fb_videomode *fb_timings);
+
 #endif /* __OMAPFB_H */
