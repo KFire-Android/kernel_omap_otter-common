@@ -311,6 +311,14 @@
 		n_latch = <0xfeff>;
 	};
 
+	pcf_lcd3: pcf8575@21 {
+		compatible = "ti,pcf8575";
+		reg = <0x21>;
+		gpio-controller;
+		#gpio-cells = <2>;
+		n_latch = <0x1408>;
+	};
+
 	/* TLC chip for LCD panel power and backlight */
 	tlc59108: tlc59108@40 {
 		compatible = "ti,tlc59108";
@@ -457,6 +465,14 @@
 		hdmi-monitor {
 			compatible = "ti,hdmi_panel";
 		};
+	};
+};
+
+&dpi3 {
+	fpdlink {
+		compatible = "ti,lg101";
+		gpios = <&pcf_lcd3 0 0>; /* pcf8575@21 P0, SEL_GPMC_AD_VID_S0 */
+		data-lines = <24>;
 	};
 };
 
