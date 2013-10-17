@@ -65,6 +65,7 @@ config OMAP2_DSS_VENC
 
 config OMAP4_DSS_HDMI
 	bool "OMAP4 HDMI support"
+	depends on ARCH_OMAP4 || ANDROID_SWITCH
         default y
 	select I2C_ALGOBIT
 	help
@@ -138,5 +139,14 @@ config OMAP2_DSS_SLEEP_AFTER_VENC_RESET
 
 	  This option enables the sleep, and is enabled by default. You can
 	  disable the sleep if it doesn't cause problems on your platform.
+
+config USE_FB_MODE_DB
+	bool "Enable FB mode db support"
+	default n
+	select FB
+	select FB_MODE_HELPERS
+	select FB_OMAP2
+	help
+	  Enable FB mode support.
 
 endif

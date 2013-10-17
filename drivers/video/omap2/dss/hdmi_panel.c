@@ -143,11 +143,10 @@ static int hdmi_panel_probe(struct omap_dss_device *dssdev)
 	DSSDBG("hdmi_panel_probe x_res= %d y_res = %d\n",
 		dssdev->panel.timings.x_res,
 		dssdev->panel.timings.y_res);
-
+#ifndef CONFIG_USE_FB_MODE_DB
 	omapdss_hdmi_display_set_timing(dssdev, &dssdev->panel.timings);
-
 	hdmi.dssdev = dssdev;
-
+#endif
 	return 0;
 }
 
@@ -326,9 +325,9 @@ static int hdmi_panel_enable(struct omap_dss_device *dssdev)
 		r = -EINVAL;
 		goto err;
 	}
-
+#ifndef CONFIG_USE_FB_MODE_DB
 	omapdss_hdmi_display_set_timing(dssdev, &dssdev->panel.timings);
-
+#endif
 	r = omapdss_hdmi_display_enable(dssdev);
 	if (r) {
 		DSSERR("failed to power on\n");
@@ -412,10 +411,14 @@ static void hdmi_set_timings(struct omap_dss_device *dssdev,
 	 */
 	hdmi_panel_audio_disable(dssdev);
 
-	omapdss_hdmi_display_set_timing(dssdev, timings);
 	dssdev->panel.timings = *timings;
-
+#ifndef CONFIG_USE_FB_MODE_DB
+	omapdss_hdmi_display_set_timing(dssdev, timings);
 	mutex_unlock(&hdmi.lock);
+#else
+	mutex_unlock(&hdmi.lock);
+	omapdss_hdmi_display_set_timing(dssdev, timings);
+#endif
 }
 
 static int hdmi_check_timings(struct omap_dss_device *dssdev,
@@ -496,6 +499,18 @@ MODULE_DEVICE_TABLE(of, hdmi_panel_of_match);
 #define dss_of_match NULL
 #endif
 
+#ifdef CONFIG_USE_FB_MODE_DB
+static int hdmi_get_modedb(struct omap_dss_device *dssdev,
+			   struct fb_videomode *modedb, int modedb_len)
+{
+	struct fb_monspecs *specs = &dssdev->panel.monspecs;
+	if (specs->modedb_len < modedb_len)
+		modedb_len = specs->modedb_len;
+	memcpy(modedb, specs->modedb, sizeof(*modedb) * modedb_len);
+	return modedb_len;
+}
+#endif
+
 static struct omap_dss_driver hdmi_driver = {
 	.probe		= hdmi_panel_probe,
 	.remove		= hdmi_panel_remove,
@@ -505,6 +520,10 @@ static struct omap_dss_driver hdmi_driver = {
 	.set_timings	= hdmi_set_timings,
 	.check_timings	= hdmi_check_timings,
 	.read_edid	= hdmi_read_edid,
+#ifdef CONFIG_USE_FB_MODE_DB
+	.get_modedb	= hdmi_get_modedb,
+	.set_mode       = omapdss_hdmi_display_set_mode,
+#endif
 	.detect		= hdmi_detect,
 	.audio_enable	= hdmi_panel_audio_enable,
 	.audio_disable	= hdmi_panel_audio_disable,
