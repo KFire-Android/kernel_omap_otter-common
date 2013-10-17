@@ -23,6 +23,8 @@
 
 #include <linux/fb.h>
 
+extern struct device_attribute dev_attr_hdmi_timings;
+
 int omapdss_hdmi_display_set_mode2(struct omap_dss_device *dssdev,
 				   struct fb_videomode *vm,
 				   int code, int mode);
