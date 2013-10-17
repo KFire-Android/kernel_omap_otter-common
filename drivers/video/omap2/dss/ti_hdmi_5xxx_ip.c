@@ -27,6 +27,7 @@
 #include <linux/delay.h>
 #include <linux/string.h>
 #include <linux/seq_file.h>
+#include <drm/drm_edid.h>
 #if defined(CONFIG_OMAP5_DSS_HDMI_AUDIO)
 #include <sound/asound.h>
 #include <sound/asoundef.h>
@@ -84,6 +85,7 @@ static inline int hdmi_wait_for_bit_change(void __iomem *base_addr,
 	return val;
 }
 
+#ifdef CONFIG_OMAP5_DSS_HDMI_DDC
 static inline void hdmi_core_ddc_req_addr(struct hdmi_ip_data *ip_data,
 						u8 addr, int ext)
 {
@@ -100,8 +102,82 @@ static inline void hdmi_core_ddc_req_addr(struct hdmi_ip_data *ip_data,
 		REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_OPERATION, 1, 0, 0);
 }
 
-#define EDID_LENGTH 128
+static void hdmi_core_ddc_init(struct hdmi_ip_data *ip_data)
+{
+	void __iomem *core_sys_base = hdmi_core_sys_base(ip_data);
 
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_SDA_HOLD_ADDR, 0x18, 7, 0);
+
+	/*Mask the interrupts*/
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_CTLINT, 0x0, 2, 2);
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_CTLINT, 0x0, 6, 6);
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_INT, 0x0, 2, 2);
+
+	/* Master clock division */
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_DIV, 0x5, 3, 0);
+
+	/* Standard speed counter */
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_SS_SCL_HCNT_1_ADDR, 0x0,
+		7, 0);
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_SS_SCL_HCNT_0_ADDR, 0x6C,
+		7, 0);
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_SS_SCL_LCNT_1_ADDR, 0x0,
+		7, 0);
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_SS_SCL_LCNT_0_ADDR, 0x7F,
+		7, 0);
+
+	/* Fast speed counter*/
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_FS_SCL_HCNT_1_ADDR, 0x0,
+		7, 0);
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_FS_SCL_HCNT_0_ADDR, 0x0F,
+		7, 0);
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_FS_SCL_LCNT_1_ADDR, 0x0,
+		7, 0);
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_FS_SCL_LCNT_0_ADDR, 0x21,
+		7, 0);
+
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_SLAVE, 0x50, 6, 0);
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_SEGADDR, 0x30, 6, 0);
+}
+
+static int hdmi_core_ddc_edid(struct hdmi_ip_data *ip_data,
+					u8 *pedid, int ext)
+{
+	u8 cur_addr = 0;
+	char checksum = 0;
+	void __iomem *core_sys_base = hdmi_core_sys_base(ip_data);
+
+	hdmi_core_ddc_req_addr(ip_data, cur_addr, ext);
+
+	/* Unmask the interrupts*/
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_CTLINT, 0x1, 2, 2);
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_CTLINT, 0x1, 6, 6);
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_I2CM_INT, 0x1, 2, 2);
+
+	/* FIXME:This is a hack to  read only 128 bytes data with a mdelay
+	 * Ideally the read has to be based on the done interrupt and
+	 * status which is not received thus it is ignored for now
+	 */
+	while (cur_addr < 128) {
+	#if 0
+		if (hdmi_wait_for_bit_change(core_sys_base, HDMI_CORE_I2CM_INT,
+						0, 0, 1) != 1) {
+			DSSERR("Failed to recieve done interrupt\n");
+			return -ETIMEDOUT;
+		}
+	#endif
+		mdelay(1);
+		pedid[cur_addr] = REG_GET(core_sys_base,
+					HDMI_CORE_I2CM_DATAI, 7, 0);
+		DSSDBG("pedid[%d] = %x", cur_addr, pedid[cur_addr]);
+		checksum += pedid[cur_addr++];
+		hdmi_core_ddc_req_addr(ip_data, cur_addr, ext);
+	}
+
+	return 0;
+
+}
+#else
 static int read_one_block(u8 *edid, unsigned int block)
 {
 	struct i2c_adapter *adapter = omapdss_hdmi_adapter();
@@ -142,32 +218,57 @@ static int read_one_block(u8 *edid, unsigned int block)
 
 	return r == xfers ? 0 : -1;
 }
+#endif
 
 int ti_hdmi_5xxx_read_edid(struct hdmi_ip_data *ip_data,
 				u8 *edid, int len)
 {
-	int num_extensions, bytes_read = 0, i;
+#ifdef CONFIG_OMAP5_DSS_HDMI_DDC
+	int r, n, i;
+	int max_ext_blocks = (len / 128) - 1;
 
+	if (len < 128)
+		return -EINVAL;
+
+	hdmi_core_ddc_init(ip_data);
+
+	r = hdmi_core_ddc_edid(ip_data, edid, 0);
+	if (r)
+		return r;
+	else {
+		/*Multiblock read*/
+		n = edid[0x7e];
+
+		if (n > max_ext_blocks)
+			n = max_ext_blocks;
+		for (i = 1; i <= n; i++) {
+			r = hdmi_core_ddc_edid(ip_data,
+					edid + i*EDID_LENGTH, i);
+			if (r)
+				return r;
+		}
+	}
+
+#else
+	int num_extensions, bytes_read = 0, i;
 	/* get base block */
 	if (read_one_block(edid, 0))
-		goto bad;
+		return -EINVAL;
 
 	num_extensions = edid[0x7e];
 	bytes_read += EDID_LENGTH;
 
 	for (i = 1; i <= num_extensions; i++) {
 		if (bytes_read >= len)
-			break;
+			return -EINVAL;
 
 		if (read_one_block(edid + EDID_LENGTH * i, i))
-			break;
+			return -EINVAL;
 
 		bytes_read += EDID_LENGTH;
-
 	}
 
-	return bytes_read;
-bad:
+#endif
 	return 0;
 }
 

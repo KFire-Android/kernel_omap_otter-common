@@ -29,12 +29,6 @@ struct hdmi_ip_data;
 struct hdmi_audio_dma;
 #endif
 
-enum level_shifter_state {
-	LS_DISABLED = 0,        /* HPD off, LS off */
-	LS_HPD_ON,              /* HPD on, LS off */
-	LS_ENABLED,             /* HPD on, LS on */
-};
-
 enum hdmi_pll_pwr {
 	HDMI_PLLPWRCMD_ALLOFF = 0,
 	HDMI_PLLPWRCMD_PLLONLY = 1,

@@ -522,7 +522,6 @@ static void hdmi_hotplug_detect_worker(struct work_struct *work)
 			dssdev->driver->disable(dssdev);
 			/* clear EDID and mode */
 			omapdss_hdmi_clear_edid();
-			sel_i2c();
 			mutex_lock(&hdmi.lock);
 		}
 		goto done;
@@ -530,11 +529,11 @@ static void hdmi_hotplug_detect_worker(struct work_struct *work)
 		if (state == HPD_STATE_EDID_TRYLAST) {
 			DSSINFO("Failed to read EDID after %d times."
 				"Giving up.", state - HPD_STATE_START);
-			sel_i2c();
+			hdmi_set_ls_state(LS_HPD_ON);
 			goto done;
 		} else if (state == HPD_STATE_START ||
 				state != HPD_STATE_EDID_READ_OK) {
-			sel_hdmi();
+			hdmi_set_ls_state(LS_ENABLED);
 			/* Read EDID before we turn on the HDMI */
 			DSSERR("%s state = %d\n", __func__, state);
 			if (hdmi_read_valid_edid()) {
