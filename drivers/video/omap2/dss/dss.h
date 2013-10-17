@@ -116,6 +116,12 @@ struct dss_clock_info {
 	u16 fck_div;
 };
 
+enum omap_burst_size {
+	BURST_SIZE_X2 = 0,
+	BURST_SIZE_X4 = 1,
+	BURST_SIZE_X8 = 2,
+};
+
 struct dispc_clock_info {
 	/* rates that we get with dividers below */
 	unsigned long lck;
@@ -181,6 +187,35 @@ struct dpi_common_ops {
 		struct omap_video_timings *timings);
 	void (*set_data_lines) (struct omap_dss_device *dssdev,
 		int data_lines);
+};
+
+struct writeback_cache_data {
+	/* If true, cache changed, but not written to shadow registers.
+	 * cleared when registers written.
+	 */
+	bool dirty;
+	/* If true, shadow registers contain changed values not yet in real
+	 * registers. Set when writing to shadow registers, cleared at
+	 * VSYNC/EVSYNC
+	 */
+	bool shadow_dirty;
+	bool enabled;
+	u32 paddr;
+	u32 p_uv_addr; /* relevant for NV12 format only */
+	u16 out_width;
+	u16 out_height;
+	u16 width;
+	u16 height;
+	u32	fifo_low;
+	u32	fifo_high;
+	enum omap_color_mode			color_mode;
+	enum omap_color_mode			input_color_mode;
+	enum omap_writeback_capturemode		capturemode;
+	enum omap_writeback_source		source;
+	enum omap_burst_size			burst_size;
+	enum omap_writeback_mode		mode;
+	u8					rotation;
+	enum omap_dss_rotation_type		rotation_type;
 };
 
 struct seq_file;
@@ -261,6 +296,12 @@ int dss_overlay_kobj_init(struct omap_overlay *ovl,
 		struct platform_device *pdev);
 void dss_overlay_kobj_uninit(struct omap_overlay *ovl);
 
+/* Write back */
+void dss_init_writeback(struct platform_device *pdev);
+void dss_uninit_writeback(struct platform_device *pdev);
+bool omap_dss_check_wb(struct writeback_cache_data *wb, int overlay_id,
+		       int manager_id);
+
 /* DSS */
 int dss_init_platform_driver(void) __init;
 void dss_uninit_platform_driver(void);
@@ -283,6 +324,7 @@ void dss_sdi_init(int datapairs);
 int dss_sdi_enable(void);
 void dss_sdi_disable(void);
 
+void dss_select_dispc_clk_source(enum omap_dss_clk_source clk_src);
 void dss_select_dsi_clk_source(int dsi_module,
 		enum omap_dss_clk_source clk_src);
 void dss_select_lcd_clk_source(enum omap_channel channel,
@@ -431,6 +473,7 @@ void dispc_mgr_set_clock_div(enum omap_channel channel,
 		const struct dispc_clock_info *cinfo);
 int dispc_mgr_get_clock_div(enum omap_channel channel,
 		struct dispc_clock_info *cinfo);
+void dispc_mgr_set_size(enum omap_channel channel, u16 width, u16 height);
 
 u32 dispc_wb_get_framedone_irq(void);
 bool dispc_wb_go_busy(void);

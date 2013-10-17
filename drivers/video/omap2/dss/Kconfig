@@ -65,6 +65,7 @@ config OMAP2_DSS_VENC
 
 config OMAP4_DSS_HDMI
 	bool "OMAP4 HDMI support"
+	depends on ARCH_OMAP4 || ANDROID_SWITCH
         default y
 	select I2C_ALGOBIT
 	help
@@ -90,6 +91,25 @@ config OMAP5_DSS_HDMI
 	help
 	    HDMI Interface.This add the High Deinition Multimedia Interface.
 	    See http://wwww.hdmi.org/ for HDMI specification.
+
+config OMAP5_DSS_HDMI_DDC
+	bool "OMAP5 HDMI DDC support"
+	depends on OMAP5_DSS_HDMI
+	default y
+	help
+	  HDMI DDC interface. This adds support for selecting DDC or I2C2 lines
+	  for HDMI DDC transfer.
+	  EDID can be read using direct I2C commands sent to the external display
+	  over I2C lines or by configuring the DDC registers in the core.
+
+config OMAP4_HDCP_SUPPORT
+	bool "OMAP4 HDCP support"
+	depends on OMAP4_DSS_HDMI
+	default n
+	help
+	  High-bandwidth Digital Content Protection (HDCP).
+	  This option required for OMAP4 HDCP support.
+
 config OMAP2_DSS_SDI
 	bool "SDI support"
         default n
@@ -138,5 +158,22 @@ config OMAP2_DSS_SLEEP_AFTER_VENC_RESET
 
 	  This option enables the sleep, and is enabled by default. You can
 	  disable the sleep if it doesn't cause problems on your platform.
+
+config USE_FB_MODE_DB
+	bool "Enable FB mode db support"
+	default n
+	select FB
+	select FB_MODE_HELPERS
+	select FB_OMAP2
+	help
+	  Enable FB mode support.
+
+config SWITCH_STATE
+	bool "Enable hpd switch state"
+	depends on OMAP5_DSS_HDMI
+	default n
+	help
+	  HDMI HDP switch state interface. This adds support for sending
+	  HDMI HPD switch state events to user space.
 
 endif

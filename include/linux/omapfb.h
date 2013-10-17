@@ -39,4 +39,10 @@ struct omapfb_platform_data {
 
 void __init omapfb_set_lcd_config(const struct omap_lcd_config *config);
 
+struct omap_video_timings;
+void omapfb_fb2dss_timings(struct fb_videomode *fb_timings,
+				struct omap_video_timings *dss_timings);
+void omapfb_dss2fb_timings(struct omap_video_timings *dss_timings,
+				struct fb_videomode *fb_timings);
+
 #endif /* __OMAPFB_H */

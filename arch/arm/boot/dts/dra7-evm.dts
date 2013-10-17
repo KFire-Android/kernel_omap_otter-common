@@ -136,6 +136,7 @@
 		&atl_pins
 		&mcasp3_pins
 		&mcasp6_pins
+		&mcasp8_pins
 		&vout1_pins
 		&vin1a_pins
 		&usb_pins
@@ -174,6 +175,12 @@
 			0x420	0x1	/* Wakeup2 INPUT | MODE1 */
                 >;
         };
+	};
+
+	mcasp8_pins: pinmux_mcasp8_pins {
+		pinctrl-single,pins = <
+			0x2fc 0x00040001	/* mcasp2_aclkr.mcasp8_axr2 OUTPUT | MODE1 */
+		>;
 	};
 
 	usb_pins: pinmux_usb_pins {
