@@ -157,9 +157,24 @@ int dss_ovl_check(struct omap_overlay *ovl, struct omap_overlay_info *info,
 {
 	u16 outw, outh;
 	u16 dw, dh;
+	struct omap_writeback_info wb_info;
+	struct omap_writeback *wb;
 
 	dw = mgr_timings->x_res;
 	dh = mgr_timings->y_res;
+
+	wb = omap_dss_get_wb(0);
+	if (wb) {
+		wb->get_wb_info(wb, &wb_info);
+
+		if (wb_info.mode == OMAP_WB_MEM2MEM_MODE &&
+			(int)ovl->manager->id == (int)wb_info.source &&
+			ovl->get_device(ovl)->state !=
+			OMAP_DSS_DISPLAY_ACTIVE) {
+			dw = wb_info.width;
+			dh = wb_info.height;
+		}
+	}
 
 	if ((ovl->caps & OMAP_DSS_OVL_CAP_SCALE) == 0) {
 		outw = info->width;
@@ -176,18 +191,20 @@ int dss_ovl_check(struct omap_overlay *ovl, struct omap_overlay_info *info,
 			outh = info->out_height;
 	}
 
-	if (dw < info->pos_x + outw) {
-		DSSERR("overlay %d horizontally not inside the display area "
-				"(%d + %d >= %d)\n",
-				ovl->id, info->pos_x, outw, dw);
-		return -EINVAL;
-	}
+	if (!info->wb_source) {
+		if (dw < info->pos_x + outw) {
+			DSSERR("%s: overlay %d horizontally not inside the "
+					"display area (%d + %d >= %d)\n",
+				__func__, ovl->id, info->pos_x, outw, dw);
+			return -EINVAL;
+		}
 
-	if (dh < info->pos_y + outh) {
-		DSSERR("overlay %d vertically not inside the display area "
-				"(%d + %d >= %d)\n",
-				ovl->id, info->pos_y, outh, dh);
-		return -EINVAL;
+		if (dh < info->pos_y + outh) {
+			DSSERR("%s: overlay %d vertically not inside the "
+					"display area (%d + %d >= %d)\n",
+				__func__, ovl->id, info->pos_y, outh, dh);
+			return -EINVAL;
+		}
 	}
 
 	return 0;

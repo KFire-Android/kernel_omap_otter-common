@@ -157,56 +157,18 @@ struct vpdma_data_format vpdma_misc_fmts[] = {
 	},
 };
 
-struct vpdma_channel_info {
-	int num;		/* VPDMA channel number */
-	int cstat_offset;	/* client CSTAT register offset */
-};
-
-static struct vpdma_channel_info chan_info[] = {
-	[VPE_CHAN_LUMA1_IN] = {
-		.num		= VPE_CHAN_NUM_LUMA1_IN,
-		.cstat_offset	= VPDMA_DEI_LUMA1_CSTAT,
-	},
-	[VPE_CHAN_CHROMA1_IN] = {
-		.num		= VPE_CHAN_NUM_CHROMA1_IN,
-		.cstat_offset	= VPDMA_DEI_CHROMA1_CSTAT,
-	},
-	[VPE_CHAN_LUMA2_IN] = {
-		.num		= VPE_CHAN_NUM_LUMA2_IN,
-		.cstat_offset	= VPDMA_DEI_LUMA2_CSTAT,
-	},
-	[VPE_CHAN_CHROMA2_IN] = {
-		.num		= VPE_CHAN_NUM_CHROMA2_IN,
-		.cstat_offset	= VPDMA_DEI_CHROMA2_CSTAT,
-	},
-	[VPE_CHAN_LUMA3_IN] = {
-		.num		= VPE_CHAN_NUM_LUMA3_IN,
-		.cstat_offset	= VPDMA_DEI_LUMA3_CSTAT,
-	},
-	[VPE_CHAN_CHROMA3_IN] = {
-		.num		= VPE_CHAN_NUM_CHROMA3_IN,
-		.cstat_offset	= VPDMA_DEI_CHROMA3_CSTAT,
-	},
-	[VPE_CHAN_MV_IN] = {
-		.num		= VPE_CHAN_NUM_MV_IN,
-		.cstat_offset	= VPDMA_DEI_MV_IN_CSTAT,
-	},
-	[VPE_CHAN_MV_OUT] = {
-		.num		= VPE_CHAN_NUM_MV_OUT,
-		.cstat_offset	= VPDMA_DEI_MV_OUT_CSTAT,
-	},
-	[VPE_CHAN_LUMA_OUT] = {
-		.num		= VPE_CHAN_NUM_LUMA_OUT,
-		.cstat_offset	= VPDMA_VIP_UP_Y_CSTAT,
-	},
-	[VPE_CHAN_CHROMA_OUT] = {
-		.num		= VPE_CHAN_NUM_CHROMA_OUT,
-		.cstat_offset	= VPDMA_VIP_UP_UV_CSTAT,
-	},
-	[VPE_CHAN_RGB_OUT] = {
-		.num		= VPE_CHAN_NUM_RGB_OUT,
-		.cstat_offset	= VPDMA_VIP_UP_Y_CSTAT,
-	},
+static int cstat_offset[256] = {
+	[VPE_CHAN_NUM_LUMA1_IN] = VPDMA_DEI_LUMA1_CSTAT,
+	[VPE_CHAN_NUM_CHROMA1_IN] = VPDMA_DEI_CHROMA1_CSTAT,
+	[VPE_CHAN_NUM_LUMA2_IN] = VPDMA_DEI_LUMA2_CSTAT,
+	[VPE_CHAN_NUM_CHROMA2_IN] = VPDMA_DEI_CHROMA2_CSTAT,
+	[VPE_CHAN_NUM_LUMA3_IN] = VPDMA_DEI_LUMA3_CSTAT,
+	[VPE_CHAN_NUM_CHROMA3_IN] = VPDMA_DEI_CHROMA3_CSTAT,
+	[VPE_CHAN_NUM_MV_IN] = VPDMA_DEI_MV_IN_CSTAT,
+	[VPE_CHAN_NUM_MV_OUT] = VPDMA_DEI_MV_OUT_CSTAT,
+	[VPE_CHAN_NUM_LUMA_OUT] = VPDMA_VIP_UP_Y_CSTAT,
+	[VPE_CHAN_NUM_CHROMA_OUT] = VPDMA_VIP_UP_UV_CSTAT,
+	[VPE_CHAN_NUM_RGB_OUT] = VPDMA_VIP_UP_Y_CSTAT,
 };
 
 static u32 read_reg(struct vpdma_data *vpdma, int offset)
@@ -413,7 +375,7 @@ void vpdma_free_desc_list(struct vpdma_desc_list *list)
 	list->next = NULL;
 }
 
-static int vpdma_list_busy(struct vpdma_data *vpdma, int list_num)
+int vpdma_list_busy(struct vpdma_data *vpdma, int list_num)
 {
 	u32 sync_reg = read_reg(vpdma, VPDMA_LIST_STAT_SYNC);
 
@@ -445,6 +407,18 @@ int vpdma_submit_descs(struct vpdma_data *vpdma, struct vpdma_desc_list *list)
 	return 0;
 }
 
+void vpdma_vip_set_max_size(struct vpdma_data *vpdma, int vip_num)
+{
+	u32 val = 0;
+
+	if (vip_num == 1) {
+		insert_field(&val, 1919, VPDMA_MAX_SIZE_WIDTH_MASK, VPDMA_MAX_SIZE_WIDTH_SHFT);
+		insert_field(&val, 1079, VPDMA_MAX_SIZE_HEIGHT_MASK, VPDMA_MAX_SIZE_HEIGHT_SHFT);
+		write_reg(vpdma, VPDMA_MAX_SIZE1, val);
+	}
+}
+
+#ifdef VPDMA_DEBUG
 static void dump_cfd(struct vpdma_cfd *cfd)
 {
 	int class;
@@ -469,6 +443,7 @@ static void dump_cfd(struct vpdma_cfd *cfd)
 		cfd_get_direct(cfd), class, cfd_get_dest(cfd),
 		cfd_get_payload_len(cfd));
 }
+#endif
 
 /*
  * append a configuration descriptor to the given descriptor list, where the
@@ -494,7 +469,9 @@ void vpdma_add_cfd_block(struct vpdma_desc_list *list, int client,
 
 	list->next = cfd + 1;
 
+#ifdef VPDMA_DEBUG
 	dump_cfd(cfd);
+#endif
 }
 
 /*
@@ -522,7 +499,9 @@ void vpdma_add_cfd_adb(struct vpdma_desc_list *list, int client,
 
 	list->next = cfd + 1;
 
+#ifdef VPDMA_DEBUG
 	dump_cfd(cfd);
+#endif
 };
 
 /*
@@ -530,6 +509,7 @@ void vpdma_add_cfd_adb(struct vpdma_desc_list *list, int client,
  * is, we only use 'sync on channel' control descriptors for now, so assume it's
  * that
  */
+#ifdef VPDMA_DEBUG
 static void dump_ctd(struct vpdma_ctd *ctd)
 {
 	pr_debug("control descriptor\n");
@@ -537,6 +517,7 @@ static void dump_ctd(struct vpdma_ctd *ctd)
 	pr_debug("word3: pkt_type = %d, source = %d, ctl_type = %d\n",
 		ctd_get_pkt_type(ctd), ctd_get_source(ctd), ctd_get_ctl(ctd));
 }
+#endif
 
 /*
  * append a 'sync on channel' type control descriptor to the given descriptor
@@ -544,7 +525,7 @@ static void dump_ctd(struct vpdma_ctd *ctd)
  * on the specified channel
  */
 void vpdma_add_sync_on_channel_ctd(struct vpdma_desc_list *list,
-		enum vpdma_channel chan)
+		 int channel)
 {
 	struct vpdma_ctd *ctd;
 
@@ -554,14 +535,16 @@ void vpdma_add_sync_on_channel_ctd(struct vpdma_desc_list *list,
 	ctd_set_w0(ctd, 0);
 	ctd_set_w1(ctd, 0);
 	ctd_set_w2(ctd, 0);
-	ctd_set_type_source_ctl(ctd, chan_info[chan].num,
-		CTD_TYPE_SYNC_ON_CHANNEL);
+	ctd_set_type_source_ctl(ctd, channel, CTD_TYPE_SYNC_ON_CHANNEL);
 
 	list->next = ctd + 1;
 
+#ifdef VPDMA_DEBUG
 	dump_ctd(ctd);
+#endif
 }
 
+#ifdef VPDMA_DEBUG
 static void dump_dtd(struct vpdma_dtd *dtd)
 {
 	int dir, chan;
@@ -608,24 +591,23 @@ static void dump_dtd(struct vpdma_dtd *dtd)
 	pr_debug("word6: client specfic attr0 = 0x%08x\n", dtd->client_attr0);
 	pr_debug("word7: client specfic attr1 = 0x%08x\n", dtd->client_attr1);
 }
+#endif
 
 /*
  * append an outbound data transfer descriptor to the given descriptor list,
  * this sets up a 'client to memory' VPDMA transfer for the given VPDMA channel
  */
-void vpdma_add_out_dtd(struct vpdma_desc_list *list, struct v4l2_rect *c_rect,
-		struct vpdma_data_format *fmt, dma_addr_t dma_addr,
-		enum vpdma_channel chan, u32 flags)
+int vpdma_add_out_dtd(struct vpdma_desc_list *list, struct v4l2_rect *c_rect,
+		struct vpdma_data_format *fmt, dma_addr_t dma_addr, int channel,
+		u32 flags)
 {
 	int priority = 0;
 	int field = 0;
 	int notify = 1;
-	int channel, next_chan;
+	int next_chan = channel;
 	int depth = fmt->depth;
 	int stride;
 	struct vpdma_dtd *dtd;
-
-	channel = next_chan = chan_info[chan].num;
 
 	if (fmt->data_type == DATA_TYPE_C420)
 		depth = 8;
@@ -654,9 +636,12 @@ void vpdma_add_out_dtd(struct vpdma_desc_list *list, struct v4l2_rect *c_rect,
 	dtd_set_client_attr0(dtd, 0);
 	dtd_set_client_attr1(dtd, 0);
 
+#ifdef VPDMA_DEBUG
+	dump_dtd(dtd);
+#endif
 	list->next = dtd + 1;
 
-	dump_dtd(dtd);
+	return 0;
 }
 
 /*
@@ -666,17 +651,15 @@ void vpdma_add_out_dtd(struct vpdma_desc_list *list, struct v4l2_rect *c_rect,
 void vpdma_add_in_dtd(struct vpdma_desc_list *list, int frame_width,
 		int frame_height, struct v4l2_rect *c_rect,
 		struct vpdma_data_format *fmt, dma_addr_t dma_addr,
-		enum vpdma_channel chan, int field, u32 flags)
+		int channel, int field, u32 flags)
 {
 	int priority = 0;
 	int notify = 1;
 	int depth = fmt->depth;
-	int channel, next_chan;
+	int next_chan = channel;
 	int stride;
 	int height = c_rect->height;
 	struct vpdma_dtd *dtd;
-
-	channel = next_chan = chan_info[chan].num;
 
 	if (fmt->data_type == DATA_TYPE_C420) {
 		height >>= 1;
@@ -708,9 +691,11 @@ void vpdma_add_in_dtd(struct vpdma_desc_list *list, int frame_width,
 	dtd_set_client_attr0(dtd, 0);
 	dtd_set_client_attr1(dtd, 0);
 
-	list->next = dtd + 1;
-
+#ifdef VPDMA_DEBUG
 	dump_dtd(dtd);
+#endif
+
+	list->next = dtd + 1;
 }
 
 /* set or clear the mask for list complete interrupt */
@@ -740,16 +725,16 @@ void vpdma_clear_list_stat(struct vpdma_data *vpdma)
  * passed to the client as is
  */
 void vpdma_set_line_mode(struct vpdma_data *vpdma, int line_mode,
-		enum vpdma_channel chan)
+		int channel)
 {
 	int client_cstat;
 
-	if (chan >= ARRAY_SIZE(chan_info)) {
+	if (channel >= ARRAY_SIZE(cstat_offset)) {
 		dev_err(&vpdma->pdev->dev, "invalid VPDMA channel\n");
 		return;
 	}
 
-	client_cstat = chan_info[chan].cstat_offset;
+	client_cstat = cstat_offset[channel];
 
 	insert_field_reg(vpdma, client_cstat, line_mode,
 		VPDMA_CSTAT_LINE_MODE_MASK, VPDMA_CSTAT_LINE_MODE_SHIFT);
@@ -760,17 +745,16 @@ void vpdma_set_line_mode(struct vpdma_data *vpdma, int line_mode,
  * client
  */
 void vpdma_set_frame_start_event(struct vpdma_data *vpdma,
-		enum vpdma_frame_start_event fs_event,
-		enum vpdma_channel chan)
+		enum vpdma_frame_start_event fs_event, int channel)
 {
 	int client_cstat;
 
-	if (chan >= ARRAY_SIZE(chan_info)) {
+	if (channel >= ARRAY_SIZE(cstat_offset)) {
 		dev_err(&vpdma->pdev->dev, "invalid VPDMA channel\n");
 		return;
 	}
 
-	client_cstat = chan_info[chan].cstat_offset;
+	client_cstat = cstat_offset[channel];
 
 	insert_field_reg(vpdma, client_cstat, fs_event,
 		VPDMA_CSTAT_FRAME_START_MASK, VPDMA_CSTAT_FRAME_START_SHIFT);

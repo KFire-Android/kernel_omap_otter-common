@@ -28,6 +28,10 @@
 #define VPDMA_MAX_SIZE1		0x34
 #define VPDMA_MAX_SIZE2		0x38
 #define VPDMA_MAX_SIZE3		0x3c
+#define VPDMA_MAX_SIZE_WIDTH_MASK	0xffff
+#define VPDMA_MAX_SIZE_WIDTH_SHFT	16
+#define VPDMA_MAX_SIZE_HEIGHT_MASK	0xffff
+#define VPDMA_MAX_SIZE_HEIGHT_SHFT	0
 
 /* Interrupts */
 #define VPDMA_INT_CHAN_STAT(grp)	(0x40 + grp * 8)
@@ -41,7 +45,7 @@
 
 #define VPDMA_PERFMON(i)		(0x200 + i * 4)
 
-/* VPE specific client registers */
+/* VIP/VPE client registers */
 #define VPDMA_DEI_CHROMA1_CSTAT		0x0300
 #define VPDMA_DEI_LUMA1_CSTAT		0x0304
 #define VPDMA_DEI_LUMA2_CSTAT		0x0308
@@ -50,6 +54,8 @@
 #define VPDMA_DEI_CHROMA3_CSTAT		0x0314
 #define VPDMA_DEI_MV_IN_CSTAT		0x0330
 #define VPDMA_DEI_MV_OUT_CSTAT		0x033c
+#define VPDMA_VIP_LO_Y_CSTAT		0x0388
+#define VPDMA_VIP_LO_UV_CSTAT		0x038c
 #define VPDMA_VIP_UP_Y_CSTAT		0x0390
 #define VPDMA_VIP_UP_UV_CSTAT		0x0394
 #define VPDMA_VPI_CTL_CSTAT		0x03d0
@@ -115,6 +121,11 @@
 #define	VPE_CHAN_NUM_LUMA_OUT		102
 #define	VPE_CHAN_NUM_CHROMA_OUT		103
 #define	VPE_CHAN_NUM_RGB_OUT		106
+#define VIP1_CHAN_NUM_MULT_PORT_A_SRC0	38
+#define VIP1_CHAN_NUM_MULT_ANC_A_SRC0	70
+#define VIP1_CHAN_NUM_PORT_B_LUMA	104
+#define VIP1_CHAN_NUM_PORT_B_CHROMA	105
+#define VIP1_CHAN_NUM_PORT_A_RGB	106
 
 /*
  * a VPDMA address data block payload for a configuration descriptor needs to
@@ -645,11 +656,12 @@ struct vpdma_ctd {
 #define CTD_TYPE_SYNC_ON_CLIENT		0
 #define CTD_TYPE_SYNC_ON_LIST		1
 #define CTD_TYPE_SYNC_ON_EXT		2
-#define CTD_TYPE_SYNC_ON_CHANNEL	3
-#define CTD_TYPE_CHNG_CLIENT_IRQ	4
-#define CTD_TYPE_SEND_IRQ		5
-#define CTD_TYPE_RELOAD_LIST		6
-#define CTD_TYPE_ABORT_CHANNEL		6
+#define CTD_TYPE_SYNC_ON_LM_TIMER	3
+#define CTD_TYPE_SYNC_ON_CHANNEL	4
+#define CTD_TYPE_CHNG_CLIENT_IRQ	5
+#define CTD_TYPE_SEND_IRQ		6
+#define CTD_TYPE_RELOAD_LIST		7
+#define CTD_TYPE_ABORT_CHANNEL		8
 
 #define CTD_PKT_TYPE		0xc
 

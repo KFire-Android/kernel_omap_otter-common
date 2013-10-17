@@ -233,6 +233,9 @@ static int __init omap_dss_probe(struct platform_device *pdev)
 
 	dss_features_init(omapdss_get_version());
 
+	if (dss_has_feature(FEAT_WB))
+		dss_init_writeback(pdev);
+
 	r = dss_initialize_debugfs();
 	if (r)
 		goto err_debugfs;
