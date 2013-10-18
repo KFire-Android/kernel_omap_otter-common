@@ -1479,6 +1479,9 @@ static struct clk dss_sys_clk = {
 	.enable_reg	= OMAP4430_CM_DSS_DSS_CLKCTRL,
 	.enable_bit	= OMAP4430_OPTFCLKEN_SYS_CLK_SHIFT,
 	.clkdm_name	= "l3_dss_clkdm",
+#ifdef CONFIG_MACH_OMAP_4430_KC1
+	.flags		= ENABLE_ON_INIT,
+#endif
 	.parent		= &syc_clk_div_ck,
 	.recalc		= &followparent_recalc,
 };
@@ -1545,6 +1548,9 @@ static struct clk dss_48mhz_clk = {
 	.clkdm_name	= "l3_dss_clkdm",
 	.parent		= &func_48mc_fclk,
 	.recalc		= &followparent_recalc,
+#ifdef CONFIG_MACH_OMAP_4430_KC1
+	.flags		= ENABLE_ON_INIT,
+#endif
 };
 
 static struct clk efuse_ctrl_cust_fck = {
@@ -2410,6 +2416,9 @@ static struct clk timer10_fck = {
 	.enable_reg	= OMAP4430_CM_L4PER_DMTIMER10_CLKCTRL,
 	.enable_bit	= OMAP4430_MODULEMODE_SWCTRL,
 	.clkdm_name	= "l4_per_clkdm",
+#ifdef CONFIG_MACH_OMAP_4430_KC1
+	.flags		= ENABLE_ON_INIT,
+#endif
 };
 
 /* Merged cm2_dm11_mux into timer11 */
