@@ -49,7 +49,11 @@
 struct omap_iommu_domain {
 	u32 *pgtable;
 	struct omap_iommu *iommu_dev;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	struct mutex lock;
+#else
 	spinlock_t lock;
+#endif
 };
 
 /* accommodate the difference between omap1 and omap2/3 */
@@ -617,9 +621,17 @@ static u32 *iopte_alloc(struct omap_iommu *obj, u32 *iopgd, u32 da)
 	/*
 	 * do the allocation outside the page table lock
 	 */
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	mutex_unlock(&obj->page_table_lock);
+#else
 	spin_unlock(&obj->page_table_lock);
+#endif
 	iopte = kmem_cache_zalloc(iopte_cachep, GFP_KERNEL);
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	mutex_lock(&obj->page_table_lock);
+#else
 	spin_lock(&obj->page_table_lock);
+#endif
 
 	if (!*iopgd) {
 		if (!iopte)
@@ -745,9 +757,17 @@ iopgtable_store_entry_core(struct omap_iommu *obj, struct iotlb_entry *e)
 
 	prot = get_iopte_attr(e);
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	mutex_lock(&obj->page_table_lock);
+#else
 	spin_lock(&obj->page_table_lock);
+#endif
 	err = fn(obj, e->da, e->pa, prot);
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	mutex_unlock(&obj->page_table_lock);
+#else
 	spin_unlock(&obj->page_table_lock);
+#endif
 
 	return err;
 }
@@ -864,12 +884,20 @@ static size_t iopgtable_clear_entry(struct omap_iommu *obj, u32 da)
 		return 0;
 	}
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	mutex_lock(&obj->page_table_lock);
+#else
 	spin_lock(&obj->page_table_lock);
+#endif
 
 	bytes = iopgtable_clear_entry_core(obj, da);
 	flush_iotlb_page(obj, da);
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	mutex_unlock(&obj->page_table_lock);
+#else
 	spin_unlock(&obj->page_table_lock);
+#endif
 
 	return bytes;
 }
@@ -878,7 +906,11 @@ static void iopgtable_clear_entry_all(struct omap_iommu *obj)
 {
 	int i;
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	mutex_lock(&obj->page_table_lock);
+#else
 	spin_lock(&obj->page_table_lock);
+#endif
 
 	for (i = 0; i < PTRS_PER_IOPGD; i++) {
 		u32 da;
@@ -899,7 +931,11 @@ static void iopgtable_clear_entry_all(struct omap_iommu *obj)
 
 	flush_iotlb_all(obj);
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	mutex_unlock(&obj->page_table_lock);
+#else
 	spin_unlock(&obj->page_table_lock);
+#endif
 }
 EXPORT_SYMBOL_GPL(iopgtable_clear_entry_all);
 /*
@@ -975,7 +1011,11 @@ static struct omap_iommu *omap_iommu_attach(const char *name,
 
 	obj = to_iommu(dev);
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	mutex_lock(&obj->iommu_lock);
+#else
 	spin_lock(&obj->iommu_lock);
+#endif
 
 	/* an iommu device can only be attached once */
 	if (++obj->refcount > 1) {
@@ -1004,7 +1044,11 @@ static struct omap_iommu *omap_iommu_attach(const char *name,
 	if (!try_module_get(obj->owner))
 		goto err_module;
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	mutex_unlock(&obj->iommu_lock);
+#else
 	spin_unlock(&obj->iommu_lock);
+#endif
 
 	dev_dbg(obj->dev, "%s: %s\n", __func__, obj->name);
 	return obj;
@@ -1017,7 +1061,11 @@ err_enable:
 		if (pm_constraint)
 			omap_iommu_update_latency(obj, PM_QOS_DEFAULT_VALUE);
 	}
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	mutex_unlock(&obj->iommu_lock);
+#else
 	spin_unlock(&obj->iommu_lock);
+#endif
 	return ERR_PTR(err);
 }
 
@@ -1032,7 +1080,11 @@ static void omap_iommu_detach(struct omap_iommu *obj)
 	if (!obj || IS_ERR(obj))
 		return;
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	mutex_lock(&obj->iommu_lock);
+#else
 	spin_lock(&obj->iommu_lock);
+#endif
 
 	if (--obj->refcount == 0) {
 		iommu_disable(obj);
@@ -1044,7 +1096,11 @@ static void omap_iommu_detach(struct omap_iommu *obj)
 
 	obj->iopgd = NULL;
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	mutex_unlock(&obj->iommu_lock);
+#else
 	spin_unlock(&obj->iommu_lock);
+#endif
 
 	dev_dbg(obj->dev, "%s: %s\n", __func__, obj->name);
 }
@@ -1071,9 +1127,17 @@ static int __devinit omap_iommu_probe(struct platform_device *pdev)
 	obj->da_start = pdata->da_start;
 	obj->da_end = pdata->da_end;
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	mutex_init(&obj->iommu_lock);
+#else
 	spin_lock_init(&obj->iommu_lock);
+#endif
 	mutex_init(&obj->mmap_lock);
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	mutex_init(&obj->page_table_lock);
+#else
 	spin_lock_init(&obj->page_table_lock);
+#endif
 	INIT_LIST_HEAD(&obj->mmap);
 
 	if (!strcmp(obj->name, "ipu"))
@@ -1113,7 +1177,11 @@ static int __devinit omap_iommu_probe(struct platform_device *pdev)
 		err = -ENODEV;
 		goto err_irq;
 	}
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	err = request_threaded_irq(irq, NULL, iommu_fault_handler, IRQF_SHARED,
+#else
 	err = request_irq(irq, iommu_fault_handler, IRQF_SHARED,
+#endif
 			  dev_name(&pdev->dev), obj);
 	if (err < 0)
 		goto err_irq;
@@ -1229,7 +1297,11 @@ omap_iommu_attach_dev(struct iommu_domain *domain, struct device *dev)
 	struct omap_iommu_arch_data *arch_data = dev->archdata.iommu;
 	int ret = 0;
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	mutex_lock(&omap_domain->lock);
+#else
 	spin_lock(&omap_domain->lock);
+#endif
 
 	/* only a single device is supported per domain for now */
 	if (omap_domain->iommu_dev) {
@@ -1240,8 +1312,13 @@ omap_iommu_attach_dev(struct iommu_domain *domain, struct device *dev)
 
 	/* get a handle to and enable the omap iommu */
 	oiommu = omap_iommu_attach(arch_data->name, domain);
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	if (IS_ERR_OR_NULL(oiommu)) {
+		ret = (oiommu) ? PTR_ERR(oiommu) : -ENODEV;
+#else
 	if (IS_ERR(oiommu)) {
 		ret = PTR_ERR(oiommu);
+#endif
 		dev_err(dev, "can't get omap iommu: %d\n", ret);
 		goto out;
 	}
@@ -1251,7 +1328,11 @@ omap_iommu_attach_dev(struct iommu_domain *domain, struct device *dev)
 
 
 out:
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	mutex_unlock(&omap_domain->lock);
+#else
 	spin_unlock(&omap_domain->lock);
+#endif
 	return ret;
 }
 
@@ -1262,7 +1343,11 @@ static void omap_iommu_detach_dev(struct iommu_domain *domain,
 	struct omap_iommu_arch_data *arch_data = dev->archdata.iommu;
 	struct omap_iommu *oiommu = dev_to_omap_iommu(dev);
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	mutex_lock(&omap_domain->lock);
+#else
 	spin_lock(&omap_domain->lock);
+#endif
 
 	/* only a single device is supported per domain for now */
 	if (omap_domain->iommu_dev != oiommu) {
@@ -1278,7 +1363,11 @@ static void omap_iommu_detach_dev(struct iommu_domain *domain,
 
 
 out:
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	mutex_unlock(&omap_domain->lock);
+#else
 	spin_unlock(&omap_domain->lock);
+#endif
 }
 
 static int omap_iommu_domain_init(struct iommu_domain *domain)
@@ -1304,7 +1393,11 @@ static int omap_iommu_domain_init(struct iommu_domain *domain)
 	BUG_ON(!IS_ALIGNED((long)omap_domain->pgtable, IOPGD_TABLE_SIZE));
 
 	clean_dcache_area(omap_domain->pgtable, IOPGD_TABLE_SIZE);
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	mutex_init(&omap_domain->lock);
+#else
 	spin_lock_init(&omap_domain->lock);
+#endif
 
 	domain->priv = omap_domain;
 

@@ -451,8 +451,10 @@ omap_hsmmc_max_min(u8 slot, unsigned long *max, unsigned long *min)
 		switch (slot) {
 		case 0:
 		case 1:
+#ifndef CONFIG_MACH_OMAP4_BOWSER
 			*max = 96000000;
 			break;
+#endif
 		case 2:
 		case 3:
 		case 4:
@@ -502,7 +504,11 @@ static u32 __init omap_hsmmc_si_spec_caps(struct omap2_hsmmc_info *c)
 
 static u32 __init omap_hsmmc_si_spec_caps2(struct omap2_hsmmc_info *c)
 {
+#ifdef CONFIG_MACH_OMAP4_BOWSER
 	u32 caps2 = 0;
+#else
+	u32 caps2 = c->caps2;
+#endif
 	if (cpu_is_omap54xx()) {
 		if (c->mmc == 2) {
 			caps2 |= MMC_CAP2_HS200_1_8V_SDR;
@@ -536,6 +542,9 @@ static int __init omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
 	mmc->slots[0].caps2 |= omap_hsmmc_si_spec_caps2(c);
 	mmc->slots[0].pm_caps = c->pm_caps;
 	mmc->slots[0].internal_clock = !c->ext_clock;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	mmc->slots[0].housekeeping_ms = c->housekeeping_ms;
+#endif
 	mmc->dma_mask = 0xffffffff;
 
 	mmc->set_clk_src = omap_hsmmc_set_clks_src;
@@ -589,6 +598,14 @@ static int __init omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
 	if (c->vcc_aux_disable_is_sleep)
 		mmc->slots[0].vcc_aux_disable_is_sleep = 1;
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	if (c->mmc_data) {
+		memcpy(&mmc->slots[0].mmc_data, c->mmc_data,
+				sizeof(struct mmc_platform_data));
+		mmc->slots[0].card_detect =
+				(int (*)(struct device *dev, int slot))c->mmc_data->status;
+	}
+#endif
 	/*
 	 * NOTE:  MMC slots should have a Vcc regulator set up.
 	 * This may be from a TWL4030-family chip, another
