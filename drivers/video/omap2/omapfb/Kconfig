@@ -19,6 +19,15 @@ config FB_OMAP2_DEBUG_SUPPORT
 	  Support for debug output. You have to enable the actual printing
 	  with 'debug' module parameter.
 
+config FB_OMAP_BOOTLOADER_INIT
+	bool "Check bootloader initialization"
+	depends on FB_OMAP || FB_OMAP2
+	help
+	  Say Y here if you want to enable checking if the bootloader has
+	  already initialized the display controller. In this case the
+	  driver will skip the initialization.
+
+
 config FB_OMAP2_NUM_FBS
 	int "Number of framebuffers"
 	range 1 10
