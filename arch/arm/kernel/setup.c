@@ -765,11 +765,11 @@ static int __init parse_tag_serial16(const struct tag *tag)
 	memcpy(system_serial16,
 		tag->u.id16.data,
 		SERIAL16_SIZE); /* Serial nuber */
-#if 0
-	pr_info("ATAGS:serial16:str=\"%.*s\"\n",
+
+	pr_debug("ATAGS:serial16:str=\"%.*s\"\n",
 			SERIAL16_SIZE,
 			system_serial16);
-#endif
+
 	return 0;
 }
 
@@ -814,12 +814,12 @@ static int __init parse_tag_mac(const struct tag *tag)
 	memcpy(system_mac_sec, tag->u.macaddr.secret, MAC_SEC_SIZE);
 	memcpy(system_mac_addr, tag->u.macaddr.wifi_addr, MAC_ADDR_SIZE);
 	memcpy(system_bt_mac_addr, tag->u.macaddr.bt_addr, MAC_ADDR_SIZE);
-#if 0
-	pr_info("ATAGS:mac:addr=%.*s secret=%.*s bt=%.*s\n",
+
+	pr_debug("ATAGS:mac:addr=%.*s secret=%.*s bt=%.*s\n",
 		MAC_ADDR_SIZE, system_mac_addr,
 		MAC_SEC_SIZE, system_mac_sec,
 		MAC_ADDR_SIZE, system_bt_mac_addr);
-#endif
+
 	return 0;
 }
 
@@ -842,23 +842,21 @@ static int __init parse_tag_gyrocal(const struct tag *tag)
 {
 	int j;
 	memset(system_gyro_cal, 0, GYROCAL_SIZE+1);
-        memcpy(system_gyro_cal, tag->u.gyrocal.gyrocal_data, GYROCAL_SIZE);
-#if 1
-        printk("ATAGS:gyro_cal_size=%d. \n",GYROCAL_SIZE);
+	memcpy(system_gyro_cal, tag->u.gyrocal.gyrocal_data, GYROCAL_SIZE);
+	printk("ATAGS:gyro_cal_size=%d. \n",GYROCAL_SIZE);
 
-        printk("        0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f");
+	printk("        0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f");
 
-        for ( j=0 ; j < GYROCAL_SIZE ; j++){
+	for ( j=0 ; j < GYROCAL_SIZE ; j++){
+		if( j%16 == 0 ){
+			printk("\n  %03X:", j/16);
+			printk(" %02X", system_gyro_cal[j]);
+		}else{
+			printk(" %02X", system_gyro_cal[j]);
+		}
+	}
+	printk("\n\n");
 
-             if( j%16 == 0 ){
-                     printk("\n  %03X:", j/16);
-                     printk(" %02X", system_gyro_cal[j]);
-             }else{
-                     printk(" %02X", system_gyro_cal[j]);
-             }
-        }
-        printk("\n\n");
-#endif
 	return 0;
 }
 

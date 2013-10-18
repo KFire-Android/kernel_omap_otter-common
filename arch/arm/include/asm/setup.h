@@ -18,6 +18,27 @@
 
 #define COMMAND_LINE_SIZE 1024
 
+#if defined(CONFIG_MACH_OMAP4_BOWSER)
+#define SERIAL16_SIZE	16
+#define REVISION16_SIZE	16
+#define MAC_ADDR_SIZE	16
+#define MAC_SEC_SIZE	32
+#define BOOTMODE_SIZE	16
+#define PRODUCTID_SIZE	32
+
+extern unsigned char system_rev16[REVISION16_SIZE+1];
+extern unsigned char system_serial16[SERIAL16_SIZE+1];
+extern unsigned char system_mac_addr[MAC_ADDR_SIZE+1];
+extern unsigned char system_mac_sec[MAC_SEC_SIZE+1];
+extern unsigned char system_bootmode[BOOTMODE_SIZE+1];
+extern unsigned char system_postmode[BOOTMODE_SIZE+1];
+extern unsigned char system_bt_mac_addr[MAC_ADDR_SIZE+1];
+extern unsigned char system_productid[PRODUCTID_SIZE+1];
+
+#endif //CONFIG_MACH_OMAP4_BOWSER
+#define GYROCAL_SIZE	36
+extern unsigned char system_gyro_cal[GYROCAL_SIZE+1];
+
 /* The list ends with an ATAG_NONE node. */
 #define ATAG_NONE	0x00000000
 
