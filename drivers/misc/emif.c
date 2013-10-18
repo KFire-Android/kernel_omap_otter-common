@@ -58,7 +58,9 @@ struct emif_data {
 	u8				temperature_level;
 	u8				lpmode;
 	struct list_head		node;
+#ifndef CONFIG_MACH_OMAP4_BOWSER
 	unsigned long			irq_state;
+#endif
 	void __iomem			*base;
 	struct device			*dev;
 	const struct lpddr2_addressing	*addressing;
@@ -680,15 +682,26 @@ static u32 get_ddr_phy_ctrl_1_attilaphy_4d(const struct lpddr2_timings *timings,
 {
 	u32 phy = EMIF_DDR_PHY_CTRL_1_BASE_VAL_ATTILAPHY, val = 0;
 
+#if defined(CONFIG_MACH_OMAP4_BOWSER)
+	val = RL + DIV_ROUND_UP(timings->tDQSCK_max, t_ck);
+#else
 	val = RL + DIV_ROUND_UP(timings->tDQSCK_max, t_ck) - 1;
+#endif
 	phy |= val << READ_LATENCY_SHIFT_4D;
 
 	if (freq <= 100000000)
 		val = EMIF_DLL_SLAVE_DLY_CTRL_100_MHZ_AND_LESS_ATTILAPHY;
 	else if (freq <= 200000000)
 		val = EMIF_DLL_SLAVE_DLY_CTRL_200_MHZ_ATTILAPHY;
+#if defined(CONFIG_MACH_OMAP4_BOWSER)
+	else if (freq <= 400000000)
+		val = EMIF_DLL_SLAVE_DLY_CTRL_400_MHZ_ATTILAPHY;
+	else
+		val = EMIF_DLL_SLAVE_DLY_CTRL_466_MHZ_ATTILAPHY;
+#else
 	else
 		val = EMIF_DLL_SLAVE_DLY_CTRL_400_MHZ_ATTILAPHY;
+#endif
 
 	phy |= val << DLL_SLAVE_DLY_CTRL_SHIFT_4D;
 
@@ -975,7 +988,12 @@ static irqreturn_t handle_temp_alert(void __iomem *base, struct emif_data *emif)
 	irqreturn_t	ret = IRQ_HANDLED;
 	struct emif_custom_configs *custom_configs;
 
+#if defined(CONFIG_MACH_OMAP4_BOWSER)
+	unsigned long flags;
+	spin_lock_irqsave(&emif_lock, flags);
+#else
 	spin_lock_irqsave(&emif_lock, irq_state);
+#endif
 	old_temp_level = emif->temperature_level;
 	get_temperature_level(emif);
 
@@ -1024,7 +1042,11 @@ static irqreturn_t handle_temp_alert(void __iomem *base, struct emif_data *emif)
 	}
 
 out:
+#if defined(CONFIG_MACH_OMAP4_BOWSER)
+	spin_unlock_irqrestore(&emif_lock, flags);
+#else
 	spin_unlock_irqrestore(&emif_lock, irq_state);
+#endif
 	return ret;
 }
 
@@ -1067,6 +1089,9 @@ static irqreturn_t emif_interrupt_handler(int irq, void *dev_id)
 static irqreturn_t emif_threaded_isr(int irq, void *dev_id)
 {
 	struct emif_data	*emif = dev_id;
+#if defined(CONFIG_MACH_OMAP4_BOWSER)
+	unsigned long		flags;
+#endif
 
 	if (emif->temperature_level == SDRAM_TEMP_VERY_HIGH_SHUTDOWN) {
 		dev_emerg(emif->dev, "SDRAM temperature exceeds operating limit.. Needs shut down!!!\n");
@@ -1080,7 +1105,11 @@ static irqreturn_t emif_threaded_isr(int irq, void *dev_id)
 		return IRQ_HANDLED;
 	}
 
+#if defined(CONFIG_MACH_OMAP4_BOWSER)
+	spin_lock_irqsave(&emif_lock, flags);
+#else
 	spin_lock_irqsave(&emif_lock, irq_state);
+#endif
 
 	if (emif->curr_regs) {
 		setup_temperature_sensitive_regs(emif, emif->curr_regs);
@@ -1089,7 +1118,11 @@ static irqreturn_t emif_threaded_isr(int irq, void *dev_id)
 		dev_err(emif->dev, "temperature alert before registers are calculated, not de-rating timings\n");
 	}
 
+#if defined(CONFIG_MACH_OMAP4_BOWSER)
+	spin_unlock_irqrestore(&emif_lock, flags);
+#else
 	spin_unlock_irqrestore(&emif_lock, irq_state);
+#endif
 
 	return IRQ_HANDLED;
 }
@@ -1409,6 +1442,19 @@ static int __init_or_module emif_probe(struct platform_device *pdev)
 		goto error;
 	}
 
+#if defined(CONFIG_MACH_OMAP4_BOWSER)
+	/* One-time actions taken on probing the first device */
+	if (!emif1) {
+		emif1 = emif;
+		spin_lock_init(&emif_lock);
+
+		/*
+		 * TODO: register notifiers for frequency and voltage
+		 * change here once the respective frameworks are
+		 * available
+		 */
+	}
+#endif
 	list_add(&emif->node, &device_list);
 	emif->addressing = get_addressing_table(emif->plat_data->device_info);
 
@@ -1675,6 +1721,9 @@ static int volt_notify_handling(struct notifier_block *nb,
 				unsigned long volt_state, void *data)
 {
 	struct emif_data *emif;
+#if defined(CONFIG_MACH_OMAP4_BOWSER)
+	unsigned long flags;
+#endif
 	u32 val;
 
 	/* If there are no devices, nothing for us to do */
@@ -1686,13 +1735,21 @@ static int volt_notify_handling(struct notifier_block *nb,
 	else
 		val =  DDR_VOLTAGE_STABLE;
 
+#if defined(CONFIG_MACH_OMAP4_BOWSER)
+	spin_lock_irqsave(&emif_lock, flags);
+#else
 	spin_lock_irqsave(&emif_lock, irq_state);
+#endif
 
 	list_for_each_entry(emif, &device_list, node)
 		do_volt_notify_handling(emif, val);
 	do_freq_update();
 
+#if defined(CONFIG_MACH_OMAP4_BOWSER)
+	spin_unlock_irqrestore(&emif_lock, flags);
+#else
 	spin_unlock_irqrestore(&emif_lock, irq_state);
+#endif
 
 	return 0;
 }
@@ -1733,7 +1790,11 @@ static void do_freq_pre_notify_handling(struct emif_data *emif, u32 new_freq)
  * available in mainline kernel. This function is un-used
  * right now.
  */
+#if defined(CONFIG_MACH_OMAP4_BOWSER)
+static void freq_prepare_notify_handling(void)
+#else
 static void freq_pre_notify_handling(u32 new_freq)
+#endif
 {
 	struct emif_data *emif;
 
@@ -1757,6 +1818,13 @@ static void freq_pre_notify_handling(u32 new_freq)
 	 * a given frequency
 	 */
 	spin_lock_irqsave(&emif_lock, irq_state);
+#if defined(CONFIG_MACH_OMAP4_BOWSER)
+}
+
+static void freq_pre_notify_handling(u32 new_freq)
+{
+	struct emif_data *emif;
+#endif
 
 	list_for_each_entry(emif, &device_list, node)
 		do_freq_pre_notify_handling(emif, new_freq);
@@ -1784,7 +1852,12 @@ static void freq_post_notify_handling(void)
 
 	list_for_each_entry(emif, &device_list, node)
 		do_freq_post_notify_handling(emif);
+#if defined(CONFIG_MACH_OMAP4_BOWSER)
+}
 
+static void freq_cleanup_notify_handling(void)
+{
+#endif
 	/*
 	 * Lock is done in pre-notify handler. See freq_pre_notify_handling()
 	 * for more details
@@ -1803,12 +1876,22 @@ static int core_dpll_notify_handling(struct notifier_block *nb,
 		return 0;
 
 	switch (dpll_state) {
+#if defined(CONFIG_MACH_OMAP4_BOWSER)
+	case OMAP_CORE_DPLL_PREPARE:
+		freq_prepare_notify_handling();
+		break;
+#endif
 	case OMAP_CORE_DPLL_PRECHANGE:
 		freq_pre_notify_handling(notify->rate);
 		break;
 	case OMAP_CORE_DPLL_POSTCHANGE:
 		freq_post_notify_handling();
 		break;
+#if defined(CONFIG_MACH_OMAP4_BOWSER)
+	case OMAP_CORE_DPLL_CLEANUP:
+		freq_cleanup_notify_handling();
+		break;
+#endif
 	default:
 		WARN(1, "INVALID state usage - %ld\n", dpll_state);
 	}

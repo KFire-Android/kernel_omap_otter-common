@@ -236,6 +236,10 @@ int omap4_core_dpll_m2_set_rate(struct clk *clk, unsigned long rate)
 		}
 	}
 
+#if defined(CONFIG_MACH_OMAP4_BOWSER)
+	srcu_notifier_call_chain(&core_dpll_change_notify_list,
+				 OMAP_CORE_DPLL_PREPARE, (void *)&notify);
+#endif
 	/* Configures MEMIF domain in SW_WKUP */
 	clkdm_wakeup(l3_emif_clkdm);
 
@@ -279,6 +283,10 @@ int omap4_core_dpll_m2_set_rate(struct clk *clk, unsigned long rate)
 
 	/* Configures MEMIF domain back to HW_WKUP */
 	clkdm_allow_idle(l3_emif_clkdm);
+#if defined(CONFIG_MACH_OMAP4_BOWSER)
+	srcu_notifier_call_chain(&core_dpll_change_notify_list,
+				 OMAP_CORE_DPLL_CLEANUP, (void *)&notify);
+#endif
 
 	if (i == MAX_FREQ_UPDATE_TIMEOUT) {
 		pr_err("%s: Frequency update for CORE DPLL M2 change failed\n",
