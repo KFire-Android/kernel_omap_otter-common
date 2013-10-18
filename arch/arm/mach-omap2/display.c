@@ -96,11 +96,17 @@ static const struct omap_dss_hwmod_data omap3_dss_hwmod_data[] __initdata = {
 static const struct omap_dss_hwmod_data omap4_dss_hwmod_data[] __initdata = {
 	{ "dss_core", "omapdss_dss", -1 },
 	{ "dss_dispc", "omapdss_dispc", -1 },
+#ifdef CONFIG_OMAP2_DSS_RFBI
 	{ "dss_rfbi", "omapdss_rfbi", -1 },
+#endif /* CONFIG_OMAP2_DSS_RFBI */
+#ifdef CONFIG_OMAP2_DSS_CENC
 	{ "dss_venc", "omapdss_venc", -1 },
+#endif /* CONFIG_OMAP2_DSS_CENC */
 	{ "dss_dsi1", "omapdss_dsi", 0 },
 	{ "dss_dsi2", "omapdss_dsi", 1 },
+#ifdef CONFIG_OMAP4_DSS_HDMI
 	{ "dss_hdmi", "omapdss_hdmi", -1 },
+#endif /* CONFIG_OMAP4_DSS_HDMI */
 };
 
 static const struct omap_dss_hwmod_data omap5_dss_hwmod_data[] __initdata = {
@@ -398,11 +404,13 @@ int __init omap_display_init(struct omap_dss_board_info *board_data)
 
 	/* Create devices for DPI and SDI */
 
+#ifdef CONFIG_OMAP2_DSS_DPI
 	pdev = create_simple_dss_pdev("omapdss_dpi", -1, NULL, 0, dss_pdev);
 	if (IS_ERR(pdev)) {
 		pr_err("Could not build platform_device for omapdss_dpi\n");
 		return PTR_ERR(pdev);
 	}
+#endif /* CONFIG_OMAP2_DSS_DPI */
 
 	if (cpu_is_omap34xx()) {
 		pdev = create_simple_dss_pdev("omapdss_sdi", -1, NULL, 0,
