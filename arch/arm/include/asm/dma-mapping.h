@@ -469,6 +469,9 @@ extern void dma_sync_sg_for_cpu(struct device *, struct scatterlist *, int,
 extern void dma_sync_sg_for_device(struct device *, struct scatterlist *, int,
 		enum dma_data_direction);
 
+extern void dma_cache_maint_page(struct page *page, unsigned long offset,
+	size_t size, enum dma_data_direction dir,
+	void (*op)(const void *, size_t, int));
 
 #endif /* __KERNEL__ */
 #endif

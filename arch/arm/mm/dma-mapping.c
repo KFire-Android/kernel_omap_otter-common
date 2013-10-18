@@ -737,7 +737,7 @@ void ___dma_single_dev_to_cpu(const void *kaddr, size_t size,
 }
 EXPORT_SYMBOL(___dma_single_dev_to_cpu);
 
-static void dma_cache_maint_page(struct page *page, unsigned long offset,
+void dma_cache_maint_page(struct page *page, unsigned long offset,
 	size_t size, enum dma_data_direction dir,
 	void (*op)(const void *, size_t, int))
 {
@@ -782,6 +782,7 @@ static void dma_cache_maint_page(struct page *page, unsigned long offset,
 		left -= len;
 	} while (left);
 }
+EXPORT_SYMBOL(dma_cache_maint_page);
 
 void ___dma_page_cpu_to_dev(struct page *page, unsigned long off,
 	size_t size, enum dma_data_direction dir)
