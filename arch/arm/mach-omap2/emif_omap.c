@@ -18,6 +18,17 @@
 #include <plat/omap_device.h>
 #include "common.h"
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+#include <linux/io.h>
+
+#define OMAP44XX_EMIF1				0x4c000000
+
+#define OMAP44XX_EMIF_LPDDR2_MODE_REG_DATA	0x0040
+#define OMAP44XX_EMIF_LPDDR2_MODE_REG_CFG	0x0050
+
+#define LPDDR2_MR5      5
+#define LPDDR2_MR8      8
+#endif
 static struct emif_platform_data omap_emif_platform_data __initdata = {
 	.hw_caps = EMIF_HW_CAPS_LL_INTERFACE
 };
@@ -121,3 +132,39 @@ error:
 	return -1;
 }
 subsys_initcall(init_emif_timings);
+
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+static int read_reg_data(int mrid)
+{
+	int val;
+	void __iomem *base;
+
+	base = ioremap(OMAP44XX_EMIF1, SZ_1M);
+
+	__raw_writel(mrid, base + OMAP44XX_EMIF_LPDDR2_MODE_REG_CFG);
+	val =  __raw_readb(base  +  OMAP44XX_EMIF_LPDDR2_MODE_REG_DATA);
+
+	iounmap(base);
+
+	return val;
+}
+
+/*
+ * omap_sdram_vendor - identify ddr vendor
+ * Identify DDR vendor ID for selecting correct timing parameter
+ * for dynamic ddr detection.
+ */
+int omap_sdram_vendor(void)
+{
+	return read_reg_data(LPDDR2_MR5);
+}
+/*
+ * omap_sdram_density - identify ddr density
+ * Identify DDR density for selecting correct timing parameter
+ * for dynamic ddr detection.
+ */
+int omap_sdram_density(void)
+{
+	return read_reg_data(LPDDR2_MR8);
+}
+#endif

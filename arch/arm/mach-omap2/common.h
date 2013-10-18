@@ -298,6 +298,17 @@ void __init omap_emif_set_device_details(u32 emif_nr,
 			u32 timings_arr_size,
 			struct lpddr2_min_tck *min_tck,
 			struct emif_custom_configs *custom_configs);
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+#define SAMSUNG_SDRAM		0x1
+#define ELPIDA_SDRAM		0x3
+#define HYNIX_SDRAM		0x6
+#define MICRON_SDRAM		0xFF
+#define SDRAM_DENSITY_MASK	0x3C
+#define SDRAM_DENSITY_2CS	0x14
+#define SDRAM_DENSITY_1CS	0x18
+int omap_sdram_vendor(void);
+int omap_sdram_density(void);
+#endif
 #endif
 
 /* Convert microsecond value to number of 32kHz clock cycles */
