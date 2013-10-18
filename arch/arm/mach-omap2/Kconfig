@@ -392,6 +392,25 @@ config MACH_OMAP_4430SDP
 	select TWL6030_GPADC
 	select CDC_TCXO
 
+config MACH_OMAP_BLAZE
+	bool "OMAP 44XX Tablet board"
+	default y
+	depends on ARCH_OMAP4
+	select OMAP_PACKAGE_CBS
+	select REGULATOR_FIXED_VOLTAGE
+	select OMAP_TPS6236X
+	select TWL6030_GPADC
+	select CDC_TCXO
+
+config MACH_OMAP4_PANDA
+	bool "OMAP4 Panda Board"
+	default y
+	depends on ARCH_OMAP4
+	select OMAP_PACKAGE_CBL
+	select OMAP_PACKAGE_CBS
+	select REGULATOR_FIXED_VOLTAGE if REGULATOR
+	select OMAP_TPS6236X
+
 config MACH_OMAP_4430_KC1
 	bool "OMAP 4430 Kindle Fires (Otters)"
 	depends on ARCH_OMAP4
@@ -420,9 +439,15 @@ config OTTER2
 	depends on MACH_OMAP_4430_KC1
 
 config MACH_OMAP4_BOWSER
-	bool "OMAP4 based Bowser3 board"
-	default y
+	bool
+
+choice
+	prompt "OMAP4 Bowser based boards"
 	depends on ARCH_OMAP4
+
+config MACH_OMAP4_BOWSER_SUBTYPE_BOWSER7
+	bool "Bowser7"
+	select MACH_OMAP4_BOWSER
 	select LEDS_OMAP4430_SDP_DISPLAY
 	select LEDS_OMAP4430_SDP_KEYPAD
 	select SENSORS_LM75
@@ -438,21 +463,68 @@ config MACH_OMAP4_BOWSER
 	select OMAP_PACKAGE_CBS
 	select REGULATOR_FIXED_VOLTAGE
 	select OMAP_TPS6236X
-	select TOUCHSCREEN_SYNTM12XX
 	select TWL6030_POWEROFF
 	select INPUT_TWL6030_PWRBUTTON
-#	select TWL6040_VIB
 	select OMAP_REBOOT_REASON
-
-config MACH_OMAP4_BOWSER_SUBTYPE_TATE
-        bool "OMAP4 Bowser based Tate sub-type board"
-        select MACH_OMAP4_BOWSER
-        depends on ARCH_OMAP4
+	select OMAP_RESET_REASON
 
 config MACH_OMAP4_BOWSER_SUBTYPE_JEM
-        bool "OMAP4 Bowser based Jem sub-type board"
-        select MACH_OMAP4_BOWSER
-        depends on ARCH_OMAP4
+	bool "Jem"
+	select MACH_OMAP4_BOWSER
+	select INPUT_MISC
+	select HWMON
+	select OMAP_PACKAGE_CBL
+	select OMAP_PACKAGE_CBS
+	select REGULATOR_FIXED_VOLTAGE
+	select TWL6030_POWEROFF
+	select INPUT_TWL6030_PWRBUTTON
+	select OMAP_REBOOT_REASON
+	select INPUT_BU52061_HALLSENSOR
+	select BATTERY_BQ27541
+	select CHARGER_SMB347
+	select BCMDHD_BCM43239
+	select TOUCHSCREEN_CYPRESS_TTSP
+	select PANEL_NT71391_HYDIS
+	select BACKLIGHT_BOWSER
+
+config MACH_OMAP4_BOWSER_SUBTYPE_SOHO
+	bool "Soho"
+	select MACH_OMAP4_BOWSER
+	select INPUT_MISC
+	select HWMON
+	select OMAP_PACKAGE_CBL
+	select OMAP_PACKAGE_CBS
+	select REGULATOR_FIXED_VOLTAGE
+	select TWL6030_POWEROFF
+	select INPUT_TWL6030_PWRBUTTON
+	select OMAP_REBOOT_REASON
+	select INPUT_BU52061_HALLSENSOR
+	select BATTERY_BQ27541
+	select CHARGER_SMB347
+	select BCMDHD_BCM4330
+	select TOUCHSCREEN_SYNAPTICS_I2C_RMI4
+	select BACKLIGHT_LP855X
+
+config MACH_OMAP4_BOWSER_SUBTYPE_TATE
+	bool "Tate"
+	select MACH_OMAP4_BOWSER
+	select INPUT_MISC
+	select HWMON
+	select OMAP_PACKAGE_CBL
+	select OMAP_PACKAGE_CBS
+	select REGULATOR_FIXED_VOLTAGE
+	select TWL6030_POWEROFF
+	select INPUT_TWL6030_PWRBUTTON
+	select OMAP_REBOOT_REASON
+	select INPUT_BU52061_HALLSENSOR
+	select BATTERY_BQ27541
+	select CHARGER_SMB347
+	select BCMDHD_BCM43239
+#	select TOUCHSCREEN_CYPRESS_TTSP
+#	select PANEL_NT71391_HYDIS
+#	select BACKLIGHT_BOWSER
+
+endchoice
 
 config MACH_OMAP4_BOWSER_SUBTYPE_JEM_FTM
         bool "FTM mode for OMAP4 Bowser based Jem sub-type board"
@@ -461,25 +533,6 @@ config MACH_OMAP4_BOWSER_SUBTYPE_JEM_FTM
 config USE_AMAZON_DUCATI
         bool "Ducati settings which are compatible with the stock binary from Amazon"
         depends on MACH_OMAP4_BOWSER
-
-config MACH_OMAP_BLAZE
-	bool "OMAP 44XX Tablet board"
-	default y
-	depends on ARCH_OMAP4
-	select OMAP_PACKAGE_CBS
-	select REGULATOR_FIXED_VOLTAGE
-	select OMAP_TPS6236X
-	select TWL6030_GPADC
-	select CDC_TCXO
-
-config MACH_OMAP4_PANDA
-	bool "OMAP4 Panda Board"
-	default y
-	depends on ARCH_OMAP4
-	select OMAP_PACKAGE_CBL
-	select OMAP_PACKAGE_CBS
-	select REGULATOR_FIXED_VOLTAGE if REGULATOR
-	select OMAP_TPS6236X
 
 config MACH_OMAP5_SEVM
 	bool "OMAP5 EVM board"
