@@ -1479,7 +1479,7 @@ static struct clk dss_sys_clk = {
 	.enable_reg	= OMAP4430_CM_DSS_DSS_CLKCTRL,
 	.enable_bit	= OMAP4430_OPTFCLKEN_SYS_CLK_SHIFT,
 	.clkdm_name	= "l3_dss_clkdm",
-#ifdef CONFIG_MACH_OMAP_4430_KC1
+#if defined(CONFIG_MACH_OMAP_4430_KC1) || defined(CONFIG_MACH_OMAP4_BOWSER)
 	.flags		= ENABLE_ON_INIT,
 #endif
 	.parent		= &syc_clk_div_ck,
@@ -1552,6 +1552,21 @@ static struct clk dss_48mhz_clk = {
 	.flags		= ENABLE_ON_INIT,
 #endif
 };
+
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+static struct clk dss_fck = {
+	.name		= "dss_fck",
+	.ops		= &clkops_omap2_dflt,
+	.enable_reg	= OMAP4430_CM_DSS_DSS_CLKCTRL,
+	.enable_bit	= OMAP4430_MODULEMODE_SWCTRL,
+	.clkdm_name	= "l3_dss_clkdm",
+#ifdef CONFIG_FB_OMAP_BOOTLOADER_INIT
+	.flags          = ENABLE_ON_INIT,
+#endif
+	.parent		= &l3_div_ck,
+	.recalc		= &followparent_recalc,
+};
+#endif
 
 static struct clk efuse_ctrl_cust_fck = {
 	.name		= "efuse_ctrl_cust_fck",
@@ -3314,6 +3329,9 @@ static struct clk_lookup omap44xx_clks[] = {
 	CLKDEV_INIT(NULL,	"dss_tv_clk",			&dss_tv_clk),
 	CLKDEV_INIT(NULL,	"dss_48mhz_clk",		&dss_48mhz_clk),
 	CLKDEV_INIT(NULL,	"dss_dss_clk",			&dss_dss_clk),
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	CLKDEV_INIT("omapdss_dss",	"ick",			&dss_fck),
+#endif
 	CLKDEV_INIT(NULL,	"efuse_ctrl_cust_fck",		&efuse_ctrl_cust_fck),
 	CLKDEV_INIT(NULL,	"emif1_fck",			&emif1_fck),
 	CLKDEV_INIT(NULL,	"emif2_fck",			&emif2_fck),
@@ -3386,6 +3404,18 @@ static struct clk_lookup omap44xx_clks[] = {
 	CLKDEV_INIT(NULL,	"smartreflex_iva_fck",		&smartreflex_iva_fck),
 	CLKDEV_INIT(NULL,	"smartreflex_mpu_fck",		&smartreflex_mpu_fck),
 	CLKDEV_INIT(NULL,	"timer1_fck",			&timer1_fck),
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	CLKDEV_INIT("omap_timer.10",	"timer10_fck",			&timer10_fck),
+	CLKDEV_INIT("omap_timer.11",	"timer11_fck",			&timer11_fck),
+	CLKDEV_INIT("omap_timer.2",	"timer2_fck",			&timer2_fck),
+	CLKDEV_INIT("omap_timer.3",	"timer3_fck",			&timer3_fck),
+	CLKDEV_INIT("omap_timer.4",	"timer4_fck",			&timer4_fck),
+	CLKDEV_INIT("omap_timer.5",	"timer5_fck",			&timer5_fck),
+	CLKDEV_INIT("omap_timer.6",	"timer6_fck",			&timer6_fck),
+	CLKDEV_INIT("omap_timer.7",	"timer7_fck",			&timer7_fck),
+	CLKDEV_INIT("omap_timer.8",	"timer8_fck",			&timer8_fck),
+	CLKDEV_INIT("omap_timer.9",	"timer9_fck",			&timer9_fck),
+#else
 	CLKDEV_INIT(NULL,	"timer10_fck",			&timer10_fck),
 	CLKDEV_INIT(NULL,	"timer11_fck",			&timer11_fck),
 	CLKDEV_INIT(NULL,	"timer2_fck",			&timer2_fck),
@@ -3396,6 +3426,7 @@ static struct clk_lookup omap44xx_clks[] = {
 	CLKDEV_INIT(NULL,	"timer7_fck",			&timer7_fck),
 	CLKDEV_INIT(NULL,	"timer8_fck",			&timer8_fck),
 	CLKDEV_INIT(NULL,	"timer9_fck",			&timer9_fck),
+#endif
 	CLKDEV_INIT(NULL,	"uart1_fck",			&uart1_fck),
 	CLKDEV_INIT(NULL,	"uart2_fck",			&uart2_fck),
 	CLKDEV_INIT(NULL,	"uart3_fck",			&uart3_fck),
