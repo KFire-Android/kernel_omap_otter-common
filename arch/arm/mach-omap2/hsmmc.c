@@ -505,9 +505,9 @@ static u32 __init omap_hsmmc_si_spec_caps(struct omap2_hsmmc_info *c)
 static u32 __init omap_hsmmc_si_spec_caps2(struct omap2_hsmmc_info *c)
 {
 #ifdef CONFIG_MACH_OMAP4_BOWSER
-	u32 caps2 = 0;
-#else
 	u32 caps2 = c->caps2;
+#else
+	u32 caps2 = 0;
 #endif
 	if (cpu_is_omap54xx()) {
 		if (c->mmc == 2) {
