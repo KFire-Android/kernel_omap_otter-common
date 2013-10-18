@@ -377,6 +377,7 @@ static void __init omap4_timer_init(void)
 OMAP_SYS_TIMER(4)
 #endif
 
+#ifdef CONFIG_ARCH_OMAP5
 #ifdef CONFIG_ARM_ARCH_TIMER
 static struct arch_timer arch_timer_resources[] = {
 	{
@@ -393,6 +394,7 @@ static struct arch_timer arch_timer_resources[] = {
 
 	},
 };
+#endif
 #endif
 
 #ifdef CONFIG_ARCH_OMAP5

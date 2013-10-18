@@ -521,6 +521,7 @@ static void __init omap4_init_voltages(void)
 	omap_set_init_opp("iva", "virt_dpll_iva_ck", "iva");
 }
 
+#ifdef CONFIG_ARCH_OMAP5
 static void __init omap5_init_voltages(void)
 {
 	if (!cpu_is_omap54xx())
@@ -530,6 +531,7 @@ static void __init omap5_init_voltages(void)
 	omap_set_init_opp("core", "virt_l3_ck", "l3_main_1");
 	omap_set_init_opp("mm", "virt_dpll_iva_ck", "iva");
 }
+#endif
 
 /* Interface to the memory throughput class of the PM QoS framework */
 static int omap2_pm_qos_tput_handler(struct notifier_block *nb,
@@ -650,7 +652,9 @@ static int __init omap2_common_pm_subsys_init(void)
 	/* Initialize the voltages */
 	omap3_init_voltages();
 	omap4_init_voltages();
+	#ifdef CONFIG_ARCH_OMAP5
 	omap5_init_voltages();
+	#endif
 
 	/* Smartreflex device init */
 	omap_devinit_smartreflex();
