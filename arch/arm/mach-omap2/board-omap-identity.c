@@ -28,6 +28,15 @@
 
 #include <plat/omap_apps_brd_id.h>
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+#include <linux/gpio.h>
+
+#define SMTID1_GPIO 172 //TST_BD_ID1
+#define SMTID2_GPIO 174 //TST_BD_ID2
+#define SMTID3_GPIO 91  //TST_BD_ID3
+
+static u8 smtid;
+#endif
 static char omap_mach_print[255];
 
 static ssize_t omap_soc_family_show(struct kobject *kobj,
@@ -74,6 +83,81 @@ static ssize_t omap_soc_type_show(struct kobject *kobj,
 	return sprintf(buf, "%s\n", omap_types[omap_type()]);
 }
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+/* SMT ID */
+static int omap_smt_id_init(void)
+{
+	int retval = 0;
+
+	retval = gpio_request(SMTID1_GPIO, "SMTID1");
+	if (retval) {
+		pr_err("%s: Failed to get smt_id gpio %d (code: %d)",
+				__func__, SMTID1_GPIO, retval);
+		return retval;
+	}
+	retval = gpio_direction_input(SMTID1_GPIO);
+	if (retval) {
+		pr_err("%s: Failed to setup smt_id gpio %d (code: %d)",
+				__func__, SMTID1_GPIO, retval);
+		gpio_free(SMTID1_GPIO);
+	}
+
+	retval = gpio_request(SMTID2_GPIO, "SMTID2");
+	if (retval) {
+		pr_err("%s: Failed to get smt_id gpio %d (code: %d)",
+			__func__, SMTID2_GPIO, retval);
+		return retval;
+	}
+	retval = gpio_direction_input(SMTID2_GPIO);
+	if (retval) {
+		pr_err("%s: Failed to setup smt_id gpio %d (code: %d)",
+				__func__, SMTID2_GPIO, retval);
+		gpio_free(SMTID2_GPIO);
+	}
+
+	retval = gpio_request(SMTID3_GPIO, "SMTID3");
+	if (retval) {
+		pr_err("%s: Failed to get smt_id gpio %d (code: %d)",
+			__func__, SMTID3_GPIO, retval);
+		return retval;
+	}
+	retval = gpio_direction_input(SMTID3_GPIO);
+	if (retval) {
+		pr_err("%s: Failed to setup smt_id gpio %d (code: %d)",
+				__func__, SMTID3_GPIO, retval);
+		gpio_free(SMTID3_GPIO);
+	}
+
+	printk("SMT ID1=%d, ID2=%d, ID3=%d\n", gpio_get_value(SMTID1_GPIO), gpio_get_value(SMTID2_GPIO), gpio_get_value(SMTID3_GPIO));
+	smtid = gpio_get_value(SMTID1_GPIO) |
+	        (gpio_get_value(SMTID2_GPIO) << 1) |
+	        (gpio_get_value(SMTID3_GPIO) << 2);
+
+	return retval;
+}
+
+static ssize_t omap_smt_id_show(struct kobject *kobj,
+				 struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf,"%d\n", smtid);
+}
+
+#define OMAP_BOARD_ATTR_RO(_name, _show) \
+	struct kobj_attribute omap_board_prop_attr_##_name = \
+		__ATTR(_name, S_IRUGO, _show, NULL)
+
+static OMAP_BOARD_ATTR_RO(smt_id, omap_smt_id_show);
+
+static struct attribute *omap_board_prop_attrs[] = {
+	&omap_board_prop_attr_smt_id.attr,
+	NULL,
+};
+
+static struct attribute_group omap_board_prop_attr_group = {
+	.attrs = omap_board_prop_attrs,
+};
+#endif
+
 #define OMAP_SOC_ATTR_RO(_name, _show) \
 	struct kobj_attribute omap_soc_prop_attr_##_name = \
 		__ATTR(_name, S_IRUGO, _show, NULL)
@@ -103,6 +187,10 @@ void __init omap_create_board_props(void)
 	struct kobject *soc_kobj = NULL;
 	int ret = 0;
 	char soc_f[10], soc_r[10], soc_t[10], soc_pid[20], soc_die[40];
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	struct kobject *board_kobj = NULL;
+    omap_smt_id_init();
+#endif
 
 	board_props_kobj = kobject_create_and_add("board_properties", NULL);
 	if (!board_props_kobj)
@@ -111,10 +199,23 @@ void __init omap_create_board_props(void)
 	soc_kobj = kobject_create_and_add("soc", board_props_kobj);
 	if (!soc_kobj)
 		goto err_soc_obj;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	board_kobj = kobject_create_and_add("board", board_props_kobj);
+	if (!board_kobj)
+		goto err_app_board_obj;
+#endif
 
 	ret = sysfs_create_group(soc_kobj, &omap_soc_prop_attr_group);
 	if (ret)
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+		goto err_soc_sysfs_create;
+
+	ret = sysfs_create_group(board_kobj, &omap_board_prop_attr_group);
+	if (ret)
+		goto err_board_sysfs_create;
+#else
 		goto err_sysfs_create;
+#endif
 
 	omap_soc_family_show(NULL, NULL, soc_f);
 	omap_soc_revision_show(NULL, NULL, soc_r);
@@ -132,7 +233,15 @@ void __init omap_create_board_props(void)
 
 	return;
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+err_board_sysfs_create:
+	sysfs_remove_group(soc_kobj, &omap_soc_prop_attr_group);
+err_soc_sysfs_create:
+	kobject_put(board_kobj);
+err_app_board_obj:
+#else
 err_sysfs_create:
+#endif
 	kobject_put(soc_kobj);
 err_soc_obj:
 	kobject_put(board_props_kobj);
