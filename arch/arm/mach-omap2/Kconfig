@@ -439,15 +439,12 @@ config OTTER2
 	depends on MACH_OMAP_4430_KC1
 
 config MACH_OMAP4_BOWSER
-	bool
-
-choice
-	prompt "OMAP4 Bowser based boards"
+	bool "OMAP4 Bowser based boards"
 	depends on ARCH_OMAP4
 
 config MACH_OMAP4_BOWSER_SUBTYPE_BOWSER7
 	bool "Bowser7"
-	select MACH_OMAP4_BOWSER
+	depends on MACH_OMAP4_BOWSER
 	select LEDS_OMAP4430_SDP_DISPLAY
 	select LEDS_OMAP4430_SDP_KEYPAD
 	select SENSORS_LM75
@@ -470,7 +467,7 @@ config MACH_OMAP4_BOWSER_SUBTYPE_BOWSER7
 
 config MACH_OMAP4_BOWSER_SUBTYPE_JEM
 	bool "Jem"
-	select MACH_OMAP4_BOWSER
+	depends on MACH_OMAP4_BOWSER
 	select INPUT_MISC
 	select HWMON
 	select OMAP_PACKAGE_CBL
@@ -487,9 +484,13 @@ config MACH_OMAP4_BOWSER_SUBTYPE_JEM
 	select PANEL_NT71391_HYDIS
 	select BACKLIGHT_BOWSER
 
+config MACH_OMAP4_BOWSER_SUBTYPE_JEM_FTM
+        bool "FTM mode for OMAP4 Bowser based Jem sub-type board"
+        depends on MACH_OMAP4_BOWSER_SUBTYPE_JEM
+
 config MACH_OMAP4_BOWSER_SUBTYPE_SOHO
 	bool "Soho"
-	select MACH_OMAP4_BOWSER
+	depends on MACH_OMAP4_BOWSER
 	select INPUT_MISC
 	select HWMON
 	select OMAP_PACKAGE_CBL
@@ -507,7 +508,7 @@ config MACH_OMAP4_BOWSER_SUBTYPE_SOHO
 
 config MACH_OMAP4_BOWSER_SUBTYPE_TATE
 	bool "Tate"
-	select MACH_OMAP4_BOWSER
+	depends on MACH_OMAP4_BOWSER
 	select INPUT_MISC
 	select HWMON
 	select OMAP_PACKAGE_CBL
@@ -523,12 +524,6 @@ config MACH_OMAP4_BOWSER_SUBTYPE_TATE
 #	select TOUCHSCREEN_CYPRESS_TTSP
 #	select PANEL_NT71391_HYDIS
 #	select BACKLIGHT_BOWSER
-
-endchoice
-
-config MACH_OMAP4_BOWSER_SUBTYPE_JEM_FTM
-        bool "FTM mode for OMAP4 Bowser based Jem sub-type board"
-        depends on MACH_OMAP4_BOWSER_SUBTYPE_JEM
 
 config USE_AMAZON_DUCATI
         bool "Ducati settings which are compatible with the stock binary from Amazon"
