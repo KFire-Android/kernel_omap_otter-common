@@ -349,10 +349,18 @@ int clkdm_complete_init(void)
 		return -EACCES;
 
 	list_for_each_entry(clkdm, &clkdm_list, node) {
+#if defined(CONFIG_MACH_OMAP4_BOWSER) && defined(CONFIG_FB_OMAP_BOOTLOADER_INIT)
+		if (clkdm->flags & CLKDM_BOOTLOADER) {
+			clkdm_wakeup_allow_sleep(clkdm);
+		} else {
+#endif /* CONFIG_FB_OMAP_BOOTLOADER_INIT */
 		if (clkdm->flags & CLKDM_CAN_FORCE_WAKEUP)
 			clkdm_wakeup(clkdm);
 		else if (clkdm->flags & CLKDM_CAN_DISABLE_AUTO)
 			clkdm_deny_idle(clkdm);
+#if defined(CONFIG_MACH_OMAP4_BOWSER) && defined(CONFIG_FB_OMAP_BOOTLOADER_INIT)
+		}
+#endif /* CONFIG_FB_OMAP_BOOTLOADER_INIT */
 
 		_resolve_clkdm_deps(clkdm, clkdm->wkdep_srcs);
 		clkdm_clear_all_wkdeps(clkdm);
@@ -774,6 +782,45 @@ int clkdm_sleep(struct clockdomain *clkdm)
 	spin_unlock_irqrestore(&clkdm->lock, flags);
 	return ret;
 }
+#if defined(CONFIG_MACH_OMAP4_BOWSER) && defined(CONFIG_FB_OMAP_BOOTLOADER_INIT)
+/**
+ * clkdm_wakeup_allow_sleep - force clockdomain wakeup transition
+ * @clkdm: struct clockdomain *
+ *
+ * Instruct the CM to force a wakeup transition on the specified
+ * clockdomain @clkdm without settings NO_SLEEP flag.
+ * Returns -EINVAL if @clkdm is NULL or if the
+ * clockdomain does not support software-controlled wakeup; 0 upon
+ * success.
+ */
+int clkdm_wakeup_allow_sleep(struct clockdomain *clkdm)
+{
+	int ret;
+	unsigned long flags;
+
+	if (!clkdm)
+		return -EINVAL;
+
+	if (!(clkdm->flags & CLKDM_CAN_FORCE_WAKEUP)) {
+		pr_debug("clockdomain: %s does not support forcing "
+			 "wakeup via software\n", clkdm->name);
+		return -EINVAL;
+	}
+
+	if (!arch_clkdm || !arch_clkdm->clkdm_wakeup)
+		return -EINVAL;
+
+	pr_debug("clockdomain: forcing wakeup on %s\n", clkdm->name);
+
+	spin_lock_irqsave(&clkdm->lock, flags);
+	clkdm->_flags &= ~_CLKDM_FLAG_HWSUP_ENABLED;
+	ret = arch_clkdm->clkdm_wakeup(clkdm);
+	pwrdm_wait_transition(clkdm->pwrdm.ptr);
+	pwrdm_state_low2high_counter_update(clkdm->pwrdm.ptr);
+	spin_unlock_irqrestore(&clkdm->lock, flags);
+	return ret;
+}
+#endif /* CONFIG_FB_OMAP_BOOTLOADER_INIT */
 
 /**
  * clkdm_wakeup - force clockdomain wakeup transition
