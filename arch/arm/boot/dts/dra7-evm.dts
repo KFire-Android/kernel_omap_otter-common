@@ -111,6 +111,7 @@
 		&mcasp6_pins
 		&mcasp8_pins
 		&vout1_pins
+		&vout3_pins
 		&vin1a_pins
 		&usb_pins
 		&irq_pins
@@ -198,6 +199,40 @@
 			0x230	0x0	/* vout1_d21 OUTPUT | MODE0 */
 			0x234	0x0	/* vout1_d22 OUTPUT | MODE0 */
 			0x238	0x0	/* vout1_d23 OUTPUT | MODE0 */
+		>;
+	};
+
+	vout3_pins: pinmux_vout3_pins {
+		pinctrl-single,pins = <
+			0x000	0x3	/*GPMC_AD0  = VOUT3_D0*/
+			0x004	0x3	/*GPMC_AD1  = VOUT3_D1*/
+			0x008	0x3	/*GPMC_AD2  = VOUT3_D2*/
+			0x00c	0x3	/*GPMC_AD3  = VOUT3_D3*/
+			0x010	0x3	/*GPMC_AD4  = VOUT3_D4*/
+			0x014	0x3	/*GPMC_AD5  = VOUT3_D5*/
+			0x018	0x3	/*GPMC_AD6  = VOUT3_D6*/
+			0x01c	0x3	/*GPMC_AD7  = VOUT3_D7*/
+			0x020	0x3	/*GPMC_AD8  = VOUT3_D8*/
+			0x024	0x3	/*GPMC_AD9  = VOUT3_D9*/
+			0x028	0x3	/*GPMC_AD10 = VOUT3_D10*/
+			0x02c	0x3	/*GPMC_AD11 = VOUT3_D11*/
+			0x030	0x3	/*GPMC_AD12 = VOUT3_D12*/
+			0x034	0x3	/*GPMC_AD13 = VOUT3_D13*/
+			0x038	0x3	/*GPMC_AD14 = VOUT3_D14*/
+			0x03c	0x3	/*GPMC_AD15 = VOUT3_D15*/
+			0x040	0x3	/*GPMC_A0   = VOUT3_D16*/
+			0x044	0x3	/*GPMC_A1   = VOUT3_D17*/
+			0x048	0x3	/*GPMC_A2   = VOUT3_D18*/
+			0x04c	0x3	/*GPMC_A3   = VOUT3_D19*/
+			0x050	0x3	/*GPMC_A4   = VOUT3_D20*/
+			0x054	0x3	/*GPMC_A5   = VOUT3_D21*/
+			0x058	0x3	/*GPMC_A6   = VOUT3_D22*/
+			0x05c	0x3	/*GPMC_A7   = VOUT3_D23*/
+			0x060	0x3	/*GPMC_A8   = VOUT3_HSYNC*/
+			0x064	0x3	/*GPMC_A9   = VOUT3_VSYNC*/
+			0x068	0x3	/*GPMC_A10  = VOUT3_DE*/
+			0x06c	0x3	/*GPMC_A11  = VOUT3_FLD*/
+			0x0bc	0x3	/*GPMC_CS3  = VOUT3_CLK*/
 		>;
 	};
 
