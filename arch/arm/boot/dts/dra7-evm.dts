@@ -122,7 +122,7 @@
 		nshutdown_gpio = <132>;
 		dev_name = "/dev/ttyO2";
 		flow_cntrl = <1>;
-		baud_rate = <115200>;
+		baud_rate = <3686400>;
 	};
 
 	btwilink {
