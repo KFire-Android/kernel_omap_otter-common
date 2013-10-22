@@ -3,4 +3,5 @@
 *.bin
 *.csp
 *.dsp
+*.img
 ihex2fw
