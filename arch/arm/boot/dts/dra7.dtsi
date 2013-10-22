@@ -806,18 +806,21 @@
 				compatible = "ti,dra7xx-dpi";
 				reg = <0>;
 				video-source = <0>;
+				display-id = <0>;
 			};
 
 			dpi2: dpi@2 {
 				compatible = "ti,dra7xx-dpi";
 				reg = <1>;
 				video-source = <2>;
+				display-id = <2>;
 			};
 
 			dpi3: dpi@3 {
 				compatible = "ti,dra7xx-dpi";
 				reg = <2>;
 				video-source = <3>;
+				display-id = <3>;
 			};
 
 			hdmi: hdmi {
@@ -826,6 +829,7 @@
 				video-source = <1>;
 				vdda_hdmi_microvolt_min = <1500000>;
 				vdda_hdmi_microvolt_max = <1800000>;
+				display-id = <1>;
 			};
 		};
 
