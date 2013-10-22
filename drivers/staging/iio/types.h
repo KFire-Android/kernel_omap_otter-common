@@ -27,6 +27,9 @@ enum iio_chan_type {
 	IIO_ANGL,
 	IIO_TIMESTAMP,
 	IIO_CAPACITANCE,
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	IIO_QUATERNION,
+#endif
 };
 
 enum iio_modifier {
@@ -44,6 +47,9 @@ enum iio_modifier {
 	IIO_MOD_X_OR_Y_OR_Z,
 	IIO_MOD_LIGHT_BOTH,
 	IIO_MOD_LIGHT_IR,
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	IIO_MOD_R,
+#endif
 };
 
 #define IIO_VAL_INT 1

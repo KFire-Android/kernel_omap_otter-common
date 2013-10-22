@@ -57,6 +57,11 @@ unsigned int iio_buffer_poll(struct file *filp,
 	struct iio_dev *indio_dev = filp->private_data;
 	struct iio_buffer *rb = indio_dev->buffer;
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+    if (rb->stufftoread)
+            return POLLIN | POLLRDNORM;
+#endif
+
 	poll_wait(filp, &rb->pollq, wait);
 	if (rb->stufftoread)
 		return POLLIN | POLLRDNORM;

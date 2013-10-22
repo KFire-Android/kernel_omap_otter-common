@@ -367,9 +367,15 @@ static ssize_t iio_trigger_write_current(struct device *dev,
 	return len;
 }
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+static DEVICE_ATTR(current_trigger, S_IRUGO | S_IWUGO,
+		   iio_trigger_read_current,
+		   iio_trigger_write_current);
+#else
 static DEVICE_ATTR(current_trigger, S_IRUGO | S_IWUSR,
 		   iio_trigger_read_current,
 		   iio_trigger_write_current);
+#endif
 
 static struct attribute *iio_trigger_consumer_attrs[] = {
 	&dev_attr_current_trigger.attr,

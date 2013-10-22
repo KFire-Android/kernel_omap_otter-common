@@ -166,13 +166,25 @@ ssize_t iio_buffer_store_enable(struct device *dev,
 ssize_t iio_buffer_show_enable(struct device *dev,
 			       struct device_attribute *attr,
 			       char *buf);
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+#define IIO_BUFFER_LENGTH_ATTR DEVICE_ATTR(length, S_IRUGO | S_IWUGO,	\
+					   iio_buffer_read_length,	\
+					   iio_buffer_write_length)
+#else
 #define IIO_BUFFER_LENGTH_ATTR DEVICE_ATTR(length, S_IRUGO | S_IWUSR,	\
 					   iio_buffer_read_length,	\
 					   iio_buffer_write_length)
+#endif
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+#define IIO_BUFFER_ENABLE_ATTR DEVICE_ATTR(enable, S_IRUGO | S_IWUGO,	\
+					   iio_buffer_show_enable,	\
+					   iio_buffer_store_enable)
+#else
 #define IIO_BUFFER_ENABLE_ATTR DEVICE_ATTR(enable, S_IRUGO | S_IWUSR,	\
 					   iio_buffer_show_enable,	\
 					   iio_buffer_store_enable)
+#endif
 
 int iio_sw_buffer_preenable(struct iio_dev *indio_dev);
 
