@@ -784,7 +784,8 @@ void dsscomp_dbg_comps(struct seq_file *s)
 		}
 
 		/* print manager cache */
-		mgr->dump_cb(mgr, s);
+		if (mgr->dump_cb)
+			mgr->dump_cb(mgr, s);
 	}
 	mutex_unlock(&dbg_mtx);
 #endif
