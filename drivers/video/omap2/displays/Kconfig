@@ -96,10 +96,24 @@ config TC358765_DEBUG
 	  Support of TC358765 DSI-2-LVDS chip register access via debugfs
 
 config PANEL_OTTER1
-        tristate "Amazon Kindle Fire (Otter) Panel"
-        depends on OMAP2_DSS
-        help
-          LCD Panel used in KC1 
+	tristate "Amazon Kindle Fire (Otter) Panel"
+	depends on OMAP2_DSS
+	help
+	  LCD Panel used in KC1 
+
+config PANEL_NT71391_HYDIS
+	tristate "NT71391 Hydis 1920x1200 WUXGA DSI LCD Panel"
+	depends on OMAP2_DSS_DSI
+	select BACKLIGHT_CLASS_DEVICE
+	help
+	  MIPI DSI LCD Panel used by Lab126
+
+config PANEL_NT51012_LG
+	tristate "NT51012 LG 800x1280 DSI LCD Panel"
+	depends on OMAP2_DSS_DSI
+	select BACKLIGHT_CLASS_DEVICE
+	help
+	  MIPI DSI LCD Panel used by Lab126
 
 config PANEL_LP_101
         tristate "LP101 LCD Panel"
