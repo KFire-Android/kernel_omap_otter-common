@@ -160,9 +160,13 @@ static ssize_t backlight_store_brightness(struct device *dev,
 
 	mutex_lock(&bd->ops_lock);
 	if (bd->ops) {
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+		if (brightness > bd->props.max_brightness)
+#else
 		if (brightness > bd->props.max_brightness ||
 				/* account for thermal limits */
 				brightness > bd->props.max_thermal_brightness)
+#endif
 			rc = -EINVAL;
 		else {
 			pr_debug("backlight: set brightness to %lu\n",
@@ -194,6 +198,16 @@ static ssize_t backlight_show_max_brightness(struct device *dev,
 
 	return sprintf(buf, "%d\n", bd->props.max_brightness);
 }
+
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+static ssize_t backlight_show_max_thermal_brightness(struct device *dev,
+					struct device_attribute *attr, char *buf)
+{
+	struct backlight_device *bd = to_backlight_device(dev);
+
+	return sprintf(buf, "%d\n", bd->props.max_thermal_brightness);
+}
+#endif
 
 static ssize_t backlight_show_actual_brightness(struct device *dev,
 		struct device_attribute *attr, char *buf)
@@ -239,6 +253,26 @@ static int backlight_resume(struct device *dev)
 	return 0;
 }
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_HAS_EARLYSUSPEND
+static void backlight_early_suspend(struct early_suspend *es)
+{
+	struct backlight_device *bld = container_of(es,
+		struct backlight_device, early_suspend);
+
+	backlight_suspend(&bld->dev, PMSG_SUSPEND);
+}
+
+static void backlight_late_resume(struct early_suspend *es)
+{
+	struct backlight_device *bld = container_of(es,
+		struct backlight_device, early_suspend);
+
+	backlight_resume(&bld->dev);
+}
+#endif
+#endif
+
 static void bl_device_release(struct device *dev)
 {
 	struct backlight_device *bd = to_backlight_device(dev);
@@ -249,6 +283,10 @@ static struct device_attribute bl_device_attributes[] = {
 	__ATTR(bl_power, 0644, backlight_show_power, backlight_store_power),
 	__ATTR(brightness, 0644, backlight_show_brightness,
 		     backlight_store_brightness),
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	__ATTR(max_thermal_brightness, 0444,
+			backlight_show_max_thermal_brightness, NULL),
+#endif
 	__ATTR(actual_brightness, 0444, backlight_show_actual_brightness,
 		     NULL),
 	__ATTR(max_brightness, 0444, backlight_show_max_brightness, NULL),
@@ -293,8 +331,10 @@ static int backlight_apply_cooling(struct thermal_dev *dev,
 		pr_debug("backlight: set brightness to %lu due to thermal\n",
 				 brightness);
 		bd->props.max_thermal_brightness = brightness;
+#ifndef CONFIG_MACH_OMAP4_BOWSER
 		if (bd->props.brightness > brightness)
 			bd->props.brightness = brightness;
+#endif
 		backlight_update_status(bd);
 		backlight_generate_event(bd, BACKLIGHT_UPDATE_SYSFS);
 	}
@@ -383,6 +423,14 @@ struct backlight_device *backlight_device_register(const char *name,
 		return ERR_PTR(rc);
 	}
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	new_bd->early_suspend.suspend = backlight_early_suspend;
+	new_bd->early_suspend.resume = backlight_late_resume;
+	new_bd->early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN;
+	register_early_suspend(&new_bd->early_suspend);
+#endif
+#endif
 	new_bd->ops = ops;
 
 #ifdef CONFIG_PMAC_BACKLIGHT
@@ -424,6 +472,11 @@ void backlight_device_unregister(struct backlight_device *bd)
 		pmac_backlight = NULL;
 	mutex_unlock(&pmac_backlight_mutex);
 #endif
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	unregister_early_suspend(&bd->early_suspend);
+#endif
+#endif
 	mutex_lock(&bd->ops_lock);
 	bd->ops = NULL;
 	mutex_unlock(&bd->ops_lock);
@@ -449,8 +502,15 @@ static int __init backlight_class_init(void)
 	}
 
 	backlight_class->dev_attrs = bl_device_attributes;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifndef CONFIG_HAS_EARLYSUSPEND
 	backlight_class->suspend = backlight_suspend;
 	backlight_class->resume = backlight_resume;
+#endif
+#else
+	backlight_class->suspend = backlight_suspend;
+	backlight_class->resume = backlight_resume;
+#endif
 	return 0;
 }
 
