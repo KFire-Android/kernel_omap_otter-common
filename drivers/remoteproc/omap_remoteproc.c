@@ -43,6 +43,11 @@
 /* 1 sec is fair enough time for suspending an OMAP device */
 #define DEF_SUSPEND_TIMEOUT 1000
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+/* How many pending messages/requests we can buffer. */
+#define QUEUE_SIZE	256
+#endif
+
 /**
  * union oproc_pm_qos - holds the pm qos structure
  *			ipu being in core domain uses pm_qos API
@@ -91,7 +96,9 @@ struct omap_rproc {
 	void __iomem *boot_reg;
 	union oproc_pm_qos lat_req;
 	struct pm_qos_request bw_req;
+#ifndef CONFIG_MACH_OMAP4_BOWSER
 	atomic_t thrd_cnt;
+#endif
 	struct completion pm_comp;
 	void __iomem *idle;
 	u32 idle_mask;
@@ -100,8 +107,53 @@ struct omap_rproc {
 	bool suspended;
 	bool need_kick;
 	struct hwspinlock_info hwlock_info;
+
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	spinlock_t queue_lock;
+	DECLARE_KFIFO_PTR(queue_kfifo, uint32_t);
+	struct task_struct *queue_thread;
+	struct mutex thread_lock;
+#endif
 };
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+static int _vq_interrupt_thread(void *d)
+{
+	struct rproc *rproc = d;
+	struct omap_rproc *oproc = rproc->priv;
+	struct device *dev = rproc->dev.parent;
+
+	current->flags |= PF_MEMALLOC;
+
+	mutex_lock(&oproc->thread_lock);
+	do {
+		uint32_t msg;
+		int ret;
+
+		spin_lock_irq(&oproc->queue_lock);
+		set_current_state(TASK_INTERRUPTIBLE);
+		ret = kfifo_out(&oproc->queue_kfifo, &msg, 1);
+		spin_unlock_irq(&oproc->queue_lock);
+
+		if (ret == 1) {
+			set_current_state(TASK_RUNNING);
+			if (rproc_vq_interrupt(rproc, msg) == IRQ_NONE)
+				dev_dbg(dev, "no message was found in vqid 0x0\n");
+		} else {
+			if (kthread_should_stop()) {
+				set_current_state(TASK_RUNNING);
+				break;
+			}
+			mutex_unlock(&oproc->thread_lock);
+			schedule();
+			mutex_lock(&oproc->thread_lock);
+		}
+	} while (1);
+	mutex_unlock(&oproc->thread_lock);
+
+	return 0;
+}
+#else
 struct _thread_data {
 	struct rproc *rproc;
 	int msg;
@@ -119,6 +171,7 @@ static int _vq_interrupt_thread(struct _thread_data *d)
 	atomic_dec(&oproc->thrd_cnt);
 	return 0;
 }
+#endif
 
 /**
  * omap_rproc_mbox_callback() - inbound mailbox message handler
@@ -142,11 +195,20 @@ static int omap_rproc_mbox_callback(struct notifier_block *this,
 	struct omap_rproc *oproc = container_of(this, struct omap_rproc, nb);
 	struct device *dev = oproc->rproc->dev.parent;
 	const char *name = oproc->rproc->name;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	unsigned long flags;
+	int ret;
+#else
 	struct _thread_data *d;
+#endif
 
 	dev_dbg(dev, "mbox msg: 0x%x\n", msg);
 
 	switch (msg) {
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	case RP_MBOX_BOOTINIT_DONE:
+		break;
+#endif
 	case RP_MBOX_CRASH:
 		/* remoteproc detected an exception, notify the rproc core.
 		 * The remoteproc core will handle the recovery. */
@@ -166,6 +228,14 @@ static int omap_rproc_mbox_callback(struct notifier_block *this,
 			dev_info(dev, "Dropping unknown message %x", msg);
 			return NOTIFY_DONE;
 		}
+
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+		spin_lock_irqsave(&oproc->queue_lock, flags);
+		ret = kfifo_in(&oproc->queue_kfifo, &msg, 1);
+		spin_unlock_irqrestore(&oproc->queue_lock, flags);
+		if (ret == 1)
+			wake_up_process(oproc->queue_thread);
+#else
 		d = kmalloc(sizeof(*d), GFP_KERNEL);
 		if (!d)
 			break;
@@ -174,6 +244,7 @@ static int omap_rproc_mbox_callback(struct notifier_block *this,
 		atomic_inc(&oproc->thrd_cnt);
 		kthread_run((void *)_vq_interrupt_thread, d,
 					"vp_interrupt_thread");
+#endif
 	}
 
 	return NOTIFY_DONE;
@@ -191,6 +262,12 @@ static void omap_rproc_kick(struct rproc *rproc, int vqid)
 		oproc->need_kick = true;
 		return;
 	}
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	if (oproc->mbox == NULL) {
+		dev_warn(dev, "mbox not initialised yet. Skipping kick.\n");
+		return;
+	}
+#endif
 	/* send the index of the triggered virtqueue in the mailbox payload */
 	ret = omap_mbox_msg_send(oproc->mbox, vqid);
 	if (ret)
@@ -294,11 +371,29 @@ static int omap_rproc_start(struct rproc *rproc)
 	struct omap_rproc_timers_info *timers = pdata->timers;
 	int ret, i;
 
+#ifndef CONFIG_MACH_OMAP4_BOWSER
 	/* init thread counter for mbox messages */
 	atomic_set(&oproc->thrd_cnt, 0);
+#endif
 	/* load remote processor boot address if needed. */
 	if (oproc->boot_reg)
 		writel(rproc->bootaddr, oproc->boot_reg);
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	spin_lock_init(&oproc->queue_lock);
+
+	ret = kfifo_alloc(&oproc->queue_kfifo, QUEUE_SIZE, GFP_KERNEL);
+	if (ret) {
+		printk(KERN_ERR "error kfifo_alloc\n");
+		return ret;
+	}
+
+	mutex_init(&oproc->thread_lock);
+
+	oproc->queue_thread = kthread_run(_vq_interrupt_thread, rproc,
+			"vp_interrupt_thread/%d", rproc->index);
+	if (IS_ERR(oproc->queue_thread))
+		return PTR_ERR(oproc->queue_thread);
+#endif
 
 	oproc->nb.notifier_call = omap_rproc_mbox_callback;
 
@@ -426,12 +521,39 @@ static int omap_rproc_stop(struct rproc *rproc)
 
 	omap_mbox_put(oproc->mbox, &oproc->nb);
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	oproc->mbox = NULL;
+
+	kthread_stop(oproc->queue_thread);
+	kfifo_free(&oproc->queue_kfifo);
+#else
 	/* wait untill all threads have finished */
 	while (atomic_read(&oproc->thrd_cnt))
 		schedule();
+#endif
 
 	return 0;
 }
+
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+static int omap_rproc_cb_barrier(struct rproc *rproc)
+{
+	struct omap_rproc *oproc = rproc->priv;
+	int fifo_empty;
+
+	do {
+		mutex_lock(&oproc->thread_lock);
+		spin_lock_irq(&oproc->queue_lock);
+		fifo_empty = kfifo_is_empty(&oproc->queue_kfifo);
+		spin_unlock_irq(&oproc->queue_lock);
+		mutex_unlock(&oproc->thread_lock);
+		if (!fifo_empty)
+			schedule();
+	} while (!fifo_empty);
+
+	return 0;
+}
+#endif
 
 static bool _rproc_idled(struct omap_rproc *oproc)
 {
@@ -513,7 +635,9 @@ static int omap_rproc_resume(struct rproc *rproc)
 	struct omap_rproc_timers_info *timers = pdata->timers;
 	int ret, i;
 
+#ifndef CONFIG_MACH_OMAP4_BOWSER
 	oproc->suspended = false;
+#endif
 	/* boot address could be lost after suspend, so restore it */
 	if (oproc->boot_reg)
 		writel(rproc->bootaddr, oproc->boot_reg);
@@ -539,8 +663,15 @@ static int omap_rproc_resume(struct rproc *rproc)
 		for (i = 0; i < pdata->timers_cnt; i++)
 			omap_dm_timer_stop(timers[i].odt);
 		omap_mbox_disable(oproc->mbox);
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+		return ret;
+	}
+	oproc->suspended = false;
+	return 0;
+#else
 	}
 	return ret;
+#endif
 }
 
 static inline int omap_rproc_handle_hwspin_rsc(struct rproc *rproc,
@@ -584,6 +715,9 @@ static struct rproc_ops omap_rproc_ops = {
 	.start			= omap_rproc_start,
 	.stop			= omap_rproc_stop,
 	.kick			= omap_rproc_kick,
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	.cb_barrier		= omap_rproc_cb_barrier,
+#endif
 	.suspend		= omap_rproc_suspend,
 	.resume			= omap_rproc_resume,
 	.set_latency		= omap_rproc_set_latency,

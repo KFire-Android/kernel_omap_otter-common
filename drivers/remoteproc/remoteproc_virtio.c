@@ -403,5 +403,28 @@ out:
  */
 void rproc_remove_virtio_dev(struct rproc_vdev *rvdev)
 {
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	struct virtio_device *vdev = &rvdev->vdev;
+	struct rproc *rproc = vdev_to_rproc(vdev);
+	struct virtqueue *vq, *n;
+
+	list_for_each_entry_safe(vq, n, &vdev->vqs, list) {
+		/*
+		 * Be rude and cut all callbacks to this virtqueue.
+		 * There might be a nicer way out there, but this one
+		 * works and (together with the barrier below) stops
+		 * all callback activities.
+		 */
+		vq->callback = NULL;
+	}
+
+	/*
+	 * Now that all vq callbacks have been unhooked, ensure
+	 * that we have no in-flight ones.
+	 */
+	if (rproc->ops->cb_barrier)
+		rproc->ops->cb_barrier(rproc);
+#endif
+
 	unregister_virtio_device(&rvdev->vdev);
 }

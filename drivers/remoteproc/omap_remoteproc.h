@@ -57,6 +57,10 @@
  * @RP_MBOX_ABORT_REQUEST: a "please crash" request, used for testing the
  * recovery mechanism (to some extent).
  *
+ * @RP_MBOX_BOOTINIT_DONE: this message is sent by remote processor once it has
+ * completed some essential initialization during its boot. This notification
+ * can be used to do state maintainance.
+ *
  * @RP_MBOX_SUSPEND: suspend request for the remote processor
  *
  * @RP_MBOX_SUSPEND_FORCED: forced suspend for system suspend request
@@ -78,6 +82,9 @@ enum omap_rp_mbox_messages {
 	RP_MBOX_ECHO_REQUEST	= 0xFFFFFF03,
 	RP_MBOX_ECHO_REPLY	= 0xFFFFFF04,
 	RP_MBOX_ABORT_REQUEST	= 0xFFFFFF05,
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	RP_MBOX_BOOTINIT_DONE	= 0xFFFFFF07,
+#endif
 	RP_MBOX_SUSPEND		= 0xFFFFFF10,
 	RP_MBOX_SUSPEND_FORCED	= 0xFFFFFF11,
 	RP_MBOX_SUSPEND_ACK	= 0xFFFFFF12,

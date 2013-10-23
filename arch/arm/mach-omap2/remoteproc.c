@@ -68,9 +68,13 @@
 #define OMAP5_RPROC_CMA_BASE_IPU	(0x82000000)
 #define OMAP5_RPROC_CMA_BASE_DSP	(0x82000000)
 
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 #define OMAP4_RPROC_CMA_BASE_IPU	(0x82000000)
 #define OMAP4_RPROC_CMA_BASE_DSP	(0x82000000)
-
+#else
+#define OMAP4_RPROC_CMA_BASE_IPU	(0x99000000)
+#define OMAP4_RPROC_CMA_BASE_DSP	(0x98800000)
+#endif
 
 #ifdef CONFIG_OMAP_REMOTEPROC_DSP
 static struct omap_rproc_timers_info dsp_timers[] = {
@@ -250,19 +254,24 @@ void __init omap_rproc_reserve_cma(int platform_type)
 #endif
 
 #ifdef CONFIG_OMAP_REMOTEPROC_IPU
+#if defined(CONFIG_OMAP4_IPU_CMA_SIZE) || defined(CONFIG_OMAP4_IPU_CMA_SIZE_512MB)
 	if (platform_type == RPROC_CMA_OMAP4) {
 		if (omap_total_ram_size() <= SZ_512M)
 			cma_size = CONFIG_OMAP4_IPU_CMA_SIZE_512MB;
 		else
 			cma_size = CONFIG_OMAP4_IPU_CMA_SIZE;
 		cma_addr = OMAP4_RPROC_CMA_BASE_IPU;
-	} else if (platform_type == RPROC_CMA_OMAP5) {
+	}
+#endif
+#if defined(CONFIG_OMAP5_IPU_CMA_SIZE) || defined(CONFIG_OMAP5_IPU_CMA_SIZE_512MB)
+	if (platform_type == RPROC_CMA_OMAP5) {
 		if (omap_total_ram_size() <= SZ_512M)
 			cma_size = CONFIG_OMAP5_IPU_CMA_SIZE_512MB;
 		else
 			cma_size = CONFIG_OMAP5_IPU_CMA_SIZE;
 		cma_addr = OMAP5_RPROC_CMA_BASE_IPU;
 	}
+#endif
 
 #ifdef CONFIG_REMOTEPROC_USE_CARVEOUT
 	/* memblock_remove for OMAP4's M3 "ducati" remote processor */

@@ -51,6 +51,10 @@ int rproc_secure_boot(struct rproc *rproc);
 int rproc_secure_get_mode(struct rproc *rproc);
 int rproc_secure_get_ttb(struct rproc *rproc);
 bool rproc_is_secure(struct rproc *rproc);
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+void rproc_secure_complete(struct rproc *rproc);
+int rproc_secure_recover(struct rproc *rproc);
+#endif
 
 /* from remoteproc_debugfs.c */
 void rproc_remove_trace_file(struct dentry *tfile);

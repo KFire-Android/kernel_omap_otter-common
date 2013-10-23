@@ -28,6 +28,17 @@
 #include <linux/rproc_drm.h>
 #include <linux/slab.h>
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+#include <linux/delay.h>
+
+#ifdef CONFIG_ION_OMAP
+#include <linux/ion.h>
+#include <linux/omap_ion.h>
+#endif
+
+#define RPROC_RELOAD_TIMEOUT_MS	5000
+#endif
+
 #include "remoteproc_internal.h"
 
 /**
@@ -47,6 +58,9 @@ enum rproc_secure_state {
 static DECLARE_COMPLETION(secure_reload_complete);
 static DEFINE_MUTEX(secure_lock);
 static enum rproc_secure_state secure_state;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+static enum rproc_secure_state prev_secure_state;
+#endif
 static int secure_request;
 static struct rproc_sec_params *secure_params;
 static rproc_drm_invoke_service_t rproc_secure_drm_function;
@@ -78,6 +92,33 @@ void rproc_secure_init(struct rproc *rproc)
 	secure_state = RPROC_SECURE_OFF;
 }
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+static int rproc_exit_secure_playback(struct rproc *rproc)
+{
+	const int max_retries = 20;
+	int try = 0;
+	int ret;
+
+	/*
+	 * Retry a few times in case we accidentally stumble upon some
+	 * userspace security session.
+	 */
+	do {
+		/* invoke service to exit secure mode */
+		ret = rproc_secure_drm_service(EXIT_SECURE_PLAYBACK,
+								secure_params);
+		if (ret == -EBUSY) {
+			dev_warn(&rproc->dev,
+				"EBUSY disabling secure mode, try %d/%d\n",
+				try + 1, max_retries);
+			msleep(20);
+		}
+	} while (ret == -EBUSY && ++try < max_retries);
+
+	return ret;
+}
+#endif
+
 /**
  * rproc_secure_reset() - reset secure service and firewalls
  * @rproc: remote processor
@@ -86,6 +127,9 @@ void rproc_secure_init(struct rproc *rproc)
  */
 void rproc_secure_reset(struct rproc *rproc)
 {
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	const bool rproc_has_crashed = (rproc->state == RPROC_CRASHED);
+#endif
 	int ret;
 
 	dev_dbg(&rproc->dev, "reseting secure service\n");
@@ -93,10 +137,24 @@ void rproc_secure_reset(struct rproc *rproc)
 	if (strcmp(rproc->name, "ipu_c0"))
 		return;
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	/*
+	 * Reset firewalls when we're either:
+	 *   - exiting from secure playback mode
+	 *   - recovering from rproc crash
+	 * When recovering we practically reboot the remote processor, so
+	 * consequently there should be no firewalls while kernel
+	 * reloads the firmware.
+	 */
+	if ((!secure_request && secure_state) || rproc_has_crashed) {
+		/* invoke service to exit secure mode */
+		ret = rproc_exit_secure_playback(rproc);
+#else
 	if (!secure_request && secure_state) {
 		/* invoke service to exit secure mode */
 		ret = rproc_secure_drm_service(EXIT_SECURE_PLAYBACK,
 								secure_params);
+#endif
 		if (ret)
 			dev_err(&rproc->dev,
 				"error disabling secure mode 0x%x\n", ret);
@@ -196,6 +254,11 @@ int rproc_secure_parse_fw(struct rproc *rproc, const u8 *elf_data)
 	struct elf32_shdr *shdr = (struct elf32_shdr *)
 					(elf_data + ehdr->e_shoff);
 	const char *name_sect = elf_data + shdr[ehdr->e_shstrndx].sh_offset;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_ION_OMAP
+	struct ion_platform_heap *tiler_2d_heap;
+#endif
+#endif
 
 	if (strcmp(rproc->name, "ipu_c0"))
 		return 0;
@@ -277,6 +340,24 @@ int rproc_secure_parse_fw(struct rproc *rproc, const u8 *elf_data)
 		}
 	}
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_ION_OMAP
+	tiler_2d_heap = omap_ion_get2d_heap();
+	if (!tiler_2d_heap)
+		BUG();
+	secure_params_local->decoded_buffer_address = (dma_addr_t) tiler_2d_heap->base;
+	secure_params_local->decoded_buffer_size = (uint32_t) tiler_2d_heap->size;
+	dev_dbg(dev, "decode buff addr = %x, decode buff size = %d\n",
+			secure_params_local->decoded_buffer_address, secure_params_local->decoded_buffer_size);
+
+	/* copy the local secure params into a direct-mapped kernel memory */
+	secure_params = kzalloc(sizeof(*secure_params), GFP_KERNEL);
+	if (secure_params)
+		*secure_params = *secure_params_local;
+	else
+		ret = -ENOMEM;
+#endif
+#else
 	/* FIXME: hardcoded, NEED to be acquired from ION */
 	secure_params_local->decoded_buffer_address = (dma_addr_t) 0xB4300000;
 	secure_params_local->decoded_buffer_size = (uint32_t) 0x6000000;
@@ -288,6 +369,7 @@ int rproc_secure_parse_fw(struct rproc *rproc, const u8 *elf_data)
 						sizeof(*secure_params));
 	else
 		ret = -ENOMEM;
+#endif
 
 out:
 	return ret;
@@ -369,6 +451,9 @@ out:
  */
 int rproc_set_secure(const char *name, bool enable)
 {
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	unsigned long timeout = msecs_to_jiffies(RPROC_RELOAD_TIMEOUT_MS);
+#endif
 	int ret = 0;
 
 	if (strcmp(name, "ipu_c0"))
@@ -386,7 +471,12 @@ int rproc_set_secure(const char *name, bool enable)
 	ret = rproc_reload(name);
 	if (ret)
 		goto out;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	if (wait_for_completion_timeout(&secure_reload_complete, timeout) == 0)
+		pr_err("Timeout waiting for rproc to boot.\n");
+#else
 	wait_for_completion(&secure_reload_complete);
+#endif
 
 	if (enable && secure_state != RPROC_SECURE_ON)
 		ret = -EACCES;
@@ -398,6 +488,71 @@ out:
 	return ret;
 }
 EXPORT_SYMBOL(rproc_set_secure);
+
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+void rproc_secure_complete(struct rproc *rproc)
+{
+	if (strcmp(rproc->name, "ipu_c0"))
+		return;
+
+	if (prev_secure_state == RPROC_SECURE_RELOAD)
+		complete_all(&secure_reload_complete);
+}
+
+/**
+ * Resembles rproc_set_secure, but secure state machine handling is
+ * sufficiently different during recovery to deem a separate function.
+ */
+int rproc_secure_recover(struct rproc *rproc)
+{
+	enum rproc_secure_state crashed_secure_state;
+	unsigned long timeout = msecs_to_jiffies(RPROC_RELOAD_TIMEOUT_MS);
+	int ret = 0;
+
+	if (strcmp(rproc->name, "ipu_c0")) {
+		rproc_recover(rproc);
+		return 0;
+	}
+
+	dev_err(&rproc->dev, "trying to recover %s\n", rproc->name);
+
+	if (!secure_params) {
+		/*
+		 * There is no secure playback integrated, so take
+		 * a shortcut
+		 */
+		return rproc_reload(rproc->name);
+	}
+
+	mutex_lock(&secure_lock);
+
+	crashed_secure_state = secure_state;
+
+	/*
+	 * We don't touch secure_request because we want to trigger a
+	 * reload in whatever mode we have been during the crash.
+	 */
+	secure_state = RPROC_SECURE_RELOAD;
+	init_completion(&secure_reload_complete);
+	ret = rproc_reload(rproc->name);
+
+	if (wait_for_completion_timeout(&secure_reload_complete, timeout) == 0)
+		pr_err("Timeout waiting for rproc to recover.\n");
+
+	if (crashed_secure_state != secure_state)
+		ret = -EACCES;
+
+	pr_info("Ducati %s in %s mode.\n",
+			ret ? "FAILED to recover" : "successfully recovered",
+			secure_state == RPROC_SECURE_ON ?
+					"secure" : "non-secure");
+
+	mutex_unlock(&secure_lock);
+
+	return ret;
+}
+#endif
+
 
 /**
  * rproc_secure_drm_service() - invoke the specified rproc_drm service
