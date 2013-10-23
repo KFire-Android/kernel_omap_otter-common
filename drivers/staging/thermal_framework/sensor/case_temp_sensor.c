@@ -127,16 +127,23 @@ static int case_report_temp(struct thermal_dev *tdev)
 			thermal_sensor_set_temp(temp_sensor->therm_fw);
 			mutex_lock(&temp_sensor->sensor_mutex);
 			kobject_uevent(&temp_sensor->dev->kobj, KOBJ_CHANGE);
+#ifndef CONFIG_MACH_OMAP4_BOWSER
 			/* now hotevent back to 1 until we reach cold thres */
 			temp_sensor->hot_event = 1;
+#endif
 		}
 		if ((current_temp < temp_sensor->threshold_cold) &&
 		    (temp_sensor->hot_event == 1)) {
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+			temp_sensor->hot_event = 0;
+#endif
 			mutex_unlock(&temp_sensor->sensor_mutex);
 			thermal_sensor_set_temp(temp_sensor->therm_fw);
 			mutex_lock(&temp_sensor->sensor_mutex);
 			kobject_uevent(&temp_sensor->dev->kobj, KOBJ_CHANGE);
+#ifndef CONFIG_MACH_OMAP4_BOWSER
 			temp_sensor->hot_event = 0;
+#endif
 		}
 	}
 	mutex_unlock(&temp_sensor->sensor_mutex);
@@ -157,7 +164,11 @@ static int case_set_temp_thresh(struct thermal_dev *tdev, int min, int max)
 	mutex_lock(&temp_sensor->sensor_mutex);
 	temp_sensor->threshold_cold = min;
 	temp_sensor->threshold_hot = max;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	temp_sensor->hot_event = 1;
+#else
 	temp_sensor->hot_event = 0;
+#endif
 	pr_info("%s:threshold_cold %d, threshold_hot %d\n", __func__,
 		min, max);
 	mutex_unlock(&temp_sensor->sensor_mutex);
@@ -273,7 +284,11 @@ static void case_sensor_delayed_work_fn(struct work_struct *work)
 					     case_sensor_work.work);
 
 	case_report_temp(temp_sensor->therm_fw);
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	queue_delayed_work(system_long_wq, &temp_sensor->case_sensor_work,
+#else
 	schedule_delayed_work(&temp_sensor->case_sensor_work,
+#endif
 				msecs_to_jiffies(temp_sensor->work_delay));
 }
 
@@ -301,7 +316,9 @@ static int __devinit case_temp_sensor_probe(struct platform_device *pdev)
 
 	temp_sensor->dev = dev;
 
+#ifndef CONFIG_MACH_OMAP4_BOWSER
 	pm_runtime_enable(dev);
+#endif
 
 	kobject_uevent(&pdev->dev.kobj, KOBJ_ADD);
 	platform_set_drvdata(pdev, temp_sensor);
@@ -330,7 +347,11 @@ static int __devinit case_temp_sensor_probe(struct platform_device *pdev)
 		temp_sensor->average_number = pdata->average_number;
 
 	temp_sensor->work_delay = pdata->report_delay_ms;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	queue_work(system_long_wq, &temp_sensor->case_sensor_work.work);
+#else
 	schedule_work(&temp_sensor->case_sensor_work.work);
+#endif
 
 	dev_info(&pdev->dev, "%s: Initialised\n", temp_sensor->therm_fw->name);
 
@@ -345,10 +366,15 @@ static int __devexit case_temp_sensor_remove(struct platform_device *pdev)
 {
 	struct case_temp_sensor *temp_sensor = platform_get_drvdata(pdev);
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	cancel_delayed_work_sync(&temp_sensor->case_sensor_work);
+#endif
 	thermal_sensor_dev_unregister(temp_sensor->therm_fw);
 	kfree(temp_sensor->therm_fw);
 	kobject_uevent(&temp_sensor->dev->kobj, KOBJ_REMOVE);
+#ifndef CONFIG_MACH_OMAP4_BOWSER
 	cancel_delayed_work_sync(&temp_sensor->case_sensor_work);
+#endif
 	platform_set_drvdata(pdev, NULL);
 	mutex_destroy(&temp_sensor->sensor_mutex);
 	kfree(temp_sensor);
@@ -361,6 +387,9 @@ static void case_temp_sensor_shutdown(struct platform_device *pdev)
 	struct case_temp_sensor *temp_sensor = platform_get_drvdata(pdev);
 
 	cancel_delayed_work_sync(&temp_sensor->case_sensor_work);
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	thermal_sensor_dev_unregister(temp_sensor->therm_fw);
+#endif
 }
 
 #ifdef CONFIG_PM
@@ -378,7 +407,11 @@ static int case_temp_sensor_resume(struct platform_device *pdev)
 {
 	struct case_temp_sensor *temp_sensor = platform_get_drvdata(pdev);
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	queue_work(system_long_wq, &temp_sensor->case_sensor_work.work);
+#else
 	schedule_work(&temp_sensor->case_sensor_work.work);
+#endif
 
 	return 0;
 }

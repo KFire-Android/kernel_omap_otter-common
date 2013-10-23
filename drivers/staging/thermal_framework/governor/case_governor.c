@@ -29,9 +29,15 @@
 #include <plat/omap_device.h>
 
 /* System/Case Thermal thresholds */
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+#define SYS_THRESHOLD_HOT		78000
+#define SYS_THRESHOLD_COLD		74000
+#define SYS_THRESHOLD_HOT_INC		1000
+#else
 #define SYS_THRESHOLD_HOT		62000
 #define SYS_THRESHOLD_COLD		57000
 #define SYS_THRESHOLD_HOT_INC		500
+#endif
 #define INIT_COOLING_LEVEL		0
 #define CASE_SUBZONES_NUMBER		4
 int case_subzone_number = CASE_SUBZONES_NUMBER;
@@ -39,6 +45,9 @@ EXPORT_SYMBOL_GPL(case_subzone_number);
 
 static int sys_threshold_hot = SYS_THRESHOLD_HOT;
 static int sys_threshold_cold = SYS_THRESHOLD_COLD;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+static int sys_threshold_hot_inc = SYS_THRESHOLD_HOT_INC;
+#endif
 static int thot = SYS_THRESHOLD_COLD;
 static int tcold = SYS_THRESHOLD_COLD;
 
@@ -50,13 +59,24 @@ struct case_governor {
 
 static struct thermal_dev *therm_fw;
 static struct case_governor *case_gov;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+static struct case_policy *extern_policy;
+#endif
 
 static void case_reached_max_state(int temp)
 {
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	pr_emerg("%s: shutdown due to thermal case policy (temp == %d)\n",
+		__func__, temp);
+
+	/* Sync and shutdown. */
+	orderly_poweroff(true);
+#else
 	pr_emerg("%s: restart due to thermal case policy (temp == %d)\n",
 		 __func__, temp);
 	sys_sync();
 	kernel_restart(NULL);
+#endif
 }
 
 /**
@@ -89,6 +109,11 @@ static int case_thermal_manager(struct list_head *cooling_list, int temp)
 		 sys_threshold_hot, sys_threshold_cold);
 
 	if (temp < sys_threshold_cold) {
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+		/* Do nothing if system is cool and we're already on level 0. */
+		if (case_gov->cooling_level == INIT_COOLING_LEVEL)
+			return 0;
+#endif
 		case_gov->cooling_level = INIT_COOLING_LEVEL;
 		/* We want to be notified on the first subzone */
 		thot = sys_threshold_cold;
@@ -108,11 +133,19 @@ static int case_thermal_manager(struct list_head *cooling_list, int temp)
 		if (temp < tcold) {
 			case_gov->cooling_level--;
 			thot = tcold;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+			tcold -= sys_threshold_hot_inc;
+#else
 			tcold -= SYS_THRESHOLD_HOT_INC;
+#endif
 		} else { /* temp > thot */
 			case_gov->cooling_level++;
 			tcold = thot;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+			thot += sys_threshold_hot_inc;
+#else
 			thot += SYS_THRESHOLD_HOT_INC;
+#endif
 		}
 
 		pr_debug("%s: temp: %d >= sys_threshold_hot, thot: %d:%d (%d)",
@@ -130,6 +163,17 @@ static int case_thermal_manager(struct list_head *cooling_list, int temp)
 
 		pr_debug("%s: sys_thot >= temp: %d >= sys_tcold, %d:%d (%d)",
 			 __func__, temp, thot, tcold, case_gov->cooling_level);
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	} else if (temp <= tcold) {
+		case_gov->cooling_level--;
+		thot = tcold;
+		tcold = sys_threshold_cold +
+			((sys_threshold_hot - sys_threshold_cold) /
+			case_subzone_number) * (case_gov->cooling_level - 1);
+		pr_info("%s: sys_thot >= temp: %d reseting %d:%d (%d)",
+				__func__, temp, thot, tcold,
+				case_gov->cooling_level);
+#else
 	} else if (temp < tcold) {
 		/* coming from Tj > sys_threshold_hot */
 		if (case_gov->cooling_level > case_subzone_number) {
@@ -146,6 +190,7 @@ static int case_thermal_manager(struct list_head *cooling_list, int temp)
 				 __func__, temp, thot, tcold,
 				 case_gov->cooling_level);
 		}
+#endif
 	}
 
 update:
@@ -168,6 +213,14 @@ static int case_process_temp(struct thermal_dev *gov,
 
 	return ret;
 }
+
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+void set_case_policy(struct case_policy *policy)
+{
+	if (policy)
+		extern_policy = policy;
+}
+#endif
 
 static int option_get(void *data, u64 *val)
 {
@@ -259,8 +312,29 @@ static int __init case_governor_init(void)
 		return -ENOMEM;
 	}
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	if (extern_policy) {
+		if (extern_policy->sys_threshold_hot)
+			sys_threshold_hot = extern_policy->sys_threshold_hot;
+		if (extern_policy->sys_threshold_cold) {
+			sys_threshold_cold = extern_policy->sys_threshold_cold;
+			thot = tcold = sys_threshold_cold;
+		}
+		if (extern_policy->case_subzone_number)
+			case_subzone_number =
+				extern_policy->case_subzone_number;
+		if (extern_policy->sys_threshold_hot_inc)
+			sys_threshold_hot_inc =
+				extern_policy->sys_threshold_hot_inc;
+	}
+#endif
+
 	case_gov->cooling_level = INIT_COOLING_LEVEL;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	case_gov->max_cooling_level = case_subzone_number + opps;
+#else
 	case_gov->max_cooling_level = CASE_SUBZONES_NUMBER + opps;
+#endif
 
 	return 0;
 }

@@ -8,6 +8,13 @@ config TMP102_SENSOR
 	  Enabling this config will give support for the tmp102
 	  temp sensor.
 
+config TMP103_SENSOR
+	bool "OMAP TMP103 temp sensor support"
+	depends on THERMAL_FRAMEWORK && OMAP_THERMAL && I2C
+	help
+	  Enabling this config will give support for the tmp103
+	  temp sensor for the OMAP platform.
+
 config TMP006_SENSOR
 	bool "TMP006 temp sensor support"
 	depends on OMAP_THERMAL && I2C

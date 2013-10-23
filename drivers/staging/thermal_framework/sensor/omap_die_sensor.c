@@ -231,7 +231,12 @@ int omap_thermal_report_temperature(struct omap_bandgap *bg_ptr, int id)
 	mutex_lock(&therm_data->thermal_mutex);
 
 	if (therm_data->enabled)
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+		queue_work(system_long_wq,
+			&therm_data->report_temperature_work);
+#else
 		schedule_work(&therm_data->report_temperature_work);
+#endif
 
 	mutex_unlock(&therm_data->thermal_mutex);
 
