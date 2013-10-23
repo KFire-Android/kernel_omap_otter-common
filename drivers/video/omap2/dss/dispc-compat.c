@@ -360,8 +360,7 @@ static void dispc_error_worker(struct work_struct *work)
 		if (bit & errors) {
 			DSSERR("FIFO UNDERFLOW on %s, disabling the overlay\n",
 					ovl->name);
-			dispc_ovl_enable(ovl->id, false);
-			dispc_mgr_go(ovl->manager->id);
+			ovl->disable(ovl);
 			msleep(50);
 		}
 	}
@@ -371,6 +370,11 @@ static void dispc_error_worker(struct work_struct *work)
 		unsigned bit;
 
 		mgr = omap_dss_get_overlay_manager(i);
+		if ((!mgr) || !(mgr->get_device(mgr))) {
+			DSSERR("mgr or device is NULL\n");
+			break;
+		}
+
 		bit = dispc_mgr_get_sync_lost_irq(i);
 
 		if (bit & errors) {
@@ -404,6 +408,9 @@ static void dispc_error_worker(struct work_struct *work)
 			dss_mgr_disable(mgr);
 		}
 	}
+
+	if (errors & DISPC_IRQ_WBINCOMPLETE)
+		DSSERR("WB FIFO flushed before completion\n");
 
 	spin_lock_irqsave(&dispc_compat.irq_lock, flags);
 	dispc_compat.irq_error_mask |= errors;

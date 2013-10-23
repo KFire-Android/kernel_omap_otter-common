@@ -613,6 +613,7 @@ static inline u16 DISPC_TABLE_BA_OFFSET(enum omap_plane plane)
 	case OMAP_DSS_VIDEO1:
 	case OMAP_DSS_VIDEO2:
 	case OMAP_DSS_VIDEO3:
+	case OMAP_DSS_WB:
 		BUG();
 		return 0;
 	default:
@@ -904,6 +905,7 @@ static inline u16 DISPC_PRELOAD_OFFSET(enum omap_plane plane)
 		return 0x00E8;
 	case OMAP_DSS_VIDEO3:
 		return 0x00A0;
+	case OMAP_DSS_WB:
 	default:
 		BUG();
 		return 0;
