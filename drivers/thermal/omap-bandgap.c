@@ -959,9 +959,10 @@ struct omap_bandgap *omap_bandgap_platform_build(struct platform_device *pdev)
 
 static struct omap_bandgap *omap_bandgap_build(struct platform_device *pdev)
 {
+	struct omap_bandgap *bg_ptr = NULL;
+#ifdef CONFIG_USE_OF
 	struct device_node *node = pdev->dev.of_node;
 	const struct of_device_id *of_id;
-	struct omap_bandgap *bg_ptr;
 	u32 prop;
 
 	/* just for the sake */
@@ -993,7 +994,7 @@ static struct omap_bandgap *omap_bandgap_build(struct platform_device *pdev)
 			return ERR_PTR(-EINVAL);
 		}
 	}
-
+#endif
 	return bg_ptr;
 }
 
