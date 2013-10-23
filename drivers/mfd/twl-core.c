@@ -41,6 +41,9 @@
 #include <linux/irq.h>
 #include <linux/irqdomain.h>
 #include <linux/slab.h>
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+#include <linux/interrupt.h>
+#endif
 
 #include <linux/regulator/machine.h>
 
@@ -220,6 +223,9 @@ defined(CONFIG_INPUT_TWL6030_PWRBUTTON_MODULE)
 #define TWL6030_BASEADD_MEM		0x0017
 #define TWL6030_BASEADD_PM_MASTER	0x001F
 #define TWL6030_BASEADD_PM_SLAVE_MISC	0x0030 /* PM_RECEIVER */
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+#define TWL6030_BASEADD_PM_SLAVE_RES	0x00AD
+#endif
 #define TWL6030_BASEADD_PM_MISC		0x00E2
 #define TWL6030_BASEADD_PM_PUPD		0x00F0
 
@@ -397,6 +403,9 @@ static struct twl_mapping twl6030_map[] = {
 	{ SUB_CHIP_ID0, TWL6030_BASEADD_RTC },
 	{ SUB_CHIP_ID0, TWL6030_BASEADD_MEM },
 	{ SUB_CHIP_ID1, TWL6032_BASEADD_CHARGER },
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	{ SUB_CHIP_ID0, TWL6030_BASEADD_PM_SLAVE_RES },
+#endif
 	{ SUB_CHIP_ID0, TWL6030_BASEADD_PM_MISC },
 };
 
@@ -1420,6 +1429,24 @@ static void create_twl_proc_files(void)
 	}
 }
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_PM
+static int twl_suspend(struct i2c_client *client, pm_message_t mesg)
+{
+	/* Un-mask low battery interrupt */
+	twl6030_interrupt_unmask(VLOW_INT_MASK, REG_INT_MSK_STS_A);
+	return irq_set_irq_wake(client->irq, 1);
+}
+
+static int twl_resume(struct i2c_client *client)
+{
+	return irq_set_irq_wake(client->irq, 0);
+}
+#else
+#define twl_suspend	NULL
+#define twl_resume	NULL
+#endif
+#endif
 
 /*
  * twl_load_regs_setup_script() - helper to setup a one-time regs configuration
@@ -1686,6 +1713,8 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
 			I2C_SDA_CTRL_PU | I2C_SCL_CTRL_PU);
 		twl_i2c_write_u8(TWL4030_MODULE_INTBR, temp, REG_GPPUPDCTR1);
 	}
+
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 	if (twl_class_is_6030()) {
 		twl_i2c_write_u8(TWL6030_MODULE_ID0, 0xC0, PHOENIX_MSK_TRANSITION);
 		/*rtc off mode low power,BBSPOR_CFG,VRTC_EN_OFF_STS*/
@@ -1729,6 +1758,47 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		/* Create proc files */
 		create_twl_proc_files();
 	}
+#endif
+
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	/* Print some useful registers at boot up */
+	pr_info("TWL603x Boot Information:\n");
+	twl_i2c_read_u8(TWL6030_MODULE_ID0, &twl_reg, PHOENIX_START_CONDITION);
+	memset(twl_start_condition, 0 , TWL_BOOT_INFO_SIZE);
+	for (i = 0; i < ARRAY_SIZE(start_cond_flags); i++)
+		if (twl_reg & start_cond_flags[i].mask)
+			strlcat(twl_start_condition, start_cond_flags[i].str,
+				sizeof(twl_start_condition));
+	pr_info("Start condition is %s (PHOENIX_START_CONDITION = 0x%02x)\n", twl_start_condition, twl_reg);
+
+	/* Clear register for next boot */
+	twl_reg = 0x7F; // Bit 8 is reserved
+	twl_i2c_write_u8(TWL6030_MODULE_ID0, twl_reg, PHOENIX_STS_HW_CONDITIONS);
+
+	twl_i2c_read_u8(TWL6030_MODULE_ID0, &twl_reg, PHOENIX_LAST_TURNOFF_STS);
+	memset(twl_turnoff_reason, 0 , TWL_BOOT_INFO_SIZE);
+
+	if (0x01 == twl_reg) {
+		/* Upon normal shutdown with power button, this register will be set to 0x1 */
+		snprintf(twl_turnoff_reason,  TWL_BOOT_INFO_SIZE, "normal shutdown");
+	}
+	else {
+		for (i = 0; i < ARRAY_SIZE(last_turnoff_flags); i++)
+			if (twl_reg & last_turnoff_flags[i].mask)
+				strlcat(twl_turnoff_reason, last_turnoff_flags[i].str,
+					sizeof(twl_turnoff_reason));
+	}
+	pr_info("Last turn off status is %s (PHOENIX_LAST_TURN_OFF_STATUS = 0x%02x)\n", twl_turnoff_reason, twl_reg);
+	/* Clear register for next boot */
+	twl_reg = 0xFE; // Bit 0 is read-only
+	twl_i2c_write_u8(TWL6030_MODULE_ID0, twl_reg, PHOENIX_LAST_TURNOFF_STS);
+
+	twl_i2c_read_u8(TWL6030_MODULE_ID0, &twl_reg, PHOENIX_STS_HW_CONDITIONS);
+	printk(KERN_INFO "Hardware Conditions (PHOENIX_STS_HW_CONDITIONS) is 0x%02x\n", twl_reg);
+
+	/* Create proc files */
+	create_twl_proc_files();
+#endif
 
 	status = -ENODEV;
 	if (node)
@@ -1769,6 +1839,10 @@ static struct i2c_driver twl_driver = {
 	.driver.name	= DRIVER_NAME,
 	.id_table	= twl_ids,
 	.probe		= twl_probe,
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	.suspend	= twl_suspend,
+	.resume		= twl_resume,
+#endif
 	.remove		= __devexit_p(twl_remove),
 };
 

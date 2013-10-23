@@ -494,7 +494,11 @@ int twl6030_unregister_notifier(struct notifier_block *nb,
 
 #define TWL4030_PM_MASTER_GLOBAL_TST		0xb6
 
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 #define TWL6030_PHOENIX_DEV_ON			0x25 //0x06
+#else
+#define TWL6030_PHOENIX_DEV_ON			0x06
+#endif
 
 #define TWL6030_PM_MASTER_MSK_TRANSITION	0x01
 #define TWL6030_VBATMIN_HI_THRESHOLD		0x05

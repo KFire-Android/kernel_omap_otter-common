@@ -50,6 +50,7 @@
 
 #define SCALE				(1 << 15)
 
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 /* TWL6030_GPADC_CTRL */
 #define GPADC_CTRL_TEMP1_EN	(1 << 0)    /* input ch 1 */
 #define GPADC_CTRL_TEMP2_EN	(1 << 1)    /* input ch 4 */
@@ -60,6 +61,7 @@
 #define GPADC_CTRL_TEMP2_EN_MONITOR	(1 << 6)
 #define GPADC_CTRL_ISOURCE_EN		(1 << 7)
 #define ENABLE_ISOURCE		0x80
+#endif
 
 struct twl6030_chnl_calib {
 	s32 gain_error;
@@ -200,7 +202,7 @@ static const struct twl6030_ideal_code
 	{0,	0},	/* CHANNEL 16 */
 };
 
-
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 static int temperature_table[] =
 {
 	954,  952,  951,  949,  948,  /* -15C~ -11C*/
@@ -234,6 +236,7 @@ static int temperature_batt_table[] =
 	 63,   61,   60,   58,   56,   55,   53,   51,   50,   49,  /* 90C~ 99C*/
 	 47,   46,   45,   43,   42,   41  /* 100C~ 105C*/
 };
+#endif
 
 /* PhoenixLite has a different calibration sysem to the Phoenix */
 static const struct twl6032_ideal_code
@@ -432,6 +435,7 @@ static ssize_t show_offset(struct device *dev,
 	return status;
 }
 
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 static ssize_t show_temperature(struct device *dev,
 		struct device_attribute *devattr, char *buf)
 {
@@ -570,6 +574,51 @@ static ssize_t show_value(struct device *dev,
                 status = sprintf(buf, "%d\n", temp1);
         return status;
 }
+#endif
+
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+static ssize_t set_offset(struct device *dev,
+	struct device_attribute *devattr, const char *buf, size_t count)
+{
+	long val;
+	int status = count;
+	struct sensor_device_attribute *attr = to_sensor_dev_attr(devattr);
+
+	if ((kstrtol(buf, 10, &val) < 0) || (val < 15000)
+							|| (val > 60000))
+		return -EINVAL;
+
+	twl6030_calib_tbl[attr->index].offset_error = val;
+
+	return status;
+}
+
+static ssize_t show_value(struct device *dev,
+	struct device_attribute *devattr, char *buf)
+{
+	struct sensor_device_attribute *attr = to_sensor_dev_attr(devattr);
+	int temp1 = 0;
+	int temp2 = 0;
+	int ret;
+	int status;
+	struct twl6030_gpadc_request req;
+
+	req.channels = (1 << attr->index);
+	req.method = TWL6030_GPADC_SW2;
+	req.active = 0;
+	req.func_cb = NULL;
+	ret = twl6030_gpadc_conversion(&req);
+	if (ret < 0)
+		return ret;
+
+	if (req.rbuf[attr->index] > 0) {
+		temp1 = req.rbuf[attr->index];
+		temp2 = req.buf[attr->index].raw_code;
+	}
+	status = sprintf(buf, "%d\n", temp1);
+	return status;
+}
+#endif
 
 static int twl6030_gpadc_read(struct twl6030_gpadc_data *gpadc, u8 reg)
 {
@@ -736,7 +785,7 @@ static irqreturn_t twl6030_gpadc_irq_handler(int irq, void *_req)
 	return IRQ_HANDLED;
 }
 
-
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 ////////////////////////////leon add for ntc/////////////////
 static int ntc_setup(void)
 {
@@ -752,7 +801,7 @@ static int ntc_setup(void)
 	return ret;
 }
 ////////////////////////////////////////////////////////////////////////////////
-
+#endif
 
 static void twl6030_gpadc_work(struct work_struct *ws)
 {
@@ -1089,6 +1138,7 @@ static ssize_t show_raw_code(struct device *dev,
 	return ret;
 }
 
+#if defined(CONFIG_MACH_OMAP_4430_KC1) || defined(CONFIG_MACH_OMAP4_BOWSER)
 #define in_gain(index) \
 static SENSOR_DEVICE_ATTR(in##index##_gain, S_IRUGO|S_IWUSR, show_gain, \
 	set_gain, index); \
@@ -1096,6 +1146,13 @@ static SENSOR_DEVICE_ATTR(in##index##_offset, S_IRUGO|S_IWUSR, show_offset, \
 	set_offset, index); \
 static SENSOR_DEVICE_ATTR(in##index##_value, S_IROTH|S_IWUSR, show_value, \
 	NULL, index);
+#else
+#define in_gain(index) \
+static SENSOR_DEVICE_ATTR(in##index##_gain, S_IRUGO|S_IWUSR, show_gain, \
+	set_gain, index); \
+static SENSOR_DEVICE_ATTR(in##index##_offset, S_IRUGO|S_IWUSR, show_offset, \
+	set_offset, index)
+#endif
 
 in_gain(0);
 in_gain(1);
@@ -1114,11 +1171,13 @@ in_gain(13);
 in_gain(14);
 in_gain(15);
 in_gain(16);
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 static DEVICE_ATTR(ntc, S_IROTH|S_IWUSR, show_temperature, NULL);
 static DEVICE_ATTR(ntc_batt, S_IROTH|S_IWUSR, show_temperature_batt, NULL);
 //////////////leon add for NTC access
 //static SENSOR_DEVICE_ATTR(ntcvalue, S_IRUGO|S_IWUSR|S_IWGRP,
 //		get_ntc_value, NULL, 6);
+#endif
 
 #define in_channel(index) \
 static SENSOR_DEVICE_ATTR(in##index##_channel, S_IRUGO, show_channel, \
@@ -1173,9 +1232,10 @@ static struct attribute *twl6030_gpadc_attributes[] = {
 	IN_ATTRS(14),
 	IN_ATTRS(15),
 	IN_ATTRS(16),
-/* FIXME-HASH: Added in Kindle Kernel */
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 	&dev_attr_ntc.attr,
-	&dev_attr_ntc_batt.attr,	
+	&dev_attr_ntc_batt.attr,
+#endif
 	IN_ATTRS_CHANNEL(0),
 	IN_ATTRS_CHANNEL(1),
 	IN_ATTRS_CHANNEL(2),
@@ -1524,6 +1584,7 @@ static int __devinit twl6030_gpadc_probe(struct platform_device *pdev)
 		dev_dbg(&pdev->dev, "could not register misc_device\n");
 		goto err_misc;
 	}
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 //////////////////////////////////// leon add/////////////////////////////////////
 	ret = ntc_setup();
 	if (ret) {
@@ -1531,6 +1592,7 @@ static int __devinit twl6030_gpadc_probe(struct platform_device *pdev)
 		goto err_irq;
 	}
 ////////////////////////////////////////////////////////////////////////////////////
+#endif
 
 	irq_rt = platform_get_irq(pdev, 0);
 	if (irq_rt < 0) {
@@ -1648,7 +1710,11 @@ static int __init twl6030_gpadc_init(void)
 {
 	return platform_driver_register(&twl6030_gpadc_driver);
 }
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 subsys_initcall(twl6030_gpadc_init);
+#else
+module_init(twl6030_gpadc_init);
+#endif
 
 static void __exit twl6030_gpadc_exit(void)
 {
