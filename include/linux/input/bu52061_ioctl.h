@@ -4,7 +4,7 @@
 #include <linux/ioctl.h>
 
 struct ioctl_cmd {
-       unsigned int halt_key;
+	unsigned int halt_key;
 };
 
 #define IOC_MAGIC 'b'
