@@ -1840,8 +1840,13 @@ int input_register_device(struct input_dev *dev)
 	if (!dev->rep[REP_DELAY] && !dev->rep[REP_PERIOD]) {
 		dev->timer.data = (long) dev;
 		dev->timer.function = input_repeat_key;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+		dev->rep[REP_DELAY] = 750;
+		dev->rep[REP_PERIOD] = 99;
+#else
 		dev->rep[REP_DELAY] = 250;
 		dev->rep[REP_PERIOD] = 33;
+#endif
 	}
 
 	if (!dev->getkeycode)
