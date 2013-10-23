@@ -1074,7 +1074,7 @@ static void dss_completion_irq_handler(void *data, u32 mask)
 		DISPC_IRQ_FRAMEDONETV | DISPC_IRQ_EVSYNC_EVEN |
 		DISPC_IRQ_EVSYNC_ODD,
 		DISPC_IRQ_FRAMEDONE2 | DISPC_IRQ_VSYNC2,
-		0
+		DISPC_IRQ_FRAMEDONE3 | DISPC_IRQ_VSYNC3
 	};
 	int i;
 
@@ -1117,7 +1117,7 @@ static void schedule_completion_irq(void)
 		DISPC_IRQ_FRAMEDONETV | DISPC_IRQ_EVSYNC_EVEN |
 		DISPC_IRQ_EVSYNC_ODD,
 		DISPC_IRQ_FRAMEDONE2 | DISPC_IRQ_VSYNC2,
-		0
+		DISPC_IRQ_FRAMEDONE3 | DISPC_IRQ_VSYNC3
 	};
 	u32 mask = 0;
 	int i;
