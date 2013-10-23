@@ -3776,5 +3776,6 @@
 #define WM8962_VSS_ENA_WIDTH                         1  /* VSS_ENA */
 
 int wm8962_mic_detect(struct snd_soc_codec *codec, struct snd_soc_jack *jack);
+int wm8962_get_jack(struct snd_soc_codec *codec, struct snd_soc_jack *jack);
 
 #endif

@@ -1436,14 +1436,22 @@ struct snd_soc_dai_driver omap_abe_dai[] = {
 			.stream_name = "MM1 Playback",
 			.channels_min = 1,
 			.channels_max = 2,
+#ifdef CONFIG_ABE_44100
+			.rates = SNDRV_PCM_RATE_44100,
+#else
 			.rates = SNDRV_PCM_RATE_48000 | SNDRV_PCM_RATE_44100,
+#endif
 			.formats = OMAP_ABE_FORMATS,
 		},
 		.capture = {
 			.stream_name = "MM1 Capture",
 			.channels_min = 1,
 			.channels_max = 6,
+#ifdef CONFIG_ABE_44100
+			.rates = SNDRV_PCM_RATE_44100,
+#else
 			.rates = SNDRV_PCM_RATE_48000,
+#endif
 			.formats = SNDRV_PCM_FMTBIT_S32_LE,
 		},
 		.ops = &omap_abe_dai_ops,
@@ -1456,7 +1464,11 @@ struct snd_soc_dai_driver omap_abe_dai[] = {
 			.stream_name = "MM2 Capture",
 			.channels_min = 1,
 			.channels_max = 2,
+#ifdef CONFIG_ABE_44100
+			.rates = SNDRV_PCM_RATE_44100,
+#else
 			.rates = SNDRV_PCM_RATE_48000,
+#endif
 			.formats = OMAP_ABE_FORMATS,
 		},
 		.ops = &omap_abe_dai_ops,
@@ -1489,7 +1501,11 @@ struct snd_soc_dai_driver omap_abe_dai[] = {
 			.stream_name = "Tones Playback",
 			.channels_min = 1,
 			.channels_max = 2,
+#ifdef CONFIG_ABE_44100
+			.rates = SNDRV_PCM_RATE_44100,
+#else
 			.rates = SNDRV_PCM_RATE_48000 | SNDRV_PCM_RATE_44100,
+#endif
 			.formats = OMAP_ABE_FORMATS,
 		},
 		.ops = &omap_abe_dai_ops,
@@ -1535,7 +1551,11 @@ struct snd_soc_dai_driver omap_abe_dai[] = {
 			.stream_name = "MMLP Playback",
 			.channels_min = 2,
 			.channels_max = 2,
+#ifdef CONFIG_ABE_44100
+			.rates = SNDRV_PCM_RATE_44100,
+#else
 			.rates = SNDRV_PCM_RATE_44100 | SNDRV_PCM_RATE_48000,
+#endif
 			.formats = OMAP_ABE_FORMATS,
 		},
 		.ops = &omap_abe_dai_ops,

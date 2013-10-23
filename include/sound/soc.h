@@ -95,6 +95,18 @@
 	.private_value = (unsigned long)&(struct soc_mixer_control) \
 		{.reg = xreg, .min = xmin, .max = xmax, \
 		 .platform_max = xmax} }
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+#define SOC_SINGLE_RANGE_TLV(xname, xreg, xshift, xmin, xmax, xinvert, tlv_array) \
+{	.iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = (xname),\
+	.access = SNDRV_CTL_ELEM_ACCESS_TLV_READ |\
+		 SNDRV_CTL_ELEM_ACCESS_READWRITE,\
+	.tlv.p = (tlv_array), \
+	.info = snd_soc_info_volsw_range, \
+	.get = snd_soc_get_volsw_range, .put = snd_soc_put_volsw_range, \
+	.private_value = (unsigned long)&(struct soc_mixer_control) \
+		{.reg = xreg, .shift = xshift, .min = xmin,\
+		 .max = xmax, .platform_max = xmax, .invert = xinvert} }
+#endif
 #define SOC_ENUM_DOUBLE(xreg, xshift_l, xshift_r, xmax, xtexts) \
 {	.reg = xreg, .shift_l = xshift_l, .shift_r = xshift_r, \
 	.max = xmax, .texts = xtexts }
@@ -469,6 +481,14 @@ int snd_soc_get_volsw_s8(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol);
 int snd_soc_put_volsw_s8(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol);
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+int snd_soc_info_volsw_range(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_info *uinfo);
+int snd_soc_put_volsw_range(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol);
+int snd_soc_get_volsw_range(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol);
+#endif
 int snd_soc_limit_volume(struct snd_soc_codec *codec,
 	const char *name, int max);
 int snd_soc_info_volsw_2r_sx(struct snd_kcontrol *kcontrol,

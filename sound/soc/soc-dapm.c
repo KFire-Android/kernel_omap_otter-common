@@ -3518,7 +3518,11 @@ static void soc_dapm_shutdown_codec(struct snd_soc_dapm_context *dapm)
 	LIST_HEAD(down_list);
 	int powerdown = 0;
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	mutex_lock(&card->dapm_mutex);
+#else
 	mutex_lock(&card->power_mutex);
+#endif
 
 	list_for_each_entry(w, &dapm->card->widgets, list) {
 		if (w->dapm != dapm)
@@ -3543,7 +3547,11 @@ static void soc_dapm_shutdown_codec(struct snd_soc_dapm_context *dapm)
 						    SND_SOC_BIAS_STANDBY);
 	}
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	mutex_unlock(&card->dapm_mutex);
+#else
 	mutex_unlock(&card->power_mutex);
+#endif
 }
 
 /*

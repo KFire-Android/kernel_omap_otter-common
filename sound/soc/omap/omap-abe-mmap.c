@@ -171,6 +171,13 @@ static int aess_hw_params(struct snd_pcm_substream *substream,
 		goto out;
 
 	format.f = params_rate(params);
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	if(format.f == 44100) {
+		dev_dbg(dai->dev, "%s: %s - set event generator at 44.1kHz\n",
+		__func__, dai->name);
+		omap_aess_write_event_generator(abe->aess, EVENT_44100);
+	}
+#endif
 	if (params_format(params) == SNDRV_PCM_FORMAT_S32_LE)
 		format.samp_format = STEREO_MSB;
 	else

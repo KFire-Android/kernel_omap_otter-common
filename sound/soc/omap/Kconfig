@@ -24,6 +24,9 @@ config SND_OMAP_SOC_ABE_VXREC
 config SND_OMAP_SOC_ABE_ECHO
 	tristate
 
+config ABE_44100
+        tristate
+
 config SND_OMAP_SOC_ABE
 	tristate
 	select SND_OMAP_SOC_ABE_VXREC
@@ -140,8 +143,8 @@ config SND_OMAP_SOC_OMAP_HDMI
 	tristate "SoC Audio support for Texas Instruments OMAP4/5 HDMI"
 	depends on SND_OMAP_SOC && (OMAP4_DSS_HDMI || OMAP5_DSS_HDMI) && OMAP2_DSS
 	select SND_OMAP_SOC_HDMI
-	select OMAP4_DSS_HDMI_AUDIO
-	select OMAP5_DSS_HDMI_AUDIO
+	select OMAP4_DSS_HDMI_AUDIO if OMAP4_DSS_HDMI
+	select OMAP5_DSS_HDMI_AUDIO if OMAP5_DSS_HDMI
 	select SND_SOC_OMAP_HDMI_CODEC
 
 	help
@@ -191,3 +194,25 @@ config SND_OMAP_SOC_IGEP0020
 	select SND_SOC_TWL4030
 	help
 	  Say Y if you want to add support for Soc audio on IGEP v2 board.
+
+config SND_OMAP_SOC_BOWSER_MAXIM
+	bool
+	select SND_SOC_MAX98090
+	select SND_SOC_MAX97236
+
+config SND_OMAP_SOC_BOWSER_WOLFSON
+	bool
+	select SND_SOC_WM8962
+
+config SND_OMAP_SOC_BOWSER
+	tristate "SoC Audio (MAX98090,WM8962) Codecs on Bowser board Rev.7+"
+	depends on SND_OMAP_SOC && I2C
+	select SND_OMAP_SOC_MCBSP
+	select SND_OMAP_SOC_BOWSER_WOLFSON if !(MACH_OMAP4_BOWSER_SUBTYPE_BOWSER7 || MACH_OMAP4_BOWSER_SUBTYPE_SOHO)
+	select SND_OMAP_SOC_BOWSER_MAXIM if (MACH_OMAP4_BOWSER_SUBTYPE_BOWSER7 || MACH_OMAP4_BOWSER_SUBTYPE_SOHO)
+	select SND_OMAP_SOC_ABE
+	select SND_OMAP_SOC_ABE_DSP
+	select ABE_44100
+	help
+	  Say Y if you want to add support for SoC audio on Lab126 Bowser
+

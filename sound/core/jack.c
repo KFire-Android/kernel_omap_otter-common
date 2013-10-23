@@ -48,6 +48,10 @@ static int snd_jack_dev_free(struct snd_device *device)
 	else
 		input_free_device(jack->input_dev);
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	switch_dev_unregister(&jack->sdev);
+#endif
+
 	kfree(jack->id);
 	kfree(jack);
 
@@ -81,9 +85,29 @@ static int snd_jack_dev_register(struct snd_device *device)
 		input_set_capability(jack->input_dev, EV_KEY, jack->key[i]);
 	}
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	/* Android custom switch API */
+	jack->sdev.name = jack->id;
+	err = switch_dev_register(&jack->sdev);
+	if (err != 0)
+		return err;
+#endif
+
 	err = input_register_device(jack->input_dev);
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	if (err != 0)
+		goto err_switch;
+#else
 	if (err == 0)
+#endif
 		jack->registered = 1;
+
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	return 0;
+
+err_switch:
+	switch_dev_unregister(&jack->sdev);
+#endif
 
 	return err;
 }
@@ -128,10 +152,26 @@ int snd_jack_new(struct snd_card *card, const char *id, int type,
 
 	jack->type = type;
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	for (i = 0; i < ARRAY_SIZE(jack_switch_types); i++) {
+		switch (i) {
+		case SND_JACK_MICROPHONE:
+		case SND_JACK_HEADPHONE:
+			/* Exclude from the input layer for Android */
+			break;
+		default:
+			if (type & (1 << i))
+				input_set_capability(jack->input_dev, EV_SW,
+						     jack_switch_types[i]);
+			break;
+		}
+	}
+#else
 	for (i = 0; i < SND_JACK_SWITCH_TYPES; i++)
 		if (type & (1 << i))
 			input_set_capability(jack->input_dev, EV_SW,
 					     jack_switch_types[i]);
+#endif
 
 	err = snd_device_new(card, SNDRV_DEV_JACK, jack, &ops);
 	if (err < 0)
@@ -213,9 +253,40 @@ EXPORT_SYMBOL(snd_jack_set_key);
 void snd_jack_report(struct snd_jack *jack, int status)
 {
 	int i;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	int mask;
+#endif
 
 	if (!jack)
 		return;
+
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	mask = SND_JACK_HEADSET | SND_JACK_LINEOUT | SND_JACK_DATA;
+
+	/* This is Android, headset information goes separately */
+	switch (status & mask) {
+	case SND_JACK_HEADSET:
+	case SND_JACK_MICROPHONE:
+		jack->sstatus = 1;
+		break;
+	case SND_JACK_HEADPHONE:
+	case SND_JACK_LINEOUT:
+		jack->sstatus = 2;
+		break;
+	case SND_JACK_DATA:
+		jack->sstatus = 3;
+		break;
+	default:
+		jack->sstatus = 0;
+		break;
+	}
+
+	if (jack->registered){
+		switch_set_state(&jack->sdev, jack->sstatus);
+	}
+
+	status &= ~(mask);
+#endif
 
 	for (i = 0; i < ARRAY_SIZE(jack->key); i++) {
 		int testbit = SND_JACK_BTN_0 >> i;

@@ -287,7 +287,11 @@ static int abe_probe(struct snd_soc_platform *platform)
 	omap_aess_load_fw(abe->aess, abe->firmware);
 
 	/* "tick" of the audio engine */
+#ifdef CONFIG_ABE_44100
+	omap_aess_write_event_generator(abe->aess, EVENT_44100);
+#else
 	omap_aess_write_event_generator(abe->aess, EVENT_TIMER);
+#endif
 	omap_aess_set_auto_gating(abe->aess);
 	abe_init_gains(abe->aess);
 
