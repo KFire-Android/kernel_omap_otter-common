@@ -444,6 +444,9 @@ static int disp_num_counter;
 struct omap_dss_device *dss_alloc_and_init_device(struct device *parent)
 {
 	struct omap_dss_device *dssdev;
+	u32 v;
+	int r;
+	struct device_node *node = parent->of_node;
 
 	dssdev = kzalloc(sizeof(*dssdev), GFP_KERNEL);
 	if (!dssdev)
@@ -452,7 +455,16 @@ struct omap_dss_device *dss_alloc_and_init_device(struct device *parent)
 	dssdev->dev.bus = &dss_bus_type;
 	dssdev->dev.parent = parent;
 	dssdev->dev.release = omap_dss_dev_release;
-	dev_set_name(&dssdev->dev, "display%d", disp_num_counter++);
+
+	/* It is presumed that we have display-id specified in dts file or not at all.
+	     Half backed approach will lead to duplicate display number.
+	*/
+	r = of_property_read_u32(node, "display-id", &v);
+	if (r) {
+		v = disp_num_counter++;
+	}
+
+	dev_set_name(&dssdev->dev, "display%d", v);
 
 	device_initialize(&dssdev->dev);
 
