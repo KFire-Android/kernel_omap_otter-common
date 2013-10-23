@@ -12,3 +12,6 @@ obj-$(CONFIG_PANEL_PICODLP) +=  panel-picodlp.o
 obj-$(CONFIG_PANEL_TPO_TD043MTEA1) += panel-tpo-td043mtea1.o
 obj-$(CONFIG_PANEL_ACX565AKM) += panel-acx565akm.o
 obj-$(CONFIG_PANEL_N8X0) += panel-n8x0.o
+obj-$(CONFIG_PANEL_LG_101) += panel-lg101.o
+obj-$(CONFIG_PANEL_SERLINK) += lvds-serlink.o
+obj-$(CONFIG_PANEL_DSERLINK) += lvds-de-serlink.o

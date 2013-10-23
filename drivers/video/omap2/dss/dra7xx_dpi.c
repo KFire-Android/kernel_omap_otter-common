@@ -216,7 +216,6 @@ static int dra7xx_dpi_display_enable(struct omap_dss_device *dssdev)
 		DSSDBG("using DPLL %d for DPI%d\n", dpi->dpll, dpi->module_id);
 
 		dss_dpll_activate(dpi->dpll);
-		dss_dpll_set_control_mux(channel, dpi->dpll);
 	}
 
 	r = dpi_set_mode(pdev, dpi->dpll);
@@ -224,6 +223,8 @@ static int dra7xx_dpi_display_enable(struct omap_dss_device *dssdev)
 		goto err_set_mode;
 
 	dss_use_dpll_lcd(channel, dpi->dpll != DSS_DPLL_NONE);
+
+	dss_dpll_set_control_mux(channel, dpi->dpll);
 
 	dpi_config_lcd_manager(pdev);
 
