@@ -786,6 +786,123 @@ out:
 }
 EXPORT_SYMBOL(rpmsg_send_offchannel_raw);
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+static int rpmsg_recv_single(struct virtproc_info *vrp, struct device *dev,
+			     struct rpmsg_hdr *msg, unsigned int len)
+{
+	struct rpmsg_endpoint *ept;
+	rpmsg_rx_cb_t cb = NULL;
+	struct scatterlist sg;
+	unsigned long offset = 0;
+	void *sg_addr;
+	int err;
+
+
+	dev_dbg(dev, "From: 0x%x, To: 0x%x, Len: %d, Flags: %d, Reserved: %d\n",
+					msg->src, msg->dst, msg->len,
+					msg->flags, msg->reserved);
+#if 0
+	print_hex_dump(KERN_DEBUG, "rpmsg_virtio RX: ", DUMP_PREFIX_NONE, 16, 1,
+					msg, sizeof(*msg) + msg->len, true);
+#endif
+
+	/*
+	 * We currently use fixed-sized buffers, so trivially sanitize
+	 * the reported payload length.
+	 */
+	if (len > RPMSG_BUF_SIZE ||
+		msg->len > (len - sizeof(struct rpmsg_hdr))) {
+		mutex_unlock(&vrp->rx_lock);
+		dev_warn(dev, "inbound msg too big: (%d, %d)\n", len, msg->len);
+		return -EINVAL;
+	}
+
+	/* use the dst addr to fetch the callback of the appropriate user */
+	mutex_lock(&vrp->endpoints_lock);
+
+	ept = idr_find(&vrp->endpoints, msg->dst);
+
+	/* let's make sure no one deallocates ept while we use it */
+	if (ept) {
+		kref_get(&ept->refcount);
+		cb = ept->cb;
+	}
+
+	mutex_unlock(&vrp->endpoints_lock);
+
+	if (ept) {
+		/* ept->cb won't go away until refcount drops to zero */
+		if (cb)
+			cb(ept->rpdev, msg->data, msg->len, ept->priv,
+				msg->src);
+
+		/* farewell, ept, we don't need you anymore */
+		kref_put(&ept->refcount, __ept_release);
+	} else
+		dev_warn(dev, "msg received with no recepient\n");
+
+	/* use a direct-mapped equivalent virtual address in case of carveout */
+	if (vrp->use_carveout) {
+		offset = ((unsigned long) msg) - ((unsigned long) vrp->rbufs);
+		sg_addr = __va(vrp->bufs_dma) + offset;
+	} else {
+		sg_addr = msg;
+	}
+	/* publish the real size of the buffer */
+	sg_init_one(&sg, sg_addr, RPMSG_BUF_SIZE);
+
+	/* add the buffer back to the remote processor's virtqueue */
+	err = virtqueue_add_buf(vrp->rvq, &sg, 0, 1, msg, GFP_KERNEL);
+	if (err < 0) {
+		mutex_unlock(&vrp->rx_lock);
+		dev_err(dev, "failed to add a virtqueue buffer: %d\n", err);
+		return err;
+	}
+
+	return 0;
+}
+
+/* called when an rx buffer is used, and it's time to digest a message */
+static void rpmsg_recv_done(struct virtqueue *rvq)
+{
+	struct virtproc_info *vrp = rvq->vdev->priv;
+	struct device *dev = &rvq->vdev->dev;
+	struct rpmsg_hdr *msg;
+	unsigned int len, msgs_received = 0;
+	int err;
+
+	mutex_lock(&vrp->rx_lock);
+
+	msg = virtqueue_get_buf(rvq, &len);
+	if (!msg) {
+		mutex_unlock(&vrp->rx_lock);
+		/*
+		 * This is not an error as we might have handled a couple of
+		 * buffers with the previous signal.
+		 */
+		dev_dbg(dev, "uhm, incoming signal, but no used buffer\n");
+		return;
+	}
+
+	while (msg) {
+		err = rpmsg_recv_single(vrp, dev, msg, len);
+		if (err)
+			break;
+
+		msgs_received++;
+
+		msg = virtqueue_get_buf(rvq, &len);
+	};
+
+	dev_dbg(dev, "Received %u messages\n", msgs_received);
+
+	/* tell the remote processor we added another available rx buffer */
+	if (msgs_received)
+		virtqueue_kick(vrp->rvq);
+
+	mutex_unlock(&vrp->rx_lock);
+}
+#else
 /* called when an rx buffer is used, and it's time to digest a message */
 static void rpmsg_recv_done(struct virtqueue *rvq)
 {
@@ -874,6 +991,7 @@ static void rpmsg_recv_done(struct virtqueue *rvq)
 	virtqueue_kick(vrp->rvq);
 	mutex_unlock(&vrp->rx_lock);
 }
+#endif
 
 /*
  * This is invoked whenever the remote processor completed processing
@@ -981,6 +1099,9 @@ static int rpmsg_probe(struct virtio_device *vdev)
 		return -ENOMEM;
 
 	vrp->vdev = vdev;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	vdev->priv = vrp;
+#endif
 
 	idr_init(&vrp->endpoints);
 	mutex_init(&vrp->endpoints_lock);
@@ -1041,6 +1162,10 @@ static int rpmsg_probe(struct virtio_device *vdev)
 
 	/* and half is dedicated for TX */
 	vrp->sbufs = bufs_va + RPMSG_TOTAL_BUF_SPACE / 2;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	/* disable "rx-complete" interrupts */
+	virtqueue_disable_cb(vrp->rvq);
+#endif
 
 	/* set up the receive buffers */
 	for (i = 0; i < RPMSG_NUM_BUFS / 2; i++) {
@@ -1064,7 +1189,9 @@ static int rpmsg_probe(struct virtio_device *vdev)
 	/* suppress "tx-complete" interrupts */
 	virtqueue_disable_cb(vrp->svq);
 
+#ifndef CONFIG_MACH_OMAP4_BOWSER
 	vdev->priv = vrp;
+#endif
 
 	/* if supported by the remote processor, enable the name service */
 	if (virtio_has_feature(vdev, VIRTIO_RPMSG_F_NS)) {
@@ -1078,12 +1205,20 @@ static int rpmsg_probe(struct virtio_device *vdev)
 		}
 	}
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	/* re-enable "rx-complete" interrupts */
+	virtqueue_enable_cb(vrp->rvq);
+
+	/* tell the remote processor it can start sending messages */
+	virtqueue_kick(vrp->rvq);
+#else
 	/*
 	 * FIXME (if needed): the below virtqueue_kick is commented out
 	 * to help with supporting the non-SMP boot of IPU processors, which
 	 * is non-standard for 3.4 and upstream kernels.
 	 */
 	/* virtqueue_kick(vrp->rvq); */
+#endif
 
 	dev_info(&vdev->dev, "rpmsg host is online\n");
 

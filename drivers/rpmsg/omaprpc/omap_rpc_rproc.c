@@ -61,6 +61,18 @@ struct remote_mmu_region_t {
 };
 
 static struct remote_mmu_region_t regions[OMAPRPC_CORE_REMOTE_MAX] = {
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	/* Tesla */
+	{0x60000000, 0x80000000, 0xBF300000, 0xBFD00000, 0x88000000},
+	/* SIMCOP */
+	{0x60000000, 0x80000000, 0xBF300000, 0xBFD00000, 0x88000000},
+	/* MCU0 */
+	{0x60000000, 0x80000000, 0xBF300000, 0xBFD00000, 0x88000000},
+	/* MCU1 */
+	{0x60000000, 0x80000000, 0xBF300000, 0xBFD00000, 0x88000000},
+	/* EVE */
+	{0x60000000, 0x80000000, 0xBF300000, 0xBFD00000, 0x88000000},
+#else
 	/* Tesla */
 	{0x60000000, 0x80000000, 0xBA300000, 0xBFD00000, 0x88000000},
 	/* SIMCOP */
@@ -71,6 +83,7 @@ static struct remote_mmu_region_t regions[OMAPRPC_CORE_REMOTE_MAX] = {
 	{0x60000000, 0x80000000, 0xBA300000, 0xBFD00000, 0x88000000},
 	/* EVE */
 	{0x60000000, 0x80000000, 0xBA300000, 0xBFD00000, 0x88000000},
+#endif
 };
 
 static u32 numCores = sizeof(regions) / sizeof(regions[0]);
