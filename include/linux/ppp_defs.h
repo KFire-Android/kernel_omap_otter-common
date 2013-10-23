@@ -18,6 +18,9 @@
 #define PPP_HDRLEN	4	/* octets for standard ppp header */
 #define PPP_FCSLEN	2	/* octets for FCS */
 #define PPP_MRU		1500	/* default MRU = max length of info field */
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+#define PPP_MAXMRU      65000   /* Largest MRU we allow */
+#endif
 
 #define PPP_ADDRESS(p)	(((__u8 *)(p))[0])
 #define PPP_CONTROL(p)	(((__u8 *)(p))[1])
