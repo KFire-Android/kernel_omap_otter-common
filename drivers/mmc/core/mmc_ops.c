@@ -399,6 +399,21 @@ int mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
 	if (err)
 		return err;
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	/* special case for Power Off Notification.
+	 * It must be the last command before power off, otherwise
+	 * PON state will be canceled by device. */
+	if (set == EXT_CSD_CMD_SET_NORMAL &&
+		index == EXT_CSD_POWER_OFF_NOTIFICATION &&
+		(value  == 2 || value == 3)) {
+		printk(KERN_DEBUG "MMC%d: Bypassing CMD13 for PON\n",
+				card->host->index);
+		if (!(card->host->caps & MMC_CAP_WAIT_WHILE_BUSY))
+			msleep(timeout_ms);
+		return 0;
+	}
+#endif
+
 	/* Must check status to be sure of no errors */
 	do {
 		err = mmc_send_status(card, &status);
@@ -583,3 +598,223 @@ int mmc_send_hpi_cmd(struct mmc_card *card, u32 *status)
 
 	return 0;
 }
+
+#ifdef CONFIG_MMC_SAMSUNG_SMART
+/*
+ * Vendor-specific Samsung BACK-DOOR command
+ */
+static int mmc_movi_vendor_cmd(struct mmc_card *card, unsigned int arg)
+{
+	struct mmc_command cmd;
+	int err;
+	u32 status;
+
+	/* CMD62 is vendor CMD, it's not defined in eMMC spec. */
+	cmd.opcode = 62;
+	cmd.flags = MMC_RSP_R1B | MMC_CMD_AC;
+	cmd.arg = arg;
+	cmd.error = 0;
+
+	err = mmc_wait_for_cmd(card->host, &cmd, 0);
+	if (err)
+		return err;
+
+	do {
+		err = mmc_send_status(card, &status);
+		if (err)
+			return err;
+		if (card->host->caps & MMC_CAP_WAIT_WHILE_BUSY)
+			break;
+		if (mmc_host_is_spi(card->host))
+			break;
+	} while (R1_CURRENT_STATE(status) == R1_STATE_PRG);
+
+	return err;
+}
+
+static int mmc_movi_read_cmd(struct mmc_card *card, u8 *buffer)
+{
+	struct mmc_command wcmd;
+	struct mmc_data wdata;
+	struct mmc_request brq;
+	struct scatterlist sg;
+
+	brq.cmd = &wcmd;
+	brq.data = &wdata;
+	brq.stop = NULL;
+	brq.sbc = NULL;
+
+	wcmd.opcode = MMC_READ_SINGLE_BLOCK;
+	wcmd.arg = 0;
+	wcmd.flags = MMC_RSP_SPI_R1 | MMC_RSP_R1 | MMC_CMD_ADTC;
+	wcmd.error = 0;
+	wcmd.retries = 0;
+	wdata.blksz = 512;
+	wdata.error = 0;
+	wdata.stop = NULL;
+	wdata.blocks = 1;
+	wdata.flags = MMC_DATA_READ;
+
+	wdata.sg = &sg;
+	wdata.sg_len = 1;
+
+	sg_init_one(&sg, buffer, 512);
+
+	mmc_set_data_timeout(&wdata, card);
+
+	mmc_wait_for_req(card->host, &brq);
+	if (wcmd.error)
+		return wcmd.error;
+	if (wdata.error)
+		return wdata.error;
+	return 0;
+}
+
+static int mmc_samsung_smart_read(struct mmc_card *card, u8 *rdblock)
+{
+	int err, errx;
+
+	/* enter vendor Smart Report mode */
+	err = mmc_movi_vendor_cmd(card, 0xEFAC62EC);
+	if (err) {
+		pr_err("Failed entering Smart Report mode(1, %d)\n", err);
+		return err;
+	}
+	err = mmc_movi_vendor_cmd(card, 0x0000CCEE);
+	if (err) {
+		pr_err("Failed entering Smart Report mode(2, %d)\n", err);
+		return err;
+	}
+
+	/* read Smart Report */
+	err = mmc_movi_read_cmd(card, rdblock);
+	if (err)
+		pr_err("Failed reading Smart Report(%d)\n", err);
+		/* Do NOT return yet; we must leave Smart Report mode.*/
+
+	/* exit vendor Smart Report mode */
+	errx = mmc_movi_vendor_cmd(card, 0xEFAC62EC);
+	if (errx)
+		pr_err("Failed exiting Smart Report mode(1, %d)\n", errx);
+	else {
+		errx = mmc_movi_vendor_cmd(card, 0x00DECCEE);
+		if (errx)
+			pr_err("Failed exiting Smart Report mode(2, %d)\n",
+									errx);
+	}
+	if (err)
+		return err;
+	return errx;
+}
+
+ssize_t mmc_samsung_smart_parse(u32 *report, char *for_sysfs)
+{
+	unsigned size = PAGE_SIZE;
+	unsigned wrote;
+	unsigned i;
+	u32 val;
+	char *str;
+	static const struct {
+		char *fmt;
+		unsigned val_index;
+	} to_output[] = {
+		{ "super block size              : %u\n", 1 },
+		{ "super page size               : %u\n", 2 },
+		{ "optimal write size            : %u\n", 3 },
+		{ "read reclaim count            : %u\n", 20 },
+		{ "optimal trim size             : %u\n", 21 },
+		{ "number of banks               : %u\n", 4 },
+		{ "initial bad blocks per bank   : %u",	  5 },
+		{ ",%u",				  8 },
+		{ ",%u",				  11 },
+		{ ",%u\n",				  14 },
+		{ "runtime bad blocks per bank   : %u",	  6 },
+		{ ",%u",				  9 },
+		{ ",%u",				  12 },
+		{ ",%u\n",				  15 },
+		{ "reserved blocks left per bank : %u",	  7 },
+		{ ",%u",				  10 },
+		{ ",%u",				  13 },
+		{ ",%u\n",				  16 },
+		{ "all erase counts (min,avg,max): %u",	  18 },
+		{ ",%u",				  19 },
+		{ ",%u\n",				  17 },
+		{ "SLC erase counts (min,avg,max): %u",	  31 },
+		{ ",%u",				  32 },
+		{ ",%u\n",				  30 },
+		{ "MLC erase counts (min,avg,max): %u",	  34 },
+		{ ",%u",				  35 },
+		{ ",%u\n",				  33 },
+	};
+
+	/* A version field just in case things change. */
+	wrote = scnprintf(for_sysfs, size,
+				"version                       : %u\n", 0);
+	size -= wrote;
+	for_sysfs += wrote;
+
+	/* The error mode. */
+	val = le32_to_cpu(report[0]);
+	switch (val) {
+	case 0xD2D2D2D2:
+		str = "Normal";
+		break;
+	case 0x5C5C5C5C:
+		str = "RuntimeFatalError";
+		break;
+	case 0xE1E1E1E1:
+		str = "MetaBrokenError";
+		break;
+	case 0x37373737:
+		str = "OpenFatalError";
+		val = 0; /* Remaining data is unreliable. */
+		break;
+	default:
+		str = "Invalid";
+		val = 0; /* Remaining data is unreliable. */
+		break;
+	}
+	wrote = scnprintf(for_sysfs, size,
+				"error mode                    : %s\n", str);
+	size -= wrote;
+	for_sysfs += wrote;
+	/* Exit if we can't rely on the remaining data. */
+	if (!val)
+		return PAGE_SIZE - size;
+
+	for (i = 0; i < ARRAY_SIZE(to_output); i++) {
+		wrote = scnprintf(for_sysfs, size, to_output[i].fmt,
+				  le32_to_cpu(report[to_output[i].val_index]));
+		size -= wrote;
+		for_sysfs += wrote;
+	}
+
+	return PAGE_SIZE - size;
+}
+
+ssize_t mmc_samsung_smart_handle(struct mmc_card *card, char *buf)
+{
+	int err;
+	u32 *buffer;
+	ssize_t len;
+
+	buffer = kmalloc(512, GFP_KERNEL);
+	if (!buffer) {
+		pr_err("Failed to alloc memory for Smart Report\n");
+		return 0;
+	}
+
+	mmc_claim_host(card->host);
+	err = mmc_samsung_smart_read(card, (u8 *)buffer);
+	mmc_release_host(card->host);
+
+	if (err)
+		len = 0;
+	else
+		len = mmc_samsung_smart_parse(buffer, buf);
+
+	kfree(buffer);
+	return len;
+}
+
+#endif /* CONFIG_MMC_SAMSUNG_SMART */

@@ -1803,6 +1803,10 @@ static const struct mmc_fixup blk_fixups[] =
 	MMC_FIXUP("VZL00M", CID_MANFID_SAMSUNG, CID_OEMID_ANY, add_quirk_mmc,
 		  MMC_QUIRK_SEC_ERASE_TRIM_BROKEN),
 
+#ifdef CONFIG_MMC_SAMSUNG_SMART
+	MMC_FIXUP(CID_NAME_ANY, CID_MANFID_SAMSUNG, CID_OEMID_ANY,
+		      add_quirk_mmc, MMC_QUIRK_SAMSUNG_SMART),
+#endif
 	END_FIXUP
 };
 

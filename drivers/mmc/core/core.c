@@ -27,6 +27,9 @@
 #include <linux/fault-inject.h>
 #include <linux/random.h>
 #include <linux/wakelock.h>
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+#include <linux/reboot.h>
+#endif
 
 #include <linux/mmc/card.h>
 #include <linux/mmc/host.h>
@@ -43,6 +46,9 @@
 #include "sdio_ops.h"
 
 static struct workqueue_struct *workqueue;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+static int mmc_shutdown;
+#endif
 
 /*
  * Enabling software CRCs on the data blocks can be a significant (30%)
@@ -75,13 +81,21 @@ MODULE_PARM_DESC(
 static int mmc_schedule_delayed_work(struct delayed_work *work,
 				     unsigned long delay)
 {
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	if (mmc_shutdown)
+		return -EFAULT;
+#endif
 	return queue_delayed_work(workqueue, work, delay);
 }
 
 /*
  * Internal function. Flush all scheduled work from the MMC work queue.
  */
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 void mmc_flush_scheduled_work(void)
+#else
+static void mmc_flush_scheduled_work(void)
+#endif
 {
 	flush_workqueue(workqueue);
 }
@@ -269,7 +283,13 @@ static void mmc_wait_for_req_done(struct mmc_host *host,
 	struct mmc_command *cmd;
 
 	while (1) {
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+		while (!wait_for_completion_timeout(&mrq->completion, 30*HZ))
+			dev_err(&host->class_dev, "Can't complete cmd %d %p\n",
+				mrq->cmd->opcode, mrq);
+#else
 		wait_for_completion(&mrq->completion);
+#endif
 
 		cmd = mrq->cmd;
 		if (!cmd->error || !cmd->retries ||
@@ -347,6 +367,13 @@ struct mmc_async_req *mmc_start_req(struct mmc_host *host,
 	int start_err = 0;
 	struct mmc_async_req *data = host->areq;
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	/* This is the first time mmc block code sees this request.
+	 * Enforce data->dma_len = 0 */
+	if (areq && areq->mrq && areq->mrq->data)
+		areq->mrq->data->dma_len = 0;
+#endif
+
 	/* Prepare a new request */
 	if (areq)
 		mmc_pre_req(host, areq->mrq, !host->areq);
@@ -388,6 +415,11 @@ EXPORT_SYMBOL(mmc_start_req);
  */
 void mmc_wait_for_req(struct mmc_host *host, struct mmc_request *mrq)
 {
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	/* Enforce data->dma_len =0 for internally generated request */
+	if (mrq && mrq->data)
+		mrq->data->dma_len = 0;
+#endif
 	__mmc_start_req(host, mrq);
 	mmc_wait_for_req_done(host, mrq);
 }
@@ -1735,6 +1767,9 @@ EXPORT_SYMBOL(mmc_can_discard);
 
 int mmc_can_sanitize(struct mmc_card *card)
 {
+#if defined(CONFIG_MACH_OMAP_4430_KC1) || defined(CONFIG_MACH_OMAP4_BOWSER)
+		return 0;
+#endif
 	if (!mmc_can_trim(card) && !mmc_can_erase(card))
 		return 0;
 	if (card->ext_csd.sec_feature_support & EXT_CSD_SEC_SANITIZE)
@@ -2491,6 +2526,21 @@ void mmc_set_embedded_sdio_data(struct mmc_host *host,
 EXPORT_SYMBOL(mmc_set_embedded_sdio_data);
 #endif
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+static int mmc_reboot_notifier(struct notifier_block *this,
+		unsigned long code, void *cmd)
+{
+	mmc_shutdown = 1;
+	mmc_flush_scheduled_work();
+
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block mmc_reboot_notifier_block = {
+	.notifier_call = mmc_reboot_notifier,
+};
+#endif
+
 static int __init mmc_init(void)
 {
 	int ret;
@@ -2510,6 +2560,9 @@ static int __init mmc_init(void)
 	ret = sdio_register_bus();
 	if (ret)
 		goto unregister_host_class;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	register_reboot_notifier(&mmc_reboot_notifier_block);
+#endif
 
 	return 0;
 

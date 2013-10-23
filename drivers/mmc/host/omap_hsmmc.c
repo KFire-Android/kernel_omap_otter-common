@@ -237,7 +237,9 @@ struct omap_hsmmc_host {
 	resource_size_t		mapbase;
 	spinlock_t		irq_lock; /* Prevent races with irq handler */
 	struct completion	buf_ready;
+#ifndef CONFIG_MACH_OMAP4_BOWSER
 	unsigned int		dma_len;
+#endif
 	unsigned int		dma_sg_idx;
 	unsigned char		bus_mode;
 	unsigned char		power_mode;
@@ -258,6 +260,9 @@ struct omap_hsmmc_host {
 	int			reqs_blocked;
 	int			use_reg;
 	int			req_in_progress;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	unsigned long		req_ts;
+#endif
 	unsigned int		flags;
 	unsigned int		errata;
 	int			regulator_enabled;
@@ -265,10 +270,17 @@ struct omap_hsmmc_host {
 	int			tuning_fsrc;
 	u32			tuning_uhsmc;
 	u32			tuning_opcode;
+#ifndef CONFIG_MACH_OMAP4_BOWSER
 	struct omap_hsmmc_next	next_data;
+#endif
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	int			mapped_data_cnt;
+#endif
 	struct	omap_mmc_platform_data	*pdata;
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 	int			shutdown;
+#endif
 };
 static u32 tuning_data[16];
 static u32 ref_tuning[16] = { 0x00FF0FFF, 0xCCC3CCFF, 0xFFCC3CC3, 0xEFFEFFFE,
@@ -276,6 +288,35 @@ static u32 ref_tuning[16] = { 0x00FF0FFF, 0xCCC3CCFF, 0xFFCC3CC3, 0xEFFEFFFE,
 				0xF0FFF0FF, 0x3CCCFC0F, 0xCFCC33CC, 0xEEFFEFFF,
 				0xFDFFFDFF, 0xFFBFFFDF, 0xFFF7FFBB, 0xDE7B7FF7,
 				};
+
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+static int
+omap_hsmmc_prepare_data(struct omap_hsmmc_host *host, struct mmc_request *req);
+
+static void omap_hsmmc_status_notify_cb(int card_present, void *dev_id)
+{
+	struct omap_hsmmc_host *host = (struct omap_hsmmc_host *)dev_id;
+	unsigned int status, oldstat;
+
+	pr_debug("%s: card_present %d\n", mmc_hostname(host->mmc),
+		card_present);
+
+	if (!mmc_slot(host).mmc_data.status) {
+		mmc_detect_change(host->mmc, 0);
+		return;
+	}
+
+	status = mmc_slot(host).mmc_data.status(mmc_dev(host->mmc));
+
+	oldstat = mmc_slot(host).mmc_data.card_present;
+	mmc_slot(host).mmc_data.card_present = status;
+	if (status ^ oldstat) {
+		pr_debug("%s: Slot status change detected (%d -> %d)\n",
+			mmc_hostname(host->mmc), oldstat, status);
+		mmc_detect_change(host->mmc, 0);
+	}
+}
+#endif
 
 static inline int omap_hsmmc_set_dll(struct omap_hsmmc_host *host, int count)
 {
@@ -607,7 +648,9 @@ static void omap_hsmmc_enable_irq(struct omap_hsmmc_host *host,
 	if (cmd->opcode == MMC_ERASE)
 		irq_mask &= ~DTO_ENABLE;
 
+#ifndef CONFIG_MACH_OMAP4_BOWSER
 	OMAP_HSMMC_WRITE(host->base, STAT, STAT_CLEAR);
+#endif
 	OMAP_HSMMC_WRITE(host->base, ISE, irq_mask);
 	OMAP_HSMMC_WRITE(host->base, IE, irq_mask);
 }
@@ -778,6 +821,20 @@ static int omap_hsmmc_context_restore(struct omap_hsmmc_host *host)
 	if (host->context_loss == context_loss)
 		return 1;
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	timeout = 100;
+	while (!(OMAP_HSMMC_READ(host->base, SYSSTATUS) & RESETDONE)) {
+		udelay(1);
+		if (!timeout--)
+			break;
+	}
+
+	if (!(OMAP_HSMMC_READ(host->base, SYSSTATUS) & RESETDONE)) {
+		dev_err(mmc_dev(host->mmc), "Register MMC_SYSSTATUS is zero");
+		return -EBUSY;
+	}
+#endif
+
 	if (host->pdata->controller_flags & OMAP_HSMMC_SUPPORTS_DUAL_VOLT) {
 		if (host->power_mode != MMC_POWER_OFF &&
 		    (ios->signal_voltage == MMC_SIGNAL_VOLTAGE_180))
@@ -945,9 +1002,19 @@ static DEVICE_ATTR(slot_name, S_IRUGO, omap_hsmmc_show_slot_name, NULL);
  */
 static void
 omap_hsmmc_start_command(struct omap_hsmmc_host *host, struct mmc_command *cmd,
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	struct mmc_data *data, bool no_auto_cmd12)
+#else
 	struct mmc_data *data)
+#endif
 {
 	int cmdreg = 0, resptype = 0, cmdtype = 0;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	int blocks = 0;
+
+	if (data)
+		blocks = data->blocks;
+#endif
 
 	dev_dbg(mmc_dev(host->mmc), "%s: CMD%d, argument 0x%08x\n",
 		mmc_hostname(host->mmc), cmd->opcode, cmd->arg);
@@ -975,7 +1042,12 @@ omap_hsmmc_start_command(struct omap_hsmmc_host *host, struct mmc_command *cmd,
 		cmdtype = 0x3;
 
 	cmdreg = (cmd->opcode << 24) | (resptype << 16) | (cmdtype << 22);
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	if ((host->flags & AUTO_CMD12) &&
+			mmc_op_multi(cmd->opcode) && !no_auto_cmd12)
+#else
 	if ((host->flags & AUTO_CMD12) && mmc_op_multi(cmd->opcode))
+#endif
 		cmdreg |= ACEN_ACMD12;
 
 	if (data) {
@@ -1014,10 +1086,20 @@ static void omap_hsmmc_request_done(struct omap_hsmmc_host *host, struct mmc_req
 {
 	int dma_ch;
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	unsigned long flags;
+
+	spin_lock_irqsave(&host->irq_lock, flags);
+	host->req_in_progress = 0;
+	host->req_ts = jiffies;
+	dma_ch = host->dma_ch;
+	spin_unlock_irqrestore(&host->irq_lock, flags);
+#else
 	spin_lock(&host->irq_lock);
 	host->req_in_progress = 0;
 	dma_ch = host->dma_ch;
 	spin_unlock(&host->irq_lock);
+#endif
 
 	omap_hsmmc_disable_irq(host);
 	/* Do not complete the request if DMA is still in progress */
@@ -1026,6 +1108,48 @@ static void omap_hsmmc_request_done(struct omap_hsmmc_host *host, struct mmc_req
 	host->mrq = NULL;
 	mmc_request_done(host->mmc, mrq);
 }
+
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+static int
+omap_hsmmc_map_data(struct omap_hsmmc_host *host, struct mmc_data *data)
+{
+	int dma_len = 0;
+	unsigned long flags;
+	spin_lock_irqsave(&host->irq_lock, flags);
+	if (data)
+		dma_len = data->dma_len;
+	if (data && !dma_len) {
+		dma_len = dma_map_sg(mmc_dev(host->mmc), data->sg,
+				     data->sg_len,
+				     omap_hsmmc_get_dma_dir(host, data));
+		data->dma_len = dma_len;
+		if (dma_len)
+			host->mapped_data_cnt++;
+	}
+	spin_unlock_irqrestore(&host->irq_lock, flags);
+	WARN(host->mapped_data_cnt < 0 || host->mapped_data_cnt > 2,
+		"MMC%d: Mapped Data count: %d",
+		host->mmc->index, host->mapped_data_cnt);
+	return dma_len  > 0 ? 0 : -EINVAL;
+}
+
+static void
+omap_hsmmc_unmap_data(struct omap_hsmmc_host *host, struct mmc_data *data)
+{
+	unsigned long flags;
+	spin_lock_irqsave(&host->irq_lock, flags);
+	if (data && data->dma_len) {
+		dma_unmap_sg(mmc_dev(host->mmc), data->sg, data->sg_len,
+				omap_hsmmc_get_dma_dir(host, data));
+		data->dma_len = 0;
+		host->mapped_data_cnt--;
+	}
+	spin_unlock_irqrestore(&host->irq_lock, flags);
+	WARN(host->mapped_data_cnt < 0 || host->mapped_data_cnt > 2,
+		"MMC%d: Mapped Data count: %d",
+		host->mmc->index, host->mapped_data_cnt);
+}
+#endif
 
 /*
  * Notify the transfer complete to MMC core
@@ -1036,9 +1160,18 @@ omap_hsmmc_xfer_done(struct omap_hsmmc_host *host, struct mmc_data *data)
 	if (!data) {
 		struct mmc_request *mrq = host->mrq;
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+		/* some commands generate busy on DATx, but do not
+		 * transfer data. Transition from on DATA bus from
+		 * busy to ready generates TC interrupt, even if
+		 * there was no data transfer. It may happen before
+		 * or after CC interrupt. */
+		if (host->cmd && host->response_busy) {
+#else
 		/* TC before CC from CMD6 - don't know why, but it happens */
 		if (host->cmd && host->cmd->opcode == 6 &&
 		    host->response_busy) {
+#endif
 			host->response_busy = 0;
 			return;
 		}
@@ -1049,9 +1182,14 @@ omap_hsmmc_xfer_done(struct omap_hsmmc_host *host, struct mmc_data *data)
 
 	host->data = NULL;
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	if (host->dma_type == ADMA_XFER)
+		omap_hsmmc_unmap_data(host, data);
+#else
 	if ((host->dma_type == ADMA_XFER) && !data->host_cookie)
 		dma_unmap_sg(mmc_dev(host->mmc), data->sg, data->sg_len,
 			omap_hsmmc_get_dma_dir(host, data));
+#endif
 
 	if (!data->error)
 		data->bytes_xfered += data->blocks * (data->blksz);
@@ -1059,7 +1197,11 @@ omap_hsmmc_xfer_done(struct omap_hsmmc_host *host, struct mmc_data *data)
 		data->bytes_xfered = 0;
 
 	if (data->stop && ((!(host->flags & AUTO_CMD12)) || data->error)) {
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+		omap_hsmmc_start_command(host, data->stop, NULL, 0);
+#else
 		omap_hsmmc_start_command(host, data->stop, NULL);
+#endif
 	} else {
 		if (data->stop)
 			data->stop->resp[0] = OMAP_HSMMC_READ(host->base,
@@ -1093,8 +1235,31 @@ omap_hsmmc_errata_i761(struct omap_hsmmc_host *host, struct mmc_command *cmd)
 static void
 omap_hsmmc_cmd_done(struct omap_hsmmc_host *host, struct mmc_command *cmd)
 {
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	struct mmc_request *req = host->mrq;
+#endif
+
 	if (host->cmd->opcode == MMC_SEND_TUNING_BLOCK)
 		return;
+
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	if (req->sbc && (host->cmd == req->sbc)) {
+		int err;
+		host->cmd = NULL;
+		err = omap_hsmmc_prepare_data(host, req);
+		if (err) {
+			req->cmd->error = err;
+			if (req->data)
+				req->data->error = err;
+			omap_hsmmc_request_done(host, req);
+			return;
+		}
+		omap_hsmmc_start_command(host, host->mrq->cmd,
+			host->mrq->data, 1);
+		return;
+	}
+#endif
+
 	host->cmd = NULL;
 
 	if (cmd->flags & MMC_RSP_PRESENT) {
@@ -1119,20 +1284,36 @@ omap_hsmmc_cmd_done(struct omap_hsmmc_host *host, struct mmc_command *cmd)
 static void omap_hsmmc_dma_cleanup(struct omap_hsmmc_host *host, int errno)
 {
 	int dma_ch;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	unsigned long flags;
+#endif
 
 	host->data->error = errno;
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	spin_lock_irqsave(&host->irq_lock, flags);
+#else
 	spin_lock(&host->irq_lock);
+#endif
 	dma_ch = host->dma_ch;
 	host->dma_ch = -1;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	spin_unlock_irqrestore(&host->irq_lock, flags);
+#else
 	spin_unlock(&host->irq_lock);
+#endif
 
 	if ((host->dma_type == SDMA_XFER) && (dma_ch != -1)) {
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+		omap_hsmmc_unmap_data(host, host->data);
+		omap_free_dma(dma_ch);
+#else
 		dma_unmap_sg(mmc_dev(host->mmc), host->data->sg,
 			host->data->sg_len,
 			omap_hsmmc_get_dma_dir(host, host->data));
 		omap_free_dma(dma_ch);
 		host->data->host_cookie = 0;
+#endif
 	}
 	host->data = NULL;
 }
@@ -1217,11 +1398,15 @@ static void omap_hsmmc_do_irq(struct omap_hsmmc_host *host, int status)
 	int i = 0;
 
 	if (!host->req_in_progress) {
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+		dev_dbg(host->dev, "Supirious IRQ 0x%08X\n", status);
+#else
 		do {
 			OMAP_HSMMC_WRITE(host->base, STAT, status);
 			/* Flush posted write */
 			status = OMAP_HSMMC_READ(host->base, STAT);
 		} while (status & INT_EN_MASK);
+#endif
 		return;
 	}
 
@@ -1303,7 +1488,9 @@ static void omap_hsmmc_do_irq(struct omap_hsmmc_host *host, int status)
 			end_trans = 1;
 	}
 
+#ifndef CONFIG_MACH_OMAP4_BOWSER
 	OMAP_HSMMC_WRITE(host->base, STAT, status);
+#endif
 
 	if (status & BRR) {
 		for (i = 0; i < sizeof(tuning_data)/4; i++)
@@ -1328,10 +1515,17 @@ static irqreturn_t omap_hsmmc_irq(int irq, void *dev_id)
 
 	status = OMAP_HSMMC_READ(host->base, STAT);
 	do {
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+		OMAP_HSMMC_WRITE(host->base, STAT, status);
+#endif
 		omap_hsmmc_do_irq(host, status);
 		/* Flush posted write */
 		status = OMAP_HSMMC_READ(host->base, STAT);
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	} while (status);
+#else
 	} while (status & INT_EN_MASK);
+#endif
 
 	return IRQ_HANDLED;
 }
@@ -1531,6 +1725,9 @@ static void omap_hsmmc_dma_cb(int lch, u16 ch_status, void *cb_data)
 	struct omap_hsmmc_host *host = cb_data;
 	struct mmc_data *data;
 	int dma_ch, req_in_progress;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	unsigned long flags;
+#endif
 
 	if (!(ch_status & OMAP_DMA_BLOCK_IRQ)) {
 		dev_warn(mmc_dev(host->mmc), "unexpected dma status %x\n",
@@ -1538,30 +1735,53 @@ static void omap_hsmmc_dma_cb(int lch, u16 ch_status, void *cb_data)
 		return;
 	}
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	spin_lock_irqsave(&host->irq_lock, flags);
+#else
 	spin_lock(&host->irq_lock);
+#endif
 	if (host->dma_ch < 0) {
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+		spin_unlock_irqrestore(&host->irq_lock, flags);
+#else
 		spin_unlock(&host->irq_lock);
+#endif
 		return;
 	}
 
 	data = host->mrq->data;
 	host->dma_sg_idx++;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	if (host->dma_sg_idx < data->dma_len) {
+#else
 	if (host->dma_sg_idx < host->dma_len) {
+#endif
 		/* Fire up the next transfer. */
 		omap_hsmmc_config_dma_params(host, data,
 					   data->sg + host->dma_sg_idx);
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+		spin_unlock_irqrestore(&host->irq_lock, flags);
+#else
 		spin_unlock(&host->irq_lock);
+#endif
 		return;
 	}
 
+#ifndef CONFIG_MACH_OMAP4_BOWSER
 	if (!data->host_cookie)
 		dma_unmap_sg(mmc_dev(host->mmc), data->sg, data->sg_len,
 			     omap_hsmmc_get_dma_dir(host, data));
+#endif
 
 	req_in_progress = host->req_in_progress;
 	dma_ch = host->dma_ch;
 	host->dma_ch = -1;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	spin_unlock_irqrestore(&host->irq_lock, flags);
+	omap_hsmmc_unmap_data(host, data);
+#else
 	spin_unlock(&host->irq_lock);
+#endif
 
 	omap_free_dma(dma_ch);
 
@@ -1569,12 +1789,21 @@ static void omap_hsmmc_dma_cb(int lch, u16 ch_status, void *cb_data)
 	if (!req_in_progress) {
 		struct mmc_request *mrq = host->mrq;
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+		omap_hsmmc_request_done(host, mrq);
+#else
 		host->mrq = NULL;
 		mmc_request_done(host->mmc, mrq);
+#endif
 	}
 }
 
 static int omap_hsmmc_pre_dma_transfer(struct omap_hsmmc_host *host,
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+				       struct mmc_data *data)
+{
+	return omap_hsmmc_map_data(host, data);
+#else
 				       struct mmc_data *data,
 				       struct omap_hsmmc_next *next)
 {
@@ -1611,6 +1840,7 @@ static int omap_hsmmc_pre_dma_transfer(struct omap_hsmmc_host *host,
 		host->dma_len = dma_len;
 
 	return 0;
+#endif
 }
 
 /*
@@ -1646,7 +1876,11 @@ static int omap_hsmmc_start_sdma_transfer(struct omap_hsmmc_host *host,
 			mmc_hostname(host->mmc), ret);
 		return ret;
 	}
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	ret = omap_hsmmc_pre_dma_transfer(host, data);
+#else
 	ret = omap_hsmmc_pre_dma_transfer(host, data, NULL);
+#endif
 	if (ret)
 		return ret;
 
@@ -1668,10 +1902,18 @@ static int mmc_populate_adma_desc_table(struct omap_hsmmc_host *host,
 	struct mmc_data *data = req->data;
 	int ret = 0;
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	ret = omap_hsmmc_pre_dma_transfer(host, data);
+#else
 	ret = omap_hsmmc_pre_dma_transfer(host, data, NULL);
+#endif
 	if (ret)
 		return ret;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	for (i = 0, j = 0; i < data->dma_len; i++) {
+#else
 	for (i = 0, j = 0; i < host->dma_len; i++) {
+#endif
 		dmaaddr = sg_dma_address(data->sg + i);
 		dmalen = sg_dma_len(data->sg + i);
 		numblocks += dmalen / data->blksz;
@@ -1707,7 +1949,11 @@ static int mmc_populate_adma_desc_table(struct omap_hsmmc_host *host,
 	WARN_ON((i + j - 1) > DMA_TABLE_NUM_ENTRIES);
 	dev_dbg(mmc_dev(host->mmc),
 		"ADMA table has %d entries from %d sglist\n",
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+		i + j, data->dma_len);
+#else
 		i + j, host->dma_len);
+#endif
 	return numblocks;
 }
 
@@ -1768,11 +2014,20 @@ omap_hsmmc_prepare_data(struct omap_hsmmc_host *host, struct mmc_request *req)
 	if (req->data == NULL) {
 		OMAP_HSMMC_WRITE(host->base, BLK, 0);
 		/*
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+		 * Set an arbitrary 500ms data timeout for commands with
+#else
 		 * Set an arbitrary 100ms data timeout for commands with
+#endif
 		 * busy signal.
 		 */
 		if (req->cmd->flags & MMC_RSP_BUSY)
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+			/* really advanced mathematics inside */
+			set_data_timeout(host, 500 * 1000000U, 0);
+#else
 			set_data_timeout(host, 100000000U, 0);
+#endif
 		return 0;
 	}
 
@@ -1801,6 +2056,10 @@ static void omap_hsmmc_post_req(struct mmc_host *mmc, struct mmc_request *mrq,
 	struct omap_hsmmc_host *host = mmc_priv(mmc);
 	struct mmc_data *data = mrq->data;
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	if (data && host->dma_type)
+		omap_hsmmc_unmap_data(host, data);
+#else
 	if (host->dma_type) {
 		if (data->host_cookie)
 			dma_unmap_sg(mmc_dev(host->mmc), data->sg,
@@ -1808,22 +2067,33 @@ static void omap_hsmmc_post_req(struct mmc_host *mmc, struct mmc_request *mrq,
 				     omap_hsmmc_get_dma_dir(host, data));
 		data->host_cookie = 0;
 	}
+#endif
 }
 
 static void omap_hsmmc_pre_req(struct mmc_host *mmc, struct mmc_request *mrq,
 			       bool is_first_req)
 {
 	struct omap_hsmmc_host *host = mmc_priv(mmc);
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	struct mmc_data *data = mrq->data;
 
+	if (!data)
+		return;
+#else
 	if (mrq->data->host_cookie) {
 		mrq->data->host_cookie = 0;
 		return ;
 	}
+#endif
 
 	if (host->dma_type)
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+		omap_hsmmc_map_data(host, data);
+#else
 		if (omap_hsmmc_pre_dma_transfer(host, mrq->data,
 						&host->next_data))
 			mrq->data->host_cookie = 0;
+#endif
 }
 
 /*
@@ -1837,8 +2107,10 @@ static void omap_hsmmc_request(struct mmc_host *mmc, struct mmc_request *req)
 	BUG_ON(host->req_in_progress);
 	BUG_ON(host->dma_ch != -1);
 
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 	if (host->shutdown)
 		return;
+#endif
 
 	if (host->protect_card) {
 		if (host->reqs_blocked < 3) {
@@ -1855,7 +2127,11 @@ static void omap_hsmmc_request(struct mmc_host *mmc, struct mmc_request *req)
 		if (req->data)
 			req->data->error = -EBADF;
 		req->cmd->retries = 0;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+		omap_hsmmc_request_done(host, req);
+#else
 		mmc_request_done(mmc, req);
+#endif
 		return;
 	} else if (host->reqs_blocked)
 		host->reqs_blocked = 0;
@@ -1871,27 +2147,53 @@ static void omap_hsmmc_request(struct mmc_host *mmc, struct mmc_request *req)
 	 * the commands immediately
 	 */
 	if (host->power_mode == MMC_POWER_OFF) {
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+		req->cmd->error = -EIO;
+#else
 		req->cmd->error = EIO;
+#endif
 		if (req->data)
 			req->data->error = -EIO;
 		dev_warn(mmc_dev(host->mmc),
 			"Card is no longer present\n");
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+		omap_hsmmc_request_done(host, req);
+#else
 		mmc_request_done(mmc, req);
+#endif
 		return;
 	}
 
 	host->mrq = req;
+
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	OMAP_HSMMC_WRITE(host->base, STAT, STAT_CLEAR);
+
+	if (req->sbc) {
+		omap_hsmmc_start_command(host, req->sbc, NULL, 0);
+		return;
+	}
+#endif
+
 	err = omap_hsmmc_prepare_data(host, req);
 	if (err) {
 		req->cmd->error = err;
 		if (req->data)
 			req->data->error = err;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+		omap_hsmmc_request_done(host, req);
+#else
 		host->mrq = NULL;
 		mmc_request_done(mmc, req);
+#endif
 		return;
 	}
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	omap_hsmmc_start_command(host, req->cmd, req->data, 0);
+#else
 	omap_hsmmc_start_command(host, req->cmd, req->data);
+#endif
 }
 
 /* Routine to configure clock values. Exposed API to core */
@@ -2123,7 +2425,12 @@ static int omap_execute_tuning(struct mmc_host *mmc, u32 opcode)
 
 		OMAP_HSMMC_WRITE(host->base, BLK, 64 | (1 << 16));
 		set_data_timeout(host, 50000000, 0);
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+		OMAP_HSMMC_WRITE(host->base, STAT, STAT_CLEAR);
+		omap_hsmmc_start_command(host, &cmd, NULL, 0);
+#else
 		omap_hsmmc_start_command(host, &cmd, NULL);
+#endif
 
 		host->cmd = NULL;
 		host->mrq = NULL;
@@ -2523,6 +2830,9 @@ static int __devinit omap_hsmmc_probe(struct platform_device *pdev)
 	host->dma_ch	= -1;
 	host->irq	= irq;
 	host->slot_id	= 0;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	host->mapped_data_cnt = 0;
+#endif
 	host->mapbase	= res->start + pdata->reg_offset;
 	host->base	= ioremap(host->mapbase, SZ_4K);
 	if (!host->base) {
@@ -2531,7 +2841,9 @@ static int __devinit omap_hsmmc_probe(struct platform_device *pdev)
 	}
 	host->power_mode = MMC_POWER_OFF;
 	host->flags	= AUTO_CMD12;
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 	host->shutdown = 0;
+#endif
 
 	host->errata = 0;
 	if (cpu_is_omap44xx())
@@ -2539,7 +2851,9 @@ static int __devinit omap_hsmmc_probe(struct platform_device *pdev)
 	if (cpu_is_omap44xx() && (omap_rev() > OMAP4430_REV_ES1_0))
 		host->errata |= OMAP_HSMMC_ERRATA_FSMR;
 
+#ifndef CONFIG_MACH_OMAP4_BOWSER
 	host->next_data.cookie = 1;
+#endif
 	host->regulator_enabled = 0;
 	pdata->dev = host->dev;
 
@@ -2636,7 +2950,13 @@ static int __devinit omap_hsmmc_probe(struct platform_device *pdev)
 	mmc->max_seg_size = mmc->max_req_size;
 
 	mmc->caps |= MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED |
+#ifdef CONFIG_MACH_OMAP_4430_KC1
 		     MMC_CAP_WAIT_WHILE_BUSY;
+#elif CONFIG_MACH_OMAP4_BOWSER
+		     MMC_CAP_WAIT_WHILE_BUSY | MMC_CAP_ERASE | MMC_CAP_CMD23;
+#else
+		     MMC_CAP_WAIT_WHILE_BUSY | MMC_CAP_ERASE;
+#endif
 
 	mmc->caps |= mmc_slot(host).caps;
 	if (mmc->caps & MMC_CAP_8_BIT_DATA)
@@ -2709,6 +3029,10 @@ static int __devinit omap_hsmmc_probe(struct platform_device *pdev)
 		}
 		pdata->suspend = omap_hsmmc_suspend_cdirq;
 		pdata->resume = omap_hsmmc_resume_cdirq;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	} else if (mmc_slot(host).mmc_data.register_status_notify) {
+		mmc_slot(host).mmc_data.register_status_notify(omap_hsmmc_status_notify_cb, host);
+#endif
 	}
 
 	omap_hsmmc_disable_irq(host);
@@ -2766,6 +3090,10 @@ err_ioremap:
 err_alloc:
 	omap_hsmmc_gpio_free(pdata);
 err:
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	if (res)
+#endif
 	release_mem_region(res->start, resource_size(res));
 	return ret;
 }
@@ -2807,6 +3135,51 @@ static int __devexit omap_hsmmc_remove(struct platform_device *pdev)
 	return 0;
 }
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+static void omap_hsmmc_shutdown(struct platform_device *pdev)
+{
+	struct omap_hsmmc_host *host = platform_get_drvdata(pdev);
+	long delay;
+
+	/* Protection from forgotten wakelock */
+	wake_unlock(&host->mmc->detect_wake_lock);
+
+	/* If require housekeeping and has minimum one request */
+	delay = mmc_slot(host).housekeeping_ms -
+			jiffies_to_msecs(jiffies - host->req_ts);
+	if (delay > 0) {
+		/* Block all requests */
+		host->protect_card = 1;
+		dev_info(&pdev->dev, "remain housekeeping %ld ms\n", delay);
+		msleep(delay);
+	}
+}
+#elif CONFIG_MACH_OMAP_4430_KC1
+static void omap_hsmmc_shutdown(struct platform_device *pdev)
+{
+	struct omap_hsmmc_host *host;
+
+	host = platform_get_drvdata(pdev);
+
+#ifdef CONFIG_WL12XX_SDIO
+	/* No particular shutdown delay for WLAN - only apply this to real cards */
+	/* FIXME-HASH: HARD-CODING THE WLAN MMC (WAS: CONFIG_TIWLAN_MMC_CONTROLLER) */
+	if (pdev->id == (5-1)) {
+		return;
+	}
+#endif
+	dev_info(&pdev->dev, "shutting down mmc\n");
+	mmc_flush_scheduled_work();
+	host->shutdown = 1;
+	cancel_delayed_work(&host->mmc->detect);
+	mmc_flush_scheduled_work();
+
+	/* MMC spec gives 800ms min for card housekeeping.
+	   Leave it on the safe side */
+	msleep(1000);
+}
+#endif
+
 #ifdef CONFIG_PM
 static int omap_hsmmc_suspend(struct device *dev)
 {
@@ -2818,6 +3191,11 @@ static int omap_hsmmc_suspend(struct device *dev)
 
 	if (host && host->suspended)
 		return 0;
+
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	if (host->req_in_progress)
+		return -EBUSY;
+#endif
 
 	pm_runtime_get_sync(host->dev);
 	host->suspended = 1;
@@ -2924,30 +3302,6 @@ static int omap_hsmmc_runtime_resume(struct device *dev)
 	return 0;
 }
 
-static void omap_hsmmc_shutdown(struct platform_device *pdev)
-{
-	struct omap_hsmmc_host *host;
-
-	host = platform_get_drvdata(pdev);
-
-#ifdef CONFIG_WL12XX_SDIO
-	/* No particular shutdown delay for WLAN - only apply this to real cards */
-	/* FIXME-HASH: HARD-CODING THE WLAN MMC (WAS: CONFIG_TIWLAN_MMC_CONTROLLER) */
-	if (pdev->id == (5-1)) {
-		return;
-	}
-#endif
-	dev_info(&pdev->dev, "shutting down mmc\n");
-	mmc_flush_scheduled_work();
-	host->shutdown = 1;
-	cancel_delayed_work(&host->mmc->detect);
-	mmc_flush_scheduled_work();
-
-	/* MMC spec gives 800ms min for card housekeeping.
-	   Leave it on the safe side */
-	msleep(1000);
-}
-
 static struct dev_pm_ops omap_hsmmc_dev_pm_ops = {
 	.suspend	= omap_hsmmc_suspend,
 	.resume		= omap_hsmmc_resume,
@@ -2958,7 +3312,9 @@ static struct dev_pm_ops omap_hsmmc_dev_pm_ops = {
 static struct platform_driver omap_hsmmc_driver = {
 	.probe		= omap_hsmmc_probe,
 	.remove		= __devexit_p(omap_hsmmc_remove),
+#if defined(CONFIG_MACH_OMAP_4430_KC1) || defined(CONFIG_MACH_OMAP4_BOWSER)
 	.shutdown	= omap_hsmmc_shutdown,
+#endif
 	.driver		= {
 		.name = DRIVER_NAME,
 		.owner = THIS_MODULE,

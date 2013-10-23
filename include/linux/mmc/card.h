@@ -57,6 +57,9 @@ struct mmc_ext_csd {
 	unsigned int		sa_timeout;		/* Units: 100ns */
 	unsigned int		generic_cmd6_time;	/* Units: 10ms */
 	unsigned int            power_off_longtime;     /* Units: ms */
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	u8			power_off_notification;	/* state */
+#endif
 	unsigned int		hs_max_dtr;
 	unsigned int		sectors;
 	unsigned int		card_type;
@@ -236,6 +239,9 @@ struct mmc_card {
 #define MMC_QUIRK_LONG_READ_TIME (1<<9)		/* Data read time > CSD says */
 #define MMC_QUIRK_SEC_ERASE_TRIM_BROKEN (1<<10)	/* Skip secure for erase/trim */
 						/* byte mode */
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+#define MMC_QUIRK_SAMSUNG_SMART (1<<11)		/* Samrung smart read */
+#endif
 	unsigned int    poweroff_notify_state;	/* eMMC4.5 notify feature */
 #define MMC_NO_POWER_NOTIFICATION	0
 #define MMC_POWERED_ON			1
@@ -491,5 +497,9 @@ extern void mmc_unregister_driver(struct mmc_driver *);
 
 extern void mmc_fixup_device(struct mmc_card *card,
 			     const struct mmc_fixup *table);
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+extern ssize_t mmc_samsung_smart_handle(struct mmc_card *card, char *buf);
+extern int mmc_samsung_report(struct mmc_card *card, u8 *buf);
+#endif
 
 #endif /* LINUX_MMC_CARD_H */

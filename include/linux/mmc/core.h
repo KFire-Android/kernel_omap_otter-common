@@ -118,6 +118,9 @@ struct mmc_data {
 	unsigned int		sg_len;		/* size of scatter list */
 	struct scatterlist	*sg;		/* I/O scatter list */
 	s32			host_cookie;	/* host private data */
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	unsigned int		dma_len;	/* mapped dma chain len */
+#endif
 };
 
 struct mmc_request {

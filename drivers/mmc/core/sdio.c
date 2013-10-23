@@ -1222,7 +1222,11 @@ err:
 	return err;
 }
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+int sdio_reset_comm(struct mmc_card *card)
+#else
 static int sdio_reset_comm(struct mmc_card *card)
+#endif
 {
 	struct mmc_host *host = card->host;
 	u32 ocr;
