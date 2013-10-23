@@ -35,7 +35,11 @@ enum ion_heap_type {
 	ION_HEAP_TYPE_CARVEOUT,
 	ION_HEAP_TYPE_CUSTOM, /* must be last so device specific heaps always
 				 are at the end of this enum */
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	ION_NUM_HEAPS = 16,   /* take into account custom heaps */
+#else
 	ION_NUM_HEAPS,
+#endif
 };
 
 #define ION_HEAP_SYSTEM_MASK		(1 << ION_HEAP_TYPE_SYSTEM)
@@ -146,6 +150,28 @@ void ion_free(struct ion_client *client, struct ion_handle *handle);
  */
 int ion_phys(struct ion_client *client, struct ion_handle *handle,
 	     ion_phys_addr_t *addr, size_t *len);
+
+
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+/**
+ * ion_phys_frm_dev - returns the physical address and len of a handle
+ * @dev:	ion_dev
+ * @handle:	the handle
+ * @addr:	a pointer to put the address in
+ * @len:	a pointer to put the length in
+ *
+ * This function queries the heap for a particular handle to get the
+ * handle's physical address.  It't output is only correct if
+ * a heap returns physically contiguous memory -- in other cases
+ * this api should not be implemented -- ion_map_dma should be used
+ * instead.  Returns -EINVAL if the handle is invalid.  This has
+ * no implications on the reference counting of the handle --
+ * the returned value may not be valid if the caller is not
+ * holding a reference.
+ */
+int ion_phys_frm_dev(struct ion_device *dev, struct ion_handle *handle,
+			ion_phys_addr_t *addr, size_t *len);
+#endif
 
 int ion_handle_phys(struct ion_handle *handle,
 		    ion_phys_addr_t *addr, size_t *len);
