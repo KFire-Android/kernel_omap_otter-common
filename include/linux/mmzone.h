@@ -141,6 +141,9 @@ enum zone_stat_item {
 	NUMA_LOCAL,		/* allocation from local node */
 	NUMA_OTHER,		/* allocation from other node */
 #endif
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	NR_INUSE,		/* pages currently allocated from zone */
+#endif
 	NR_ANON_TRANSPARENT_HUGEPAGES,
 	NR_VM_ZONE_STAT_ITEMS };
 

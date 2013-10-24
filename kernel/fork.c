@@ -1123,6 +1123,19 @@ static void posix_cpu_timers_init(struct task_struct *tsk)
 	INIT_LIST_HEAD(&tsk->cpu_timers[2]);
 }
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+static int chpid_pte(pte_t *pte, pgtable_t token, unsigned long addr, void *data)
+{
+	struct pid *pid = data;
+	struct page *pg = token;
+	struct allocation_detail detail;
+	detail = pg->detail;
+	detail.allocation_pid = pid_nr(pid);
+	pg->detail = detail;
+	return 0;
+}
+#endif
+
 /*
  * This creates a new process as a copy of the old one,
  * but does not actually start it yet.
@@ -1366,6 +1379,23 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	 */
 	if ((clone_flags & (CLONE_VM|CLONE_VFORK)) == CLONE_VM)
 		p->sas_ss_sp = p->sas_ss_size = 0;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	else if ((clone_flags & (CLONE_VM|CLONE_VFORK)) == 0) {
+		struct vm_area_struct *vma;
+		struct page *pg;
+		struct allocation_detail detail;
+		for (vma = p->mm->mmap; vma; vma = vma->vm_next) {
+			if (!(vma->vm_flags & (VM_HUGETLB|VM_NONLINEAR|VM_PFNMAP|VM_INSERTPAGE)))
+				if (!vma->anon_vma)
+					continue;
+			apply_to_page_range(p->mm, vma->vm_start, vma->vm_end - vma->vm_start, chpid_pte, (void *)pid);
+		}
+		pg = virt_to_page((void *)p->mm->pgd);
+		detail = pg->detail;
+		detail.allocation_pid = pid_nr(pid);
+		pg->detail = detail;
+	}
+#endif
 
 	/*
 	 * Syscall tracing and stepping should be turned off in the

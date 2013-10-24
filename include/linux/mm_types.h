@@ -22,6 +22,14 @@
 
 struct address_space;
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+struct allocation_detail {
+	void *call_site;
+	uint16_t allocation_pid;
+	uint16_t last_mapper_pid;
+};
+#endif
+
 #define USE_SPLIT_PTLOCKS	(NR_CPUS >= CONFIG_SPLIT_PTLOCK_CPUS)
 
 /*
@@ -158,6 +166,9 @@ struct page {
 	 * is a pointer to such a status block. NULL if not tracked.
 	 */
 	void *shadow;
+#endif
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	struct allocation_detail detail;
 #endif
 }
 /*
