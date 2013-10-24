@@ -36,6 +36,13 @@
 
 #include <video/omapdss.h>
 
+#ifdef CONFIG_FB_OMAP_BOOTLOADER_INIT
+#include <linux/clk.h>
+#include <plat/clock.h>
+#include <linux/delay.h>
+#endif /* CONFIG_FB_OMAP_BOOTLOADER_INIT */
+
+
 #include "dss.h"
 #include "dss_features.h"
 
@@ -124,6 +131,27 @@ void dss_dsi_disable_pads(int dsi_id, unsigned lane_mask)
 	return board_data->dsi_disable_pads(dsi_id, lane_mask);
 }
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+int dss_set_dispc_clk(unsigned long freq)
+{
+	struct clk *clk;
+	int r;
+
+	if (cpu_is_omap44xx()) {
+		clk = clk_get(NULL, "dpll_per_m5x2_ck");
+		if (IS_ERR(clk)) {
+			DSSERR("Failed to get dpll_per_m5x2_ck\n");
+			r = PTR_ERR(clk);
+			return r;
+		}
+		r = clk_set_rate(clk, freq);
+		if (r)
+			return r;
+	}
+	return 0;
+}
+#endif
+
 #if defined(CONFIG_DEBUG_FS) && defined(CONFIG_OMAP2_DSS_DEBUG_SUPPORT)
 static int dss_debug_show(struct seq_file *s, void *unused)
 {
@@ -211,6 +239,11 @@ static int omap_dss_probe(struct platform_device *pdev)
 	int r;
 	int i;
 
+#ifdef CONFIG_FB_OMAP_BOOTLOADER_INIT
+	static int first_boot = 1;
+	struct clk *iclk;
+#endif /* CONFIG_FB_OMAP_BOOTLOADER_INIT */
+
 	core.pdev = pdev;
 
 	dss_features_init();
@@ -240,6 +273,17 @@ static int omap_dss_probe(struct platform_device *pdev)
 		if (def_disp_name && strcmp(def_disp_name, dssdev->name) == 0)
 			pdata->default_device = dssdev;
 	}
+
+#ifdef CONFIG_FB_OMAP_BOOTLOADER_INIT
+	if (unlikely(first_boot != 0)) {
+		iclk = clk_get_sys("omapdss_dss", "ick");
+		if (!IS_ERR(iclk)) {
+			clk_disable(iclk);
+			clk_put(iclk);
+		}
+		first_boot = 0;
+	}
+#endif /* CONFIG_FB_OMAP_BOOTLOADER_INIT */
 
 	return 0;
 

@@ -892,8 +892,13 @@ EXPORT_SYMBOL(omapdss_rfbi_display_enable);
 
 void omapdss_rfbi_display_disable(struct omap_dss_device *dssdev)
 {
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	omap_dispc_unregister_isr_sync(framedone_callback, NULL,
+			DISPC_IRQ_FRAMEDONE);
+#else
 	omap_dispc_unregister_isr(framedone_callback, NULL,
 			DISPC_IRQ_FRAMEDONE);
+#endif
 	omap_dss_stop_device(dssdev);
 
 	rfbi_runtime_put();

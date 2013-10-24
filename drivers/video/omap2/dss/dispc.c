@@ -175,6 +175,11 @@ static void dispc_save_context(void)
 		}
 	}
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	if (dss_has_feature(FEAT_MFLAG))
+		SR(GLOBAL_MFLAG);
+#endif
+
 	for (i = 0; i < dss_feat_get_num_ovls(); i++) {
 		SR(OVL_BA0(i));
 		SR(OVL_BA1(i));
@@ -189,6 +194,10 @@ static void dispc_save_context(void)
 		if (i == OMAP_DSS_GFX) {
 			SR(OVL_WINDOW_SKIP(i));
 			SR(OVL_TABLE_BA(i));
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+		if (dss_has_feature(FEAT_MFLAG))
+			SR(OVL_MFLAG_THRESHOLD(i));
+#endif
 			continue;
 		}
 		SR(OVL_FIR(i));
@@ -266,6 +275,11 @@ static void dispc_restore_context(void)
 	if (dss_has_feature(FEAT_MGR_LCD2))
 		RR(CONFIG2);
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	if (dss_has_feature(FEAT_MFLAG))
+		RR(GLOBAL_MFLAG);
+#endif
+
 	for (i = 0; i < dss_feat_get_num_mgrs(); i++) {
 		RR(DEFAULT_COLOR(i));
 		RR(TRANS_COLOR(i));
@@ -341,6 +355,10 @@ static void dispc_restore_context(void)
 		}
 		if (dss_has_feature(FEAT_ATTR2))
 			RR(OVL_ATTRIBUTES2(i));
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+		if (dss_has_feature(FEAT_MFLAG))
+			RR(OVL_MFLAG_THRESHOLD(i));
+#endif
 	}
 
 	if (dss_has_feature(FEAT_CORE_CLK_DIV))
@@ -446,6 +464,21 @@ bool dispc_mgr_go_busy(enum omap_channel channel)
 	else
 		return REG_GET(DISPC_CONTROL, bit, bit) == 1;
 }
+
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+void dispc_set_dithering(enum omap_channel channel)
+{
+	int temp;
+
+	if (channel == OMAP_DSS_CHANNEL_LCD)
+	{
+		temp = 2;
+		REG_FLD_MOD(DISPC_CONTROL, temp, 31, 30);
+		temp = 1;
+		REG_FLD_MOD(DISPC_CONTROL, temp, 7, 7);
+	}
+}
+#endif
 
 void dispc_mgr_go(enum omap_channel channel)
 {
@@ -1073,6 +1106,9 @@ static void dispc_ovl_set_mflag_start(enum dispc_mflag_start start)
 void dispc_ovl_set_global_mflag(enum omap_plane plane, bool mflag)
 {
 	u32 fifosize;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	u32 unit;
+#endif
 	u8 bit;
 
 	/* Set the ARBITRATION bit to give
@@ -1092,14 +1128,26 @@ void dispc_ovl_set_global_mflag(enum omap_plane plane, bool mflag)
 	  * frame even if the DMA buffer is empty */
 	 dispc_ovl_set_mflag_start(DISPC_MFLAG_START_ENABLE);
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	 if (dss_has_feature(FEAT_MFLAG)) {
+#endif
 	 fifosize = dispc_ovl_get_fifo_size(plane);
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	 unit = dss_feat_get_buffer_size_unit();
+#endif
 	 /* As per the simultaion team suggestion, below thesholds are set:
 	  * HT = fifosize * 5/8;
 	  * LT = fifosize * 4/8;
 	  */
 	 dispc_write_reg(DISPC_OVL_MFLAG_THRESHOLD(plane),
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+			FLD_VAL((fifosize * 5) / (8 * unit), 31, 16) |
+			FLD_VAL((fifosize * 4) / (8 * unit), 15, 0));
+	 }
+#else
 		FLD_VAL((fifosize*5)/8, 31, 16) |
 		FLD_VAL((fifosize*4)/8, 15, 0));
+#endif
 }
 
 void dispc_ovl_set_fifo_threshold(enum omap_plane plane, u32 low, u32 high)
@@ -1139,6 +1187,11 @@ void dispc_ovl_set_fifo_threshold(enum omap_plane plane, u32 low, u32 high)
 	dispc_write_reg(DISPC_OVL_FIFO_THRESHOLD(plane),
 			FLD_VAL(high, hi_start, hi_end) |
 			FLD_VAL(low, lo_start, lo_end));
+
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	if (plane == OMAP_DSS_GFX)
+		dispc_ovl_set_global_mflag(OMAP_DSS_GFX, true);
+#endif
 }
 
 void dispc_enable_fifomerge(bool enable)
@@ -2344,6 +2397,9 @@ skip_errata:
 		dispc_ovl_set_1d_tiled_mode(plane, oi->force_1d);
 
 	if (dss_has_feature(FEAT_MFLAG)) {
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+		oi->mflag_en = true;
+#endif
 		dispc_ovl_set_global_mflag(ovl->id, oi->mflag_en);
 	} else if (plane == OMAP_DSS_GFX) {
 		dispc_enable_arbitration(plane,
@@ -2395,6 +2451,17 @@ skip_errata:
 
 	if (plane != OMAP_DSS_GFX)
 		dispc_mgr_setup_color_conv_coef(plane, &oi->cconv);
+
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	if (plane == OMAP_DSS_GFX) {
+		if (channel == OMAP_DSS_CHANNEL_DIGIT ||
+			omap_rev() == OMAP5430_REV_ES1_0 ||
+			omap_rev() == OMAP5432_REV_ES1_0)
+			dispc_enable_arbitration(plane, true);
+		else
+			dispc_enable_arbitration(plane, false);
+	}
+#endif
 
 	return 0;
 }
@@ -2699,8 +2766,13 @@ static void dispc_mgr_enable_lcd_out(enum omap_channel channel, bool enable)
 					msecs_to_jiffies(100)))
 			DSSERR("timeout waiting for FRAME DONE\n");
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+		r = omap_dispc_unregister_isr_sync(dispc_disable_isr,
+				&frame_done_completion, irq);
+#else
 		r = omap_dispc_unregister_isr(dispc_disable_isr,
 				&frame_done_completion, irq);
+#endif
 
 		if (r)
 			DSSERR("failed to unregister FRAMEDONE isr\n");
@@ -2768,8 +2840,13 @@ static void dispc_mgr_enable_digit_out(bool enable)
 					enable ? "start" : "stop");
 	}
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	r = omap_dispc_unregister_isr_sync(dispc_disable_isr,
+			&frame_done_completion, irq_mask);
+#else
 	r = omap_dispc_unregister_isr(dispc_disable_isr, &frame_done_completion,
 			irq_mask);
+#endif
 	if (r)
 		DSSERR("failed to unregister %x isr\n", irq_mask);
 
@@ -3452,6 +3529,31 @@ void dispc_dump_regs(struct seq_file *s)
 #undef DUMPREG
 }
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+static void dispc_mgr_get_pol_freq(enum omap_channel channel,
+			enum omap_panel_config *config, u8 *acbi, u8 *acb)
+{
+	u32 l = dispc_read_reg(DISPC_POL_FREQ(channel));
+	*config = 0;
+
+	if (FLD_GET(l, 17, 17))
+		*config |= OMAP_DSS_LCD_ONOFF;
+	if (FLD_GET(l, 16, 16))
+		*config |= OMAP_DSS_LCD_RF;
+	if (FLD_GET(l, 15, 15))
+		*config |= OMAP_DSS_LCD_IEO;
+	if (FLD_GET(l, 14, 14))
+		*config |= OMAP_DSS_LCD_IPC;
+	if (FLD_GET(l, 13, 13))
+		*config |= OMAP_DSS_LCD_IHS;
+	if (FLD_GET(l, 12, 12))
+		*config |= OMAP_DSS_LCD_IVS;
+
+	*acbi = FLD_GET(l, 11, 8);
+	*acb = FLD_GET(l, 7, 0);
+}
+#endif
+
 static void _dispc_mgr_set_pol_freq(enum omap_channel channel, bool onoff,
 		bool rf, bool ieo, bool ipc, bool ihs, bool ivs, u8 acbi,
 		u8 acb)
@@ -3557,6 +3659,18 @@ int dispc_mgr_set_clock_div(enum omap_channel channel,
 	DSSDBG("lck = %lu (%u)\n", cinfo->lck, cinfo->lck_div);
 	DSSDBG("pck = %lu (%u)\n", cinfo->pck, cinfo->pck_div);
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	/* In case DISPC_CORE_CLK == PCLK, IPC must work on rising edge */
+	if (dss_has_feature(FEAT_CORE_CLK_DIV) &&
+			(cinfo->lck_div * cinfo->pck_div == 1)) {
+		u8 acb, acbi;
+		enum omap_panel_config config;
+		dispc_mgr_get_pol_freq(channel, &config, &acbi, &acb);
+		config |= OMAP_DSS_LCD_IPC;
+		dispc_mgr_set_pol_freq(channel, config, acbi, acb);
+	}
+#endif
+
 	dispc_mgr_set_lcd_divisor(channel, cinfo->lck_div, cinfo->pck_div);
 
 	return 0;
@@ -3629,6 +3743,14 @@ int omap_dispc_register_isr(omap_dispc_isr_t isr, void *arg, u32 mask)
 	isr_data = NULL;
 	ret = -EBUSY;
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	/* WARN and return if DISPC is suspended, as otherwise we
+	*  will crash while trying to write DSS registers. */
+	if (WARN(pm_runtime_suspended(&dispc.pdev->dev),
+		"Trying to register ISR while DISPC is suspended, exiting!\n"))
+		goto err;
+#endif
+
 	for (i = 0; i < DISPC_MAX_NR_ISRS; i++) {
 		isr_data = &dispc.registered_isr[i];
 
@@ -3690,7 +3812,42 @@ int omap_dispc_unregister_isr(omap_dispc_isr_t isr, void *arg, u32 mask)
 
 	return ret;
 }
+#ifdef CONFIG_MACH_OMAP4_BOWSER
 EXPORT_SYMBOL(omap_dispc_unregister_isr);
+
+/*
+ * Ensure that callback <isr> will NOT be executed after this function
+ * returns. Must be called from sleepable context, though!
+ */
+int omap_dispc_unregister_isr_sync(omap_dispc_isr_t isr, void *arg, u32 mask)
+{
+	int ret;
+
+	ret = omap_dispc_unregister_isr(isr, arg, mask);
+
+	/* Non-atomic context is not really needed. But if we're called
+	 * from atomic context, it is probably from DISPC IRQ, where we
+	 * will deadlock.
+	 */
+	might_sleep();
+
+#if defined(CONFIG_SMP)
+	/* DISPC IRQ executes callbacks with dispc.irq_lock released, so
+	 * there is a chance that a callback be executed even though it
+	 * has been unregistered. Do disable/enable to act as a barrier, and
+	 * ensure that after returning from this function, the DISPC IRQ
+	 * will use an updated callback array, and NOT its cached copy.
+	 *
+	 * This is SMP-only issue because unregister_isr disables
+	 * IRQs.
+	 */
+	synchronize_irq(dispc.irq);
+#endif
+
+	return ret;
+}
+EXPORT_SYMBOL(omap_dispc_unregister_isr_sync);
+#endif
 
 #ifdef DEBUG
 static void print_irq_status(u32 status)
@@ -3927,7 +4084,12 @@ int omap_dispc_wait_for_irq_timeout(u32 irqmask, unsigned long timeout)
 
 	timeout = wait_for_completion_timeout(&completion, timeout);
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	omap_dispc_unregister_isr_sync(dispc_irq_wait_handler,
+		&completion, irqmask);
+#else
 	omap_dispc_unregister_isr(dispc_irq_wait_handler, &completion, irqmask);
+#endif
 
 	if (timeout == 0)
 		return -ETIMEDOUT;
@@ -3958,7 +4120,12 @@ int omap_dispc_wait_for_irq_interruptible_timeout(u32 irqmask,
 	timeout = wait_for_completion_interruptible_timeout(&completion,
 			timeout);
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	omap_dispc_unregister_isr_sync(dispc_irq_wait_handler,
+		&completion, irqmask);
+#else
 	omap_dispc_unregister_isr(dispc_irq_wait_handler, &completion, irqmask);
+#endif
 
 	if (timeout == 0)
 		return -ETIMEDOUT;

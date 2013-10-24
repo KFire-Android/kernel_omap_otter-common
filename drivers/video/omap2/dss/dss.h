@@ -24,6 +24,9 @@
 #define __OMAP2_DSS_H
 
 #ifdef CONFIG_OMAP2_DSS_DEBUG_SUPPORT
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+#undef DEBUG
+#endif
 #define DEBUG
 #endif
 
@@ -510,7 +513,9 @@ void dispc_enable_lcd_out(enum omap_channel channel, bool enable);
 int dispc_setup_wb(struct writeback_cache_data *wb);
 void dispc_setup_wb_source(enum omap_writeback_source source);
 void dispc_go_wb(void);
-
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+void dispc_set_dithering(enum omap_channel channel);
+#endif
 /* VENC */
 #ifdef CONFIG_OMAP2_DSS_VENC
 int venc_init_platform_driver(void);

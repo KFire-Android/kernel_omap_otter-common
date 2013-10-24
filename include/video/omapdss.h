@@ -304,6 +304,10 @@ struct omap_dss_dsi_videomode_data {
 	u16 vsa;
 	u16 vfp;
 	u16 vbp;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	u16 ddr_clk_pre;
+	u16 ddr_clk_post;
+#endif
 
 	/* DSI blanking modes */
 	int blanking_mode;
@@ -354,6 +358,16 @@ int dsi_vc_send_null(struct omap_dss_device *dssdev, int channel);
 int dsi_vc_send_bta_sync(struct omap_dss_device *dssdev, int channel);
 int dsi_enable_video_output(struct omap_dss_device *dssdev, int channel);
 void dsi_disable_video_output(struct omap_dss_device *dssdev, int channel);
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+void dsi_videomode_panel_preinit(struct omap_dss_device *dssdev);
+int dsi_vc_gen_write_nosync_sclk(struct omap_dss_device *dssdev, int channel,
+                u8 *data, int len);
+int dsi_vc_gen_write_nosync(struct omap_dss_device *dssdev, int channel,
+		u8 *data, int len);
+
+int dsi_video_mode_enable(struct omap_dss_device *dssdev, u8 data_type);
+void dsi_video_mode_disable(struct omap_dss_device *dssdev);
+#endif
 
 /* Board specific data */
 struct omap_dss_board_info {
@@ -390,6 +404,20 @@ struct omap_video_timings {
 	/* Unit: line clocks */
 	u16 vbp;	/* Vertical back porch */
 };
+
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+struct omap_cio_timings {
+	u32 ths_prepare;
+	u32 ths_prepare_ths_zero;
+	u32 ths_trail;
+	u32 ths_exit;
+	u32 tlpx_half;
+	u32 tclk_trail;
+	u32 tclk_zero;
+	u32 tclk_prepare;
+	u32 reg_ttaget;
+};
+#endif
 
 #ifdef CONFIG_OMAP2_DSS_VENC
 /* Hardcoded timings for tv modes. Venc only uses these to
@@ -744,6 +772,9 @@ struct omap_dss_device {
 		enum omap_dss_dsi_pixel_format dsi_pix_fmt;
 		enum omap_dss_dsi_mode dsi_mode;
 		struct omap_dss_dsi_videomode_data dsi_vm_data;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+		struct omap_cio_timings dsi_cio_data;
+#endif
 		u32 width_in_um;
 		u32 height_in_um;
 		u16 fb_xres;
@@ -756,6 +787,10 @@ struct omap_dss_device {
 	} ctrl;
 
 	int reset_gpio;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	int hpd_gpio;
+	bool skip_init;
+#endif
 
 	int max_backlight_level;
 
@@ -950,6 +985,13 @@ int dispc_scaling_decision(enum omap_plane plane, struct omap_overlay_info *oi,
 
 int omap_dss_manager_unregister_callback(struct omap_overlay_manager *mgr,
 					 struct omapdss_ovl_cb *cb);
+
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+int omap_dispc_unregister_isr_sync(omap_dispc_isr_t isr, void *arg, u32 mask);
+int dss_set_dispc_clk(unsigned long freq);
+bool omap_dss_overlay_ensure_bw(void);
+void dss_tput_request(u32 tput);
+#endif
 
 /* generic callback handling */
 static inline void dss_ovl_cb(struct omapdss_ovl_cb *cb, int id, int status)
