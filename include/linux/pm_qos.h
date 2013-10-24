@@ -28,6 +28,9 @@ enum {
 #define PM_QOS_NETWORK_THROUGHPUT_DEFAULT_VALUE	0
 #define PM_QOS_DEV_LAT_DEFAULT_VALUE		0
 #define	PM_QOS_MEMORY_THROUGHPUT_DEFAULT_VALUE	0
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+#define PM_QOS_MEMORY_THROUGHPUT_HIGH_VALUE	(1000000)
+#endif
 
 struct pm_qos_request {
 	struct plist_node node;
