@@ -24,6 +24,73 @@
  */
 #define TIMEOUT	(20 * HZ)
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+/* Copy of try_to_freeze_tasks() but with recovery code path removed.
+ * We just want to freeze as many processes as possible.
+ */
+int try_to_freeze_tasks_norecovery(bool user_only)
+{
+	struct task_struct *g, *p;
+	unsigned long end_time;
+	unsigned int todo;
+	bool wq_busy = false;
+	bool wakeup = false;
+
+	end_time = jiffies + TIMEOUT;
+
+	if (!user_only)
+		freeze_workqueues_begin();
+
+	while (true) {
+		todo = 0;
+		read_lock(&tasklist_lock);
+		do_each_thread(g, p) {
+			if (p == current || !freeze_task(p))
+				continue;
+
+			/*
+			 * Now that we've done set_freeze_flag, don't
+			 * perturb a task in TASK_STOPPED or TASK_TRACED.
+			 * It is "frozen enough".  If the task does wake
+			 * up, it will immediately call try_to_freeze.
+			 *
+			 * Because freeze_task() goes through p's scheduler lock, it's
+			 * guaranteed that TASK_STOPPED/TRACED -> TASK_RUNNING
+			 * transition can't race with task state testing here.
+			 */
+			if (!task_is_stopped_or_traced(p) &&
+			    !freezer_should_skip(p))
+				todo++;
+		} while_each_thread(g, p);
+		read_unlock(&tasklist_lock);
+
+		if (!user_only) {
+			wq_busy = freeze_workqueues_busy();
+			todo += wq_busy;
+		}
+
+		if (todo && has_wake_lock(WAKE_LOCK_SUSPEND)) {
+			wakeup = 1;
+			break;
+		}
+		if (!todo || time_after(jiffies, end_time))
+			break;
+
+		if (pm_wakeup_pending()) {
+			wakeup = true;
+			break;
+		}
+
+		/*
+		 * We need to retry, but first give the freezing tasks some
+		 * time to enter the regrigerator.
+		 */
+		msleep(10);
+	}
+	return todo ? -EBUSY : 0;
+}
+#endif
+
 static int try_to_freeze_tasks(bool user_only)
 {
 	struct task_struct *g, *p;
