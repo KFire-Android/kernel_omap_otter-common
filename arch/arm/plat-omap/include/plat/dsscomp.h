@@ -30,6 +30,9 @@ struct dsscomp_platform_data {
 
 /* queuing operations */
 struct dsscomp;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+typedef struct dsscomp *dsscomp_t;
+#endif
 struct dsscomp *dsscomp_new(struct omap_overlay_manager *mgr);
 u32 dsscomp_get_ovls(struct dsscomp *comp);
 int dsscomp_set_ovl(struct dsscomp *comp, struct dss2_ovl_info *ovl);
@@ -48,5 +51,8 @@ int dsscomp_gralloc_queue(struct dsscomp_setup_dispc_data *d,
 			void (*cb_fn)(void *, int), void *cb_arg);
 
 void dsscomp_set_platform_data(struct dsscomp_platform_data *data);
-
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+int dsscomp_apply(dsscomp_t comp);
+u32 dsscomp_mgr_callback(void *data, int id, int status);
+#endif
 #endif
