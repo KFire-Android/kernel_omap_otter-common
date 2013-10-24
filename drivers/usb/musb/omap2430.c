@@ -30,6 +30,9 @@
 #include <linux/init.h>
 #include <linux/list.h>
 #include <linux/io.h>
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+#include <linux/clk.h>
+#endif
 #include <linux/platform_device.h>
 #include <linux/dma-mapping.h>
 #include <linux/pm_runtime.h>
@@ -49,7 +52,12 @@ struct omap2430_glue {
 	struct work_struct	omap_musb_mailbox_work;
 	struct device		*control_dev;
 	enum omap_musb_vbus_id_status status;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	struct workqueue_struct *work_queue;
+	struct clk              *phy_clk;
+#else
 	struct wake_lock	omap_musb_wakelock;
+#endif
 };
 #define glue_to_musb(g)		platform_get_drvdata(g->musb)
 
@@ -233,10 +241,40 @@ static inline void omap2430_low_level_init(struct musb *musb)
 	musb_writel(musb->mregs, OTG_FORCESTDBY, l);
 }
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+static void omap2430_otg_interface(struct musb *musb, int enable)
+{
+	u32 val;
+
+	val = musb_readl(musb->mregs, OTG_INTERFSEL);
+
+	if (enable) {
+		val &= ~ULPI_12PIN;	/* Disable ULPI */
+		val |= UTMI_8BIT;	/* Enable UTMI  */
+	} else {
+		val |= ULPI_12PIN;	/* Enable ULPI */
+		val &= ~UTMI_8BIT;	/* Disable UTMI  */
+	}
+
+	musb_writel(musb->mregs, OTG_INTERFSEL, val);
+}
+#endif
+
 int omap_musb_mailbox(enum omap_musb_vbus_id_status status)
 {
 	struct omap2430_glue	*glue = _glue;
 	struct musb		*musb = glue_to_musb(glue);
+
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	/* After quickly calling this function is possibility to miss one event.
+	 * Because variable 'glue-> status' will be overwritten with the last
+	 * value. And work function will use exactly last value. This will affect
+	 * the balance of calls pm_runtime_get/_put. To avoid this a check for
+	 * pending and waiting to be completed previous event to the end.
+	 */
+	if (work_pending(&glue->omap_musb_mailbox_work))
+		flush_work(&glue->omap_musb_mailbox_work);
+#endif
 
 	glue->status = status;
 	if (!musb) {
@@ -244,10 +282,14 @@ int omap_musb_mailbox(enum omap_musb_vbus_id_status status)
 		return -ENODEV;
 	}
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	queue_work(glue->work_queue, &glue->omap_musb_mailbox_work);
+#else
 	if (status == OMAP_MUSB_ID_GROUND || status == OMAP_MUSB_VBUS_VALID)
 		wake_lock(&glue->omap_musb_wakelock);
 
 	schedule_work(&glue->omap_musb_mailbox_work);
+#endif
 
 	return 0;
 }
@@ -265,6 +307,12 @@ static void omap_musb_set_mailbox(struct omap2430_glue *glue)
 	case OMAP_MUSB_ID_GROUND:
 		dev_dbg(dev, "ID GND\n");
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+		/* Protection of invalid sequence of mailbox settings */
+		if (musb->xceiv->last_event != USB_EVENT_NONE)
+			break;
+#endif
+
 		otg->default_a = true;
 		musb->xceiv->state = OTG_STATE_A_IDLE;
 		musb->xceiv->last_event = USB_EVENT_ID;
@@ -275,17 +323,29 @@ static void omap_musb_set_mailbox(struct omap2430_glue *glue)
 				omap4_usb_phy_mailbox(glue->control_dev, val);
 			}
 			omap2430_musb_set_vbus(musb, 1);
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+			omap2430_otg_interface(musb, true);
+#endif
 		}
 		break;
 
 	case OMAP_MUSB_VBUS_VALID:
 		dev_dbg(dev, "VBUS Connect\n");
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+		/* Protection of invalid sequence of mailbox settings */
+		if (musb->xceiv->last_event != USB_EVENT_NONE)
+			break;
+#endif
 
 		otg->default_a = false;
 		musb->xceiv->state = OTG_STATE_B_IDLE;
 		musb->xceiv->last_event = USB_EVENT_VBUS;
 		if (musb->gadget_driver)
 			pm_runtime_get_sync(dev);
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+		if (musb->gadget_driver)
+			omap2430_otg_interface(musb, true);
+#endif
 
 		if (glue->control_dev) {
 			val = IDDIG | AVALID | VBUSVALID;
@@ -296,8 +356,17 @@ static void omap_musb_set_mailbox(struct omap2430_glue *glue)
 	case OMAP_MUSB_ID_FLOAT:
 	case OMAP_MUSB_VBUS_OFF:
 		dev_dbg(dev, "VBUS Disconnect\n");
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+		/* Protection of invalid sequence of mailbox settings */
+		if (musb->xceiv->last_event == USB_EVENT_NONE)
+			break;
+#endif
 
 		musb->xceiv->last_event = USB_EVENT_NONE;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+		if (musb->gadget_driver)
+			omap2430_otg_interface(musb, false);
+#endif
 
 		if (is_otg_enabled(musb) || is_peripheral_enabled(musb))
 			if (musb->gadget_driver) {
@@ -316,7 +385,9 @@ static void omap_musb_set_mailbox(struct omap2430_glue *glue)
 			omap4_usb_phy_mailbox(glue->control_dev, val);
 		}
 
+#ifndef CONFIG_MACH_OMAP4_BOWSER
 		wake_unlock(&glue->omap_musb_wakelock);
+#endif
 
 		break;
 	default:
@@ -334,12 +405,16 @@ static void omap_musb_mailbox_work(struct work_struct *mailbox_work)
 
 static int omap2430_musb_init(struct musb *musb)
 {
+#ifndef CONFIG_MACH_OMAP4_BOWSER
 	u32 l;
+#endif
 	int status = 0;
 	struct device *dev = musb->controller;
 	struct omap2430_glue *glue = dev_get_drvdata(dev->parent);
+#ifndef CONFIG_MACH_OMAP4_BOWSER
 	struct musb_hdrc_platform_data *plat = dev->platform_data;
 	struct omap_musb_board_data *data = plat->board_data;
+#endif
 
 	/* We require some kind of external transceiver, hooked
 	 * up through ULPI.  TWL4030-family PMICs include one,
@@ -357,6 +432,10 @@ static int omap2430_musb_init(struct musb *musb)
 		goto err1;
 	}
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	/* Initial state of interface is ULPI state. Expected from TWL6030 */
+	omap2430_otg_interface(musb, false);
+#else
 	l = musb_readl(musb->mregs, OTG_INTERFSEL);
 
 	if (data->interface_type == MUSB_INTERFACE_UTMI) {
@@ -368,6 +447,7 @@ static int omap2430_musb_init(struct musb *musb)
 	}
 
 	musb_writel(musb->mregs, OTG_INTERFSEL, l);
+#endif
 
 	pr_debug("HS USB OTG: revision 0x%x, sysconfig 0x%02x, "
 			"sysstatus 0x%x, intrfsel 0x%x, simenable  0x%x\n",
@@ -382,10 +462,11 @@ static int omap2430_musb_init(struct musb *musb)
 	setup_timer(&musb_idle_timer, musb_do_idle, (unsigned long) musb);
 
 	if (glue->status != OMAP_MUSB_UNKNOWN) {
+#ifndef CONFIG_MACH_OMAP4_BOWSER
 		if (glue->status == OMAP_MUSB_ID_GROUND ||
 				glue->status == OMAP_MUSB_VBUS_VALID)
 			wake_lock(&glue->omap_musb_wakelock);
-
+#endif
 		omap_musb_set_mailbox(glue);
 	}
 
@@ -485,6 +566,9 @@ static int __devinit omap2430_probe(struct platform_device *pdev)
 	struct musb_hdrc_platform_data	*pdata = pdev->dev.platform_data;
 	struct platform_device		*musb;
 	struct omap2430_glue		*glue;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	struct clk                      *phy_clk;
+#endif
 	int				ret = -ENOMEM;
 
 	glue = kzalloc(sizeof(*glue), GFP_KERNEL);
@@ -516,7 +600,34 @@ static int __devinit omap2430_probe(struct platform_device *pdev)
 	 * REVISIT if we ever have two instances of the wrapper, we will be
 	 * in big trouble
 	 */
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	phy_clk = clk_get(&pdev->dev, "fck");
+
+	if (IS_ERR(phy_clk)) {
+                dev_err(&pdev->dev, "failed to get PHY clock\n");
+                ret = PTR_ERR(phy_clk);
+                goto err2;
+        }
+
+	ret = clk_enable(phy_clk);
+        if (ret) {
+                dev_err(&pdev->dev, "failed to enable PHY clock\n");
+                goto err3;
+        }
+
+	glue->phy_clk	= phy_clk;
+#endif
+
 	_glue	= glue;
+
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	glue->work_queue = create_singlethread_workqueue("omap2430_wq");
+	if (!glue->work_queue) {
+		dev_err(&pdev->dev, "failed to create a workqueue\n");
+		ret = -ENOMEM;
+		goto err4;
+	}
+#endif
 
 	INIT_WORK(&glue->omap_musb_mailbox_work, omap_musb_mailbox_work);
 
@@ -524,13 +635,21 @@ static int __devinit omap2430_probe(struct platform_device *pdev)
 			pdev->num_resources);
 	if (ret) {
 		dev_err(&pdev->dev, "failed to add resources\n");
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+		goto errq;
+#else
 		goto err2;
+#endif
 	}
 
 	ret = platform_device_add_data(musb, pdata, sizeof(*pdata));
 	if (ret) {
 		dev_err(&pdev->dev, "failed to add platform_data\n");
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+		goto errq;
+#else
 		goto err2;
+#endif
 	}
 
 	pm_runtime_enable(&pdev->dev);
@@ -538,16 +657,33 @@ static int __devinit omap2430_probe(struct platform_device *pdev)
 	ret = platform_device_add(musb);
 	if (ret) {
 		dev_err(&pdev->dev, "failed to register musb device\n");
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+		goto errq;
+#else
 		goto err2;
+#endif
 	}
 
+#ifndef CONFIG_MACH_OMAP4_BOWSER
 	wake_lock_init(&glue->omap_musb_wakelock, WAKE_LOCK_SUSPEND,
 		       "omap_musb_wakelock");
+#endif
 
 	return 0;
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+errq:
+	destroy_workqueue(glue->work_queue);
+err4:
+	platform_device_put(musb);
+err3:
+	clk_disable(phy_clk);
+err2:
+	clk_put(phy_clk);
+#else
 err2:
 	platform_device_put(musb);
+#endif
 
 err1:
 	kfree(glue);
@@ -561,6 +697,12 @@ static int __devexit omap2430_remove(struct platform_device *pdev)
 	struct omap2430_glue		*glue = platform_get_drvdata(pdev);
 
 	cancel_work_sync(&glue->omap_musb_mailbox_work);
+
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	destroy_workqueue(glue->work_queue);
+	clk_disable(glue->phy_clk);
+	clk_put(glue->phy_clk);
+#endif
 
 	platform_device_del(glue->musb);
 	platform_device_put(glue->musb);
@@ -577,9 +719,11 @@ static int omap2430_runtime_suspend(struct device *dev)
 	struct musb			*musb = glue_to_musb(glue);
 
 	if (musb) {
+#ifndef CONFIG_MACH_OMAP4_BOWSER
 		musb->context.otg_interfsel = musb_readl(musb->mregs,
 				OTG_INTERFSEL);
 		musb_writel(musb->mregs, OTG_INTERFSEL, ULPI_12PIN);
+#endif
 		omap2430_low_level_exit(musb);
 		usb_phy_set_suspend(musb->xceiv, 1);
 	}
@@ -594,16 +738,44 @@ static int omap2430_runtime_resume(struct device *dev)
 
 	if (musb) {
 		omap2430_low_level_init(musb);
+#ifndef CONFIG_MACH_OMAP4_BOWSER
 		musb_writel(musb->mregs, OTG_INTERFSEL,
 				musb->context.otg_interfsel);
-
+#endif
 		usb_phy_set_suspend(musb->xceiv, 0);
 	}
 
 	return 0;
 }
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+static int omap2430_suspend_noirq(struct device *dev)
+{
+	struct omap2430_glue            *glue = dev_get_drvdata(dev);
+
+	clk_disable(glue->phy_clk);
+	return 0;
+}
+
+static int omap2430_resume_noirq(struct device *dev)
+{
+	struct omap2430_glue            *glue = dev_get_drvdata(dev);
+	int ret;
+
+	ret = clk_enable(glue->phy_clk);
+	if (ret) {
+		dev_err(dev, "failed to enable clock\n");
+		return ret;
+	}
+	return 0;
+}
+#endif
+
 static struct dev_pm_ops omap2430_pm_ops = {
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	.resume_noirq = omap2430_resume_noirq,
+	.suspend_noirq = omap2430_suspend_noirq,
+#endif
 	.runtime_suspend = omap2430_runtime_suspend,
 	.runtime_resume = omap2430_runtime_resume,
 };

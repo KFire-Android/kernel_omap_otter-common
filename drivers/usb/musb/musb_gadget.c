@@ -987,8 +987,19 @@ void musb_g_rx(struct musb *musb, u8 epnum)
 	defined(CONFIG_USB_UX500_DMA)
 		/* Autoclear doesn't clear RxPktRdy for short packets */
 		if ((dma->desired_mode == 0 && !hw_ep->rx_double_buffered)
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+				|| (dma->actual_len & (musb_ep->packet_sz - 1))
+			/* ZLPs are't caught by the upper rule since we are in
+			 * DMA_MODE1, hw_ep->rx_double_buffered=1 and
+			 * dma->actual_len=0, so we need to implement an
+			 * Addon handler for ZLPs in double buffered mode:
+			 */
+				|| (hw_ep->rx_double_buffered
+					&& musb_ep->dma->actual_len == 0)) {
+#else
 				|| (dma->actual_len
 					& (musb_ep->packet_sz - 1))) {
+#endif
 			/* ack the read! */
 			csr &= ~MUSB_RXCSR_RXPKTRDY;
 			musb_writew(epio, MUSB_RXCSR, csr);

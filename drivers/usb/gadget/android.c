@@ -1468,10 +1468,18 @@ android_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *c)
 	spin_lock_irqsave(&cdev->lock, flags);
 	if (!dev->connected) {
 		dev->connected = 1;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+		queue_work(system_long_wq, &dev->work);
+#else
 		schedule_work(&dev->work);
+#endif
 	} else if (c->bRequest == USB_REQ_SET_CONFIGURATION &&
 						cdev->config) {
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+		queue_work(system_long_wq, &dev->work);
+#else
 		schedule_work(&dev->work);
+#endif
 	}
 	spin_unlock_irqrestore(&cdev->lock, flags);
 
@@ -1494,7 +1502,11 @@ static void android_disconnect(struct usb_gadget *gadget)
 	spin_lock_irqsave(&cdev->lock, flags);
 	if (dev->connected) {
 		dev->connected = 0;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+		queue_work(system_long_wq, &dev->work);
+#else
 		schedule_work(&dev->work);
+#endif
 	}
 	spin_unlock_irqrestore(&cdev->lock, flags);
 }

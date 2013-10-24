@@ -511,6 +511,7 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
 	/* Soft reset the PHY using PHY reset command over ULPI */
 	if (pdata->port_mode[0] == OMAP_EHCI_PORT_MODE_PHY) {
 		omap_ehci_soft_phy_reset(pdev, 0);
+#ifndef CONFIG_MACH_OMAP4_BOWSER
 		omap_ehci_ulpi_write(hcd,
 				1,
 				(ULPI_FUNC_CTRL_FULL_SPEED |
@@ -518,9 +519,11 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
 						ULPI_FUNC_CTRL_SUSPENDM),
 				ULPI_FUNC_CTRL,
 				1);
+#endif
 	}
 	if (pdata->port_mode[1] == OMAP_EHCI_PORT_MODE_PHY) {
 		omap_ehci_soft_phy_reset(pdev, 1);
+#ifndef CONFIG_MACH_OMAP4_BOWSER
 		omap_ehci_ulpi_write(hcd,
 				2,
 				(ULPI_FUNC_CTRL_FULL_SPEED |
@@ -528,6 +531,7 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
 						ULPI_FUNC_CTRL_SUSPENDM),
 				ULPI_FUNC_CTRL,
 				1);
+#endif
 	}
 
 	omap_ehci = hcd_to_ehci(hcd);

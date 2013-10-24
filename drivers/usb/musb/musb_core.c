@@ -1094,10 +1094,17 @@ static struct musb_fifo_cfg __devinitdata mode_3_cfg[] = {
 
 /* mode 4 - fits in 16KB */
 static struct musb_fifo_cfg __devinitdata mode_4_cfg[] = {
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+{ .hw_ep_num =  1, .style = FIFO_TX,   .maxpacket = 512, .mode = BUF_DOUBLE, },
+{ .hw_ep_num =  1, .style = FIFO_RX,   .maxpacket = 512, .mode = BUF_DOUBLE, },
+{ .hw_ep_num =  2, .style = FIFO_TX,   .maxpacket = 512, .mode = BUF_DOUBLE, },
+{ .hw_ep_num =  2, .style = FIFO_RX,   .maxpacket = 512, .mode = BUF_DOUBLE, },
+#else
 { .hw_ep_num =  1, .style = FIFO_TX,   .maxpacket = 512, },
 { .hw_ep_num =  1, .style = FIFO_RX,   .maxpacket = 512, },
 { .hw_ep_num =  2, .style = FIFO_TX,   .maxpacket = 512, },
 { .hw_ep_num =  2, .style = FIFO_RX,   .maxpacket = 512, },
+#endif
 { .hw_ep_num =  3, .style = FIFO_TX,   .maxpacket = 512, },
 { .hw_ep_num =  3, .style = FIFO_RX,   .maxpacket = 512, },
 { .hw_ep_num =  4, .style = FIFO_TX,   .maxpacket = 512, },
@@ -1118,7 +1125,11 @@ static struct musb_fifo_cfg __devinitdata mode_4_cfg[] = {
 { .hw_ep_num = 11, .style = FIFO_RX,   .maxpacket = 64, },
 { .hw_ep_num = 12, .style = FIFO_TX,   .maxpacket = 256, },
 { .hw_ep_num = 12, .style = FIFO_RX,   .maxpacket = 64, },
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+{ .hw_ep_num = 13, .style = FIFO_RXTX, .maxpacket = 2048, },
+#else
 { .hw_ep_num = 13, .style = FIFO_RXTX, .maxpacket = 4096, },
+#endif
 { .hw_ep_num = 14, .style = FIFO_RXTX, .maxpacket = 1024, },
 { .hw_ep_num = 15, .style = FIFO_RXTX, .maxpacket = 1024, },
 };
@@ -2327,6 +2338,11 @@ static int musb_suspend(struct device *dev)
 {
 	struct musb	*musb = dev_to_musb(dev);
 	unsigned long	flags;
+
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	if (pm_runtime_suspended(dev))
+		return 0;
+#endif
 
 	spin_lock_irqsave(&musb->lock, flags);
 

@@ -133,7 +133,9 @@ static unsigned	n_ports;
 #define GS_CLOSE_TIMEOUT		15		/* seconds */
 
 
-
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+#undef pr_vdebug
+#endif
 #ifdef VERBOSE_DEBUG
 #define pr_vdebug(fmt, arg...) \
 	pr_debug(fmt, ##arg)

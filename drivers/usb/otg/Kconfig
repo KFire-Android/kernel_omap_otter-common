@@ -84,6 +84,13 @@ config TWL6030_USB
           and OTG SRP events capabilities. For all other transceiver
 	  functionality UTMI PHY is embedded in OMAP4430.
 
+config TWL6030_USB_DISABLE_VBUS_TYPE_DETECTION
+	bool "Disable internal VBUS type detection - Fix HW issue on TWL6030"
+	default no
+	depends on TWL6030_USB
+	help
+	  Force disable internel detector of VBUS type
+
 config OMAP4_USB_PHY
 	tristate "Texas Instruments OMAP4+ USB pin control driver"
 	depends on MFD_OMAP_CONTROL
