@@ -40,6 +40,8 @@
 #include <linux/err.h>
 #include <linux/slab.h>
 
+#ifdef CONFIG_TWL4030_USB
+
 /* Register defines */
 
 #define MCPC_CTRL			0x30
@@ -726,3 +728,4 @@ MODULE_ALIAS("platform:twl4030_usb");
 MODULE_AUTHOR("Texas Instruments, Inc, Nokia Corporation");
 MODULE_DESCRIPTION("TWL4030 USB transceiver driver");
 MODULE_LICENSE("GPL");
+#endif
