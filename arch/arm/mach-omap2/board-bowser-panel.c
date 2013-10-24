@@ -532,14 +532,41 @@ static struct omapfb_platform_data bowser_fb_pdata = {
 	},
 };
 
-/* Allocate 24 MB for TILER1D slot size for WUXGA panel on JEM,
- * total of 48 MB of TILER1D
- */
-
-static struct dsscomp_platform_data dsscomp_config_bowser = {
-		.tiler1d_slotsz = (SZ_16M + SZ_8M),
+#if defined(CONFIG_MACH_OMAP4_BOWSER_SUBTYPE_TATE) || defined(CONFIG_MACH_OMAP4_BOWSER_SUBTYPE_SOHO)
+/*
+ (This is essentially the screen size * 4 = 2x for wallpaper, 1x for launcher + nav bar and 1x for status bar)
+  800x1280 (*4BPP) = 4MB * 4 = 16MB and then double for HDMI = 32MB
+*/
+static struct dsscomp_platform_data dsscomp_config_wuxga = {
+               .tiler1d_slotsz = ( SZ_16M ),
 };
+#else
+/*
+ Allocate a safe 34 MB (by calculation) for TILER1D slot size for WUXGA panel on JEM, total of 68 MB of TILER1D
+ (This is essentially the screen size * 4 = 2x for wallpaper, 1x for launcher + nav bar and 1x for status bar)
 
+ These values are based on stock AOSP tablet UI home screen. JB needs more than ICS
+ because behavior of pulled down status bar has changed.
+
+ Rough calculations:
+
+ Wallpaper:
+ 15120.00 KiB | 2000 (2016) x 1920
+
+ Launcher:
+ 8460.00 KiB  | 1920 (1920) x 1128
+
+ StatusBar:
+ 9000.00 KiB  | 1920 (1920) x 1200
+
+ NavigationBar:
+ 540.00 KiB   | 1920 (1920) x   72
+
+*/
+static struct dsscomp_platform_data dsscomp_config_bowser = {
+               .tiler1d_slotsz = ( 34 * SZ_1M ),
+};
+#endif
 
 static struct sgx_omaplfb_config omaplfb_config_wuxga[] = {
 	{
