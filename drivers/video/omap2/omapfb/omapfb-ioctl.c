@@ -921,6 +921,9 @@ int omapfb_ioctl(struct fb_info *fbi, unsigned int cmd, unsigned long arg)
 		fbdev->vsync_active = !!p.crt;
 		if (p.crt)
 			if (display->state == OMAP_DSS_DISPLAY_ACTIVE)
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+				r = 
+#endif
 				omapfb_enable_vsync(fbdev, display->channel,
 					true);
 			else
