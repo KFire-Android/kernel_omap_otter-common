@@ -409,10 +409,18 @@ static int twl_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alm)
 	struct twl_rtc_device *twl_rtc = dev_get_drvdata(dev);
 	unsigned char alarm_data[ALL_TIME_REGS + 1];
 	int ret;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	struct timespec ts;
+	struct rtc_time tm;
+#endif
 
 	ret = twl_rtc_alarm_irq_enable(dev, 0);
 	if (ret)
 		goto out;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	if (!alm->enabled)
+		return ret;
+#endif
 
 	alarm_data[1] = bin2bcd(alm->time.tm_sec);
 	alarm_data[2] = bin2bcd(alm->time.tm_min);
@@ -429,7 +437,22 @@ static int twl_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alm)
 		goto out;
 	}
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	getnstimeofday(&ts);
+	rtc_time_to_tm(ts.tv_sec, &tm);
+	pr_info("RTC: Alarm set to %d-%02d-%02d %02d:%02d:%02d. "
+		"(Now is: %d-%02d-%02d %02d:%02d:%02d UTC)\n",
+		alm->time.tm_year + 1900,
+		alm->time.tm_mon + 1,
+		alm->time.tm_mday,
+		alm->time.tm_hour,
+		alm->time.tm_min,
+		alm->time.tm_sec,
+		tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
+		tm.tm_hour, tm.tm_min, tm.tm_sec);
+#else
 	if (alm->enabled)
+#endif
 		ret = twl_rtc_alarm_irq_enable(dev, 1);
 out:
 	return ret;
