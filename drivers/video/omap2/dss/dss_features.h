@@ -69,6 +69,7 @@ enum dss_feat_id {
 	FEAT_DSI_PLL_REFSEL,
 	FEAT_DSI_PHY_DCC,
 	FEAT_MFLAG,
+	FEAT_WB,
 };
 
 /* DSS register field id */

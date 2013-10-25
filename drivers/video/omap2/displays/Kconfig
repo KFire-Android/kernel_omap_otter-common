@@ -85,4 +85,20 @@ config PANEL_N8X0
 	depends on BACKLIGHT_CLASS_DEVICE
 	help
 	  This is the LCD panel used on Nokia N8x0
+
+config PANEL_LG_101
+	tristate "LG101 LCD Panel"
+	depends on OMAP2_DSS_DPI && I2C
+	help
+		LCD Panel used in TI's J6 uevm board attachable on LCDX interface
+
+config PANEL_SERLINK
+	tristate "SERLINK"
+	help
+	  This is Serial link
+
+config PANEL_DSERLINK
+	tristate "DSERLINK"
+	help
+	  This is de-serial link
 endmenu
