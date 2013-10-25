@@ -37,6 +37,10 @@
 
 #include <linux/pm_runtime.h>
 
+#include <linux/of_gpio.h>
+#include <linux/of_i2c.h>
+#include <linux/of_device.h>
+
 /* Register definitions */
 #define	OV10635_VFLIP			0x381c
 #define	 OV10635_VFLIP_ON		(0x3 << 6)
@@ -80,6 +84,16 @@ struct ov10635_priv {
 	const struct ov10635_color_format	*cfmt;
 	int				width;
 	int				height;
+
+	const char 		*sensor_name;
+	int			mux_gpio;
+	int			mux1_sel0_gpio;
+	int			mux1_sel1_gpio;
+	int			mux2_sel0_gpio;
+	int			mux2_sel1_gpio;
+	int			cam_fpd_mux_s0_gpio;
+	int			vin2_s0_gpio;
+	int			ov_pwdn_gpio;
 };
 
 /* default register setup */
@@ -1029,6 +1043,163 @@ static int ov10635_cropcap(struct v4l2_subdev *sd, struct v4l2_cropcap *a)
 	return 0;
 }
 
+static int ov1063x_init_sensor(struct i2c_client *client)
+{
+	struct ov10635_priv *priv = to_ov10635(client);
+	int r;
+
+	if (strcmp(priv->sensor_name, "ov10633") == 0) {
+		struct gpio gpios[] = {
+			{ priv->cam_fpd_mux_s0_gpio, GPIOF_OUT_INIT_LOW,
+				"cam_fpd_mux_s0_gpio"},
+			};
+
+		r = gpio_request_array(gpios, ARRAY_SIZE(gpios));
+		if (r)
+			return r;
+	} else if (strcmp(priv->sensor_name, "ov10635") == 0) {
+		struct gpio gpios[] = {
+		{ priv->vin2_s0_gpio, GPIOF_OUT_INIT_LOW,
+			"vin2_s0" },
+		{ priv->cam_fpd_mux_s0_gpio, GPIOF_OUT_INIT_HIGH,
+			"cam_fpd_mux_s0" },
+		{ priv->mux1_sel0_gpio, GPIOF_OUT_INIT_HIGH,
+			"mux1_sel0" },
+		{ priv->mux1_sel1_gpio, GPIOF_OUT_INIT_LOW,
+			"mux1_sel1" },
+		{ priv->mux2_sel0_gpio, GPIOF_OUT_INIT_HIGH,
+			"mux2_sel0" },
+		{ priv->mux2_sel1_gpio, GPIOF_OUT_INIT_LOW,
+			"mux2_sel1" },
+		{ priv->ov_pwdn_gpio, GPIOF_OUT_INIT_LOW,
+			"ov_pwdn" },
+		};
+
+		r = gpio_request_array(gpios, ARRAY_SIZE(gpios));
+		if (r)
+			return r;
+	}
+
+	return 0;
+}
+
+static void ov1063x_uninit_sensor(struct i2c_client *client)
+ {
+	struct ov10635_priv *priv = to_ov10635(client);
+	if (strcmp(priv->sensor_name, "ov10633") == 0) {
+		gpio_free(priv->cam_fpd_mux_s0_gpio);
+	} else if (strcmp(priv->sensor_name, "ov10635") == 0) {
+		gpio_free(priv->vin2_s0_gpio);
+		gpio_free(priv->cam_fpd_mux_s0_gpio);
+		gpio_free(priv->mux1_sel0_gpio);
+		gpio_free(priv->mux1_sel1_gpio);
+		gpio_free(priv->mux2_sel0_gpio);
+		gpio_free(priv->mux2_sel1_gpio);
+		gpio_free(priv->ov_pwdn_gpio);
+	}
+}
+
+static const struct of_device_id ov10635_dt_id[];
+
+static int sensor_get_gpios(struct device_node *node, struct i2c_client *client)
+{
+	struct ov10635_priv *priv = to_ov10635(client);
+	const struct of_device_id *of_dev_id;
+	const char *sensor;
+	int gpio;
+	int err;
+
+	of_dev_id = of_match_device(ov10635_dt_id, &client->dev);
+	if (!of_dev_id) {
+		dev_err(&client->dev, "%s: Unable to match device\n", __func__);
+		return -ENODEV;
+	}
+	sensor = (const char *)of_dev_id->data;
+	if (strcmp(sensor, "ov10635") == 0 ) {
+		node = of_find_compatible_node(node, NULL, "ti,camera-ov10635");
+	} else if (strcmp(sensor, "ov10633") == 0) {
+		node = of_find_compatible_node(node, NULL, "ti,camera-ov10633");
+	} else
+		dev_err(&client->dev, "Invalid sensor\n");
+
+	err = of_property_read_string(node, "sensor", &priv->sensor_name);
+	if (err) {
+		dev_err(&client->dev, "failed to parse sensor name\n");
+		return err;
+	}
+
+	if (strcmp(priv->sensor_name, "ov10635") == 0) {
+		gpio = of_get_gpio(node, 0);
+		if (gpio_is_valid(gpio)) {
+			priv->vin2_s0_gpio = gpio;
+		} else {
+			dev_err(&client->dev, "failed to parse VIN2_S0 gpio\n");
+			return -EINVAL;
+		}
+
+		gpio = of_get_gpio(node, 1);
+		if (gpio_is_valid(gpio)) {
+			priv->cam_fpd_mux_s0_gpio = gpio;
+		} else {
+			dev_err(&client->dev, "failed to parse CAM_FPD_MUX_S0 gpio\n");
+			return -EINVAL;
+		}
+
+		gpio = of_get_gpio(node, 2);
+		if (gpio_is_valid(gpio)) {
+			priv->mux1_sel0_gpio = gpio;
+		} else {
+			dev_err(&client->dev, "failed to parse MUX1_SEL0 gpio\n");
+			return -EINVAL;
+		}
+
+		gpio = of_get_gpio(node, 3);
+		if (gpio_is_valid(gpio)) {
+			priv->mux1_sel1_gpio = gpio;
+		} else {
+			dev_err(&client->dev, "failed to parse MUX1_SEL1 gpio\n");
+			return -EINVAL;
+		}
+
+		gpio = of_get_gpio(node, 4);
+		if (gpio_is_valid(gpio)) {
+			priv->mux2_sel0_gpio = gpio;
+		} else {
+			dev_err(&client->dev, "failed to parse MUX2_SEL0 gpio\n");
+			return -EINVAL;
+		}
+
+		gpio = of_get_gpio(node, 5);
+		if (gpio_is_valid(gpio)) {
+			priv->mux2_sel1_gpio = gpio;
+		} else {
+			dev_err(&client->dev, "failed to parse MUX2_SEL1 gpio\n");
+			return -EINVAL;
+		}
+
+		gpio = of_get_gpio(node, 6);
+		if (gpio_is_valid(gpio)) {
+			priv->ov_pwdn_gpio = gpio;
+		} else {
+			dev_err(&client->dev, "failed to parse OV_PWDN gpio\n");
+			return -EINVAL;
+		}
+	} else if (strcmp(priv->sensor_name, "ov10633") == 0) {
+		gpio = of_get_gpio(node, 1);
+		if (gpio_is_valid(gpio)) {
+			priv->cam_fpd_mux_s0_gpio = gpio;
+		} else {
+			dev_err(&client->dev, "failed to parse CAM_FPD_MUX_S0 gpio\n");
+			return -EINVAL;
+		}
+	} else {
+		dev_err(&client->dev, "Invalid sensor name\n");
+		return -ENODEV;
+	}
+
+	return 0;
+}
+
 static int ov10635_video_probe(struct i2c_client *client)
 {
 	struct ov10635_priv *priv = to_ov10635(client);
@@ -1054,13 +1225,15 @@ static int ov10635_video_probe(struct i2c_client *client)
 		return ret;
 
 	id |= ver;
-	if (OV10635_VERSION(pid, ver) != OV10635_VERSION_REG) {
+	if (OV10635_VERSION(pid, ver) == OV10635_VERSION_REG) {
+		priv->model = V4L2_IDENT_OV10635;
+		priv->revision = 1;
+	} else {
+		priv->model = V4L2_IDENT_OV10633;
+		priv->revision = 1;
 		dev_err(&client->dev, "Product ID error %x:%x\n", pid, ver);
-		return -ENODEV;
+				/* return -ENODEV; */
 	}
-
-	priv->model = V4L2_IDENT_OV10635;
-	priv->revision = 1;
 
 	dev_info(&client->dev, "ov10635 Product ID %x Manufacturer ID %x\n",
 		 pid, ver);
@@ -1098,6 +1271,7 @@ static struct v4l2_subdev_ops ov10635_subdev_ops = {
 static int ov10635_probe(struct i2c_client *client,
 			 const struct i2c_device_id *did)
 {
+	struct device_node *node = client->dev.of_node;
 	struct ov10635_priv *priv;
 	struct v4l2_subdev *sd;
 	int ret;
@@ -1128,8 +1302,22 @@ static int ov10635_probe(struct i2c_client *client,
 		return priv->hdl.error;
 
 	ret = ov10635_video_probe(client);
-	if (ret)
+	if (ret) {
 		v4l2_ctrl_handler_free(&priv->hdl);
+		return ret;
+	}
+
+	ret = sensor_get_gpios(node, client);
+	if (ret) {
+		dev_err(&client->dev, "Unable to get gpios\n");
+		return ret;
+	}
+
+	ret = ov1063x_init_sensor(client);
+	if (ret) {
+		dev_err(&client->dev, "failed to initialize the sensor\n");
+		return ret;
+	}
 
 	sd->dev = &client->dev;
 	ret = v4l2_async_register_subdev(sd);
@@ -1147,12 +1335,14 @@ static int ov10635_remove(struct i2c_client *client)
 
 	v4l2_device_unregister_subdev(&priv->subdev);
 	v4l2_ctrl_handler_free(&priv->hdl);
+	ov1063x_uninit_sensor(client);
 
 	return 0;
 }
 
 static const struct i2c_device_id ov10635_id[] = {
 	{ "ov10635", 0 },
+	{ "ov10633", 0 },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, ov10635_id);
@@ -1160,7 +1350,10 @@ MODULE_DEVICE_TABLE(i2c, ov10635_id);
 #if defined (CONFIG_OF)
 static const struct of_device_id ov10635_dt_id[] = {
 	{
-	.compatible   = "omnivision,ov10635",
+	.compatible   = "omnivision,ov10635", .data = "ov10635"
+	},
+	{
+	.compatible	  = "omnivision,ov10633", .data = "ov10633"
 	},
 	{
 	}
@@ -1173,7 +1366,7 @@ static const struct of_device_id ov10635_dt_id[] = {
 static struct i2c_driver ov10635_i2c_driver = {
 	.driver = {
 		.owner	= THIS_MODULE,
-		.name	= "ov10635",
+		.name	= "ov1063x",
 		.of_match_table = ov10635_dt_id,
 	},
 	.probe    = ov10635_probe,
