@@ -56,7 +56,7 @@ unsigned int crc32(unsigned int *pdata, int n);
 struct snd_soc_codec;
 #else
 #ifdef DEBUG
-#define DBG(fmt, ...) printk("CFW: " fmt "\n", ##__VA_ARGS__)
+#define DBG(fmt, ...) printk("AIC3XXX-CFW: " fmt "\n", ##__VA_ARGS__)
 #else
 #define DBG(fmt, ...)
 #endif
@@ -87,7 +87,7 @@ int aic3xxx_cfw_add_modes(struct snd_soc_codec *codec, cfw_state *ps);
 
 typedef struct aic3xxx_codec_ops {
 	int (*reg_read) (void *p, unsigned int reg);
-	int (*reg_write) (void *p, unsigned int reg, unsigned char val);
+	int (*reg_write) (void *p, unsigned int reg, unsigned int val);
 	int (*set_bits) (void *p, unsigned int reg,
 			 unsigned char mask, unsigned char val);
 	int (*bulk_read) (void *p, unsigned int reg, int count, u8 *buf);
@@ -101,6 +101,5 @@ typedef struct aic3xxx_codec_ops {
 	int (*bswap) (void *p, int mask);
 } aic3xxx_codec_ops;
 
-MODULE_LICENSE("GPL");
 
 #endif

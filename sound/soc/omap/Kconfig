@@ -151,15 +151,17 @@ config SND_OMAP_SOC_OMAP_HDMI
 	  Say Y if you want to add support for SoC HDMI audio on Texas Instruments
 	  OMAP4/5 chips
 
-config SND_OMAP_SOC_OMAP4_PANDA_AIC31XX
-	tristate "SoC Audio support for OMAP4 Panda board with AIC31XX"
-	depends on SND_OMAP_SOC && ( MACH_OMAP4_PANDA || MACH_OMAP_4430_KC1 )
+config SND_OMAP_SOC_AIC3111
+	tristate "SoC Audio support for OMAP4 and AIC3111 Audio Codec Chipset"
+	depends on SND_OMAP_SOC && ( ARCH_OMAP4 || ARCH_OMAP5 )
 	select SND_OMAP_SOC_MCBSP
-	select SND_OMAP_SOC_ABE
-	select SND_DYNAMIC_MINORS
 	select SND_SOC_TLV320AIC31XX
+	select SND_OMAP_SOC_ABE
+	select SND_OMAP_SOC_ABE_DSP
+	select ABE_44100
+	select CONFIG_MINIDSP
 	help
-	  Say Y if you want to add support for SoC audio  with AIC31XX on the OMAP4 Blaze or Panda board.
+	Say Y if you want to add support for SoC audio on the OMAP4 Board
 
 config SND_OMAP_SOC_OMAP3_PANDORA
 	tristate "SoC Audio support for OMAP3 Pandora"
