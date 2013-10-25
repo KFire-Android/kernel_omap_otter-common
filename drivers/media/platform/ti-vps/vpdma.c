@@ -26,7 +26,7 @@
 #include "vpdma.h"
 #include "vpdma_priv.h"
 
-#define VPDMA_FIRMWARE	"vpdma-1b8.bin"
+#define VPDMA_FIRMWARE	"vpdma-1b8.fw"
 
 struct vpdma_data_format vpdma_yuv_fmts[] = {
 	[VPDMA_DATA_FMT_Y444] = {
