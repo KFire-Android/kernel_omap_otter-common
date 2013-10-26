@@ -67,7 +67,7 @@
 #include "common.h"
 #include "control.h"
 #include "common-board-devices.h"
-#include "omap4_ion.h"
+#include <mach/omap4_ion.h>
 #include "omap_ram_console.h"
 #include "board-bowser.h"
 #include "board-bowser-idme.h"
@@ -116,7 +116,7 @@ struct max97236_pdata max97236_pdata = {
 #endif
 
 #ifdef CONFIG_CHARGER_SMB347
-    #include <linux/power/smb347.h>
+    #include <linux/power/smb347-bowser.h>
 #endif
 
 static struct omap_musb_board_data musb_board_data = {
