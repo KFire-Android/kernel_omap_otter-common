@@ -1482,8 +1482,8 @@ static struct omap_hwmod_opt_clk dss_opt_clks[] = {
 
 static struct omap_hwmod omap44xx_dss_hwmod = {
 	.name		= "dss_core",
-#if defined(CONFIG_MACH_OMAP_4430_KC1)
-	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET | HWMOD_INIT_NO_RESET,
+#if defined(CONFIG_MACH_OMAP_4430_KC1) || defined(CONFIG_MACH_OMAP4_BOWSER)
+	.flags		= HWMOD_INIT_NO_RESET | HWMOD_CONTROL_OPT_CLKS_IN_RESET,
 #else
 	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
 #endif
@@ -1590,10 +1590,10 @@ static struct omap_hwmod_ocp_if *omap44xx_dss_dispc_slaves[] = {
 static struct omap_hwmod omap44xx_dss_dispc_hwmod = {
 	.name		= "dss_dispc",
 	.class		= &omap44xx_dispc_hwmod_class,
-	.clkdm_name	= "l3_dss_clkdm",
-#if defined(CONFIG_MACH_OMAP_4430_KC1)
+#if defined(CONFIG_MACH_OMAP_4430_KC1) || defined(CONFIG_MACH_OMAP4_BOWSER)
 	.flags		= HWMOD_INIT_NO_RESET,
 #endif
+	.clkdm_name	= "l3_dss_clkdm",
 	.mpu_irqs	= omap44xx_dss_dispc_irqs,
 	.sdma_reqs	= omap44xx_dss_dispc_sdma_reqs,
 	.main_clk	= "dss_dss_clk",
@@ -1690,10 +1690,10 @@ static struct omap_hwmod_opt_clk dss_dsi1_opt_clks[] = {
 static struct omap_hwmod omap44xx_dss_dsi1_hwmod = {
 	.name		= "dss_dsi1",
 	.class		= &omap44xx_dsi_hwmod_class,
-	.clkdm_name	= "l3_dss_clkdm",
-#if defined(CONFIG_MACH_OMAP_4430_KC1)
+#if defined(CONFIG_MACH_OMAP_4430_KC1) || defined(CONFIG_MACH_OMAP4_BOWSER)
 	.flags		= HWMOD_INIT_NO_RESET,
 #endif
+	.clkdm_name	= "l3_dss_clkdm",
 	.mpu_irqs	= omap44xx_dss_dsi1_irqs,
 	.sdma_reqs	= omap44xx_dss_dsi1_sdma_reqs,
 	.main_clk	= "dss_dss_clk",
@@ -1770,10 +1770,10 @@ static struct omap_hwmod_opt_clk dss_dsi2_opt_clks[] = {
 static struct omap_hwmod omap44xx_dss_dsi2_hwmod = {
 	.name		= "dss_dsi2",
 	.class		= &omap44xx_dsi_hwmod_class,
-	.clkdm_name	= "l3_dss_clkdm",
-#if defined(CONFIG_MACH_OMAP_4430_KC1)
+#if defined(CONFIG_MACH_OMAP_4430_KC1) || defined(CONFIG_MACH_OMAP4_BOWSER)
 	.flags		= HWMOD_INIT_NO_RESET,
 #endif
+	.clkdm_name	= "l3_dss_clkdm",
 	.mpu_irqs	= omap44xx_dss_dsi2_irqs,
 	.sdma_reqs	= omap44xx_dss_dsi2_sdma_reqs,
 	.main_clk	= "dss_dss_clk",
@@ -1870,10 +1870,10 @@ static struct omap_hwmod_opt_clk dss_hdmi_opt_clks[] = {
 static struct omap_hwmod omap44xx_dss_hdmi_hwmod = {
 	.name		= "dss_hdmi",
 	.class		= &omap44xx_hdmi_hwmod_class,
-	.clkdm_name	= "l3_dss_clkdm",
-#if defined(CONFIG_MACH_OMAP_4430_KC1)
+#if defined(CONFIG_MACH_OMAP_4430_KC1) || defined(CONFIG_MACH_OMAP4_BOWSER)
 	.flags		= HWMOD_INIT_NO_RESET,
 #endif
+	.clkdm_name	= "l3_dss_clkdm",
 	.mpu_irqs	= omap44xx_dss_hdmi_irqs,
 	.sdma_reqs	= omap44xx_dss_hdmi_sdma_reqs,
 	.main_clk	= "dss_48mhz_clk",
@@ -1965,10 +1965,10 @@ static struct omap_hwmod_opt_clk dss_rfbi_opt_clks[] = {
 static struct omap_hwmod omap44xx_dss_rfbi_hwmod = {
 	.name		= "dss_rfbi",
 	.class		= &omap44xx_rfbi_hwmod_class,
-	.clkdm_name	= "l3_dss_clkdm",
-#if defined(CONFIG_MACH_OMAP_4430_KC1)
+#if defined(CONFIG_MACH_OMAP_4430_KC1) || defined(CONFIG_MACH_OMAP4_BOWSER)
 	.flags		= HWMOD_INIT_NO_RESET,
 #endif
+	.clkdm_name	= "l3_dss_clkdm",
 	.sdma_reqs	= omap44xx_dss_rfbi_sdma_reqs,
 	.main_clk	= "dss_dss_clk",
 	.prcm = {
@@ -2039,10 +2039,10 @@ static struct omap_hwmod_ocp_if *omap44xx_dss_venc_slaves[] = {
 static struct omap_hwmod omap44xx_dss_venc_hwmod = {
 	.name		= "dss_venc",
 	.class		= &omap44xx_venc_hwmod_class,
-	.clkdm_name	= "l3_dss_clkdm",
-#if defined(CONFIG_MACH_OMAP_4430_KC1)
+#if defined(CONFIG_MACH_OMAP_4430_KC1) || defined(CONFIG_MACH_OMAP4_BOWSER)
 	.flags		= HWMOD_INIT_NO_RESET,
 #endif
+	.clkdm_name	= "l3_dss_clkdm",
 	.main_clk	= "dss_tv_clk",
 	.prcm = {
 		.omap4 = {
@@ -2191,6 +2191,9 @@ static struct omap_hwmod_opt_clk gpio1_opt_clks[] = {
 static struct omap_hwmod omap44xx_gpio1_hwmod = {
 	.name		= "gpio1",
 	.class		= &omap44xx_gpio_hwmod_class,
+#if defined(CONFIG_MACH_OMAP4_BOWSER)
+	.flags		= HWMOD_INIT_NO_RESET,
+#endif
 	.clkdm_name	= "l4_wkup_clkdm",
 	.mpu_irqs	= omap44xx_gpio1_irqs,
 	.main_clk	= "gpio1_ick",
@@ -2245,8 +2248,12 @@ static struct omap_hwmod_opt_clk gpio2_opt_clks[] = {
 static struct omap_hwmod omap44xx_gpio2_hwmod = {
 	.name		= "gpio2",
 	.class		= &omap44xx_gpio_hwmod_class,
-	.clkdm_name	= "l4_per_clkdm",
+#if defined(CONFIG_MACH_OMAP4_BOWSER)
+	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET | HWMOD_INIT_NO_RESET,
+#else
 	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
+#endif
+	.clkdm_name	= "l4_per_clkdm",
 	.mpu_irqs	= omap44xx_gpio2_irqs,
 	.main_clk	= "gpio2_ick",
 	.prcm = {
@@ -2466,7 +2473,11 @@ static struct omap_hwmod omap44xx_gpio6_hwmod = {
 	.name		= "gpio6",
 	.class		= &omap44xx_gpio_hwmod_class,
 	.clkdm_name	= "l4_per_clkdm",
+#if defined(CONFIG_MACH_OMAP4_BOWSER)
+	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET | HWMOD_INIT_NO_RESET,
+#else
 	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
+#endif
 	.mpu_irqs	= omap44xx_gpio6_irqs,
 	.main_clk	= "gpio6_ick",
 	.prcm = {
@@ -5474,7 +5485,7 @@ static struct omap_hwmod omap44xx_timer10_hwmod = {
 	.name		= "timer10",
 	.class		= &omap44xx_timer_1ms_hwmod_class,
 	.clkdm_name	= "l4_per_clkdm",
-#if defined(CONFIG_MACH_OMAP_4430_KC1)
+#if defined(CONFIG_MACH_OMAP_4430_KC1) || defined(CONFIG_MACH_OMAP4_BOWSER_SUBTYPE_JEM)
 	.flags		= HWMOD_INIT_NO_RESET,
 #endif
 	.mpu_irqs	= omap44xx_timer10_irqs,
@@ -5655,6 +5666,9 @@ static struct omap_hwmod omap44xx_uart2_hwmod = {
 	.name		= "uart2",
 	.class		= &omap44xx_uart_hwmod_class,
 	.clkdm_name	= "l4_per_clkdm",
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	.flags		= HWMOD_SWSUP_SIDLE,
+#endif
 	.mpu_irqs	= omap44xx_uart2_irqs,
 	.sdma_reqs	= omap44xx_uart2_sdma_reqs,
 	.main_clk	= "uart2_fck",
@@ -5709,9 +5723,7 @@ static struct omap_hwmod omap44xx_uart3_hwmod = {
 	.name		= "uart3",
 	.class		= &omap44xx_uart_hwmod_class,
 	.clkdm_name	= "l4_per_clkdm",
-#ifdef CONFIG_DEBUG_LL
 	.flags		= HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET,
-#endif
 	.mpu_irqs	= omap44xx_uart3_irqs,
 	.sdma_reqs	= omap44xx_uart3_sdma_reqs,
 	.main_clk	= "uart3_fck",
