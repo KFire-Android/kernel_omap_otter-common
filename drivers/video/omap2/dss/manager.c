@@ -217,6 +217,11 @@ int dss_mgr_check(struct omap_overlay_manager *mgr,
 	struct omap_overlay *ovl;
 	int r;
 
+#ifdef CONFIG_DISPLAY_SKIP_INIT
+	if (omapdss_skipinit())
+		return 0;
+#endif
+
 	if (dss_has_feature(FEAT_ALPHA_FREE_ZORDER)) {
 		r = dss_mgr_check_zorder(mgr, overlay_infos);
 		if (r)

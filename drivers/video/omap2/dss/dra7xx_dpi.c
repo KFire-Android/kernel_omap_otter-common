@@ -206,29 +206,36 @@ static int dra7xx_dpi_display_enable(struct omap_dss_device *dssdev)
 	if (r)
 		goto err_get_dispc;
 
-	r = dss_dpi_select_source(dpi->module_id, channel);
-	if (r)
-		goto err_src_sel;
+#ifdef CONFIG_DISPLAY_SKIP_INIT
+	if (!omapdss_skipinit()) {
+#endif
+		r = dss_dpi_select_source(dpi->module_id, channel);
+		if (r)
+			goto err_src_sel;
 
-	/* try to get a free dpll, if not, try to change DSS_FCLK */
-	dpi->dpll = dpi_get_dpll(pdev);
-	if (dpi->dpll != DSS_DPLL_NONE) {
-		DSSDBG("using DPLL %d for DPI%d\n", dpi->dpll, dpi->module_id);
+		/* try to get a free dpll, if not, try to change DSS_FCLK */
+		dpi->dpll = dpi_get_dpll(pdev);
+		if (dpi->dpll != DSS_DPLL_NONE) {
+			DSSDBG("using DPLL %d for DPI%d\n", dpi->dpll,
+			       dpi->module_id);
 
-		dss_dpll_activate(dpi->dpll);
+			dss_dpll_activate(dpi->dpll);
+		}
+
+		r = dpi_set_mode(pdev, dpi->dpll);
+		if (r)
+			goto err_set_mode;
+
+		dss_use_dpll_lcd(channel, dpi->dpll != DSS_DPLL_NONE);
+
+		dss_dpll_set_control_mux(channel, dpi->dpll);
+
+		dpi_config_lcd_manager(pdev);
+
+		mdelay(2);
+#ifdef CONFIG_DISPLAY_SKIP_INIT
 	}
-
-	r = dpi_set_mode(pdev, dpi->dpll);
-	if (r)
-		goto err_set_mode;
-
-	dss_use_dpll_lcd(channel, dpi->dpll != DSS_DPLL_NONE);
-
-	dss_dpll_set_control_mux(channel, dpi->dpll);
-
-	dpi_config_lcd_manager(pdev);
-
-	mdelay(2);
+#endif
 
 	r = dss_mgr_enable(out->manager);
 	if (r)
