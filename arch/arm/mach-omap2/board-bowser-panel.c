@@ -48,47 +48,41 @@
 #include "control.h"
 #include "mux.h"
 
-#define DP_4430_GPIO_59			59
-#define LED_DISP_EN			102
-#define DSI2_GPIO_59			59
+#define DP_4430_GPIO_59         59
+#define LED_DISP_EN		102
+#define DSI2_GPIO_59		59
 
-#define HDMI_GPIO_CT_CP_HPD		60
-#define HDMI_GPIO_HPD			63	/* Hot plug pin for HDMI */
+#define HDMI_GPIO_CT_CP_HPD             60
+#define HDMI_GPIO_HPD                   63  /* Hot plug pin for HDMI */
 
-#define HDMI_GPIO_LS_OE			41	/* Level shifter for HDMI */
-#define LCD_BL_GPIO			59	/* LCD Backlight GPIO */
+#define HDMI_GPIO_LS_OE 41 /* Level shifter for HDMI */
+#define LCD_BL_GPIO		59 /*27*/	/* LCD Backlight GPIO */
 /* PWM2 and TOGGLE3 register offsets */
-#define LED_PWM2ON			0x03
-#define LED_PWM2OFF			0x04
-#define TWL6030_TOGGLE3			0x92
+#define LED_PWM2ON		0x03
+#define LED_PWM2OFF		0x04
+#define TWL6030_TOGGLE3		0x92
 
-#define OMAP_HDMI_HPD_ADDR		0x4A100098
-#define OMAP_HDMI_PULLTYPE_MASK		0x00000010
+#define OMAP_HDMI_HPD_ADDR      0x4A100098
+#define OMAP_HDMI_PULLTYPE_MASK 0x00000010
 
 #define LED_SEC_DISP_GPIO 27
 
-/* same as ref clk which is 38.4M */
-#define SYS_CLK				38400000
+#define SYS_CLK                 38400000     /* same as ref clk which is 38.4M  */
 
-#define SZ_20M	(SZ_16M + SZ_4M)
-#define SZ_40M	(SZ_32M + SZ_8M)
-
-#define GPIO_BACKLIGHT_EN_O2M		25	/* enabling O2Micro 9979 */
-#define GPIO_BACKLIGHT_VOL_O2M		-1	/* no need to do for Jem */
-#define GPIO_LCD_ENABLE			35	/* enabling LCD panel */
-#define GPIO_LCD_ENABLE_FROM_EVT2		190	/* enabling LCD panel */
-#define GPIO_D2L_RESET			40	/* D2L reset gpio */
-#define GPIO_LED_TST			41	/* LED_TST_GPIO41 */
+#define GPIO_BACKLIGHT_EN_O2M         25  /* enabling O2Micro 9979 */
+#define GPIO_BACKLIGHT_VOL_O2M        -1  /* no need to do for Jem */
+#define GPIO_LCD_ENABLE               35  /* enabling LCD panel */
+#define GPIO_LCD_ENABLE_FROM_EVT2     190 /* enabling LCD panel */
+#define GPIO_D2L_RESET                40  /* D2L reset gpio */
+#define GPIO_LED_TST                  41  /* LED_TST_GPIO41 */
 
 
-#if defined(CONFIG_BACKLIGHT_LP855X)
-#define GPIO_BACKLIGHT_EN_LP855X	(25)	/* Enable LP855x backlight */
+#if defined (CONFIG_BACKLIGHT_LP855X)
+#define GPIO_BACKLIGHT_EN_LP855X	(25)	/*Enable LP855x backlight*/
 #define INITIAL_BRT			(0x64)
 #define MAX_BRT				(0xFF)
 #define LP8557_PLAT_CONFIG	(LP8557_COMB2_CONFIG | LP8557_PWM_FILTER)
 #endif
-
-
 
 #if defined(CONFIG_PANEL_NT71391_HYDIS)
 #define OMAP4_BOWSER_LCD_FB_RAM_SIZE	(SZ_32M) /*1920*1200*4 * 4*/
@@ -97,7 +91,7 @@
 #endif
 
 #ifdef CONFIG_OMAP4_DSS_HDMI
-#define OMAP4_BOWSER_HDMI_FB_RAM_SIZE	(SZ_20M) /*1920*1080*4 * 2*/
+#define OMAP4_BOWSER_HDMI_FB_RAM_SIZE	(20 * SZ_1M) /*1920*1080*4 * 2*/
 #else
 #define OMAP4_BOWSER_HDMI_FB_RAM_SIZE	(0)
 #endif
@@ -105,41 +99,34 @@
 #define OMAP4_BOWSER_FB_RAM_SIZE	(OMAP4_BOWSER_LCD_FB_RAM_SIZE + \
 						OMAP4_BOWSER_HDMI_FB_RAM_SIZE)
 
-
-#if defined(CONFIG_MACH_OMAP4_BOWSER_SUBTYPE_TATE) || \
-	defined(CONFIG_MACH_OMAP4_BOWSER_SUBTYPE_SOHO) || \
-	defined(CONFIG_MACH_OMAP4_BOWSER_SUBTYPE_BOWSER7)
-
-/* enabling backlight CABC (Content Adaptive Backlight Control) */
-#define GPIO_BACKLIGHT_CABC_EN		35
+#if defined (CONFIG_MACH_OMAP4_BOWSER_SUBTYPE_TATE)
+#define GPIO_BACKLIGHT_CABC_EN        37  /* enabling backlight CABC (Content Adaptive Backlight Control) */
+#elif defined(CONFIG_MACH_OMAP4_BOWSER_SUBTYPE_SOHO)
+#define GPIO_BACKLIGHT_CABC_EN        35
 #endif
-
-struct omap_tablet_panel_data {
-	struct omap_dss_board_info *board_info;
-	struct dsscomp_platform_data *dsscomp_data;
-	struct sgx_omaplfb_platform_data *omaplfb_data;
-};
 
 #if 0
 static struct gpio tablet_hdmi_gpios[] = {
-	{HDMI_GPIO_CT_CP_HPD, GPIOF_OUT_INIT_HIGH, "hdmi_gpio_hpd"},
-	{HDMI_GPIO_LS_OE, GPIOF_OUT_INIT_HIGH, "hdmi_gpio_ls_oe"},
+	{HDMI_GPIO_CT_CP_HPD,  GPIOF_OUT_INIT_HIGH,    "hdmi_gpio_hpd"   },
+	{HDMI_GPIO_LS_OE,      GPIOF_OUT_INIT_HIGH,    "hdmi_gpio_ls_oe" },
 };
 #endif
 
-#if defined(CONFIG_PANEL_TC358765)
+#if defined (CONFIG_PANEL_TC358765)
 static struct panel_board_data bowser_dsi_panel = {
 		.lcd_en_gpio = GPIO_LCD_ENABLE,
 		.reset_gpio	= GPIO_D2L_RESET,
+		.cabc_en_gpio = -1,
 		.lcd_vsys_gpio = -1,
 };
-#elif defined(CONFIG_PANEL_NT71391_HYDIS)
+#elif defined (CONFIG_PANEL_NT71391_HYDIS)
 static struct panel_board_data bowser_dsi_panel = {
 		.lcd_en_gpio = GPIO_LCD_ENABLE,
 		.reset_gpio = -1,
+		.cabc_en_gpio = -1,
 		.lcd_vsys_gpio = -1,
 };
-#elif defined(CONFIG_PANEL_NT51012_LG)
+#elif defined (CONFIG_PANEL_NT51012_LG)
 static struct panel_board_data bowser_dsi_panel = {
 		.lcd_en_gpio = GPIO_LCD_ENABLE,
 		.reset_gpio = -1,
@@ -149,7 +136,7 @@ static struct panel_board_data bowser_dsi_panel = {
 #endif
 
 
-#if defined(CONFIG_PANEL_TC358765)
+#if defined (CONFIG_PANEL_TC358765)
 static struct omap_dss_device bowser_lcd_device = {
 	.name			= "lcd",
 	.driver_name		= "tc358765",
@@ -168,7 +155,7 @@ static struct omap_dss_device bowser_lcd_device = {
 		.data4_pol	= 0,
 	},
 
-#if defined(CONFIG_PANEL_SAMSUNG_LTL089CL01)
+#if defined (CONFIG_PANEL_SAMSUNG_LTL089CL01)
 	.panel = {
 		.acbi = 0,
 		.acb = 40,
@@ -251,28 +238,10 @@ static struct omap_dss_device bowser_lcd_device = {
 		.data3_pol	= 0,
 		.data4_lane	= 5,
 		.data4_pol	= 0,
+
 		.module		= 0,
 	},
-	.clocks = {
-		.dispc = {
-			 .channel = {
-				.lck_div        = 1,	/* LCD */
-				.pck_div        = 1,	/* PCD */
-				.lcd_clk_src    = OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DISPC,
-			},
-			.dispc_fclk_src = OMAP_DSS_CLK_SRC_FCK,
-		},
 
-		.dsi = {
-			.regn           = 16,	/* DSI_PLL_REGN */
-			.regm           = 272,	/* DSI_PLL_REGM */
-			.regm_dispc     = 9,	/* PLL_CLK1 (M4) */
-			.regm_dsi       = 8,	/* PLL_CLK2 (M5) */
-			.lp_clk_div     = 17,	/* PLDIV */
-			.offset_ddr_clk = 0,
-			.dsi_fclk_src   = OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DSI,
-		},
-	},
 	.panel = {
 		.dsi_mode	= OMAP_DSS_DSI_VIDEO_MODE,
 		.dsi_pix_fmt= OMAP_DSS_DSI_FMT_RGB666_PACKED,
@@ -326,13 +295,33 @@ static struct omap_dss_device bowser_lcd_device = {
 			.reg_ttaget			= 4,
 		},
 	},
+	.clocks = {
+		.dispc = {
+			 .channel = {
+				.lck_div        = 1,	/* LCD */
+				.pck_div        = 1,	/* PCD */
+				.lcd_clk_src    = OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DISPC,
+			},
+			.dispc_fclk_src = OMAP_DSS_CLK_SRC_FCK,
+		},
+
+		.dsi = {
+			.regn           = 16,	/* DSI_PLL_REGN */
+			.regm           = 272,	/* DSI_PLL_REGM */
+			.regm_dispc     = 9,	/* PLL_CLK1 (M4) */
+			.regm_dsi       = 8,	/* PLL_CLK2 (M5) */
+			.lp_clk_div     = 17,	/* PLDIV */
+			.offset_ddr_clk = 0,
+			.dsi_fclk_src   = OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DSI,
+		},
+	},
+
 	.channel = OMAP_DSS_CHANNEL_LCD,
 #ifdef CONFIG_FB_OMAP_BOOTLOADER_INIT
 	.skip_init = true,
 #else
 	.skip_init = false,
 #endif
-
 
 	.platform_enable = NULL,
 	.platform_disable = NULL,
@@ -357,38 +346,16 @@ static struct omap_dss_device bowser_lcd_device = {
 
 		.module		= 0,
 	},
-	.clocks = {
-		.dispc = {
-			 .channel = {
-				.lck_div        = 1,	/* LCD */
-				.pck_div        = 2,	/* PCD */
-				.lcd_clk_src    =
-					OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DISPC,
-			},
-			.dispc_fclk_src = OMAP_DSS_CLK_SRC_FCK,
-		},
-
-		.dsi = {
-			.regn			= 16,	/* DSI_PLL_REGN */
-			.regm			= 178,	/* DSI_PLL_REGM */
-			.regm_dispc		= 6,	/* PLL_CLK1 (M4) */
-			.regm_dsi		= 5,	/* PLL_CLK2 (M5) */
-			.lp_clk_div		= 8,	/* PLDIV */
-			.offset_ddr_clk		= 0,
-			.dsi_fclk_src		=
-				OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DSI,
-		},
-	},
 	.panel = {
 		.dsi_mode			= OMAP_DSS_DSI_VIDEO_MODE,
 		.dsi_pix_fmt			= OMAP_DSS_DSI_FMT_RGB888,
 
 		.timings = {
-				.x_res		= 800,
-				.y_res		= 1280,
+			.x_res = 800,
+			.y_res = 1280,
 		},
-		.width_in_um			= 94200,
-		.height_in_um			= 150720,
+		.width_in_um = 94200,
+		.height_in_um = 150720,
 
 		.dsi_vm_data = {
 			.hsa			= 0,
@@ -430,6 +397,28 @@ static struct omap_dss_device bowser_lcd_device = {
 			.reg_ttaget		= 4,
 		},
 	},
+
+	.clocks = {
+		.dispc = {
+			 .channel = {
+				.lck_div        = 1,	/* LCD */
+				.pck_div        = 2,	/* PCD */
+				.lcd_clk_src    = OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DISPC,
+			},
+			.dispc_fclk_src = OMAP_DSS_CLK_SRC_FCK,
+		},
+
+		.dsi = {
+			.regn           = 16,	/* DSI_PLL_REGN */
+			.regm           = 178,	/* DSI_PLL_REGM */
+			.regm_dispc     = 6,	/* PLL_CLK1 (M4) */
+			.regm_dsi       = 5,	/* PLL_CLK2 (M5) */
+			.lp_clk_div     = 8,	/* PLDIV */
+			.offset_ddr_clk = 0,
+			.dsi_fclk_src   = OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DSI,
+		},
+	},
+
 	.channel = OMAP_DSS_CHANNEL_LCD,
 #ifdef CONFIG_FB_OMAP_BOOTLOADER_INIT
 	.skip_init = true,
@@ -472,7 +461,7 @@ static struct i2c_board_info __initdata nt51012_pmic_i2c = {
 
 #ifdef CONFIG_OMAP4_DSS_HDMI
 static struct omap_dss_hdmi_data omap5panda_hdmi_data = {
-    .hpd_gpio = HDMI_GPIO_HPD,
+	.hpd_gpio = HDMI_GPIO_HPD,
 	.ct_cp_hpd_gpio = HDMI_GPIO_CT_CP_HPD,
 	.ls_oe_gpio = HDMI_GPIO_LS_OE,
 };
@@ -509,66 +498,17 @@ static struct omap_dss_board_info bowser_dss_data = {
 	.default_device	=	&bowser_lcd_device,
 };
 
-static struct omapfb_platform_data bowser_fb_pdata = {
-	.mem_desc = {
-#ifdef CONFIG_OMAP4_DSS_HDMI
-		.region_cnt = 2,
-			.region = {
-				[0] = {
-					.size = OMAP4_BOWSER_LCD_FB_RAM_SIZE,
-				},
-				[1] = {
-					.size = OMAP4_BOWSER_HDMI_FB_RAM_SIZE,
-				},
-			},
-#else
-		.region_cnt = 1,
-			.region = {
-				[0] = {
-					.size = OMAP4_BOWSER_LCD_FB_RAM_SIZE,
-				},
-			},
-#endif
-	},
-};
-
-#if defined(CONFIG_MACH_OMAP4_BOWSER_SUBTYPE_TATE) || defined(CONFIG_MACH_OMAP4_BOWSER_SUBTYPE_SOHO)
-/*
- (This is essentially the screen size * 4 = 2x for wallpaper, 1x for launcher + nav bar and 1x for status bar)
-  800x1280 (*4BPP) = 4MB * 4 = 16MB and then double for HDMI = 32MB
-*/
-static struct dsscomp_platform_data dsscomp_config_wuxga = {
-               .tiler1d_slotsz = ( SZ_16M ),
-};
-#else
-/*
- Allocate a safe 34 MB (by calculation) for TILER1D slot size for WUXGA panel on JEM, total of 68 MB of TILER1D
- (This is essentially the screen size * 4 = 2x for wallpaper, 1x for launcher + nav bar and 1x for status bar)
-
- These values are based on stock AOSP tablet UI home screen. JB needs more than ICS
- because behavior of pulled down status bar has changed.
-
- Rough calculations:
-
- Wallpaper:
- 15120.00 KiB | 2000 (2016) x 1920
-
- Launcher:
- 8460.00 KiB  | 1920 (1920) x 1128
-
- StatusBar:
- 9000.00 KiB  | 1920 (1920) x 1200
-
- NavigationBar:
- 540.00 KiB   | 1920 (1920) x   72
-
-*/
 static struct dsscomp_platform_data dsscomp_config_bowser = {
-               .tiler1d_slotsz = ( 34 * SZ_1M ),
-};
+#if defined (CONFIG_PANEL_NT51012_LG)
+	.tiler1d_slotsz = ( 24 * SZ_1M ),
+#elif defined (CONFIG_PANEL_NT71391_HYDIS)
+    .tiler1d_slotsz = ( 36 * SZ_1M ),
+#else
+	.tiler1d_slotsz = ( 16 * SZ_1M ),
 #endif
+};
 
-static struct sgx_omaplfb_config omaplfb_config_wuxga[] = {
+static struct sgx_omaplfb_config omaplfb_config_bowser[] = {
 	{
 	.vram_buffers = 4,
 	.swap_chain_length = 2,
@@ -581,20 +521,18 @@ static struct sgx_omaplfb_config omaplfb_config_wuxga[] = {
 #endif
 };
 
-static struct sgx_omaplfb_platform_data omaplfb_plat_data_wuxga = {
-	.num_configs = ARRAY_SIZE(omaplfb_config_wuxga),
-	.configs = omaplfb_config_wuxga,
+static struct sgx_omaplfb_platform_data omaplfb_plat_data_bowser = {
+	.num_configs = ARRAY_SIZE(omaplfb_config_bowser),
+	.configs = omaplfb_config_bowser,
 };
 
-
-static struct omap_tablet_panel_data panel_data_nt51012 = {
-	.board_info = &bowser_dss_data,
-	.dsscomp_data = &dsscomp_config_bowser,
-	.omaplfb_data = &omaplfb_plat_data_wuxga,
+static struct omapfb_platform_data bowser_fb_pdata = {
+	.mem_desc = {
+		.region_cnt = ARRAY_SIZE(omaplfb_config_bowser),
+	},
 };
 
-
-#if defined(CONFIG_BACKLIGHT_LP855X)
+#if defined (CONFIG_BACKLIGHT_LP855X)
 static struct lp855x_rom_data lp8552_eeprom_arr[] = {
 	{0xa1, 0xf0}, /* SLOPE=0 */
 	{0xa5, 0x4f}, /* EN_VSYNC=0 */
@@ -606,7 +544,7 @@ static struct lp855x_rom_data lp8557_eeprom_arr[] = {
 };
 
 static struct lp855x_platform_data lp8552_pdata = {
-	.name = "bowser",
+	.name = "lcd-backlight",
 	.mode = REGISTER_BASED,
 	.device_control = I2C_CONFIG(LP8552),
 	.initial_brightness = INITIAL_BRT,
@@ -643,7 +581,7 @@ static struct i2c_board_info __initdata bl_lp8557_i2c_boardinfo[] = {
 	},
 };
 
-#else	/* CONFIG_BACKLIGHT_LP855X */
+#else	/*CONFIG_BACKLIGHT_LP855X*/
 
 static struct bowser_backlight_platform_data bowser_backlight_data = {
 	.gpio_en_o2m = GPIO_BACKLIGHT_EN_O2M,
@@ -653,18 +591,16 @@ static struct bowser_backlight_platform_data bowser_backlight_data = {
 #else
 	.gpio_cabc_en = -1,
 #endif
-	.timer = 10,		/* use GPTimer 10 for backlight */
-	.sysclk = SYS_CLK,	/* input frequency to the timer, 38.4M */
-	.pwmfreq = 10000,	/* output freqeuncy from timer, 10k */
+	.timer       = 10,        /* use GPTimer 10 for backlight */
+	.sysclk      = SYS_CLK,   /* input frequency to the timer, 38.4M */
+	.pwmfreq     = 10000,     /* output freqeuncy from timer, 10k */
 #if defined (CONFIG_MACH_OMAP4_BOWSER_SUBTYPE_TATE)
-	/* how many backlight steps for the user, also the max brightness */
-	.totalsteps = 255,
-	.initialstep = 200	/* initial brightness */
+	.totalsteps  = 255,       /* how many backlight steps for the user, also the max brightness */
+        .initialstep = 200        /* initial brightness */
 
 #else
-	/* how many backlight steps for the user, also the max brightness */
-	.totalsteps = 256,
-	.initialstep = 100	/* initial brightness */
+	.totalsteps  = 256,       /* how many backlight steps for the user, also the max brightness */
+	.initialstep = 100        /* initial brightness */
 #endif
 };
 
@@ -681,6 +617,13 @@ static struct platform_device *bowser_devices[] __initdata = {
 };
 
 #endif  /*CONFIG_BACKLIGHT_LP855X*/
+
+#if defined(CONFIG_FB_OMAP2_NUM_FBS)
+#define OMAPLFB_NUM_DEV CONFIG_FB_OMAP2_NUM_FBS
+#else
+#define OMAPLFB_NUM_DEV 1
+#endif
+
 
 #ifdef CONFIG_OMAP4_DSS_HDMI
 static void tablet_hdmi_mux_init(void)
@@ -707,86 +650,36 @@ static void tablet_hdmi_mux_init(void)
 	omap4_ctrl_pad_writel(r, OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_I2C_1);
 
 	phymux_base = ioremap(0x4A100000, 0x1000);
-
-
 	gpio_request(HDMI_GPIO_HPD, NULL);
 	omap_mux_init_gpio(HDMI_GPIO_HPD, OMAP_PIN_INPUT | OMAP_PULL_ENA);
 	gpio_direction_input(HDMI_GPIO_HPD);
 
-	/*
-	 * This debouncing interval brings more stability where it manages
-	 * the HPD interrupt response time
-	 */
+	/* This debouncing interval brings more stability where it manages the HPD interrupt response time */
 	status = gpio_set_debounce(HDMI_GPIO_HPD, 5 * 1000);
 	if (status)
-		pr_err("%s: Cannot set debounce to hdmi_gpio %x\n", __func__,
-			status);
+		pr_err("%s: Cannot set debounce to hdmi_gpio %x \n", __func__, status);
 
 	/* Turning on DSI PHY Mux*/
 	__raw_writel(val, phymux_base + 0x618);
-#if 0
 
 	if (idme_query_board_type(IDME_BOARD_TYPE_JEM_PVT_WIFI) ||
 	    idme_query_board_type(IDME_BOARD_TYPE_JEM_PVT_WAN)) {
-		/*
-		 * Disabling TPD12S015's DCDC and it's level shifter
-		 * during off-mode by configuring off-mode state of
-		 * HDMI_GPIO_CT_CP_HPD's and HDMI_GPIO_LS_OE's GPIOs
-		 */
-		omap_mux_init_signal("gpmc_nbe1.gpio_60", OMAP_PIN_OUTPUT |
-				     OMAP_PIN_OFF_OUTPUT_LOW);
-		omap_mux_init_signal("gpmc_a17.gpio_41", OMAP_PIN_OUTPUT |
-				     OMAP_PIN_OFF_OUTPUT_LOW);
+		/* Disabling TPD12S015's DCDC and it's level shifter during off-mode
+		* by configuring off-mode state of HDMI_GPIO_CT_CP_HPD's and HDMI_GPIO_LS_OE's GPIOs*/
+		omap_mux_init_signal("gpmc_nbe1.gpio_60", OMAP_PIN_OUTPUT | OMAP_PIN_OFF_OUTPUT_LOW);
+		omap_mux_init_signal("gpmc_a17.gpio_41", OMAP_PIN_OUTPUT | OMAP_PIN_OFF_OUTPUT_LOW);
 	}
-#endif
 
+#if 0
 	/* Request HDMI_GPIO_CT_CP_HPD and HDMI_GPIO_LS_OE GPIOs */
-	/*
 	status = gpio_request_array(tablet_hdmi_gpios,
-				    ARRAY_SIZE(tablet_hdmi_gpios));
+			ARRAY_SIZE(tablet_hdmi_gpios));
 	if (status)
-		pr_err("%s: Cannot request HDMI GPIOs %x\n", __func__, status);
-	*/
-
-
+		pr_err("%s: Cannot request HDMI GPIOs %x \n", __func__, status);
+#endif
 	iounmap(phymux_base);
 }
 #endif /* CONFIG_OMAP4_DSS_HDMI */
-
-#if defined(CONFIG_BACKLIGHT_LP855X)
-static void lp855x_backlight_init(void)
-{
-	omap_mux_init_gpio(GPIO_BACKLIGHT_EN_LP855X, OMAP_PIN_OUTPUT);
-
-	/* Add backlight IC voltage source from PMIC LDO5 since
-	 * it will be phase in DVT build */
-	/*if (idme_get_board_revision() > 5) {
-		lp8557_pdata.gpio_en = -1;
-		lp8557_pdata.regulator_name = "lp8557_ldo5";
-	}*/
-
-	if(idme_query_board_type(IDME_BOARD_TYPE_SOHO_PROTO))
-		i2c_register_board_info(2, bl_lp8552_i2c_boardinfo,
-					ARRAY_SIZE(bl_lp8552_i2c_boardinfo));
-	else
-		i2c_register_board_info(2, bl_lp8557_i2c_boardinfo,
-					ARRAY_SIZE(bl_lp8557_i2c_boardinfo));
-}
-
-#else /*CONFIG_BACKLIGHT_LP855X*/
-static void bowser_backlight_init(void)
-{
-	/* backlight gpio */
-	if (GPIO_BACKLIGHT_EN_O2M > 0)
-		omap_mux_init_gpio(GPIO_BACKLIGHT_EN_O2M, OMAP_PIN_OUTPUT);
-	if (GPIO_BACKLIGHT_VOL_O2M > 0)
-		omap_mux_init_gpio(GPIO_BACKLIGHT_VOL_O2M, OMAP_PIN_OUTPUT);
-#if defined(CONFIG_MACH_OMAP4_BOWSER_SUBTYPE_TATE)
-	if (GPIO_BACKLIGHT_CABC_EN >= 0)
-		omap_mux_init_gpio(GPIO_BACKLIGHT_CABC_EN, OMAP_PIN_OUTPUT);
-#endif
-}
-#endif  /*CONFIG_BACKLIGHT_LP855X*/
 
 extern int idme_get_board_type(void);
 extern int idme_get_board_revision(void);
@@ -836,7 +729,6 @@ static void __init bowser_lcd_init(void)
 			pr_err("%s: lcd_en_gpio request failed\n", __func__);
 			bowser_dsi_panel.lcd_en_gpio = -1;
 		}
-
 		gpio_direction_output(bowser_dsi_panel.lcd_en_gpio, 1);
 		printk("LCD_EN_GPIO success\n");
 	}
@@ -863,26 +755,50 @@ static void __init bowser_lcd_init(void)
 #endif
 }
 
+#if defined (CONFIG_BACKLIGHT_LP855X)
+static void lp855x_backlight_init(void)
+{
+	omap_mux_init_gpio(GPIO_BACKLIGHT_EN_LP855X, OMAP_PIN_OUTPUT);
+
+#if defined (CONFIG_MACH_OMAP4_BOWSER_SUBTYPE_TATE)
+		i2c_register_board_info(2, bl_lp8552_i2c_boardinfo,
+					ARRAY_SIZE(bl_lp8552_i2c_boardinfo));
+#else
+	if(idme_query_board_type(IDME_BOARD_TYPE_SOHO_PROTO))
+		i2c_register_board_info(2, bl_lp8552_i2c_boardinfo,
+					ARRAY_SIZE(bl_lp8552_i2c_boardinfo));
+	else
+		i2c_register_board_info(2, bl_lp8557_i2c_boardinfo,
+					ARRAY_SIZE(bl_lp8557_i2c_boardinfo));
+#endif
+}
+
+#else /*CONFIG_BACKLIGHT_LP855X*/
+static void bowser_backlight_init(void)
+{
+	/* backlight gpio */
+	if (GPIO_BACKLIGHT_EN_O2M > 0)
+		omap_mux_init_gpio(GPIO_BACKLIGHT_EN_O2M, OMAP_PIN_OUTPUT);
+	if (GPIO_BACKLIGHT_VOL_O2M > 0)
+		omap_mux_init_gpio(GPIO_BACKLIGHT_VOL_O2M, OMAP_PIN_OUTPUT);
+#if defined (CONFIG_MACH_OMAP4_BOWSER_SUBTYPE_TATE)
+        if (GPIO_BACKLIGHT_CABC_EN >= 0)
+               omap_mux_init_gpio(GPIO_BACKLIGHT_CABC_EN, OMAP_PIN_OUTPUT); 
+#endif
+}
+#endif  /*CONFIG_BACKLIGHT_LP855X*/
+
 void __init bowser_android_display_setup(struct omap_ion_platform_data *ion)
 {
-	/* get_panel_data(tablet_panel_type); */
-	struct omap_tablet_panel_data *panel_data = &panel_data_nt51012;
-	omap_android_display_setup(panel_data->board_info,
-				   panel_data->dsscomp_data,
-				   panel_data->omaplfb_data,
+	omap_android_display_setup(&bowser_dss_data,
+				   &dsscomp_config_bowser,
+				   &omaplfb_plat_data_bowser,
 				   &bowser_fb_pdata);
-
 }
 
 int __init bowser_panel_init(void)
 {
-	struct sgx_omaplfb_config data = {
-		.tiler2d_buffers = 0,
-		.swap_chain_length = 2,
-		.vram_buffers = 4,
-	};
-
-#if defined(CONFIG_BACKLIGHT_LP855X)
+#if defined (CONFIG_BACKLIGHT_LP855X)
 	lp855x_backlight_init();
 #else
 	bowser_backlight_init();
@@ -894,12 +810,10 @@ int __init bowser_panel_init(void)
 
 	omapfb_set_platform_data(&bowser_fb_pdata);
 	omap_vram_set_sdram_vram(OMAP4_BOWSER_FB_RAM_SIZE, 0);
-	sgx_omaplfb_set(0, &data);
 
 	omap_display_init(&bowser_dss_data);
-#if defined(CONFIG_BACKLIGHT_BOWSER)
+#if defined (CONFIG_BACKLIGHT_BOWSER)
 	platform_add_devices(bowser_devices, ARRAY_SIZE(bowser_devices));
 #endif
-
 	return 0;
 }
