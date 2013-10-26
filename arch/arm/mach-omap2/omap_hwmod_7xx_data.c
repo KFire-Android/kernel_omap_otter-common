@@ -1461,6 +1461,9 @@ static struct omap_hwmod dra7xx_ipu1_hwmod = {
 			.modulemode   = MODULEMODE_HWCTRL,
 		},
 	},
+#ifdef CONFIG_EARLYCAMERA_IPU
+	.flags		= HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET,
+#endif
 };
 
 /* ipu2 processor */
@@ -2229,6 +2232,9 @@ static struct omap_hwmod dra7xx_mmu_ipu1_hwmod = {
 		},
 	},
 	.dev_attr	= &dra7xx_mmu_ipu_dev_attr,
+#ifdef CONFIG_EARLYCAMERA_IPU
+	.flags		= HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET,
+#endif
 };
 
 /* mmu ipu2 */
@@ -3975,6 +3981,9 @@ static struct omap_hwmod dra7xx_vip1_hwmod = {
 			.modulemode   = MODULEMODE_HWCTRL,
 		},
 	},
+#ifdef CONFIG_EARLYCAMERA_IPU
+	.flags		= HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET,
+#endif
 };
 
 /* vip2 */
@@ -4329,6 +4338,9 @@ static struct omap_hwmod_ocp_if dra7xx_l3_main_1__mmu_ipu1 = {
 	.clk		= "l3_iclk_div",
 	.addr		= dra7xx_mmu_ipu1_addrs,
 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+#ifdef CONFIG_EARLYCAMERA_IPU
+	.flags		= HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET,
+#endif
 };
 
 static struct omap_hwmod_addr_space dra7xx_mmu_ipu2_addrs[] = {
