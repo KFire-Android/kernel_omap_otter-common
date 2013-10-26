@@ -31,11 +31,6 @@
 #include <linux/thermal_framework.h>
 #include <linux/usb/omap_usb.h>
 
-#ifdef CONFIG_AMAZON_METRICS_LOG
-#include <linux/metricslog.h>
-#define THERMO_METRICS_STR_LEN 128
-#endif
-
 #define SUMMIT_SMB347_I2C_ADDRESS	0x5F
 #define SUMMIT_SMB347_I2C_ADDRESS_SECONDARY	0x06
 
@@ -1212,9 +1207,6 @@ static int smb347_usb_notifier_cb(struct notifier_block *nb,
 		power_supply_changed(&priv->usb);
 
 		dev_info(priv->dev, "USB disconnected\n");
-#ifdef CONFIG_AMAZON_METRICS_LOG
-		usb_log_metrics("usb_disconnected");
-#endif
 		break;
 
 	case TWL6030_USB_EVENT_VBUS_DETECT:
@@ -1224,6 +1216,15 @@ static int smb347_usb_notifier_cb(struct notifier_block *nb,
 		*supply = smb347_apsd_complete(priv);
 		dev_info(priv->dev, "=========== after *supply\n");
 		break;
+
+	case TWL6030_USB_EVENT_OTG_GND:
+		dev_info(priv->dev, "in %s, OTG GND\n", __func__);
+		break;
+
+	case TWL6030_USB_EVENT_OTG_OFF:
+		dev_info(priv->dev, "in %s, OTG OFF\n", __func__);
+		break;
+
 	}
 	return 0;
 }
@@ -2394,10 +2395,7 @@ static int smb347_apply_cooling(struct thermal_dev *dev,
 	unsigned char temp = 0xff;
 	int ret = -1;
 	static int previous_cooling_level = 0, new_cooling_level = 0;
-#ifdef CONFIG_AMAZON_METRICS_LOG
-	char *thermal_metric_prefix = "charger_cooling:def:monitor=1;CT;1";
-	char buf[THERMO_METRICS_STR_LEN];
-#endif
+
 	/* transform into current limitation */
 	current_limit = thermal_cooling_device_reduction_get(dev, level);
 
@@ -2603,19 +2601,6 @@ static int smb347_apply_cooling(struct thermal_dev *dev,
 		THERMAL_INFO("max charge current transision from %d to %d",previous_max_charge_current,priv->max_thermal_charge_current);
 	}
 
-#ifdef CONFIG_AMAZON_METRICS_LOG
-		if ( previous_cooling_level == 0 ) {
-			snprintf(buf, THERMO_METRICS_STR_LEN,
-				"%s,throttling_start=1;CT;1:NR",
-				thermal_metric_prefix);
-			log_to_metrics(ANDROID_LOG_INFO, "ThermalEvent", buf);
-		} else if ( new_cooling_level == 0 ) {
-			snprintf(buf, THERMO_METRICS_STR_LEN,
-				"%s,throttling_stop=1;CT;1:NR",
-				thermal_metric_prefix);
-			log_to_metrics(ANDROID_LOG_INFO, "ThermalEvent", buf);
-		}
-#endif
 	previous_cooling_level = new_cooling_level;
 
 	return 0;
