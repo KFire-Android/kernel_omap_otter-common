@@ -804,30 +804,21 @@ static int smb347_configure_otg(struct summit_smb347_info *di, int enable) {
 		goto error;
 	}
 	if (enable) {
-dev_info(di->dev, "1\n");
 		/* Configure INOK to be active high */
 		mdelay(1);
 		if (smb347_i2c_write(di->client, SMB347_SYSOK_USB30, 0x01))
 			goto error;
-dev_info(di->dev, "2\n");
 		mdelay(1);
 		if (smb347_i2c_read(di->client, SMB347_OTG_THERM_CONTROL, &value))
 			goto error;
-dev_info(di->dev, "3\n");
 		mdelay(1);
 		/* Change "OTG output current limit" to 250mA */
 		if (smb347_i2c_write(di->client, SMB347_OTG_THERM_CONTROL, (value & (~(1<<3)))))
 			goto error;
-dev_info(di->dev, "4\n");
 		/* Enable OTG */
 		mdelay(1);
 		if (smb347_i2c_write(di->client, SMB347_COMMAND_REG_A, (1<<4)))
 			goto error;
-dev_info(di->dev, "5\n");
-		/* Change "OTG output current limit" from 250mA to 750mA */
-//		mdelay(1);
-//		if (smb347_i2c_write(di->client, SMB347_OTG_THERM_CONTROL, (1<<3)))
-//			goto error;
 	} else {
 		/* Disable OTG */
 		mdelay(1);
@@ -836,11 +827,9 @@ dev_info(di->dev, "5\n");
 		mdelay(1);
 		if (smb347_i2c_write(di->client, SMB347_COMMAND_REG_A, (value & (~(1<<4)))))
 			goto error;
-dev_info(di->dev, "6\n");
 		mdelay(1);
 		if (smb347_i2c_read(di->client, SMB347_OTG_THERM_CONTROL, &value))
 			goto error;
-dev_info(di->dev, "7\n");
 		mdelay(1);
 		/* Change "OTG output current limit" to 250mA */
 		if (smb347_i2c_write(di->client, SMB347_OTG_THERM_CONTROL, (value & (~(1<<3)))))
@@ -853,14 +842,11 @@ dev_info(di->dev, "7\n");
 		if (smb347_i2c_write(di->client, SMB347_SYSOK_USB30, (value & (~(1)))))
 			goto error;
         }
-dev_info(di->dev, "6\n");
 	mdelay(1);
-dev_info(di->dev, "7\n");
 	if (smb347_config(di, 0)) {
 		dev_err(di->dev, "Unable to disable writes to CONFIG regs\n");
 		goto error;
 	}
-dev_info(di->dev, "8\n");
 	return 0;
 error:
 		dev_info(di->dev, "1\n");
