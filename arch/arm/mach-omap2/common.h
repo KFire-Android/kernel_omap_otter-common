@@ -206,11 +206,13 @@ struct device_node;
 int __init omap_intc_of_init(struct device_node *node,
 			     struct device_node *parent);
 #else
+#if 0
 int __init omap_intc_of_init(struct device_node *node,
 			     struct device_node *parent)
 {
 	return 0;
 }
+#endif
 #endif
 
 #ifdef CONFIG_SMP
