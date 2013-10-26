@@ -1786,3 +1786,31 @@ bool pwrdm_can_ever_lose_context(struct powerdomain *pwrdm)
 
 	return 0;
 }
+
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+/* When enabling AUTO_IDLE for clocks during boot some power domains
+ * go to low power state and their saved state goes out of sync.
+ * For domains that are never used this causes warnings if we access
+ * pm_debug/count debugfs entry since the state never changes and stays
+ * out of sync.
+ */
+static int pwrdm_fixup_saved_state(void)
+{
+	struct powerdomain *pwrdm;
+	int current_state;
+
+	list_for_each_entry(pwrdm, &pwrdm_list, node) {
+		pwrdm_wait_transition(pwrdm);
+		current_state = pwrdm_read_pwrst(pwrdm);
+		if (_pwrdm_state_compare_int(current_state, pwrdm->state,
+					     PWRDM_COMPARE_PWRST_LT)) {
+			pr_debug("powerdomain: %s: synchronizing saved state\n",
+					pwrdm->name);
+			pwrdm_state_high2low_counter_update(pwrdm);
+		}
+	}
+
+	return 0;
+}
+late_initcall_sync(pwrdm_fixup_saved_state);
+#endif
