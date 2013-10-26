@@ -136,6 +136,11 @@ static void tfc_s9700_power_off(struct omap_dss_device *dssdev)
 {
 	struct panel_drv_data *ddata = dev_get_drvdata(&dssdev->dev);
 
+#ifdef CONFIG_DISPLAY_SKIP_INIT
+	if (omapdss_skipinit())
+		return;
+#endif
+
 	if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE)
 		return;
 
