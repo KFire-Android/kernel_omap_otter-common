@@ -144,6 +144,15 @@ void __init omap_nand_flash_init(int options, struct mtd_partition *parts,
 /*
  * SDRAM memory data
  */
+struct ddr_device_info lpddr2_elpida_2G_S4_x1_info = {
+	.type		= DDR_TYPE_LPDDR2_S4,
+	.density	= DDR_DENSITY_2Gb,
+	.io_width	= DDR_IO_WIDTH_32,
+	.cs1_used	= false,
+	.cal_resistors_per_cs = false,
+	.manufacturer	= "Elpida"
+};
+
 struct ddr_device_info lpddr2_elpida_2G_S4_x2_info = {
 	.type		= DDR_TYPE_LPDDR2_S4,
 	.density	= DDR_DENSITY_2Gb,
@@ -259,7 +268,7 @@ struct lpddr2_timings lpddr2_elpida_4G_S4_timings[] = {
 		.tXP		= 7500,
 		.tRTP		= 7500,
 		.tCKESR		= 15000,
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_MACH_OMAP4_BOWSER_SUBTYPE_SOHO
 		.tDQSCK_max	= 7000,
 #else
 		.tDQSCK_max	= 5500,
@@ -271,7 +280,7 @@ struct lpddr2_timings lpddr2_elpida_4G_S4_timings[] = {
 		.tRAS_max_ns	= 70000,
 		.tRTW		= 7500,
 		.tAONPD		= 1000,
-#ifdef CONFIG_MACH_OMAP4_BOWSER
+#ifdef CONFIG_MACH_OMAP4_BOWSER_SUBTYPE_SOHO
 		.tDQSCK_max_derated = 7000,
 #else
 		.tDQSCK_max_derated = 6000,
