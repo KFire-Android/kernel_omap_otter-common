@@ -308,15 +308,6 @@ static void twl6030_hnd_vbus_off(struct work_struct *work)
 			twl6030_event_str[event], twl6030_event_str[twl->state],
 			twl->supply_type);
 		ret = blocking_notifier_call_chain(&notifier_list, event, NULL);
-#ifdef CONFIG_AMAZON_METRICS_LOG
-		{
-		char buf[128];
-		snprintf(buf, sizeof(buf),
-			"%s:twl6030:vbus_off=1;CT;1,state=%d;DV;1:NR",
-			__func__, twl->state);
-		log_to_metrics(ANDROID_LOG_INFO, "USBCableEvent", buf);
-		}
-#endif
 		break;
 
 	default:
@@ -355,15 +346,6 @@ static void twl6030_hnd_detect(struct work_struct *work)
 		ret = blocking_notifier_call_chain(&notifier_list, event,
 			&twl->supply_type);
 		dev_dbg(twl->dev, "after notifier_call_chain,ret=%d\n", ret);
-#ifdef CONFIG_AMAZON_METRICS_LOG
-		{
-		char buf[128];
-		snprintf(buf, sizeof(buf),
-			"%s:twl6030:detect=1;CT;1,state=%d;DV;1:NR",
-			__func__, twl->state);
-		log_to_metrics(ANDROID_LOG_INFO, "USBCableEvent", buf);
-		}
-#endif
 		break;
 
 	case TWL6030_USB_EVENT_VBUS_OFF:
@@ -411,15 +393,6 @@ static void twl6030_hnd_otg_gnd(struct work_struct *work)
 			twl6030_event_str[event], twl6030_event_str[twl->state],
 			twl->supply_type);
 		ret = blocking_notifier_call_chain(&notifier_list, event, NULL);
-#ifdef CONFIG_AMAZON_METRICS_LOG
-		{
-		char buf[128];
-		snprintf(buf, sizeof(buf),
-			"%s:twl6030:otg_gnd=1;CT;1,state=%d;DV;1:NR",
-			__func__, twl->state);
-		log_to_metrics(ANDROID_LOG_INFO, "USBCableEvent", buf);
-		}
-#endif
 		break;
 
 	default:
@@ -453,15 +426,6 @@ static void twl6030_hnd_otg_off(struct work_struct *work)
 	switch (twl->state) {
 	case TWL6030_USB_EVENT_OTG_GND:
 		ret = blocking_notifier_call_chain(&notifier_list, event, NULL);
-#ifdef CONFIG_AMAZON_METRICS_LOG
-		{
-		char buf[128];
-		snprintf(buf, sizeof(buf),
-			"%s:twl6030:otg_off=1;CT;1,state=%d;DV;1:NR",
-			__func__, twl->state);
-		log_to_metrics(ANDROID_LOG_INFO, "USBCableEvent", buf);
-		}
-#endif
 		break;
 
 	case TWL6030_USB_EVENT_VBUS_ON:
