@@ -130,7 +130,6 @@ static void omap_dm_timer_reset(struct omap_dm_timer *timer)
 
 int omap_dm_timer_prepare(struct omap_dm_timer *timer)
 {
-	int ret = 0;
 	struct dmtimer_platform_data *pdata = timer->pdev->dev.platform_data;
 
 	timer->fclk = clk_get(&timer->pdev->dev, "fck");
@@ -151,11 +150,10 @@ int omap_dm_timer_prepare(struct omap_dm_timer *timer)
 
 #ifdef CONFIG_MACH_OMAP_4430_KC1
 	if (timer->id == 10)
-	ret = omap_dm_timer_set_source(timer, OMAP_TIMER_SRC_SYS_CLK);
+	return omap_dm_timer_set_source(timer, OMAP_TIMER_SRC_SYS_CLK);
 	else
 #endif
-	ret = omap_dm_timer_set_source(timer, OMAP_TIMER_SRC_32_KHZ);
-	return ret;
+	return omap_dm_timer_set_source(timer, OMAP_TIMER_SRC_32_KHZ);
 }
 
 struct omap_dm_timer *omap_dm_timer_request(void)
