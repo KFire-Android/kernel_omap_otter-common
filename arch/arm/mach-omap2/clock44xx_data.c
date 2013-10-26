@@ -1553,21 +1553,6 @@ static struct clk dss_48mhz_clk = {
 #endif
 };
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
-static struct clk dss_fck = {
-	.name		= "dss_fck",
-	.ops		= &clkops_omap2_dflt,
-	.enable_reg	= OMAP4430_CM_DSS_DSS_CLKCTRL,
-	.enable_bit	= OMAP4430_MODULEMODE_SWCTRL,
-	.clkdm_name	= "l3_dss_clkdm",
-#ifdef CONFIG_FB_OMAP_BOOTLOADER_INIT
-	.flags          = ENABLE_ON_INIT,
-#endif
-	.parent		= &l3_div_ck,
-	.recalc		= &followparent_recalc,
-};
-#endif
-
 static struct clk efuse_ctrl_cust_fck = {
 	.name		= "efuse_ctrl_cust_fck",
 	.ops		= &clkops_omap2_dflt,
@@ -3329,9 +3314,6 @@ static struct clk_lookup omap44xx_clks[] = {
 	CLKDEV_INIT(NULL,	"dss_tv_clk",			&dss_tv_clk),
 	CLKDEV_INIT(NULL,	"dss_48mhz_clk",		&dss_48mhz_clk),
 	CLKDEV_INIT(NULL,	"dss_dss_clk",			&dss_dss_clk),
-#ifdef CONFIG_MACH_OMAP4_BOWSER
-	CLKDEV_INIT("omapdss_dss",	"ick",			&dss_fck),
-#endif
 	CLKDEV_INIT(NULL,	"efuse_ctrl_cust_fck",		&efuse_ctrl_cust_fck),
 	CLKDEV_INIT(NULL,	"emif1_fck",			&emif1_fck),
 	CLKDEV_INIT(NULL,	"emif2_fck",			&emif2_fck),
