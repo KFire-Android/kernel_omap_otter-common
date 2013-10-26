@@ -139,4 +139,12 @@ config OMAP2_DSS_SLEEP_AFTER_VENC_RESET
 	  This option enables the sleep, and is enabled by default. You can
 	  disable the sleep if it doesn't cause problems on your platform.
 
+config DISPLAY_SKIP_INIT
+	bool "Skip display initialization during bootup"
+	default n
+	help
+		This allows for skipping display initialization during bootup
+		for cases where the display is initialized elsewhere - like
+		u-boot or other processors
+
 endif
