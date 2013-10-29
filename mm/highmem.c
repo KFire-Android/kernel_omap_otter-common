@@ -247,6 +247,9 @@ void *kmap_high_get(struct page *page)
 	unlock_kmap_any(flags);
 	return (void*) vaddr;
 }
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+EXPORT_SYMBOL(kmap_high_get);
+#endif
 #endif
 
 /**
