@@ -22,6 +22,9 @@
 #include <linux/syscore_ops.h>
 #include <linux/time.h>
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+static struct timespec suspend_time_total;
+#endif
 static struct timespec suspend_time_before;
 static unsigned int time_in_suspend_bins[32];
 
@@ -53,9 +56,32 @@ static const struct file_operations suspend_time_debug_fops = {
 	.release	= single_release,
 };
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+ssize_t suspend_total_time_read(struct file *file, char __user *buf,
+	size_t size, loff_t *pos)
+{
+	struct timespec t = suspend_time_total;
+
+	if (*pos)
+		return 0;
+
+	*pos += snprintf(buf, size, "%lu.%03lu\n",
+		t.tv_sec, t.tv_nsec / NSEC_PER_MSEC);
+
+	return *pos;
+}
+
+static const struct file_operations suspend_total_time_debug_fops = {
+	.read = suspend_total_time_read,
+};
+#endif
+
 static int __init suspend_time_debug_init(void)
 {
 	struct dentry *d;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	struct dentry *d2;
+#endif
 
 	d = debugfs_create_file("suspend_time", 0755, NULL, NULL,
 		&suspend_time_debug_fops);
@@ -63,6 +89,16 @@ static int __init suspend_time_debug_init(void)
 		pr_err("Failed to create suspend_time debug file\n");
 		return -ENOMEM;
 	}
+
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	d2 = debugfs_create_file("suspend_total_time", 0755, NULL, NULL,
+		&suspend_total_time_debug_fops);
+	if (!d2) {
+		debugfs_remove(d);
+		pr_err("Failed to create suspend_total_time debug file\n");
+		return -ENOMEM;
+	}
+#endif
 
 	return 0;
 }
@@ -84,11 +120,22 @@ static void suspend_time_syscore_resume(void)
 	read_persistent_clock(&after);
 
 	after = timespec_sub(after, suspend_time_before);
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	suspend_time_total = timespec_add(suspend_time_total, after);
+#endif
 
 	time_in_suspend_bins[fls(after.tv_sec)]++;
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	pr_info("Suspended for %lu.%03lu seconds. "
+		"Total since boot: %lu.%03lu s\n",
+		after.tv_sec, after.tv_nsec / NSEC_PER_MSEC,
+		suspend_time_total.tv_sec,
+		suspend_time_total.tv_nsec / NSEC_PER_MSEC);
+#else
 	pr_info("Suspended for %lu.%03lu seconds\n", after.tv_sec,
 		after.tv_nsec / NSEC_PER_MSEC);
+#endif
 }
 
 static struct syscore_ops suspend_time_syscore_ops = {
