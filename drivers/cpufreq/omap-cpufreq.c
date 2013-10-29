@@ -363,7 +363,11 @@ static int cpufreq_apply_cooling(struct thermal_dev *dev, int cooling_level)
 	if (dev && !strcmp(dev->domain_name, "case")) {
 		int tmp;
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+		tmp = thermal_cooling_device_reduction_get(dev, cooling_level);
+#else
 		tmp = cooling_level - case_subzone_number;
+#endif
 		if (tmp < 0)
 			tmp = 0;
 		case_cooling_level = tmp;
