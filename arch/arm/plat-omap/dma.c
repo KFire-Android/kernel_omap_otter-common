@@ -35,6 +35,9 @@
 #include <linux/io.h>
 #include <linux/slab.h>
 #include <linux/delay.h>
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+#include <linux/syscore_ops.h>
+#endif
 
 #include <mach/hardware.h>
 #include <plat/dma.h>
@@ -2158,7 +2161,11 @@ static int __devexit omap_system_dma_remove(struct platform_device *pdev)
 	return 0;
 }
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+static int omap_dma_suspend(void)
+#else
 static int omap_dma_suspend(struct device *dev)
+#endif
 {
 	if (p->dma_context_save)
 		p->dma_context_save();
@@ -2166,7 +2173,11 @@ static int omap_dma_suspend(struct device *dev)
 	return 0;
 }
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+static void omap_dma_resume(void)
+#else
 static int omap_dma_resume(struct device *dev)
+#endif
 {
 	/*
 	 * This may not restore sysconfig register if multiple DMA channels
@@ -2177,11 +2188,17 @@ static int omap_dma_resume(struct device *dev)
 	if (p->dma_context_restore)
 		p->dma_context_restore();
 
+#ifndef CONFIG_MACH_OMAP4_BOWSER
 	return 0;
+#endif
 
 }
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+static struct syscore_ops omap_system_dma_sys_ops = {
+#else
 static const struct dev_pm_ops dma_pm_ops = {
+#endif
 	.suspend	 = omap_dma_suspend,
 	.resume		 = omap_dma_resume,
 };
@@ -2191,18 +2208,26 @@ static struct platform_driver omap_system_dma_driver = {
 	.remove		= __devexit_p(omap_system_dma_remove),
 	.driver		= {
 		.name	= "omap_dma_system",
+#ifndef CONFIG_MACH_OMAP4_BOWSER
 		.pm     = &dma_pm_ops,
+#endif
 	},
 };
 
 static int __init omap_system_dma_init(void)
 {
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	register_syscore_ops(&omap_system_dma_sys_ops);
+#endif
 	return platform_driver_register(&omap_system_dma_driver);
 }
 arch_initcall(omap_system_dma_init);
 
 static void __exit omap_system_dma_exit(void)
 {
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	unregister_syscore_ops(&omap_system_dma_sys_ops);
+#endif
 	platform_driver_unregister(&omap_system_dma_driver);
 }
 
