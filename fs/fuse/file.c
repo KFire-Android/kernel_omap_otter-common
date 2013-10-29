@@ -444,7 +444,11 @@ int fuse_fsync_common(struct file *file, loff_t start, loff_t end,
 
 	memset(&inarg, 0, sizeof(inarg));
 	inarg.fh = ff->fh;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	inarg.fsync_flags = (datasync == 3) ? 3 : (datasync ? 1 : 0);
+#else
 	inarg.fsync_flags = datasync ? 1 : 0;
+#endif
 	req->in.h.opcode = isdir ? FUSE_FSYNCDIR : FUSE_FSYNC;
 	req->in.h.nodeid = get_node_id(inode);
 	req->in.numargs = 1;

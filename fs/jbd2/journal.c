@@ -1314,18 +1314,31 @@ void jbd2_journal_update_sb_log_tail(journal_t *journal, tid_t tail_tid,
 static void jbd2_mark_journal_empty(journal_t *journal)
 {
 	journal_superblock_t *sb = journal->j_superblock;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	__be32		new_tail_sequence;
+#endif
 
 	BUG_ON(!mutex_is_locked(&journal->j_checkpoint_mutex));
 	read_lock(&journal->j_state_lock);
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	new_tail_sequence = cpu_to_be32(journal->j_tail_sequence);
+	/* Nothing to do? */
+	if (sb->s_start == 0 && sb->s_sequence == new_tail_sequence) {
+#else
 	/* Is it already empty? */
 	if (sb->s_start == 0) {
+#endif
 		read_unlock(&journal->j_state_lock);
 		return;
 	}
 	jbd_debug(1, "JBD2: Marking journal as empty (seq %d)\n",
 		  journal->j_tail_sequence);
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	sb->s_sequence = new_tail_sequence;
+#else
 	sb->s_sequence = cpu_to_be32(journal->j_tail_sequence);
+#endif
 	sb->s_start    = cpu_to_be32(0);
 	read_unlock(&journal->j_state_lock);
 
