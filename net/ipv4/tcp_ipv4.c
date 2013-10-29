@@ -84,6 +84,10 @@
 
 #include <linux/crypto.h>
 #include <linux/scatterlist.h>
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+#include <linux/suspend.h>
+#include <linux/semaphore.h>
+#endif
 
 int sysctl_tcp_tw_reuse __read_mostly;
 int sysctl_tcp_low_latency __read_mostly;
@@ -2373,26 +2377,216 @@ int tcp_seq_open(struct inode *inode, struct file *file)
 }
 EXPORT_SYMBOL(tcp_seq_open);
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+typedef struct __reset_port_skip_tag {
+	__u16 port;
+	struct __reset_port_skip_tag *next;
+} __reset_port_skip;
+
+static void tcp_force_reset(int skip_lh, __reset_port_skip *rps)
+{
+	int bucket;
+
+	for (bucket = 0; bucket <= tcp_hashinfo.ehash_mask; bucket++) {
+		struct sock *sk;
+		const struct hlist_nulls_node *node;
+
+		if (hlist_nulls_empty(&tcp_hashinfo.ehash[bucket].chain))
+			continue;
+
+		sk_nulls_for_each(sk, node, &tcp_hashinfo.ehash[bucket].chain) {
+			int reset = 1;
+
+			struct inet_sock *inet = inet_sk(sk);
+
+			spin_lock_bh(&sk->sk_lock.slock);
+
+			if (skip_lh && ipv4_is_loopback(inet->inet_saddr)) {
+				reset = 0;
+			}
+
+			if (reset) {
+				__reset_port_skip *r = rps;
+				while (r != NULL) {
+					// Comparing skip list with local port
+					if (r->port == inet->inet_num) {
+						reset = 0;
+						break;
+					}
+
+					r = r->next;
+				}
+			}
+
+			if (reset) {
+				tcp_send_active_reset(sk, GFP_ATOMIC);
+
+				sk->sk_err = ETIMEDOUT;
+				sk->sk_error_report(sk);
+
+				tcp_done(sk);
+			}
+
+			spin_unlock_bh(&sk->sk_lock.slock);
+		}
+	}
+}
+
+#define N_PROC_TCPRESET			"reset"
+#define N_PROC_TCPRESET_MAX		2
+static struct proc_dir_entry *proc_tcpreset[N_PROC_TCPRESET_MAX];
+int proc_tcpreset_count = 0;
+
+/* This Static Reset Port Skip list is populated on screen blank, processed at suspend */
+static __reset_port_skip *rps;
+static int tcp_reset_mode = -1;
+DEFINE_SEMAPHORE(rps_semaphore);
+
+static int
+proc_tcpreset_write(
+	struct file *file,
+	const char __user *buf,
+	unsigned long count,
+	void *data)
+{
+    char *lbuf = NULL;
+    char *p = NULL;
+
+	lbuf = kmalloc(count, GFP_KERNEL);
+	if (lbuf == NULL) {
+	  return -ENOMEM;
+	}
+
+	memset(lbuf, 0, count);
+
+	if (copy_from_user(lbuf, buf, count)) {
+		kfree(lbuf);
+		return -EFAULT;
+	}
+
+	down(&rps_semaphore);
+	p = lbuf;
+
+	if (*p++ == '4') {
+		tcp_reset_mode = -1;
+
+		if (*p == '2') {
+			tcp_reset_mode = 0;
+		} else if (*p == '3') {
+			tcp_reset_mode = 1;
+		}
+
+		if (tcp_reset_mode != -1) {
+			char *q;
+
+			/* Empty the static Reset Port Skip List */
+			while (rps != NULL) {
+				__reset_port_skip *next = rps->next;
+				kfree(rps);
+				rps = next;
+			}
+
+			if (p[1] == ',') {
+				++p;
+			}
+
+			do {
+				unsigned long v;
+
+		  q = strnchr(++p, count, ',');
+		  if (q != NULL) {
+			*q = '\0';
+		  }
+
+				v = simple_strtoul(p, NULL, 10);
+				if (v != 0) {
+					__reset_port_skip *r =
+					kmalloc(sizeof(__reset_port_skip), GFP_KERNEL);
+					if (r != NULL) {
+						r->next = rps;
+						r->port = (__u16)v;
+						rps = r;
+					}
+				}
+
+				p = q;
+			} while (p != NULL);
+		}
+	}
+
+	up(&rps_semaphore);
+
+	kfree(lbuf);
+	return count;
+}
+
+void tcpreset_begin_suspend(void)
+{
+  printk("tcpreset_begin_suspend\n");
+  down(&rps_semaphore);
+  tcp_force_reset(tcp_reset_mode, rps);
+  up(&rps_semaphore);
+}
+EXPORT_SYMBOL(tcpreset_begin_suspend);
+#endif
+
 int tcp_proc_register(struct net *net, struct tcp_seq_afinfo *afinfo)
 {
 	int rc = 0;
 	struct proc_dir_entry *p;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	char proc_name[32];
+#endif
 
 	afinfo->seq_ops.start		= tcp_seq_start;
 	afinfo->seq_ops.next		= tcp_seq_next;
 	afinfo->seq_ops.stop		= tcp_seq_stop;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	sema_init(&rps_semaphore, 1);
+#endif
 
 	p = proc_create_data(afinfo->name, S_IRUGO, net->proc_net,
 			     afinfo->seq_fops, afinfo);
 	if (!p)
 		rc = -ENOMEM;
+
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	sprintf(proc_name, "%s%s", afinfo->name, N_PROC_TCPRESET);
+
+	if (proc_tcpreset_count < N_PROC_TCPRESET_MAX) {
+		proc_tcpreset[proc_tcpreset_count] = create_proc_entry(proc_name, S_IWUGO, NULL);
+		if (proc_tcpreset[proc_tcpreset_count] != NULL) {
+			proc_tcpreset[proc_tcpreset_count]->data = afinfo;
+			proc_tcpreset[proc_tcpreset_count]->read_proc = NULL;
+			proc_tcpreset[proc_tcpreset_count]->write_proc = proc_tcpreset_write;
+			proc_tcpreset_count++;
+		}
+	}
+#endif
+
 	return rc;
 }
 EXPORT_SYMBOL(tcp_proc_register);
 
 void tcp_proc_unregister(struct net *net, struct tcp_seq_afinfo *afinfo)
 {
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	char proc_name[32];
+	int i = 0;
+#endif
+
 	proc_net_remove(net, afinfo->name);
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	while (i < proc_tcpreset_count && proc_tcpreset[i] != NULL && proc_tcpreset[i]->data != afinfo)
+		i++;
+ 	if (i < N_PROC_TCPRESET_MAX) {
+		sprintf(proc_name, "%s%s", afinfo->name, N_PROC_TCPRESET);
+		remove_proc_entry(proc_name, NULL);
+
+		proc_tcpreset[i] = NULL;
+		proc_tcpreset_count--;
+	}
+#endif
 }
 EXPORT_SYMBOL(tcp_proc_unregister);
 
