@@ -64,16 +64,15 @@
 
 #include <video/omapdss.h>
 
-#include <linux/mfd/tlv320aic31xx-registers.h>
-#include <linux/mfd/tlv320aic3xxx-registers.h>
-#include <linux/mfd/tlv320aic3xxx-core.h>
-
 #include <linux/platform_data/emif_plat.h>
 #include <linux/platform_data/lm75_platform_data.h>
 #include <linux/input/bma250.h>
 #include <linux/power/bq27541_battery.h>
 #include <linux/leds-otter-button.h>
+
+#ifdef CONFIG_SUMMIT_SMB347_Q
 #include <linux/power/smb347-otter.h>
+#endif
 
 #include "omap_ram_console.h"
 #include "common.h"
@@ -85,6 +84,8 @@
 #include "prm-regbits-44xx.h"
 #include "prm44xx.h"
 #include "voltage.h"
+
+#include "../../../sound/soc/codecs/tlv320aic31xx.h"
 
 #include "board-4430kc1-tablet.h"
 
@@ -175,17 +176,11 @@ static struct aic3xxx_gpio_setup aic3xxx_gpio[] ={
 
 static struct aic3xxx_pdata aic31xx_codec_pdata ={
 	.audio_mclk1 = 19200000,
-	.gpio_defaults = aic3xxx_gpio,
 	.num_gpios = ARRAY_SIZE(aic3xxx_gpio),
-	.irq_base = TWL6040_CODEC_IRQ_BASE,
-	.regulator_name = "audio-pwr",
-	.regulator_min_uV = 3000000,
-	.regulator_max_uV = 3000000,
-};
-
-static struct platform_device sdp4430_aic3110 = {
-        .name   = "omap4-panda-aic31xx",
-        .id     = -1,
+	.gpio_irq = 1,
+	.gpio_defaults = aic3xxx_gpio,
+	.naudint_irq = 0,
+	.irq_base = AIC31XX_CODEC_IRQ_BASE,
 };
 #endif
 
@@ -278,9 +273,6 @@ static struct platform_device __initdata *sdp4430_devices[] = {
 #ifdef CONFIG_LEDS_OTTER_BUTTON
 	&orange_led,
 	&green_led,
-#endif
-#ifdef CONFIG_SND_SOC_TLV320AIC31XX
-	&sdp4430_aic3110,
 #endif
 };
 
@@ -436,6 +428,7 @@ static struct bq27541_battery_platform_data bq27541_pdata = {
 	.led_callback		= battery_led_callback,
 };
 
+#ifdef CONFIG_SUMMIT_SMB347_Q
 #if 0
 static int kc1_phydetect_setting[] = {
 /*0*/	FCC_2500mA | PCC_150mA | TC_150mA,
@@ -557,6 +550,7 @@ static struct summit_smb347_platform_data smb347_pdata = {
 	.charger_setting_skip_flag = true,
 	.led_callback		= battery_led_callback,
 };
+#endif
 
 static struct i2c_board_info __initdata sdp4430_i2c_boardinfo_dvt[] = {
 #ifdef CONFIG_BATTERY_BQ27541_Q
@@ -581,7 +575,7 @@ static struct i2c_board_info __initdata sdp4430_i2c_2_boardinfo[] = {
 
 static struct i2c_board_info __initdata sdp4430_i2c_3_boardinfo[] = {
 #ifdef CONFIG_SND_SOC_TLV320AIC31XX
-	{ I2C_BOARD_INFO("tlv320aic31xx", 0x18), .platform_data = &aic31xx_codec_pdata, },
+	{ I2C_BOARD_INFO("tlv320aic31xx-codec", 0x18), .platform_data = &aic31xx_codec_pdata, },
 #endif
 };
 
@@ -844,7 +838,9 @@ static int __init omap4_i2c_init(void)
 {
 	int err;
 
+#ifdef CONFIG_SUMMIT_SMB347_Q
 	smb347_pdata.mbid = quanta_get_mbid();
+#endif
 
 	omap_i2c_hwspinlock_init(1, 0, &sdp4430_i2c_bus_pdata);
 	omap_i2c_hwspinlock_init(2, 1, &sdp4430_i2c_2_bus_pdata);
@@ -872,7 +868,7 @@ static int __init omap4_i2c_init(void)
 		TWL_COMMON_REGULATOR_V1V8 |
 		TWL_COMMON_REGULATOR_V2V1);
 #endif
-	omap_pmic_init(1, 400, "twl6030", OMAP44XX_IRQ_SYS_1N, &sdp4430_twldata);
+	omap4_pmic_init("twl6030", &sdp4430_twldata, NULL, OMAP44XX_IRQ_SYS_2N);
 
 	/*
 	 * Phoenix Audio IC needs I2C1 to
@@ -933,9 +929,6 @@ static void __init omap4_display_init(void)
 	iounmap(phymux_base);
 }
 
-static bool enable_suspend_off = true;
-module_param(enable_suspend_off, bool, S_IRUGO);
-
 /******** END I2C BOARD INIT ********/
 
 #if defined(CONFIG_TOUCHSCREEN_ILITEK)
@@ -995,6 +988,8 @@ void __init board_serial_init(void)
 
 #ifdef CONFIG_OMAP_MUX
 static struct omap_board_mux board_mux[] __initdata = {
+    OMAP4_MUX(SYS_NIRQ2, OMAP_MUX_MODE7 | OMAP_PIN_OUTPUT),
+    OMAP4_MUX(SYS_NIRQ1, OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP | OMAP_WAKEUP_EN),
 #if 0
     OMAP4_MUX(ABE_DMIC_CLK1,OMAP_MUX_MODE3 | OMAP_OFF_EN),//+5V ADO_SPEAK_ENABLE
     OMAP4_MUX(GPMC_AD0, OMAP_MUX_MODE1 | OMAP_PIN_INPUT | OMAP_OFF_EN | OMAP_OFFOUT_EN), // SDMMC2_DAT0
@@ -1156,22 +1151,14 @@ static void enable_rtc_gpio(void){
 
 static void __init omap4_kc1_wifi_mux_init(void)
 {
-	omap_mux_init_gpio(GPIO_WIFI_IRQ, OMAP_PIN_INPUT |
-				OMAP_PIN_OFF_WAKEUPENABLE);
+	omap_mux_init_gpio(GPIO_WIFI_IRQ, OMAP_PIN_INPUT | OMAP_PIN_OFF_WAKEUPENABLE);
 	omap_mux_init_gpio(GPIO_WIFI_PMENA, OMAP_PIN_OUTPUT);
-
-	omap_mux_init_signal("sdmmc5_cmd.sdmmc5_cmd",
-				OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP);
-	omap_mux_init_signal("sdmmc5_clk.sdmmc5_clk",
-				OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP);
-	omap_mux_init_signal("sdmmc5_dat0.sdmmc5_dat0",
-				OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP);
-	omap_mux_init_signal("sdmmc5_dat1.sdmmc5_dat1",
-				OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP);
-	omap_mux_init_signal("sdmmc5_dat2.sdmmc5_dat2",
-				OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP);
-	omap_mux_init_signal("sdmmc5_dat3.sdmmc5_dat3",
-				OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP);
+	omap_mux_init_signal("sdmmc5_cmd.sdmmc5_cmd",	OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP);
+	omap_mux_init_signal("sdmmc5_clk.sdmmc5_clk",	OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP);
+	omap_mux_init_signal("sdmmc5_dat0.sdmmc5_dat0",	OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP);
+	omap_mux_init_signal("sdmmc5_dat1.sdmmc5_dat1",	OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP);
+	omap_mux_init_signal("sdmmc5_dat2.sdmmc5_dat2",	OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP);
+	omap_mux_init_signal("sdmmc5_dat3.sdmmc5_dat3",	OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP);
 }
 
 static void __init omap4_kc1_wifi_init(void)
@@ -1228,17 +1215,6 @@ static void __init omap4_ehci_ohci_init(void){}
  * Same devices installed on EMIF1 and EMIF2
  */
 
-#if defined(CONFIG_TI_EMIF) || defined(CONFIG_TI_EMIF_MODULE)
-struct ddr_device_info lpddr2_elpida_2G_S4_x1_info = {
-.type	= DDR_TYPE_LPDDR2_S4,
-.density	= DDR_DENSITY_2Gb,
-.io_width	= DDR_IO_WIDTH_32,
-.cs1_used	= false,
-.cal_resistors_per_cs = false,
-.manufacturer	= "Elpida"
-};
-#endif
-
 static void __init omap_kc1_init(void)
 {
 	int package = OMAP_PACKAGE_CBS;
@@ -1283,6 +1259,7 @@ static void __init omap_kc1_init(void)
 	gpio_request(42, "OMAP_GPIO_ADC");
 	gpio_direction_output(42, 0);
 
+#ifdef CONFIG_SUMMIT_SMB347_Q
 	/*For smb347*/
 	//Enable charger interrupt wakeup function.
 	omap_mux_init_signal("fref_clk4_req.gpio_wk7", \
@@ -1298,6 +1275,8 @@ static void __init omap_kc1_init(void)
 		gpio_request(155, "CHARGE-SUSP");
 		gpio_direction_output(155, 1);
 	}
+#endif
+
 	omap4_kc1_wifi_init();
 
 	omap4_kc1_display_init();
@@ -1321,15 +1300,17 @@ static void __init omap_kc1_init(void)
 	////////////////////////////////////////////
 
 	omap_enable_smartreflex_on_init();
-	if (enable_suspend_off)
-		omap_pm_enable_off_mode();
+	omap_pm_enable_off_mode();
 }
 
 static void __init omap_4430sdp_reserve(void)
 {
 	omap_init_ram_size();
 
-	omap_ram_console_init(OMAP_RAM_CONSOLE_START_DEFAULT, OMAP_RAM_CONSOLE_SIZE_DEFAULT);
+	if (omap_total_ram_size() > SZ_512M)
+		omap_ram_console_init(OMAP_RAM_CONSOLE_START_DEFAULT, OMAP_RAM_CONSOLE_SIZE_DEFAULT);
+	else
+		omap_ram_console_init(OMAP_RAM_CONSOLE_START_DEFAULT_512M, OMAP_RAM_CONSOLE_SIZE_DEFAULT);
 	omap_rproc_reserve_cma(RPROC_CMA_OMAP4);
 
 #ifdef CONFIG_ION_OMAP
@@ -1340,9 +1321,13 @@ static void __init omap_4430sdp_reserve(void)
 #endif
 
 	/* do the static reservations first */
-	omap_secure_set_secure_workspace_addr(omap_smc_addr(), omap_smc_size());
+	//omap_secure_set_secure_workspace_addr(omap_smc_addr(), omap_smc_size());
 
-	omap_reserve();
+	//HASH: don't call omap_reserve() here, omap_type() breaks GP
+	omap_vram_reserve_sdram_memblock();
+	omap_dsp_reserve_sdram_memblock();
+	omap_secure_ram_reserve_memblock();
+	omap_barrier_reserve_memblock();
 }
 
 MACHINE_START(OMAP_4430SDP, "OMAP4430")
