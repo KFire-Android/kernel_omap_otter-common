@@ -452,8 +452,10 @@ static void wq_sync_buffer(struct work_struct *work)
 	struct oprofile_cpu_buffer *b =
 		container_of(work, struct oprofile_cpu_buffer, work.work);
 	if (b->cpu != smp_processor_id()) {
+#ifndef CONFIG_MACH_OMAP4_BOWSER
 		printk(KERN_DEBUG "WQ on CPU%d, prefer CPU%d\n",
 		       smp_processor_id(), b->cpu);
+#endif
 
 		if (!cpu_online(b->cpu)) {
 			cancel_delayed_work(&b->work);
@@ -464,5 +466,9 @@ static void wq_sync_buffer(struct work_struct *work)
 
 	/* don't re-add the work if we're shutting down */
 	if (work_enabled)
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+		schedule_delayed_work_on(b->cpu, &b->work, DEFAULT_TIMER_EXPIRE);
+#else
 		schedule_delayed_work(&b->work, DEFAULT_TIMER_EXPIRE);
+#endif
 }
