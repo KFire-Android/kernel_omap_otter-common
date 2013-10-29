@@ -65,7 +65,7 @@
 #include "common.h"
 #include "control.h"
 #include "common-board-devices.h"
-#include "omap4_ion.h"
+#include <mach/omap4_ion.h>
 #include "omap_ram_console.h"
 #include "board-bowser.h"
 #include "board-bowser-idme.h"
@@ -137,7 +137,7 @@ static struct platform_device *bowser_audio_devices[] __initdata = {
 };
 
 #ifdef CONFIG_CHARGER_SMB347
-    #include <linux/power/smb347.h>
+    #include <linux/power/smb347-bowser.h>
 #endif
 
 static struct omap_musb_board_data musb_board_data = {
@@ -176,12 +176,6 @@ static struct omap2_hsmmc_info mmc[] = {
 	},
 	{}	/* Terminator */
 };
-
-static struct regulator_consumer_supply sdp4430_vcxio_supply[] = {
-	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dss"),
-	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dsi1"),
-};
-
 
 /* GPIO_KEY for Bowser */
 /* Config VolumeUp : GPIO_WK1 , VolumeDown : GPIO_50 */
@@ -384,6 +378,12 @@ static struct regulator_init_data sdp4430_vusim = {
 #endif
 };
 
+static struct regulator_consumer_supply sdp4430_vcxio_supply[] = {
+	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dss"),
+	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dsi.0"),
+	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dsi.1"),
+};
+
 static struct regulator_init_data sdp4430_vcxio = {
 	.constraints = {
 		.min_uV                 = 1800000,
@@ -398,6 +398,7 @@ static struct regulator_init_data sdp4430_vcxio = {
 	.consumer_supplies      = sdp4430_vcxio_supply,
 };
 
+#if 0
 static struct regulator_consumer_supply omap4_vaux_supply[] = {
 	REGULATOR_SUPPLY("vmmc", "omap_hsmmc.1"),
 };
@@ -417,14 +418,16 @@ static struct regulator_init_data jem_vaux1_idata = {
 	.num_consumer_supplies  = ARRAY_SIZE(omap4_vaux_supply),
 	.consumer_supplies      = omap4_vaux_supply,
 };
+#endif
 
 static struct twl4030_platform_data jem_twldata = {
-	.vaux1		= &jem_vaux1_idata,
-	.ldo2		= &jem_vaux1_idata,
 	/* TWL6030 regulators at OMAP443X/446X based SOMs */
+//	.vaux1		= &jem_vaux1_idata,
 	.vusim		= &sdp4430_vusim,
 	.vcxio		= &sdp4430_vcxio,
 	/* TWL6032 regulators at OMAP447X based SOMs */
+//	.ldo2		= &jem_vaux1_idata,
+	.ldo6		= &sdp4430_vcxio,
 	.ldo7		= &sdp4430_vusim,
 };
 #ifdef CONFIG_SND_SOC_WM8962
@@ -447,56 +450,29 @@ static struct tmp103_platform_data tmp103_case_info = {
 
 static struct i2c_board_info __initdata jem_i2c_2_boardinfo[] = {
 #ifdef CONFIG_TOUCHSCREEN_CYPRESS_TTSP
-	{
-		I2C_BOARD_INFO(CY_I2C_NAME, CY_I2C_TCH_ADR),
-		.platform_data = &cyttsp4_i2c_touch_platform_data,
-		.irq = GPIO_TOUCH_IRQ,
-	},
+	{ I2C_BOARD_INFO(CY_I2C_NAME, CY_I2C_TCH_ADR), .irq = GPIO_TOUCH_IRQ, .platform_data = &cyttsp4_i2c_touch_platform_data, },
 #endif
 };
 
 static struct i2c_board_info __initdata jem_i2c_3_boardinfo[] = {
 #if defined(CONFIG_BATTERY_BQ27541)
-	{
-		I2C_BOARD_INFO("bq27541", 0x55),
-	},
+	{ I2C_BOARD_INFO("bq27541", 0x55), },
 #endif
-
 #if defined(CONFIG_SND_SOC_WM8962)
-        {
-                I2C_BOARD_INFO("wm8962", 0x1a),
-                .platform_data = &wm8962_pdata,
-        },
+        { I2C_BOARD_INFO("wm8962", 0x1a), .platform_data = &wm8962_pdata, },
 #endif
-
 #if defined(CONFIG_TMP103_SENSOR)
-	{
-		I2C_BOARD_INFO("tmp103_temp_sensor", 0x70),
-		.platform_data = &tmp103_case_info,
-	},
+	{ I2C_BOARD_INFO("tmp103_temp_sensor", 0x70), .platform_data = &tmp103_case_info, },
 #endif
-
 #ifdef CONFIG_CHARGER_SMB347
-	{
-		I2C_BOARD_INFO(SMB347_NAME, 0x5F),
-		.platform_data = &smb347_pdata,
-		.irq = GPIO_SMB347_IRQ,
-	},
+	{ I2C_BOARD_INFO(SMB347_NAME, 0x5F), .platform_data = &smb347_pdata, .irq = GPIO_SMB347_IRQ, },
 #endif
 };
 
 static struct i2c_board_info __initdata jem_i2c_4_boardinfo[] = {
 #ifdef CONFIG_INV_MPU_IIO
-	{
-		I2C_BOARD_INFO("mpu6xxx", 0x68),
-		.irq = GPIO_GRYO,
-		.platform_data = &mpu_gyro_data,
-	},
-	/*{
-		I2C_BOARD_INFO("ami306", 0x0F),
-		.irq = OMAP_GPIO_IRQ(GPIO_GRYO),
-		.platform_data = &mpu_compass_data,
-	},*/
+	{ I2C_BOARD_INFO("mpu6xxx", 0x68), .irq = GPIO_GRYO, .platform_data = &mpu_gyro_data, },
+//	{I2C_BOARD_INFO("ami306", 0x0F), .irq = OMAP_GPIO_IRQ(GPIO_GRYO), .platform_data = &mpu_compass_data, },
 #endif
 };
 
@@ -719,12 +695,20 @@ static void __init omap_jem_init(void)
 
 static void __init omap_jem_reserve(void)
 {
-	omap_ram_console_init(OMAP_RAM_CONSOLE_START_DEFAULT,
-			OMAP_RAM_CONSOLE_SIZE_DEFAULT);
+	omap_init_ram_size();
+
+	omap_ram_console_init(OMAP_RAM_CONSOLE_START_DEFAULT, OMAP_RAM_CONSOLE_SIZE_DEFAULT);
 	omap_rproc_reserve_cma(RPROC_CMA_OMAP4);
-	bowser_android_display_setup(NULL);
+
+#ifdef CONFIG_ION_OMAP
+	bowser_android_display_setup(get_omap_ion_platform_data());
 	omap4_ion_init();
+#else
+	bowser_android_display_setup(NULL);
+#endif
+
 	omap4_secure_workspace_addr_default();
+
 	omap_reserve();
 }
 
