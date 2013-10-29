@@ -173,7 +173,11 @@ int __init omap_android_display_setup(struct omap_dss_board_info *dss,
 	struct omap_android_display_data mem = {
 		.bpp = 4,
 		.width = 1920,
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+		.height = 1200,
+#else
 		.height = 1080,
+#endif
 	};
 
 	if (!sgx || !sgx->num_configs)
