@@ -594,8 +594,22 @@ request_firmware(const struct firmware **firmware_p, const char *name,
 		return PTR_RET(fw_priv);
 
 	ret = usermodehelper_read_trylock();
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	if (ret) {
+#else
 	if (WARN_ON(ret)) {
+#endif
 		dev_err(device, "firmware: %s will not be loaded\n", name);
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+		/*
+		 * Only show backtraces if system is in normal running mode.
+		 * If we're rebooting then don't scare users. It is normal
+		 * and expected behaviour for usermode helper to be frozen
+		 * during reboot/poweroff/halt.
+		 */
+		WARN_ON(system_state == SYSTEM_RUNNING);
+		WARN_ON(system_state == SYSTEM_BOOTING);
+#endif
 	} else {
 		ret = _request_firmware_load(fw_priv, true,
 					firmware_loading_timeout());
