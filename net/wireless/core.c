@@ -18,6 +18,9 @@
 #include <linux/etherdevice.h>
 #include <linux/rtnetlink.h>
 #include <linux/sched.h>
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+#include <linux/vmalloc.h>
+#endif
 #include <net/genetlink.h>
 #include <net/cfg80211.h>
 #include "nl80211.h"
@@ -341,7 +344,11 @@ struct wiphy *wiphy_new(const struct cfg80211_ops *ops, int sizeof_priv)
 
 	alloc_size = sizeof(*rdev) + sizeof_priv;
 
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	rdev = vzalloc(alloc_size);
+#else
 	rdev = kzalloc(alloc_size, GFP_KERNEL);
+#endif
 	if (!rdev)
 		return NULL;
 
@@ -355,7 +362,11 @@ struct wiphy *wiphy_new(const struct cfg80211_ops *ops, int sizeof_priv)
 		wiphy_counter--;
 		mutex_unlock(&cfg80211_mutex);
 		/* ugh, wrapped! */
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+		vfree(rdev);
+#else
 		kfree(rdev);
+#endif
 		return NULL;
 	}
 
@@ -720,7 +731,11 @@ void cfg80211_dev_free(struct cfg80211_registered_device *rdev)
 	list_for_each_entry_safe(scan, tmp, &rdev->bss_list, list)
 		cfg80211_put_bss(&scan->pub);
 	cfg80211_rdev_free_wowlan(rdev);
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	vfree(rdev);
+#else
 	kfree(rdev);
+#endif
 }
 
 void wiphy_free(struct wiphy *wiphy)
