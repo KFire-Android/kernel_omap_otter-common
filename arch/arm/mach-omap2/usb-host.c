@@ -61,10 +61,14 @@ static struct omap_device_pm_latency omap_uhhtll_latency[] = {
 static const struct omap_device_pad port1_phy_pads[] __initconst = {
 	{
 		.name = "usbb1_ulpitll_stp.usbb1_ulpiphy_stp",
+#ifndef CONFIG_MACH_OMAP4_BOWSER
 		.flags  = OMAP_DEVICE_PAD_REMUX,
+#endif
 		.enable = OMAP_PIN_OUTPUT | OMAP_MUX_MODE4,
+#ifndef CONFIG_MACH_OMAP4_BOWSER
 		.idle = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE7,
 		.off = OMAP_PIN_OFF_OUTPUT_LOW | OMAP_MUX_MODE7,
+#endif
 	},
 	{
 		.name = "usbb1_ulpitll_clk.usbb1_ulpiphy_clk",
@@ -217,10 +221,14 @@ static const struct omap_device_pad port3_hsic_pads[] __initconst = {
 static const struct omap_device_pad port2_phy_pads[] __initconst = {
 	{
 		.name = "usbb2_ulpitll_stp.usbb2_ulpiphy_stp",
+#ifndef CONFIG_MACH_OMAP4_BOWSER
 		.flags  = OMAP_DEVICE_PAD_REMUX,
+#endif
 		.enable = OMAP_PIN_OUTPUT | OMAP_MUX_MODE4,
+#ifndef CONFIG_MACH_OMAP4_BOWSER
 		.idle = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE7,
 		.off = OMAP_PIN_OFF_OUTPUT_LOW | OMAP_MUX_MODE7,
+#endif
 	},
 	{
 		.name = "usbb2_ulpitll_clk.usbb2_ulpiphy_clk",
