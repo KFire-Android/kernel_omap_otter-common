@@ -114,6 +114,9 @@ static void omap2_iommu_disable(struct omap_iommu *obj)
 	oh = omap_hwmod_lookup(obj->name);
 	if (!oh)
 		return;
+#ifdef CONFIG_MACH_OMAP4_BOWSER
+	clkdm_deny_idle(oh->clkdm);
+#endif
 	/*
 	 * IPU and DSP iommus are not directly connected to the processor
 	 * instead they are  behind a shared MMU. Therefore in the case of
@@ -179,7 +182,9 @@ static u32 omap2_iommu_fault_isr(struct omap_iommu *obj, u32 *ra)
 		errs |= OMAP_IOMMU_ERR_MULTIHIT_FAULT;
 	iommu_write_reg(obj, stat, MMU_IRQSTATUS);
 
+#ifndef CONFIG_MACH_OMAP4_BOWSER
 	clkdm_deny_idle(oh->clkdm);
+#endif
 
 	return errs;
 }
