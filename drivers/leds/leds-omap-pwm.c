@@ -257,7 +257,7 @@ static int omap_pwm_led_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, led);
 	led->cdev.brightness_set = omap_pwm_led_set;
-	led->cdev.max_brightness = LED_FULL;
+	led->cdev.max_brightness = LED_FULL - 1; /* HASH: stop overheat */
 	led->cdev.brightness = pdata->def_brightness;
 	led->cdev.default_trigger = NULL;
 	led->cdev.name = pdata->name;
