@@ -4558,8 +4558,8 @@ static struct omap_hwmod_addr_space dra7xx_dss_addrs[] = {
 	},
 	{
 		.name		= "pllctrl2",
-		.pa_start	= 0x58005000,
-		.pa_end		= 0x5800533f,
+		.pa_start	= 0x58009000,
+		.pa_end		= 0x5800933f,
 	},
 };
 
