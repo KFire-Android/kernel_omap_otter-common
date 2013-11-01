@@ -469,13 +469,6 @@ static void hdmi_panel_disable(struct omap_dss_device *dssdev)
 	}
 
 	if (dssdev->state == OMAP_DSS_DISPLAY_ACTIVE) {
-		/*
-		 * TODO: notify audio users that the display was disabled. For
-		 * now, disable audio locally to not break our audio state
-		 * machine.
-		 */
-		hdmi_panel_audio_disable(dssdev);
-		dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
 #ifdef CONFIG_USE_FB_MODE_DB
 		dssdev->output->manager->blank(dssdev->output->manager, true);
 #endif
