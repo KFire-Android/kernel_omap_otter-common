@@ -233,6 +233,10 @@ config VIDEO_TI_VPDMA
 	  A helper library used for TI Video processing subsystem
 	  found on DRA7xx SoC.
 
+config VIDEO_LOAD_KERNEL_VPDMA
+	bool "Load VPDMA F/W from Kernel"
+	default n
+
 menuconfig V4L_TEST_DRIVERS
 	bool "Media test drivers"
 	depends on MEDIA_CAMERA_SUPPORT

@@ -147,7 +147,8 @@
 		nshutdown_gpio = <132>;
 		dev_name = "/dev/ttyO2";
 		flow_cntrl = <1>;
-		baud_rate = <115200>;
+		baud_rate = <3686400>;
+		gpios = <&pcf_lcd3 14 0>; /* pcf8575@21 P16 */
 	};
 
 	btwilink {

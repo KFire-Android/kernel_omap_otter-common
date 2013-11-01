@@ -640,7 +640,11 @@
 			operating-points = <
 				/* kHz    uV */
 				425600  1090000
-				500000  1210000
+				/* FIXME: Cannot get 500 MHz with the same clock source as
+				 * 425.6 MHz and 532 MHz. 500 MHz is not supported
+				 * in SW and should be removed from the specification.
+				 */
+				/* 500000  1210000 */
 				532000  1280000
 				>;
 			clocks = <&dpll_core_h14x2_ck>, <&dpll_per_h14x2_ck>,
