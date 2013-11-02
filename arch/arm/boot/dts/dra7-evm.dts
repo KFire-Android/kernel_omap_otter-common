@@ -349,18 +349,18 @@
 			0x27c	0x00040000 /* rgmii1_rd0 PIN_INPUT | MUX_MODE0 */
 
 			/* Slave 2 */
-			0x198	0x4 /* rgmii2_tclk PIN_OUTPUT | MUX_MODE4 */
-			0x19c	0x4 /* rgmii2_tctl PIN_OUTPUT | MUX_MODE4 */
-			0x1a0	0x4 /* rgmii2_td3 PIN_OUTPUT | MUX_MODE4 */
-			0x1a4	0x4 /* rgmii2_td2 PIN_OUTPUT | MUX_MODE4 */
-			0x1a8	0x4 /* rgmii2_td1 PIN_OUTPUT | MUX_MODE4 */
-			0x1ac	0x4 /* rgmii2_td0 PIN_OUTPUT | MUX_MODE4 */
-			0x1b0	0x00040004 /* rgmii2_rclk PIN_INPUT | MUX_MODE4 */
-			0x1b4	0x00040004 /* rgmii2_rctl PIN_INPUT | MUX_MODE4 */
-			0x1b8	0x00040004 /* rgmii2_rd3 PIN_INPUT | MUX_MODE4 */
-			0x1bc	0x00040004 /* rgmii2_rd2 PIN_INPUT | MUX_MODE4 */
-			0x1c0	0x00040004 /* rgmii2_rd1 PIN_INPUT | MUX_MODE4 */
-			0x1c4	0x00040004 /* rgmii2_rd0 PIN_INPUT | MUX_MODE4 */
+			0x198	0x3 /* rgmii2_tclk PIN_OUTPUT | MUX_MODE3 */
+			0x19c	0x3 /* rgmii2_tctl PIN_OUTPUT | MUX_MODE3 */
+			0x1a0	0x3 /* rgmii2_td3 PIN_OUTPUT | MUX_MODE3 */
+			0x1a4	0x3 /* rgmii2_td2 PIN_OUTPUT | MUX_MODE3 */
+			0x1a8	0x3 /* rgmii2_td1 PIN_OUTPUT | MUX_MODE3 */
+			0x1ac	0x3 /* rgmii2_td0 PIN_OUTPUT | MUX_MODE3 */
+			0x1b0	0x00040003 /* rgmii2_rclk PIN_INPUT | MUX_MODE3 */
+			0x1b4	0x00040003 /* rgmii2_rctl PIN_INPUT | MUX_MODE3 */
+			0x1b8	0x00040003 /* rgmii2_rd3 PIN_INPUT | MUX_MODE3 */
+			0x1bc	0x00040003 /* rgmii2_rd2 PIN_INPUT | MUX_MODE3 */
+			0x1c0	0x00040003 /* rgmii2_rd1 PIN_INPUT | MUX_MODE3 */
+			0x1c4	0x00040003 /* rgmii2_rd0 PIN_INPUT | MUX_MODE3 */
 				>;
 		};
 
@@ -432,8 +432,8 @@
 		reg = <0x20>;
 		gpio-controller;
 		#gpio-cells = <2>;
-		/* HACK: Using n_latch in cf8575 driver to "drive P10" to not hold ETH0 in reset */
-		n_latch = <0xfeff>;
+		/* HACK: Using n_latch in pcf8575 driver to "drive P10/11" to not hold ETH0/1 in reset */
+		n_latch = <0xfcff>;
 	};
 
 	pcf_lcd3: pcf8575@21 {
