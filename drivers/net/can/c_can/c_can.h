@@ -150,6 +150,11 @@ enum c_can_dev_id {
 	BOSCH_D_CAN,
 };
 
+
+struct c_can_raminit_bits {
+	u8 start;
+	u8 done;
+};
 /* c_can private data structure */
 struct c_can_priv {
 	struct can_priv can;	/* must be the first member */
@@ -170,6 +175,7 @@ struct c_can_priv {
 	u16 irqstatus;
 	enum c_can_dev_id type;
 	u32 __iomem *raminit_ctrlreg;
+	struct c_can_raminit_bits raminit_bits;
 	unsigned int instance;
 	void (*raminit) (const struct c_can_priv *priv);
 };

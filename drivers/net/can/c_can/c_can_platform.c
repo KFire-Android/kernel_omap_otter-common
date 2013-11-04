@@ -38,6 +38,9 @@
 
 #include "c_can.h"
 
+#define CAN_DEFAULT_RAMINIT_START_BIT	0
+#define CAN_DEFAULT_RAMINIT_DONE_BIT	8
+
 #define CAN_RAMINIT_BIT_MASK(i)	(1 << (i))
 
 /*
@@ -75,7 +78,7 @@ static void c_can_hw_raminit(const struct c_can_priv *priv)
 	u32 val;
 
 	val = readl(priv->raminit_ctrlreg);
-	val |= CAN_RAMINIT_BIT_MASK(priv->instance);
+	val |= CAN_RAMINIT_BIT_MASK(priv->raminit_bits.start);
 	writel(val, priv->raminit_ctrlreg);
 }
 
@@ -197,6 +200,10 @@ static int c_can_plat_probe(struct platform_device *pdev)
 		else
 			priv->instance = pdev->id;
 
+		priv->raminit_bits.start =
+			(1 << (priv->instance + CAN_DEFAULT_RAMINIT_START_BIT));
+		priv->raminit_bits.done =
+			(1 << (priv->instance + CAN_DEFAULT_RAMINIT_DONE_BIT));
 		res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
 		priv->raminit_ctrlreg =	devm_request_and_ioremap(&pdev->dev, res);
 		if (!priv->raminit_ctrlreg || priv->instance < 0)
