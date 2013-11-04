@@ -368,6 +368,20 @@
 			0x2c8 0x106000E	/* WLAN_IRQ: INPUT | WAKEUP_ENABLE | MODE 14 */
 		>;
 	};
+
+	dcan1_pins: pinmux_dcan1_pins {
+		pinctrl-single,pins = <
+			0x3d0	0x00000000	/* DCAN1_TX: MODE0 */
+			0x3d4	0x00060000	/* DCAN1_RX: MODE0 | INPUTENABLE | PULLUP */
+		>;
+	};
+
+	dcan2_pins: pinmux_dcan2_pins {
+		pinctrl-single,pins = <
+			0x288	0x00000002	/* DCAN2_TX: MODE2 */
+			0x28C	0x00060002	/* DCAN2_RX: MODE2 | INPUTENABLE | PULLUP */
+		>;
+	};
 };
 
 &gmac {
@@ -538,6 +552,18 @@
 
 &i2c5 {
 	clock-frequency = <400000>;
+};
+
+&dcan1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&dcan1_pins>;
+	status = "okay";
+};
+
+&dcan2 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&dcan2_pins>;
+	status = "okay";
 };
 
 &mmc1 {

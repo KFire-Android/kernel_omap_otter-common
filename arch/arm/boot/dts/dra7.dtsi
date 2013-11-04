@@ -20,6 +20,8 @@
 		serial3 = &uart4;
 		serial4 = &uart5;
 		serial5 = &uart6;
+		d_can0 = &dcan1;
+		d_can1 = &dcan2;
 	};
 
 	cpus {
@@ -148,6 +150,11 @@
 		};
 
 		gpu_hyd_gclk_mux: gpu_hyd_gclk_mux {
+			#clock-cells = <0>;
+			compatible = "ti,omap-clock";
+		};
+
+		dcan1_sys_clk_mux: dcan1_sys_clk_mux {
 			#clock-cells = <0>;
 			compatible = "ti,omap-clock";
 		};
@@ -299,6 +306,28 @@
 			interrupts = <0 106 0x4>;
 			ti,hwmods = "uart6";
 			clock-frequency = <48000000>;
+		};
+
+		dcan1: d_can@4ae3c000{
+			compatible = "bosch,d_can";
+			ti,hwmods = "dcan1";
+			reg = <0x4ae3c000 0x2000
+			       0x4a002558 0x4>;
+			interrupts = <0 81 0x4>;
+			clocks = <&dcan1_sys_clk_mux>;
+			flags = <0x5>;
+			status = "disabled";
+		};
+
+		dcan2: d_can@48480000 {
+			compatible = "bosch,d_can";
+			ti,hwmods = "dcan2";
+			reg = <0x48480000 0x2000
+			       0x4a002558 0x4>;
+			interrupts = <0 82 0x4>;
+			clocks = <&sys_clkin1>;
+			flags = <0x6>;
+			status = "disabled";
 		};
 
 		mailbox1: mailbox@4a0f4000 {
