@@ -108,6 +108,10 @@
 		ti,multichannel-codec-c = <&tlv320aic3106c>;
 		ti,multichannel-slots = <8>;
 		ti,multichannel-mclk-freq = <11289600>;
+
+		/* Bluetooth */
+		ti,bt-cpu = <&mcasp7>;
+		ti,bt-bclk-freq = <512000>;
 	};
 
 	sound_hdmi {
@@ -137,6 +141,7 @@
 		&atl_pins
 		&mcasp3_pins
 		&mcasp6_pins
+		&mcasp7_pins
 		&mcasp8_pins
 		&vout1_pins
 		&vout3_pins
@@ -170,6 +175,15 @@
 			0x2d8 0x00040001	/* mcasp1_axr9.mcasp6_axr1 INPUT | MODE 1 */
 			0x2dc 0x00000001	/* mcasp1_axr10.mcasp6_clkx OUTPUT | MODE1 */
 			0x2e0 0x00000001	/* mcasp1_axr11.mcasp6_fsx OUTPUT | MODE1 */
+		>;
+	};
+
+	mcasp7_pins: pinmux_mcasp7_pins {
+		pinctrl-single,pins = <
+			0x2e4 0x00040001	/* mcasp1_axr12.mcasp7_axr0 INPUT | MODE 1 */
+			0x2e8 0x00000001	/* mcasp1_axr13.mcasp7_axr1 OUTPUT | MODE 1 */
+			0x2ec 0x00040001	/* mcasp1_axr14.mcasp7_clkx INPUT | MODE1 */
+			0x2f0 0x00040001	/* mcasp1_axr15.mcasp7_fsx INPUT | MODE1 */
 		>;
 	};
 

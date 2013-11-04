@@ -1804,12 +1804,19 @@ static struct omap_hwmod dra7xx_mcasp6_hwmod = {
 	},
 };
 
+static struct omap_hwmod_dma_info dra7xx_mcasp7_sdma_reqs[] = {
+	{ .name = "tx", .dma_req = 69 + DRA7XX_DMA_REQ_START },
+	{ .name = "rx", .dma_req = 70 + DRA7XX_DMA_REQ_START },
+	{ .dma_req = -1 }
+};
+
 /* mcasp7 */
 static struct omap_hwmod dra7xx_mcasp7_hwmod = {
 	.name		= "mcasp7",
 	.class		= &dra7xx_mcasp_hwmod_class,
 	.clkdm_name	= "l4per2_clkdm",
 	.main_clk	= "mcasp7_ahclkx_mux",
+	.sdma_reqs	= dra7xx_mcasp7_sdma_reqs,
 	.flags		= HWMOD_SWSUP_SIDLE,
 	.prcm = {
 		.omap4 = {
@@ -1975,12 +1982,6 @@ static struct omap_hwmod_irq_info dra7xx_mcspi4_irqs[] = {
 	{ .irq = -1 }
 };
 
-static struct omap_hwmod_dma_info dra7xx_mcspi4_sdma_reqs[] = {
-	{ .name = "70", .dma_req = 69 + DRA7XX_DMA_REQ_START },
-	{ .name = "71", .dma_req = 70 + DRA7XX_DMA_REQ_START },
-	{ .dma_req = -1 }
-};
-
 /* mcspi4 dev_attr */
 static struct omap2_mcspi_dev_attr mcspi4_dev_attr = {
 	.num_chipselect	= 1,
@@ -1991,7 +1992,6 @@ static struct omap_hwmod dra7xx_mcspi4_hwmod = {
 	.class		= &dra7xx_mcspi_hwmod_class,
 	.clkdm_name	= "l4per_clkdm",
 	.mpu_irqs	= dra7xx_mcspi4_irqs,
-	.sdma_reqs	= dra7xx_mcspi4_sdma_reqs,
 	.main_clk	= "func_48m_fclk",
 	.prcm = {
 		.omap4 = {
