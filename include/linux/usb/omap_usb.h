@@ -33,6 +33,7 @@ struct usb_dpll_params {
 struct omap_usb {
 	struct usb_phy		phy;
 	struct phy_companion	*comparator;
+	void __iomem		*ocp2scp_base;
 	void __iomem		*pll_ctrl_base;
 	struct device		*dev;
 	struct device		*control_dev;
