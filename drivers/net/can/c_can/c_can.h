@@ -176,6 +176,7 @@ struct c_can_priv {
 	enum c_can_dev_id type;
 	u32 __iomem *raminit_ctrlreg;
 	struct c_can_raminit_bits raminit_bits;
+	u32 flags;
 	unsigned int instance;
 	void (*raminit) (const struct c_can_priv *priv);
 };

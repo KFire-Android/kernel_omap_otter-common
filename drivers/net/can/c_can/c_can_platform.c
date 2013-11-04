@@ -42,6 +42,7 @@
 #define CAN_DEFAULT_RAMINIT_DONE_BIT	8
 
 #define CAN_RAMINIT_BIT_MASK(i)	(1 << (i))
+#define CAN_FLAG_ENABLED(flag, flags)	((flags) & (1<<(flag)))
 
 /*
  * 16-bit c_can registers can be arranged differently in the memory
@@ -174,6 +175,11 @@ static int c_can_plat_probe(struct platform_device *pdev)
 	}
 
 	priv = netdev_priv(dev);
+	
+        /* record flags if they are specified */
+	if (!of_property_read_u32(pdev->dev.of_node, "flags", &priv->flags))
+		dev_info(&pdev->dev, "flags recorded (0x%x)\n", priv->flags);
+
 	switch (id->driver_data) {
 	case BOSCH_C_CAN:
 		priv->regs = reg_map_c_can;
