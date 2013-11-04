@@ -171,12 +171,6 @@
 			0x2dc 0x00000001	/* mcasp1_axr10.mcasp6_clkx OUTPUT | MODE1 */
 			0x2e0 0x00000001	/* mcasp1_axr11.mcasp6_fsx OUTPUT | MODE1 */
 		>;
-
-	irq_pins: pinmux_irq_pins {
-                pinctrl-single,pins = <
-			0x420	0x1	/* Wakeup2 INPUT | MODE1 */
-                >;
-        };
 	};
 
 	mcasp8_pins: pinmux_mcasp8_pins {
@@ -184,6 +178,12 @@
 			0x2fc 0x00040001	/* mcasp2_aclkr.mcasp8_axr2 OUTPUT | MODE1 */
 		>;
 	};
+
+	irq_pins: pinmux_irq_pins {
+                pinctrl-single,pins = <
+			0x420	0x1	/* Wakeup2 INPUT | MODE1 */
+                >;
+        };
 
 	usb_pins: pinmux_usb_pins {
                 pinctrl-single,pins = <
