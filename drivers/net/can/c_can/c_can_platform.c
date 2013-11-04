@@ -205,7 +205,8 @@ static int c_can_plat_probe(struct platform_device *pdev)
 		priv->raminit_bits.done =
 			(1 << (priv->instance + CAN_DEFAULT_RAMINIT_DONE_BIT));
 		res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-		priv->raminit_ctrlreg =	devm_request_and_ioremap(&pdev->dev, res);
+		priv->raminit_ctrlreg =	devm_ioremap_nocache(&pdev->dev,
+				res->start, resource_size(res));
 		if (!priv->raminit_ctrlreg || priv->instance < 0)
 			dev_info(&pdev->dev, "control memory is not used for raminit\n");
 		else
