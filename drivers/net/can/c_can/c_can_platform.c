@@ -38,7 +38,7 @@
 
 #include "c_can.h"
 
-#define CAN_RAMINIT_START_MASK(i)	(1 << (i))
+#define CAN_RAMINIT_BIT_MASK(i)	(1 << (i))
 
 /*
  * 16-bit c_can registers can be arranged differently in the memory
@@ -76,9 +76,9 @@ static void c_can_hw_raminit(const struct c_can_priv *priv, bool enable)
 
 	val = readl(priv->raminit_ctrlreg);
 	if (enable)
-		val |= CAN_RAMINIT_START_MASK(priv->instance);
+		val |= CAN_RAMINIT_BIT_MASK(priv->instance);
 	else
-		val &= ~CAN_RAMINIT_START_MASK(priv->instance);
+		val &= ~CAN_RAMINIT_BIT_MASK(priv->instance);
 	writel(val, priv->raminit_ctrlreg);
 }
 
