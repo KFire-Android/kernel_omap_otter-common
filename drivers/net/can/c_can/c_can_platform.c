@@ -70,15 +70,12 @@ static void c_can_plat_write_reg_aligned_to_32bit(struct c_can_priv *priv,
 	writew(val, priv->base + 2 * priv->regs[index]);
 }
 
-static void c_can_hw_raminit(const struct c_can_priv *priv, bool enable)
+static void c_can_hw_raminit(const struct c_can_priv *priv)
 {
 	u32 val;
 
 	val = readl(priv->raminit_ctrlreg);
-	if (enable)
-		val |= CAN_RAMINIT_BIT_MASK(priv->instance);
-	else
-		val &= ~CAN_RAMINIT_BIT_MASK(priv->instance);
+	val |= CAN_RAMINIT_BIT_MASK(priv->instance);
 	writel(val, priv->raminit_ctrlreg);
 }
 
