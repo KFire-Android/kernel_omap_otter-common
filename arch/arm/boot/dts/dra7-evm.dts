@@ -101,6 +101,10 @@
 		ti,hdmi_audio = <&hdmi>;
 		ti,level_shifter = <&tpd12s015>;
 	};
+
+	display_skipinit {
+		skip_init =<1>;
+	};
 };
 
 &dra7_pmx_core {
