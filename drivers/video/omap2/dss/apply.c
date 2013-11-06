@@ -806,11 +806,17 @@ static void dss_mgr_write_regs_extra(struct omap_overlay_manager *mgr)
 	if (!mp->extra_info_dirty)
 		return;
 
-	dispc_mgr_set_timings(mgr->id, &mp->timings);
+#ifdef CONFIG_DISPLAY_SKIP_INIT
+	if (!omapdss_skipinit()) {
+#endif
+		dispc_mgr_set_timings(mgr->id, &mp->timings);
 
-	/* lcd_config parameters */
-	if (dss_mgr_is_lcd(mgr->id))
-		dispc_mgr_set_lcd_config(mgr->id, &mp->lcd_config);
+		/* lcd_config parameters */
+		if (dss_mgr_is_lcd(mgr->id))
+			dispc_mgr_set_lcd_config(mgr->id, &mp->lcd_config);
+#ifdef CONFIG_DISPLAY_SKIP_INIT
+	}
+#endif
 
 	mp->extra_info_dirty = false;
 	if (mp->updating)
@@ -1067,7 +1073,7 @@ static void dss_completion_irq_handler(void *data, u32 mask)
 	struct ovl_priv_data *op;
 	struct omap_overlay_manager *mgr;
 	struct omap_overlay *ovl;
-	const int num_ovls = ARRAY_SIZE(dss_data.ovl_priv_data_array);
+	int num_ovls = dss_feat_get_num_ovls();
 	const int num_mgrs = dss_feat_get_num_mgrs();
 	const u32 masks[] = {
 		DISPC_IRQ_FRAMEDONE | DISPC_IRQ_VSYNC,

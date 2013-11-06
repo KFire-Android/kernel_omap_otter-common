@@ -300,7 +300,7 @@ static int lg101_probe(struct omap_dss_device *dssdev)
 	else
 		return -EINVAL;
 
-	r = gpio_request_one(ddata->p_gpio, GPIOF_OUT_INIT_LOW, "vid3_sel");
+	r = gpio_request_one(ddata->p_gpio, GPIOF_OUT_INIT_HIGH, "vid3_sel");
 	if (r)
 		return r;
 

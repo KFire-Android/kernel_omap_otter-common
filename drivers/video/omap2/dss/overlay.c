@@ -138,7 +138,13 @@ int dss_ovl_simple_check(struct omap_overlay *ovl,
 		return -EINVAL;
 	}
 
+	/* For early display use-case, we reduce the number of overlays by 1
+	 * to dedicate VID3 pipe for M4 camera but z-order can be higher */
+#ifdef CONFIG_EARLYCAMERA_IPU
+	if (info->zorder >= (omap_dss_get_num_overlays()+1)) {
+#else
 	if (info->zorder >= omap_dss_get_num_overlays()) {
+#endif
 		DSSERR("check_overlay: zorder %d too high\n", info->zorder);
 		return -EINVAL;
 	}

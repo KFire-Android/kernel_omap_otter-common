@@ -176,4 +176,12 @@ config SWITCH_STATE
 	  HDMI HDP switch state interface. This adds support for sending
 	  HDMI HPD switch state events to user space.
 
+config DISPLAY_SKIP_INIT
+	bool "Skip display initialization during bootup"
+	default n
+	help
+		This allows for skipping display initialization during bootup
+		for cases where the display is initialized elsewhere - like
+		u-boot or other processors
+
 endif

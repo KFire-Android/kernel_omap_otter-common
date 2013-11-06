@@ -527,6 +527,7 @@ static void hdmi_hotplug_detect_worker(struct work_struct *work)
 			omapdss_hdmi_clear_edid();
 			mutex_lock(&hdmi.lock);
 		}
+		hdmi_set_ls_state(LS_HPD_ON);
 		goto done;
 	} else {
 		if (state == HPD_STATE_EDID_TRYLAST) {
