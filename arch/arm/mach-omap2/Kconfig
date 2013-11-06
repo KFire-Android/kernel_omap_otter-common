@@ -451,6 +451,15 @@ config OMAP5_HS_SECURE_SRAM_SIZE
 	default 120
 	help
 	  resized secure SRAM size for OMAP5
+
+config EARLYCAMERA_IPU
+	bool "Early camera using IPU config"
+	depends on  SOC_DRA7XX
+	select DISPLAY_SKIP_INIT
+	default n
+	help
+	  Enable early rear view camera using IPU on DRA7xx platforms
+
 endmenu
 
 endif
