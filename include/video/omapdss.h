@@ -874,6 +874,13 @@ struct omap_dss_driver {
 };
 
 enum omapdss_version omapdss_get_version(void);
+int omapdss_is_earlydisplay(bool);
+int omapdss_is_earlydisplay_ongoing(bool);
+
+#ifdef CONFIG_DISPLAY_SKIP_INIT
+int omapdss_skipinit(void);
+void omapdss_skipinit_done(void);
+#endif
 
 int omap_dss_register_driver(struct omap_dss_driver *);
 void omap_dss_unregister_driver(struct omap_dss_driver *);

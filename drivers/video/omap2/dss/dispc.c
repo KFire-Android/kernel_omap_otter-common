@@ -542,7 +542,13 @@ EXPORT_SYMBOL(dispc_mgr_go_busy);
 void dispc_mgr_go(enum omap_channel channel)
 {
 	WARN_ON(dispc_mgr_is_enabled(channel) == false);
+#ifndef CONFIG_EARLYCAMERA_IPU
+	/* In case of early camera use-case, the remote processor
+	 * will be setting GO bit independently. Hence we might see the
+	 * channel as busy on kernel side. Ignore this and proceed
+	 * further */
 	WARN_ON(dispc_mgr_go_busy(channel));
+#endif
 
 	DSSDBG("GO %s\n", mgr_desc[channel].name);
 
@@ -3545,7 +3551,13 @@ void dispc_write_irqenable(u32 mask)
 	/* clear the irqstatus for newly enabled irqs */
 	dispc_clear_irqstatus((mask ^ old_mask) & mask);
 
+#ifdef CONFIG_EARLYCAMERA_IPU
+	/* Should not clear already enabled interrupts when remote
+	 * preview is ongoing */
+	dispc_write_reg(DISPC_IRQENABLE, mask | old_mask);
+#else
 	dispc_write_reg(DISPC_IRQENABLE, mask);
+#endif
 }
 EXPORT_SYMBOL(dispc_write_irqenable);
 

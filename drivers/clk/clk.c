@@ -18,6 +18,9 @@
 #include <linux/slab.h>
 #include <linux/of.h>
 #include <linux/device.h>
+#ifdef CONFIG_EARLYCAMERA_IPU
+#include <video/omapdss.h>
+#endif
 
 static DEFINE_SPINLOCK(enable_lock);
 static DEFINE_MUTEX(prepare_lock);
@@ -242,6 +245,12 @@ static int clk_disable_unused(void)
 {
 	struct clk *clk;
 	struct hlist_node *tmp;
+
+#ifdef CONFIG_EARLYCAMERA_IPU
+	/* In case of early camera, do not explicitly disable unused clocks
+	 * as the remote processor will be using them */
+	return 0;
+#endif
 
 	mutex_lock(&prepare_lock);
 

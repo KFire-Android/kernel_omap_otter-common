@@ -288,6 +288,10 @@ static irqreturn_t omap_dispc_irq_handler(int irq, void *arg)
 
 	print_irq_status(irqstatus);
 
+	/* Should not handle vid3 interrupt as it is handled by M4 */
+#ifdef CONFIG_EARLYCAMERA_IPU
+	irqstatus &= ~DISPC_IRQ_VID3_END_WIN;
+#endif
 	/* Ack the interrupt. Do it here before clocks are possibly turned
 	 * off */
 	dispc_clear_irqstatus(irqstatus);
@@ -447,7 +451,14 @@ int dss_dispc_initialize_irq(void)
 	 * there's SYNC_LOST_DIGIT waiting after enabling the DSS,
 	 * so clear it
 	 */
+#ifdef CONFIG_EARLYCAMERA_IPU
+	/* For the early init case, remote processor will be using VID3 pipe,
+	 * so skip clearing VID3 interrupt */
+	dispc_clear_irqstatus(dispc_read_irqstatus() &
+			   ~DISPC_IRQ_VID3_END_WIN);
+#else
 	dispc_clear_irqstatus(dispc_read_irqstatus());
+#endif
 
 	INIT_WORK(&dispc_compat.error_work, dispc_error_worker);
 
