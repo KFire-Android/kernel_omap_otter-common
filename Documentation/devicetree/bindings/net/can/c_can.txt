@@ -12,12 +12,17 @@ Required properties:
 Optional properties:
 - ti,hwmods		: Must be "d_can<n>" or "c_can<n>", n being the
 			  instance number
+- flags			: unsigned integer flags to be passed to the C_CAN/D_CAN
+			  driver
 
 Note: "ti,hwmods" field is used to fetch the base address and irq
 resources from TI, omap hwmod data base during device registration.
 Future plan is to migrate hwmod data base contents into device tree
 blob so that, all the required data will be used from device tree dts
 file.
+
+Note: "flags" field is intended to be used to account for quirks and other
+considerations that should be made between different devices.
 
 Example:
 
@@ -39,6 +44,19 @@ Step1: SoC common .dtsi file
 		reg = <0x481d0000 0x2000>;
 		interrupts = <55>;
 		interrupt-parent = <&intc>;
+		status = "disabled";
+	};
+
+(or)
+
+	dcan1: d_can@4ae3c000{
+		compatible = "bosch,d_can";
+		ti,hwmods = "dcan1";
+		reg = <0x4ae3c000 0x2000
+		       0x4a002558 0x4>;
+		interrupts = <0 81 0x4>;
+		clocks = <&dcan1_sys_clk_mux>;
+		flags = <0x5>;
 		status = "disabled";
 	};
 

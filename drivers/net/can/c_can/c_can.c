@@ -233,10 +233,10 @@ static inline void c_can_pm_runtime_put_sync(const struct c_can_priv *priv)
 		pm_runtime_put_sync(priv->device);
 }
 
-static inline void c_can_reset_ram(const struct c_can_priv *priv, bool enable)
+static inline void c_can_reset_ram(const struct c_can_priv *priv)
 {
 	if (priv->raminit)
-		priv->raminit(priv, enable);
+		priv->raminit(priv);
 }
 
 static inline int get_tx_next_msg_obj(const struct c_can_priv *priv)
@@ -1100,7 +1100,7 @@ static int c_can_open(struct net_device *dev)
 	struct c_can_priv *priv = netdev_priv(dev);
 
 	c_can_pm_runtime_get_sync(priv);
-	c_can_reset_ram(priv, true);
+	c_can_reset_ram(priv);
 
 	/* open the can device */
 	err = open_candev(dev);
@@ -1129,7 +1129,6 @@ static int c_can_open(struct net_device *dev)
 exit_irq_fail:
 	close_candev(dev);
 exit_open_fail:
-	c_can_reset_ram(priv, false);
 	c_can_pm_runtime_put_sync(priv);
 	return err;
 }
@@ -1144,7 +1143,6 @@ static int c_can_close(struct net_device *dev)
 	free_irq(dev->irq, dev);
 	close_candev(dev);
 
-	c_can_reset_ram(priv, false);
 	c_can_pm_runtime_put_sync(priv);
 
 	return 0;
@@ -1202,7 +1200,6 @@ int c_can_power_down(struct net_device *dev)
 
 	c_can_stop(dev);
 
-	c_can_reset_ram(priv, false);
 	c_can_pm_runtime_put_sync(priv);
 
 	return 0;
@@ -1221,7 +1218,7 @@ int c_can_power_up(struct net_device *dev)
 	WARN_ON(priv->type != BOSCH_D_CAN);
 
 	c_can_pm_runtime_get_sync(priv);
-	c_can_reset_ram(priv, true);
+	c_can_reset_ram(priv);
 
 	/* Clear PDR and INIT bits */
 	val = priv->read_reg(priv, C_CAN_CTRL_EX_REG);
