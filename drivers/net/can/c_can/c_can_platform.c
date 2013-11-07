@@ -74,33 +74,42 @@ static void c_can_plat_write_reg_aligned_to_32bit(struct c_can_priv *priv,
 	writew(val, priv->base + 2 * priv->regs[index]);
 }
 
-static void c_can_hw_raminit(const struct c_can_priv *priv)
+static void c_can_hw_raminit(const struct c_can_priv *priv, bool enable)
 {
 	u32 val;
 
 	val = readl(priv->raminit_ctrlreg);
-	val |= CAN_RAMINIT_BIT_MASK(priv->raminit_bits.start);
+	if (enable)
+		val |= CAN_RAMINIT_BIT_MASK(priv->raminit_bits.start);
+	else
+		val &= ~CAN_RAMINIT_BIT_MASK(priv->raminit_bits.start);
 	writel(val, priv->raminit_ctrlreg);
 }
 
-static void c_can_hw_raminit_dra7(const struct c_can_priv *priv)
+static void c_can_hw_raminit_dra7(const struct c_can_priv *priv, bool enable)
 {
 	u32 start_set, start_clr;
 	DEFINE_SPINLOCK(raminit_lock);
 	unsigned long flags;
 
-	/* Disable interrupts */
-	spin_lock_irqsave(&raminit_lock, flags);
-
-	/* Trigger the RAM initialization */
 	start_set = start_clr = readl(priv->raminit_ctrlreg);
 	start_set |= CAN_RAMINIT_BIT_MASK(priv->raminit_bits.start);
 	start_clr &= ~(CAN_RAMINIT_BIT_MASK(priv->raminit_bits.start));
-	writel(start_set, priv->raminit_ctrlreg);
-	writel(start_clr, priv->raminit_ctrlreg);
 
-	/* Restore interrupts */
-	spin_unlock_irqrestore(&raminit_lock, flags);
+	if (enable) {
+		/* Disable interrupts */
+		spin_lock_irqsave(&raminit_lock, flags);
+
+		/* Trigger the RAM initialization */
+		writel(start_set, priv->raminit_ctrlreg);
+		writel(start_clr, priv->raminit_ctrlreg);
+
+		/* Restore interrupts */
+		spin_unlock_irqrestore(&raminit_lock, flags);
+	}
+	else {
+		writel(start_clr, priv->raminit_ctrlreg);
+	}
 }
 
 static struct platform_device_id c_can_id_table[] = {
