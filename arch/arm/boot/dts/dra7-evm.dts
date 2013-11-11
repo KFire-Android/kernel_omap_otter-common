@@ -406,6 +406,7 @@
 	status="okay";
 	pinctrl-names = "default";
 	pinctrl-0 = <&cpsw_default_pins>;
+	dual_emac = <1>;
 };
 
 &davinci_mdio {
