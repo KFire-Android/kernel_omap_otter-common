@@ -154,12 +154,6 @@
 			compatible = "ti,omap-clock";
 		};
 
-		dcan1_sys_clk_mux: dcan1_sys_clk_mux {
-			#clock-cells = <0>;
-			compatible = "ti,omap-clock";
-		};
-
-
 		sdma: dma-controller@4a056000 {
 			compatible = "ti,omap4430-sdma";
 			reg = <0x4a056000 0x1000>;
@@ -314,7 +308,7 @@
 			reg = <0x4ae3c000 0x2000
 			       0x4a002558 0x4>;
 			interrupts = <0 81 0x4>;
-			clocks = <&dcan1_sys_clk_mux>;
+			clocks = <&sys_clkin1>;
 			flags = <0x5>;
 			status = "disabled";
 		};

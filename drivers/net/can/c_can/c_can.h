@@ -193,7 +193,7 @@ struct c_can_priv {
 	struct c_can_raminit_bits raminit_bits;
 	u32 flags;
 	unsigned int instance;
-	void (*raminit) (const struct c_can_priv *priv);
+	void (*raminit) (const struct c_can_priv *priv, bool enable);
 };
 
 struct net_device *alloc_c_can_dev(void);
