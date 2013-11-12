@@ -995,32 +995,31 @@ static int __init omap_dsshw_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 
+	r = dss_get_clocks();
+	if (r)
+		return r;
+
+	r = dss_setup_default_clock();
+	if (r)
+		goto err_setup_clocks;
+
 #ifdef CONFIG_DISPLAY_SKIP_INIT
 	if (!omapdss_skipinit()) {
 #endif
-		r = dss_get_clocks();
-		if (r)
-			return r;
-
-		r = dss_setup_default_clock();
-		if (r)
-			goto err_setup_clocks;
-
 		pm_runtime_enable(&pdev->dev);
 
 		r = dss_runtime_get();
 		if (r)
 			goto err_runtime_get;
-
-		dss.dss_clk_rate = clk_get_rate(dss.dss_clk);
-
-		/* Select DPLL */
-		REG_FLD_MOD(DSS_CONTROL, 0, 0, 0);
-
-		dss_select_dispc_clk_source(OMAP_DSS_CLK_SRC_FCK);
 #ifdef CONFIG_DISPLAY_SKIP_INIT
 	}
 #endif
+	dss.dss_clk_rate = clk_get_rate(dss.dss_clk);
+
+	/* Select DPLL */
+	REG_FLD_MOD(DSS_CONTROL, 0, 0, 0);
+
+	dss_select_dispc_clk_source(OMAP_DSS_CLK_SRC_FCK);
 
 #ifdef CONFIG_OMAP2_DSS_VENC
 	REG_FLD_MOD(DSS_CONTROL, 1, 4, 4);	/* venc dac demen */

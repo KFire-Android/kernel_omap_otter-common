@@ -807,7 +807,7 @@ static void dss_mgr_write_regs_extra(struct omap_overlay_manager *mgr)
 		return;
 
 #ifdef CONFIG_DISPLAY_SKIP_INIT
-	if (!omapdss_skipinit()) {
+	if (!omapdss_skipinit() || mgr->id != OMAP_DSS_CHANNEL_LCD) {
 #endif
 		dispc_mgr_set_timings(mgr->id, &mp->timings);
 

@@ -4126,9 +4126,6 @@ static struct omap_hwmod_ocp_if dra7xx_l3_main_1__dmm = {
 	.clk		= "l3_iclk_div",
 	.addr		= dra7xx_dmm_addrs,
 	.user		= OCP_USER_SDMA,
-#ifdef CONFIG_DISPLAY_SKIP_INIT
-	.flags		= HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET,
-#endif
 };
 
 /* dmm -> emif_ocp_fw */
