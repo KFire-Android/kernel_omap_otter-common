@@ -1780,14 +1780,23 @@ static struct v4l2_async_subdev ov10635_sd = {
 	},
 };
 
+static struct v4l2_async_subdev ov10633_sd = {
+	.bus_type = V4L2_ASYNC_BUS_I2C,
+	.match.i2c = {
+		.adapter_id = 1,
+		.address = 0x37,
+	},
+};
+
 static struct v4l2_async_subdev *vip_async_subdevs[] = {
 	&ov10635_sd,
+	&ov10633_sd,
 };
 
 static struct vip_config dra7xx_vip_config = {
 	.card_name	= "DRA7XX VIP Driver",
 	.asd		= vip_async_subdevs,
-	.asd_sizes	= 1,
+	.asd_sizes	= sizeof(vip_async_subdevs)/sizeof(vip_async_subdevs[0]),
 };
 
 static int ov10635_init_sensor(struct vip_dev *dev)

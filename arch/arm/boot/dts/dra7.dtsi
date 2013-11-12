@@ -1091,6 +1091,24 @@
 			rx-num-evt = <8>;
 		};
 
+		mcasp7: mcasp@48478000 {
+			compatible = "ti,dra7-mcasp-audio";
+			reg = <0x48478000 0x2000>,
+				<0x48450000 0x1000>;
+			reg-names = "cfg","dat";
+			interrupts = <0 146 0x4>, /* AREVT */
+				     <0 147 0x4>; /* TXEVT */
+			ti,hwmods = "mcasp7";
+			op-mode = <0>;		/* MCASP_IIS_MODE */
+			tdm-slots = <2>;
+			num-serializer = <4>;
+			serial-dir = <2 1 0 0>;	/* 0:INACTIVE, 1:TX, 2:RX */
+			ti,tx-inactive-mode = <2>; /* 0: Hi-Z, 2: Low, 3: High */
+			ti,rx-inactive-mode = <2>; /* 0: Hi-Z, 2: Low, 3: High */
+			tx-num-evt = <8>;
+			rx-num-evt = <8>;
+		};
+
 		vip1: vip@0x48970000 {
                         compatible = "ti,vip1";
 			reg = <0x48970000 0x10000>,

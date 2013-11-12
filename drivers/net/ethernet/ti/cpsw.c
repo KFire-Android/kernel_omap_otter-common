@@ -33,6 +33,7 @@
 #include <linux/of_net.h>
 #include <linux/of_device.h>
 #include <linux/if_vlan.h>
+#include <linux/pinctrl/consumer.h>
 
 #include <linux/platform_data/cpsw.h>
 
@@ -1411,6 +1412,7 @@ static int cpsw_probe_dt(struct cpsw_platform_data *data,
 {
 	struct device_node *node = pdev->dev.of_node;
 	struct device_node *slave_node;
+	struct pinctrl *pinctrl;
 	int i = 0, ret;
 	u32 prop;
 
@@ -1488,6 +1490,12 @@ static int cpsw_probe_dt(struct cpsw_platform_data *data,
 
 	if (!of_property_read_u32(node, "dual_emac", &prop))
 		data->dual_emac = prop;
+
+	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
+	if (IS_ERR(pinctrl)) {
+		ret = PTR_ERR(pinctrl);
+		goto error_ret;
+	}
 
 	/*
 	 * Populate all the child nodes here...

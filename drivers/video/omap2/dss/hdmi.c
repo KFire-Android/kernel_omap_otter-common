@@ -716,7 +716,10 @@ u8 *hdmi_read_valid_edid(void)
 						  HDMI_EDID_MAX_LENGTH);
 
 	/* revert DSS clock domain back to HW_AUTO*/
-	__raw_writel(0x3, clk_base + 0x100);
+	/* Somehow putting the clock domain back to HW_AUTO
+	 * is causing the clock to get idled and fails edid reading
+	 * if hdmi is connected after bootup */
+	/*__raw_writel(0x3, clk_base + 0x100);*/
 	iounmap(clk_base);
 	hdmi_runtime_put();
 

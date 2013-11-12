@@ -21,6 +21,8 @@ Required properties:
 Optional properties:
 - ti,always-on: Keep analog codecs always on to minimize artifacts. Use it
   if power is not a concern.
+- ti,bt-cpu: phandle for the McASP node used for bluetooth.
+- ti,bt-bclk-freq: Bit clock frequency provided by bluetooth chip.
 
 Available audio endpoints for the audio-routing table:
 

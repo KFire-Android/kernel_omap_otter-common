@@ -157,7 +157,7 @@ static int omap_connector_get_modes(struct drm_connector *connector)
 	if (dssdrv->read_edid) {
 		void *edid = kzalloc(MAX_EDID, GFP_KERNEL);
 
-		if ((dssdrv->read_edid(dssdev, edid, MAX_EDID) > 0) &&
+		if ((dssdrv->read_edid(dssdev, edid, MAX_EDID) == 0) &&
 				drm_edid_is_valid(edid)) {
 			drm_mode_connector_update_edid_property(
 					connector, edid);
