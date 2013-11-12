@@ -368,26 +368,6 @@
 		DRVDD-supply = <&vaudio_3v3>;
 	};
 
-	ov10635: ov10635@30 {
-		compatible = "omnivision,ov10635";
-		reg = <0x30>;
-
-		camera_ov10635: camera_ov10635 {
-			compatible = "ti,camera-ov10635";
-
-			gpios = <&pcf_hdmi 2 0>,
-				<&pcf_hdmi 3 0>,
-				<&gpio4 13 0>,
-				<&gpio4 14 0>,
-				<&gpio4 15 0>,
-				<&gpio4 16 0>,
-				<&gpio6 17 0>;
-
-			ovnode = <&i2c2>;
-			sensor = "ov10635";
-		};
-	};
-
 	ov10633: ov10633@37 {
 		compatible = "omnivision,ov10633";
 		reg = <0x37>;
@@ -405,6 +385,25 @@
 
 			ovnode = <&i2c2>;
 			sensor = "ov10633";
+		};
+
+	ov10635: ov10635@30 {
+		compatible = "omnivision,ov10635";
+		reg = <0x30>;
+
+		camera_ov10635: camera_ov10635 {
+			compatible = "ti,camera-ov10635";
+
+			gpios = <&pcf_hdmi 2 0>,
+				<&pcf_hdmi 3 0>,
+				<&gpio4 13 0>,
+				<&gpio4 14 0>,
+				<&gpio4 15 0>,
+				<&gpio4 16 0>,
+				<&gpio6 17 0>;
+
+			ovnode = <&i2c2>;
+			sensor = "ov10635";
 		};
 	};
 };
