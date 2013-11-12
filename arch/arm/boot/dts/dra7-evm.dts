@@ -480,6 +480,7 @@
 		reg = <0x26>;
 		gpio-controller;
 		#gpio-cells = <2>;
+		n_latch = <0xfffb>;
 	};
 
 	tlv320aic3106a: tlv320aic3106@18 {
