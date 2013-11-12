@@ -22,6 +22,7 @@
 		serial5 = &uart6;
 		d_can0 = &dcan1;
 		d_can1 = &dcan2;
+		ethernet0 = &cpsw_emac0;
 	};
 
 	cpus {
