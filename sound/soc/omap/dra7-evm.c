@@ -35,6 +35,7 @@
 struct dra7_snd_data {
 	unsigned int media_mclk_freq;
 	unsigned int multichannel_mclk_freq;
+	unsigned int bt_bclk_freq;
 	unsigned int media_slots;
 	unsigned int multichannel_slots;
 	int always_on;
@@ -277,6 +278,60 @@ static struct snd_soc_dai_link_codec dra7_snd_multichannel_codecs[] = {
 	},
 };
 
+static int dra7_snd_bt_startup(struct snd_pcm_substream *substream)
+{
+	struct snd_pcm_runtime *runtime = substream->runtime;
+
+	snd_pcm_hw_constraint_minmax(runtime, SNDRV_PCM_HW_PARAM_RATE,
+				     8000, 8000);
+	snd_pcm_hw_constraint_minmax(runtime, SNDRV_PCM_HW_PARAM_CHANNELS,
+				     2, 2);
+	snd_pcm_hw_constraint_mask64(runtime, SNDRV_PCM_HW_PARAM_FORMAT,
+				     SNDRV_PCM_FMTBIT_S16_LE);
+
+	return 0;
+}
+
+static int dra7_snd_bt_hw_params(struct snd_pcm_substream *substream,
+				 struct snd_pcm_hw_params *params)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
+	struct snd_soc_card *card = rtd->card;
+	struct dra7_snd_data *card_data = snd_soc_card_get_drvdata(card);
+	int ret;
+
+	ret = snd_soc_dai_set_fmt(cpu_dai,
+				  SND_SOC_DAIFMT_DSP_A |
+				  SND_SOC_DAIFMT_CBM_CFM |
+				  SND_SOC_DAIFMT_NB_IF);
+	if (ret < 0) {
+		dev_err(card->dev, "can't set CPU DAI format %d\n", ret);
+		return ret;
+	}
+
+	/*
+	 * Bluetooth SCO is 8kHz, mono, 16-bits/sample but the BCLK runs
+	 * at 4x the min required rate. So, the BCLK / FSYNC ratio is 64 which
+	 * is not possible with McASP. Instead, the DAI link is configured
+	 * in stereo (right channel carries no data) to have 32-bit samples and
+	 * the BCLK / FSYNC ratio is programmed so that only 16-bits carry
+	 * actual data.
+	 */
+	ret = snd_soc_dai_set_clkdiv(cpu_dai, 2,
+				card_data->bt_bclk_freq / params_rate(params));
+	if (ret < 0)
+		dev_err(card->dev, "can't set CPU DAI BCLK/FSYNC ratio %d\n",
+			ret);
+
+	return ret;
+}
+
+static struct snd_soc_ops dra7_snd_bt_ops = {
+	.startup = dra7_snd_bt_startup,
+	.hw_params = dra7_snd_bt_hw_params,
+};
+
 static struct snd_soc_dai_link dra7_snd_dai[] = {
 	{
 		/* Media: McASP3 + tlv320aic3106 */
@@ -294,6 +349,14 @@ static struct snd_soc_dai_link dra7_snd_dai[] = {
 		.codecs = dra7_snd_multichannel_codecs,
 		.num_codecs = ARRAY_SIZE(dra7_snd_multichannel_codecs),
 		.init = dra7_dai_init,
+	},
+	{
+		/* Bluetooth: McASP7 + dummy codec */
+		.name = "Bluetooth",
+		.platform_name = "omap-pcm-audio",
+		.codec_name = "snd-soc-dummy",
+		.codec_dai_name = "snd-soc-dummy-dai",
+		.ops = &dra7_snd_bt_ops,
 	},
 };
 
@@ -440,6 +503,42 @@ static int dra7_snd_add_multichannel_dai_link(struct snd_soc_card *card,
 	return 0;
 }
 
+static int dra7_snd_add_bt_dai_link(struct snd_soc_card *card,
+				    struct snd_soc_dai_link *dai_link,
+				    const char *prefix)
+{
+	struct dra7_snd_data *card_data = snd_soc_card_get_drvdata(card);
+	struct device_node *node = card->dev->of_node;
+	struct device_node *dai_node;
+	char prop[32];
+	int ret;
+
+	if (!node) {
+		dev_err(card->dev, "bluetooth node is invalid\n");
+		return -EINVAL;
+	}
+
+	snprintf(prop, sizeof(prop), "%s-bclk-freq", prefix);
+	of_property_read_u32(node, prop,
+			     &card_data->bt_bclk_freq);
+
+	snprintf(prop, sizeof(prop), "%s-cpu", prefix);
+	dai_node = of_parse_phandle(node, prop, 0);
+	if (!dai_node) {
+		dev_err(card->dev, "cpu dai node is invalid\n");
+		return -EINVAL;
+	}
+
+	dai_link->cpu_of_node = dai_node;
+
+	ret = snd_soc_card_new_dai_links(card, dai_link, 1);
+	if (ret < 0)
+		dev_err(card->dev, "failed to add bluetooth dai link %s\n",
+			dai_link->name);
+
+	return ret;
+}
+
 /* DRA7 CPU board widgets */
 static const struct snd_soc_dapm_widget dra7_snd_dapm_widgets[] = {
 	/* CPU board input */
@@ -564,6 +663,11 @@ static int dra7_snd_probe(struct platform_device *pdev)
 			ret);
 		return ret;
 	}
+
+	ret = dra7_snd_add_bt_dai_link(card, &dra7_snd_dai[2], "ti,bt");
+	if (ret)
+		dev_err(card->dev, "failed to add bluetooth dai link %d\n",
+			ret);
 
 	ret = snd_soc_register_card(card);
 	if (ret) {
