@@ -1757,10 +1757,10 @@ static int omapfb_allocate_all_fbs(struct omapfb2_device *fbdev)
 		rg = ofbi->region;
 
 		DBG("region%d phys %08x virt %p size=%lu\n",
-				i,
-				rg->paddr,
-				rg->vaddr,
-				rg->size);
+			       i,
+			       rg->paddr,
+			       rg->vaddr,
+			       rg->size);
 	}
 
 	return 0;
@@ -2059,7 +2059,7 @@ static int omapfb_create_framebuffers(struct omapfb2_device *fbdev)
 
 	fbdev->num_fbs = 0;
 
-	DBG("create %d framebuffers\n",	CONFIG_FB_OMAP2_NUM_FBS);
+	DBG("create %d framebuffers\n", CONFIG_FB_OMAP2_NUM_FBS);
 
 	/* allocate fb_infos */
 	for (i = 0; i < CONFIG_FB_OMAP2_NUM_FBS; i++) {
@@ -2104,7 +2104,7 @@ static int omapfb_create_framebuffers(struct omapfb2_device *fbdev)
 		struct omap_overlay_manager *mgr = fbdev->managers[i];
 		ofbi->overlays[0] = fbdev->overlays[i];
 		ofbi->num_overlays = 1;
-		if (mgr->output) {
+		if (mgr && mgr->output) {
 			ofbi->overlays[0]->unset_manager(ofbi->overlays[0]);
 			ofbi->overlays[0]->set_manager(ofbi->overlays[0], mgr);
 			DBG("ofbi%d assigned dev %s",
@@ -2589,6 +2589,7 @@ static int omapfb_init_connections(struct omapfb2_device *fbdev,
 	}
 
 	for (i = 0; i < fbdev->num_overlays; i++) {
+
 		struct omap_overlay *ovl = fbdev->overlays[i];
 
 		if (ovl->manager)
@@ -2655,12 +2656,13 @@ static int __init omapfb_probe(struct platform_device *pdev)
 	struct omapfb2_device *fbdev = NULL;
 	int r = 0;
 	int i;
-	struct omap_dss_device *def_display;
-	struct omap_dss_device *dssdev;
+	struct omap_dss_device *init_displays[3];
+	struct omap_dss_device *dssdev = NULL;
 	u16 fb_ov_start_ix = 0;
 
 	DBG("omapfb_probe\n");
 
+	memset(init_displays, 0, sizeof(init_displays));
 	if (pdev->num_resources != 0) {
 		dev_err(&pdev->dev, "probed for an unknown device\n");
 		r = -ENODEV;
@@ -2690,7 +2692,6 @@ static int __init omapfb_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, fbdev);
 
 	fbdev->num_displays = 0;
-	dssdev = NULL;
 	for_each_dss_dev(dssdev) {
 		struct omapfb_display_data *d;
 
@@ -2703,12 +2704,35 @@ static int __init omapfb_probe(struct platform_device *pdev)
 			continue;
 		}
 
-		d = &fbdev->displays[fbdev->num_displays++];
+		d = &fbdev->displays[dssdev->display_id];
 		d->dssdev = dssdev;
 		if (dssdev->caps & OMAP_DSS_DISPLAY_CAP_MANUAL_UPDATE)
 			d->update_mode = OMAPFB_MANUAL_UPDATE;
 		else
 			d->update_mode = OMAPFB_AUTO_UPDATE;
+
+		/* select the displays that need to be intialized at boot up
+		 * 1. display_id[0] is the default display
+		 * 2. display_id[1] is set to HDMI due to limitations in HWC
+		 * 3. HDMI can either be primary or external attachable display
+		 * 4. LCD/FPDLINK can be either primary and/or secondary
+		 * attached displays.
+		 */
+		switch (dssdev->display_id) {
+		case 0:
+			init_displays[dssdev->display_id] = dssdev;
+			break;
+		case 2:
+		case 3:
+			if ((strcmp("lcd", dssdev->name) == 0 ||
+			     strcmp("fpdlink", dssdev->name) == 0))
+				init_displays[dssdev->display_id-1] = dssdev;
+		}
+		fbdev->num_displays++;
+		dev_err(&pdev->dev, " display(%d) = %s, driver_name = %s\n",
+			dssdev->display_id,
+			dssdev->name,
+			dssdev->driver->driver.name);
 	}
 
 	if (fbdev->num_displays == 0) {
@@ -2719,34 +2743,26 @@ static int __init omapfb_probe(struct platform_device *pdev)
 	fbdev->num_overlays = omap_dss_get_num_overlays();
 	for (i = 0; i < fbdev->num_overlays; i++)
 		fbdev->overlays[i] = omap_dss_get_overlay(i);
+
 	fbdev->num_managers = omap_dss_get_num_overlay_managers();
 	for (i = 0; i < fbdev->num_managers; i++)
-		fbdev->managers[i] = omap_dss_get_overlay_manager(i);
-
-	def_display = NULL;
-
-	for (i = 0; i < fbdev->num_displays; ++i) {
-		struct omap_dss_device *dssdev;
-		const char *def_name;
-
-		def_name = omapdss_get_default_display_name();
-
-		dssdev = fbdev->displays[i].dssdev;
-
-		if (def_name == NULL ||
-			(dssdev->name && strcmp(def_name, dssdev->name) == 0)) {
-			def_display = dssdev;
-			break;
+		if (fbdev->displays[i].dssdev) {
+			fbdev->managers[i] =
+				omap_dss_get_overlay_manager(fbdev->displays[i].dssdev->channel);
+			dev_err(fbdev->dev, "fbdev->mgr[%d] = %s, display_id[%d]=%s, channel=%d\n",
+				i, fbdev->managers[i]->name,
+				fbdev->displays[i].dssdev->display_id,
+				fbdev->displays[i].dssdev->name,
+				fbdev->displays[i].dssdev->channel);
 		}
-	}
 
-	if (def_display == NULL) {
+	if (init_displays[0] == NULL) {
 		dev_err(fbdev->dev, "failed to find default display\n");
 		r = -EINVAL;
 		goto cleanup;
 	}
 
-	r = omapfb_init_connections(fbdev, def_display);
+	r = omapfb_init_connections(fbdev, init_displays[0]);
 	if (r) {
 		dev_err(fbdev->dev, "failed to init overlay connections\n");
 		goto cleanup;
@@ -2775,10 +2791,11 @@ static int __init omapfb_probe(struct platform_device *pdev)
 	}
 
 	fbdev->num_overlays = omap_dss_get_num_overlays();
-	if (def_display && check_fb_scale(def_display)) {
+	if (init_displays[0] && check_fb_scale(init_displays[0])) {
 		fb_ov_start_ix = 1;
 		fbdev->num_overlays -= 1;
 	}
+
 	for (i = 0; i < fbdev->num_overlays; i++)
 		fbdev->overlays[i] = omap_dss_get_overlay(i+fb_ov_start_ix);
 	r = omapfb_create_framebuffers(fbdev);
@@ -2788,20 +2805,27 @@ static int __init omapfb_probe(struct platform_device *pdev)
 	for (i = 0; i < fbdev->num_managers; i++) {
 		struct omap_overlay_manager *mgr;
 		mgr = fbdev->managers[i];
-		r = mgr->apply(mgr);
-		if (r)
-			dev_warn(fbdev->dev, "failed to apply dispc config\n");
+		if (mgr) {
+			r = mgr->apply(mgr);
+			if (r)
+				dev_warn(fbdev->dev, "failed to apply dispc config\n");
+		}
 	}
 
 	DBG("mgr->apply'ed\n");
 
-	if (def_display) {
-		r = omapfb_init_display(fbdev, def_display);
-		if (r) {
-			dev_err(fbdev->dev,
-					"failed to initialize default "
-					"display\n");
-			goto cleanup;
+	for (i = 0; i < fbdev->num_displays; i++) {
+		if (init_displays[i]) {
+			r = omapfb_init_display(fbdev, init_displays[i]);
+			if (r) {
+				dev_err(fbdev->dev,
+						"failed to initialize default "
+						"display(%d): %s, err = %d\n",
+					init_displays[i]->display_id,
+					init_displays[i]->name, r);
+				if (!i)
+					goto cleanup;
+			}
 		}
 	}
 
