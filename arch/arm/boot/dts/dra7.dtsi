@@ -984,14 +984,14 @@
 				compatible = "ti,dra7xx-dpi";
 				reg = <1>;
 				video-source = <2>;
-				display-id = <2>;
+				display-id = <3>;
 			};
 
 			dpi3: dpi@3 {
 				compatible = "ti,dra7xx-dpi";
 				reg = <2>;
 				video-source = <3>;
-				display-id = <3>;
+				display-id = <2>;
 			};
 
 			hdmi: hdmi {
