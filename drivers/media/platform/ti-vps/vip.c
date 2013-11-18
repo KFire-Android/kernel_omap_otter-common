@@ -58,6 +58,11 @@ MODULE_VERSION("0.1");
 #define VIP_VBI_STREAMS_PER_PORT	16
 
 /*
+ * Global static variables
+ */
+static int once = 1;
+
+/*
  * Minimum and maximum frame sizes
  */
 #define MIN_W		128
@@ -261,7 +266,9 @@ struct vip_dev {
 	struct vip_config	*config;
 	struct v4l2_subdev	*sensor;
 	struct v4l2_device	v4l2_dev;
+	struct platform_device *pdev;
 	struct vip_shared	*shared;
+	struct resource *res;
 	int			slice_id;
 	int			num_ports;	/* count of open ports */
 	struct mutex		mutex;
@@ -345,6 +352,14 @@ struct vip_stream {
 	struct vb2_queue	vb_vidq;
 	struct video_device	vdev;
 };
+
+/*
+ * Function prototype declarations
+ */
+static int alloc_port(struct vip_dev *, int);
+static void free_port(struct vip_port *);
+static int find_or_alloc_shared(struct platform_device *, struct vip_dev *,
+		struct resource *);
 
 static u32 read_sreg(struct vip_shared *shared, int offset)
 {
@@ -918,6 +933,9 @@ static irqreturn_t vip_irq(int irq_vip, void *data)
 	struct vip_dev *dev = (struct vip_dev *)data;
 	u32 irqst0;
 
+	if (!dev->shared)
+		return IRQ_HANDLED;
+
 	irqst0 = read_sreg(dev->shared, VIP_INT0_STATUS0);
 
 	if (irqst0) {
@@ -1401,7 +1419,6 @@ static void vip_lock(struct vb2_queue *vq)
 static void vip_unlock(struct vb2_queue *vq)
 {
 	struct vip_stream *stream = vb2_get_drv_priv(vq);
-
 	mutex_unlock(&stream->port->dev->mutex);
 }
 
@@ -1433,7 +1450,6 @@ static int vip_init_dev(struct vip_dev *dev)
 		return ret;
 
 	vip_set_clock_enable(dev, 1);
-
 done:
 	dev->num_ports++;
 
@@ -1485,11 +1501,39 @@ static int vip_open(struct file *file)
 	struct vip_stream *stream = video_drvdata(file);
 	struct vip_port *port = stream->port;
 	struct vip_dev *dev = port->dev;
+	struct platform_device *pdev = dev->pdev;
 	int ret;
 
 	if (vb2_is_busy(&stream->vb_vidq)) {
 		v4l2_err(&dev->v4l2_dev, "%s queue busy\n", __func__);
 		return -EBUSY;
+	}
+
+	if (once) {
+		vip_top_reset(dev);
+		ret = find_or_alloc_shared(pdev, dev, dev->res);
+		if (ret)
+			goto done;
+
+		dev->alloc_ctx = vb2_dma_contig_init_ctx(&pdev->dev);
+		if (IS_ERR(dev->alloc_ctx)) {
+			v4l2_err(&dev->v4l2_dev, "Failed to alloc vb2 context\n");
+			ret = PTR_ERR(dev->alloc_ctx);
+			goto done;
+		}
+
+		vip_set_idle_mode(dev->shared, VIP_SMART_IDLE_MODE);
+		vip_set_standby_mode(dev->shared, VIP_SMART_STANDBY_MODE);
+		vip_set_slice_path(dev, VIP_MULTI_CHANNEL_DATA_SELECT);
+		vip_set_port_enable(dev->ports[0], 1);
+		vip_set_data_interface(dev->ports[0], DUAL_8B_INTERFACE);
+		vip_sync_type(dev->ports[0], DISCRETE_SYNC_SINGLE_YUV422);
+		vip_set_vsync_polarity(dev->ports[0], 1);
+		vip_set_hsync_polarity(dev->ports[0], 1);
+		vip_set_actvid_polarity(dev->ports[0], 1);
+		vip_set_discrete_basic_mode(dev->ports[0]);
+
+		once = 0;
 	}
 
 	ret = vip_init_port(port);
@@ -1644,14 +1688,6 @@ static int alloc_port(struct vip_dev *dev, int id)
 
 	ret = alloc_stream(port, 0, VFL_TYPE_GRABBER);
 
-	vip_set_port_enable(port, 1);
-	vip_set_data_interface(port, DUAL_8B_INTERFACE);
-	vip_sync_type(port, DISCRETE_SYNC_SINGLE_YUV422);
-	vip_set_vsync_polarity(port, 1);
-	vip_set_hsync_polarity(port, 1);
-	vip_set_actvid_polarity(port, 1);
-	vip_set_discrete_basic_mode(port);
-
 	return 0;
 }
 
@@ -1760,7 +1796,6 @@ static int vip_async_bound(struct v4l2_async_notifier *notifier,
 			struct v4l2_async_subdev *asd)
 {
 	struct vip_dev *dev = notifier_to_vip_dev(notifier);
-
 	dev->sensor = subdev;
 
 	return 0;
@@ -1799,34 +1834,6 @@ static struct vip_config dra7xx_vip_config = {
 	.asd_sizes	= sizeof(vip_async_subdevs)/sizeof(vip_async_subdevs[0]),
 };
 
-static int ov10635_init_sensor(struct vip_dev *dev)
-{
-	int r;
-
-	struct gpio gpios[] = {
-		{ dev->vin2_s0_gpio, GPIOF_OUT_INIT_LOW,
-			"vin2_s0" },
-		{ dev->cam_fpd_mux_s0_gpio, GPIOF_OUT_INIT_HIGH,
-			"cam_fpd_mux_s0" },
-		{ dev->mux1_sel0_gpio, GPIOF_OUT_INIT_HIGH,
-			"mux1_sel0" },
-		{ dev->mux1_sel1_gpio, GPIOF_OUT_INIT_LOW,
-			"mux1_sel1" },
-		{ dev->mux2_sel0_gpio, GPIOF_OUT_INIT_HIGH,
-			"mux2_sel0" },
-		{ dev->mux2_sel1_gpio, GPIOF_OUT_INIT_LOW,
-			"mux2_sel1" },
-		{ dev->ov_pwdn_gpio, GPIOF_OUT_INIT_LOW,
-			"ov_pwdn" },
-	};
-
-	r = gpio_request_array(gpios, ARRAY_SIZE(gpios));
-	if (r)
-		return r;
-
-	return 0;
-}
-
 static void ov10635_uninit_sensor(struct vip_dev *dev)
 {
 	gpio_free(dev->vin2_s0_gpio);
@@ -1840,11 +1847,7 @@ static void ov10635_uninit_sensor(struct vip_dev *dev)
 
 static int vip_probe(struct platform_device *pdev)
 {
-	struct device_node *node = pdev->dev.of_node;
 	struct vip_dev *dev;
-	struct vip_shared *shared;
-	struct resource *res;
-	int gpio;
 	int ret;
 	int irq;
 
@@ -1864,55 +1867,39 @@ static int vip_probe(struct platform_device *pdev)
 		goto err_runtime_get;
 
 	irq = platform_get_irq(pdev, 0);
-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	if (irq < 0 || res == NULL) {
+	dev->res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	if (irq < 0 || dev->res == NULL) {
 		dev_err(&pdev->dev, "Missing platform resources data\n");
 		ret = -ENODEV;
 	}
 
 	ret = v4l2_device_register(&pdev->dev, &dev->v4l2_dev);
 	if (ret)
-		return ret;
+		goto err_runtime_get;
 
 	mutex_init(&dev->mutex);
 
 	platform_set_drvdata(pdev, dev);
 
-	dev->base = devm_ioremap(&pdev->dev, res->start, SZ_64K);
+	dev->base = devm_ioremap(&pdev->dev, dev->res->start, SZ_64K);
 	if (!dev->base)
 		ret = -ENOMEM;
-
-	vip_set_clock_enable(dev, 1);
-	vip_top_reset(dev);
-
-	ret = find_or_alloc_shared(pdev, dev, res);
-
-	shared = dev->shared;
-
-	dev->slice_id = VIP_SLICE1;
-
-	ret = alloc_port(dev, 0);
-	if (ret)
-		goto dev_unreg;
 
 	dev->irq = irq;
 
 	if (devm_request_irq(&pdev->dev, dev->irq, vip_irq,
 			     0, VIP_MODULE_NAME, dev) < 0) {
 		ret = -ENOMEM;
-		goto free_port;
+		goto dev_unreg;
 	}
 
-	dev->alloc_ctx = vb2_dma_contig_init_ctx(&pdev->dev);
-	if (IS_ERR(dev->alloc_ctx)) {
-		v4l2_err(&dev->v4l2_dev, "Failed to alloc vb2 context\n");
-		ret = PTR_ERR(dev->alloc_ctx);
-		goto free_irq;
-	}
+	dev->slice_id = VIP_SLICE1;
 
-	vip_set_idle_mode(shared, VIP_SMART_IDLE_MODE);
-	vip_set_standby_mode(shared, VIP_SMART_STANDBY_MODE);
-	vip_set_slice_path(dev, VIP_MULTI_CHANNEL_DATA_SELECT);
+	dev->pdev = pdev;
+
+	ret = alloc_port(dev, 0);
+	if (ret)
+		goto dev_unreg;
 
 	dev->config = &dra7xx_vip_config;
 
@@ -1925,22 +1912,17 @@ static int vip_probe(struct platform_device *pdev)
 	if (ret) {
 		vip_dprintk(dev, "Error registering async notifier\n");
 		ret = -EINVAL;
-		goto probe_subdev_out;
+		goto free_port;
 	}
 
 	return 0;
 
-free_irq:
-	free_irq(irq, dev);
 free_port:
 	free_port(dev->ports[0]);
 dev_unreg:
 	v4l2_device_unregister(&dev->v4l2_dev);
-probe_subdev_out:
-	kfree(dev->sensor);
 err_runtime_get:
 	pm_runtime_disable(&pdev->dev);
-
 	return ret;
 }
 
