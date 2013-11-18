@@ -58,6 +58,14 @@
 #define DRM_MODE_FLAG_PIXMUX	(1<<11)
 #define DRM_MODE_FLAG_DBLCLK	(1<<12)
 #define DRM_MODE_FLAG_CLKDIV2	(1<<13)
+#define DRM_MODE_FLAG_RDATAPCLK	(1<<14) /* Rising edge data_pclk */
+#define DRM_MODE_FLAG_FDATAPCLK	(1<<15) /* Falling edge data_pclk */
+#define DRM_MODE_FLAG_ODATAPCLK	(1<<16) /* Opposite edge data_pclk */
+#define DRM_MODE_FLAG_PDE	(1<<17) /* Active High data enable */
+#define DRM_MODE_FLAG_NDE	(1<<18) /* Active Low data enable */
+#define DRM_MODE_FLAG_RSYNCPCLK	(1<<19) /* Rising edge sync_pclk */
+#define DRM_MODE_FLAG_FSYNCPCLK	(1<<20) /* Falling edge sync_pclk */
+#define DRM_MODE_FLAG_OSYNCPCLK	(1<<21) /* Opposite edge sync_pclk */
 
 /* DPMS flags */
 /* bit compatible with the xorg definitions. */
