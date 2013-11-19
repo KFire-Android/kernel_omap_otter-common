@@ -180,14 +180,9 @@ static int omap_modeset_init(struct drm_device *dev)
 			continue;
 
 		/*
-		 * get the recommended DISPC channel for this encoder. For now,
-		 * we only try to get create a crtc out of the recommended, the
-		 * other possible channels to which the encoder can connect are
-		 * not considered.
+		 * Getting the dssdev->channel for creation of crtc.
 		 */
-		channel = dssdev->type == OMAP_DISPLAY_TYPE_HDMI ?
-						OMAP_DSS_CHANNEL_DIGIT :
-						OMAP_DSS_CHANNEL_LCD;
+		channel = dssdev->channel;
 
 		/*
 		 * if this channel hasn't already been taken by a previously
