@@ -303,14 +303,14 @@ static int dserlink_command(struct i2c_client *client,
 
 	case DSER_READ:
 		pd = (struct dser_i2c_data *)arg;
-		if (!pd)
+		if (pd)
 			pd->data = status = i2c_read_le8(client,
 							pd->addr);
 	break;
 
 	case DSER_WRITE:
 		pd = (struct dser_i2c_data *)arg;
-		if (!pd)
+		if (pd)
 			status = i2c_write_le8(client, pd->addr,
 							pd->data);
 	break;
