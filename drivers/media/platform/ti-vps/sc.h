@@ -161,15 +161,34 @@
 #define CFG_OFF_W_MASK			0x07ff
 #define CFG_OFF_W_SHIFT			16
 
+/* num phases x num sets(luma and chroma) x num taps x coeff size */
+#define SC_COEF_SRAM_SIZE		(32 * 2 * 8 * 2)
+
 struct sc_data {
 	void __iomem		*base;
 	struct resource		*res;
+
+	dma_addr_t		loaded_coeff_h; /* loaded h coeffs in scaler */
+	dma_addr_t		loaded_coeff_v; /* loaded v coeffs in scaler */
+
+	/* have new horizontal SC coefficients */
+	bool			load_coeff_h;
+
+	/* have new vertical SC coefficients */
+	bool			load_coeff_v;
+
+	unsigned int		hs_index;	/* horizontal scaler selector */
+	unsigned int		vs_index;	/* vertical scaler selector */
 
 	struct platform_device *pdev;
 };
 
 void sc_set_regs_bypass(struct sc_data *sc, u32 *sc_reg0);
 void sc_dump_regs(struct sc_data *sc);
+void sc_set_hs_coeffs(struct sc_data *sc, void *addr, unsigned int src_w,
+		unsigned int dst_w);
+void sc_set_vs_coeffs(struct sc_data *sc, void *addr, unsigned int src_h,
+		unsigned int dst_h);
 struct sc_data *sc_create(struct platform_device *pdev);
 
 #endif

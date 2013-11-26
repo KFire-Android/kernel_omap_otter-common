@@ -126,7 +126,7 @@ enum vpdma_frame_start_event {
  * client identifiers used for configuration descriptors
  */
 #define CFD_MMR_CLIENT		0
-#define CFD_SC_CLIENT		7
+#define CFD_SC_CLIENT		4
 #define CFD_SC_CLIENT2		8
 
 /* Address data block header format */

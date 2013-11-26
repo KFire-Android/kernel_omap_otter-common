@@ -18,6 +18,7 @@
 #include <linux/slab.h>
 
 #include "sc.h"
+#include "sc_coeff.h"
 
 void sc_set_regs_bypass(struct sc_data *sc, u32 *sc_reg0)
 {
@@ -63,6 +64,98 @@ void sc_dump_regs(struct sc_data *sc)
 	DUMPREG(SC25);
 
 #undef DUMPREG
+}
+
+/*
+ * set the horizontal scaler coefficients according to the ratio of output to
+ * input widths, after accounting for up to two levels of decimation
+ */
+void sc_set_hs_coeffs(struct sc_data *sc, void *addr, unsigned int src_w,
+		unsigned int dst_w)
+{
+	int sixteenths;
+	int idx;
+	int i, j;
+	u16 *coeff_h = addr;
+	u16 *blk_cp;
+	const u16 *cp;
+
+	if (dst_w > src_w) {
+		idx = HS_UP_SCALE;
+	} else {
+		if ((dst_w << 1) < src_w)
+			dst_w <<= 1;	/* first level decimation */
+		if ((dst_w << 1) < src_w)
+			dst_w <<= 1;	/* second level decimation */
+
+		if (dst_w == src_w) {
+			idx = HS_LE_16_16_SCALE;
+		} else {
+			sixteenths = (dst_w << 4) / src_w;
+			if (sixteenths < 8)
+				sixteenths = 8;
+			idx = HS_LT_9_16_SCALE + sixteenths - 8;
+		}
+	}
+
+	if (idx == sc->hs_index)
+		return;
+
+	cp = scaler_hs_coeffs[idx];
+	blk_cp = coeff_h;
+
+	for (i = 0; i < 64; i++) {
+		for (j = 0; j < 7; j++)
+			*blk_cp++ = *cp++;
+
+		blk_cp++;
+	}
+
+	sc->hs_index = idx;
+
+	sc->load_coeff_h = true;
+}
+
+/*
+ * set the vertical scaler coefficients according to the ratio of output to
+ * input heights
+ */
+void sc_set_vs_coeffs(struct sc_data *sc, void *addr, unsigned int src_h,
+		unsigned int dst_h)
+{
+	int sixteenths;
+	int idx;
+	int i, j;
+	u16 *coeff_v = addr;
+	u16 *blk_cp;
+	const u16 *cp;
+
+	if (dst_h > src_h) {
+		idx = VS_UP_SCALE;
+	} else if (dst_h == src_h) {
+		idx = VS_1_TO_1_SCALE;
+	} else {
+		sixteenths = (dst_h << 4) / src_h;
+		if (sixteenths < 8)
+			sixteenths = 8;
+		idx = VS_LT_9_16_SCALE + sixteenths - 8;
+	}
+
+	if (idx == sc->vs_index)
+		return;
+
+	cp = scaler_vs_coeffs[idx];
+	blk_cp = coeff_v;
+
+	for (i = 0; i < 64; i++) {
+		for (j = 0; j < 5; j++)
+			*blk_cp++ = *cp++;
+
+		blk_cp += 3;
+	}
+
+	sc->vs_index = idx;
+	sc->load_coeff_v = true;
 }
 
 struct sc_data *sc_create(struct platform_device *pdev)
