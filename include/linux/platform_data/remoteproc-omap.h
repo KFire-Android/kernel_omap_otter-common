@@ -22,12 +22,12 @@ struct platform_device;
 
 /**
  * struct omap_rproc_timers_info - timers for the omap rproc
- * @cap: capabilities of the timer
+ * @name: hwmod name of the timer
  * @id: timer id to use by the remoteproc (only for non-DT and temporary)
  * @odt: timer pointer
  */
 struct omap_rproc_timers_info {
-	u32 cap;
+	const char *name;
 	int id;
 	struct omap_dm_timer *odt;
 };
