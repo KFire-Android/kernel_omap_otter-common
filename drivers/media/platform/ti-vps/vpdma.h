@@ -48,6 +48,9 @@ struct vpdma_data_format {
 
 #define VPDMA_DESC_ALIGN		16	/* 16-byte descriptor alignment */
 
+/* line stride should be 16 byte aligned */
+#define VPDMA_STRIDE_ALIGN		16
+
 #define VPDMA_MAX_DESC_SIZE		32	/* 8 words */
 
 #define VPDMA_LIST_TYPE_NORMAL		0
