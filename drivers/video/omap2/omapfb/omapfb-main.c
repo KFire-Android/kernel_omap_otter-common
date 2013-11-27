@@ -2568,17 +2568,19 @@ static int omapfb_init_connections(struct omapfb2_device *fbdev,
 
 	for (i = 0; i < fbdev->num_displays; ++i) {
 		struct omap_dss_device *dssdev = fbdev->displays[i].dssdev;
-		struct omap_dss_output *out = dssdev->output;
+		if (dssdev) {
+			struct omap_dss_output *out = dssdev->output;
 
-		mgr = omap_dss_get_overlay_manager(dssdev->channel);
+			mgr = omap_dss_get_overlay_manager(dssdev->channel);
 
-		if (!mgr || !out)
-			continue;
+			if (!mgr || !out)
+				continue;
 
-		if (mgr->output)
-			mgr->unset_output(mgr);
+			if (mgr->output)
+				mgr->unset_output(mgr);
 
-		mgr->set_output(mgr, out);
+			mgr->set_output(mgr, out);
+		}
 	}
 
 	mgr = def_dssdev->output->manager;
@@ -2659,6 +2661,7 @@ static int __init omapfb_probe(struct platform_device *pdev)
 	struct omap_dss_device *init_displays[3];
 	struct omap_dss_device *dssdev = NULL;
 	u16 fb_ov_start_ix = 0;
+	const char *def_disp = omapdss_get_default_display_name();
 
 	DBG("omapfb_probe\n");
 
@@ -2722,11 +2725,23 @@ static int __init omapfb_probe(struct platform_device *pdev)
 		case 0:
 			init_displays[dssdev->display_id] = dssdev;
 			break;
+		case 1:
 		case 2:
 		case 3:
-			if ((strcmp("lcd", dssdev->name) == 0 ||
-			     strcmp("fpdlink", dssdev->name) == 0))
-				init_displays[dssdev->display_id-1] = dssdev;
+			if (!def_disp) {
+				if (strcmp("lcd", dssdev->name) == 0 ||
+				    strcmp("fpdlink", dssdev->name) == 0)
+					init_displays[dssdev->display_id-1] = dssdev;
+				break;
+			} else
+				dev_err(&pdev->dev,
+					"default display set to %s\n",
+					def_disp);
+		default:
+			dev_err(&pdev->dev,
+				"ignoring from initialization display[%d]=%s\n",
+				dssdev->display_id, dssdev->name);
+			break;
 		}
 		fbdev->num_displays++;
 		dev_err(&pdev->dev, " display(%d) = %s, driver_name = %s\n",
@@ -2786,7 +2801,8 @@ static int __init omapfb_probe(struct platform_device *pdev)
 	}
 
 	for (i = 0; i < fbdev->num_displays; i++) {
-		if (!intialize_dev_fb_resolution(i, fbdev->displays[i].dssdev))
+		if (fbdev->displays[i].dssdev &&
+		    !intialize_dev_fb_resolution(i, fbdev->displays[i].dssdev))
 			goto cleanup;
 	}
 
