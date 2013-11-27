@@ -24,6 +24,7 @@ obj-$(CONFIG_VIDEO_MEM2MEM_TESTDEV) += mem2mem_testdev.o
 
 obj-$(CONFIG_VIDEO_TI_VPE)		+= ti-vps/vpe.o
 obj-$(CONFIG_VIDEO_TI_VPE)		+= ti-vps/sc.o
+obj-$(CONFIG_VIDEO_TI_VPE)		+= ti-vps/csc.o
 obj-$(CONFIG_VIDEO_TI_VIP)		+= ti-vps/vip.o
 obj-$(CONFIG_VIDEO_TI_VPDMA)		+= ti-vps/vpdma.o
 

@@ -6771,6 +6771,11 @@ static struct omap_hwmod_addr_space dra7xx_vpe_addrs[] = {
 		.pa_end         = 0x489d56ff,
 	},
 	{
+		.name           = "vpe_csc",
+		.pa_start       = 0x489d5700,
+		.pa_end         = 0x489dcfff,
+	},
+	{
 		.name		= "vpdma",
 		.pa_start	= 0x489dd000,
 		.pa_end		= 0x489dd3ff,
