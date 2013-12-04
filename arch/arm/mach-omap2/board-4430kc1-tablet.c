@@ -62,6 +62,10 @@
 #include <plat/usb.h>
 #include <plat/vram.h>
 
+// to fix omap_reserve
+#include <plat/dsp.h>
+#include <plat/omap-secure.h>
+
 #include <video/omapdss.h>
 
 #include <linux/platform_data/emif_plat.h>
