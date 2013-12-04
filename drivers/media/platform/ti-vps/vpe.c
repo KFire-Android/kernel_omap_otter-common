@@ -105,7 +105,7 @@ struct vpe_us_coeffs {
 /*
  * Default upsampler coefficients
  */
-static struct vpe_us_coeffs us_coeffs[2] = {
+static const struct vpe_us_coeffs us_coeffs[] = {
 	{
 		/* Coefficients for progressive input */
 		0x00C8, 0x0348, 0x0018, 0x3FD8, 0x3FB8, 0x0378, 0x00E8, 0x3FE8,
@@ -136,7 +136,7 @@ struct vpe_dei_regs {
 /*
  * default expert DEI register values, unlikely to be modified.
  */
-static struct vpe_dei_regs dei_regs = {
+static const struct vpe_dei_regs dei_regs = {
 	0x020C0804u,
 	0x0118100Fu,
 	0x08040200u,
@@ -169,7 +169,7 @@ struct vpe_port_data {
 #define VPE_PORT_CHROMA_OUT	9
 #define VPE_PORT_RGB_OUT	10
 
-static struct vpe_port_data port_data[11] = {
+static const struct vpe_port_data port_data[11] = {
 	[VPE_PORT_LUMA1_IN] = {
 		.channel	= VPE_CHAN_NUM_LUMA1_IN,
 		.vb_index	= 0,
@@ -228,7 +228,7 @@ struct vpe_fmt {
 	u8	types;			/* CAPTURE and/or OUTPUT */
 	u8	coplanar;		/* set for unpacked Luma and Chroma */
 	/* vpdma format info for each plane */
-	struct vpdma_data_format *vpdma_fmt[VPE_MAX_PLANES];
+	struct vpdma_data_format const *vpdma_fmt[VPE_MAX_PLANES];
 };
 
 static struct vpe_fmt vpe_formats[] = {
@@ -623,7 +623,7 @@ static void set_us_coefficients(struct vpe_ctx *ctx)
 	u32 *us1_reg = &mmr_adb->us1_regs[0];
 	u32 *us2_reg = &mmr_adb->us2_regs[0];
 	u32 *us3_reg = &mmr_adb->us3_regs[0];
-	unsigned short *cp, *end_cp;
+	const unsigned short *cp, *end_cp;
 
 	cp = &us_coeffs[0].anchor_fid0_c0;
 
@@ -956,11 +956,11 @@ static void vpe_dump_regs(struct vpe_dev *dev)
 static void add_out_dtd(struct vpe_ctx *ctx, int port)
 {
 	struct vpe_q_data *q_data = &ctx->q_data[Q_DATA_DST];
-	struct vpe_port_data *p_data = &port_data[port];
+	const struct vpe_port_data *p_data = &port_data[port];
 	struct vb2_buffer *vb = ctx->dst_vb;
 	struct v4l2_rect *c_rect = &q_data->c_rect;
 	struct vpe_fmt *fmt = q_data->fmt;
-	struct vpdma_data_format *vpdma_fmt;
+	const struct vpdma_data_format *vpdma_fmt;
 	int mv_buf_selector = !ctx->src_mv_buf_selector;
 	dma_addr_t dma_addr;
 	u32 flags = 0;
@@ -994,11 +994,11 @@ static void add_out_dtd(struct vpe_ctx *ctx, int port)
 static void add_in_dtd(struct vpe_ctx *ctx, int port)
 {
 	struct vpe_q_data *q_data = &ctx->q_data[Q_DATA_SRC];
-	struct vpe_port_data *p_data = &port_data[port];
+	const struct vpe_port_data *p_data = &port_data[port];
 	struct vb2_buffer *vb = ctx->src_vbs[p_data->vb_index];
 	struct v4l2_rect *c_rect = &q_data->c_rect;
 	struct vpe_fmt *fmt = q_data->fmt;
-	struct vpdma_data_format *vpdma_fmt;
+	const struct vpdma_data_format *vpdma_fmt;
 	int mv_buf_selector = ctx->src_mv_buf_selector;
 	int field = vb->v4l2_buf.field == V4L2_FIELD_BOTTOM;
 	dma_addr_t dma_addr;

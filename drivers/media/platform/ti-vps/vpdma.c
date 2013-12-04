@@ -28,7 +28,7 @@
 
 #define VPDMA_FIRMWARE	"vpdma-1b8.fw"
 
-struct vpdma_data_format vpdma_yuv_fmts[] = {
+const struct vpdma_data_format vpdma_yuv_fmts[] = {
 	[VPDMA_DATA_FMT_Y444] = {
 		.type		= VPDMA_DATA_FMT_TYPE_YUV,
 		.data_type	= DATA_TYPE_Y444,
@@ -77,7 +77,7 @@ struct vpdma_data_format vpdma_yuv_fmts[] = {
 };
 EXPORT_SYMBOL(vpdma_yuv_fmts);
 
-struct vpdma_data_format vpdma_rgb_fmts[] = {
+const struct vpdma_data_format vpdma_rgb_fmts[] = {
 	[VPDMA_DATA_FMT_RGB565] = {
 		.type		= VPDMA_DATA_FMT_TYPE_RGB,
 		.data_type	= DATA_TYPE_RGB16_565,
@@ -181,7 +181,7 @@ struct vpdma_data_format vpdma_rgb_fmts[] = {
 };
 EXPORT_SYMBOL(vpdma_rgb_fmts);
 
-struct vpdma_data_format vpdma_misc_fmts[] = {
+const struct vpdma_data_format vpdma_misc_fmts[] = {
 	[VPDMA_DATA_FMT_MV] = {
 		.type		= VPDMA_DATA_FMT_TYPE_MISC,
 		.data_type	= DATA_TYPE_MV,

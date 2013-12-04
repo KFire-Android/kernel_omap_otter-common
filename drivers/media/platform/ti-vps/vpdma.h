@@ -103,9 +103,9 @@ enum vpdma_misc_formats {
 	VPDMA_DATA_FMT_MV = 0,
 };
 
-extern struct vpdma_data_format vpdma_yuv_fmts[];
-extern struct vpdma_data_format vpdma_rgb_fmts[];
-extern struct vpdma_data_format vpdma_misc_fmts[];
+extern const struct vpdma_data_format vpdma_yuv_fmts[];
+extern const struct vpdma_data_format vpdma_rgb_fmts[];
+extern const struct vpdma_data_format vpdma_misc_fmts[];
 
 enum vpdma_frame_start_event {
 	VPDMA_FSEVENT_HDMI_FID = 0,
