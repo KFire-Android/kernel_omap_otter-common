@@ -1129,6 +1129,25 @@ static void device_run(void *priv)
 	if (ctx->deinterlacing)
 		add_in_dtd(ctx, VPE_PORT_MV_IN);
 
+	/* sync on channel control descriptors for input ports */
+	vpdma_add_sync_on_channel_ctd(&ctx->desc_list, VPE_CHAN_NUM_LUMA1_IN);
+	vpdma_add_sync_on_channel_ctd(&ctx->desc_list, VPE_CHAN_NUM_CHROMA1_IN);
+
+	if (ctx->deinterlacing) {
+		vpdma_add_sync_on_channel_ctd(&ctx->desc_list,
+			VPE_CHAN_NUM_LUMA2_IN);
+		vpdma_add_sync_on_channel_ctd(&ctx->desc_list,
+			VPE_CHAN_NUM_CHROMA2_IN);
+
+		vpdma_add_sync_on_channel_ctd(&ctx->desc_list,
+			VPE_CHAN_NUM_LUMA3_IN);
+		vpdma_add_sync_on_channel_ctd(&ctx->desc_list,
+			VPE_CHAN_NUM_CHROMA3_IN);
+
+		vpdma_add_sync_on_channel_ctd(&ctx->desc_list,
+					      VPE_CHAN_NUM_MV_IN);
+	}
+
 	/* sync on channel control descriptors for output ports */
 	if (d_q_data->colorspace == V4L2_COLORSPACE_SRGB) {
 		vpdma_add_sync_on_channel_ctd(&ctx->desc_list,
