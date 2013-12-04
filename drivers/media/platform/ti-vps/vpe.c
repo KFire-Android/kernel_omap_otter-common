@@ -73,10 +73,11 @@
 #define VPE_DEF_BUFS_PER_JOB	1	/* default one buffer per batch job */
 
 /*
- * each VPE context needs up to 3 config desciptors, 7 input descriptors,
- * 3 output descriptors, and 3 control descripors
+ * each VPE context can need up to 3 config desciptors, 7 input descriptors,
+ * 3 output descriptors, and 10 control descriptors
  */
-#define VPE_DESC_LIST_SIZE	(15 * VPDMA_MAX_DESC_SIZE)
+#define VPE_DESC_LIST_SIZE	(10 * VPDMA_DTD_DESC_SIZE +	\
+					13 * VPDMA_CFD_CTD_DESC_SIZE)
 
 #define vpe_dbg(vpedev, fmt, arg...)	\
 		dev_dbg((vpedev)->v4l2_dev.dev, fmt, ##arg)
