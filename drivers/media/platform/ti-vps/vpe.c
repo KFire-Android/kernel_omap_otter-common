@@ -386,7 +386,14 @@ struct vpe_ctx {
 	struct vb2_buffer	*src_vbs[VPE_MAX_SRC_BUFS];
 	struct vb2_buffer	*dst_vb;
 
-	struct vpdma_buf	mv_buf[2];		/* motion vector in/out bufs */
+	/* dma addrs of motion vector in/out bufs */
+	dma_addr_t		mv_buf_dma[2];
+
+	/* virtual addrs of motion vector bufs */
+	void			*mv_buf[2];
+
+	/* current motion vector buffer size */
+	size_t			mv_buf_size;
 	struct vpdma_buf	mmr_adb;		/* shadow reg addr/data block */
 	struct vpdma_buf	sc_coeff_h;		/* h coeff buffer */
 	struct vpdma_buf	sc_coeff_v;		/* v coeff buffer */
@@ -520,34 +527,40 @@ static void init_adb_hdrs(struct vpe_ctx *ctx)
  */
 static int realloc_mv_buffers(struct vpe_ctx *ctx, size_t size)
 {
-	struct vpdma_data *vpdma = ctx->dev->vpdma;
-	int ret;
+	struct device *dev = ctx->dev->v4l2_dev.dev;
 
-	if (ctx->mv_buf[0].mapped) {
-		vpdma_buf_unmap(vpdma, &ctx->mv_buf[0]);
-		vpdma_buf_free(&ctx->mv_buf[0]);
-	}
+	if (ctx->mv_buf_size == size)
+		return 0;
 
-	if (ctx->mv_buf[1].mapped) {
-		vpdma_buf_unmap(vpdma, &ctx->mv_buf[1]);
-		vpdma_buf_free(&ctx->mv_buf[1]);
-	}
+	if (ctx->mv_buf[0])
+		dma_free_coherent(dev, ctx->mv_buf_size, ctx->mv_buf[0],
+			ctx->mv_buf_dma[0]);
+
+	if (ctx->mv_buf[1])
+		dma_free_coherent(dev, ctx->mv_buf_size, ctx->mv_buf[1],
+			ctx->mv_buf_dma[1]);
 
 	if (size == 0)
 		return 0;
 
-	ret = vpdma_buf_alloc(&ctx->mv_buf[0], size);
-	if (ret)
-		return ret;
-	ret = vpdma_buf_alloc(&ctx->mv_buf[1], size);
-	if (ret) {
-		vpdma_buf_free(&ctx->mv_buf[0]);
-		return ret;
+	ctx->mv_buf[0] = dma_alloc_coherent(dev, size, &ctx->mv_buf_dma[0],
+				GFP_KERNEL);
+	if (!ctx->mv_buf[0]) {
+		vpe_err(ctx->dev, "failed to allocate motion vector buffer\n");
+		return -ENOMEM;
 	}
 
-	vpdma_buf_map(vpdma, &ctx->mv_buf[0]);
-	vpdma_buf_map(vpdma, &ctx->mv_buf[1]);
+	ctx->mv_buf[1] = dma_alloc_coherent(dev, size, &ctx->mv_buf_dma[1],
+				GFP_KERNEL);
+	if (!ctx->mv_buf[1]) {
+		vpe_err(ctx->dev, "failed to allocate motion vector buffer\n");
+		dma_free_coherent(dev, size, ctx->mv_buf[0],
+			ctx->mv_buf_dma[0]);
 
+		return -ENOMEM;
+	}
+
+	ctx->mv_buf_size = size;
 	ctx->src_mv_buf_selector = 0;
 
 	return 0;
@@ -968,7 +981,7 @@ static void add_out_dtd(struct vpe_ctx *ctx, int port)
 
 	if (port == VPE_PORT_MV_OUT) {
 		vpdma_fmt = &vpdma_misc_fmts[VPDMA_DATA_FMT_MV];
-		dma_addr = ctx->mv_buf[mv_buf_selector].dma_addr;
+		dma_addr = ctx->mv_buf_dma[mv_buf_selector];
 	} else {
 		/* to incorporate interleaved formats */
 		int plane = fmt->coplanar ? p_data->vb_part : 0;
@@ -1007,7 +1020,7 @@ static void add_in_dtd(struct vpe_ctx *ctx, int port)
 
 	if (port == VPE_PORT_MV_IN) {
 		vpdma_fmt = &vpdma_misc_fmts[VPDMA_DATA_FMT_MV];
-		dma_addr = ctx->mv_buf[mv_buf_selector].dma_addr;
+		dma_addr = ctx->mv_buf_dma[mv_buf_selector];
 	} else {
 		/* to incorporate interleaved formats */
 		int plane = fmt->coplanar ? p_data->vb_part : 0;
