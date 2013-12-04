@@ -440,7 +440,7 @@ int vpdma_submit_descs(struct vpdma_data *vpdma, struct vpdma_desc_list *list)
 	list_size = (list->next - list->buf.addr) >> 4;
 
 	write_reg(vpdma, VPDMA_LIST_ADDR, (u32) list->buf.dma_addr);
-	wmb();
+
 	write_reg(vpdma, VPDMA_LIST_ATTR,
 			(list_num << VPDMA_LIST_NUM_SHFT) |
 			(list->type << VPDMA_LIST_TYPE_SHFT) |
