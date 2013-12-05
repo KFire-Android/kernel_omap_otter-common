@@ -1581,7 +1581,7 @@ static int alloc_stream(struct vip_port *port, int stream_id, int vfl_type)
 	 */
 	q = &stream->vb_vidq;
 	q->type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-	q->io_modes = VB2_MMAP;
+	q->io_modes = VB2_MMAP | VB2_DMABUF;
 	q->drv_priv = stream;
 	q->buf_struct_size = sizeof(struct vip_buffer);
 	q->ops = &vip_video_qops;
