@@ -359,14 +359,14 @@ static int serlink_command(struct i2c_client *client,
 
 	case SER_READ:
 		pd = (struct ser_i2c_data *)arg;
-		if (!pd)
+		if (pd)
 			pd->data = status = i2c_read_le8(client,
 							pd->addr);
 	break;
 
 	case SER_WRITE:
 		pd = (struct ser_i2c_data *)arg;
-		if (!pd)
+		if (pd)
 			status = i2c_write_le8(client, pd->addr,
 							pd->data);
 	break;
