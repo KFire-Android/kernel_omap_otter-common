@@ -289,7 +289,7 @@ static int omap_modeset_init(struct drm_device *dev)
 	/* note: eventually will need some cpu_is_omapXYZ() type stuff here
 	 * to fill in these limits properly on different OMAP generations..
 	 */
-	dev->mode_config.max_width = 2048;
+	dev->mode_config.max_width = 4096;
 	dev->mode_config.max_height = 2048;
 
 	dev->mode_config.funcs = &omap_mode_config_funcs;
