@@ -2055,7 +2055,7 @@ static void init_sel_i2c_hdmi(void)
 {
 	void __iomem *clk_base = ioremap(0x4A009000, SZ_4K);
 	void __iomem *mcasp8_base = ioremap(0x4847C000, SZ_1K);
-	
+
 	if (omapdss_get_version() != OMAPDSS_VER_DRA7xx)
 		goto err;
 
@@ -2436,7 +2436,7 @@ static int __init omapdss_hdmihw_probe(struct platform_device *pdev)
 		DSSWARN("could not create platform device for audio");
 #endif
 
-	if (hdmi_get_current_hpd())
+	if (hdmi.hpd_gpio && hdmi_get_current_hpd())
 		hdmi_panel_hpd_handler(1);
 
 	return 0;
