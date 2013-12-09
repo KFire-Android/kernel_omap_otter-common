@@ -41,14 +41,25 @@ struct vpdma_data {
 	bool ready;
 };
 
+enum vpdma_data_format_type {
+	VPDMA_DATA_FMT_TYPE_YUV,
+	VPDMA_DATA_FMT_TYPE_RGB,
+	VPDMA_DATA_FMT_TYPE_MISC,
+};
+
 struct vpdma_data_format {
+	enum vpdma_data_format_type type;
 	int data_type;
 	u8 depth;
 };
 
 #define VPDMA_DESC_ALIGN		16	/* 16-byte descriptor alignment */
 
-#define VPDMA_MAX_DESC_SIZE		32	/* 8 words */
+/* line stride should be 16 byte aligned */
+#define VPDMA_STRIDE_ALIGN		16
+
+#define VPDMA_DTD_DESC_SIZE		32	/* 8 words */
+#define VPDMA_CFD_CTD_DESC_SIZE		16	/* 4 words */
 
 #define VPDMA_LIST_TYPE_NORMAL		0
 #define VPDMA_LIST_TYPE_SELF_MODIFYING	1
@@ -93,9 +104,9 @@ enum vpdma_misc_formats {
 	VPDMA_DATA_FMT_MV = 0,
 };
 
-extern struct vpdma_data_format vpdma_yuv_fmts[];
-extern struct vpdma_data_format vpdma_rgb_fmts[];
-extern struct vpdma_data_format vpdma_misc_fmts[];
+extern const struct vpdma_data_format vpdma_yuv_fmts[];
+extern const struct vpdma_data_format vpdma_rgb_fmts[];
+extern const struct vpdma_data_format vpdma_misc_fmts[];
 
 enum vpdma_frame_start_event {
 	VPDMA_FSEVENT_HDMI_FID = 0,
@@ -123,7 +134,7 @@ enum vpdma_frame_start_event {
  * client identifiers used for configuration descriptors
  */
 #define CFD_MMR_CLIENT		0
-#define CFD_SC_CLIENT		7
+#define CFD_SC_CLIENT		4
 #define CFD_SC_CLIENT2		8
 
 /* Address data block header format */
