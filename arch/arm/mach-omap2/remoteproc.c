@@ -83,24 +83,27 @@ static void dra7_ctrl_write_dsp2_boot_addr(u32 bootaddr);
 #define DRA7_RPROC_CMA_SIZE_IPU1	(0x800000)
 
 /*
- * The order of the timers (if there are more) here should be
- * exactly given in the order we expect a remoteproc dmtimer to
- * be acquired based on its needs with the matching capabilities.
- * The DT adaptation for dmtimers doesn't support requesting by id,
- * so the .id field will be made obsolete, and is provided only
- * for a fallback non-DT boot scenario (and also for identifying
- * the specific timer for readability).
+ * These data structures define the desired timers that would
+ * be needed by the respective processors. The timer info is
+ * defined through its hwmod name and a timer id. The id is used
+ * only for non-DT boots, and the hwmod_name serves both for
+ * identifying the timer as well as a matching logic to be used
+ * to lookup the specific timer device node from the DT blob.
  */
 static struct omap_rproc_timers_info ipu_timers[] = {
-	{ .cap = OMAP_TIMER_HAS_IPU_IRQ, .id = 3, },
+	{ .name = "timer3", .id = 3, },
 };
 
 static struct omap_rproc_timers_info dsp_timers[] = {
-	{ .cap = OMAP_TIMER_HAS_DSP_IRQ, .id = 5, },
+	{ .name = "timer5", .id = 5, },
 };
 
 static struct omap_rproc_timers_info ipu1_timers[] = {
-	{ .cap = OMAP_TIMER_HAS_IPU_IRQ | OMAP_TIMER_HAS_PWM, .id = 11, },
+	{ .name = "timer11", .id = 11, },
+};
+
+static struct omap_rproc_timers_info dsp2_timers[] = {
+	{ .name = "timer6", .id = 6, },
 };
 
 /*
@@ -150,6 +153,8 @@ static struct omap_rproc_pdata dra7_rproc_data[] = {
 		.firmware	= "dra7-dsp2-fw.xe66",
 		.mbox_name	= "mbox-dsp2",
 		.oh_name	= "dsp2",
+		.timers		= dsp2_timers,
+		.timers_cnt	= ARRAY_SIZE(dsp2_timers),
 		.set_bootaddr	= dra7_ctrl_write_dsp2_boot_addr,
 	},
 	{
@@ -384,6 +389,38 @@ out:
 }
 
 /**
+ * of_dev_timer_lookup - look up needed timer node from dt blob
+ * @np: parent device_node of all the searchable nodes
+ * @hwmod_name: hwmod name of the desired timer
+ *
+ * Parse the dt blob and find out needed timer by matching hwmod
+ * name. The match logic only loops through one level of child
+ * nodes of the @np parent device node, and uses the @hwmod_name
+ * instead of the actual timer device name to minimize the need
+ * for defining SoC specific timer data (the DT node names would
+ * also incorporate addresses, so the same timer may have completely
+ * different addresses on different SoCs).
+ *
+ * Return: The device node on success or NULL on failure.
+ */
+static struct device_node *of_dev_timer_lookup(struct device_node *np,
+						const char *hwmod_name)
+{
+	struct device_node *np0 = NULL;
+	const char *p;
+
+	for_each_child_of_node(np, np0) {
+		if (of_find_property(np0, "ti,hwmods", NULL)) {
+			p = of_get_property(np0, "ti,hwmods", NULL);
+			if (!strcmp(p, hwmod_name))
+				return np0;
+		}
+	}
+
+	return NULL;
+}
+
+/**
  * omap_rproc_enable_timers - enable the timers for a remoteproc
  * @pdev - the remoteproc platform device
  * @configure - boolean flag used to acquire and configure the timer handle
@@ -400,6 +437,7 @@ static int omap_rproc_enable_timers(struct platform_device *pdev,
 	int ret = 0;
 	struct omap_rproc_pdata *pdata = pdev->dev.platform_data;
 	struct omap_rproc_timers_info *timers = pdata->timers;
+	struct device_node *np = NULL;
 
 	if (!timers)
 		return -EINVAL;
@@ -411,22 +449,32 @@ static int omap_rproc_enable_timers(struct platform_device *pdev,
 		/*
 		 * The omap_dm_timer_request_specific will be made obsolete
 		 * eventually, and the design needs to rely on dmtimer DT
-		 * specific api. The current logic is flawed and does not
-		 * meet the needs of remoteproc as it requests the timers by
-		 * capabilities. This needs that the timer data be written
-		 * with an intrinsic knowledge of timer capabilities w.r.t
-		 * the exact timer that we need.
+		 * specific api. This api can only be used in non-DT boots.
+		 * For DT-boot, the current logic of requesting the desired
+		 * timer utilizes a somewhat crude lookup by finding the
+		 * specific DT node from all the sub-nodes of the 'ocp' node
+		 * and matching it with its hwmod name.
 		 */
-		if (of_have_populated_dt())
+		if (!of_have_populated_dt()) {
 			timers[i].odt =
-			   omap_dm_timer_request_by_cap(timers[i].cap);
-		else
-			timers[i].odt =
-				   omap_dm_timer_request_specific(timers[i].id);
+				omap_dm_timer_request_specific(timers[i].id);
+			goto check_timer;
+		}
+
+		np = of_dev_timer_lookup(of_find_node_by_name(NULL, "ocp"),
+						timers[i].name);
+		if (!np) {
+			ret = -ENXIO;
+			dev_err(&pdev->dev, "device node lookup for timer %s failed: %d\n",
+				timers[i].name, ret);
+			goto free_timers;
+		}
+		timers[i].odt = omap_dm_timer_request_by_node(np);
+check_timer:
 		if (!timers[i].odt) {
 			ret = -EBUSY;
-			dev_err(&pdev->dev, "request for timer %d failed: %d\n",
-						timers[i].id, ret);
+			dev_err(&pdev->dev, "request for timer %s failed: %d\n",
+				timers[i].name, ret);
 			goto free_timers;
 		}
 		omap_dm_timer_set_source(timers[i].odt, OMAP_TIMER_SRC_SYS_CLK);
@@ -538,7 +586,7 @@ static int __init omap_rproc_init(void)
 {
 	struct omap_hwmod *oh;
 	struct omap_device *od;
-	int i, j, ret = 0, oh_count;
+	int i, ret = 0, oh_count;
 	struct omap_rproc_pdata *rproc_data = NULL;
 	struct omap_iommu_arch_data *rproc_iommu = NULL;
 	struct omap_rproc_pdev_data *rproc_pdev_data = NULL;
@@ -566,7 +614,6 @@ static int __init omap_rproc_init(void)
 	for (i = 0; i < rproc_size; i++) {
 		const char *oh_name = rproc_data[i].oh_name;
 		struct platform_device *pdev = rproc_pdev_data[i].pdev;
-		struct omap_rproc_timers_info *timers = rproc_data[i].timers;
 		oh_count = 0;
 
 		if (!rproc_pdev_data[i].enabled) {
@@ -582,18 +629,6 @@ static int __init omap_rproc_init(void)
 			continue;
 		}
 		oh_count++;
-
-		/*
-		 * adjust the PWM capability for the additional timers
-		 * in OMAP5, so that the exact capabilities are mentioned
-		 * for each of OMAP4 and OMAP5. This is done dynamically
-		 * to avoid creating separate static data for OMAP5.
-		 */
-		for (j = 0; j < rproc_data[i].timers_cnt; j++) {
-			if (soc_is_omap54xx() && timers &&
-				(timers[j].id == 5 || timers[j].id == 6))
-				timers[j].cap |= OMAP_TIMER_HAS_PWM;
-		}
 
 		rproc_data[i].device_enable = omap_rproc_device_enable;
 		rproc_data[i].device_shutdown = omap_rproc_device_shutdown;
