@@ -80,7 +80,7 @@ static void dra7_ctrl_write_dsp2_boot_addr(u32 bootaddr);
 #define DRA7_RPROC_CMA_SIZE_DSP1	(0x4000000)
 
 #define OMAP4_RPROC_CMA_SIZE_IPU	(0x7000000)
-#define OMAP5_RPROC_CMA_SIZE_IPU	(0xA400000)
+#define OMAP5_RPROC_CMA_SIZE_IPU	(0x3800000)
 #define DRA7_RPROC_CMA_SIZE_IPU2	(0x3800000)
 #define DRA7_RPROC_CMA_SIZE_IPU1	(0x2000000)
 
