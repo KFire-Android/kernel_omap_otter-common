@@ -66,9 +66,9 @@ static void dra7_ctrl_write_dsp2_boot_addr(u32 bootaddr);
  * Placing these in Kconfig is not worth the complexity.
  */
 #define DRA7_RPROC_CMA_BASE_IPU2	(0x95800000)
-#define DRA7_RPROC_CMA_BASE_DSP1	(0x95000000)
-#define DRA7_RPROC_CMA_BASE_DSP2	(0x94800000)
-#define DRA7_RPROC_CMA_BASE_IPU1	(0x94000000)
+#define DRA7_RPROC_CMA_BASE_DSP1	(0x99000000)
+#define DRA7_RPROC_CMA_BASE_IPU1	(0x9D000000)
+#define DRA7_RPROC_CMA_BASE_DSP2	(0x9F000000)
 
 #define OMAP5_RPROC_CMA_BASE_IPU	(0x95800000)
 #define OMAP5_RPROC_CMA_BASE_DSP	(0x95000000)
@@ -77,10 +77,12 @@ static void dra7_ctrl_write_dsp2_boot_addr(u32 bootaddr);
 #define OMAP4_RPROC_CMA_BASE_DSP	(0x98800000)
 
 #define OMAP_RPROC_CMA_SIZE_DSP		(0x800000)
+#define DRA7_RPROC_CMA_SIZE_DSP1	(0x4000000)
 
 #define OMAP4_RPROC_CMA_SIZE_IPU	(0x7000000)
-#define OMAP5_RPROC_CMA_SIZE_IPU	(0xA400000)
-#define DRA7_RPROC_CMA_SIZE_IPU1	(0x800000)
+#define OMAP5_RPROC_CMA_SIZE_IPU	(0x3800000)
+#define DRA7_RPROC_CMA_SIZE_IPU2	(0x3800000)
+#define DRA7_RPROC_CMA_SIZE_IPU1	(0x2000000)
 
 /*
  * These data structures define the desired timers that would
@@ -261,7 +263,7 @@ static struct omap_rproc_pdev_data dra7_rproc_pdev_data[] = {
 #endif
 		.pdev = &omap4_dsp,
 		.cma_addr = DRA7_RPROC_CMA_BASE_DSP1,
-		.cma_size = OMAP_RPROC_CMA_SIZE_DSP,
+		.cma_size = DRA7_RPROC_CMA_SIZE_DSP1,
 	},
 	{
 #ifdef CONFIG_OMAP_REMOTEPROC_IPU
@@ -269,7 +271,7 @@ static struct omap_rproc_pdev_data dra7_rproc_pdev_data[] = {
 #endif
 		.pdev = &omap4_ipu,
 		.cma_addr = DRA7_RPROC_CMA_BASE_IPU2,
-		.cma_size = OMAP5_RPROC_CMA_SIZE_IPU,
+		.cma_size = DRA7_RPROC_CMA_SIZE_IPU2,
 	},
 	{
 #ifdef CONFIG_OMAP_REMOTEPROC_DSP2
