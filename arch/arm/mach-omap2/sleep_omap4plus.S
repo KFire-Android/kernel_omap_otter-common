@@ -19,6 +19,7 @@
 #include "common.h"
 #include "omap44xx.h"
 #include "omap4-sar-layout.h"
+#include <../arch/arm/mm/proc-macros.S>
 
 #if defined(CONFIG_SMP) && defined(CONFIG_PM)
 
@@ -133,11 +134,18 @@ scu_gp_set:
 skip_scu_gp_set:
 	mrc	p15, 0, r0, c1, c1, 2		@ Read NSACR data
 	tst	r0, #(1 << 18)
+#ifdef CONFIG_ARM_ERRATA_799270
+	beq     1f
+	clear_actlr_smp r0, r8
+#else
 	mrcne	p15, 0, r0, c1, c0, 1
 	bicne	r0, r0, #(1 << 6)		@ Disable SMP bit
 	mcrne	p15, 0, r0, c1, c0, 1
 	isb
 	dsb
+#endif
+1:
+
 #ifdef CONFIG_CACHE_L2X0
 	/*
 	 * Clean and invalidate the L2 cache.
@@ -208,9 +216,15 @@ do_WFI:
 	 */
 	mrc	p15, 0, r0, c1, c0, 1
 	tst	r0, #(1 << 6)			@ Check SMP bit enabled?
+#ifdef CONFIG_ARM_ERRATA_799270
+	bne     1f
+	write_actlr_smp r0, r8
+#else
 	orreq	r0, r0, #(1 << 6)
 	mcreq	p15, 0, r0, c1, c0, 1
 	isb
+#endif
+1:
 	bl	omap4_get_sar_ram_base
 	mov	r8, r0
 	ldr	r9, [r8, #OMAP_TYPE_OFFSET]

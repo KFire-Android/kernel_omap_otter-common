@@ -22,6 +22,7 @@
 		serial5 = &uart6;
 		d_can0 = &dcan1;
 		d_can1 = &dcan2;
+		ethernet0 = &cpsw_emac0;
 	};
 
 	cpus {
@@ -260,6 +261,7 @@
 			interrupts = <0 72 0x4>;
 			ti,hwmods = "uart1";
 			clock-frequency = <48000000>;
+			flags = <0x10000000>;
 		};
 
 		uart2: serial@4806c000 {
@@ -268,6 +270,7 @@
 			interrupts = <0 73 0x4>;
 			ti,hwmods = "uart2";
 			clock-frequency = <48000000>;
+			flags = <0x10000000>;
 		};
 
 		uart3: serial@48020000 {
@@ -276,6 +279,7 @@
 			interrupts = <0 74 0x4>;
 			ti,hwmods = "uart3";
 			clock-frequency = <48000000>;
+			flags = <0x10000000>;
 		};
 
 		uart4: serial@4806e000 {
@@ -284,6 +288,7 @@
 			interrupts = <0 70 0x4>;
 			ti,hwmods = "uart4";
 			clock-frequency = <48000000>;
+			flags = <0x10000000>;
 		};
 
 		uart5: serial@48066000 {
@@ -292,6 +297,7 @@
 			interrupts = <0 105 0x4>;
 			ti,hwmods = "uart5";
 			clock-frequency = <48000000>;
+			flags = <0x10000000>;
 		};
 
 		uart6: serial@48068000 {
@@ -300,6 +306,7 @@
 			interrupts = <0 106 0x4>;
 			ti,hwmods = "uart6";
 			clock-frequency = <48000000>;
+			flags = <0x10000000>;
 		};
 
 		dcan1: d_can@4ae3c000{

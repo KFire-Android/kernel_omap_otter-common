@@ -93,6 +93,7 @@ config SOC_OMAP5
 	select ARCH_NEEDS_CPU_IDLE_COUPLED
 	select PM_OPP if PM
 	select ARM_ERRATA_798181 if SMP
+	select ARM_ERRATA_799270
 
 config SOC_DRA7XX
 	bool "TI DRA7XX"
@@ -103,6 +104,7 @@ config SOC_DRA7XX
 	select HAVE_SMP
 	select COMMON_CLK
 	select ARM_ERRATA_798181 if SMP
+	select ARM_ERRATA_799270
 
 comment "OMAP Core Type"
 	depends on ARCH_OMAP2
