@@ -127,6 +127,23 @@
 		ti,level_shifter = <&tpd12s015>;
 	};
 
+	radio {
+		compatible = "ti,dra7xx_radio";
+		gpios = <&gpio6 20 0>;
+
+		radio_helper1 {
+			compatible = "ti,dra7xx_radio_subdev";
+			ti,hwmods = "mcasp2";
+			status = "okay";
+		};
+
+		radio_helper2 {
+			compatible = "ti,dra7xx_radio_subdev";
+			ti,hwmods = "mcasp6";
+			status = "okay";
+		};
+	};
+
 	kim {
 		compatible = "kim";
 		nshutdown_gpio = <132>;
@@ -143,6 +160,7 @@
 	display_skipinit {
 		skip_init =<1>;
 	};
+
 };
 
 &dra7_pmx_core {
