@@ -16,6 +16,22 @@ config RADIO_SI470X
 	bool "Silicon Labs Si470x FM Radio Receiver support"
 	depends on VIDEO_V4L2
 
+config DRA7XX_RADIO_HELPER
+	tristate "TI DRA7xx Radio Helper/Configuration Driver"
+	depends on VIDEO_V4L2
+	default y
+	---help---
+	This is a helper/configuration driver for radio integration for
+	the dra7xx based socs. This driver does basic initialization
+	and configuration required to use the radio.
+
+	  Say Y here if you want to enable Radio helper for DRA7xx
+	  platform.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called dra7xx-radio.
+
+
 source "drivers/media/radio/si470x/Kconfig"
 
 config USB_MR800

@@ -1060,7 +1060,7 @@
 			ti,hwmods = "atl";
 			ti,atclk1-freq = <11289600>;
 			ti,atl1-bws-input = <3>;	/* McASP2 FSX */
-			ti,atl1-aws-input = <15>;	/* McASP6 FSX */
+			ti,atl1-aws-input = <7>;	/* McASP6 FSX */
 			ti,atclk2-freq = <5644800>;
 			ti,atl2-bws-input = <3>;	/* McASP2 FSX */
 			ti,atl2-aws-input = <4>;	/* McASP3 FSX */

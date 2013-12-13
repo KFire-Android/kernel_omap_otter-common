@@ -153,6 +153,23 @@
 		ti,level_shifter = <&tpd12s015>;
 	};
 
+	radio {
+		compatible = "ti,dra7xx_radio";
+		gpios = <&gpio6 20 0>;
+
+		radio_helper1 {
+			compatible = "ti,dra7xx_radio_subdev";
+			ti,hwmods = "mcasp2";
+			status = "okay";
+		};
+
+		radio_helper2 {
+			compatible = "ti,dra7xx_radio_subdev";
+			ti,hwmods = "mcasp6";
+			status = "okay";
+		};
+	};
+
 	kim {
 		compatible = "kim";
 		nshutdown_gpio = <132>;
@@ -169,6 +186,7 @@
 	display_skipinit {
 		skip_init =<1>;
 	};
+
 };
 
 &dra7_pmx_core {
@@ -187,6 +205,7 @@
 		&bt_uart3_pins
 		&wl_pins
 		&wlirq_pins
+		&radio_pins
 	>;
 
 	atl_pins: pinmux_atl_pins {
@@ -438,6 +457,24 @@
 			0x28C	0x00060002	/* DCAN2_RX: MODE2 | INPUTENABLE | PULLUP */
 		>;
 	};
+	radio_pins: pinmux_radio_pins {
+		pinctrl-single,pins = <
+			0x02F4	 0x40000	/* MCASP2_ACLKX: MODE0 */
+			0x02F8	 0xc0000	/* MCASP2_AFSX: MODE0 */
+			0x0304	 0x40000	/* MCASP2_AXR0: MODE0 */
+			0x0308	 0x40000	/* MCASP2_AXR1: MODE0 */
+			0x030C	 0xc0000	/* MCASP2_AXR2: MODE0 */
+			0x0310	 0xc0000	/* MCASP2_AXR3: MODE0 */
+			0x0314	 0x40000	/* MCASP2_AXR4: MODE0 */
+			0x0318	 0x40000	/* MCASP2_AXR5: MODE0 */
+			0x031c	 0x40000	/* MCASP2_AXR6: MODE0 */
+			0x0320	 0x40000	/* MCASP2_AXR7: MODE0 */
+			0x0334	 0x70004	/* I2C4_SDA: MODE4 */
+			0x0338	 0x70004	/* I2C4_SCL: MODE4 */
+			0x02A0	 0x5000e	/* GPIO6_20: MODE14 */
+		>;
+	};
+
 };
 
 &gmac {
