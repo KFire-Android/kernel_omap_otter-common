@@ -22,6 +22,8 @@
 #include <linux/platform_device.h>
 #include <linux/module.h>
 #include <linux/of.h>
+#include <linux/of_gpio.h>
+#include <linux/gpio.h>
 #include <linux/clk.h>
 #include <linux/io.h>
 #include <sound/core.h>
@@ -617,6 +619,7 @@ static int dra7_snd_probe(struct platform_device *pdev)
 	struct device_node *node = pdev->dev.of_node;
 	struct snd_soc_card *card = &dra7_snd_card;
 	struct dra7_snd_data *card_data;
+	int gpio;
 	int ret;
 
 	card->dev = &pdev->dev;
@@ -624,6 +627,17 @@ static int dra7_snd_probe(struct platform_device *pdev)
 	card_data = devm_kzalloc(&pdev->dev, sizeof(*card_data), GFP_KERNEL);
 	if (card_data == NULL)
 		return -ENOMEM;
+
+	gpio = of_get_gpio(node, 0);
+	if (gpio_is_valid(gpio)) {
+		ret = devm_gpio_request_one(card->dev, gpio,
+					    GPIOF_OUT_INIT_LOW, "snd_gpio");
+		if (ret) {
+			dev_err(card->dev, "failed to request DAI sel gpio %d\n",
+				gpio);
+			return ret;
+		}
+	}
 
 	snd_soc_register_dais(&pdev->dev, &dummy_cpu_dai, 1);
 
