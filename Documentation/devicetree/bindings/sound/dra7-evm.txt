@@ -23,6 +23,7 @@ Optional properties:
   if power is not a concern.
 - ti,bt-cpu: phandle for the McASP node used for bluetooth.
 - ti,bt-bclk-freq: Bit clock frequency provided by bluetooth chip.
+- gpios: selects/enables the DAI pins (Media, Bluetooth)
 
 Available audio endpoints for the audio-routing table:
 

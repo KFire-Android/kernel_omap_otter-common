@@ -105,6 +105,8 @@
 		ti,model = "dra7evm";
 		ti,always-on;
 
+		gpios = <&pcf_hdmi 1 0>;
+
 		/* Audio routing */
 		ti,audio-routing =
 			"LINE1L", "Line In",
