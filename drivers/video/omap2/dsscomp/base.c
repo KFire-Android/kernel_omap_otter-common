@@ -293,21 +293,19 @@ int set_dss_ovl_info(struct dss2_ovl_info *oi)
 			bpp = 3;
 
 		tilview_create(&t, info.paddr, cfg->width, cfg->height);
-		info.paddr -= t.tsptr;
 		tilview_crop(&t, 0, crop.y, cfg->width, crop.h);
-		info.paddr += t.tsptr + bpp * crop.x;
+		info.paddr = t.tsptr + bpp * crop.x;
 
 		info.rotation_type = OMAP_DSS_ROT_TILER;
-		info.screen_width = 0;
+		info.screen_width = tiler_stride(fmt, 0)/bpp;
 
 		/* for NV12 format also crop NV12 */
 		if (info.color_mode == OMAP_DSS_COLOR_NV12) {
 			tilview_create(&t, info.p_uv_addr,
 					cfg->width >> 1, cfg->height >> 1);
-			info.p_uv_addr -= t.tsptr;
 			tilview_crop(&t, 0, crop.y >> 1, cfg->width >> 1,
 								crop.h >> 1);
-			info.p_uv_addr += t.tsptr + bpp * crop.x;
+			info.p_uv_addr = t.tsptr + bpp * crop.x;
 		}
 	} else {
 		/* program tiler 1D as SDMA */
