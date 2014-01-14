@@ -113,7 +113,8 @@ void dss_uninit_overlays(struct platform_device *pdev)
 int dss_ovl_simple_check(struct omap_overlay *ovl,
 		const struct omap_overlay_info *info)
 {
-	if (info->paddr == 0) {
+	if ((info->color_mode != OMAP_DSS_COLOR_NV12) &&
+	    info->paddr == 0) {
 		DSSERR("check_overlay: paddr cannot be 0\n");
 		return -EINVAL;
 	}
