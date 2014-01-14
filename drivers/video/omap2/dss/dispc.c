@@ -2507,7 +2507,8 @@ static int dispc_ovl_setup_common(enum omap_plane plane,
 	unsigned long lclk = dispc_plane_lclk_rate(plane);
 	enum omap_channel channel = dispc_ovl_get_channel_out(plane);
 
-	if (paddr == 0)
+	if (color_mode != OMAP_DSS_COLOR_NV12 &&
+	    paddr == 0)
 		return -EINVAL;
 
 	out_width = out_width == 0 ? width : out_width;

@@ -761,6 +761,7 @@ struct omap_dss_device {
 
 	void *data;
 
+	int display_id;
 	struct omap_dss_driver *driver;
 
 	/* helper variable for driver suspend/resume */
