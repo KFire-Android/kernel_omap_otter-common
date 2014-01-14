@@ -181,11 +181,12 @@ static int crop_to_rect(union rect *crop, union rect *win, union rect *vis,
 int set_dss_ovl_info(struct dss2_ovl_info *oi)
 {
 	struct omap_overlay_info info;
+	struct omap_writeback_info wb_info;
+	struct omap_writeback *wb;
 	struct omap_overlay *ovl;
 	struct dss2_ovl_cfg *cfg;
 	union rect crop, win, vis;
 	int c;
-	int bpp;
 	enum tiler_fmt fmt;
 
 	/* check overlay number */
@@ -223,8 +224,19 @@ int set_dss_ovl_info(struct dss2_ovl_info *oi)
 	crop.r = cfg->crop;
 	win.r = cfg->win;
 	vis.x = vis.y = 0;
-	vis.w = ovl->manager->output->device->panel.timings.x_res;
-	vis.h = ovl->manager->output->device->panel.timings.y_res;
+
+	wb = omap_dss_get_wb(0);
+
+	wb->get_wb_info(wb, &wb_info);
+
+	if (wb && wb_info.enabled && wb_info.mode == OMAP_WB_MEM2MEM_MODE &&
+				(int)ovl->manager->id == (int)wb_info.source) {
+		vis.w = wb_info.width;
+		vis.h = wb_info.height;
+	} else {
+		vis.w = ovl->manager->output->device->panel.timings.x_res;
+		vis.h = ovl->manager->output->device->panel.timings.y_res;
+	}
 
 	if (!info.wb_source)
 		if (crop_to_rect(&crop, &win, &vis, cfg->rotation,
@@ -281,21 +293,19 @@ int set_dss_ovl_info(struct dss2_ovl_info *oi)
 			bpp = 3;
 
 		tilview_create(&t, info.paddr, cfg->width, cfg->height);
-		info.paddr -= t.tsptr;
 		tilview_crop(&t, 0, crop.y, cfg->width, crop.h);
-		info.paddr += t.tsptr + bpp * crop.x;
+		info.paddr = t.tsptr + bpp * crop.x;
 
 		info.rotation_type = OMAP_DSS_ROT_TILER;
-		info.screen_width = 0;
+		info.screen_width = tiler_stride(fmt, 0)/bpp;
 
 		/* for NV12 format also crop NV12 */
 		if (info.color_mode == OMAP_DSS_COLOR_NV12) {
 			tilview_create(&t, info.p_uv_addr,
 					cfg->width >> 1, cfg->height >> 1);
-			info.p_uv_addr -= t.tsptr;
 			tilview_crop(&t, 0, crop.y >> 1, cfg->width >> 1,
 								crop.h >> 1);
-			info.p_uv_addr += t.tsptr + bpp * crop.x;
+			info.p_uv_addr = t.tsptr + bpp * crop.x;
 		}
 	} else {
 		/* program tiler 1D as SDMA */
@@ -362,6 +372,67 @@ done:
 	return ovl->set_overlay_info(ovl, &info);
 }
 
+int set_dss_wb_info(struct dss2_ovl_info *oi)
+{
+	struct omap_writeback_info info;
+	struct omap_writeback *wb;
+	struct dss2_ovl_cfg *cfg;
+	union rect crop, win;
+
+	/* check overlay number */
+	if (!oi || oi->cfg.ix != OMAP_DSS_WB)
+		return -EINVAL;
+
+	cfg = &oi->cfg;
+	wb = omap_dss_get_wb(0);
+
+	/* just in case there are new fields, we get the current info */
+	wb->get_wb_info(wb, &info);
+
+	info.enabled = cfg->enabled;
+	if (!cfg->enabled)
+		goto done;
+
+	info.source = cfg->wb_source;
+	info.mode = cfg->wb_mode;
+
+	info.capturemode = OMAP_WB_CAPTURE_ALL;
+
+	/* calculate input/output height and width */
+	crop.r = cfg->crop;
+	win.r = cfg->win;
+	info.width = cfg->crop.w;
+	info.height = cfg->crop.h;
+	info.out_width = cfg->win.w;
+	info.out_height = cfg->win.h;
+	info.dss_mode = cfg->color_mode;
+	info.buffer_width = cfg->width;
+
+	/* calculate addresses */
+	info.paddr = oi->ba;
+	info.p_uv_addr = (info.dss_mode == OMAP_DSS_COLOR_NV12) ? oi->uv : 0;
+
+	info.rotation = cfg->rotation;
+	/* swap height & width for 90/270 degrees */
+	if (info.rotation & 1)
+		swap(info.out_width, info.out_height);
+	/* If its TILER 2D buffer, use TILER for rotation */
+	if (info.paddr >= 0x60000000 && info.paddr < 0x78000000)
+		info.rotation_type = OMAP_DSS_ROT_TILER;
+	else
+		info.rotation_type = OMAP_DSS_ROT_DMA;
+done:
+
+	pr_debug("Writeback: en=%d %x/%x %d, (%dx%d => (%dx%d)\n"
+		"col=%x src=%d mode=%d capt=%d\n",
+		info.enabled, info.paddr, info.p_uv_addr, info.buffer_width,
+		info.width, info.height, info.out_width, info.out_height,
+		info.dss_mode, info.source, info.mode, info.capturemode);
+
+	/* set overlay info */
+	return wb->set_wb_info(wb, &info);
+}
+
 void swap_rb_in_ovl_info(struct dss2_ovl_info *oi)
 {
 	/* we need to swap YUV color matrix if we are swapping R and B */
@@ -393,7 +464,8 @@ struct omap_overlay_manager *find_dss_mgr(int display_ix)
 	return NULL;
 }
 
-int set_dss_mgr_info(struct dss2_mgr_info *mi, struct omapdss_ovl_cb *cb)
+int set_dss_mgr_info(struct dss2_mgr_info *mi, struct omapdss_ovl_cb *cb,
+								bool m2m_mode)
 {
 	struct omap_overlay_manager_info info;
 	struct omap_overlay_manager *mgr;
@@ -425,6 +497,7 @@ int set_dss_mgr_info(struct dss2_mgr_info *mi, struct omapdss_ovl_cb *cb)
 	info.cpr_coefs = mi->cpr_coefs;
 	info.cpr_enable = mi->cpr_enabled;
 	info.cb = *cb;
+	info.wb_only = m2m_mode;
 
 	return mgr->set_manager_info(mgr, &info);
 }
