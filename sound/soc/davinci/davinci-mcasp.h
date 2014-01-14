@@ -51,6 +51,8 @@ struct davinci_audio_dev {
 
 	/* McASP port related */
 	bool	dat_port;
+
+	struct snd_pcm_substream *substreams[2];
 };
 
 #endif	/* DAVINCI_MCASP_H */

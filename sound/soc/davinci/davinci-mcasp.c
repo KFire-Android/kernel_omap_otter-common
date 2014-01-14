@@ -298,6 +298,16 @@
 #define TXDATADMADIS	BIT(0)
 
 /*
+ * DAVINCI_MCASP_EVTCTLR_REG - Receiver Interrupt Control Register Bits
+ */
+#define ROVRN		BIT(0)
+
+/*
+ * DAVINCI_MCASP_EVTCTLX_REG - Transmitter Interrupt Control Register Bits
+ */
+#define XUNDRN		BIT(0)
+
+/*
  * DAVINCI_MCASP_W[R]FIFOCTL - Write/Read FIFO Control Register bits
  */
 #define FIFO_ENABLE	BIT(16)
@@ -387,6 +397,9 @@ static void mcasp_start_rx(struct davinci_audio_dev *dev)
 	if (rxfmctl & AFSRE)
 		mcasp_set_ctl_reg(dev->base + DAVINCI_MCASP_GBLCTLX_REG,
 				  TXFSRST);
+
+	/* enable IRQ sources */
+	mcasp_set_bits(dev->base + DAVINCI_MCASP_EVTCTLR_REG, ROVRN);
 }
 
 static void mcasp_start_tx(struct davinci_audio_dev *dev)
@@ -418,6 +431,9 @@ static void mcasp_start_tx(struct davinci_audio_dev *dev)
 		cnt++;
 
 	mcasp_set_reg(dev->base + DAVINCI_MCASP_TXBUF_REG, 0);
+
+	/* enable IRQ sources */
+	mcasp_set_bits(dev->base + DAVINCI_MCASP_EVTCTLX_REG, XUNDRN);
 }
 
 static int davinci_mcasp_start(struct davinci_audio_dev *dev, int stream)
@@ -489,6 +505,9 @@ static void mcasp_stop_rx(struct davinci_audio_dev *dev)
 	u32 gblctl = mcasp_get_reg(dev->base + DAVINCI_MCASP_GBLCTLX_REG);
 	u32 rxfmctl = mcasp_get_reg(dev->base + DAVINCI_MCASP_RXFMCTL_REG);
 
+	/* disable IRQ sources */
+	mcasp_clr_bits(dev->base + DAVINCI_MCASP_EVTCTLR_REG, ROVRN);
+
 	/* Disable TX FSG if RX was the only active user */
 	if ((rxfmctl & AFSRE) && !(gblctl & TXSMRST))
 		mcasp_set_reg(dev->base + DAVINCI_MCASP_GBLCTLX_REG, 0);
@@ -502,6 +521,9 @@ static void mcasp_stop_tx(struct davinci_audio_dev *dev)
 	u32 gblctl = mcasp_get_reg(dev->base + DAVINCI_MCASP_GBLCTLR_REG);
 	u32 rxfmctl = mcasp_get_reg(dev->base + DAVINCI_MCASP_RXFMCTL_REG);
 	u32 val = 0;
+
+	/* disable IRQ sources */
+	mcasp_clr_bits(dev->base + DAVINCI_MCASP_EVTCTLX_REG, XUNDRN);
 
 	/* Keep FSG active until RX section is stopped too */
 	if ((rxfmctl & AFSRE) && (gblctl & RXSMRST))
@@ -556,6 +578,52 @@ static void davinci_mcasp_stop(struct davinci_audio_dev *dev, int stream)
 		}
 		mcasp_stop_rx(dev);
 	}
+}
+
+static irqreturn_t davinci_mcasp_tx_irq_handler(int irq, void *data)
+{
+	struct davinci_audio_dev *dev = (struct davinci_audio_dev *)data;
+	struct snd_pcm_substream *substream;
+	u32 stat;
+
+	stat = mcasp_get_reg(dev->base + DAVINCI_MCASP_TXSTAT_REG);
+	if (stat & XUNDRN) {
+		dev_dbg(dev->dev, "Transmit buffer underflow\n");
+		substream = dev->substreams[SNDRV_PCM_STREAM_PLAYBACK];
+		if (substream) {
+			snd_pcm_stream_lock_irq(substream);
+			if (snd_pcm_running(substream))
+				snd_pcm_stop(substream, SNDRV_PCM_STATE_XRUN);
+			snd_pcm_stream_unlock_irq(substream);
+		}
+	}
+
+	mcasp_set_reg(dev->base + DAVINCI_MCASP_TXSTAT_REG, stat);
+
+	return IRQ_HANDLED;
+}
+
+static irqreturn_t davinci_mcasp_rx_irq_handler(int irq, void *data)
+{
+	struct davinci_audio_dev *dev = (struct davinci_audio_dev *)data;
+	struct snd_pcm_substream *substream;
+	u32 stat;
+
+	stat = mcasp_get_reg(dev->base + DAVINCI_MCASP_RXSTAT_REG);
+	if (stat & ROVRN) {
+		dev_dbg(dev->dev, "Receive buffer overflow\n");
+		substream = dev->substreams[SNDRV_PCM_STREAM_CAPTURE];
+		if (substream) {
+			snd_pcm_stream_lock_irq(substream);
+			if (snd_pcm_running(substream))
+				snd_pcm_stop(substream, SNDRV_PCM_STATE_XRUN);
+			snd_pcm_stream_unlock_irq(substream);
+		}
+	}
+
+	mcasp_set_reg(dev->base + DAVINCI_MCASP_RXSTAT_REG, stat);
+
+	return IRQ_HANDLED;
 }
 
 static int davinci_mcasp_set_dai_fmt(struct snd_soc_dai *cpu_dai,
@@ -1163,6 +1231,8 @@ static int davinci_mcasp_startup(struct snd_pcm_substream *substream,
 					     dev->sample_bits,
 					     dev->sample_bits);
 
+	dev->substreams[substream->stream] = substream;
+
 	return 0;
 }
 
@@ -1175,6 +1245,8 @@ static void davinci_mcasp_shutdown(struct snd_pcm_substream *substream,
 		dev->channels = 0;
 		dev->sample_bits = 0;
 	}
+
+	dev->substreams[substream->stream] = NULL;
 }
 
 static const struct snd_soc_dai_ops davinci_mcasp_dai_ops = {
@@ -1376,6 +1448,7 @@ static int davinci_mcasp_probe(struct platform_device *pdev)
 	struct resource *tx_res, *rx_res;
 	struct snd_platform_data *pdata;
 	struct davinci_audio_dev *dev;
+	int irq;
 	int ret;
 
 	if (!pdev->dev.platform_data && !pdev->dev.of_node) {
@@ -1405,6 +1478,28 @@ static int davinci_mcasp_probe(struct platform_device *pdev)
 	if (!ioarea) {
 		dev_err(&pdev->dev, "Audio region already claimed\n");
 		return -EBUSY;
+	}
+
+	irq = platform_get_irq_byname(pdev, "rx");
+	if (irq >= 0) {
+		ret = devm_request_threaded_irq(&pdev->dev, irq, NULL,
+				davinci_mcasp_rx_irq_handler,
+				IRQF_ONESHOT, dev_name(&pdev->dev), dev);
+		if (ret) {
+			dev_err(&pdev->dev, "RX IRQ request failed\n");
+			return ret;
+		}
+	}
+
+	irq = platform_get_irq_byname(pdev, "tx");
+	if (irq >= 0) {
+		ret = devm_request_threaded_irq(&pdev->dev, irq, NULL,
+				davinci_mcasp_tx_irq_handler,
+				IRQF_ONESHOT, dev_name(&pdev->dev), dev);
+		if (ret) {
+			dev_err(&pdev->dev, "TX IRQ request failed\n");
+			return ret;
+		}
 	}
 
 	mem_dat = platform_get_resource_byname(pdev, IORESOURCE_MEM, "dat");

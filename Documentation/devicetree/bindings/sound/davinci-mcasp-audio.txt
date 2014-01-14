@@ -9,6 +9,7 @@ Required properties:
 
 - reg : Should contain McASP registers offset and length
 - interrupts : Interrupt number for McASP
+- interrupt-names : Names of the interrupts ("tx", "rx")
 - op-mode : I2S/DIT ops mode.
 - tdm-slots : Slots for TDM operation.
 - num-serializer : Serializers used by McASP.
