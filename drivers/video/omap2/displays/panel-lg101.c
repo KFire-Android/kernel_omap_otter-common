@@ -122,6 +122,7 @@ static int lg101_power_on(struct omap_dss_device *dssdev)
 	r = send_i2c_cmd(ddata->ser_i2c_client, SER_VALIDATE_LINK, NULL);
 	if (r != 1) {
 		dev_err(&dssdev->dev, "link not preset ...");
+		r = -ENODEV;
 		goto err0;
 	}
 	dev_err(&dssdev->dev, "Link detected ...");

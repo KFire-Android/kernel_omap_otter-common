@@ -539,7 +539,7 @@ static void hdmi_hotplug_detect_worker(struct work_struct *work)
 				state != HPD_STATE_EDID_READ_OK) {
 			hdmi_set_ls_state(LS_ENABLED);
 			/* Read EDID before we turn on the HDMI */
-			DSSERR("%s state = %d\n", __func__, state);
+			DSSINFO("%s state = %d\n", __func__, state);
 			if (hdmi_read_valid_edid()
 #ifdef CONFIG_USE_FB_MODE_DB
 			    || omapdss_hdmi_get_force_timings()
@@ -573,7 +573,7 @@ static void hdmi_hotplug_detect_worker(struct work_struct *work)
 #ifdef CONFIG_SWITCH_STATE
 			switch_set_state(&hdmi.hpd_switch, 1);
 #endif
-			DSSERR("%s state = %d\n", __func__, state);
+			DSSINFO("%s state = %d\n", __func__, state);
 			goto done;
 		}
 		if (atomic_add_unless(&d->state, 1, HPD_STATE_OFF)) {

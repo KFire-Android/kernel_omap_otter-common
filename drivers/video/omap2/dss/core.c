@@ -493,6 +493,7 @@ struct omap_dss_device *dss_alloc_and_init_device(struct device *parent)
 	dev_set_name(&dssdev->dev, "display%d", v);
 
 	device_initialize(&dssdev->dev);
+	dssdev->display_id = v;
 
 	return dssdev;
 }
