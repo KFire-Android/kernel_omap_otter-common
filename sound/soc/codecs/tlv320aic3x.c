@@ -141,6 +141,8 @@ static int snd_soc_dapm_put_volsw_aic3x(struct snd_kcontrol *kcontrol,
 {
 	struct snd_soc_dapm_widget_list *wlist = snd_kcontrol_chip(kcontrol);
 	struct snd_soc_dapm_widget *widget = wlist->widgets[0];
+	struct snd_soc_codec *codec = widget->codec;
+	struct snd_soc_card *card = codec->card;
 	struct soc_mixer_control *mc =
 		(struct soc_mixer_control *)kcontrol->private_value;
 	unsigned int reg = mc->reg;
@@ -148,12 +150,13 @@ static int snd_soc_dapm_put_volsw_aic3x(struct snd_kcontrol *kcontrol,
 	int max = mc->max;
 	unsigned int mask = (1 << fls(max)) - 1;
 	unsigned int invert = mc->invert;
-	unsigned short val, val_mask;
-	int ret;
-	struct snd_soc_dapm_path *path;
-	int found = 0;
+	unsigned int val, val_mask;
+	int connect;
+	struct snd_soc_dapm_update update;
+	int wi;
 
 	val = (ucontrol->value.integer.value[0] & mask);
+	connect = !!val;
 
 	mask = 0xf;
 	if (val)
@@ -164,37 +167,30 @@ static int snd_soc_dapm_put_volsw_aic3x(struct snd_kcontrol *kcontrol,
 	val_mask = mask << shift;
 	val = val << shift;
 
-	mutex_lock(&widget->codec->mutex);
+	mutex_lock_nested(&card->dapm_mutex, SND_SOC_DAPM_CLASS_RUNTIME);
 
 	if (snd_soc_test_bits(widget->codec, reg, val_mask, val)) {
-		/* find dapm widget path assoc with kcontrol */
-		list_for_each_entry(path, &widget->dapm->card->paths, list) {
-			if (path->kcontrol != kcontrol)
-				continue;
+		for (wi = 0; wi < wlist->num_widgets; wi++) {
+			widget = wlist->widgets[wi];
 
-			/* found, now check type */
-			found = 1;
-			if (val)
-				/* new connection */
-				path->connect = invert ? 0 : 1;
-			else
-				/* old connection must be powered down */
-				path->connect = invert ? 1 : 0;
+			widget->value = val;
 
-			dapm_mark_dirty(path->source, "tlv320aic3x source");
-			dapm_mark_dirty(path->sink, "tlv320aic3x sink");
+			update.kcontrol = kcontrol;
+			update.widget = widget;
+			update.reg = reg;
+			update.mask = val_mask;
+			update.val = val;
+			widget->dapm->update = &update;
 
-			break;
+			snd_soc_dapm_mixer_update_power_unlocked(widget,
+							kcontrol, connect);
+
+			widget->dapm->update = NULL;
 		}
-
-		if (found)
-			snd_soc_dapm_sync(widget->dapm);
 	}
 
-	ret = snd_soc_update_bits(widget->codec, reg, val_mask, val);
-
-	mutex_unlock(&widget->codec->mutex);
-	return ret;
+	mutex_unlock(&card->dapm_mutex);
+	return 0;
 }
 
 static const char *aic3x_left_dac_mux[] = { "DAC_L1", "DAC_L3", "DAC_L2" };

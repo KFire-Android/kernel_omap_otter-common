@@ -1957,6 +1957,13 @@ int snd_soc_dapm_mux_update_power(struct snd_soc_dapm_widget *widget,
 }
 EXPORT_SYMBOL_GPL(snd_soc_dapm_mux_update_power);
 
+int snd_soc_dapm_mux_update_power_unlocked(struct snd_soc_dapm_widget *widget,
+		struct snd_kcontrol *kcontrol, int mux, struct soc_enum *e)
+{
+	return soc_dapm_mux_update_power(widget, kcontrol, mux, e);
+}
+EXPORT_SYMBOL_GPL(snd_soc_dapm_mux_update_power_unlocked);
+
 /* test and update the power status of a mixer or switch widget */
 static int soc_dapm_mixer_update_power(struct snd_soc_dapm_widget *widget,
 				   struct snd_kcontrol *kcontrol, int connect)
@@ -2002,6 +2009,13 @@ int snd_soc_dapm_mixer_update_power(struct snd_soc_dapm_widget *widget,
 	return ret;
 }
 EXPORT_SYMBOL_GPL(snd_soc_dapm_mixer_update_power);
+
+int snd_soc_dapm_mixer_update_power_unlocked(struct snd_soc_dapm_widget *widget,
+				struct snd_kcontrol *kcontrol, int connect)
+{
+	return soc_dapm_mixer_update_power(widget, kcontrol, connect);
+}
+EXPORT_SYMBOL_GPL(snd_soc_dapm_mixer_update_power_unlocked);
 
 static ssize_t dapm_widget_show_codec(struct snd_soc_codec *codec, char *buf)
 {

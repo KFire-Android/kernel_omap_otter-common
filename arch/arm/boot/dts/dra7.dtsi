@@ -1071,6 +1071,7 @@
 			reg = <0x48468000 0x2000>;
 			interrupts = <0 155 0x4>, /* AREVT */
 				     <0 154 0x4>; /* TXEVT */
+			interrupt-names = "rx", "tx";
 			ti,hwmods = "mcasp3";
 			op-mode = <0>;		/* MCASP_IIS_MODE */
 			tdm-slots = <2>;
@@ -1087,6 +1088,7 @@
 			reg-names = "cfg","dat";
 			interrupts = <0 156 0x4>, /* AREVT */
 				     <0 157 0x4>; /* TXEVT */
+			interrupt-names = "rx", "tx";
 			ti,hwmods = "mcasp6";
 			op-mode = <0>;		/* MCASP_IIS_MODE */
 			tdm-slots = <8>;
@@ -1105,6 +1107,7 @@
 			reg-names = "cfg","dat";
 			interrupts = <0 146 0x4>, /* AREVT */
 				     <0 147 0x4>; /* TXEVT */
+			interrupt-names = "rx", "tx";
 			ti,hwmods = "mcasp7";
 			op-mode = <0>;		/* MCASP_IIS_MODE */
 			tdm-slots = <2>;
