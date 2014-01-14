@@ -306,9 +306,9 @@
 
 	display_layout {
 		compatible = "ti, omap4-dsscomp";
-		ti,num_displays = <2>;
+		ti,num_displays = <3>;
 		ti,default_display = "lcd";
-	};	
+	};
 
 	vout3_pins: pinmux_vout3_pins {
 		pinctrl-single,pins = <
