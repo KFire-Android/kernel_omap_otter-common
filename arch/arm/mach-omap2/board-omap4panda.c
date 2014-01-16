@@ -687,6 +687,10 @@ static void omap4_panda_hdmi_mux_init(void)
 		pr_err("%s: Cannot request HDMI GPIOs %x \n", __func__, status);
 }
 
+static struct omap_dss_hdmi_data omap4_panda_hdmi_data = {
+	.hpd_gpio = HDMI_GPIO_HPD,
+};
+
 static struct omap_dss_device  omap4_panda_hdmi_device = {
 	.name = "hdmi",
 	.driver_name = "hdmi_panel",
@@ -702,6 +706,7 @@ static struct omap_dss_device  omap4_panda_hdmi_device = {
 	},
 	.hpd_gpio = HDMI_GPIO_HPD,
 	.channel = OMAP_DSS_CHANNEL_DIGIT,
+	.data = &omap4_panda_hdmi_data,
 };
 
 static struct omap_dss_device *omap4_panda_dss_devices[] = {
@@ -742,6 +747,10 @@ void omap4_panda_display_init(void)
 
 	omap4_panda_hdmi_mux_init();
 	omap_display_init(&omap4_panda_dss_data);
+
+	omap_mux_init_gpio(HDMI_GPIO_LS_OE, OMAP_PIN_OUTPUT);
+	omap_mux_init_gpio(HDMI_GPIO_CT_CP_HPD, OMAP_PIN_OUTPUT);
+	omap_mux_init_gpio(HDMI_GPIO_HPD, OMAP_PIN_INPUT_PULLDOWN);
 }
 
 
@@ -831,6 +840,7 @@ static void __init omap4_panda_reserve(void)
 	omap_ipu_set_static_mempool(PHYS_ADDR_DUCATI_MEM, PHYS_ADDR_DUCATI_SIZE +
 					OMAP4_ION_HEAP_SECURE_INPUT_SIZE +
 					OMAP4_ION_HEAP_SECURE_OUTPUT_WFDHDCP_SIZE);
+
 
 	omap_reserve();
 }

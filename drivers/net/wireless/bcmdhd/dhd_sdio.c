@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd_sdio.c 326662 2012-04-10 06:38:08Z $
+ * $Id: dhd_sdio.c 352730 2012-08-23 20:55:11Z $
  */
 
 #include <typedefs.h>
@@ -539,6 +539,8 @@ dhdsdio_set_siaddr_window(dhd_bus_t *bus, uint32 address)
 static int
 dhdsdio_htclk(dhd_bus_t *bus, bool on, bool pendok)
 {
+#define HT_AVAIL_ERROR_MAX	10
+	static int ht_avail_error = 0;
 	int err;
 	uint8 clkctl, clkreq, devctl;
 	bcmsdh_info_t *sdh;
@@ -551,18 +553,22 @@ dhdsdio_htclk(dhd_bus_t *bus, bool on, bool pendok)
 	clkctl = 0;
 	sdh = bus->sdh;
 
-
 	if (on) {
 		/* Request HT Avail */
 		clkreq = bus->alp_only ? SBSDIO_ALP_AVAIL_REQ : SBSDIO_HT_AVAIL_REQ;
 
-
-
-
 		bcmsdh_cfg_write(sdh, SDIO_FUNC_1, SBSDIO_FUNC1_CHIPCLKCSR, clkreq, &err);
 		if (err) {
-			DHD_ERROR(("%s: HT Avail request error: %d\n", __FUNCTION__, err));
+			ht_avail_error++;
+			if (ht_avail_error < HT_AVAIL_ERROR_MAX) {
+				DHD_ERROR(("%s: HT Avail request error: %d\n", __FUNCTION__, err));
+			} else {
+				if (ht_avail_error == HT_AVAIL_ERROR_MAX)
+					dhd_os_send_hang_message(bus->dhd);
+			}
 			return BCME_ERROR;
+		} else {
+			ht_avail_error = 0;
 		}
 
 		if (pendok &&
@@ -614,6 +620,7 @@ dhdsdio_htclk(dhd_bus_t *bus, bool on, bool pendok)
 		if (!SBSDIO_CLKAV(clkctl, bus->alp_only)) {
 			DHD_ERROR(("%s: HT Avail timeout (%d): clkctl 0x%02x\n",
 			           __FUNCTION__, PMU_MAX_TRANSITION_DLY, clkctl));
+			dhd_os_send_hang_message(bus->dhd);
 			return BCME_ERROR;
 		}
 
@@ -1369,7 +1376,13 @@ dhd_bus_txctl(struct dhd_bus *bus, uchar *msg, uint msglen)
 		/* Send from dpc */
 		bus->ctrl_frame_buf = frame;
 		bus->ctrl_frame_len = len;
-		dhd_wait_for_event(bus->dhd, &bus->ctrl_frame_stat);
+		if (!bus->dpc_sched) {
+			bus->dpc_sched = TRUE;
+			dhd_sched_dpc(bus->dhd);
+		}
+		if (bus->ctrl_frame_stat) {
+			dhd_wait_for_event(bus->dhd, &bus->ctrl_frame_stat);
+		}
 		if (bus->ctrl_frame_stat == FALSE) {
 			DHD_INFO(("%s: ctrl_frame_stat == FALSE\n", __FUNCTION__));
 			ret = 0;
@@ -1481,7 +1494,7 @@ dhd_bus_rxctl(struct dhd_bus *bus, uchar *msg, uint msglen)
 		dhd_os_sdunlock(bus->dhd);
 #endif /* DHD_DEBUG */
 	} else if (pending == TRUE) {
-		/* signal pending */
+		/* possibly fw hangs so never responsed back */
 		DHD_ERROR(("%s: signal pending\n", __FUNCTION__));
 		return -EINTR;
 	} else {
@@ -5186,7 +5199,7 @@ done:
 }
 #endif /* DHD_DEBUG */
 
-#ifdef DHD_DEBUG
+#if (defined DHD_DEBUG)
 static void
 dhd_dump_cis(uint fn, uint8 *cis)
 {
@@ -5462,11 +5475,10 @@ dhdsdio_probe_attach(struct dhd_bus *bus, osl_t *osh, void *sdh, void *regsva,
 		clkctl = bcmsdh_cfg_read(sdh, SDIO_FUNC_1, SBSDIO_FUNC1_CHIPCLKCSR, &err);
 
 	if (err || ((clkctl & ~SBSDIO_AVBITS) != DHD_INIT_CLKCTL1)) {
-		DHD_ERROR(("dhdsdio_probe: ChipClkCSR access: err %d wrote 0x%02x read 0x%02x\n",
-		           err, DHD_INIT_CLKCTL1, clkctl));
+		DHD_ERROR(("%s: ChipClkCSR access: err %d wrote 0x%02x read 0x%02x\n",
+		           __FUNCTION__, err, DHD_INIT_CLKCTL1, clkctl));
 		goto fail;
 	}
-
 
 #ifdef DHD_DEBUG
 	if (DHD_INFO_ON()) {
@@ -6320,7 +6332,23 @@ uint dhd_bus_chip_id(dhd_pub_t *dhdp)
 {
 	dhd_bus_t *bus = dhdp->bus;
 
-	return  bus->sih->chip;
+	return bus->sih->chip;
+}
+
+/* Get Chip Rev ID version */
+uint dhd_bus_chiprev_id(dhd_pub_t *dhdp)
+{
+	dhd_bus_t *bus = dhdp->bus;
+
+	return bus->sih->chiprev;
+}
+
+/* Get Chip Pkg ID version */
+uint dhd_bus_chippkg_id(dhd_pub_t *dhdp)
+{
+	dhd_bus_t *bus = dhdp->bus;
+
+	return bus->sih->chippkg;
 }
 
 int

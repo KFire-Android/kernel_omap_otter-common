@@ -210,6 +210,21 @@ static irqreturn_t twl6030_irq_thread(int irq, void *devid)
 				twl6030_interrupt_mapping[i];
 			handle_nested_irq(module_irq);
 		}
+
+		/*
+		 * NOTE:
+		 * Simulation confirms that documentation is wrong w.r.t the
+		 * interrupt status clear operation. A single *byte* write to
+		 * any one of STS_A to STS_C register results in all three
+		 * STS registers being reset. Since it does not matter which
+		 * value is written, all three registers are cleared on a
+		 * single byte write, so we just use 0x0 to clear.
+		 */
+		ret = twl_i2c_write_u8(TWL_MODULE_PIH, 0x00, REG_INT_STS_A);
+		if (ret)
+			pr_warning("twl6030: I2C error in clearing PIH ISR\n");
+
+		enable_irq(irq);
 	}
 
 	/*
