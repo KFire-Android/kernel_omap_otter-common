@@ -68,7 +68,7 @@ static struct omap_dss_device tablet_lcd_device = {
 		.timings	= {
 			.x_res          = 1024,
 			.y_res          = 600,
-			.pixel_clock    = 46000, /* in kHz */
+			.pixel_clock    = 51200, /* in kHz */
 			.hfp            = 160,   /* HFP fix 160 */
 			.hsw            = 10,    /* HSW = 1~140 */
 			.hbp            = 150,   /* HSW + HBP = 160 */
