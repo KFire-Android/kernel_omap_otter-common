@@ -44,7 +44,7 @@
 #define GPIO_OMAP_RGB_SHTDN	37
 
 extern u8 quanta_get_panelid(void);
-static unsigned int ignore_first_suspend = 1;
+static unsigned int ignore_first_suspend = 0;
 static struct spi_device *otter1_spi;
 #if 0
 static struct omap_video_timings otter1_panel_timings = {
