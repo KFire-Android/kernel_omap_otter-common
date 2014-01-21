@@ -21,6 +21,8 @@
 #include <linux/firmware.h>
 #include <linux/slab.h>
 #include <linux/sched.h>
+#include <linux/notifier.h>
+#include <linux/reboot.h>
 
 #define to_dev(obj) container_of(obj, struct device, kobj)
 
@@ -440,6 +442,39 @@ static void firmware_class_timeout(u_long data)
 	fw_load_abort(fw_priv);
 }
 
+struct fw_notifier_block {
+	struct notifier_block notifier;
+	struct firmware_priv *priv;
+	struct mutex	reboot_cb;
+	};
+
+static int firmware_reboot_notifier_cb(struct notifier_block *nb,
+				unsigned long val, void *ptr)
+{
+	struct fw_notifier_block *fw_nb = (struct fw_notifier_block *) nb;
+
+	mutex_lock(&fw_nb->reboot_cb);
+	fw_load_abort(fw_nb->priv);
+	mutex_unlock(&fw_nb->reboot_cb);
+
+	return 0;
+}
+
+static int firmware_notifier_chain(struct firmware_priv *fw_priv,
+			struct fw_notifier_block *fw_nb)
+{
+	fw_nb->notifier.notifier_call = firmware_reboot_notifier_cb;
+	fw_nb->priv = fw_priv;
+	mutex_init(&fw_nb->reboot_cb);
+
+	return register_reboot_notifier((struct notifier_block *) fw_nb);
+}
+
+static int firmware_notifier_unchain(struct fw_notifier_block *fw_nb)
+{
+	return unregister_reboot_notifier((struct notifier_block *) fw_nb);
+}
+
 static struct firmware_priv *
 fw_create_instance(struct firmware *firmware, const char *fw_name,
 		   struct device *device, bool uevent, bool nowait)
@@ -511,6 +546,10 @@ static int _request_firmware_load(struct firmware_priv *fw_priv, bool uevent,
 {
 	int retval = 0;
 	struct device *f_dev = &fw_priv->dev;
+	struct fw_notifier_block fw_nb = {
+		.notifier.notifier_call = NULL,
+		.notifier.priority = 0
+		};
 
 	dev_set_uevent_suppress(f_dev, true);
 
@@ -545,7 +584,14 @@ static int _request_firmware_load(struct firmware_priv *fw_priv, bool uevent,
 		kobject_uevent(&fw_priv->dev.kobj, KOBJ_ADD);
 	}
 
+	firmware_notifier_chain(fw_priv, &fw_nb);
+
 	wait_for_completion(&fw_priv->completion);
+	/* Waiting for callback will be finished*/
+	mutex_lock(&fw_nb.reboot_cb);
+	mutex_unlock(&fw_nb.reboot_cb);
+
+	firmware_notifier_unchain(&fw_nb);
 
 	set_bit(FW_STATUS_DONE, &fw_priv->status);
 	del_timer_sync(&fw_priv->timeout);
