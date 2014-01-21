@@ -1966,11 +1966,7 @@ static void summit_smb347_irq_worker(struct work_struct *work) {
 	mdelay(1);
 	smb347_read_interrupt_e(di);
 	mdelay(1);
-
-	/* Check interrupt status F register */
-	if (!smb347_i2c_read(di->client, SMB347_INTSTAT_REG_F, &value)) {
-		// TODO
-	}
+	smb347_read_interrupt_f(di);
 
 	return;
 }
