@@ -158,6 +158,7 @@ config SND_OMAP_SOC_OMAP4_PANDA_AIC31XX
 	select SND_OMAP_SOC_ABE
 	select SND_DYNAMIC_MINORS
 	select SND_SOC_TLV320AIC31XX
+	select ABE_44100
 	help
 	  Say Y if you want to add support for SoC audio  with AIC31XX on the OMAP4 Blaze or Panda board.
 

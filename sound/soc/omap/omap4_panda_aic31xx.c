@@ -72,10 +72,6 @@
 #include "omap-abe-priv.h"
 #include "../codecs/tlv320aic31xx.h"
 
-#include <linux/mfd/tlv320aic31xx-registers.h>
-#include <linux/mfd/tlv320aic3xxx-registers.h>
-#include <linux/mfd/tlv320aic3xxx-core.h>
-
 // static struct snd_soc_codec *aic31xx_codec;
 
 /* Forward Declaration */
@@ -97,8 +93,6 @@ static int omap_abe_mcbsp_hw_params(struct snd_pcm_substream *substream,
 	void __iomem *phymux_base = NULL;
 #endif
 
-
-#ifdef AIC31XX_MCBSP_SLAVE
 
 		pr_debug("\naic31xx: AIC31xx  MCBSP slave & master\n");
 		/* Set codec DAI configuration */
@@ -142,46 +136,6 @@ static int omap_abe_mcbsp_hw_params(struct snd_pcm_substream *substream,
                 	pr_debug(KERN_ERR "Can't set codec pll clock\n");
                 	return ret;
         }
-#else
-		pr_debug("\naic31xx: AIC31xx SLAVE & MASTER\n");
-		/* Set codec DAI configuration */
-		err = snd_soc_dai_set_fmt(codec_dai,
-						SND_SOC_DAIFMT_I2S |
-						SND_SOC_DAIFMT_NB_NF |
-						SND_SOC_DAIFMT_CBS_CFS);
-		if (err < 0) {
-			printk(KERN_INFO"\nInside %s cannot set codec"
-				"dai configuration\n", __func__);
-			return err;
-		}
-
-		/* Set cpu DAI configuration */
-		err = snd_soc_dai_set_fmt(cpu_dai,
-						SND_SOC_DAIFMT_I2S |
-						SND_SOC_DAIFMT_NB_NF |
-						SND_SOC_DAIFMT_CBS_CFS);
-		if (err < 0) {
-			printk("\nInside %s cannot set"
-					"cpu dai configuration\n", __func__);
-			return err;
-		}
-
-        /* Set McBSP clock to external */
-        ret = snd_soc_dai_set_sysclk(cpu_dai, OMAP_MCBSP_SYSCLK_CLKS_FCLK,
-                                     64 * params_rate(params),
-                                     SND_SOC_CLOCK_IN);
-        if (ret < 0) {
-                pr_debug(KERN_ERR "can't set cpu system clock\n");
-                return ret;
-        }
-
-	ret = snd_soc_dai_set_pll(codec_dai, 0, AIC31XX_PLL_CLKIN_MCLK , 19200000, params_rate(params));
-        if (ret < 0) {
-                pr_debug(KERN_ERR "Can't set codec pll clock\n");
-                return ret;
-        }
-#endif
-	
 	
 	if (params != NULL) {
 		struct omap_mcbsp *mcbsp = snd_soc_dai_get_drvdata(cpu_dai);
