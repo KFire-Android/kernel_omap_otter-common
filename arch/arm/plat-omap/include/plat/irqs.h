@@ -418,27 +418,8 @@
 #endif
 #define TWL6030_IRQ_END		(TWL6030_IRQ_BASE + TWL6030_BASE_NR_IRQS)
 
-/*----Change added w.r.t. 3c changes*/
-
-#define AIC31XX_CODEC_IRQ_BASE	TWL6030_IRQ_END
-#ifdef CONFIG_AIC31XX_CORE
-#define AIC31XX_CODEC_NR_IRQS	6
-#else
-#define AIC31XX_CODEC_NR_IRQS	0
-#endif
-#define AIC31XX_CODEC_IRQ_END	(AIC31XX_CODEC_IRQ_BASE + AIC31XX_CODEC_NR_IRQS)
-
-/* Total number of interrupts depends on the enabled blocks above */
-#if (TWL4030_GPIO_IRQ_END > AIC31XX_CODEC_IRQ_END)
-#define TWL_IRQ_END		TWL4030_GPIO_IRQ_END
-#else
-#define TWL_IRQ_END		AIC31XX_CODEC_IRQ_END
-#endif
-
-/*End*/
-
 #define TWL6040_CODEC_IRQ_BASE	TWL6030_IRQ_END
-#ifdef CONFIG_TWL6040_CORE
+#if defined(CONFIG_TWL6040_CORE) || defined(CONFIG_MFD_AIC3XXX)
 #define TWL6040_CODEC_NR_IRQS	6
 #else
 #define TWL6040_CODEC_NR_IRQS	0
