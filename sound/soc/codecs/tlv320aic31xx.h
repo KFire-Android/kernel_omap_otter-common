@@ -86,6 +86,15 @@
 
 #endif
 
+/* Headphones Driver */
+#define HP_DRIVER_ON                    0xCC
+#define HP_DRIVER_OFF                   0x0C
+
+/* Speaker Driver */
+#define SPK_DRV_ON			0xC6
+#define SPK_DRV_OFF			0x06
+
+
 #define AIC31XX_RATES	(SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_11025 | \
 			SNDRV_PCM_RATE_16000 | SNDRV_PCM_RATE_22050 | \
 			SNDRV_PCM_RATE_32000 | SNDRV_PCM_RATE_44100 | \
@@ -482,6 +491,8 @@
 
 
 /******************** Page 1 Registers **************************************/
+/* Headphone / Speaker protection power bits */
+#define AIC31XX_HP_SPK_ERR_CTL		AIC31XX_MAKE_REG(0, 1, 30)
 /* Headphone drivers */
 #define AIC31XX_HPHONE_DRIVERS		AIC31XX_MAKE_REG(0, 1, 31)
 /* Class-D Speakear Amplifier */
@@ -556,7 +567,7 @@ struct aic3xxx_irq_data {
  *----------------------------------------------------------------------------
  */
 struct aic31xx_configs {
-	u16 reg_offset;
+	unsigned int reg;
 	u8 reg_val;
 };
 

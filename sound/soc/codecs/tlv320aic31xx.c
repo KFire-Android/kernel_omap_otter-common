@@ -1754,6 +1754,55 @@ void aic3xxx_device_exit(struct aic3xxx *aic3xxx)
 	}
 }
 
+
+/*
+ * The global Register Initialization sequence Array. During the Audio
+ * Driver initialization, this array will be utilized to perform the
+ * default initialization of the audio Driver.
+ */
+static const struct
+aic31xx_configs aic31xx_reg_init[] = {
+
+	/* Clock settings */
+	{AIC31XX_CLK_R1,		CODEC_MUX_VALUE},
+	{AIC31XX_INTERFACE_SET_REG_1,	BCLK_DIR_CTRL},
+	{AIC31XX_INTERFACE_SET_REG_2,	DAC_MOD_CLK_2_BDIV_CLKIN},
+
+	/* POP_REMOVAL: Step_1: Setting HP in weakly driver common mode */
+	{AIC31XX_HPL_DRIVER_REG,	0x00},
+	{AIC31XX_HPR_DRIVER_REG,	0x00},
+
+	/* Step_2: HP pop removal settings */
+	{AIC31XX_HP_OUT_DRIVERS,	CM_VOLTAGE_FROM_AVDD},
+
+	/* Step_3: Configuring HP in Line out Mode */
+	{AIC31XX_HP_DRIVER_CONTROL,	0x06},
+
+	/* Step_4: Powering up the HP in Line out mode */
+	{AIC31XX_HPHONE_DRIVERS,	HP_DRIVER_ON},
+
+	/* Step_5: Reconfiguring the CM to Band Gap mode */
+	{AIC31XX_HP_OUT_DRIVERS,	BIT7 | HP_POWER_UP_76_2_MSEC | HP_DRIVER_3_9_MS | CM_VOLTAGE_FROM_BAND_GAP},
+
+	/* Speaker Ramp up time scaled to 30.5ms */
+	{AIC31XX_PGA_RAMP_REG,		0x70},
+
+	/* Headset Detect setting */
+	{AIC31XX_INT1_CTRL_REG,		AIC31XX_HEADSET_IN_MASK | AIC31XX_BUTTON_PRESS_MASK},
+
+	/* previous value was 0x01 */
+	{AIC31XX_MICPGA_CM_REG,		0x20},
+
+	/* short circuit protection of HP and Speaker power bits */
+	{AIC31XX_HP_SPK_ERR_CTL,	3},
+
+	/* Headset detection enabled by default and Debounce programmed to 32 ms
+	 * for Headset Detection and 32ms for Headset button-press Detection
+	 */
+	{AIC31XX_HS_DETECT_REG,		HP_DEBOUNCE_32_MS | HS_DETECT_EN | HS_BUTTON_PRESS_32_MS},
+
+};
+
 /*
  *----------------------------------------------------------------------------
  * Function : aic31xx_codec_probe
@@ -1765,7 +1814,7 @@ static int aic31xx_codec_probe(struct snd_soc_codec *codec)
 {
 
 
-	int ret = 0;
+	int ret = 0, i;
 	struct aic3xxx *control;
 	struct aic31xx_priv *priv;
 	struct aic31xx_jack_data *jack;
@@ -1822,6 +1871,11 @@ static int aic31xx_codec_probe(struct snd_soc_codec *codec)
 
 	aic31xx_codec_write(codec, AIC31XX_RESET_REG , 0x01);
 	mdelay(10);
+
+	for (i = 0; i < sizeof(aic31xx_reg_init)/sizeof(struct aic31xx_configs); i++) {
+		aic31xx_codec_write(codec, aic31xx_reg_init[i].reg, aic31xx_reg_init[i].reg_val);
+		mdelay(5);
+	}
 
 	priv->power_status = 1;
 	priv->headset_connected = 1;
