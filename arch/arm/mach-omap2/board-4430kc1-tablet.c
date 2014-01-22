@@ -187,6 +187,19 @@ static struct aic3xxx_pdata aic31xx_codec_pdata ={
 	.regulator_min_uV = 3000000,
 	.regulator_max_uV = 3000000,
 };
+
+static struct platform_device aic31xx_codec = {
+        .name           = "tlv320aic31xx-codec",
+        .id             = -1,
+        .dev    = {
+                .platform_data = &aic31xx_codec_pdata,
+        },
+};
+
+static struct platform_device aic31xx_abe_audio = {
+	.name		= "omap4-panda-aic31xx",
+	.id		= -1,
+};
 #endif
 
 #ifdef CONFIG_LEDS_OTTER_BUTTON
@@ -278,6 +291,10 @@ static struct platform_device __initdata *sdp4430_devices[] = {
 #ifdef CONFIG_LEDS_OTTER_BUTTON
 	&orange_led,
 	&green_led,
+#endif
+#ifdef CONFIG_SND_SOC_TLV320AIC31XX
+	&aic31xx_codec,
+	&aic31xx_abe_audio,
 #endif
 };
 
@@ -579,7 +596,8 @@ static struct i2c_board_info __initdata sdp4430_i2c_2_boardinfo[] = {
 };
 
 static struct i2c_board_info __initdata sdp4430_i2c_3_boardinfo[] = {
-#ifdef CONFIG_SND_SOC_TLV320AIC31XX
+//#ifdef CONFIG_SND_SOC_TLV320AIC31XX
+#if 0
 	{ I2C_BOARD_INFO("tlv320aic31xx-codec", 0x18), .platform_data = &aic31xx_codec_pdata, },
 #endif
 };
@@ -611,7 +629,7 @@ static struct i2c_board_info __initdata sdp4430_i2c_4_boardinfo_c1c[] = {
 static struct i2c_board_info __initdata sdp4430_i2c_4_boardinfo_dvt[] = {
 #ifdef CONFIG_SUMMIT_SMB347_Q
 	{ I2C_BOARD_INFO("summit_smb347", 0x6), .irq = OMAP_GPIO_IRQ(OMAP4_CHARGER_IRQ), .platform_data = &smb347_pdata, },
-#endif    
+#endif
 #ifdef CONFIG_INPUT_STK_ALS22x7
 	{ I2C_BOARD_INFO("stk_als22x7", 0x10), },
 #endif
@@ -626,7 +644,7 @@ static struct i2c_board_info __initdata sdp4430_i2c_4_boardinfo_dvt[] = {
 static struct i2c_board_info __initdata sdp4430_i2c_4_boardinfo_pvt[] = {
 #ifdef CONFIG_SUMMIT_SMB347_Q
 	{ I2C_BOARD_INFO("summit_smb347", 0x6), .irq = OMAP_GPIO_IRQ(OMAP4_CHARGER_IRQ), .platform_data = &smb347_pdata, },
-#endif    
+#endif
 #ifdef CONFIG_INPUT_STK_ALS22x7
 	{ I2C_BOARD_INFO("stk_als22x7", 0x10), },
 #endif
