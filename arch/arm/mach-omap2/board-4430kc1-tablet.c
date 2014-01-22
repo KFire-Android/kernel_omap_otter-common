@@ -182,6 +182,10 @@ static struct aic3xxx_pdata aic31xx_codec_pdata ={
 	.audio_mclk1 = 19200000,
 	.num_gpios = ARRAY_SIZE(aic3xxx_gpio),
 	.gpio_defaults = aic3xxx_gpio,
+	.irq_base = TWL6040_CODEC_IRQ_BASE,
+	.regulator_name = "audio-pwr",
+	.regulator_min_uV = 3000000,
+	.regulator_max_uV = 3000000,
 };
 #endif
 
