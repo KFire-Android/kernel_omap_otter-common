@@ -40,6 +40,8 @@ struct dra7_snd_data {
 	unsigned int bt_bclk_freq;
 	unsigned int media_slots;
 	unsigned int multichannel_slots;
+	unsigned int bt_rate;
+	int bt_is_master;
 	int always_on;
 };
 
@@ -298,17 +300,41 @@ static int dra7_snd_bt_hw_params(struct snd_pcm_substream *substream,
 				 struct snd_pcm_hw_params *params)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_card *card = rtd->card;
+	struct dra7_snd_data *card_data = snd_soc_card_get_drvdata(card);
+
+	card_data->bt_rate = params_rate(params);
+
+	return 0;
+}
+
+static int dra7_snd_bt_prepare(struct snd_pcm_substream *substream)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
 	struct snd_soc_card *card = rtd->card;
 	struct dra7_snd_data *card_data = snd_soc_card_get_drvdata(card);
+	unsigned int fmt = SND_SOC_DAIFMT_DSP_A | SND_SOC_DAIFMT_NB_IF;
+	int dir;
 	int ret;
 
-	ret = snd_soc_dai_set_fmt(cpu_dai,
-				  SND_SOC_DAIFMT_DSP_A |
-				  SND_SOC_DAIFMT_CBM_CFM |
-				  SND_SOC_DAIFMT_NB_IF);
+	if (card_data->bt_is_master) {
+		fmt |= SND_SOC_DAIFMT_CBM_CFM;
+		dir = SND_SOC_CLOCK_OUT;
+	} else {
+		fmt |= SND_SOC_DAIFMT_CBS_CFS;
+		dir = SND_SOC_CLOCK_IN;
+	}
+
+	ret = snd_soc_dai_set_fmt(cpu_dai, fmt);
 	if (ret < 0) {
 		dev_err(card->dev, "can't set CPU DAI format %d\n", ret);
+		return ret;
+	}
+
+	ret = snd_soc_dai_set_sysclk(cpu_dai, 0, 0, dir);
+	if (ret < 0) {
+		dev_err(card->dev, "can't set CPU DAI sysclk %d\n", ret);
 		return ret;
 	}
 
@@ -321,7 +347,7 @@ static int dra7_snd_bt_hw_params(struct snd_pcm_substream *substream,
 	 * actual data.
 	 */
 	ret = snd_soc_dai_set_clkdiv(cpu_dai, 2,
-				card_data->bt_bclk_freq / params_rate(params));
+				card_data->bt_bclk_freq / card_data->bt_rate);
 	if (ret < 0)
 		dev_err(card->dev, "can't set CPU DAI BCLK/FSYNC ratio %d\n",
 			ret);
@@ -332,6 +358,7 @@ static int dra7_snd_bt_hw_params(struct snd_pcm_substream *substream,
 static struct snd_soc_ops dra7_snd_bt_ops = {
 	.startup = dra7_snd_bt_startup,
 	.hw_params = dra7_snd_bt_hw_params,
+	.prepare = dra7_snd_bt_prepare,
 };
 
 static struct snd_soc_dai_link dra7_snd_dai[] = {
@@ -360,6 +387,49 @@ static struct snd_soc_dai_link dra7_snd_dai[] = {
 		.codec_dai_name = "snd-soc-dummy-dai",
 		.ops = &dra7_snd_bt_ops,
 	},
+};
+
+static int dra7_snd_bt_get_mode(struct snd_kcontrol *kcontrol,
+				struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_card *card = snd_kcontrol_chip(kcontrol);
+	struct dra7_snd_data *card_data = snd_soc_card_get_drvdata(card);
+
+	ucontrol->value.integer.value[0] = card_data->bt_is_master;
+	return 0;
+}
+
+static int dra7_snd_bt_set_mode(struct snd_kcontrol *kcontrol,
+				struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_card *card = snd_kcontrol_chip(kcontrol);
+	struct dra7_snd_data *card_data = snd_soc_card_get_drvdata(card);
+
+	card_data->bt_is_master = ucontrol->value.integer.value[0];
+	return 1;
+}
+
+/*
+ * The Bluetooth PCM interface (the codec side of the DAI link) can cut the
+ * BCLK and FSYNC while the ALSA PCM device is still in use (typically, when
+ * BT link is about to be released). Missing BCLK/FSYNC causes audio data
+ * read/write to block for long time.
+ * Bluetooth mode kcontrol can change the CPU DAI master or slave configuration.
+ * This control is specifically meant to address the limitation describe above.
+ * By switching to slave mode, the CPU DAI link has the clocks to continue
+ * without stalling anymore.
+ * Note that this is only in the context of McASP, no pin direction change is
+ * needed.
+ */
+static const char * const dra7_snd_bt_texts[] = {"Slave", "Master"};
+
+static const struct soc_enum dra7_snd_enum[] = {
+	SOC_ENUM_SINGLE_EXT(2, dra7_snd_bt_texts),
+};
+
+static const struct snd_kcontrol_new dra7_snd_controls[] = {
+	SOC_ENUM_EXT("Bluetooth Mode", dra7_snd_enum[0],
+		     dra7_snd_bt_get_mode, dra7_snd_bt_set_mode),
 };
 
 static int dra7_snd_add_dai_link(struct snd_soc_card *card,
@@ -514,6 +584,9 @@ static int dra7_snd_add_bt_dai_link(struct snd_soc_card *card,
 	struct device_node *dai_node;
 	char prop[32];
 	int ret;
+
+	card_data->bt_is_master = 1;
+	card_data->bt_rate = 8000;
 
 	if (!node) {
 		dev_err(card->dev, "bluetooth node is invalid\n");
@@ -689,6 +762,13 @@ static int dra7_snd_probe(struct platform_device *pdev)
 		goto err_card;
 	}
 
+	ret = snd_soc_add_card_controls(card, dra7_snd_controls,
+					ARRAY_SIZE(dra7_snd_controls));
+	if (ret) {
+		dev_err(card->dev, "failed to add card controls %d\n", ret);
+		goto err_card;
+	}
+
 	ret = dra7_mcasp_reparent(card, "mcasp3_ahclkx_mux", "atl_clkin2_ck");
 	if (ret) {
 		dev_err(card->dev, "failed to reparent McASP3 %d\n", ret);
@@ -698,6 +778,12 @@ static int dra7_snd_probe(struct platform_device *pdev)
 	ret = dra7_mcasp_reparent(card, "mcasp6_ahclkx_mux", "atl_clkin1_ck");
 	if (ret) {
 		dev_err(card->dev, "failed to reparent McASP6 %d\n", ret);
+		goto err_reparent;
+	}
+
+	ret = dra7_mcasp_reparent(card, "mcasp7_ahclkx_mux", "abe_24m_fclk");
+	if (ret) {
+		dev_err(card->dev, "failed to reparent McASP7 %d\n", ret);
 		goto err_reparent;
 	}
 
