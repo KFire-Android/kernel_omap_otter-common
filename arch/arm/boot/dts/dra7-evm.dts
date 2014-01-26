@@ -15,9 +15,16 @@
  * B4300000 - TILER SECURE (81 MB)
  * B3400000 - TILER NONSECURE (15 MB)
 */
+
 /memreserve/ 0xba300000 0x5a00000;
 /memreserve/ 0xb5200000 0x5100000;
 /memreserve/ 0xb4300000 0xf00000;
+
+/*
+ * Memory is reserved for ipu1 for rearview camera
+ */
+/memreserve/ 0x8E000000 0x1000000;
+/memreserve/ 0xA0000000 0x1800000;
 
 /include/ "dra7.dtsi"
 
@@ -27,7 +34,7 @@
 
 	cpus {
 		cpu@0 {
-			cpu0-supply = <&avs_mpu>;
+			cpu0-supply = <&abb_mpu>;
 		};
 	};
 
@@ -73,7 +80,7 @@
 
 	ocp {
 		gpu: gpu@0x56000000 {
-		gpu-supply = <&avs_gpu>;
+		gpu-supply = <&abb_gpu>;
 		};
 	};
 
@@ -97,6 +104,8 @@
 		compatible = "ti,dra7-evm-sound";
 		ti,model = "dra7evm";
 		ti,always-on;
+
+		gpios = <&pcf_hdmi 1 0>;
 
 		/* Audio routing */
 		ti,audio-routing =
@@ -133,6 +142,10 @@
 		ti,multichannel-codec-c = <&tlv320aic3106c>;
 		ti,multichannel-slots = <8>;
 		ti,multichannel-mclk-freq = <11289600>;
+
+		/* Bluetooth */
+		ti,bt-cpu = <&mcasp7>;
+		ti,bt-bclk-freq = <512000>;
 	};
 
 	sound_hdmi {
@@ -142,17 +155,40 @@
 		ti,level_shifter = <&tpd12s015>;
 	};
 
+	radio {
+		compatible = "ti,dra7xx_radio";
+		gpios = <&gpio6 20 0>;
+
+		radio_helper1 {
+			compatible = "ti,dra7xx_radio_subdev";
+			ti,hwmods = "mcasp2";
+			status = "okay";
+		};
+
+		radio_helper2 {
+			compatible = "ti,dra7xx_radio_subdev";
+			ti,hwmods = "mcasp6";
+			status = "okay";
+		};
+	};
+
 	kim {
 		compatible = "kim";
 		nshutdown_gpio = <132>;
 		dev_name = "/dev/ttyO2";
 		flow_cntrl = <1>;
-		baud_rate = <115200>;
+		baud_rate = <3686400>;
+		gpios = <&pcf_lcd3 14 0>; /* pcf8575@21 P16 */
 	};
 
 	btwilink {
 		compatible = "btwilink";
 	};
+
+	display_skipinit {
+		skip_init =<1>;
+	};
+
 };
 
 &dra7_pmx_core {
@@ -161,14 +197,17 @@
 		&atl_pins
 		&mcasp3_pins
 		&mcasp6_pins
+		&mcasp7_pins
 		&mcasp8_pins
 		&vout1_pins
+		&vout3_pins
 		&vin1a_pins
 		&usb_pins
 		&irq_pins
 		&bt_uart3_pins
 		&wl_pins
 		&wlirq_pins
+		&radio_pins
 	>;
 
 	atl_pins: pinmux_atl_pins {
@@ -194,12 +233,15 @@
 			0x2dc 0x00000001	/* mcasp1_axr10.mcasp6_clkx OUTPUT | MODE1 */
 			0x2e0 0x00000001	/* mcasp1_axr11.mcasp6_fsx OUTPUT | MODE1 */
 		>;
+	};
 
-	irq_pins: pinmux_irq_pins {
-                pinctrl-single,pins = <
-			0x420	0x1	/* Wakeup2 INPUT | MODE1 */
-                >;
-        };
+	mcasp7_pins: pinmux_mcasp7_pins {
+		pinctrl-single,pins = <
+			0x2e4 0x00040001	/* mcasp1_axr12.mcasp7_axr0 INPUT | MODE 1 */
+			0x2e8 0x00000001	/* mcasp1_axr13.mcasp7_axr1 OUTPUT | MODE 1 */
+			0x2ec 0x00040001	/* mcasp1_axr14.mcasp7_clkx INPUT | MODE1 */
+			0x2f0 0x00040001	/* mcasp1_axr15.mcasp7_fsx INPUT | MODE1 */
+		>;
 	};
 
 	mcasp8_pins: pinmux_mcasp8_pins {
@@ -207,6 +249,12 @@
 			0x2fc 0x00040001	/* mcasp2_aclkr.mcasp8_axr2 OUTPUT | MODE1 */
 		>;
 	};
+
+	irq_pins: pinmux_irq_pins {
+                pinctrl-single,pins = <
+			0x420	0x1	/* Wakeup2 INPUT | MODE1 */
+                >;
+        };
 
 	usb_pins: pinmux_usb_pins {
                 pinctrl-single,pins = <
@@ -258,8 +306,42 @@
 
 	display_layout {
 		compatible = "ti, omap4-dsscomp";
-		ti,num_displays = <2>;
+		ti,num_displays = <3>;
 		ti,default_display = "lcd";
+	};
+
+	vout3_pins: pinmux_vout3_pins {
+		pinctrl-single,pins = <
+			0x000	0x3	/*GPMC_AD0  = VOUT3_D0*/
+			0x004	0x3	/*GPMC_AD1  = VOUT3_D1*/
+			0x008	0x3	/*GPMC_AD2  = VOUT3_D2*/
+			0x00c	0x3	/*GPMC_AD3  = VOUT3_D3*/
+			0x010	0x3	/*GPMC_AD4  = VOUT3_D4*/
+			0x014	0x3	/*GPMC_AD5  = VOUT3_D5*/
+			0x018	0x3	/*GPMC_AD6  = VOUT3_D6*/
+			0x01c	0x3	/*GPMC_AD7  = VOUT3_D7*/
+			0x020	0x3	/*GPMC_AD8  = VOUT3_D8*/
+			0x024	0x3	/*GPMC_AD9  = VOUT3_D9*/
+			0x028	0x3	/*GPMC_AD10 = VOUT3_D10*/
+			0x02c	0x3	/*GPMC_AD11 = VOUT3_D11*/
+			0x030	0x3	/*GPMC_AD12 = VOUT3_D12*/
+			0x034	0x3	/*GPMC_AD13 = VOUT3_D13*/
+			0x038	0x3	/*GPMC_AD14 = VOUT3_D14*/
+			0x03c	0x3	/*GPMC_AD15 = VOUT3_D15*/
+			0x040	0x3	/*GPMC_A0   = VOUT3_D16*/
+			0x044	0x3	/*GPMC_A1   = VOUT3_D17*/
+			0x048	0x3	/*GPMC_A2   = VOUT3_D18*/
+			0x04c	0x3	/*GPMC_A3   = VOUT3_D19*/
+			0x050	0x3	/*GPMC_A4   = VOUT3_D20*/
+			0x054	0x3	/*GPMC_A5   = VOUT3_D21*/
+			0x058	0x3	/*GPMC_A6   = VOUT3_D22*/
+			0x05c	0x3	/*GPMC_A7   = VOUT3_D23*/
+			0x060	0x3	/*GPMC_A8   = VOUT3_HSYNC*/
+			0x064	0x3	/*GPMC_A9   = VOUT3_VSYNC*/
+			0x068	0x3	/*GPMC_A10  = VOUT3_DE*/
+			0x06c	0x3	/*GPMC_A11  = VOUT3_FLD*/
+			0x0bc	0x3	/*GPMC_CS3  = VOUT3_CLK*/
+		>;
 	};
 
 	vin1a_pins: pinmux_vin1a_pins {
@@ -313,18 +395,18 @@
 			0x27c	0x00040000 /* rgmii1_rd0 PIN_INPUT | MUX_MODE0 */
 
 			/* Slave 2 */
-			0x198	0x4 /* rgmii2_tclk PIN_OUTPUT | MUX_MODE4 */
-			0x19c	0x4 /* rgmii2_tctl PIN_OUTPUT | MUX_MODE4 */
-			0x1a0	0x4 /* rgmii2_td3 PIN_OUTPUT | MUX_MODE4 */
-			0x1a4	0x4 /* rgmii2_td2 PIN_OUTPUT | MUX_MODE4 */
-			0x1a8	0x4 /* rgmii2_td1 PIN_OUTPUT | MUX_MODE4 */
-			0x1ac	0x4 /* rgmii2_td0 PIN_OUTPUT | MUX_MODE4 */
-			0x1b0	0x00040004 /* rgmii2_rclk PIN_INPUT | MUX_MODE4 */
-			0x1b4	0x00040004 /* rgmii2_rctl PIN_INPUT | MUX_MODE4 */
-			0x1b8	0x00040004 /* rgmii2_rd3 PIN_INPUT | MUX_MODE4 */
-			0x1bc	0x00040004 /* rgmii2_rd2 PIN_INPUT | MUX_MODE4 */
-			0x1c0	0x00040004 /* rgmii2_rd1 PIN_INPUT | MUX_MODE4 */
-			0x1c4	0x00040004 /* rgmii2_rd0 PIN_INPUT | MUX_MODE4 */
+			0x198	0x3 /* rgmii2_tclk PIN_OUTPUT | MUX_MODE3 */
+			0x19c	0x3 /* rgmii2_tctl PIN_OUTPUT | MUX_MODE3 */
+			0x1a0	0x3 /* rgmii2_td3 PIN_OUTPUT | MUX_MODE3 */
+			0x1a4	0x3 /* rgmii2_td2 PIN_OUTPUT | MUX_MODE3 */
+			0x1a8	0x3 /* rgmii2_td1 PIN_OUTPUT | MUX_MODE3 */
+			0x1ac	0x3 /* rgmii2_td0 PIN_OUTPUT | MUX_MODE3 */
+			0x1b0	0x00040003 /* rgmii2_rclk PIN_INPUT | MUX_MODE3 */
+			0x1b4	0x00040003 /* rgmii2_rctl PIN_INPUT | MUX_MODE3 */
+			0x1b8	0x00040003 /* rgmii2_rd3 PIN_INPUT | MUX_MODE3 */
+			0x1bc	0x00040003 /* rgmii2_rd2 PIN_INPUT | MUX_MODE3 */
+			0x1c0	0x00040003 /* rgmii2_rd1 PIN_INPUT | MUX_MODE3 */
+			0x1c4	0x00040003 /* rgmii2_rd0 PIN_INPUT | MUX_MODE3 */
 				>;
 		};
 
@@ -338,11 +420,11 @@
 
 	bt_uart3_pins: pinmux_bt_uart3_pins {
 		pinctrl-single,pins = <
-			0x3c0 0x60001       /* uart3_rx.spi2_sclk:  INPUT | PULLUP | MODE 1 */
-			0x3c4 0x1           /* uart3_tx.spi2.d1:    OUTPUT |  MODE 1 */
-			0x3c8 0x40001       /* uart3_rts.spi2.c0:   OUTPUT | PULLUP | MODE 1 */
-			0x3cc 0x60001       /* uart3_cts.spi2.d0:   INPUT | MODE 1 */
-			0x2bc 0xE           /* BT_EN.gp5_4:         OUTPUT | MODE 14 */
+			0x3c0 0x60001	/* spi2_sclk.uart3_rx:  INPUT | PULLUP | MODE 1 */
+			0x3c4 0x10001	/* spi2_d1.uart3_tx:    OUTPUT |  MODE 1 */
+			0x3c8 0x60001	/* spi2_d0.uart3_cts:   INPUT | PULLUP | MODE 1 */
+			0x3cc 0x10001	/* spi2_cs0.uart3_rts:  OUTPUT | MODE 1 */
+			0x2bc 0x0000E	/* BT_EN.gp5_4:         OUTPUT | PULLDEN | MODE 14 */
 		>;
 	};
 
@@ -363,12 +445,45 @@
 			0x2c8 0x106000E	/* WLAN_IRQ: INPUT | WAKEUP_ENABLE | MODE 14 */
 		>;
 	};
+
+	dcan1_pins: pinmux_dcan1_pins {
+		pinctrl-single,pins = <
+			0x3d0	0x00000000	/* DCAN1_TX: MODE0 */
+			0x3d4	0x00060000	/* DCAN1_RX: MODE0 | INPUTENABLE | PULLUP */
+		>;
+	};
+
+	dcan2_pins: pinmux_dcan2_pins {
+		pinctrl-single,pins = <
+			0x288	0x00000002	/* DCAN2_TX: MODE2 */
+			0x28C	0x00060002	/* DCAN2_RX: MODE2 | INPUTENABLE | PULLUP */
+		>;
+	};
+	radio_pins: pinmux_radio_pins {
+		pinctrl-single,pins = <
+			0x02F4	 0x40000	/* MCASP2_ACLKX: MODE0 */
+			0x02F8	 0xc0000	/* MCASP2_AFSX: MODE0 */
+			0x0304	 0x40000	/* MCASP2_AXR0: MODE0 */
+			0x0308	 0x40000	/* MCASP2_AXR1: MODE0 */
+			0x030C	 0xc0000	/* MCASP2_AXR2: MODE0 */
+			0x0310	 0xc0000	/* MCASP2_AXR3: MODE0 */
+			0x0314	 0x40000	/* MCASP2_AXR4: MODE0 */
+			0x0318	 0x40000	/* MCASP2_AXR5: MODE0 */
+			0x031c	 0x40000	/* MCASP2_AXR6: MODE0 */
+			0x0320	 0x40000	/* MCASP2_AXR7: MODE0 */
+			0x0334	 0x70004	/* I2C4_SDA: MODE4 */
+			0x0338	 0x70004	/* I2C4_SCL: MODE4 */
+			0x02A0	 0x5000e	/* GPIO6_20: MODE14 */
+		>;
+	};
+
 };
 
 &gmac {
 	status="okay";
 	pinctrl-names = "default";
 	pinctrl-0 = <&cpsw_default_pins>;
+	dual_emac = <1>;
 };
 
 &davinci_mdio {
@@ -396,8 +511,16 @@
 		reg = <0x20>;
 		gpio-controller;
 		#gpio-cells = <2>;
-		/* HACK: Using n_latch in cf8575 driver to "drive P10" to not hold ETH0 in reset */
-		n_latch = <0xfeff>;
+		/* HACK: Using n_latch in pcf8575 driver to "drive P10/11" to not hold ETH0/1 in reset */
+		n_latch = <0xfcff>;
+	};
+
+	pcf_lcd3: pcf8575@21 {
+		compatible = "ti,pcf8575";
+		reg = <0x21>;
+		gpio-controller;
+		#gpio-cells = <2>;
+		n_latch = <0x1408>;
 	};
 
 	/* TLC chip for LCD panel power and backlight */
@@ -435,6 +558,7 @@
 		reg = <0x26>;
 		gpio-controller;
 		#gpio-cells = <2>;
+		n_latch = <0xfffb>;
 	};
 
 	tlv320aic3106a: tlv320aic3106@18 {
@@ -464,9 +588,54 @@
 		DRVDD-supply = <&vaudio_3v3>;
 	};
 
+	ov10633: ov10633@37 {
+		compatible = "omnivision,ov10633";
+		reg = <0x37>;
+
+		camera_ov10633: camera_ov10633 {
+			compatible = "ti,camera-ov10633";
+
+			gpios = <&pcf_hdmi 2 0>,
+				<&pcf_hdmi 3 0>,
+				<&gpio4 13 0>,
+				<&gpio4 14 0>,
+				<&gpio4 15 0>,
+				<&gpio4 16 0>,
+				<&gpio6 17 0>;
+
+			ovnode = <&i2c2>;
+			sensor = "ov10633";
+		};
+	};
+
 	ov10635: ov10635@30 {
 		compatible = "omnivision,ov10635";
 		reg = <0x30>;
+
+		camera_ov10635: camera_ov10635 {
+			compatible = "ti,camera-ov10635";
+
+			gpios = <&pcf_hdmi 2 0>,
+				<&pcf_hdmi 3 0>,
+				<&gpio4 13 0>,
+				<&gpio4 14 0>,
+				<&gpio4 15 0>,
+				<&gpio4 16 0>,
+				<&gpio6 17 0>;
+
+			ovnode = <&i2c2>;
+			sensor = "ov10635";
+		};
+	};
+
+	lvds_fpd: ds90uh925q@1b {
+		compatible = "ti,ds90uh925q";
+		reg = <0x1b>;
+	};
+
+	lvds_fpd1: ds90uh928q@2c {
+		compatible = "ti,ds90uh928q";
+		reg = <0x2c>;
 	};
 };
 
@@ -480,6 +649,18 @@
 
 &i2c5 {
 	clock-frequency = <400000>;
+};
+
+&dcan1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&dcan1_pins>;
+	status = "okay";
+};
+
+&dcan2 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&dcan2_pins>;
+	status = "okay";
 };
 
 &mmc1 {
@@ -552,6 +733,17 @@
 	};
 };
 
+&dpi3 {
+	fpdlink {
+		compatible = "ti,lg101";
+		gpios = <&pcf_lcd3 0 0>; /* pcf8575@21 P0, SEL_GPMC_AD_VID_S0 */
+		data-lines = <24>;
+
+		serializer = <&lvds_fpd>;
+		dserializer = <&lvds_fpd1>;
+	};
+};
+
 &mXT244 {
 	compatible = "atmel,mXT244";
 	interrupts = <0 119 0x4>;
@@ -613,22 +805,5 @@
                 reg = <0>;
 		spi-cpol;
 		spi-cpha;
-	};
-};
-
-&vip1 {
-	camera: camera {
-		compatible = "ti,camera";
-
-		gpios = <&pcf_hdmi 2 0>,
-			<&pcf_hdmi 3 0>,
-			<&gpio4 13 0>,
-			<&gpio4 14 0>,
-			<&gpio4 15 0>,
-			<&gpio4 16 0>,
-			<&gpio6 17 0>;
-
-		ovnode = <&i2c2>;
-		sensor = <&ov10635>;
 	};
 };

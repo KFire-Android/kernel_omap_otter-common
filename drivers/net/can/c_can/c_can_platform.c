@@ -38,7 +38,11 @@
 
 #include "c_can.h"
 
-#define CAN_RAMINIT_START_MASK(i)	(1 << (i))
+#define CAN_DEFAULT_RAMINIT_START_BIT	0
+#define CAN_DEFAULT_RAMINIT_DONE_BIT	8
+
+#define CAN_RAMINIT_BIT_MASK(i)	(1 << (i))
+#define CAN_FLAG_ENABLED(flag, flags)	((flags) & (1<<(flag)))
 
 /*
  * 16-bit c_can registers can be arranged differently in the memory
@@ -76,10 +80,36 @@ static void c_can_hw_raminit(const struct c_can_priv *priv, bool enable)
 
 	val = readl(priv->raminit_ctrlreg);
 	if (enable)
-		val |= CAN_RAMINIT_START_MASK(priv->instance);
+		val |= CAN_RAMINIT_BIT_MASK(priv->raminit_bits.start);
 	else
-		val &= ~CAN_RAMINIT_START_MASK(priv->instance);
+		val &= ~CAN_RAMINIT_BIT_MASK(priv->raminit_bits.start);
 	writel(val, priv->raminit_ctrlreg);
+}
+
+static void c_can_hw_raminit_dra7(const struct c_can_priv *priv, bool enable)
+{
+	u32 start_set, start_clr;
+	DEFINE_SPINLOCK(raminit_lock);
+	unsigned long flags;
+
+	start_set = start_clr = readl(priv->raminit_ctrlreg);
+	start_set |= CAN_RAMINIT_BIT_MASK(priv->raminit_bits.start);
+	start_clr &= ~(CAN_RAMINIT_BIT_MASK(priv->raminit_bits.start));
+
+	if (enable) {
+		/* Disable interrupts */
+		spin_lock_irqsave(&raminit_lock, flags);
+
+		/* Trigger the RAM initialization */
+		writel(start_set, priv->raminit_ctrlreg);
+		writel(start_clr, priv->raminit_ctrlreg);
+
+		/* Restore interrupts */
+		spin_unlock_irqrestore(&raminit_lock, flags);
+	}
+	else {
+		writel(start_clr, priv->raminit_ctrlreg);
+	}
 }
 
 static struct platform_device_id c_can_id_table[] = {
@@ -174,6 +204,11 @@ static int c_can_plat_probe(struct platform_device *pdev)
 	}
 
 	priv = netdev_priv(dev);
+	
+        /* record flags if they are specified */
+	if (!of_property_read_u32(pdev->dev.of_node, "flags", &priv->flags))
+		dev_info(&pdev->dev, "flags recorded (0x%x)\n", priv->flags);
+
 	switch (id->driver_data) {
 	case BOSCH_C_CAN:
 		priv->regs = reg_map_c_can;
@@ -200,10 +235,31 @@ static int c_can_plat_probe(struct platform_device *pdev)
 		else
 			priv->instance = pdev->id;
 
+		priv->raminit_bits.start =
+			(1 << (priv->instance + CAN_DEFAULT_RAMINIT_START_BIT));
+		priv->raminit_bits.done =
+			(1 << (priv->instance + CAN_DEFAULT_RAMINIT_DONE_BIT));
+
+		if (CAN_FLAG_ENABLED(DRA7_DCAN1_RAMINIT_BITS, priv->flags)) {
+			priv->raminit_bits.start =
+				DRA7_DCAN1_RAMINIT_BITS_START;
+			priv->raminit_bits.done =
+				DRA7_DCAN1_RAMINIT_BITS_DONE;
+		}
+		if (CAN_FLAG_ENABLED(DRA7_DCAN2_RAMINIT_BITS, priv->flags)) {
+			priv->raminit_bits.start =
+				DRA7_DCAN2_RAMINIT_BITS_START;
+			priv->raminit_bits.start =
+				DRA7_DCAN2_RAMINIT_BITS_DONE;
+		}
+
 		res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-		priv->raminit_ctrlreg =	devm_request_and_ioremap(&pdev->dev, res);
+		priv->raminit_ctrlreg =	devm_ioremap_nocache(&pdev->dev,
+				res->start, resource_size(res));
 		if (!priv->raminit_ctrlreg || priv->instance < 0)
 			dev_info(&pdev->dev, "control memory is not used for raminit\n");
+		else if (CAN_FLAG_ENABLED(DRA7_DCAN_RAMINIT, priv->flags))
+			priv->raminit = c_can_hw_raminit_dra7;
 		else
 			priv->raminit = c_can_hw_raminit;
 		break;

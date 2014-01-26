@@ -33,6 +33,7 @@
 #include <linux/of_net.h>
 #include <linux/of_device.h>
 #include <linux/if_vlan.h>
+#include <linux/pinctrl/consumer.h>
 
 #include <linux/platform_data/cpsw.h>
 
@@ -1411,6 +1412,7 @@ static int cpsw_probe_dt(struct cpsw_platform_data *data,
 {
 	struct device_node *node = pdev->dev.of_node;
 	struct device_node *slave_node;
+	struct pinctrl *pinctrl;
 	int i = 0, ret;
 	u32 prop;
 
@@ -1489,6 +1491,12 @@ static int cpsw_probe_dt(struct cpsw_platform_data *data,
 	if (!of_property_read_u32(node, "dual_emac", &prop))
 		data->dual_emac = prop;
 
+	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
+	if (IS_ERR(pinctrl)) {
+		ret = PTR_ERR(pinctrl);
+		goto error_ret;
+	}
+
 	/*
 	 * Populate all the child nodes here...
 	 */
@@ -1522,9 +1530,11 @@ static int cpsw_probe_dt(struct cpsw_platform_data *data,
 		if (mac_addr)
 			memcpy(slave_data->mac_addr, mac_addr, ETH_ALEN);
 
+		slave_data->phy_if = of_get_phy_mode(slave_node);
+
 		if (data->dual_emac) {
-			if (of_property_read_u32(node, "dual_emac_res_vlan",
-						 &prop)) {
+			if (of_property_read_u32(slave_node,
+						"dual_emac_res_vlan", &prop)) {
 				pr_err("Missing dual_emac_res_vlan in DT.\n");
 				slave_data->dual_emac_res_vlan = i+1;
 				pr_err("Using %d as Reserved VLAN for %d slave\n",
@@ -1622,7 +1632,7 @@ static int cpsw_probe_dual_emac(struct platform_device *pdev,
 
 static int cpsw_probe(struct platform_device *pdev)
 {
-	struct cpsw_platform_data	*data = pdev->dev.platform_data;
+	struct cpsw_platform_data	*data;
 	struct net_device		*ndev;
 	struct cpsw_priv		*priv;
 	struct cpdma_params		dma_params;
@@ -1836,7 +1846,7 @@ static int cpsw_probe(struct platform_device *pdev)
 				goto clean_ale_ret;
 			}
 			priv->irqs_table[k] = i;
-			priv->num_irqs = k;
+			priv->num_irqs = k + 1;
 		}
 		k++;
 	}
@@ -1874,7 +1884,8 @@ static int cpsw_probe(struct platform_device *pdev)
 	return 0;
 
 clean_irq_ret:
-	free_irq(ndev->irq, priv);
+	for (i = 0; i < priv->num_irqs; i++)
+		free_irq(priv->irqs_table[i], priv);
 clean_ale_ret:
 	cpsw_ale_destroy(priv->ale);
 clean_dma_ret:
@@ -1897,7 +1908,8 @@ clean_slave_ret:
 	pm_runtime_disable(&pdev->dev);
 	kfree(priv->slaves);
 clean_ndev_ret:
-	free_netdev(ndev);
+	kfree(priv->data.slave_data);
+	free_netdev(priv->ndev);
 	return ret;
 }
 
@@ -1905,12 +1917,17 @@ static int cpsw_remove(struct platform_device *pdev)
 {
 	struct net_device *ndev = platform_get_drvdata(pdev);
 	struct cpsw_priv *priv = netdev_priv(ndev);
+	int i;
 
-	pr_info("removing device");
 	platform_set_drvdata(pdev, NULL);
+	if (priv->data.dual_emac)
+		unregister_netdev(cpsw_get_slave_ndev(priv, 1));
+	unregister_netdev(ndev);
 
 	cpts_unregister(priv->cpts);
-	free_irq(ndev->irq, priv);
+	for (i = 0; i < priv->num_irqs; i++)
+		free_irq(priv->irqs_table[i], priv);
+
 	cpsw_ale_destroy(priv->ale);
 	cpdma_chan_destroy(priv->txch);
 	cpdma_chan_destroy(priv->rxch);
@@ -1924,8 +1941,10 @@ static int cpsw_remove(struct platform_device *pdev)
 	pm_runtime_disable(&pdev->dev);
 	clk_put(priv->clk);
 	kfree(priv->slaves);
+	kfree(priv->data.slave_data);
+	if (priv->data.dual_emac)
+		free_netdev(cpsw_get_slave_ndev(priv, 1));
 	free_netdev(ndev);
-
 	return 0;
 }
 

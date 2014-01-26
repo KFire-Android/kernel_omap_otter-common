@@ -246,9 +246,6 @@
 #define HDMI_CORE_CSC_COEF_C4_MSB		0x10460
 #define HDMI_CORE_CSC_COEF_C4_LSB		0x10464
 
-/* HDMI HDCP */
-#define HDMI_CORE_HDCP_MASK			0x14020
-
 /* HDMI CEC */
 #define HDMI_CORE_CEC_MASK			0x17408
 
@@ -274,6 +271,24 @@
 #define HDMI_CORE_I2CM_FS_SCL_LCNT_0_ADDR	0x15810
 #define HDMI_CORE_I2CM_SDA_HOLD_ADDR		0x15814
 
+/* HDMI HDCP */
+#define HDMI_CORE_HDCP_MASK			0x14020
+
+#define HDMI_CORE_A_HDCPCFG0			0x18000
+#define HDMI_CORE_A_HDCPCFG1			0x18004
+#define HDMI_CORE_A_HDCPOBS0			0x18008
+#define HDMI_CORE_A_HDCPOBS1			0x1800C
+#define HDMI_CORE_A_HDCPOBS2			0x18010
+#define HDMI_CORE_A_HDCPOBS3			0x18014
+#define HDMI_CORE_A_APIINTCLR			0x18018
+#define HDMI_CORE_A_APIINTSTAT			0x1801C
+#define HDMI_CORE_A_APIINTMSK			0x18020
+#define HDMI_CORE_A_VIDPOLCFG			0x18024
+#define HDMI_CORE_A_OESSWCFG			0x18028
+#define HDMI_CORE_A_COREVERLSB			0x18050
+#define HDMI_CORE_A_COREVERMSB			0x18054
+#define HDMI_CORE_A_KSVMEMCTRL			0x18058
+
 struct hdmi_core_vid_config	{
 	struct hdmi_config  v_fc_config;
 	enum hdmi_core_packet_mode packet_mode;
@@ -281,6 +296,7 @@ struct hdmi_core_vid_config	{
 	int vblank_osc;
 	int hblank;
 	int vblank;
+	int hdcp_keepout;
 };
 
 struct csc_table {

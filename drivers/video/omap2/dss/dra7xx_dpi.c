@@ -60,7 +60,11 @@ enum dss_dpll dpi_get_dpll(struct platform_device *pdev)
 
 	switch (dpi->module_id) {
 	case 0:
+#ifdef CONFIG_DISPLAY_SKIP_INIT
+		if (omapdss_skipinit())
+#else
 		if (dss_dpll_disabled(DSS_DPLL_VIDEO1))
+#endif
 			return DSS_DPLL_VIDEO1;
 		else
 			return DSS_DPLL_NONE;
@@ -213,10 +217,10 @@ static int dra7xx_dpi_display_enable(struct omap_dss_device *dssdev)
 	/* try to get a free dpll, if not, try to change DSS_FCLK */
 	dpi->dpll = dpi_get_dpll(pdev);
 	if (dpi->dpll != DSS_DPLL_NONE) {
-		DSSDBG("using DPLL %d for DPI%d\n", dpi->dpll, dpi->module_id);
+		DSSDBG("using DPLL %d for DPI%d\n", dpi->dpll,
+		       dpi->module_id);
 
 		dss_dpll_activate(dpi->dpll);
-		dss_dpll_set_control_mux(channel, dpi->dpll);
 	}
 
 	r = dpi_set_mode(pdev, dpi->dpll);
@@ -224,6 +228,8 @@ static int dra7xx_dpi_display_enable(struct omap_dss_device *dssdev)
 		goto err_set_mode;
 
 	dss_use_dpll_lcd(channel, dpi->dpll != DSS_DPLL_NONE);
+
+	dss_dpll_set_control_mux(channel, dpi->dpll);
 
 	dpi_config_lcd_manager(pdev);
 

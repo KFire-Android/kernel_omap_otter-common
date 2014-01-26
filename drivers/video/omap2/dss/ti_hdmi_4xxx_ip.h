@@ -27,6 +27,10 @@
 #define HDMI_HPD_LOW            0x10
 #define HDMI_HPD_HIGH           0x20
 
+#define HDMI_BCAP               0x40
+#define HDMI_RI_ERR             0x80
+#define HDMI_CEC_INT            0x100
+
 /* HDMI Wrapper */
 
 #define HDMI_WP_REVISION			0x0
@@ -47,6 +51,7 @@
 #define HDMI_WP_AUDIO_CFG2			0x84
 #define HDMI_WP_AUDIO_CTRL			0x88
 #define HDMI_WP_AUDIO_DATA			0x8C
+#define HDMI_WP_IRQSTATUS_CORE                  0x1
 
 /* HDMI IP Core System */
 
@@ -126,6 +131,10 @@
 #define HDMI_CORE_SYS_SYS_CTRL1_BSEL_24BITBUS	0x1
 #define HDMI_CORE_SYS_SYS_CTRL1_EDGE_RISINGEDGE	0x1
 
+#define HDMI_CORE_CTRL1_POWER_DOWN		0x1
+#define HDMI_CORE_SYSTEM_INTR2__BCAP		0x80
+#define HDMI_CORE_SYSTEM_INTR3__RI_ERR		0xF0
+#define HDMI_CORE_SYSTEM_INTR4_CEC		0x08
 /* HDMI DDC E-DID */
 #define HDMI_CORE_DDC_ADDR			0x3B4
 #define HDMI_CORE_DDC_SEGM			0x3B8

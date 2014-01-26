@@ -38,6 +38,7 @@
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
+#include <linux/of_gpio.h>
 
 #define MAX_ST_DEVICES	3	/* Imagine 1 on each UART for now */
 static struct platform_device *st_kim_devices[MAX_ST_DEVICES];
@@ -765,6 +766,7 @@ static int kim_probe(struct platform_device *pdev)
 {
 	struct kim_data_s	*kim_gdata;
 	struct ti_st_plat_data	*pdata;
+	int sel_uart_gpio;
 	int err;
 
 	if (pdev->dev.of_node)
@@ -800,6 +802,17 @@ static int kim_probe(struct platform_device *pdev)
 	}
 	/* refer to itself */
 	kim_gdata->core_data->kim_data = kim_gdata;
+
+	/* Check if UART needs to be selected */
+	sel_uart_gpio = of_get_gpio(pdev->dev.of_node, 0);
+	if (gpio_is_valid(sel_uart_gpio)) {
+		err = gpio_request_one(sel_uart_gpio,
+				GPIOF_OUT_INIT_LOW, "kim_uart_sel");
+		if (unlikely(err)) {
+			pr_err("gpio %d configure failed\n", sel_uart_gpio);
+			goto err_core_init;
+		}
+	}
 
 	/* Claim the chip enable nShutdown gpio from the system */
 	kim_gdata->nshutdown = pdata->nshutdown_gpio;
@@ -873,6 +886,10 @@ static int kim_remove(struct platform_device *pdev)
 		pdata = pdev->dev.platform_data;
 
 	kim_gdata = dev_get_drvdata(&pdev->dev);
+
+	/* Check if UART selecte gpio needs to be freed */
+	if (of_gpio_count(pdev->dev.of_node) == 1)
+		gpio_free(of_get_gpio(pdev->dev.of_node, 0));
 
 	/* Free the Bluetooth/FM/GPIO
 	 * nShutdown gpio from the system

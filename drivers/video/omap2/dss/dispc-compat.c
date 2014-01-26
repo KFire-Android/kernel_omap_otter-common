@@ -288,6 +288,10 @@ static irqreturn_t omap_dispc_irq_handler(int irq, void *arg)
 
 	print_irq_status(irqstatus);
 
+	/* Should not handle vid3 interrupt as it is handled by M4 */
+#ifdef CONFIG_EARLYCAMERA_IPU
+	irqstatus &= ~DISPC_IRQ_VID3_END_WIN;
+#endif
 	/* Ack the interrupt. Do it here before clocks are possibly turned
 	 * off */
 	dispc_clear_irqstatus(irqstatus);
@@ -360,8 +364,7 @@ static void dispc_error_worker(struct work_struct *work)
 		if (bit & errors) {
 			DSSERR("FIFO UNDERFLOW on %s, disabling the overlay\n",
 					ovl->name);
-			dispc_ovl_enable(ovl->id, false);
-			dispc_mgr_go(ovl->manager->id);
+			ovl->disable(ovl);
 			msleep(50);
 		}
 	}
@@ -371,6 +374,11 @@ static void dispc_error_worker(struct work_struct *work)
 		unsigned bit;
 
 		mgr = omap_dss_get_overlay_manager(i);
+		if ((!mgr) || !(mgr->get_device(mgr))) {
+			DSSERR("mgr or device is NULL\n");
+			break;
+		}
+
 		bit = dispc_mgr_get_sync_lost_irq(i);
 
 		if (bit & errors) {
@@ -404,6 +412,9 @@ static void dispc_error_worker(struct work_struct *work)
 			dss_mgr_disable(mgr);
 		}
 	}
+
+	if (errors & DISPC_IRQ_WBINCOMPLETE)
+		DSSERR("WB FIFO flushed before completion\n");
 
 	spin_lock_irqsave(&dispc_compat.irq_lock, flags);
 	dispc_compat.irq_error_mask |= errors;
@@ -440,7 +451,14 @@ int dss_dispc_initialize_irq(void)
 	 * there's SYNC_LOST_DIGIT waiting after enabling the DSS,
 	 * so clear it
 	 */
+#ifdef CONFIG_EARLYCAMERA_IPU
+	/* For the early init case, remote processor will be using VID3 pipe,
+	 * so skip clearing VID3 interrupt */
+	dispc_clear_irqstatus(dispc_read_irqstatus() &
+			   ~DISPC_IRQ_VID3_END_WIN);
+#else
 	dispc_clear_irqstatus(dispc_read_irqstatus());
+#endif
 
 	INIT_WORK(&dispc_compat.error_work, dispc_error_worker);
 

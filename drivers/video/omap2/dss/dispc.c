@@ -48,12 +48,6 @@
 /* DISPC */
 #define DISPC_SZ_REGS			SZ_4K
 
-enum omap_burst_size {
-	BURST_SIZE_X2 = 0,
-	BURST_SIZE_X4 = 1,
-	BURST_SIZE_X8 = 2,
-};
-
 #define REG_GET(idx, start, end) \
 	FLD_GET(dispc_read_reg(idx), start, end)
 
@@ -90,6 +84,11 @@ struct dispc_features {
 
 	/* revert to the OMAP4 mechanism of DISPC Smart Standby operation */
 	bool standby_workaround:1;
+
+	/* match onoff, rf, ipc bits of DISPC_POL_FREQ1 in CTRL_CORE_SMA_SW_1
+	   register on dra7xx
+	*/
+	bool update_sma_sw1_reg:1;
 };
 
 #define DISPC_MAX_NR_FIFOS 5
@@ -99,6 +98,7 @@ static struct clockdomain *l3_1_clkdm, *l3_2_clkdm;
 static struct {
 	struct platform_device *pdev;
 	void __iomem    *base;
+	void __iomem    *ctrl_core_sma_sw1;
 
 	int		ctx_loss_cnt;
 
@@ -548,7 +548,13 @@ EXPORT_SYMBOL(dispc_mgr_go_busy);
 void dispc_mgr_go(enum omap_channel channel)
 {
 	WARN_ON(dispc_mgr_is_enabled(channel) == false);
+#ifndef CONFIG_EARLYCAMERA_IPU
+	/* In case of early camera use-case, the remote processor
+	 * will be setting GO bit independently. Hence we might see the
+	 * channel as busy on kernel side. Ignore this and proceed
+	 * further */
 	WARN_ON(dispc_mgr_go_busy(channel));
+#endif
 
 	DSSDBG("GO %s\n", mgr_desc[channel].name);
 
@@ -1008,6 +1014,32 @@ void dispc_wb_set_channel_in(enum dss_writeback_channel channel)
 	REG_FLD_MOD(DISPC_OVL_ATTRIBUTES(plane), channel, 18, 16);
 }
 
+void dispc_set_wb_channel_out(enum omap_plane plane)
+{
+	int shift;
+	u32 val;
+
+	switch (plane) {
+	case OMAP_DSS_GFX:
+		shift = 8;
+		break;
+	case OMAP_DSS_VIDEO1:
+	case OMAP_DSS_VIDEO2:
+	case OMAP_DSS_VIDEO3:
+		shift = 16;
+		break;
+	default:
+		BUG();
+		return;
+	}
+
+	val = dispc_read_reg(DISPC_OVL_ATTRIBUTES(plane));
+	val = FLD_MOD(val, 0, shift, shift);
+	val = FLD_MOD(val, 3, 31, 30);
+
+	dispc_write_reg(DISPC_OVL_ATTRIBUTES(plane), val);
+}
+
 static void dispc_ovl_set_burst_size(enum omap_plane plane,
 		enum omap_burst_size burst_size)
 {
@@ -1101,8 +1133,7 @@ static void dispc_ovl_enable_replication(enum omap_plane plane,
 	REG_FLD_MOD(DISPC_OVL_ATTRIBUTES(plane), enable, shift, shift);
 }
 
-static void dispc_mgr_set_size(enum omap_channel channel, u16 width,
-		u16 height)
+void dispc_mgr_set_size(enum omap_channel channel, u16 width, u16 height)
 {
 	u32 val;
 
@@ -1237,6 +1268,10 @@ void dispc_ovl_set_fifo_threshold(enum omap_plane plane, u32 low, u32 high)
 			REG_GET(DISPC_OVL_FIFO_THRESHOLD(plane),
 				hi_start, hi_end) * unit,
 			low * unit, high * unit);
+
+	/* preload to high threshold to avoid FIFO underflow , NA for WB */
+	if (plane != OMAP_DSS_WB)
+		dispc_write_reg(DISPC_OVL_PRELOAD(plane), min(high, 0xfffu));
 
 	dispc_write_reg(DISPC_OVL_FIFO_THRESHOLD(plane),
 			FLD_VAL(high, hi_start, hi_end) |
@@ -1678,7 +1713,9 @@ static void dispc_ovl_set_rotation_attrs(enum omap_plane plane, u8 rotation,
 			row_repeat = true;
 		else
 			row_repeat = false;
-	}
+	} else if (color_mode == OMAP_DSS_COLOR_NV12
+		   && rotation_type != OMAP_DSS_ROT_TILER) /* Errata ID: i631 */
+		vidrot = 1;
 
 	REG_FLD_MOD(DISPC_OVL_ATTRIBUTES(plane), vidrot, 13, 12);
 	if (dss_has_feature(FEAT_ROWREPEATENABLE))
@@ -2436,6 +2473,15 @@ static void dispc_enable_arbitration(enum omap_plane plane, bool enable)
 	return;
 }
 
+static void dispc_ovl_set_1d_tiled_mode(enum omap_plane plane, bool force_1d)
+{
+	if (plane == OMAP_DSS_GFX)
+		REG_FLD_MOD(DISPC_OVL_ATTRIBUTES(plane), force_1d, 16, 16);
+	else
+		REG_FLD_MOD(DISPC_OVL_ATTRIBUTES(plane), force_1d, 20, 20);
+}
+
+
 static int dispc_ovl_setup_common(enum omap_plane plane,
 		enum omap_overlay_caps caps, u32 paddr, u32 p_uv_addr,
 		u16 screen_width, int pos_x, int pos_y, u16 width, u16 height,
@@ -2443,7 +2489,7 @@ static int dispc_ovl_setup_common(enum omap_plane plane,
 		u8 rotation, bool mirror, u8 zorder, u8 pre_mult_alpha,
 		u8 global_alpha, enum omap_dss_rotation_type rotation_type,
 		bool replication, const struct omap_video_timings *mgr_timings,
-		bool mem_to_mem, bool mflag_en)
+		bool mem_to_mem, bool mflag_en, bool force_1d)
 {
 	bool five_taps = true;
 	bool fieldmode = 0;
@@ -2461,7 +2507,8 @@ static int dispc_ovl_setup_common(enum omap_plane plane,
 	unsigned long lclk = dispc_plane_lclk_rate(plane);
 	enum omap_channel channel = dispc_ovl_get_channel_out(plane);
 
-	if (paddr == 0)
+	if (color_mode != OMAP_DSS_COLOR_NV12 &&
+	    paddr == 0)
 		return -EINVAL;
 
 	out_width = out_width == 0 ? width : out_width;
@@ -2563,6 +2610,10 @@ static int dispc_ovl_setup_common(enum omap_plane plane,
 		dispc_ovl_set_ba1_uv(plane, p_uv_addr + offset1);
 	}
 
+	/* Force 1D tiled mode */
+	if (caps & OMAP_DSS_OVL_CAP_FORCE_1D)
+		dispc_ovl_set_1d_tiled_mode(plane, force_1d);
+
 	if (dss_has_feature(FEAT_MFLAG)) {
 		mflag_en = true;
 		dispc_ovl_set_global_mflag(plane, mflag_en);
@@ -2612,17 +2663,19 @@ int dispc_ovl_setup(enum omap_plane plane, const struct omap_overlay_info *oi,
 	channel = dispc_ovl_get_channel_out(plane);
 
 	DSSDBG("dispc_ovl_setup %d, pa %x, pa_uv %x, sw %d, %d,%d, %dx%d -> "
-		"%dx%d, cmode %x, rot %d, mir %d, chan %d repl %d\n",
+		"%dx%d, cmode %x, rot %d, mir %d, chan %d repl %d "
+		"force_1d %d\n",
 		plane, oi->paddr, oi->p_uv_addr, oi->screen_width, oi->pos_x,
 		oi->pos_y, oi->width, oi->height, oi->out_width, oi->out_height,
-		oi->color_mode, oi->rotation, oi->mirror, channel, replication);
+		oi->color_mode, oi->rotation, oi->mirror, channel, replication,
+		oi->force_1d);
 
 	r = dispc_ovl_setup_common(plane, caps, oi->paddr, oi->p_uv_addr,
 		oi->screen_width, oi->pos_x, oi->pos_y, oi->width, oi->height,
 		oi->out_width, oi->out_height, oi->color_mode, oi->rotation,
 		oi->mirror, oi->zorder, oi->pre_mult_alpha, oi->global_alpha,
 		oi->rotation_type, replication, mgr_timings, mem_to_mem,
-				   oi->mflag_en);
+				   oi->mflag_en, oi->force_1d);
 
 	return r;
 }
@@ -2652,7 +2705,7 @@ int dispc_wb_setup(const struct omap_dss_writeback_info *wi,
 		wi->buf_width, pos_x, pos_y, in_width, in_height, wi->width,
 		wi->height, wi->color_mode, wi->rotation, wi->mirror, zorder,
 		wi->pre_mult_alpha, global_alpha, wi->rotation_type,
-		replication, mgr_timings, mem_to_mem, false);
+		replication, mgr_timings, mem_to_mem, false, false);
 
 	switch (wi->color_mode) {
 	case OMAP_DSS_COLOR_RGB16:
@@ -2929,6 +2982,7 @@ static void _dispc_mgr_set_lcd_timings(enum omap_channel channel, int hsw,
 {
 	u32 timing_h, timing_v, l;
 	bool onoff, rf, ipc;
+	u32 onoff_shift, rf_shift, ipc_shift;
 
 	timing_h = FLD_VAL(hsw-1, dispc.feat->sw_start, 0) |
 			FLD_VAL(hfp-1, dispc.feat->fp_start, 8) |
@@ -2977,6 +3031,36 @@ static void _dispc_mgr_set_lcd_timings(enum omap_channel channel, int hsw,
 	l |= FLD_VAL(hsync_level, 13, 13);
 	l |= FLD_VAL(vsync_level, 12, 12);
 	dispc_write_reg(DISPC_POL_FREQ(channel), l);
+
+	/* onoff, rf, ipc values must match in CTRL_CORE_SMA_SW_1 regs */
+	if (dispc.feat->update_sma_sw1_reg) {
+		l = ioread32(dispc.ctrl_core_sma_sw1);
+
+		switch (channel) {
+		case OMAP_DSS_CHANNEL_LCD:
+			rf_shift = 16;
+			onoff_shift = 19;
+			ipc_shift = 22;
+			break;
+		case OMAP_DSS_CHANNEL_LCD2:
+			rf_shift = 17;
+			onoff_shift = 20;
+			ipc_shift = 23;
+			break;
+		case OMAP_DSS_CHANNEL_LCD3:
+			rf_shift = 18;
+			onoff_shift = 21;
+			ipc_shift = 24;
+			break;
+		default:
+			BUG();
+		}
+
+		l = FLD_MOD(l, onoff, onoff_shift, onoff_shift);
+		l = FLD_MOD(l, rf, rf_shift, rf_shift);
+		l = FLD_MOD(l, ipc, ipc_shift, ipc_shift);
+		iowrite32(l, dispc.ctrl_core_sma_sw1);
+	}
 }
 
 /* change name to mode? */
@@ -3505,7 +3589,13 @@ void dispc_write_irqenable(u32 mask)
 	/* clear the irqstatus for newly enabled irqs */
 	dispc_clear_irqstatus((mask ^ old_mask) & mask);
 
+#ifdef CONFIG_EARLYCAMERA_IPU
+	/* Should not clear already enabled interrupts when remote
+	 * preview is ongoing */
+	dispc_write_reg(DISPC_IRQENABLE, mask | old_mask);
+#else
 	dispc_write_reg(DISPC_IRQENABLE, mask);
+#endif
 }
 EXPORT_SYMBOL(dispc_write_irqenable);
 
@@ -3519,7 +3609,7 @@ void dispc_disable_sidle(void)
 	REG_FLD_MOD(DISPC_SYSCONFIG, 1, 4, 3);	/* SIDLEMODE: no idle */
 }
 
-static void _omap_dispc_initial_config(void)
+static int _omap_dispc_initial_config(void)
 {
 	u32 l;
 
@@ -3556,6 +3646,28 @@ static void _omap_dispc_initial_config(void)
 
 	if (dispc.feat->standby_workaround)
 		REG_FLD_MOD(DISPC_MSTANDBY_CTRL, 1, 0, 0);
+
+	if (dispc.feat->update_sma_sw1_reg) {
+		/* CTRL_MOD_CORE_SMA_SW1 register */
+		struct resource res[] = {
+			{
+				.start	= 0x4A002534,
+				.end	= 0x4A002538,
+				.flags	= IORESOURCE_MEM,
+			},
+		};
+
+		dispc.ctrl_core_sma_sw1 =
+			devm_request_and_ioremap(&dispc.pdev->dev,
+						 (struct resource *) &res);
+
+		if (!dispc.ctrl_core_sma_sw1) {
+			DSSERR("can't ioremap CONTROL_CORE_SMA_SW1\n");
+			return -ENOMEM;
+		}
+	}
+
+	return 0;
 }
 
 static const struct dispc_features omap24xx_dispc_feats __initconst = {
@@ -3573,6 +3685,7 @@ static const struct dispc_features omap24xx_dispc_feats __initconst = {
 	.calc_core_clk		=	calc_core_clk_24xx,
 	.num_fifos		=	3,
 	.no_framedone_tv	=	true,
+	.update_sma_sw1_reg	=	false,
 };
 
 static const struct dispc_features omap34xx_rev1_0_dispc_feats __initconst = {
@@ -3590,6 +3703,7 @@ static const struct dispc_features omap34xx_rev1_0_dispc_feats __initconst = {
 	.calc_core_clk		=	calc_core_clk_34xx,
 	.num_fifos		=	3,
 	.no_framedone_tv	=	true,
+	.update_sma_sw1_reg	=	false,
 };
 
 static const struct dispc_features omap34xx_rev3_0_dispc_feats __initconst = {
@@ -3607,6 +3721,7 @@ static const struct dispc_features omap34xx_rev3_0_dispc_feats __initconst = {
 	.calc_core_clk		=	calc_core_clk_34xx,
 	.num_fifos		=	3,
 	.no_framedone_tv	=	true,
+	.update_sma_sw1_reg	=	false,
 };
 
 static const struct dispc_features omap44xx_dispc_feats __initconst = {
@@ -3624,6 +3739,7 @@ static const struct dispc_features omap44xx_dispc_feats __initconst = {
 	.calc_core_clk		=	calc_core_clk_44xx,
 	.num_fifos		=	5,
 	.gfx_fifo_workaround	=	true,
+	.update_sma_sw1_reg	=	false,
 };
 
 static const struct dispc_features omap54xx_dispc_feats __initconst = {
@@ -3642,6 +3758,26 @@ static const struct dispc_features omap54xx_dispc_feats __initconst = {
 	.num_fifos		=	5,
 	.gfx_fifo_workaround	=	true,
 	.standby_workaround	=	true,
+	.update_sma_sw1_reg	=	false,
+};
+
+static const struct dispc_features dra7xx_dispc_feats __initconst = {
+	.sw_start		=	7,
+	.fp_start		=	19,
+	.bp_start		=	31,
+	.sw_max			=	256,
+	.vp_max			=	4095,
+	.hp_max			=	4096,
+	.mgr_width_start	=	11,
+	.mgr_height_start	=	27,
+	.mgr_width_max		=	4096,
+	.mgr_height_max		=	4096,
+	.calc_scaling		=	dispc_ovl_calc_scaling_44xx,
+	.calc_core_clk		=	calc_core_clk_44xx,
+	.num_fifos		=	5,
+	.gfx_fifo_workaround	=	true,
+	.standby_workaround	=	true,
+	.update_sma_sw1_reg	=	true,
 };
 
 static int __init dispc_init_features(struct platform_device *pdev)
@@ -3677,8 +3813,11 @@ static int __init dispc_init_features(struct platform_device *pdev)
 		break;
 
 	case OMAPDSS_VER_OMAP5:
-	case OMAPDSS_VER_DRA7xx:
 		src = &omap54xx_dispc_feats;
+		break;
+
+	case OMAPDSS_VER_DRA7xx:
+		src = &dra7xx_dispc_feats;
 		break;
 
 	default:
@@ -3742,7 +3881,9 @@ static int __init omap_dispchw_probe(struct platform_device *pdev)
 	if (r)
 		goto err_runtime_get;
 
-	_omap_dispc_initial_config();
+	r = _omap_dispc_initial_config();
+	if (r)
+		goto err_runtime_get;
 
 	rev = dispc_read_reg(DISPC_REVISION);
 	dev_dbg(&pdev->dev, "OMAP DISPC rev %d.%d\n",

@@ -513,8 +513,7 @@ static struct omap_hwmod_class_sysconfig dra7xx_dma_sysc = {
 			   SYSC_HAS_SIDLEMODE | SYSC_HAS_SOFTRESET |
 			   SYSS_HAS_RESET_STATUS),
 	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
-			   SIDLE_SMART_WKUP | MSTANDBY_FORCE | MSTANDBY_NO |
-			   MSTANDBY_SMART | MSTANDBY_SMART_WKUP),
+			   MSTANDBY_FORCE | MSTANDBY_NO | MSTANDBY_SMART),
 	.sysc_fields	= &omap_hwmod_sysc_type1,
 };
 
@@ -639,7 +638,11 @@ static struct omap_hwmod dra7xx_dss_hwmod = {
 	.name		= "dss_core",
 	.class		= &dra7xx_dss_hwmod_class,
 	.clkdm_name	= "dss_clkdm",
+#ifdef CONFIG_DISPLAY_SKIP_INIT
+	.flags		= HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET,
+#else
 	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
+#endif
 	.sdma_reqs	= dra7xx_dss_sdma_reqs,
 	.main_clk	= "dss_dss_clk",
 	.prcm = {
@@ -707,6 +710,9 @@ static struct omap_hwmod dra7xx_dss_dispc_hwmod = {
 		},
 	},
 	.dev_attr	= &dss_dispc_dev_attr,
+#ifdef CONFIG_DISPLAY_SKIP_INIT
+	.flags		= HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET,
+#endif
 };
 
 /*
@@ -1133,8 +1139,7 @@ static struct omap_hwmod_class_sysconfig dra7xx_gpmc_sysc = {
 	.syss_offs	= 0x0014,
 	.sysc_flags	= (SYSC_HAS_AUTOIDLE | SYSC_HAS_SIDLEMODE |
 			   SYSC_HAS_SOFTRESET | SYSS_HAS_RESET_STATUS),
-	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
-			   SIDLE_SMART_WKUP),
+	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
 	.sysc_fields	= &omap_hwmod_sysc_type1,
 };
 
@@ -1455,6 +1460,9 @@ static struct omap_hwmod dra7xx_ipu1_hwmod = {
 			.modulemode   = MODULEMODE_HWCTRL,
 		},
 	},
+#ifdef CONFIG_EARLYCAMERA_IPU
+	.flags		= HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET,
+#endif
 };
 
 /* ipu2 processor */
@@ -1485,8 +1493,7 @@ static struct omap_hwmod_class_sysconfig dra7xx_mailbox_sysc = {
 	.sysc_offs	= 0x0010,
 	.sysc_flags	= (SYSC_HAS_RESET_STATUS | SYSC_HAS_SIDLEMODE |
 			   SYSC_HAS_SOFTRESET),
-	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
-			   SIDLE_SMART_WKUP),
+	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
 	.sysc_fields	= &omap_hwmod_sysc_type2,
 };
 
@@ -1804,12 +1811,19 @@ static struct omap_hwmod dra7xx_mcasp6_hwmod = {
 	},
 };
 
+static struct omap_hwmod_dma_info dra7xx_mcasp7_sdma_reqs[] = {
+	{ .name = "tx", .dma_req = 69 + DRA7XX_DMA_REQ_START },
+	{ .name = "rx", .dma_req = 70 + DRA7XX_DMA_REQ_START },
+	{ .dma_req = -1 }
+};
+
 /* mcasp7 */
 static struct omap_hwmod dra7xx_mcasp7_hwmod = {
 	.name		= "mcasp7",
 	.class		= &dra7xx_mcasp_hwmod_class,
 	.clkdm_name	= "l4per2_clkdm",
 	.main_clk	= "mcasp7_ahclkx_mux",
+	.sdma_reqs	= dra7xx_mcasp7_sdma_reqs,
 	.flags		= HWMOD_SWSUP_SIDLE,
 	.prcm = {
 		.omap4 = {
@@ -1975,12 +1989,6 @@ static struct omap_hwmod_irq_info dra7xx_mcspi4_irqs[] = {
 	{ .irq = -1 }
 };
 
-static struct omap_hwmod_dma_info dra7xx_mcspi4_sdma_reqs[] = {
-	{ .name = "70", .dma_req = 69 + DRA7XX_DMA_REQ_START },
-	{ .name = "71", .dma_req = 70 + DRA7XX_DMA_REQ_START },
-	{ .dma_req = -1 }
-};
-
 /* mcspi4 dev_attr */
 static struct omap2_mcspi_dev_attr mcspi4_dev_attr = {
 	.num_chipselect	= 1,
@@ -1991,7 +1999,6 @@ static struct omap_hwmod dra7xx_mcspi4_hwmod = {
 	.class		= &dra7xx_mcspi_hwmod_class,
 	.clkdm_name	= "l4per_clkdm",
 	.mpu_irqs	= dra7xx_mcspi4_irqs,
-	.sdma_reqs	= dra7xx_mcspi4_sdma_reqs,
 	.main_clk	= "func_48m_fclk",
 	.prcm = {
 		.omap4 = {
@@ -2223,6 +2230,9 @@ static struct omap_hwmod dra7xx_mmu_ipu1_hwmod = {
 		},
 	},
 	.dev_attr	= &dra7xx_mmu_ipu_dev_attr,
+#ifdef CONFIG_EARLYCAMERA_IPU
+	.flags		= HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET,
+#endif
 };
 
 /* mmu ipu2 */
@@ -3191,8 +3201,7 @@ static struct omap_hwmod_class_sysconfig dra7xx_spinlock_sysc = {
 	.sysc_flags	= (SYSC_HAS_AUTOIDLE | SYSC_HAS_CLOCKACTIVITY |
 			   SYSC_HAS_ENAWAKEUP | SYSC_HAS_SIDLEMODE |
 			   SYSC_HAS_SOFTRESET | SYSS_HAS_RESET_STATUS),
-	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
-			   SIDLE_SMART_WKUP),
+	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
 	.sysc_fields	= &omap_hwmod_sysc_type1,
 };
 
@@ -3969,6 +3978,9 @@ static struct omap_hwmod dra7xx_vip1_hwmod = {
 			.modulemode   = MODULEMODE_HWCTRL,
 		},
 	},
+#ifdef CONFIG_EARLYCAMERA_IPU
+	.flags		= HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET,
+#endif
 };
 
 /* vip2 */
@@ -4320,6 +4332,9 @@ static struct omap_hwmod_ocp_if dra7xx_l3_main_1__mmu_ipu1 = {
 	.clk		= "l3_iclk_div",
 	.addr		= dra7xx_mmu_ipu1_addrs,
 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+#ifdef CONFIG_EARLYCAMERA_IPU
+	.flags		= HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET,
+#endif
 };
 
 static struct omap_hwmod_addr_space dra7xx_mmu_ipu2_addrs[] = {
@@ -4558,8 +4573,8 @@ static struct omap_hwmod_addr_space dra7xx_dss_addrs[] = {
 	},
 	{
 		.name		= "pllctrl2",
-		.pa_start	= 0x58005000,
-		.pa_end		= 0x5800533f,
+		.pa_start	= 0x58009000,
+		.pa_end		= 0x5800933f,
 	},
 };
 
@@ -6763,8 +6778,18 @@ static struct omap_hwmod_addr_space dra7xx_vpe_addrs[] = {
 	{
 		.name		= "vpe",
 		.pa_start	= 0x489d0000,
-		.pa_end		= 0x489dcfff,
+		.pa_end		= 0x489d06ff,
 		.flags		= ADDR_TYPE_RT
+	},
+	{
+		.name           = "vpe_sc",
+		.pa_start       = 0x489d0700,
+		.pa_end         = 0x489d56ff,
+	},
+	{
+		.name           = "vpe_csc",
+		.pa_start       = 0x489d5700,
+		.pa_end         = 0x489dcfff,
 	},
 	{
 		.name		= "vpdma",

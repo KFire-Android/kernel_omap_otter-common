@@ -397,9 +397,9 @@ int dsscomp_gralloc_queue(struct dsscomp_setup_dispc_data *d,
 			/* separate comp for tv means presentation mode */
 			if (d->num_mgrs == 1 && d->mgrs[0].ix == 1)
 				presentation_mode = true;
-			else if (d->num_mgrs == 2 ||
+			else if (cdev->mgrs[1]->output && (d->num_mgrs == 2 ||
 				cdev->mgrs[1]->output->device->state !=
-					OMAP_DSS_DISPLAY_ACTIVE)
+					OMAP_DSS_DISPLAY_ACTIVE))
 				presentation_mode = false;
 
 			slot = alloc_tiler_slot();

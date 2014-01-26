@@ -22,6 +22,8 @@
 #include <linux/platform_device.h>
 #include <linux/module.h>
 #include <linux/of.h>
+#include <linux/of_gpio.h>
+#include <linux/gpio.h>
 #include <linux/clk.h>
 #include <linux/io.h>
 #include <sound/core.h>
@@ -35,8 +37,11 @@
 struct dra7_snd_data {
 	unsigned int media_mclk_freq;
 	unsigned int multichannel_mclk_freq;
+	unsigned int bt_bclk_freq;
 	unsigned int media_slots;
 	unsigned int multichannel_slots;
+	unsigned int bt_rate;
+	int bt_is_master;
 	int always_on;
 };
 
@@ -277,6 +282,85 @@ static struct snd_soc_dai_link_codec dra7_snd_multichannel_codecs[] = {
 	},
 };
 
+static int dra7_snd_bt_startup(struct snd_pcm_substream *substream)
+{
+	struct snd_pcm_runtime *runtime = substream->runtime;
+
+	snd_pcm_hw_constraint_minmax(runtime, SNDRV_PCM_HW_PARAM_RATE,
+				     8000, 8000);
+	snd_pcm_hw_constraint_minmax(runtime, SNDRV_PCM_HW_PARAM_CHANNELS,
+				     2, 2);
+	snd_pcm_hw_constraint_mask64(runtime, SNDRV_PCM_HW_PARAM_FORMAT,
+				     SNDRV_PCM_FMTBIT_S16_LE);
+
+	return 0;
+}
+
+static int dra7_snd_bt_hw_params(struct snd_pcm_substream *substream,
+				 struct snd_pcm_hw_params *params)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_card *card = rtd->card;
+	struct dra7_snd_data *card_data = snd_soc_card_get_drvdata(card);
+
+	card_data->bt_rate = params_rate(params);
+
+	return 0;
+}
+
+static int dra7_snd_bt_prepare(struct snd_pcm_substream *substream)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
+	struct snd_soc_card *card = rtd->card;
+	struct dra7_snd_data *card_data = snd_soc_card_get_drvdata(card);
+	unsigned int fmt = SND_SOC_DAIFMT_DSP_A | SND_SOC_DAIFMT_NB_IF;
+	int dir;
+	int ret;
+
+	if (card_data->bt_is_master) {
+		fmt |= SND_SOC_DAIFMT_CBM_CFM;
+		dir = SND_SOC_CLOCK_OUT;
+	} else {
+		fmt |= SND_SOC_DAIFMT_CBS_CFS;
+		dir = SND_SOC_CLOCK_IN;
+	}
+
+	ret = snd_soc_dai_set_fmt(cpu_dai, fmt);
+	if (ret < 0) {
+		dev_err(card->dev, "can't set CPU DAI format %d\n", ret);
+		return ret;
+	}
+
+	ret = snd_soc_dai_set_sysclk(cpu_dai, 0, 0, dir);
+	if (ret < 0) {
+		dev_err(card->dev, "can't set CPU DAI sysclk %d\n", ret);
+		return ret;
+	}
+
+	/*
+	 * Bluetooth SCO is 8kHz, mono, 16-bits/sample but the BCLK runs
+	 * at 4x the min required rate. So, the BCLK / FSYNC ratio is 64 which
+	 * is not possible with McASP. Instead, the DAI link is configured
+	 * in stereo (right channel carries no data) to have 32-bit samples and
+	 * the BCLK / FSYNC ratio is programmed so that only 16-bits carry
+	 * actual data.
+	 */
+	ret = snd_soc_dai_set_clkdiv(cpu_dai, 2,
+				card_data->bt_bclk_freq / card_data->bt_rate);
+	if (ret < 0)
+		dev_err(card->dev, "can't set CPU DAI BCLK/FSYNC ratio %d\n",
+			ret);
+
+	return ret;
+}
+
+static struct snd_soc_ops dra7_snd_bt_ops = {
+	.startup = dra7_snd_bt_startup,
+	.hw_params = dra7_snd_bt_hw_params,
+	.prepare = dra7_snd_bt_prepare,
+};
+
 static struct snd_soc_dai_link dra7_snd_dai[] = {
 	{
 		/* Media: McASP3 + tlv320aic3106 */
@@ -295,6 +379,57 @@ static struct snd_soc_dai_link dra7_snd_dai[] = {
 		.num_codecs = ARRAY_SIZE(dra7_snd_multichannel_codecs),
 		.init = dra7_dai_init,
 	},
+	{
+		/* Bluetooth: McASP7 + dummy codec */
+		.name = "Bluetooth",
+		.platform_name = "omap-pcm-audio",
+		.codec_name = "snd-soc-dummy",
+		.codec_dai_name = "snd-soc-dummy-dai",
+		.ops = &dra7_snd_bt_ops,
+	},
+};
+
+static int dra7_snd_bt_get_mode(struct snd_kcontrol *kcontrol,
+				struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_card *card = snd_kcontrol_chip(kcontrol);
+	struct dra7_snd_data *card_data = snd_soc_card_get_drvdata(card);
+
+	ucontrol->value.integer.value[0] = card_data->bt_is_master;
+	return 0;
+}
+
+static int dra7_snd_bt_set_mode(struct snd_kcontrol *kcontrol,
+				struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_card *card = snd_kcontrol_chip(kcontrol);
+	struct dra7_snd_data *card_data = snd_soc_card_get_drvdata(card);
+
+	card_data->bt_is_master = ucontrol->value.integer.value[0];
+	return 1;
+}
+
+/*
+ * The Bluetooth PCM interface (the codec side of the DAI link) can cut the
+ * BCLK and FSYNC while the ALSA PCM device is still in use (typically, when
+ * BT link is about to be released). Missing BCLK/FSYNC causes audio data
+ * read/write to block for long time.
+ * Bluetooth mode kcontrol can change the CPU DAI master or slave configuration.
+ * This control is specifically meant to address the limitation describe above.
+ * By switching to slave mode, the CPU DAI link has the clocks to continue
+ * without stalling anymore.
+ * Note that this is only in the context of McASP, no pin direction change is
+ * needed.
+ */
+static const char * const dra7_snd_bt_texts[] = {"Slave", "Master"};
+
+static const struct soc_enum dra7_snd_enum[] = {
+	SOC_ENUM_SINGLE_EXT(2, dra7_snd_bt_texts),
+};
+
+static const struct snd_kcontrol_new dra7_snd_controls[] = {
+	SOC_ENUM_EXT("Bluetooth Mode", dra7_snd_enum[0],
+		     dra7_snd_bt_get_mode, dra7_snd_bt_set_mode),
 };
 
 static int dra7_snd_add_dai_link(struct snd_soc_card *card,
@@ -440,6 +575,45 @@ static int dra7_snd_add_multichannel_dai_link(struct snd_soc_card *card,
 	return 0;
 }
 
+static int dra7_snd_add_bt_dai_link(struct snd_soc_card *card,
+				    struct snd_soc_dai_link *dai_link,
+				    const char *prefix)
+{
+	struct dra7_snd_data *card_data = snd_soc_card_get_drvdata(card);
+	struct device_node *node = card->dev->of_node;
+	struct device_node *dai_node;
+	char prop[32];
+	int ret;
+
+	card_data->bt_is_master = 1;
+	card_data->bt_rate = 8000;
+
+	if (!node) {
+		dev_err(card->dev, "bluetooth node is invalid\n");
+		return -EINVAL;
+	}
+
+	snprintf(prop, sizeof(prop), "%s-bclk-freq", prefix);
+	of_property_read_u32(node, prop,
+			     &card_data->bt_bclk_freq);
+
+	snprintf(prop, sizeof(prop), "%s-cpu", prefix);
+	dai_node = of_parse_phandle(node, prop, 0);
+	if (!dai_node) {
+		dev_err(card->dev, "cpu dai node is invalid\n");
+		return -EINVAL;
+	}
+
+	dai_link->cpu_of_node = dai_node;
+
+	ret = snd_soc_card_new_dai_links(card, dai_link, 1);
+	if (ret < 0)
+		dev_err(card->dev, "failed to add bluetooth dai link %s\n",
+			dai_link->name);
+
+	return ret;
+}
+
 /* DRA7 CPU board widgets */
 static const struct snd_soc_dapm_widget dra7_snd_dapm_widgets[] = {
 	/* CPU board input */
@@ -518,6 +692,7 @@ static int dra7_snd_probe(struct platform_device *pdev)
 	struct device_node *node = pdev->dev.of_node;
 	struct snd_soc_card *card = &dra7_snd_card;
 	struct dra7_snd_data *card_data;
+	int gpio;
 	int ret;
 
 	card->dev = &pdev->dev;
@@ -525,6 +700,17 @@ static int dra7_snd_probe(struct platform_device *pdev)
 	card_data = devm_kzalloc(&pdev->dev, sizeof(*card_data), GFP_KERNEL);
 	if (card_data == NULL)
 		return -ENOMEM;
+
+	gpio = of_get_gpio(node, 0);
+	if (gpio_is_valid(gpio)) {
+		ret = devm_gpio_request_one(card->dev, gpio,
+					    GPIOF_OUT_INIT_LOW, "snd_gpio");
+		if (ret) {
+			dev_err(card->dev, "failed to request DAI sel gpio %d\n",
+				gpio);
+			return ret;
+		}
+	}
 
 	snd_soc_register_dais(&pdev->dev, &dummy_cpu_dai, 1);
 
@@ -565,9 +751,21 @@ static int dra7_snd_probe(struct platform_device *pdev)
 		return ret;
 	}
 
+	ret = dra7_snd_add_bt_dai_link(card, &dra7_snd_dai[2], "ti,bt");
+	if (ret)
+		dev_err(card->dev, "failed to add bluetooth dai link %d\n",
+			ret);
+
 	ret = snd_soc_register_card(card);
 	if (ret) {
 		dev_err(card->dev, "failed to register sound card %d\n", ret);
+		goto err_card;
+	}
+
+	ret = snd_soc_add_card_controls(card, dra7_snd_controls,
+					ARRAY_SIZE(dra7_snd_controls));
+	if (ret) {
+		dev_err(card->dev, "failed to add card controls %d\n", ret);
 		goto err_card;
 	}
 
@@ -580,6 +778,12 @@ static int dra7_snd_probe(struct platform_device *pdev)
 	ret = dra7_mcasp_reparent(card, "mcasp6_ahclkx_mux", "atl_clkin1_ck");
 	if (ret) {
 		dev_err(card->dev, "failed to reparent McASP6 %d\n", ret);
+		goto err_reparent;
+	}
+
+	ret = dra7_mcasp_reparent(card, "mcasp7_ahclkx_mux", "abe_24m_fclk");
+	if (ret) {
+		dev_err(card->dev, "failed to reparent McASP7 %d\n", ret);
 		goto err_reparent;
 	}
 

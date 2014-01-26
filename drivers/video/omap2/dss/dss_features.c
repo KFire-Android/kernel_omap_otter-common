@@ -415,6 +415,31 @@ static const enum omap_overlay_caps omap4_dss_overlay_caps[] = {
 		OMAP_DSS_OVL_CAP_POS | OMAP_DSS_OVL_CAP_REPLICATION,
 };
 
+static const enum omap_overlay_caps omap5_es_2_0_dss_overlay_caps[] = {
+	/* OMAP_DSS_GFX */
+	OMAP_DSS_OVL_CAP_GLOBAL_ALPHA | OMAP_DSS_OVL_CAP_PRE_MULT_ALPHA |
+		OMAP_DSS_OVL_CAP_ZORDER | OMAP_DSS_OVL_CAP_POS |
+		OMAP_DSS_OVL_CAP_REPLICATION | OMAP_DSS_OVL_CAP_FORCE_1D,
+
+	/* OMAP_DSS_VIDEO1 */
+	OMAP_DSS_OVL_CAP_SCALE | OMAP_DSS_OVL_CAP_GLOBAL_ALPHA |
+		OMAP_DSS_OVL_CAP_PRE_MULT_ALPHA | OMAP_DSS_OVL_CAP_ZORDER |
+		OMAP_DSS_OVL_CAP_POS | OMAP_DSS_OVL_CAP_REPLICATION |
+		OMAP_DSS_OVL_CAP_FORCE_1D,
+
+	/* OMAP_DSS_VIDEO2 */
+	OMAP_DSS_OVL_CAP_SCALE | OMAP_DSS_OVL_CAP_GLOBAL_ALPHA |
+		OMAP_DSS_OVL_CAP_PRE_MULT_ALPHA | OMAP_DSS_OVL_CAP_ZORDER |
+		OMAP_DSS_OVL_CAP_POS | OMAP_DSS_OVL_CAP_REPLICATION |
+		OMAP_DSS_OVL_CAP_FORCE_1D,
+
+	/* OMAP_DSS_VIDEO3 */
+	OMAP_DSS_OVL_CAP_SCALE | OMAP_DSS_OVL_CAP_GLOBAL_ALPHA |
+		OMAP_DSS_OVL_CAP_PRE_MULT_ALPHA | OMAP_DSS_OVL_CAP_ZORDER |
+		OMAP_DSS_OVL_CAP_POS | OMAP_DSS_OVL_CAP_REPLICATION |
+		OMAP_DSS_OVL_CAP_FORCE_1D,
+};
+
 static const char * const omap2_dss_clk_source_names[] = {
 	[OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DISPC]	= "N/A",
 	[OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DSI]	= "N/A",
@@ -645,6 +670,7 @@ static const enum dss_feat_id omap4_dss_feat_list[] = {
 
 static const enum dss_feat_id omap5_dss_feat_list[] = {
 	FEAT_MGR_LCD2,
+	FEAT_MGR_LCD3,
 	FEAT_CORE_CLK_DIV,
 	FEAT_LCD_CLK_SRC,
 	FEAT_DSI_DCS_CMD_CONFIG_VC,
@@ -664,6 +690,7 @@ static const enum dss_feat_id omap5_dss_feat_list[] = {
 	FEAT_DSI_PLL_REFSEL,
 	FEAT_DSI_PHY_DCC,
 	FEAT_MFLAG,
+	FEAT_WB,
 };
 
 /* OMAP2 DSS Features */
@@ -849,11 +876,16 @@ static const struct omap_dss_features dra7xx_dss_features = {
 	.num_features = ARRAY_SIZE(omap5_dss_feat_list),
 
 	.num_mgrs = 4,
+#ifdef CONFIG_EARLYCAMERA_IPU
+	/* VID3 is used by early camera */
+	.num_ovls = 3,
+#else
 	.num_ovls = 4,
+#endif
 	.supported_displays = dra7xx_dss_supported_displays,
 	.supported_outputs = dra7xx_dss_supported_outputs,
 	.supported_color_modes = omap4_dss_supported_color_modes,
-	.overlay_caps = omap4_dss_overlay_caps,
+	.overlay_caps = omap5_es_2_0_dss_overlay_caps,
 	.clksrc_names = omap5_dss_clk_source_names,
 	.dss_params = omap5_dss_param_range,
 	.supported_rotation_types = OMAP_DSS_ROT_DMA | OMAP_DSS_ROT_TILER,
@@ -912,7 +944,7 @@ static const struct ti_hdmi_ip_ops omap5_hdmi_functions = {
 	.dump_wrapper		=	ti_hdmi_4xxx_wp_dump,
 	.dump_pll		=	ti_hdmi_4xxx_pll_dump,
 	.dump_phy		=	ti_hdmi_4xxx_phy_dump,
-	.irq_handler		=	ti_hdmi_4xxx_irq_handler,
+	.irq_handler		=	ti_hdmi_5xxx_irq_handler,
 #if defined(CONFIG_OMAP5_DSS_HDMI_AUDIO)
 	.audio_enable		=	ti_hdmi_4xxx_wp_audio_enable,
 	.audio_disable		=	ti_hdmi_4xxx_wp_audio_disable,
@@ -921,6 +953,11 @@ static const struct ti_hdmi_ip_ops omap5_hdmi_functions = {
 	.audio_config		=	ti_hdmi_5xxx_audio_config,
 	.audio_get_dma_port	=	ti_hdmi_4xxx_audio_get_dma_port,
 #endif
+	.hdcp_init		=	ti_hdmi_5xxx_hdcp_init,
+	.hdcp_enable		=	ti_hdmi_5xxx_hdcp_enable,
+	.hdcp_disable		=	ti_hdmi_5xxx_hdcp_disable,
+	.hdcp_status		=	ti_hdmi_5xxx_hdcp_status,
+	.hdcp_int_handler	=	ti_hdmi_5xxx_hdcp_int_handler,
 };
 
 void dss_init_hdmi_ip_ops(struct hdmi_ip_data *ip_data,

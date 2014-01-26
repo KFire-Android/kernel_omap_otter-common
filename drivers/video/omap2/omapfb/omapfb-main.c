@@ -2631,10 +2631,11 @@ int omapfb_enable_vsync(struct omapfb2_device *fbdev, enum omap_channel ch,
 	const u32 masks[] = {
 		DISPC_IRQ_VSYNC,
 		DISPC_IRQ_EVSYNC_EVEN,
-		DISPC_IRQ_VSYNC2
+		DISPC_IRQ_VSYNC2,
+		DISPC_IRQ_VSYNC3
 	};
 
-	if (ch > OMAP_DSS_CHANNEL_LCD2) {
+	if (ch > OMAP_DSS_CHANNEL_LCD3) {
 		pr_warn("%s wrong channel number\n", __func__);
 		return -ENODEV;
 	}

@@ -1003,12 +1003,17 @@ static int __init omap_dsshw_probe(struct platform_device *pdev)
 	if (r)
 		goto err_setup_clocks;
 
-	pm_runtime_enable(&pdev->dev);
+#ifdef CONFIG_DISPLAY_SKIP_INIT
+	if (!omapdss_skipinit()) {
+#endif
+		pm_runtime_enable(&pdev->dev);
 
-	r = dss_runtime_get();
-	if (r)
-		goto err_runtime_get;
-
+		r = dss_runtime_get();
+		if (r)
+			goto err_runtime_get;
+#ifdef CONFIG_DISPLAY_SKIP_INIT
+	}
+#endif
 	dss.dss_clk_rate = clk_get_rate(dss.dss_clk);
 
 	/* Select DPLL */

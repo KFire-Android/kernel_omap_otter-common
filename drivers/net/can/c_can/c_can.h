@@ -22,6 +22,13 @@
 #ifndef C_CAN_H
 #define C_CAN_H
 
+/* DRA7 RAMINIT bit definitions */
+#define DRA7_DCAN1_RAMINIT_BITS_START	3
+#define DRA7_DCAN1_RAMINIT_BITS_DONE	1
+
+#define DRA7_DCAN2_RAMINIT_BITS_START	5
+#define DRA7_DCAN2_RAMINIT_BITS_DONE	2
+
 enum reg {
 	C_CAN_CTRL_REG = 0,
 	C_CAN_CTRL_EX_REG,
@@ -150,6 +157,19 @@ enum c_can_dev_id {
 	BOSCH_D_CAN,
 };
 
+
+struct c_can_raminit_bits {
+	u8 start;
+	u8 done;
+};
+
+/* c_can driver flags */
+enum c_can_flags {
+	DRA7_DCAN1_RAMINIT_BITS = 0,
+	DRA7_DCAN2_RAMINIT_BITS = 1,
+	DRA7_DCAN_RAMINIT = 2,
+};
+
 /* c_can private data structure */
 struct c_can_priv {
 	struct can_priv can;	/* must be the first member */
@@ -170,6 +190,8 @@ struct c_can_priv {
 	u16 irqstatus;
 	enum c_can_dev_id type;
 	u32 __iomem *raminit_ctrlreg;
+	struct c_can_raminit_bits raminit_bits;
+	u32 flags;
 	unsigned int instance;
 	void (*raminit) (const struct c_can_priv *priv, bool enable);
 };

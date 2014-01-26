@@ -127,7 +127,13 @@ ENTRY(cpu_v7_do_resume)
 	mcr	p15, 0, r11, c2, c0, 2	@ TTB control register
 	mrc	p15, 0, r4, c1, c0, 1	@ Read Auxiliary control register
 	teq	r4, r9			@ Is it already set?
+#ifdef CONFIG_ARM_ERRATA_799270
+	beq	1f
+	write_actlr_smp r9, r10
+#else
 	mcrne	p15, 0, r9, c1, c0, 1	@ No, so write it
+#endif
+1:
 	mcr	p15, 0, r10, c1, c0, 2	@ Co-processor access control
 	ldr	r4, =PRRR		@ PRRR
 	ldr	r5, =NMRR		@ NMRR
@@ -165,10 +171,16 @@ __v7_ca15mp_setup:
 	ALT_SMP(mrc	p15, 0, r0, c1, c0, 1)
 	ALT_UP(mov	r0, #(1 << 6))		@ fake it for UP
 	tst	r0, #(1 << 6)			@ SMP/nAMP mode enabled?
+#ifdef ARM_ERRATA_799270
+	bne	2f
+	write_actlr_smp r0, r12
+#else
 	orreq	r0, r0, #(1 << 6)		@ Enable SMP/nAMP mode
+#endif
 	orreq	r0, r0, r10			@ Enable CPU-specific SMP bits
 	mcreq	p15, 0, r0, c1, c0, 1
 #endif
+2:
 	b	__v7_setup
 
 __v7_pj4b_setup:

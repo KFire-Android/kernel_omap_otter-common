@@ -63,6 +63,25 @@ void copy_timings_omap_to_drm(struct drm_display_mode *mode,
 		mode->flags |= DRM_MODE_FLAG_PVSYNC;
 	else
 		mode->flags |= DRM_MODE_FLAG_NVSYNC;
+
+	if (timings->data_pclk_edge == OMAPDSS_DRIVE_SIG_FALLING_EDGE)
+		mode->flags |= DRM_MODE_FLAG_FDATAPCLK;
+	else if (timings->data_pclk_edge == OMAPDSS_DRIVE_SIG_OPPOSITE_EDGES)
+		mode->flags |= DRM_MODE_FLAG_ODATAPCLK;
+	else
+		mode->flags |= DRM_MODE_FLAG_RDATAPCLK;
+
+	if (timings->de_level == OMAPDSS_SIG_ACTIVE_LOW)
+		mode->flags |= DRM_MODE_FLAG_NDE;
+	else
+		mode->flags |= DRM_MODE_FLAG_PDE;
+
+	if (timings->sync_pclk_edge == OMAPDSS_DRIVE_SIG_RISING_EDGE)
+		mode->flags |= DRM_MODE_FLAG_RSYNCPCLK;
+	else if (timings->sync_pclk_edge == OMAPDSS_DRIVE_SIG_FALLING_EDGE)
+		mode->flags |= DRM_MODE_FLAG_FSYNCPCLK;
+	else
+		mode->flags |= DRM_MODE_FLAG_OSYNCPCLK;
 }
 
 void copy_timings_drm_to_omap(struct omap_video_timings *timings,
@@ -92,9 +111,24 @@ void copy_timings_drm_to_omap(struct omap_video_timings *timings,
 	else
 		timings->vsync_level = OMAPDSS_SIG_ACTIVE_LOW;
 
-	timings->data_pclk_edge = OMAPDSS_DRIVE_SIG_RISING_EDGE;
-	timings->de_level = OMAPDSS_SIG_ACTIVE_HIGH;
-	timings->sync_pclk_edge = OMAPDSS_DRIVE_SIG_OPPOSITE_EDGES;
+	if (mode->flags & DRM_MODE_FLAG_FDATAPCLK)
+		timings->data_pclk_edge = OMAPDSS_DRIVE_SIG_FALLING_EDGE;
+	else if (mode->flags & DRM_MODE_FLAG_ODATAPCLK)
+		timings->data_pclk_edge = OMAPDSS_DRIVE_SIG_OPPOSITE_EDGES;
+	else
+		timings->data_pclk_edge = OMAPDSS_DRIVE_SIG_RISING_EDGE;
+
+	if (mode->flags & DRM_MODE_FLAG_NDE)
+		timings->de_level = OMAPDSS_SIG_ACTIVE_LOW;
+	else
+		timings->de_level = OMAPDSS_SIG_ACTIVE_HIGH;
+
+	if (mode->flags & DRM_MODE_FLAG_RSYNCPCLK)
+		timings->sync_pclk_edge = OMAPDSS_DRIVE_SIG_RISING_EDGE;
+	else if (mode->flags & DRM_MODE_FLAG_FSYNCPCLK)
+		timings->sync_pclk_edge = OMAPDSS_DRIVE_SIG_FALLING_EDGE;
+	else
+		timings->sync_pclk_edge = OMAPDSS_DRIVE_SIG_OPPOSITE_EDGES;
 }
 
 static enum drm_connector_status omap_connector_detect(
@@ -157,7 +191,7 @@ static int omap_connector_get_modes(struct drm_connector *connector)
 	if (dssdrv->read_edid) {
 		void *edid = kzalloc(MAX_EDID, GFP_KERNEL);
 
-		if ((dssdrv->read_edid(dssdev, edid, MAX_EDID) > 0) &&
+		if ((dssdrv->read_edid(dssdev, edid, MAX_EDID) == 0) &&
 				drm_edid_is_valid(edid)) {
 			drm_mode_connector_update_edid_property(
 					connector, edid);

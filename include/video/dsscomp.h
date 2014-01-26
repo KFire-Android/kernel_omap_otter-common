@@ -32,13 +32,14 @@ enum omap_plane {
 	OMAP_DSS_VIDEO1	= 1,
 	OMAP_DSS_VIDEO2	= 2,
 	OMAP_DSS_VIDEO3	= 3,
-	OMAP_DSS_WB		= 4,
+	OMAP_DSS_WB	= 4,
 };
 
 enum omap_channel {
 	OMAP_DSS_CHANNEL_LCD	= 0,
 	OMAP_DSS_CHANNEL_DIGIT	= 1,
 	OMAP_DSS_CHANNEL_LCD2	= 2,
+	OMAP_DSS_CHANNEL_LCD3	= 3
 };
 
 enum omap_color_mode {
@@ -588,7 +589,7 @@ struct dsscomp_setup_dispc_data {
 	__u16 num_mgrs;		/* # of managers used in the composition */
 	__u16 get_sync_obj;	/* ioctl should return a sync object */
 
-	struct dss2_mgr_info mgrs[3];
+	struct dss2_mgr_info mgrs[4];
 	struct dss2_ovl_info ovls[5]; /* up to 5 overlays to set up */
 };
 

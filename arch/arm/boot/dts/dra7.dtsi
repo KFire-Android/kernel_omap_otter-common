@@ -20,6 +20,9 @@
 		serial3 = &uart4;
 		serial4 = &uart5;
 		serial5 = &uart6;
+		d_can0 = &dcan1;
+		d_can1 = &dcan2;
+		ethernet0 = &cpsw_emac0;
 	};
 
 	cpus {
@@ -115,6 +118,11 @@
 			#size-cells = <0>;
 			pinctrl-single,register-width = <32>;
 			pinctrl-single,function-mask = <0x3fffffff>;
+		};
+
+		sys_clkin1: sys_clkin1 {
+			#clock-cells = <0>;
+			compatible = "ti,omap-clock";
 		};
 
 		dpll_mpu_ck: dpll_mpu_ck {
@@ -253,6 +261,7 @@
 			interrupts = <0 72 0x4>;
 			ti,hwmods = "uart1";
 			clock-frequency = <48000000>;
+			flags = <0x10000000>;
 		};
 
 		uart2: serial@4806c000 {
@@ -261,6 +270,7 @@
 			interrupts = <0 73 0x4>;
 			ti,hwmods = "uart2";
 			clock-frequency = <48000000>;
+			flags = <0x10000000>;
 		};
 
 		uart3: serial@48020000 {
@@ -269,6 +279,7 @@
 			interrupts = <0 74 0x4>;
 			ti,hwmods = "uart3";
 			clock-frequency = <48000000>;
+			flags = <0x10000000>;
 		};
 
 		uart4: serial@4806e000 {
@@ -277,6 +288,7 @@
 			interrupts = <0 70 0x4>;
 			ti,hwmods = "uart4";
 			clock-frequency = <48000000>;
+			flags = <0x10000000>;
 		};
 
 		uart5: serial@48066000 {
@@ -285,6 +297,7 @@
 			interrupts = <0 105 0x4>;
 			ti,hwmods = "uart5";
 			clock-frequency = <48000000>;
+			flags = <0x10000000>;
 		};
 
 		uart6: serial@48068000 {
@@ -293,6 +306,29 @@
 			interrupts = <0 106 0x4>;
 			ti,hwmods = "uart6";
 			clock-frequency = <48000000>;
+			flags = <0x10000000>;
+		};
+
+		dcan1: d_can@4ae3c000{
+			compatible = "bosch,d_can";
+			ti,hwmods = "dcan1";
+			reg = <0x4ae3c000 0x2000
+			       0x4a002558 0x4>;
+			interrupts = <0 81 0x4>;
+			clocks = <&sys_clkin1>;
+			flags = <0x5>;
+			status = "disabled";
+		};
+
+		dcan2: d_can@48480000 {
+			compatible = "bosch,d_can";
+			ti,hwmods = "dcan2";
+			reg = <0x48480000 0x2000
+			       0x4a002558 0x4>;
+			interrupts = <0 82 0x4>;
+			clocks = <&sys_clkin1>;
+			flags = <0x6>;
+			status = "disabled";
 		};
 
 		mailbox1: mailbox@4a0f4000 {
@@ -634,7 +670,11 @@
 			operating-points = <
 				/* kHz    uV */
 				425600  1090000
-				500000  1210000
+				/* FIXME: Cannot get 500 MHz with the same clock source as
+				 * 425.6 MHz and 532 MHz. 500 MHz is not supported
+				 * in SW and should be removed from the specification.
+				 */
+				/* 500000  1210000 */
 				532000  1280000
 				>;
 			clocks = <&dpll_core_h14x2_ck>, <&dpll_per_h14x2_ck>,
@@ -772,6 +812,145 @@
 			1250000 16>;
 		};
 
+		avs_iva: regulator-avs@0x4A0025C4 {
+			compatible = "ti,avsclass0";
+			reg = <0x4A0025C4 0x20>;
+			efuse-settings = <1055000 8
+			1150000 12
+			1250000 16>;
+		};
+
+
+		abb_mpu: regulator-abb-mpu {
+			compatible = "ti,abb-v2";
+			regulator-name = "abb_mpu";
+			#address-cells = <0>;
+			#size-cells = <0>;
+			clocks = <&sys_clkin1>;
+			ti,settling-time = <50>;
+			ti,clock-cycles = <16>;
+			avs-supply = <&avs_mpu>;
+
+			reg = <0x4AE07DDC 0x8>, <0x4AE06014 0x4>,
+			      <0x4a003B20 0x8>, <0x4AE0C158 0x4>;
+			reg-names = "base-address", "int-address",
+				    "efuse-address", "ldo-address";
+			ti,tranxdone-status-mask = <0x80>;
+			/* LDOVBBMPU_FBB_MUX_CTRL */
+			ti,ldovbb-override-mask = <0x400>;
+			/* LDOVBBMPU_FBB_VSET_OUT */
+			ti,ldovbb-vset-mask = <0x1F>;
+
+			/*
+			 * NOTE: only FBB mode used but actual vset will
+			 * determine final biasing
+			 */
+			ti,abb_info = <
+			/*uV		ABB	efuse	rbb_m fbb_m	vset_m*/
+			1090000		0	0x0	0 0x02000000 0x01F00000
+			1210000		0	0x4	0 0x02000000 0x01F00000
+			1280000		0	0x8	0 0x02000000 0x01F00000
+			>;
+			voltage-tolerance = <1>;
+		};
+
+		abb_ivahd: regulator-abb-ivahd {
+			compatible = "ti,abb-v3";
+			regulator-name = "abb_ivahd";
+			#address-cells = <0>;
+			#size-cells = <0>;
+			clocks = <&sys_clkin1>;
+			ti,settling-time = <50>;
+			ti,clock-cycles = <16>;
+			avs-supply = <&avs_iva>;
+
+			reg = <0x4AE07E24 0x10>, <0x4ae06010 0x4>,
+			      <0x4a0025CC 0x8>, <0x4A002470 0x4>;
+			reg-names = "base-address", "int-address",
+				    "efuse-address", "ldo-address";
+			ti,tranxdone-status-mask = <0x40000000>;
+			/* LDOVBBIVA_FBB_MUX_CTRL */
+			ti,ldovbb-override-mask = <0x400>;
+			/* LDOVBBIVA_FBB_VSET_OUT */
+			ti,ldovbb-vset-mask = <0x1F>;
+
+			/*
+			 * NOTE: only FBB mode used but actual vset will
+			 * determine final biasing
+			 */
+			ti,abb_info = <
+			/*uV		ABB	efuse	rbb_m fbb_m	vset_m*/
+			1055000		0	0x0	0 0x02000000 0x01F00000
+			1150000		0	0x4	0 0x02000000 0x01F00000
+			1250000		0	0x8	0 0x02000000 0x01F00000
+			>;
+		};
+
+		abb_dspeve: regulator-abb-dspeve {
+			compatible = "ti,abb-v3";
+			regulator-name = "abb_dspeve";
+			#address-cells = <0>;
+			#size-cells = <0>;
+			clocks = <&sys_clkin1>;
+			ti,settling-time = <50>;
+			ti,clock-cycles = <16>;
+			avs-supply = <&avs_dspeve>;
+
+			reg = <0x4AE07E20 0x10>, <0x4ae06010 0x4>,
+			      <0x4a0025E0 0x10>, <0x4A00246C 0x4>;
+			reg-names = "base-address", "int-address",
+				    "efuse-address", "ldo-address";
+			ti,tranxdone-status-mask = <0x20000000>;
+			/* LDOVBBDSPEVE_FBB_MUX_CTRL */
+			ti,ldovbb-override-mask = <0x400>;
+			/* LDOVBBDSPEVE_FBB_VSET_OUT */
+			ti,ldovbb-vset-mask = <0x1F>;
+
+			/*
+			 * NOTE: only FBB mode used but actual vset will
+			 * determine final biasing
+			 */
+			ti,abb_info = <
+			/*uV		ABB	efuse	rbb_m fbb_m	vset_m*/
+			1055000		0	0x0	0 0x02000000 0x01F00000
+			1150000		0	0x4	0 0x02000000 0x01F00000
+			1250000		0	0x8	0 0x02000000 0x01F00000
+			>;
+		};
+
+		abb_gpu: regulator-abb-gpu {
+			compatible = "ti,abb-v2";
+			regulator-name = "abb_gpu";
+			#address-cells = <0>;
+			#size-cells = <0>;
+			clocks = <&sys_clkin1>;
+			ti,settling-time = <50>;
+			ti,clock-cycles = <16>;
+			avs-supply = <&avs_gpu>;
+			voltage-tolerance = <1>;
+
+			reg = <0x4AE07DE4 0x8>, <0x4ae06010 0x4>,
+			      <0x4a003B08 0x10>, <0x4AE0C154 0x4>;
+			reg-names = "base-address", "int-address",
+				    "efuse-address", "ldo-address";
+			ti,tranxdone-status-mask = <0x10000000>;
+			/* LDOVBBGPU_FBB_MUX_CTRL */
+			ti,ldovbb-override-mask = <0x400>;
+			/* LDOVBBGPU_FBB_VSET_OUT */
+			ti,ldovbb-vset-mask = <0x1F>;
+
+			/*
+			 * NOTE: only FBB mode used but actual vset will
+			 * determine final biasing
+			 */
+			ti,abb_info = <
+			/*uV		ABB	efuse	rbb_m fbb_m	vset_m*/
+			1090000		0	0x0	0 0x02000000 0x01F00000
+			1210000		0	0x4	0 0x02000000 0x01F00000
+			1280000		0	0x8	0 0x02000000 0x01F00000
+			>;
+		};
+
 		qspi: qspi@4b300000 {
 			compatible = "ti,dra7xxx-qspi";
 			reg = <0x4b300000 0x100>;
@@ -780,14 +959,6 @@
 			ti,hwmods = "qspi";
 			interrupts = <0 124 0x4>;
                         ti,spi-num-cs = <4>;
-		};
-
-		avs_iva: regulator-avs@0x4A0025C4 {
-			compatible = "ti,avsclass0";
-			reg = <0x4A0025C4 0x20>;
-			efuse-settings = <1055000 8
-			1150000 12
-			1250000 16>;
 		};
 
 		dss {
@@ -806,18 +977,21 @@
 				compatible = "ti,dra7xx-dpi";
 				reg = <0>;
 				video-source = <0>;
+				display-id = <0>;
 			};
 
 			dpi2: dpi@2 {
 				compatible = "ti,dra7xx-dpi";
 				reg = <1>;
 				video-source = <2>;
+				display-id = <3>;
 			};
 
 			dpi3: dpi@3 {
 				compatible = "ti,dra7xx-dpi";
 				reg = <2>;
 				video-source = <3>;
+				display-id = <2>;
 			};
 
 			hdmi: hdmi {
@@ -826,6 +1000,7 @@
 				video-source = <1>;
 				vdda_hdmi_microvolt_min = <1500000>;
 				vdda_hdmi_microvolt_max = <1800000>;
+				display-id = <1>;
 			};
 		};
 
@@ -885,7 +1060,7 @@
 			ti,hwmods = "atl";
 			ti,atclk1-freq = <11289600>;
 			ti,atl1-bws-input = <3>;	/* McASP2 FSX */
-			ti,atl1-aws-input = <15>;	/* McASP6 FSX */
+			ti,atl1-aws-input = <7>;	/* McASP6 FSX */
 			ti,atclk2-freq = <5644800>;
 			ti,atl2-bws-input = <3>;	/* McASP2 FSX */
 			ti,atl2-aws-input = <4>;	/* McASP3 FSX */
@@ -896,6 +1071,7 @@
 			reg = <0x48468000 0x2000>;
 			interrupts = <0 155 0x4>, /* AREVT */
 				     <0 154 0x4>; /* TXEVT */
+			interrupt-names = "rx", "tx";
 			ti,hwmods = "mcasp3";
 			op-mode = <0>;		/* MCASP_IIS_MODE */
 			tdm-slots = <2>;
@@ -912,11 +1088,31 @@
 			reg-names = "cfg","dat";
 			interrupts = <0 156 0x4>, /* AREVT */
 				     <0 157 0x4>; /* TXEVT */
+			interrupt-names = "rx", "tx";
 			ti,hwmods = "mcasp6";
 			op-mode = <0>;		/* MCASP_IIS_MODE */
 			tdm-slots = <8>;
 			num-serializer = <4>;
 			serial-dir = <1 2 0 0>;	/* 0:INACTIVE, 1:TX, 2:RX */
+			ti,tx-inactive-mode = <2>; /* 0: Hi-Z, 2: Low, 3: High */
+			ti,rx-inactive-mode = <2>; /* 0: Hi-Z, 2: Low, 3: High */
+			tx-num-evt = <8>;
+			rx-num-evt = <8>;
+		};
+
+		mcasp7: mcasp@48478000 {
+			compatible = "ti,dra7-mcasp-audio";
+			reg = <0x48478000 0x2000>,
+				<0x48450000 0x1000>;
+			reg-names = "cfg","dat";
+			interrupts = <0 146 0x4>, /* AREVT */
+				     <0 147 0x4>; /* TXEVT */
+			interrupt-names = "rx", "tx";
+			ti,hwmods = "mcasp7";
+			op-mode = <0>;		/* MCASP_IIS_MODE */
+			tdm-slots = <2>;
+			num-serializer = <4>;
+			serial-dir = <2 1 0 0>;	/* 0:INACTIVE, 1:TX, 2:RX */
 			ti,tx-inactive-mode = <2>; /* 0: Hi-Z, 2: Low, 3: High */
 			ti,rx-inactive-mode = <2>; /* 0: Hi-Z, 2: Low, 3: High */
 			tx-num-evt = <8>;

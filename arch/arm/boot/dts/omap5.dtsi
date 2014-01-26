@@ -829,5 +829,72 @@
 				interrupts = <0 126 4>; /* talert */
 			compatible = "ti,omap5430-bandgap";
 		};
+
+		abb_mpu: regulator-abb-mpu {
+			compatible = "ti,abb-v2";
+			regulator-name = "abb_mpu";
+			#address-cells = <0>;
+			#size-cells = <0>;
+			/* clocks = <&sysclk_in>; - once we have clock data */
+			ti,settling-time = <50>;
+			ti,clock-cycles = <16>;
+
+			reg = <0x4ae07cdc 0x8>, <0x4ae06014 0x4>,
+			      <0x4a0021ac 0x18>, <0x4ae0C318 0x4>;
+			reg-names = "base-address", "int-address",
+				    "efuse-address", "ldo-address";
+			ti,tranxdone-status-mask = <0x80>;
+			/* LDOVBBMPU_MUX_CTRL */
+			ti,ldovbb-override-mask = <0x400>;
+			/* LDOVBBMPU_VSET_OUT */
+			ti,ldovbb-vset-mask = <0x1F>;
+
+			/*
+			 * NOTE: only FBB mode used but actual vset will
+			 * determine final biasing
+			 */
+			ti,abb_info = <
+			/*uV		ABB	efuse	rbb_m fbb_m	vset_m*/
+			880000		0	0x4	0 0x20000000 0x1F000000
+			1060000		0	0x8	0 0x20000000 0x1F000000
+			1250000		0	0x10	0 0x20000000 0x1F000000
+			1260000		1	0x14	0 0x20000000 0x1F000000
+			>;
+
+			status = "disabled";
+		};
+
+		abb_mm: regulator-abb-mm {
+			compatible = "ti,abb-v2";
+			regulator-name = "abb_iva";
+			#address-cells = <0>;
+			#size-cells = <0>;
+			/* clocks = <&sysclk_in>; - once we have clock data */
+			ti,settling-time = <50>;
+			ti,clock-cycles = <16>;
+
+			reg = <0x4ae07ce4 0x8>, <0x4ae06010 0x4>,
+			      <0x4a002194 0x14>, <0x4ae0C314 0x4>;
+			reg-names = "base-address", "int-address",
+				    "efuse-address", "ldo-address";
+			ti,tranxdone-status-mask = <0x80000000>;
+			/* LDOVBBMM_MUX_CTRL */
+			ti,ldovbb-override-mask = <0x400>;
+			/* LDOVBBMM_VSET_OUT */
+			ti,ldovbb-vset-mask = <0x1F>;
+
+			/*
+			 * NOTE: only FBB mode used but actual vset will
+			 * determine final biasing
+			 */
+			ti,abb_info = <
+			/*uV		ABB	efuse	rbb_m fbb_m	vset_m*/
+			880000		0	0x4	0 0x20000000 0x1F000000
+			1025000		0	0x8	0 0x20000000 0x1F000000
+			1120000		1	0x10	0 0x20000000 0x1F000000
+			>;
+
+			status = "disabled";
+		};
 	};
 };

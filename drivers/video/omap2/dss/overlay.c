@@ -113,7 +113,8 @@ void dss_uninit_overlays(struct platform_device *pdev)
 int dss_ovl_simple_check(struct omap_overlay *ovl,
 		const struct omap_overlay_info *info)
 {
-	if (info->paddr == 0) {
+	if ((info->color_mode != OMAP_DSS_COLOR_NV12) &&
+	    info->paddr == 0) {
 		DSSERR("check_overlay: paddr cannot be 0\n");
 		return -EINVAL;
 	}
@@ -138,7 +139,13 @@ int dss_ovl_simple_check(struct omap_overlay *ovl,
 		return -EINVAL;
 	}
 
+	/* For early display use-case, we reduce the number of overlays by 1
+	 * to dedicate VID3 pipe for M4 camera but z-order can be higher */
+#ifdef CONFIG_EARLYCAMERA_IPU
+	if (info->zorder >= (omap_dss_get_num_overlays()+1)) {
+#else
 	if (info->zorder >= omap_dss_get_num_overlays()) {
+#endif
 		DSSERR("check_overlay: zorder %d too high\n", info->zorder);
 		return -EINVAL;
 	}
@@ -157,9 +164,24 @@ int dss_ovl_check(struct omap_overlay *ovl, struct omap_overlay_info *info,
 {
 	u16 outw, outh;
 	u16 dw, dh;
+	struct omap_writeback_info wb_info;
+	struct omap_writeback *wb;
 
 	dw = mgr_timings->x_res;
 	dh = mgr_timings->y_res;
+
+	wb = omap_dss_get_wb(0);
+	if (wb) {
+		wb->get_wb_info(wb, &wb_info);
+
+		if (wb_info.mode == OMAP_WB_MEM2MEM_MODE &&
+			(int)ovl->manager->id == (int)wb_info.source &&
+			ovl->get_device(ovl)->state !=
+			OMAP_DSS_DISPLAY_ACTIVE) {
+			dw = wb_info.width;
+			dh = wb_info.height;
+		}
+	}
 
 	if ((ovl->caps & OMAP_DSS_OVL_CAP_SCALE) == 0) {
 		outw = info->width;
@@ -176,18 +198,20 @@ int dss_ovl_check(struct omap_overlay *ovl, struct omap_overlay_info *info,
 			outh = info->out_height;
 	}
 
-	if (dw < info->pos_x + outw) {
-		DSSERR("overlay %d horizontally not inside the display area "
-				"(%d + %d >= %d)\n",
-				ovl->id, info->pos_x, outw, dw);
-		return -EINVAL;
-	}
+	if (!info->wb_source) {
+		if (dw < info->pos_x + outw) {
+			DSSERR("%s: overlay %d horizontally not inside the "
+					"display area (%d + %d >= %d)\n",
+				__func__, ovl->id, info->pos_x, outw, dw);
+			return -EINVAL;
+		}
 
-	if (dh < info->pos_y + outh) {
-		DSSERR("overlay %d vertically not inside the display area "
-				"(%d + %d >= %d)\n",
-				ovl->id, info->pos_y, outh, dh);
-		return -EINVAL;
+		if (dh < info->pos_y + outh) {
+			DSSERR("%s: overlay %d vertically not inside the "
+					"display area (%d + %d >= %d)\n",
+				__func__, ovl->id, info->pos_y, outh, dh);
+			return -EINVAL;
+		}
 	}
 
 	return 0;

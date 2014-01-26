@@ -66,9 +66,6 @@ config OMAP2_DSS_VENC
 config OMAP4_DSS_HDMI
 	bool "OMAP4 HDMI support"
 	depends on ARCH_OMAP4 || ANDROID_SWITCH
-	select FB
-	select FB_MODE_HELPERS
-	select FB_OMAP2
         default y
 	select I2C_ALGOBIT
 	help
@@ -91,9 +88,6 @@ config OMAP5_DSS_HDMI
 	select GPIO_PCA953X
 	select MFD_PALMAS
 	select REGULATOR_PALMAS
-	select FB
-	select FB_MODE_HELPERS
-	select FB_OMAP2
 	help
 	    HDMI Interface.This add the High Deinition Multimedia Interface.
 	    See http://wwww.hdmi.org/ for HDMI specification.
@@ -107,6 +101,14 @@ config OMAP5_DSS_HDMI_DDC
 	  for HDMI DDC transfer.
 	  EDID can be read using direct I2C commands sent to the external display
 	  over I2C lines or by configuring the DDC registers in the core.
+
+config OMAP4_HDCP_SUPPORT
+	bool "OMAP4 HDCP support"
+	depends on OMAP4_DSS_HDMI
+	default n
+	help
+	  High-bandwidth Digital Content Protection (HDCP).
+	  This option required for OMAP4 HDCP support.
 
 config OMAP2_DSS_SDI
 	bool "SDI support"
@@ -159,8 +161,27 @@ config OMAP2_DSS_SLEEP_AFTER_VENC_RESET
 
 config USE_FB_MODE_DB
 	bool "Enable FB mode db support"
-	default y
+	default n
+	select FB
+	select FB_MODE_HELPERS
+	select FB_OMAP2
 	help
 	  Enable FB mode support.
+
+config SWITCH_STATE
+	bool "Enable hpd switch state"
+	depends on OMAP5_DSS_HDMI
+	default n
+	help
+	  HDMI HDP switch state interface. This adds support for sending
+	  HDMI HPD switch state events to user space.
+
+config DISPLAY_SKIP_INIT
+	bool "Skip display initialization during bootup"
+	default n
+	help
+		This allows for skipping display initialization during bootup
+		for cases where the display is initialized elsewhere - like
+		u-boot or other processors
 
 endif

@@ -1,0 +1,16 @@
+Texas Instruments DRA7xx Radio Helper
+
+Radio Helper is a dummy device on top of the devices such as McAsp
+that needs to be configured for Radio playback.
+The corresponding platform driver configures these devices as
+required.
+
+Top node:
+Required properties:
+- compatible: "ti,dra7xx_radio"
+- gpios:  list of the gpios that needs to be configured
+
+child nodes:
+- compatible: "ti,dra7xx_radio_subdev"
+- ti,hwmods: Name of the hwmod associated to the underlying devices
+- status: Device status
