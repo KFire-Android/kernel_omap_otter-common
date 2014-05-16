@@ -448,17 +448,13 @@ extern int omap3_ctrl_save_padconf(void);
 #define omap_ctrl_readb(x)		0
 #define omap_ctrl_readw(x)		0
 #define omap_ctrl_readl(x)		0
-#define omap4_ctrl_pad_readb(x)         0
-#define omap4_ctrl_pad_readw(x)         0
-#define omap4_ctrl_pad_readl(x)         0
+#define omap4_ctrl_pad_readl(x)		0
 #define omap4_ctrl_wk_pad_readb(x)	0
 #define omap4_ctrl_wk_pad_readw(x)	0
 #define omap4_ctrl_wk_pad_readl(x)	0
 #define omap_ctrl_writeb(x, y)		WARN_ON(1)
 #define omap_ctrl_writew(x, y)		WARN_ON(1)
 #define omap_ctrl_writel(x, y)		WARN_ON(1)
-#define omap4_ctrl_pad_writeb(x, y)     WARN_ON(1)
-#define omap4_ctrl_pad_writew(x, y)     WARN_ON(1)
 #define omap4_ctrl_pad_writel(x, y)	WARN_ON(1)
 #define omap4_ctrl_wk_pad_writeb(x, y)     WARN_ON(1)
 #define omap4_ctrl_wk_pad_writew(x, y)     WARN_ON(1)
