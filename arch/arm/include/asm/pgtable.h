@@ -217,25 +217,13 @@ static inline pte_t *pmd_page_vaddr(pmd_t pmd)
 	 (L_PTE_PRESENT | L_PTE_USER))
 
 #if __LINUX_ARM_ARCH__ < 6
-#ifdef CONFIG_MACH_OMAP4_BOWSER
-static inline void __sync_icache_dcache(pte_t pteva, int only_toggling_youngl)
-#else
 static inline void __sync_icache_dcache(pte_t pteval)
-#endif
 {
 }
 #else
-#ifdef CONFIG_MACH_OMAP4_BOWSER
-extern void __sync_icache_dcache(pte_t pteval, int only_toggling_young);
-#else
 extern void __sync_icache_dcache(pte_t pteval);
 #endif
-#endif
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
-extern void set_pte_at(struct mm_struct *mm, unsigned long addr,
-		       pte_t *ptep, pte_t pteval);
-#else
 static inline void set_pte_at(struct mm_struct *mm, unsigned long addr,
 			      pte_t *ptep, pte_t pteval)
 {
@@ -248,7 +236,6 @@ static inline void set_pte_at(struct mm_struct *mm, unsigned long addr,
 
 	set_pte_ext(ptep, pteval, ext);
 }
-#endif
 
 #define PTE_BIT_FUNC(fn,op) \
 static inline pte_t pte_##fn(pte_t pte) { pte_val(pte) op; return pte; }

@@ -60,23 +60,6 @@ pgprot_t pgprot_kernel;
 EXPORT_SYMBOL(pgprot_user);
 EXPORT_SYMBOL(pgprot_kernel);
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
-void set_pte_at(struct mm_struct *mm, unsigned long addr,
-		pte_t *ptep, pte_t pteval)
-{
-	if (addr >= TASK_SIZE)
-		set_pte_ext(ptep, pteval, 0);
-	else {
-		__sync_icache_dcache(pteval,
-				     (pteval & ~L_PTE_YOUNG) ==
-				     (*ptep & ~L_PTE_YOUNG));
-		set_pte_ext(ptep, pteval, PTE_EXT_NG);
-	}
-}
-
-EXPORT_SYMBOL(set_pte_at);
-#endif
-
 struct cachepolicy {
 	const char	policy[16];
 	unsigned int	cr_mask;

@@ -32,10 +32,6 @@
 #include "../ion_priv.h"
 #include "omap_ion_priv.h"
 #include <asm/cacheflush.h>
-#ifdef CONFIG_MACH_OMAP4_BOWSER
-#include <linux/dma-mapping.h>
-#include "../../../video/omap2/dsscomp/tiler-utils.h"
-#endif
 
 bool use_dynamic_pages;
 
@@ -288,24 +284,6 @@ int omap_tiler_alloc(struct ion_heap *heap,
 	data->handle = handle;
 	data->offset = (size_t)(info->tiler_start & ~PAGE_MASK);
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
-	/* MKE Invalidate cache */
-	{
-		int i;
-		for (i = 0; i < n_phys_pages; ++i) {
-			u32 paddr = info->phys_addrs[i];
-			size_t len = PAGE_SIZE;
-			outer_inv_range(paddr, paddr + len);
-		}
-		for (i = 0; i < n_tiler_pages; ++i) {
-			u32 vaddr = info->tiler_addrs[i];
-			phys_addr_t paddr = tiler_virt2phys(vaddr);
-			size_t len = PAGE_SIZE;
-			outer_inv_range(paddr, paddr + len);
-			/* dmac_map_area((const void*) vaddr, len, DMA_FROM_DEVICE); */
-		}
-	}
-#endif
 	return 0;
 
 err:
@@ -423,21 +401,16 @@ static int omap_tiler_heap_map_user(struct ion_heap *heap,
 	return ret;
 }
 
-#ifndef CONFIG_MACH_OMAP4_BOWSER
 static void per_cpu_cache_flush_arm(void *arg)
 {
 	   flush_cache_all();
 }
-#endif
 
 static int omap_tiler_cache_operation(struct ion_buffer *buffer, size_t len,
 			unsigned long vaddr, enum cache_operation cacheop)
 {
 	struct omap_tiler_info *info;
 	int n_pages;
-#ifdef CONFIG_MACH_OMAP4_BOWSER
-	phys_addr_t paddr = tiler_virt2phys(vaddr);
-#endif
 
 	if (!buffer) {
 		pr_err("%s(): buffer is NULL\n", __func__);
@@ -466,15 +439,6 @@ static int omap_tiler_cache_operation(struct ion_buffer *buffer, size_t len,
 		return -EINVAL;
 	}
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
-	if (cacheop == CACHE_FLUSH) {
-		flush_cache_user_range(vaddr, vaddr + len);
-		outer_flush_range(paddr, paddr + len);
-	} else {
-		outer_inv_range(paddr, paddr + len);
-		dmac_map_area((const void *) vaddr, len, DMA_FROM_DEVICE);
-	}
-#else
 	if (len > FULL_CACHE_FLUSH_THRESHOLD) {
 		on_each_cpu(per_cpu_cache_flush_arm, NULL, 1);
 		outer_flush_all();
@@ -489,7 +453,6 @@ static int omap_tiler_cache_operation(struct ion_buffer *buffer, size_t len,
 	else
 		outer_inv_range(info->tiler_addrs[0],
 				info->tiler_addrs[0] + len);
-#endif
 	return 0;
 }
 

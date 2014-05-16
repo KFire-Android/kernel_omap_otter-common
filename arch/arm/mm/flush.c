@@ -225,11 +225,7 @@ static void __flush_dcache_aliases(struct address_space *mapping, struct page *p
 }
 
 #if __LINUX_ARM_ARCH__ >= 6
-#ifdef CONFIG_MACH_OMAP4_BOWSER
-void __sync_icache_dcache(pte_t pteval, int only_toggling_young)
-#else
 void __sync_icache_dcache(pte_t pteval)
-#endif
 {
 	unsigned long pfn;
 	struct page *page;
@@ -248,19 +244,10 @@ void __sync_icache_dcache(pte_t pteval)
 	else
 		mapping = NULL;
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
-	if (!test_and_set_bit(PG_dcache_clean, &page->flags)) {
-		__flush_dcache_page(mapping, page);
-		only_toggling_young = 0;
-	}
-
-	if (pte_exec(pteval) && !only_toggling_young)
-#else
 	if (!test_and_set_bit(PG_dcache_clean, &page->flags))
 		__flush_dcache_page(mapping, page);
 
 	if (pte_exec(pteval))
-#endif
 		__flush_icache_all();
 }
 #endif
@@ -296,17 +283,6 @@ void flush_dcache_page(struct page *page)
 		return;
 
 	mapping = page_mapping(page);
-
-#ifdef CONFIG_MACH_OMAP4_BOWSER
-	if (cache_is_vipt_nonaliasing()) {
-		if (!test_and_set_bit(PG_dcache_clean, &page->flags)) {
-			__flush_dcache_page(mapping, page);
-			if (mapping)
-				__flush_icache_all();
-		}
-		return;
-	}
-#endif
 
 	if (!cache_ops_need_broadcast() &&
 	    mapping && !mapping_mapped(mapping))

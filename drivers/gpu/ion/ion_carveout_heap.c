@@ -27,9 +27,6 @@
 
 #include <asm/mach/map.h>
 #include <asm/cacheflush.h>
-#ifdef CONFIG_MACH_OMAP4_BOWSER
-#include <linux/dma-mapping.h>
-#endif
 
 struct ion_carveout_heap {
 	struct ion_heap heap;
@@ -76,22 +73,8 @@ static int ion_carveout_heap_allocate(struct ion_heap *heap,
 				      unsigned long size, unsigned long align,
 				      unsigned long flags)
 {
-#ifdef CONFIG_MACH_OMAP4_BOWSER
-	phys_addr_t paddr;
-#endif
 	buffer->priv_phys = ion_carveout_allocate(heap, size, align);
-#ifdef CONFIG_MACH_OMAP4_BOWSER
-	if (buffer->priv_phys == ION_CARVEOUT_ALLOCATE_FAIL)
-		return -ENOMEM;
-
-	/* MKE Invalidate cache */
-	paddr = (phys_addr_t) buffer->priv_phys;
-	outer_inv_range(paddr, paddr + size);
-
-	return 0;
-#else
 	return buffer->priv_phys == ION_CARVEOUT_ALLOCATE_FAIL ? -ENOMEM : 0;
-#endif
 }
 
 static void ion_carveout_heap_free(struct ion_buffer *buffer)
@@ -128,34 +111,19 @@ static int ion_carveout_heap_map_user(struct ion_heap *heap,
 			       : pgprot_writecombine(vma->vm_page_prot)));
 }
 
-#ifndef CONFIG_MACH_OMAP4_BOWSER
 static void per_cpu_cache_flush_arm(void *arg)
 {
 	flush_cache_all();
 }
-#endif
 
 static int ion_carveout_heap_cache_operation(struct ion_buffer *buffer,
 		size_t len, unsigned long vaddr, enum cache_operation cacheop)
 {
-#ifdef CONFIG_MACH_OMAP4_BOWSER
-	phys_addr_t paddr = virt_to_phys((const volatile void *) vaddr);
-#endif
-
 	if (!buffer || !buffer->cached) {
 		pr_err("%s(): buffer not mapped as cacheable\n", __func__);
 		return -EINVAL;
 	}
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
-	if (cacheop == CACHE_FLUSH) {
-		flush_cache_user_range(vaddr, vaddr + len);
-		outer_flush_range(paddr, paddr + len);
-	} else {
-		outer_inv_range(paddr, paddr + len);
-		dmac_map_area((const void *) vaddr, len, DMA_FROM_DEVICE);
-	}
-#else
 	if (len > FULL_CACHE_FLUSH_THRESHOLD) {
 		on_each_cpu(per_cpu_cache_flush_arm, NULL, 1);
 		outer_flush_all();
@@ -168,7 +136,6 @@ static int ion_carveout_heap_cache_operation(struct ion_buffer *buffer,
 		outer_flush_range(buffer->priv_phys, buffer->priv_phys+len);
 	else
 		outer_inv_range(buffer->priv_phys, buffer->priv_phys+len);
-#endif
 
 	return 0;
 }
