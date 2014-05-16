@@ -26,11 +26,7 @@ static int save_return_addr(struct stackframe *frame, void *d)
 	struct return_address_data *data = d;
 
 	if (!data->level) {
-#ifdef CONFIG_MACH_OMAP4_BOWSER
-		data->addr = (void *)frame->pc;
-#else
 		data->addr = (void *)frame->lr;
-#endif
 
 		return 1;
 	} else {
@@ -45,12 +41,7 @@ void *return_address(unsigned int level)
 	struct stackframe frame;
 	register unsigned long current_sp asm ("sp");
 
-#ifdef CONFIG_MACH_OMAP4_BOWSER
-	data.level = level + 2;
-	data.addr = NULL;
-#else
 	data.level = level + 1;
-#endif
 
 	frame.fp = (unsigned long)__builtin_frame_address(0);
 	frame.sp = current_sp;
