@@ -270,7 +270,7 @@ int __init omap_mux_init_signal(const char *muxname, int val)
 	u16 old_mode;
 	int mux_mode;
 
-#ifndef CONFIG_MACH_OMAP_4430_KC1
+#if 0
 	/* If WAKEUPENABLE bit is set, the WAKEUPEVENT has to be handled by the
 	 * framework. Use omap_mux_init_gpio() or omap_hwmod_mux_init() */
 	if (val & OMAP_WAKEUP_EN) {
