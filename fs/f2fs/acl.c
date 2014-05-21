@@ -150,7 +150,7 @@ fail:
 	return ERR_PTR(-EINVAL);
 }
 
-struct posix_acl *f2fs_get_acl(struct inode *inode, int type)
+static struct posix_acl *f2fs_get_acl(struct inode *inode, int type)
 {
 	struct f2fs_sb_info *sbi = F2FS_SB(inode->i_sb);
 	int name_index = F2FS_XATTR_INDEX_POSIX_ACL_DEFAULT;
@@ -244,6 +244,28 @@ static int f2fs_set_acl(struct inode *inode, int type, struct posix_acl *acl)
 
 	cond_clear_inode_flag(fi, FI_ACL_MODE);
 	return error;
+}
+
+int f2fs_check_acl(struct inode *inode, int mask, unsigned int flags)
+{
+	struct posix_acl *acl;
+
+	if (flags & IPERM_FLAG_RCU) {
+		if (!negative_cached_acl(inode, ACL_TYPE_ACCESS))
+			return -ECHILD;
+		return -EAGAIN;
+	}
+
+	acl = f2fs_get_acl(inode, ACL_TYPE_ACCESS);
+	if (IS_ERR(acl))
+		return PTR_ERR(acl);
+	if (acl) {
+		int error = posix_acl_permission(inode, acl, mask);
+		posix_acl_release(acl);
+		return error;
+	}
+
+	return -EAGAIN;
 }
 
 int f2fs_init_acl(struct inode *inode, struct inode *dir)
