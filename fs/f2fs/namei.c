@@ -18,7 +18,7 @@
 #include "xattr.h"
 #include "acl.h"
 
-static struct inode *f2fs_new_inode(struct inode *dir, umode_t mode)
+static struct inode *f2fs_new_inode(struct inode *dir, int mode)
 {
 	struct super_block *sb = dir->i_sb;
 	struct f2fs_sb_info *sbi = F2FS_SB(sb);
@@ -114,7 +114,7 @@ static inline void set_cold_file(struct f2fs_sb_info *sbi, struct inode *inode,
 	}
 }
 
-static int f2fs_create(struct inode *dir, struct dentry *dentry, umode_t mode,
+static int f2fs_create(struct inode *dir, struct dentry *dentry, int mode,
 						struct nameidata *nd)
 {
 	struct super_block *sb = dir->i_sb;
@@ -280,7 +280,7 @@ out:
 	return err;
 }
 
-static int f2fs_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode)
+static int f2fs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 {
 	struct f2fs_sb_info *sbi = F2FS_SB(dir->i_sb);
 	struct inode *inode;
@@ -326,7 +326,7 @@ static int f2fs_rmdir(struct inode *dir, struct dentry *dentry)
 }
 
 static int f2fs_mknod(struct inode *dir, struct dentry *dentry,
-				umode_t mode, dev_t rdev)
+				int mode, dev_t rdev)
 {
 	struct super_block *sb = dir->i_sb;
 	struct f2fs_sb_info *sbi = F2FS_SB(sb);
@@ -469,7 +469,7 @@ const struct inode_operations f2fs_dir_inode_operations = {
 	.mknod		= f2fs_mknod,
 	.rename		= f2fs_rename,
 	.setattr	= f2fs_setattr,
-	.get_acl	= f2fs_get_acl,
+	.check_acl	= f2fs_check_acl,
 #ifdef CONFIG_F2FS_FS_XATTR
 	.setxattr	= generic_setxattr,
 	.getxattr	= generic_getxattr,
@@ -493,7 +493,7 @@ const struct inode_operations f2fs_symlink_inode_operations = {
 
 const struct inode_operations f2fs_special_inode_operations = {
 	.setattr        = f2fs_setattr,
-	.get_acl	= f2fs_get_acl,
+	.check_acl	= f2fs_check_acl,
 #ifdef CONFIG_F2FS_FS_XATTR
 	.setxattr       = generic_setxattr,
 	.getxattr       = generic_getxattr,
