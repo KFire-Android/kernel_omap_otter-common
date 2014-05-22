@@ -350,7 +350,7 @@ static int segment_info_seq_show(struct seq_file *seq, void *offset)
 
 static int segment_info_open_fs(struct inode *inode, struct file *file)
 {
-	return single_open(file, segment_info_seq_show, PDE_DATA(inode));
+	return single_open(file, segment_info_seq_show, PROC_I(inode)->pde->data);
 }
 
 static const struct file_operations f2fs_seq_segment_info_fops = {
