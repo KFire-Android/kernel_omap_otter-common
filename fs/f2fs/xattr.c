@@ -154,6 +154,7 @@ static int f2fs_xattr_advise_set(struct dentry *dentry, const char *name,
 }
 
 #ifdef CONFIG_F2FS_FS_SECURITY
+#if 0
 static int f2fs_initxattrs(struct inode *inode, const struct xattr *xattr_array,
 		void *page)
 {
@@ -169,12 +170,30 @@ static int f2fs_initxattrs(struct inode *inode, const struct xattr *xattr_array,
 	}
 	return err;
 }
+#endif
 
 int f2fs_init_security(struct inode *inode, struct inode *dir,
 				const struct qstr *qstr, struct page *ipage)
 {
-	return security_inode_init_security(inode, dir, qstr,
-				&f2fs_initxattrs, ipage);
+//	return security_inode_init_security(inode, dir, qstr,
+//				&f2fs_initxattrs, ipage);
+        int err;
+        size_t len;
+        void *value;
+        char *name;
+
+        err = security_inode_init_security(inode, dir, qstr, &name, &value, &len);
+        if (err) {
+                if (err == -EOPNOTSUPP)
+                        return 0;
+                return err;
+        }
+        err = f2fs_setxattr(inode, F2FS_XATTR_INDEX_SECURITY,
+                            name, value,
+                            len, (struct page *)ipage);
+        kfree(name);
+        kfree(value);
+        return err;
 }
 #endif
 
