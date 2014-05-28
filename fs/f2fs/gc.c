@@ -45,11 +45,6 @@ static int gc_thread_func(void *data)
 		if (kthread_should_stop())
 			break;
 
-		f2fs_balance_fs(sbi);
-
-		if (!test_opt(sbi, BG_GC))
-			continue;
-
 		/*
 		 * [GC triggering condition]
 		 * 0. GC is not conducted currently.
