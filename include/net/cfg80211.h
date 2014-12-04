@@ -740,7 +740,7 @@ struct mesh_setup {
  * @aifs: Arbitration interframe space [0..255]
  */
 struct ieee80211_txq_params {
-	enum nl80211_txq_q queue;
+	enum nl80211_ac queue;
 	u16 txop;
 	u16 cwmin;
 	u16 cwmax;
