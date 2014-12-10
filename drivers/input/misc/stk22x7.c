@@ -118,6 +118,8 @@ struct stk_als22x7_data {
     int32_t lux_last;
 
     unsigned int enabled : 1;
+    unsigned int future_enabled : 1;
+    unsigned int suspended : 1;
     struct mutex lock;
     struct task_struct *thread;
     struct completion thread_completion;
@@ -127,7 +129,6 @@ struct stk_als22x7_data {
 #endif
 };
 
-static struct platform_device *stk_als22x7_device = NULL;
 static struct stk_als22x7_data *stk_als22x7_device_data = NULL;
 
 static int32_t set_it(struct stk_als22x7_data *data, uint32_t it) {
@@ -227,14 +228,19 @@ static int stk_als22x7_poll(void* arg) {
 static int32_t stk_als22x7_enable(struct stk_als22x7_data *data) {
     int32_t ret = 0;
     if (data->enabled == 0) {
-	ret = stk_als22x7_set_power_state(data, 0);
-	if (ret != 0) {
-	    ERR("failed to start hardware\n");
-	    return ret;
+	if (data->suspended == 0) {
+	    ret = stk_als22x7_set_power_state(data, 0);
+	    if (ret != 0) {
+	        ERR("failed to start hardware\n");
+	        return ret;
+	    }
+	    data->lux_last = 0;
+	    data->enabled = 1;
+	    data->thread = kthread_run(stk_als22x7_poll, data, "stk_als22x7_poll");
 	}
-	data->lux_last = 0;
-	data->enabled = 1;
-	data->thread = kthread_run(stk_als22x7_poll, data, "stk_als22x7_poll");
+	else {
+	    data->future_enabled = 1;
+	}
     } else {
 	WARNING("thread is running already\n");
     }
@@ -245,6 +251,7 @@ static int32_t stk_als22x7_disable(struct stk_als22x7_data *data) {
     int32_t ret = 0;
     if (data->enabled == 1) {
 	data->enabled = 0;
+	data->future_enabled = 0;
 	mutex_unlock(&data->lock);
 	INFO("wait for thread completion\n");
 	wait_for_completion(&data->thread_completion);
@@ -386,29 +393,61 @@ static void stk_als22x7_sysfs_remove_files(struct device *dev, struct device_att
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
 static void stk_als22x7_early_suspend(struct early_suspend *h) {
-    /*struct stk_als22x7_data *data = container_of(h, struct stk_als22x7_data, early_suspend);
-      stk_als22x7_disable(data);*/
+    struct stk_als22x7_data *data = container_of(h, struct stk_als22x7_data, early_suspend);
     printk("!!!!!!!%s!!!!!!!!!!\n",__func__);
+    mutex_lock(&data->lock);
+    data->suspended = 1;
+    mutex_unlock(&data->lock);
 }
 
 static void stk_als22x7_late_resume(struct early_suspend *h) {
-    /*struct stk_als22x7_data *data = container_of(h, struct stk_als22x7_data, early_suspend);
-      stk_als22x7_enable(data);*/
+    int32_t ret = 0;
+    struct stk_als22x7_data *data = container_of(h, struct stk_als22x7_data, early_suspend);
     printk("!!!!!!!%s!!!!!!!!!!\n",__func__);
+    mutex_lock(&data->lock);
+    data->suspended = 0;
+    if (data->future_enabled) {
+        data->future_enabled = 0;
+        ret = stk_als22x7_set_power_state(data, 0);
+        if (ret != 0) {
+            ERR("failed to start hardware\n");
+        }
+	else {
+            data->lux_last = 0;
+            data->enabled = 1;
+            data->thread = kthread_run(stk_als22x7_poll, data, "stk_als22x7_poll");
+        }
+    }
+    mutex_unlock(&data->lock);
 }
 #else
 #ifdef CONFIG_PM
 static int stk_als22x7_suspend(struct i2c_client *client){
     struct stk_als22x7_data *data = (struct stk_als22x7_data*)i2c_get_clientdata(client);
-    stk_als22x7_disable(data);
     printk("!!!!!!!%s!!!!!!!!!!\n",__func__);
+    mutex_lock(&data->lock);
+    data->suspended = 1;
+    mutex_unlock(&data->lock);
     return 0;
 }
 
 static int stk_als22x7_resume(struct i2c_client *client){
     struct stk_als22x7_data *data = (struct stk_als22x7_data*)i2c_get_clientdata(client);
-    stk_als22x7_enable(data);
     printk("!!!!!!!%s!!!!!!!!!!\n",__func__);
+    mutex_lock(&data->lock);
+    data->suspended = 0;
+    if (data->future_enabled) {
+        data->future_enabled = 0;
+        ret = stk_als22x7_set_power_state(data, 0);
+        if (ret != 0) {
+            ERR("failed to start hardware\n");
+            return ret;
+        }
+        data->lux_last = 0;
+        data->enabled = 1;
+        data->thread = kthread_run(stk_als22x7_poll, data, "stk_als22x7_poll");
+    }
+    mutex_unlock(&data->lock);
     return 0;
 }
 #else
@@ -480,6 +519,8 @@ static int stk_als22x7_probe(struct i2c_client *client, const struct i2c_device_
     data->transmittance = DEFAULT_TRANSMITTANCE;
     data->change_threshold = DEFAULT_CHANGE_THRESHOLD;
     data->enabled = 0;
+    data->future_enabled = 0;
+    data->suspended = 0;
 
     /* finally initialize hardware */
     stk_als22x7_init_hardware(data);	
