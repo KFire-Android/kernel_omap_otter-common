@@ -747,11 +747,6 @@ struct omap_dss_hdmi_data
 	int hpd_gpio;
 };
 
-struct omap_dss_hdmi_data
-{
-	int hpd_gpio;
-};
-
 struct omap_dss_driver {
 	struct device_driver driver;
 
