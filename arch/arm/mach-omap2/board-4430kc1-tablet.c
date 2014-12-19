@@ -901,7 +901,7 @@ static void __init omap_kc1_init(void)
 	gpio_request(0, "sysok");
 
 //	wake_lock_init(&uart_lock, WAKE_LOCK_SUSPEND, "uart_wake_lock");
-//	board_serial_init();
+	board_serial_init();
 
 	omap4_twl6030_hsmmc_init(mmc);
 	gpio_request(42, "OMAP_GPIO_ADC");
