@@ -46,6 +46,7 @@
 #ifdef CONFIG_OMAP_PM
 #include <linux/pm_qos_params.h>
 static struct pm_qos_request_list pm_qos_handle;
+static bool pm_qos_handle_added;
 #endif
 
 #define HDMI_WP			0x0
@@ -423,10 +424,16 @@ static void hdmi_set_l3_cstr(struct omap_dss_device *dssdev, bool enable)
 	DSSINFO("%s c-state constraint for HDMI\n\n",
 		enable ? "Set" : "Release");
 
-	if (enable)
-		pm_qos_add_request(&pm_qos_handle, PM_QOS_CPU_DMA_LATENCY, 100);
-	else
-		pm_qos_remove_request(&pm_qos_handle);
+	if (enable != pm_qos_handle_added) {
+		if (enable)
+			pm_qos_add_request(&pm_qos_handle,
+					PM_QOS_CPU_DMA_LATENCY, 100);
+		else
+			pm_qos_remove_request(&pm_qos_handle);
+
+		pm_qos_handle_added = enable;
+	}
+
 #else
 	DSSINFO("C-STATE Constraints require COMFIG_OMAP_PM to be set\n");
 #endif

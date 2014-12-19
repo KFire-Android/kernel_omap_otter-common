@@ -23,14 +23,23 @@
 #include <linux/io.h>
 #include <linux/leds.h>
 #include <linux/gpio.h>
+#include <linux/omapfb.h>
 #include <linux/usb/otg.h>
+#include <linux/hwspinlock.h>
 #include <linux/i2c/twl.h>
+#include <linux/reboot.h>
 #include <linux/regulator/machine.h>
 #include <linux/regulator/fixed.h>
 #include <linux/wl12xx.h>
+#include <linux/memblock.h>
 
 #include <mach/hardware.h>
 #include <mach/omap4-common.h>
+#include <mach/emif.h>
+#include <mach/lpddr2-elpida.h>
+#include <mach/dmm.h>
+#include <mach/omap4_ion.h>
+
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
@@ -40,13 +49,21 @@
 #include <plat/common.h>
 #include <plat/usb.h>
 #include <plat/mmc.h>
+#include <plat/omap_apps_brd_id.h>
+#include <plat/remoteproc.h>
+#include <plat/vram.h>
 #include <video/omap-panel-generic-dpi.h>
 #include "timer-gp.h"
 
+#include "board-panda.h"
+#include "omap_ram_console.h"
 #include "hsmmc.h"
 #include "control.h"
 #include "mux.h"
+#include "pm.h"
 #include "common-board-devices.h"
+#include "prm-regbits-44xx.h"
+#include "prm44xx.h"
 
 #define GPIO_HUB_POWER		1
 #define GPIO_HUB_NRESET		62
@@ -55,6 +72,7 @@
 #define HDMI_GPIO_CT_CP_HPD 60 /* HPD mode enable/disable */
 #define HDMI_GPIO_LS_OE 41 /* Level shifter for HDMI */
 #define HDMI_GPIO_HPD  63 /* Hotplug detect */
+#define TPS62361_GPIO   7 /* VCORE1 power control */
 
 /* wl127x BT, FM, GPS connectivity chip */
 static int wl1271_gpios[] = {46, -1, -1};
@@ -152,7 +170,11 @@ static void __init omap4_ehci_init(void)
 
 static struct omap_musb_board_data musb_board_data = {
 	.interface_type		= MUSB_INTERFACE_UTMI,
+#ifdef CONFIG_USB_GADGET_MUSB_HDRC
+	.mode			= MUSB_PERIPHERAL,
+#else
 	.mode			= MUSB_OTG,
+#endif
 	.power			= 100,
 };
 
@@ -160,7 +182,6 @@ static struct twl4030_usb_data omap4_usbphy_data = {
 	.phy_init	= omap4430_phy_init,
 	.phy_exit	= omap4430_phy_exit,
 	.phy_power	= omap4430_phy_power,
-	.phy_set_clock	= omap4430_phy_set_clk,
 	.phy_suspend	= omap4430_phy_suspend,
 };
 
@@ -275,6 +296,10 @@ static int __init omap4_twl6030_hsmmc_init(struct omap2_hsmmc_info *controllers)
 	return 0;
 }
 
+static struct regulator_consumer_supply sdp4430_vaux2_supply[] = {
+	REGULATOR_SUPPLY("av-switch", "soc-audio"),
+};
+
 static struct regulator_init_data omap4_panda_vaux2 = {
 	.constraints = {
 		.min_uV			= 1200000,
@@ -286,6 +311,8 @@ static struct regulator_init_data omap4_panda_vaux2 = {
 					| REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
 	},
+	.num_consumer_supplies	= 1,
+	.consumer_supplies	= sdp4430_vaux2_supply,
 };
 
 static struct regulator_init_data omap4_panda_vaux3 = {
@@ -352,6 +379,12 @@ static struct regulator_init_data omap4_panda_vcxio = {
 	},
 };
 
+static struct regulator_consumer_supply panda_vdac_supply[] = {
+	{
+		.supply = "hdmi_vref",
+	},
+};
+
 static struct regulator_init_data omap4_panda_vdac = {
 	.constraints = {
 		.min_uV			= 1800000,
@@ -361,6 +394,8 @@ static struct regulator_init_data omap4_panda_vdac = {
 		.valid_ops_mask	 = REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
 	},
+	.num_consumer_supplies  = ARRAY_SIZE(panda_vdac_supply),
+	.consumer_supplies      = panda_vdac_supply,
 };
 
 static struct regulator_init_data omap4_panda_vusb = {
@@ -378,7 +413,30 @@ static struct regulator_init_data omap4_panda_vusb = {
 static struct regulator_init_data omap4_panda_clk32kg = {
 	.constraints = {
 		.valid_ops_mask		= REGULATOR_CHANGE_STATUS,
+		.always_on		= true,
 	},
+};
+
+static void omap4_audio_conf(void)
+{
+	/* twl6040 naudint */
+	omap_mux_init_signal("sys_nirq2.sys_nirq2", \
+		OMAP_PIN_INPUT_PULLUP | OMAP_PIN_OFF_WAKEUPENABLE);
+}
+
+static struct twl4030_codec_audio_data twl6040_audio = {
+	/* single-step ramp for headset and handsfree */
+	.hs_left_step	= 0x0f,
+	.hs_right_step	= 0x0f,
+	.hf_left_step	= 0x1d,
+	.hf_right_step	= 0x1d,
+};
+
+static struct twl4030_codec_data twl6040_codec = {
+	.audio		= &twl6040_audio,
+	.audpwron_gpio	= 127,
+	.naudint_irq	= OMAP44XX_IRQ_SYS_2N,
+	.irq_base	= TWL6040_CODEC_IRQ_BASE,
 };
 
 static struct twl4030_platform_data omap4_panda_twldata = {
@@ -396,6 +454,9 @@ static struct twl4030_platform_data omap4_panda_twldata = {
 	.vaux3		= &omap4_panda_vaux3,
 	.clk32kg	= &omap4_panda_clk32kg,
 	.usb		= &omap4_usbphy_data,
+
+	/* children */
+	.codec		= &twl6040_codec,
 };
 
 /*
@@ -408,8 +469,43 @@ static struct i2c_board_info __initdata panda_i2c_eeprom[] = {
 	},
 };
 
+static void __init omap_i2c_hwspinlock_init(int bus_id, int spinlock_id,
+                                struct omap_i2c_bus_board_data *pdata)
+{
+	/* spinlock_id should be -1 for a generic lock request */
+	if (spinlock_id < 0)
+		pdata->handle = hwspin_lock_request();
+	else
+		pdata->handle = hwspin_lock_request_specific(spinlock_id);
+
+	if (pdata->handle != NULL) {
+		pdata->hwspin_lock_timeout = hwspin_lock_timeout;
+		pdata->hwspin_unlock = hwspin_unlock;
+	} else {
+		pr_err("I2C hwspinlock request failed for bus %d\n", \
+								bus_id);
+	}
+}
+
+static struct omap_i2c_bus_board_data __initdata panda_i2c_1_bus_pdata;
+static struct omap_i2c_bus_board_data __initdata panda_i2c_2_bus_pdata;
+static struct omap_i2c_bus_board_data __initdata panda_i2c_3_bus_pdata;
+static struct omap_i2c_bus_board_data __initdata panda_i2c_4_bus_pdata;
+
+
 static int __init omap4_panda_i2c_init(void)
 {
+	omap_i2c_hwspinlock_init(1, 0, &panda_i2c_1_bus_pdata);
+	omap_i2c_hwspinlock_init(2, 1, &panda_i2c_2_bus_pdata);
+	omap_i2c_hwspinlock_init(3, 2, &panda_i2c_3_bus_pdata);
+	omap_i2c_hwspinlock_init(4, 3, &panda_i2c_4_bus_pdata);
+
+	omap_register_i2c_bus_board_data(1, &panda_i2c_1_bus_pdata);
+	omap_register_i2c_bus_board_data(2, &panda_i2c_2_bus_pdata);
+	omap_register_i2c_bus_board_data(3, &panda_i2c_3_bus_pdata);
+	omap_register_i2c_bus_board_data(4, &panda_i2c_4_bus_pdata);
+
+
 	omap4_pmic_init("twl6030", &omap4_panda_twldata);
 	omap_register_i2c_bus(2, 400, NULL, 0);
 	/*
@@ -498,71 +594,14 @@ static struct omap_board_mux board_mux[] __initdata = {
 	{ .reg_offset = OMAP_MUX_TERMINATOR },
 };
 
-static struct omap_device_pad serial2_pads[] __initdata = {
-	OMAP_MUX_STATIC("uart2_cts.uart2_cts",
-			 OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0),
-	OMAP_MUX_STATIC("uart2_rts.uart2_rts",
-			 OMAP_PIN_OUTPUT | OMAP_MUX_MODE0),
-	OMAP_MUX_STATIC("uart2_rx.uart2_rx",
-			 OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0),
-	OMAP_MUX_STATIC("uart2_tx.uart2_tx",
-			 OMAP_PIN_OUTPUT | OMAP_MUX_MODE0),
-};
-
-static struct omap_device_pad serial3_pads[] __initdata = {
-	OMAP_MUX_STATIC("uart3_cts_rctx.uart3_cts_rctx",
-			 OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0),
-	OMAP_MUX_STATIC("uart3_rts_sd.uart3_rts_sd",
-			 OMAP_PIN_OUTPUT | OMAP_MUX_MODE0),
-	OMAP_MUX_STATIC("uart3_rx_irrx.uart3_rx_irrx",
-			 OMAP_PIN_INPUT | OMAP_MUX_MODE0),
-	OMAP_MUX_STATIC("uart3_tx_irtx.uart3_tx_irtx",
-			 OMAP_PIN_OUTPUT | OMAP_MUX_MODE0),
-};
-
-static struct omap_device_pad serial4_pads[] __initdata = {
-	OMAP_MUX_STATIC("uart4_rx.uart4_rx",
-			 OMAP_PIN_INPUT | OMAP_MUX_MODE0),
-	OMAP_MUX_STATIC("uart4_tx.uart4_tx",
-			 OMAP_PIN_OUTPUT | OMAP_MUX_MODE0),
-};
-
-static struct omap_board_data serial2_data __initdata = {
-	.id             = 1,
-	.pads           = serial2_pads,
-	.pads_cnt       = ARRAY_SIZE(serial2_pads),
-};
-
-static struct omap_board_data serial3_data __initdata = {
-	.id             = 2,
-	.pads           = serial3_pads,
-	.pads_cnt       = ARRAY_SIZE(serial3_pads),
-};
-
-static struct omap_board_data serial4_data __initdata = {
-	.id             = 3,
-	.pads           = serial4_pads,
-	.pads_cnt       = ARRAY_SIZE(serial4_pads),
-};
-
-static inline void board_serial_init(void)
+static inline void __init board_serial_init(void)
 {
-	struct omap_board_data bdata;
-	bdata.flags     = 0;
-	bdata.pads      = NULL;
-	bdata.pads_cnt  = 0;
-	bdata.id        = 0;
-	/* pass dummy data for UART1 */
-	omap_serial_init_port(&bdata);
-
-	omap_serial_init_port(&serial2_data);
-	omap_serial_init_port(&serial3_data);
-	omap_serial_init_port(&serial4_data);
+	omap_serial_init();
 }
 #else
 #define board_mux	NULL
 
-static inline void board_serial_init(void)
+static inline void __init board_serial_init(void)
 {
 	omap_serial_init();
 }
@@ -584,7 +623,7 @@ static void omap4_panda_disable_dvi(struct omap_dss_device *dssdev)
 
 /* Using generic display panel */
 static struct panel_generic_dpi_data omap4_dvi_panel = {
-	.name			= "generic",
+	.name			= "generic_720p",
 	.platform_enable	= omap4_panda_enable_dvi,
 	.platform_disable	= omap4_panda_disable_dvi,
 };
@@ -612,38 +651,40 @@ int __init omap4_panda_dvi_init(void)
 	return r;
 }
 
+static struct gpio panda_hdmi_gpios[] = {
+	{ HDMI_GPIO_CT_CP_HPD,	GPIOF_OUT_INIT_HIGH, "hdmi_gpio_hpd"   },
+	{ HDMI_GPIO_LS_OE,	GPIOF_OUT_INIT_HIGH, "hdmi_gpio_ls_oe" },
+};
 
 static void omap4_panda_hdmi_mux_init(void)
 {
-	omap_mux_init_signal("hdmi_cec",
-			OMAP_PIN_INPUT_PULLUP);
-	omap_mux_init_signal("hdmi_ddc_scl",
-			OMAP_PIN_INPUT_PULLUP);
-	omap_mux_init_signal("hdmi_ddc_sda",
-			OMAP_PIN_INPUT_PULLUP);
-}
-
-static struct gpio panda_hdmi_gpios[] = {
-	{ HDMI_GPIO_CT_CP_HPD, GPIOF_OUT_INIT_HIGH, "hdmi_gpio_ct_cp_hpd" },
-	{ HDMI_GPIO_LS_OE,	GPIOF_OUT_INIT_HIGH, "hdmi_gpio_ls_oe" },
-	{ HDMI_GPIO_HPD, GPIOF_DIR_IN, "hdmi_gpio_hpd" },
-};
-
-static int omap4_panda_panel_enable_hdmi(struct omap_dss_device *dssdev)
-{
+	u32 r;
 	int status;
+	/* PAD0_HDMI_HPD_PAD1_HDMI_CEC */
+	omap_mux_init_signal("hdmi_hpd.hdmi_hpd",
+				OMAP_PIN_INPUT_PULLUP);
+	omap_mux_init_signal("gpmc_wait2.gpio_100",
+			OMAP_PIN_INPUT_PULLDOWN);
+	omap_mux_init_signal("hdmi_cec.hdmi_cec",
+			OMAP_PIN_INPUT_PULLUP);
+	/* PAD0_HDMI_DDC_SCL_PAD1_HDMI_DDC_SDA */
+	omap_mux_init_signal("hdmi_ddc_scl.hdmi_ddc_scl",
+			OMAP_PIN_INPUT_PULLUP);
+	omap_mux_init_signal("hdmi_ddc_sda.hdmi_ddc_sda",
+			OMAP_PIN_INPUT_PULLUP);
+
+	/* strong pullup on DDC lines using unpublished register */
+	r = ((1 << 24) | (1 << 28)) ;
+	omap4_ctrl_pad_writel(r, OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_I2C_1);
+
+	gpio_request(HDMI_GPIO_HPD, NULL);
+	omap_mux_init_gpio(HDMI_GPIO_HPD, OMAP_PIN_INPUT | OMAP_PULL_ENA);
+	gpio_direction_input(HDMI_GPIO_HPD);
 
 	status = gpio_request_array(panda_hdmi_gpios,
-				    ARRAY_SIZE(panda_hdmi_gpios));
+			ARRAY_SIZE(panda_hdmi_gpios));
 	if (status)
-		pr_err("Cannot request HDMI GPIOs\n");
-
-	return status;
-}
-
-static void omap4_panda_panel_disable_hdmi(struct omap_dss_device *dssdev)
-{
-	gpio_free_array(panda_hdmi_gpios, ARRAY_SIZE(panda_hdmi_gpios));
+		pr_err("%s: Cannot request HDMI GPIOs %x \n", __func__, status);
 }
 
 static struct omap_dss_hdmi_data omap4_panda_hdmi_data = {
@@ -654,8 +695,16 @@ static struct omap_dss_device  omap4_panda_hdmi_device = {
 	.name = "hdmi",
 	.driver_name = "hdmi_panel",
 	.type = OMAP_DISPLAY_TYPE_HDMI,
-	.platform_enable = omap4_panda_panel_enable_hdmi,
-	.platform_disable = omap4_panda_panel_disable_hdmi,
+	.clocks	= {
+		.dispc	= {
+			.dispc_fclk_src	= OMAP_DSS_CLK_SRC_FCK,
+		},
+		.hdmi	= {
+			.regn	= 15,
+			.regm2	= 1,
+		},
+	},
+	.hpd_gpio = HDMI_GPIO_HPD,
 	.channel = OMAP_DSS_CHANNEL_DIGIT,
 	.data = &omap4_panda_hdmi_data,
 };
@@ -669,6 +718,23 @@ static struct omap_dss_board_info omap4_panda_dss_data = {
 	.num_devices	= ARRAY_SIZE(omap4_panda_dss_devices),
 	.devices	= omap4_panda_dss_devices,
 	.default_device	= &omap4_panda_dvi_device,
+};
+
+/*
+ * LPDDR2 Configeration Data:
+ * The memory organisation is as below :
+ *	EMIF1 - CS0 -	2 Gb
+ *		CS1 -	2 Gb
+ *	EMIF2 - CS0 -	2 Gb
+ *		CS1 -	2 Gb
+ *	--------------------
+ *	TOTAL -		8 Gb
+ *
+ * Same devices installed on EMIF1 and EMIF2
+ */
+static __initdata struct emif_device_details emif_devices = {
+	.cs0_device = &lpddr2_elpida_2G_S4_dev,
+	.cs1_device = &lpddr2_elpida_2G_S4_dev
 };
 
 void omap4_panda_display_init(void)
@@ -687,25 +753,67 @@ void omap4_panda_display_init(void)
 	omap_mux_init_gpio(HDMI_GPIO_HPD, OMAP_PIN_INPUT_PULLDOWN);
 }
 
+
+#define PANDA_FB_RAM_SIZE                SZ_16M /* 1920×1080*4 * 2 */
+static struct omapfb_platform_data panda_fb_pdata = {
+	.mem_desc = {
+		.region_cnt = 1,
+		.region = {
+			[0] = {
+				.size = PANDA_FB_RAM_SIZE,
+			},
+		},
+	},
+};
+
+extern void __init omap4_panda_android_init(void);
+
 static void __init omap4_panda_init(void)
 {
+	int status;
 	int package = OMAP_PACKAGE_CBS;
+
+	omap_emif_setup_device_details(&emif_devices, &emif_devices);
 
 	if (omap_rev() == OMAP4430_REV_ES1_0)
 		package = OMAP_PACKAGE_CBL;
 	omap4_mux_init(board_mux, NULL, package);
 
+	omap_init_board_version(OMAP4_PANDA);
+	omap4_create_board_props();
+
 	if (wl12xx_set_platform_data(&omap_panda_wlan_data))
 		pr_err("error setting wl12xx data\n");
 
 	omap4_panda_i2c_init();
+	omap4_register_ion();
+	omap4_audio_conf();
 	platform_add_devices(panda_devices, ARRAY_SIZE(panda_devices));
 	platform_device_register(&omap_vwlan_device);
 	board_serial_init();
 	omap4_twl6030_hsmmc_init(mmc);
 	omap4_ehci_init();
 	usb_musb_init(&musb_board_data);
+
+	omap_dmm_init();
+	omap_vram_set_sdram_vram(PANDA_FB_RAM_SIZE, 0);
+	omapfb_set_platform_data(&panda_fb_pdata);
 	omap4_panda_display_init();
+
+	if (cpu_is_omap446x()) {
+		/* Vsel0 = gpio, vsel1 = gnd */
+		status = omap_tps6236x_board_setup(true, TPS62361_GPIO, -1,
+					OMAP_PIN_OFF_OUTPUT_HIGH, -1);
+		if (status)
+			pr_err("TPS62361 initialization failed: %d\n", status);
+	}
+	omap_enable_smartreflex_on_init();
+	/*
+	 * 7X-38.400MBB-T oscillator uses:
+	 * Up time = startup time(max 10ms) + enable time (max 100ns: round 1us)
+	 * Down time = disable time (max 100ns: round 1us)
+	 */
+	omap_pm_set_osc_lp_time(11000, 1);
 }
 
 static void __init omap4_panda_map_io(void)
@@ -714,10 +822,33 @@ static void __init omap4_panda_map_io(void)
 	omap44xx_map_common_io();
 }
 
+static void __init omap4_panda_reserve(void)
+{
+	omap_init_ram_size();
+
+#ifdef CONFIG_ION_OMAP
+	omap_ion_init();
+#endif
+
+	omap_ram_console_init(OMAP_RAM_CONSOLE_START_DEFAULT,
+			OMAP_RAM_CONSOLE_SIZE_DEFAULT);
+
+	/* do the static reservations first */
+	memblock_remove(PHYS_ADDR_SMC_MEM, PHYS_ADDR_SMC_SIZE);
+	memblock_remove(PHYS_ADDR_DUCATI_MEM, PHYS_ADDR_DUCATI_SIZE);
+	/* ipu needs to recognize secure input buffer area as well */
+	omap_ipu_set_static_mempool(PHYS_ADDR_DUCATI_MEM, PHYS_ADDR_DUCATI_SIZE +
+					OMAP4_ION_HEAP_SECURE_INPUT_SIZE +
+					OMAP4_ION_HEAP_SECURE_OUTPUT_WFDHDCP_SIZE);
+
+
+	omap_reserve();
+}
+
 MACHINE_START(OMAP4_PANDA, "OMAP4 Panda board")
 	/* Maintainer: David Anders - Texas Instruments Inc */
 	.boot_params	= 0x80000100,
-	.reserve	= omap_reserve,
+	.reserve	= omap4_panda_reserve,
 	.map_io		= omap4_panda_map_io,
 	.init_early	= omap4_panda_init_early,
 	.init_irq	= gic_init_irq,

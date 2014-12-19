@@ -56,6 +56,13 @@ config PANEL_TC358765
 	help
 	  Toshiba TC358765 DSI-2-LVDS chip with 1024x768 panel
 
+config PANEL_LD089WU1
+	tristate "LG LD089WU1 panel"
+	depends on OMAP2_DSS_DSI && I2C
+	select BACKLIGHT_CLASS_DEVICE
+	help
+	  LG LD089WU1 panel with WUXGA resolution.
+
 config TC358765_DEBUG
 	bool "Toshiba TC358765 DSI-2-LVDS chip debug"
 	depends on PANEL_TC358765 && DEBUG_FS

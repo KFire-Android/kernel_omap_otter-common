@@ -335,6 +335,9 @@ static inline unsigned int cpufreq_quick_get(unsigned int cpu)
 					defined(CONFIG_OMAP4_DPLL_CASCADING)
 extern void cpufreq_interactive_set_timer_rate(unsigned long val,
 							unsigned int reset);
+#else
+static inline void cpufreq_interactive_set_timer_rate(unsigned long val,
+						      unsigned int reset) {}
 #endif
 
 /*********************************************************************

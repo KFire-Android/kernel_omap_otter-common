@@ -2052,7 +2052,7 @@ static int __devinit omap_system_dma_probe(struct platform_device *pdev)
 
 	if (cpu_is_omap2430() || cpu_is_omap34xx() || cpu_is_omap44xx())
 		omap_dma_set_global_params(DMA_DEFAULT_ARB_RATE,
-				DMA_DEFAULT_FIFO_DEPTH, 0);
+				DMA_DEFAULT_FIFO_DEPTH, 1);
 
 	if (cpu_class_is_omap2()) {
 		strcpy(irq_name, "0");

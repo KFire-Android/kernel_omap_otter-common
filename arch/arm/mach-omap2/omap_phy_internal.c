@@ -185,7 +185,7 @@ static void omap44xx_hsotg_ed_correction(void)
 }
 #endif
 
-int omap4430_phy_set_clk(struct device *dev, int on)
+static int omap4430_phy_set_clk(struct device *dev, int on)
 {
 	static int state;
 

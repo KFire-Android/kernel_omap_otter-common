@@ -971,13 +971,15 @@ int omap_device_scale(struct device *req_dev, struct device *target_dev,
 		return -EBUSY;
 	}
 
-#ifdef CONFIG_OMAP4_DPLL_CASCADING
-	if (omap4_is_in_dpll_cascading())
-		return -EBUSY;
-#endif
 
 	/* Lock me to ensure cross domain scaling is secure */
 	mutex_lock(&omap_dvfs_lock);
+#ifdef CONFIG_OMAP4_DPLL_CASCADING
+	if (omap4_is_in_dpll_cascading()) {
+		mutex_unlock(&omap_dvfs_lock);
+		return -EBUSY;
+	}
+#endif
 	/* I would like CPU to be active always at this point */
 	pm_qos_update_request(&omap_dvfs_pm_qos_handle, 0);
 

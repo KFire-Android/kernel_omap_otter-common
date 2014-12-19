@@ -1128,6 +1128,7 @@ void abe_init_io_tasks(u32 id, abe_data_format_t *format,
 		case OMAP_ABE_TONES_DL_PORT:
 			if (abe_port[id].format.f == 44100) {
 				smem1 = TONES_44P1_WPTR_labelID;
+				abe->MultiFrame[20][0] = ABE_TASK_ID(C_ABE_FW_TASK_IO_TONES_DL);
 				abe->MultiFrame[20][1] = ABE_TASK_ID(C_ABE_FW_TASK_SRC44P1_TONES_1211);
 			} else {
 				abe->MultiFrame[20][1] = 0;

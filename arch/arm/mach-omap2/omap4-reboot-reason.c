@@ -21,11 +21,20 @@
 #include <mach/omap4-common.h>
 #include "omap4-sar-layout.h"
 
+#ifdef CONFIG_OMAP4_DPLL_CASCADING
+static struct device fake_reset_dev;
+#endif
+
 static int omap_reboot_notifier_call(struct notifier_block *this,
 					unsigned long code, void *cmd)
 {
 	void __iomem *sar_base;
 	char *reason = "normal";
+
+#ifdef CONFIG_OMAP4_DPLL_CASCADING
+	pr_info("%s: exit DPLL cascading\n", __func__);
+	omap4_dpll_cascading_blocker_hold(&fake_reset_dev);
+#endif
 
 	sar_base = omap4_get_sar_ram_base();
 

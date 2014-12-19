@@ -3,31 +3,17 @@
  *
  * Copyright(c) 2012 Texas Instruments. All rights reserved.
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 as published by
+ * the Free Software Foundation.
  *
- * * Redistributions of source code must retain the above copyright
- *	 notice, this list of conditions and the following disclaimer.
- * * Redistributions in binary form must reproduce the above copyright
- *	 notice, this list of conditions and the following disclaimer in
- *	 the documentation and/or other materials provided with the
- *	 distribution.
- * * Neither the name Texas Instruments nor the names of its
- *	 contributors may be used to endorse or promote products derived
- *	 from this software without specific prior written permission.
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
- * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
- * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * You should have received a copy of the GNU General Public License along with
+ * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #ifndef _OMAP_RPC_INTERNAL_H_
@@ -52,7 +38,7 @@
 #if defined(CONFIG_RPMSG) || defined(CONFIG_RPMSG_MODULE)
 #include <linux/rpmsg.h>
 #else
-#error "OMAP RPC requireds RPMSG"
+#error "OMAP RPC requires RPMSG"
 #endif
 
 #if defined(CONFIG_RPC_OMAP) || defined(CONFIG_RPC_OMAP_MODULE)
@@ -82,38 +68,37 @@ extern struct ion_device *omap_ion_device;
 #undef	OMAPRPC_USE_TILER
 #endif
 
-#if defined(CONFIG_DMA_SHARED_BUFFER) \
-|| defined(CONFIG_DMA_SHARED_BUFFER_MODULE)
-#define OMAPRPC_USE_DMABUF
-#undef	OMAPRPC_USE_RPROC_LOOKUP /* genernic linux does not support yet. */
-#else
-#undef	OMAPRPC_USE_DMABUF
-#endif
-
 #if defined(CONFIG_ION_OMAP) || defined(CONFIG_ION_OMAP_MODULE)
 #define OMAPRPC_USE_ION
-#define OMAPRPC_USE_RPROC_LOOKUP /* android supports this. */
+#undef	OMAPRPC_USE_DMABUF
+#define OMAPRPC_USE_RPROC_LOOKUP	/* android supports this. */
 #if defined(CONFIG_PVR_SGX) || defined(CONFIG_PVR_SGX_MODULE)
 #define OMAPRPC_USE_PVR
 #else
 #undef	OMAPRPC_USE_PVR
 #endif
-#else
+#elif defined(CONFIG_DMA_SHARED_BUFFER) \
+|| defined(CONFIG_DMA_SHARED_BUFFER_MODULE)
 #undef	OMAPRPC_USE_ION
-#endif
-
-/* Testing and debugging defines, leave undef'd in production */
-#undef OMAPRPC_DEBUGGING
-#undef OMAPRPC_VERY_VERBOSE
-#undef OMAPRPC_PERF_MEASUREMENT
-
-#if defined(OMAPRPC_DEBUGGING)
-#define OMAPRPC_INFO(dev, fmt, ...)	dev_info(dev, fmt, ## __VA_ARGS__)
-#define OMAPRPC_ERR(dev, fmt, ...)	dev_err(dev, fmt, ## __VA_ARGS__)
+#define OMAPRPC_USE_DMABUF
+/* genernic linux does not support it. */
+#undef	OMAPRPC_USE_RPROC_LOOKUP
 #else
-#define OMAPRPC_INFO(dev, fmt, ...)
-#define OMAPRPC_ERR(dev, fmt, ...)	dev_err(dev, fmt, ## __VA_ARGS__)
+#error "OMAP RPC requires either ION_OMAP or DMA_SHARED_BUFFER"
 #endif
+
+#define OMAPRPC_ZONE_INFO	(0x1)
+#define OMAPRPC_ZONE_PERF	(0x2)
+#define OMAPRPC_ZONE_VERBOSE	(0x4)
+
+extern unsigned int omaprpc_debug;
+
+#define OMAPRPC_PRINT(flag, dev, fmt, ...) { \
+	if ((flag) & omaprpc_debug) \
+		dev_info((dev), (fmt), ## __VA_ARGS__); \
+}
+
+#define OMAPRPC_ERR(dev, fmt, ...)	dev_err((dev), (fmt), ## __VA_ARGS__)
 
 #ifdef CONFIG_PHYS_ADDR_T_64BIT
 typedef u64 virt_addr_t;
@@ -126,6 +111,10 @@ enum omaprpc_service_state_e {
 	OMAPRPC_SERVICE_STATE_UP,
 };
 
+/**
+ * struct omaprpc_service_t - The per-service (endpoint) data. Contains the
+ * list of instances.
+ */
 struct omaprpc_service_t {
 	struct list_head list;
 	struct cdev cdev;
@@ -141,12 +130,19 @@ struct omaprpc_service_t {
 #endif
 };
 
+/**
+ * struct omaprpc_call_function_list_t - The list of all outstanding function
+ * calls in this instance.
+ */
 struct omaprpc_call_function_list_t {
 	struct list_head list;
 	struct omaprpc_call_function_t *function;
 	u16 msgId;
 };
 
+/**
+ * struct omaprpc_instance_t - The per-instance data structure (per user).
+ */
 struct omaprpc_instance_t {
 	struct list_head list;
 	struct omaprpc_service_t *rpcserv;
@@ -169,6 +165,10 @@ struct omaprpc_instance_t {
 };
 
 #if defined(OMAPRPC_USE_DMABUF)
+/**
+ * struct dma_info_t - The DMA Info structure tracks the dma_buf relevant
+ * variables.
+ */
 struct dma_info_t {
 	struct list_head list;
 	int fd;
@@ -179,13 +179,13 @@ struct dma_info_t {
 #endif
 
 /*!
- * A Wrapper function to translate local physical addresses to the remote core
+ * A wrapper function to translate local physical addresses to the remote core
  * memory maps. Initialially we can only use an internal static table until
  * rproc support querying.
  */
 #if defined(OMAPRPC_USE_RPROC_LOOKUP)
 phys_addr_t rpmsg_local_to_remote_pa(struct omaprpc_instance_t *rpc,
-	phys_addr_t pa);
+				     phys_addr_t pa);
 #else
 phys_addr_t rpmsg_local_to_remote_pa(uint32_t core, phys_addr_t pa);
 #endif
@@ -195,17 +195,16 @@ phys_addr_t rpmsg_local_to_remote_pa(uint32_t core, phys_addr_t pa);
  * structure and the translation structures.
  */
 int omaprpc_xlate_buffers(struct omaprpc_instance_t *rpc,
-			struct omaprpc_call_function_t *function,
-			int direction);
+			  struct omaprpc_call_function_t *function,
+			  int direction);
 
 /*!
  * Converts a buffer to a remote core address.
  */
 phys_addr_t omaprpc_buffer_lookup(struct omaprpc_instance_t *rpc,
-				uint32_t core,
-				virt_addr_t uva,
-				virt_addr_t buva,
-				void *reserved);
+				  uint32_t core,
+				  virt_addr_t uva,
+				  virt_addr_t buva, void *reserved);
 
 /*!
  * Used to recalculate the offset of a buffer and handles cases where Tiler
@@ -213,6 +212,4 @@ phys_addr_t omaprpc_buffer_lookup(struct omaprpc_instance_t *rpc,
  */
 long omaprpc_recalc_off(phys_addr_t lpa, long uoff);
 
-
 #endif
-

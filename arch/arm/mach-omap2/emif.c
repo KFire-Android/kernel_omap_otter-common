@@ -304,51 +304,6 @@ static const struct lpddr2_timings *get_timings_table(
 	return timings;
 }
 
-/*
- * Finds the value of emif_sdram_config_reg
- * All parameters are programmed based on the device on CS0.
- * If there is a device on CS1, it will be same as that on CS0 or
- * it will be NVM. We don't support NVM yet.
- * If cs1_device pointer is NULL it is assumed that there is no device
- * on CS1
- */
-static u32 get_sdram_config_reg(const struct lpddr2_device_info *cs0_device,
-				const struct lpddr2_device_info *cs1_device,
-				const struct lpddr2_addressing *addressing,
-				u8 RL)
-{
-	u32 config_reg = 0;
-
-	mask_n_set(config_reg, OMAP44XX_REG_SDRAM_TYPE_SHIFT,
-		   OMAP44XX_REG_SDRAM_TYPE_MASK, cs0_device->type + 4);
-
-	mask_n_set(config_reg, OMAP44XX_REG_IBANK_POS_SHIFT,
-		   OMAP44XX_REG_IBANK_POS_MASK,
-		   EMIF_INTERLEAVING_POLICY_MAX_INTERLEAVING);
-
-	mask_n_set(config_reg, OMAP44XX_REG_NARROW_MODE_SHIFT,
-		   OMAP44XX_REG_NARROW_MODE_MASK, cs0_device->io_width);
-
-	mask_n_set(config_reg, OMAP44XX_REG_CL_SHIFT, OMAP44XX_REG_CL_MASK, RL);
-
-	mask_n_set(config_reg, OMAP44XX_REG_ROWSIZE_SHIFT,
-		   OMAP44XX_REG_ROWSIZE_MASK,
-		   addressing->row_sz[cs0_device->io_width]);
-
-	mask_n_set(config_reg, OMAP44XX_REG_IBANK_SHIFT,
-		   OMAP44XX_REG_IBANK_MASK, addressing->num_banks);
-
-	mask_n_set(config_reg, OMAP44XX_REG_EBANK_SHIFT,
-		   OMAP44XX_REG_EBANK_MASK,
-		   (cs1_device ? EBANK_CS1_EN : EBANK_CS1_DIS));
-
-	mask_n_set(config_reg, OMAP44XX_REG_PAGESIZE_SHIFT,
-		   OMAP44XX_REG_PAGESIZE_MASK,
-		   addressing->col_sz[cs0_device->io_width]);
-
-	return config_reg;
-}
-
 static u32 get_sdram_ref_ctrl(u32 freq,
 			      const struct lpddr2_addressing *addressing)
 {
@@ -480,7 +435,8 @@ static u32 get_sdram_tim_2_reg(const struct lpddr2_timings *timings,
 	return tim2;
 }
 
-static u32 get_sdram_tim_3_reg(const struct lpddr2_timings *timings,
+static u32 get_sdram_tim_3_reg(u32 freq,
+			       const struct lpddr2_timings *timings,
 			       const struct lpddr2_min_tck *min_tck,
 			       const struct lpddr2_addressing *addressing)
 {
@@ -493,7 +449,13 @@ static u32 get_sdram_tim_3_reg(const struct lpddr2_timings *timings,
 	mask_n_set(tim3, OMAP44XX_REG_T_RFC_SHIFT, OMAP44XX_REG_T_RFC_MASK,
 		   val);
 
-	val = ns_x2_2_cycles(timings->tDQSCKMAXx2) - 1;
+	if (freq < 400000000)
+		val = ns_x2_2_cycles(timings->tDQSCKMAXx2) - 1;
+	else if (freq == 400000000)
+		val = 0x2;
+	else
+		val = 0x3;
+
 	mask_n_set(tim3, OMAP44XX_REG_T_TDQSCKMAX_SHIFT,
 		   OMAP44XX_REG_T_TDQSCKMAX_MASK, val);
 
@@ -506,51 +468,6 @@ static u32 get_sdram_tim_3_reg(const struct lpddr2_timings *timings,
 		   OMAP44XX_REG_T_CKESR_MASK, val);
 
 	return tim3;
-}
-
-static u32 get_zq_config_reg(const struct lpddr2_device_info *cs1_device,
-			     const struct lpddr2_addressing *addressing,
-			     bool volt_ramp)
-{
-	u32 zq = 0, val = 0;
-	if (volt_ramp)
-		val =
-		    EMIF_ZQCS_INTERVAL_DVFS_IN_US * 10 /
-		    addressing->t_REFI_us_x10;
-	else
-		val =
-		    EMIF_ZQCS_INTERVAL_NORMAL_IN_US * 10 /
-		    addressing->t_REFI_us_x10;
-	mask_n_set(zq, OMAP44XX_REG_ZQ_REFINTERVAL_SHIFT,
-		   OMAP44XX_REG_ZQ_REFINTERVAL_MASK, val);
-
-	mask_n_set(zq, OMAP44XX_REG_ZQ_ZQCL_MULT_SHIFT,
-		   OMAP44XX_REG_ZQ_ZQCL_MULT_MASK, REG_ZQ_ZQCL_MULT - 1);
-
-	mask_n_set(zq, OMAP44XX_REG_ZQ_ZQINIT_MULT_SHIFT,
-		   OMAP44XX_REG_ZQ_ZQINIT_MULT_MASK, REG_ZQ_ZQINIT_MULT - 1);
-
-	mask_n_set(zq, OMAP44XX_REG_ZQ_SFEXITEN_SHIFT,
-		   OMAP44XX_REG_ZQ_SFEXITEN_MASK, REG_ZQ_SFEXITEN_ENABLE);
-
-	/*
-	 * Assuming that two chipselects have a single calibration resistor
-	 * If there are indeed two calibration resistors, then this flag should
-	 * be enabled to take advantage of dual calibration feature.
-	 * This data should ideally come from board files. But considering
-	 * that none of the boards today have calibration resistors per CS,
-	 * it would be an unnecessary overhead.
-	 */
-	mask_n_set(zq, OMAP44XX_REG_ZQ_DUALCALEN_SHIFT,
-		   OMAP44XX_REG_ZQ_DUALCALEN_MASK, REG_ZQ_DUALCALEN_DISABLE);
-
-	mask_n_set(zq, OMAP44XX_REG_ZQ_CS0EN_SHIFT,
-		   OMAP44XX_REG_ZQ_CS0EN_MASK, REG_ZQ_CS0EN_ENABLE);
-
-	mask_n_set(zq, OMAP44XX_REG_ZQ_CS1EN_SHIFT,
-		   OMAP44XX_REG_ZQ_CS1EN_MASK, (cs1_device ? 1 : 0));
-
-	return zq;
 }
 
 static u32 get_temp_alert_config(const struct lpddr2_device_info *cs1_device,
@@ -604,17 +521,28 @@ static u32 get_ddr_phy_ctrl_1(u32 freq, u8 RL)
 {
 	u32 phy = 0, val = 0;
 
+	if (RL == 6)
+		val = 0x9;
+	else if (RL == 7)
+		val = 0xB;
+	else
+		val = RL + 2;
+
 	mask_n_set(phy, OMAP44XX_REG_READ_LATENCY_SHIFT,
-		   OMAP44XX_REG_READ_LATENCY_MASK, RL + 2);
+		   OMAP44XX_REG_READ_LATENCY_MASK, val);
 
 	if (freq <= 100000000)
 		val = EMIF_DLL_SLAVE_DLY_CTRL_100_MHZ_AND_LESS;
 	else if (freq <= 200000000)
 		val = EMIF_DLL_SLAVE_DLY_CTRL_200_MHZ;
 	else if (freq <= 400000000)
-		val = EMIF_DLL_SLAVE_DLY_CTRL_400_MHZ;
+		if (cpu_is_omap447x())
+			val = EMIF_DLL_SLAVE_DLY_CTRL_466_MHZ;
+		else
+			val = EMIF_DLL_SLAVE_DLY_CTRL_400_MHZ;
 	else
 		val = EMIF_DLL_SLAVE_DLY_CTRL_466_MHZ;
+
 	mask_n_set(phy, OMAP44XX_REG_DLL_SLAVE_DLY_CTRL_SHIFT,
 		   OMAP44XX_REG_DLL_SLAVE_DLY_CTRL_MASK, val);
 
@@ -738,10 +666,13 @@ static void setup_registers(u32 emif_nr, struct emif_regs *regs, u32 volt_state)
 	u32 temp,read_idle;
 	void __iomem *base = emif[emif_nr].base;
 
-	__raw_writel(regs->ref_ctrl, base + OMAP44XX_EMIF_SDRAM_REF_CTRL_SHDW);
+	__raw_writel(regs->ref_ctrl_shdw,
+			base + OMAP44XX_EMIF_SDRAM_REF_CTRL_SHDW);
 
-	__raw_writel(regs->sdram_tim2, base + OMAP44XX_EMIF_SDRAM_TIM_2_SHDW);
-	__raw_writel(regs->sdram_tim3, base + OMAP44XX_EMIF_SDRAM_TIM_3_SHDW);
+	__raw_writel(regs->sdram_tim2_shdw,
+			base + OMAP44XX_EMIF_SDRAM_TIM_2_SHDW);
+	__raw_writel(regs->sdram_tim3_shdw,
+			base + OMAP44XX_EMIF_SDRAM_TIM_3_SHDW);
 	/*
 	 * Do not change the RL part in PHY CTRL register
 	 * RL is not changed during DVFS
@@ -749,7 +680,7 @@ static void setup_registers(u32 emif_nr, struct emif_regs *regs, u32 volt_state)
 	temp = __raw_readl(base + OMAP44XX_EMIF_DDR_PHY_CTRL_1_SHDW);
 	mask_n_set(temp, OMAP44XX_REG_DDR_PHY_CTRL_1_SHDW_SHIFT,
 		   OMAP44XX_REG_DDR_PHY_CTRL_1_SHDW_MASK,
-		   regs->emif_ddr_phy_ctlr_1_final);
+		   regs->emif_ddr_phy_ctlr_1_shdw_final);
 	__raw_writel(temp, base + OMAP44XX_EMIF_DDR_PHY_CTRL_1_SHDW);
 
 	__raw_writel(regs->temp_alert_config,
@@ -760,9 +691,9 @@ static void setup_registers(u32 emif_nr, struct emif_regs *regs, u32 volt_state)
 	 * happen more often.
 	 */
 	if (volt_state == LPDDR2_VOLTAGE_RAMPING)
-		read_idle = regs->read_idle_ctrl_volt_ramp;
+		read_idle = regs->read_idle_ctrl_shdw_volt_ramp;
 	else
-		read_idle = regs->read_idle_ctrl_normal;
+		read_idle = regs->read_idle_ctrl_shdw_normal;
 	__raw_writel(read_idle, base + OMAP44XX_EMIF_READ_IDLE_CTRL_SHDW);
 
 	/*
@@ -788,21 +719,21 @@ static void setup_temperature_sensitive_regs(u32 emif_nr,
 	u32 temperature = emif_temperature_level[emif_nr];
 
 	if (unlikely(temperature == SDRAM_TEMP_HIGH_DERATE_REFRESH)) {
-		tim1 = regs->sdram_tim1;
-		ref_ctrl = regs->ref_ctrl_derated;
+		tim1 = regs->sdram_tim1_shdw;
+		ref_ctrl = regs->ref_ctrl_shdw_derated;
 		temp_alert_cfg = regs->temp_alert_config_derated;
 	} else if (unlikely(temperature ==
 			    SDRAM_TEMP_HIGH_DERATE_REFRESH_AND_TIMINGS)) {
-		tim1 = regs->sdram_tim1_derated;
-		ref_ctrl = regs->ref_ctrl_derated;
+		tim1 = regs->sdram_tim1_shdw_derated;
+		ref_ctrl = regs->ref_ctrl_shdw_derated;
 		temp_alert_cfg = regs->temp_alert_config_derated;
 	} else {
 		/*
 		 * Nominal timings - you may switch back to the
 		 * nominal timings if the temperature falls
 		 */
-		tim1 = regs->sdram_tim1;
-		ref_ctrl = regs->ref_ctrl;
+		tim1 = regs->sdram_tim1_shdw;
+		ref_ctrl = regs->ref_ctrl_shdw;
 		temp_alert_cfg = regs->temp_alert_config;
 	}
 
@@ -851,9 +782,9 @@ static void setup_volt_sensitive_registers(u32 emif_nr, struct emif_regs *regs,
 	 * happen more often.
 	 */
 	if (volt_state == LPDDR2_VOLTAGE_RAMPING)
-		read_idle = regs->read_idle_ctrl_volt_ramp;
+		read_idle = regs->read_idle_ctrl_shdw_volt_ramp;
 	else
-		read_idle = regs->read_idle_ctrl_normal;
+		read_idle = regs->read_idle_ctrl_shdw_normal;
 
 	__raw_writel(read_idle, base + OMAP44XX_EMIF_READ_IDLE_CTRL_SHDW);
 
@@ -1105,41 +1036,25 @@ static void emif_calculate_regs(const struct emif_device_details *devices,
 	emif_assert(addressing);
 
 	regs->RL_final = timings->RL;
-	/*
-	 * Initial value of EMIF_SDRAM_CONFIG corresponds to the base
-	 * frequency - 19.2 MHz
-	 */
-	regs->sdram_config_init =
-	    get_sdram_config_reg(cs0_device, cs1_device, addressing,
-				 RL_19_2_MHZ);
 
-	regs->sdram_config_final = regs->sdram_config_init;
-	mask_n_set(regs->sdram_config_final, OMAP44XX_REG_CL_SHIFT,
-		   OMAP44XX_REG_CL_MASK, timings->RL);
+	regs->ref_ctrl_shdw = get_sdram_ref_ctrl(freq, addressing);
+	regs->ref_ctrl_shdw_derated = regs->ref_ctrl_shdw / 4;
 
-	regs->ref_ctrl = get_sdram_ref_ctrl(freq, addressing);
-	regs->ref_ctrl_derated = regs->ref_ctrl / 4;
-
-	regs->sdram_tim1 = get_sdram_tim_1_reg(timings, min_tck, addressing);
-
-	regs->sdram_tim1_derated =
+	regs->sdram_tim1_shdw =
+	    get_sdram_tim_1_reg(timings, min_tck, addressing);
+	regs->sdram_tim1_shdw_derated =
 	    get_sdram_tim_1_reg_derated(timings, min_tck, addressing);
 
-	regs->sdram_tim2 = get_sdram_tim_2_reg(timings, min_tck);
+	regs->sdram_tim2_shdw = get_sdram_tim_2_reg(timings, min_tck);
 
-	regs->sdram_tim3 = get_sdram_tim_3_reg(timings, min_tck, addressing);
+	regs->sdram_tim3_shdw =
+	    get_sdram_tim_3_reg(freq, timings, min_tck, addressing);
 
-	regs->read_idle_ctrl_normal =
+	regs->read_idle_ctrl_shdw_normal =
 	    get_read_idle_ctrl_reg(LPDDR2_VOLTAGE_STABLE);
 
-	regs->read_idle_ctrl_volt_ramp =
+	regs->read_idle_ctrl_shdw_volt_ramp =
 	    get_read_idle_ctrl_reg(LPDDR2_VOLTAGE_RAMPING);
-
-	regs->zq_config_normal =
-	    get_zq_config_reg(cs1_device, addressing, LPDDR2_VOLTAGE_STABLE);
-
-	regs->zq_config_volt_ramp =
-	    get_zq_config_reg(cs1_device, addressing, LPDDR2_VOLTAGE_RAMPING);
 
 	regs->temp_alert_config =
 	    get_temp_alert_config(cs1_device, addressing, false);
@@ -1147,10 +1062,10 @@ static void emif_calculate_regs(const struct emif_device_details *devices,
 	regs->temp_alert_config_derated =
 	    get_temp_alert_config(cs1_device, addressing, true);
 
-	regs->emif_ddr_phy_ctlr_1_init =
+	regs->emif_ddr_phy_ctlr_1_shdw_init =
 	    get_ddr_phy_ctrl_1(EMIF_FREQ_19_2_MHZ, RL_19_2_MHZ);
 
-	regs->emif_ddr_phy_ctlr_1_final =
+	regs->emif_ddr_phy_ctlr_1_shdw_final =
 	    get_ddr_phy_ctrl_1(freq, regs->RL_final);
 
 	/* save the frequency in the struct to act as a tag when cached */
@@ -1158,27 +1073,23 @@ static void emif_calculate_regs(const struct emif_device_details *devices,
 
 	pr_debug("Calculated EMIF configuration register values "
 		 "for %d MHz", freq / 1000000);
-	pr_debug("sdram_config_init\t\t: 0x%08x\n", regs->sdram_config_init);
-	pr_debug("sdram_config_final\t\t: 0x%08x\n", regs->sdram_config_final);
-	pr_debug("sdram_ref_ctrl\t\t: 0x%08x\n", regs->ref_ctrl);
-	pr_debug("sdram_ref_ctrl_derated\t\t: 0x%08x\n",
-		 regs->ref_ctrl_derated);
-	pr_debug("sdram_tim_1_reg\t\t: 0x%08x\n", regs->sdram_tim1);
-	pr_debug("sdram_tim_1_reg_derated\t\t: 0x%08x\n",
-		 regs->sdram_tim1_derated);
-	pr_debug("sdram_tim_2_reg\t\t: 0x%08x\n", regs->sdram_tim2);
-	pr_debug("sdram_tim_3_reg\t\t: 0x%08x\n", regs->sdram_tim3);
-	pr_debug("emif_read_idle_ctrl_normal\t: 0x%08x\n",
-		 regs->read_idle_ctrl_normal);
+	pr_debug("sdram_ref_ctrl_shdw\t\t: 0x%08x\n", regs->ref_ctrl_shdw);
+	pr_debug("sdram_ref_ctrl_shdw_derated\t\t: 0x%08x\n",
+		 regs->ref_ctrl_shdw_derated);
+	pr_debug("sdram_tim1_shdw\t\t: 0x%08x\n", regs->sdram_tim1_shdw);
+	pr_debug("sdram_tim1_shdw_derated\t\t: 0x%08x\n",
+		 regs->sdram_tim1_shdw_derated);
+	pr_debug("sdram_tim2_shdw\t\t: 0x%08x\n", regs->sdram_tim2_shdw);
+	pr_debug("sdram_tim3_shdw\t\t: 0x%08x\n", regs->sdram_tim3_shdw);
+	pr_debug("emif_read_idle_ctrl_shdw_normal\t: 0x%08x\n",
+		 regs->read_idle_ctrl_shdw_normal);
 	pr_debug("emif_read_idle_ctrl_dvfs\t: 0x%08x\n",
-		 regs->read_idle_ctrl_volt_ramp);
-	pr_debug("zq_config_reg_normal\t: 0x%08x\n", regs->zq_config_normal);
-	pr_debug("zq_config_reg_dvfs\t\t: 0x%08x\n", regs->zq_config_volt_ramp);
+		 regs->read_idle_ctrl_shdw_volt_ramp);
 	pr_debug("temp_alert_config\t: 0x%08x\n", regs->temp_alert_config);
-	pr_debug("emif_ddr_phy_ctlr_1_init\t: 0x%08x\n",
-		 regs->emif_ddr_phy_ctlr_1_init);
-	pr_debug("emif_ddr_phy_ctlr_1_final\t: 0x%08x\n",
-		 regs->emif_ddr_phy_ctlr_1_final);
+	pr_debug("emif_ddr_phy_ctlr_1_shdw_init\t: 0x%08x\n",
+		 regs->emif_ddr_phy_ctlr_1_shdw_init);
+	pr_debug("emif_ddr_phy_ctlr_1_shdw_final\t: 0x%08x\n",
+		 regs->emif_ddr_phy_ctlr_1_shdw_final);
 }
 
 /*

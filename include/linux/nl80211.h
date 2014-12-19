@@ -696,6 +696,43 @@
  *
  * @NL80211_CMD_REQ_CH_SW: Request a channel switch from a GO/AP.
  *
+ * @NL80211_CMD_SET_REKEY_OFFLOAD: This command is used give the driver
+ *	the necessary information for supporting GTK rekey offload. This
+ *	feature is typically used during WoWLAN. The configuration data
+ *	is contained in %NL80211_ATTR_REKEY_DATA (which is nested and
+ *	contains the data in sub-attributes). After rekeying happened,
+ *	this command may also be sent by the driver as an MLME event to
+ *	inform userspace of the new replay counter.
+ *
+ * @NL80211_CMD_PMKSA_CANDIDATE: This is used as an event to inform userspace
+ *	of PMKSA caching dandidates.
+ *
+ * @NL80211_CMD_TDLS_OPER: Perform a high-level TDLS command (e.g. link setup).
+ * @NL80211_CMD_TDLS_MGMT: Send a TDLS management frame.
+ *
+ * @NL80211_CMD_UNEXPECTED_FRAME: Used by an application controlling an AP
+ *	(or GO) interface (i.e. hostapd) to ask for unexpected frames to
+ *	implement sending deauth to stations that send unexpected class 3
+ *	frames. Also used as the event sent by the kernel when such a frame
+ *	is received.
+ *	For the event, the %NL80211_ATTR_MAC attribute carries the TA and
+ *	other attributes like the interface index are present.
+ *	If used as the command it must have an interface index and you can
+ *	only unsubscribe from the event by closing the socket.
+ *
+ * @NL80211_CMD_PROBE_CLIENT: Probe an associated station on an AP interface
+ *	by sending a null data frame to it and reporting when the frame is
+ *	acknowleged. This is used to allow timing out inactive clients. Uses
+ *	%NL80211_ATTR_IFINDEX and %NL80211_ATTR_MAC. The command returns a
+ *	direct reply with an %NL80211_ATTR_COOKIE that is later used to match
+ *	up the event with the request. The event includes the same data and
+ *	has %NL80211_ATTR_ACK set if the frame was ACKed.
+ *
+ * @NL80211_CMD_REGISTER_BEACONS: Register this socket to receive beacons from
+ *	other BSSes when any interfaces are in AP mode. This helps implement
+ *	OLBC handling in hostapd. Beacons are reported in %NL80211_CMD_FRAME
+ *	messages. Note that per PHY only one application may register.
+ *
  * @NL80211_CMD_MAX: highest used command number
  * @__NL80211_CMD_AFTER_LAST: internal use
  */

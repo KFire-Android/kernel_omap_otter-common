@@ -48,3 +48,4 @@ int omap_get_board_version(void);
 int omap_get_board_id(void);
 int omap_init_board_version(int forced_rev);
 bool omap_is_board_version(int req_board_version);
+bool omap_board_uses_hsic(void);

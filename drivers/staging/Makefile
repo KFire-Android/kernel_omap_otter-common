@@ -73,4 +73,3 @@ obj-$(CONFIG_DRM_PSB)		+= gma500/
 obj-$(CONFIG_INTEL_MEI)		+= mei/
 obj-$(CONFIG_MFD_NVEC)		+= nvec/
 obj-$(CONFIG_THERMAL_FRAMEWORK) += thermal_framework/
-obj-$(CONFIG_RPC_OMAP)		+= omaprpc/

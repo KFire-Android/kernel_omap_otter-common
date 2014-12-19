@@ -4,10 +4,11 @@
  * Bus Glue for the EHCI controllers in OMAP3/4
  * Tested on several OMAP3 boards, and OMAP4 Pandaboard
  *
- * Copyright (C) 2007-2011 Texas Instruments, Inc.
+ * Copyright (C) 2007-2012 Texas Instruments, Inc.
  *	Author: Vikram Pandita <vikram.pandita@ti.com>
  *	Author: Anand Gadiyar <gadiyar@ti.com>
  *	Author: Keshava Munegowda <keshava_mgowda@ti.com>
+ *	Author: Ruslan Bilovol <ruslan.bilovol@ti.com>
  *
  * Copyright (C) 2009 Nokia Corporation
  *	Contact: Felipe Balbi <felipe.balbi@nokia.com>
@@ -59,10 +60,16 @@
 #define	EHCI_INSNREG05_ULPI_EXTREGADD_SHIFT		8
 #define	EHCI_INSNREG05_ULPI_WRDATA_SHIFT		0
 #define	L3INIT_HSUSBTLL_CLKCTRL				0x4A009368
+#define USB_INT_EN_RISE_CLR_0				0x4A06280F
+#define USB_INT_EN_FALL_CLR_0				0x4A062812
+#define USB_INT_EN_RISE_CLR_1				0x4A06290F
+#define USB_INT_EN_FALL_CLR_1				0x4A062912
+#define OTG_CTRL_SET_0					0x4A06280B
+#define OTG_CTRL_SET_1					0x4A06290B
 
 /*-------------------------------------------------------------------------*/
 
-static struct hc_driver ehci_omap_hc_driver;
+static const struct hc_driver ehci_omap_hc_driver;
 
 
 static inline void ehci_write(void __iomem *base, u32 reg, u32 val)
@@ -417,6 +424,48 @@ static int omap4_ehci_tll_hub_control(
 	return retval;
 }
 
+struct usb_hcd	*omap_ehci_hcd;
+
+enum omap_hsic_state {
+	HSIC_STATE_UNKNOWN = 0,
+	HSIC_STATE_DISCONNECTING,
+	HSIC_STATE_DISCONNECTED,
+	HSIC_STATE_RECONNECTING,
+	HSIC_STATE_RECONNECTED,
+};
+
+enum omap_hsic_aux_state {
+	HSIC_AUX_DEASSERTED = 0,
+	HSIC_AUX_ASSERTED,
+};
+
+struct omap_hsic_channel {
+	enum omap_hsic_state state;
+	enum omap_hsic_state prev_state;
+
+	int change_state;
+
+	int gpio;
+
+	struct hsic_aux_irq {
+		int num;
+		char name[24];
+	} aux_irq;
+};
+
+static struct omap_hsic_channel hsic_channel[OMAP3_HS_USB_PORTS] = {
+	{
+		.state = HSIC_STATE_UNKNOWN,
+		.prev_state = HSIC_STATE_UNKNOWN,
+	}
+};
+
+
+static void hsic_reconnect_work(struct work_struct *work);
+
+static DECLARE_WORK(hsic_work, hsic_reconnect_work);
+
+
 static int omap_ehci_hub_control(
 	struct usb_hcd	*hcd,
 	u16		typeReq,
@@ -428,10 +477,104 @@ static int omap_ehci_hub_control(
 	struct device *dev = hcd->self.controller;
 	struct ehci_hcd_omap_platform_data *pdata = dev->platform_data;
 
-	if ((wIndex > 0) && (wIndex < OMAP3_HS_USB_PORTS)) {
-		if (pdata->port_mode[wIndex-1] == OMAP_EHCI_PORT_MODE_TLL)
+	if (cpu_is_omap44xx() && (wIndex > 0) && (wIndex < OMAP3_HS_USB_PORTS)) {
+		if ((omap_rev() < OMAP4430_REV_ES2_3) &&
+				(pdata->port_mode[wIndex-1] == OMAP_EHCI_PORT_MODE_TLL)) {
 			return omap4_ehci_tll_hub_control(hcd, typeReq, wValue,
 						wIndex, buf, wLength);
+		} else if (pdata->port_mode[wIndex-1] == OMAP_EHCI_PORT_MODE_PHY) {
+			struct ehci_hcd *ehci = hcd_to_ehci(hcd);
+			u32 __iomem *status_reg = &ehci->regs->port_status[(wIndex & 0xff) - 1];
+			u32             temp;
+			unsigned long   flags;
+			int             retval = 0;
+
+			/* Errata i693 workaround sequence */
+			spin_lock_irqsave(&ehci->lock, flags);
+
+			if (typeReq == SetPortFeature && wValue == USB_PORT_FEAT_SUSPEND) {
+				temp = ehci_readl(ehci, status_reg);
+				if ((temp & PORT_PE) == 0 || (temp & PORT_RESET) != 0) {
+					spin_unlock_irqrestore(&ehci->lock, flags);
+					return -EPIPE;
+				}
+
+				temp &= ~(PORT_WKCONN_E | PORT_RWC_BITS);
+				temp |= PORT_WKDISC_E | PORT_WKOC_E;
+				ehci_writel(ehci, temp | PORT_SUSPEND, status_reg);
+				mdelay(4);
+
+				if ((wIndex & 0xff) == 1) {
+					u32 temp_reg;
+					temp_reg = omap_readl(L3INIT_HSUSBHOST_CLKCTRL);
+					temp_reg |= 1 << 8;
+					temp_reg &= ~(1 << 24);
+					omap_writel(temp_reg, L3INIT_HSUSBHOST_CLKCTRL);
+
+					mdelay(1);
+					temp_reg &= ~(1 << 8);
+					temp_reg |= 1 << 24;
+					omap_writel(temp_reg, L3INIT_HSUSBHOST_CLKCTRL);
+				} else if ((wIndex & 0xff) == 2) {
+					u32 temp_reg;
+					temp_reg = omap_readl(L3INIT_HSUSBHOST_CLKCTRL);
+					temp_reg |= 1 << 9;
+					temp_reg &= ~(1 << 25);
+					omap_writel(temp_reg, L3INIT_HSUSBHOST_CLKCTRL);
+
+					mdelay(1);
+					temp_reg &= ~(1 << 9);
+					temp_reg |= 1 << 25;
+					omap_writel(temp_reg, L3INIT_HSUSBHOST_CLKCTRL);
+				}
+
+				set_bit((wIndex & 0xff) - 1, &ehci->suspended_ports);
+				ehci_readl(ehci, &ehci->regs->command);	/* unblock posted writes */
+				spin_unlock_irqrestore(&ehci->lock, flags);
+				return retval;
+			}
+			spin_unlock_irqrestore(&ehci->lock, flags);
+		}
+	}
+
+	if ((wIndex > 0) && (wIndex < OMAP3_HS_USB_PORTS) &&
+			(pdata->port_mode[wIndex-1] == OMAP_EHCI_PORT_MODE_HSIC)) {
+		struct ehci_hcd *ehci = hcd_to_ehci(hcd);
+		unsigned long flags;
+		int status = 0;
+
+		spin_lock_irqsave(&ehci->lock, flags);
+		if ((typeReq == GetPortStatus) &&
+				((hsic_channel[wIndex-1].state == HSIC_STATE_DISCONNECTING) ||
+				(hsic_channel[wIndex-1].state == HSIC_STATE_DISCONNECTED) ||
+				(hsic_channel[wIndex-1].state == HSIC_STATE_RECONNECTING))) {
+			if (hsic_channel[wIndex-1].state == HSIC_STATE_DISCONNECTING) {
+				status |= USB_PORT_STAT_C_CONNECTION << 16;
+				status |= USB_PORT_STAT_POWER;
+				hsic_channel[wIndex-1].state = HSIC_STATE_DISCONNECTED;
+			} else if (hsic_channel[wIndex-1].state == HSIC_STATE_RECONNECTING) {
+				status |= USB_PORT_STAT_C_CONNECTION << 16;
+				status |= USB_PORT_STAT_CONNECTION;
+				status |= USB_PORT_STAT_POWER;
+				hsic_channel[wIndex-1].state = HSIC_STATE_RECONNECTED;
+			}
+			put_unaligned_le32(status, buf);
+			spin_unlock_irqrestore(&ehci->lock, flags);
+			return 0;
+		} else if ((typeReq == ClearPortFeature) &&
+					((hsic_channel[wIndex-1].state == HSIC_STATE_DISCONNECTING) ||
+					(hsic_channel[wIndex-1].state == HSIC_STATE_DISCONNECTED))) {
+			put_unaligned_le32(status, buf);
+			spin_unlock_irqrestore(&ehci->lock, flags);
+			return 0;
+		} else if ((typeReq == SetPortFeature) &&
+				((hsic_channel[wIndex-1].state == HSIC_STATE_DISCONNECTING) ||
+				(hsic_channel[wIndex-1].state == HSIC_STATE_DISCONNECTED))) {
+			put_unaligned_le32(status, buf);
+			spin_unlock_irqrestore(&ehci->lock, flags);
+			return 0;
+		}
+		spin_unlock_irqrestore(&ehci->lock, flags);
 	}
 
 	return ehci_hub_control(hcd, typeReq, wValue, wIndex, buf, wLength);
@@ -465,6 +608,67 @@ static void omap_ehci_soft_phy_reset(struct platform_device *pdev, u8 port)
 			break;
 		}
 	}
+}
+
+static irqreturn_t hsic_aux_irq(int irq, void *__hcd)
+{
+	struct ehci_hcd	*ehci = hcd_to_ehci((struct usb_hcd *)__hcd);
+	unsigned long flags;
+	int i;
+
+	if (!HCD_HW_ACCESSIBLE((struct usb_hcd *)__hcd))
+		return IRQ_NONE;
+
+	for (i = 0; i < OMAP3_HS_USB_PORTS; i++) {
+		enum omap_hsic_aux_state aux_state;
+		enum omap_hsic_state hsic_state, hsic_prev_state;
+
+		if (irq != hsic_channel[i].aux_irq.num)
+			continue;
+
+		aux_state = gpio_get_value(hsic_channel[i].gpio) ?
+				HSIC_AUX_DEASSERTED : HSIC_AUX_ASSERTED;
+
+		spin_lock_irqsave(&ehci->lock, flags);
+		hsic_state = hsic_channel[i].state;
+		hsic_prev_state = hsic_channel[i].prev_state;
+
+		switch (hsic_state) {
+		case HSIC_STATE_UNKNOWN:
+		case HSIC_STATE_RECONNECTED:
+			if (hsic_prev_state != HSIC_STATE_DISCONNECTED &&
+					aux_state == HSIC_AUX_DEASSERTED) {
+				/* Start disconnect sequence */
+				ehci_dbg(ehci, "HSIC ch %d disconnect detected\n", i);
+				hsic_channel[i].change_state = 1;
+				schedule_work(&hsic_work);
+			}
+			break;
+
+		case HSIC_STATE_DISCONNECTED:
+			if (aux_state == HSIC_AUX_ASSERTED) {
+				/* Start connect sequence */
+				ehci_dbg(ehci, "HSIC ch %d re-connect detected\n", i);
+				hsic_channel[i].change_state = 1;
+				schedule_work(&hsic_work);
+			}
+			break;
+
+		case HSIC_STATE_DISCONNECTING:
+			ehci_dbg(ehci, "HSIC ch %d AUX state changed during disconnect\n", i);
+			break;
+
+		case HSIC_STATE_RECONNECTING:
+		default:
+			break;
+		}
+
+		hsic_channel[i].prev_state = hsic_state;
+		spin_unlock_irqrestore(&ehci->lock, flags);
+		return IRQ_HANDLED;
+	}
+
+	return IRQ_NONE;
 }
 
 
@@ -518,9 +722,6 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 
-	if (cpu_is_omap44xx() && (omap_rev() < OMAP4430_REV_ES2_3))
-		ehci_omap_hc_driver.hub_control = omap_ehci_hub_control;
-
 	hcd = usb_create_hcd(&ehci_omap_hc_driver, dev,
 			dev_name(dev));
 
@@ -528,6 +729,47 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
 		dev_err(dev, "failed to create hcd with err %d\n", ret);
 		ret = -ENOMEM;
 		goto err_io;
+	}
+
+	omap_ehci_hcd = hcd;
+	for (i = 0; i < OMAP3_HS_USB_PORTS; i++) {
+		int hsic_aux_port = pdata->hsic_aux_port[i];
+
+		if ((pdata->port_mode[i] == OMAP_EHCI_PORT_MODE_HSIC) &&
+				gpio_is_valid(hsic_aux_port)) {
+			int hsic_irq;
+
+			hsic_channel[i].gpio = hsic_aux_port;
+
+			snprintf(hsic_channel[i].aux_irq.name,
+					sizeof(hsic_channel[i].aux_irq.name),
+					"hsic_aux_%d", i);
+
+			gpio_request(hsic_aux_port,
+					hsic_channel[i].aux_irq.name);
+			gpio_direction_input(hsic_aux_port);
+
+			hsic_irq = gpio_to_irq(hsic_aux_port);
+			if (hsic_irq < 0) {
+				dev_err(dev, "HSIC AUX %d irq failed\n", i);
+				ret = -ENODEV;
+				goto err_hsic_aux;
+			}
+
+			hsic_channel[i].aux_irq.num = hsic_irq;
+
+			ret = request_irq(hsic_irq, &hsic_aux_irq,
+					IRQF_DISABLED |
+					IRQF_TRIGGER_RISING |
+					IRQF_TRIGGER_FALLING,
+					hsic_channel[i].aux_irq.name, hcd);
+			if (ret != 0) {
+				dev_err(dev, "Request HSIC AUX interrupt %d failed\n", hsic_irq);
+				goto err_hsic_aux;
+			}
+
+			enable_irq_wake(hsic_irq);
+		}
 	}
 
 	hcd->rsrc_start = res->start;
@@ -575,6 +817,24 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
 	omap_ehci = hcd_to_ehci(hcd);
 	omap_ehci->sbrn = 0x20;
 
+	/*
+	 * Errata i754: For OMAP4, when using TLL mode the ID pin state is
+	 * incorrectly restored after returning off mode. Workaround this
+	 * by enabling ID pin pull-up and disabling ID pin events.
+	 */
+	if (cpu_is_omap44xx()) {
+		if (pdata->port_mode[0] == OMAP_EHCI_PORT_MODE_TLL) {
+			omap_writeb(0x10, USB_INT_EN_RISE_CLR_0);
+			omap_writeb(0x10, USB_INT_EN_FALL_CLR_0);
+			omap_writeb(0x01, OTG_CTRL_SET_0);
+		}
+		if (pdata->port_mode[1] == OMAP_EHCI_PORT_MODE_TLL) {
+			omap_writeb(0x10, USB_INT_EN_RISE_CLR_1);
+			omap_writeb(0x10, USB_INT_EN_FALL_CLR_1);
+			omap_writeb(0x01, OTG_CTRL_SET_1);
+		}
+	}
+
 	omap_ehci->has_smsc_ulpi_bug = 1;
 	omap_ehci->no_companion_port_handoff = 1;
 	/* we know this is the memory we want, no need to ioremap again */
@@ -594,10 +854,30 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
 		goto err_add_hcd;
 	}
 
+	omap_pm_set_min_bus_tput(dev,
+			OCP_INITIATOR_AGENT,
+			(200*1000*4));
+
 	/* root ports should always stay powered */
 	ehci_port_power(omap_ehci, 1);
 
 	return 0;
+
+err_hsic_aux:
+	for (i = 0; i < OMAP3_HS_USB_PORTS; i++) {
+		int hsic_aux_port = pdata->hsic_aux_port[i];
+
+		if ((pdata->port_mode[i] == OMAP_EHCI_PORT_MODE_HSIC) &&
+				gpio_is_valid(hsic_aux_port)) {
+			if (hsic_channel[i].aux_irq.num)
+				free_irq(hsic_channel[i].aux_irq.num, hcd);
+
+			gpio_free(hsic_aux_port);
+		}
+	}
+
+	usb_remove_hcd(hcd);
+	usb_put_hcd(hcd);
 
 err_add_hcd:
 	pm_runtime_put_sync(dev->parent);
@@ -618,7 +898,21 @@ err_io:
 static int ehci_hcd_omap_remove(struct platform_device *pdev)
 {
 	struct device *dev	= &pdev->dev;
+	struct ehci_hcd_omap_platform_data *pdata = dev->platform_data;
 	struct usb_hcd *hcd	= dev_get_drvdata(dev);
+	int i;
+
+	for (i = 0; i < OMAP3_HS_USB_PORTS; i++) {
+		int hsic_aux_port = pdata->hsic_aux_port[i];
+
+		if ((pdata->port_mode[i] == OMAP_EHCI_PORT_MODE_HSIC) &&
+				gpio_is_valid(hsic_aux_port)) {
+			if (hsic_channel[i].aux_irq.num)
+				free_irq(hsic_channel[i].aux_irq.num, hcd);
+
+			gpio_free(hsic_aux_port);
+		}
+	}
 
 	usb_remove_hcd(hcd);
 	pm_runtime_put_sync(dev->parent);
@@ -721,9 +1015,208 @@ static struct platform_driver ehci_hcd_omap_driver = {
 	}
 };
 
+static int omap_ehci_hub_status_data(struct usb_hcd *hcd, char *buf)
+{
+	struct ehci_hcd *ehci = hcd_to_ehci(hcd);
+	struct device *dev = hcd->self.controller;
+	struct ehci_hcd_omap_platform_data *pdata = dev->platform_data;
+	int retval, i;
+	unsigned long flags;
+
+	retval = ehci_hub_status_data(hcd, buf);
+
+	spin_lock_irqsave(&ehci->lock, flags);
+	for (i = 0; i < OMAP3_HS_USB_PORTS; i++) {
+		if ((pdata->port_mode[i] == OMAP_EHCI_PORT_MODE_HSIC) &&
+				((hsic_channel[i].state == HSIC_STATE_DISCONNECTING) ||
+				(hsic_channel[i].state == HSIC_STATE_RECONNECTING))) {
+			buf[0] |= 1 << (i + 1);
+			if (!retval)
+				retval = 1;
+		}
+	}
+	spin_unlock_irqrestore(&ehci->lock, flags);
+
+	return retval;
+}
+
+static int omap_hsic_disconnect(struct usb_hcd *hcd, int portnum)
+{
+	struct ehci_hcd *ehci = hcd_to_ehci(hcd);
+	struct device *dev = hcd->self.controller;
+	struct ehci_hcd_omap_platform_data *pdata = dev->platform_data;
+	int portsc, retval;
+	unsigned long flags;
+
+	if ((portnum < 0) || (portnum > OMAP3_HS_USB_PORTS) ||
+			(pdata->port_mode[portnum - 1] != OMAP_EHCI_PORT_MODE_HSIC))
+		return -EINVAL;
+
+	if (dev->parent)
+		pm_runtime_get_sync(dev->parent);
+
+	spin_lock_irqsave(&ehci->lock, flags);
+
+	if (hsic_channel[portnum - 1].state == HSIC_STATE_DISCONNECTED) {
+		retval = -EINVAL;
+		goto err_exit;
+	}
+
+	if ((hsic_channel[portnum - 1].state == HSIC_STATE_RECONNECTING) ||
+			(hsic_channel[portnum - 1].state == HSIC_STATE_DISCONNECTING)) {
+		retval = -EBUSY;
+		goto err_exit;
+	}
+
+	disable_irq(hsic_channel[portnum - 1].aux_irq.num);
+
+	portsc = ehci_readl(ehci, &ehci->regs->port_status[portnum - 1]);
+	ehci_writel(ehci, portsc & ~PORT_PE, &ehci->regs->port_status[portnum - 1]);
+	mdelay(3); /* entering in suspend*/
+	gpio_direction_output(hsic_channel[portnum - 1].gpio, 0);
+	mdelay(1);
+	gpio_direction_input(hsic_channel[portnum - 1].gpio);
+	mdelay(1);
+	portsc = ehci_readl(ehci, &ehci->regs->port_status[portnum - 1]);
+	ehci_writel(ehci, portsc | PORT_RESET, &ehci->regs->port_status[portnum - 1]);
+
+	hsic_channel[portnum - 1].state = HSIC_STATE_DISCONNECTING;
+
+	enable_irq(hsic_channel[portnum - 1].aux_irq.num);
+
+	/* resume root hub? */
+	if (hcd->state == HC_STATE_SUSPENDED)
+		usb_hcd_resume_root_hub(hcd);
+
+	ehci_work(ehci);
+	spin_unlock_irqrestore(&ehci->lock, flags);
+	usb_hcd_poll_rh_status(hcd);
+
+	if (dev->parent)
+		pm_runtime_put_sync(dev->parent);
+	return 0;
+
+err_exit:
+	spin_unlock_irqrestore(&ehci->lock, flags);
+	if (dev->parent)
+		pm_runtime_put_sync(dev->parent);
+	return retval;
+}
+
+static int omap_hsic_reconnect(struct usb_hcd *hcd, int portnum)
+{
+	struct ehci_hcd *ehci = hcd_to_ehci(hcd);
+	struct device *dev = hcd->self.controller;
+	struct ehci_hcd_omap_platform_data *pdata = dev->platform_data;
+	int portsc;
+	unsigned long flags;
+	int retval = 0;
+
+	if ((portnum < 0) || (portnum > OMAP3_HS_USB_PORTS) ||
+			(pdata->port_mode[portnum - 1] != OMAP_EHCI_PORT_MODE_HSIC))
+		return -EINVAL;
+
+	if (dev->parent)
+		pm_runtime_get_sync(dev->parent);
+
+	spin_lock_irqsave(&ehci->lock, flags);
+
+	if (hsic_channel[portnum - 1].state == HSIC_STATE_RECONNECTED ||
+			hsic_channel[portnum - 1].state == HSIC_STATE_UNKNOWN) {
+		retval = -EINVAL;
+		goto err_exit;
+	}
+
+	if ((hsic_channel[portnum - 1].state == HSIC_STATE_RECONNECTING) ||
+			(hsic_channel[portnum - 1].state == HSIC_STATE_DISCONNECTING)) {
+		retval = -EBUSY;
+		goto err_exit;
+	}
+
+	disable_irq(hsic_channel[portnum - 1].aux_irq.num);
+
+	gpio_direction_output(hsic_channel[portnum - 1].gpio, 0);
+	portsc = ehci_readl(ehci, &ehci->regs->port_status[portnum - 1]);
+	portsc &= ~PORT_RESET;
+	portsc |= PORT_PE;
+	ehci_writel(ehci, portsc, &ehci->regs->port_status[portnum - 1]);
+
+	hsic_channel[portnum - 1].state = HSIC_STATE_RECONNECTING;
+
+	/* resume root hub? */
+	if (hcd->state == HC_STATE_SUSPENDED)
+		usb_hcd_resume_root_hub(hcd);
+
+	ehci_work(ehci);
+	gpio_direction_input(hsic_channel[portnum - 1].gpio);
+	enable_irq(hsic_channel[portnum - 1].aux_irq.num);
+	spin_unlock_irqrestore(&ehci->lock, flags);
+
+	usb_hcd_poll_rh_status(hcd);
+
+	if (dev->parent)
+		pm_runtime_put_sync(dev->parent);
+	return retval;
+
+err_exit:
+	spin_unlock_irqrestore(&ehci->lock, flags);
+	if (dev->parent)
+		pm_runtime_put_sync(dev->parent);
+	return retval;
+}
+
+static void hsic_reconnect_work(struct work_struct *work)
+{
+	struct ehci_hcd *ehci = hcd_to_ehci(omap_ehci_hcd);
+	struct device *dev = omap_ehci_hcd->self.controller;
+	struct ehci_hcd_omap_platform_data *pdata = dev->platform_data;
+	int portsc, i;
+	unsigned long flags;
+
+	if (dev->parent)
+		pm_runtime_get_sync(dev->parent);
+
+	spin_lock_irqsave(&ehci->lock, flags);
+
+	for (i = 0; i < OMAP3_HS_USB_PORTS; i++) {
+		if ((pdata->port_mode[i] == OMAP_EHCI_PORT_MODE_HSIC) &&
+				hsic_channel[i].change_state) {
+			if ((hsic_channel[i].state == HSIC_STATE_RECONNECTED ||
+					hsic_channel[i].state == HSIC_STATE_UNKNOWN)) {
+				portsc = ehci_readl(ehci, &ehci->regs->port_status[i]);
+				portsc |= PORT_RESET;
+				portsc &= ~PORT_PE;
+				ehci_writel(ehci, portsc, &ehci->regs->port_status[i]);
+				hsic_channel[i].state = HSIC_STATE_DISCONNECTING;
+			} else if (hsic_channel[i].state == HSIC_STATE_DISCONNECTED) {
+				portsc = ehci_readl(ehci, &ehci->regs->port_status[i]);
+				portsc &= ~PORT_RESET;
+				portsc |= PORT_PE;
+				ehci_writel(ehci, portsc, &ehci->regs->port_status[i]);
+				hsic_channel[i].state = HSIC_STATE_RECONNECTING;
+			}
+			hsic_channel[i].change_state = 0;
+		}
+	}
+
+	/* resume root hub? */
+	if (omap_ehci_hcd->state == HC_STATE_SUSPENDED)
+		usb_hcd_resume_root_hub(omap_ehci_hcd);
+
+	ehci_work(ehci);
+	spin_unlock_irqrestore(&ehci->lock, flags);
+
+	usb_hcd_poll_rh_status(omap_ehci_hcd);
+
+	if (dev->parent)
+		pm_runtime_put_sync(dev->parent);
+
+	return;
+}
+
 /*-------------------------------------------------------------------------*/
 
-static struct hc_driver ehci_omap_hc_driver = {
+static const struct hc_driver ehci_omap_hc_driver = {
 	.description		= hcd_name,
 	.product_desc		= "OMAP-EHCI Host Controller",
 	.hcd_priv_size		= sizeof(struct ehci_hcd),
@@ -758,10 +1251,14 @@ static struct hc_driver ehci_omap_hc_driver = {
 	/*
 	 * root hub support
 	 */
-	.hub_status_data	= ehci_hub_status_data,
-	.hub_control		= ehci_hub_control,
+	.hub_status_data	= omap_ehci_hub_status_data,
+	.hub_control		= omap_ehci_hub_control,
 	.bus_suspend		= ehci_omap_bus_suspend,
 	.bus_resume		= ehci_omap_bus_resume,
+
+	/* HSIC disconnect-reconnect*/
+	.disconnect		= omap_hsic_disconnect,
+	.reconnect		= omap_hsic_reconnect,
 
 	.clear_tt_buffer_complete = ehci_clear_tt_buffer_complete,
 };

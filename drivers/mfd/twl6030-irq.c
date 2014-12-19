@@ -39,11 +39,6 @@
 #include <linux/platform_device.h>
 #include <linux/suspend.h>
 #include <linux/reboot.h>
-#ifdef CONFIG_MACH_OMAP_4430_KC1
-#include <linux/delay.h>
-#include <linux/wakelock.h>
-#include <linux/gpio.h>
-#endif
 
 #include "twl-core.h"
 
@@ -119,19 +114,11 @@ static int twl6032_interrupt_mapping_table[24] = {
 
 static int *twl6030_interrupt_mapping = twl6030_interrupt_mapping_table;
 /*----------------------------------------------------------------------*/
-#ifdef CONFIG_MACH_OMAP_4430_KC1
-/*VBAT_MONITORING = 3.2 V (setting value=0x18)*/
-#define VBAT_MONITORING_THRESHOLD 0x18
-#define VLOW_TEMPORARY_HOLD_TIME 5000
-static struct wake_lock vlow_wakelock;
-#endif
 
 static unsigned twl6030_irq_base, twl6030_irq_end;
 static int twl_irq;
 static bool twl_irq_wake_enabled;
 
-static struct task_struct *task;
-static struct completion irq_event;
 static atomic_t twl6030_wakeirqs = ATOMIC_INIT(0);
 
 static u8 vbatmin_hi_threshold;
@@ -174,34 +161,22 @@ static struct notifier_block twl6030_irq_pm_notifier_block = {
 };
 
 /*
- * This thread processes interrupts reported by the Primary Interrupt Handler.
+ * Threaded irq handler for the twl6030 interrupt.
+ * We query the interrupt controller in the twl6030 to determine
+ * which module is generating the interrupt request and call
+ * handle_nested_irq for that module.
  */
-static int twl6030_irq_thread(void *data)
+static irqreturn_t twl6030_irq_thread(int irq, void *devid)
 {
-	long irq = (long)data;
-	static unsigned i2c_errors;
-	static const unsigned max_i2c_errors = 100;
-	int ret;
-#ifdef CONFIG_MACH_OMAP_4430_KC1
-	u8 usb_charge_sts = 0, usb_charge_sts1 = 0, usb_charge_sts2 = 0;
-#endif
-
-	current->flags |= PF_NOFREEZE;
-
-	while (!kthread_should_stop()) {
-		int i;
-		union {
+	unsigned i2c_errors = 0;
+	const unsigned max_i2c_errors = 100;
+	int i, ret;
+	union {
 		u8 bytes[4];
 		u32 int_sts;
-		} sts;
-		u32 int_sts; /* sts.int_sts converted to CPU endianness */
-
-#ifdef CONFIG_MACH_OMAP_4430_KC1
-		u8 bz[4] = {0,0,0,0};
-#endif
-		/* Wait for IRQ, then read PIH irq status (also blocking) */
-		wait_for_completion_interruptible(&irq_event);
-
+	} sts;
+	u32 int_sts; /* sts.int_sts converted to CPU endianness */
+	while (1) {
 		/* read INT_STS_A, B and C in one shot using a burst read */
 		ret = twl_i2c_read(TWL_MODULE_PIH, sts.bytes,
 				REG_INT_STS_A, 3);
@@ -209,64 +184,31 @@ static int twl6030_irq_thread(void *data)
 			pr_warning("twl6030: I2C error %d reading PIH ISR\n",
 					ret);
 			if (++i2c_errors >= max_i2c_errors) {
-				printk(KERN_ERR "Maximum I2C error count"
+				pr_err("Maximum I2C error count"
 						" exceeded.  Terminating %s.\n",
 						__func__);
-				break;
+				return IRQ_NONE;
 			}
-			complete(&irq_event);
 			continue;
-		}
-#ifdef CONFIG_MACH_OMAP_4430_KC1
-		ret = twl_i2c_write(TWL_MODULE_PIH, bz,
-				REG_INT_STS_A, 3); /* clear INT_STS_A */
-		if (ret){
-			pr_info("twl6030: I2C error in clearing PIH ISR\n");		
-			for(i=0;i<=20;i++){
-				ret = twl_i2c_write(TWL_MODULE_PIH, bz,
-					REG_INT_STS_A, 3); /* clear INT_STS_A */
-				if (ret){
-					pr_info("twl6030: I2C error in clearing PIH ISR\n");	
-				}else
-					break;				
-				msleep(10);
-			}
-		}
-		/*
-                 * NOTE:
-                 * Simulation confirms that documentation is wrong w.r.t the
-                 * interrupt status clear operation. A single *byte* write to
-                 * any one of STS_A to STS_C register results in all three
-                 * STS registers being reset. Since it does not matter which
-                 * value is written, all three registers are cleared on a
-                 * single byte write, so we just use 0x0 to clear.
-                 */
-                ret = twl_i2c_write_u8(TWL_MODULE_PIH, 0x00, REG_INT_STS_A);
-                if (ret)
-                        pr_warning("twl6030: I2C error in clearing PIH ISR\n");
-#endif
+		} else
+			break;
+	}
 
+	sts.bytes[3] = 0; /* Only 24 bits are valid*/
 
+	/*
+	 * Since VBUS status bit is not reliable for VBUS disconnect
+	 * use CHARGER VBUS detection status bit instead.
+	 */
+	if (sts.bytes[2] & 0x10)
+		sts.bytes[2] |= 0x08;
 
-		sts.bytes[3] = 0; /* Only 24 bits are valid*/
-
-		/*
-		 * Since VBUS status bit is not reliable for VBUS disconnect
-		 * use CHARGER VBUS detection status bit instead.
-		 */
-		if (sts.bytes[2] & 0x10)
-			sts.bytes[2] |= 0x08;
-
-		int_sts = le32_to_cpu(sts.int_sts);
-		for (i = 0; int_sts; int_sts >>= 1, i++) {
-			local_irq_disable();
-			if (int_sts & 0x1) {
-				int module_irq = twl6030_irq_base +
-					twl6030_interrupt_mapping[i];
-				generic_handle_irq(module_irq);
-
-			}
-		local_irq_enable();
+	int_sts = le32_to_cpu(sts.int_sts);
+	for (i = 0; int_sts; int_sts >>= 1, i++) {
+		if (int_sts & 0x1) {
+			int module_irq = twl6030_irq_base +
+				twl6030_interrupt_mapping[i];
+			handle_nested_irq(module_irq);
 		}
 
 		/*
@@ -278,31 +220,26 @@ static int twl6030_irq_thread(void *data)
 		 * value is written, all three registers are cleared on a
 		 * single byte write, so we just use 0x0 to clear.
 		 */
-#ifndef CONFIG_MACH_OMAP_4430_KC1
 		ret = twl_i2c_write_u8(TWL_MODULE_PIH, 0x00, REG_INT_STS_A);
 		if (ret)
 			pr_warning("twl6030: I2C error in clearing PIH ISR\n");
-#endif
 
 		enable_irq(irq);
 	}
 
-	return 0;
-}
+	/*
+	 * NOTE:
+	 * Simulation confirms that documentation is wrong w.r.t the
+	 * interrupt status clear operation. A single *byte* write to
+	 * any one of STS_A to STS_C register results in all three
+	 * STS registers being reset. Since it does not matter which
+	 * value is written, all three registers are cleared on a
+	 * single byte write, so we just use 0x0 to clear.
+	 */
+	ret = twl_i2c_write_u8(TWL_MODULE_PIH, 0x00, REG_INT_STS_A);
+	if (ret)
+		pr_warning("twl6030: I2C error in clearing PIH ISR\n");
 
-/*
- * handle_twl6030_int() is the desc->handle method for the twl6030 interrupt.
- * This is a chained interrupt, so there is no desc->action method for it.
- * Now we need to query the interrupt controller in the twl6030 to determine
- * which module is generating the interrupt request.  However, we can't do i2c
- * transactions in interrupt context, so we must defer that work to a kernel
- * thread.  All we do here is acknowledge and mask the interrupt and wakeup
- * the kernel thread.
- */
-static irqreturn_t handle_twl6030_pih(int irq, void *devid)
-{
-	disable_irq_nosync(irq);
-	complete(devid);
 	return IRQ_HANDLED;
 }
 
@@ -317,14 +254,8 @@ static irqreturn_t handle_twl6030_vlow(int irq, void *unused)
 
 #if 1 /* temporary */
 	pr_err("%s: disabling BAT_VLOW interrupt\n", __func__);
-#ifdef CONFIG_MACH_OMAP_4430_KC1
-	wake_lock_timeout(&vlow_wakelock,
-		msecs_to_jiffies(VLOW_TEMPORARY_HOLD_TIME));
-	twl6030_interrupt_mask(VLOW_INT_MASK, REG_INT_MSK_STS_A);
-#else
 	disable_irq_nosync(twl6030_irq_base + TWL_VLOW_INTR_OFFSET);
 	WARN_ON(1);
-#endif
 #else
 	pr_emerg("handle_twl6030_vlow: kernel_power_off()\n");
 	kernel_power_off();
@@ -506,8 +437,6 @@ int twl6030_vlow_init(int vlow_irq)
 		return status;
 	}
 
-	/*Only enable this interrupt when system go to suspend.*/
-#ifndef CONFIG_MACH_OMAP_4430_KC1
 	status = twl_i2c_read_u8(TWL_MODULE_PIH, &val, REG_INT_MSK_STS_A);
 	if (status < 0) {
 		pr_err("twl6030: I2C err reading REG_INT_MSK_STS_A: %d\n",
@@ -522,9 +451,6 @@ int twl6030_vlow_init(int vlow_irq)
 				status);
 		return status;
 	}
-#else
-	vbatmin_hi_threshold = VBAT_MONITORING_THRESHOLD;
-#endif
 
 	twl_i2c_read_u8(TWL_MODULE_PM_MASTER, &vbatmin_hi_threshold,
 			TWL6030_VBATMIN_HI_THRESHOLD);
@@ -539,9 +465,6 @@ int twl6030_vlow_init(int vlow_irq)
 		return status;
 	}
 
-#ifdef CONFIG_MACH_OMAP_4430_KC1
-	wake_lock_init(&vlow_wakelock, WAKE_LOCK_SUSPEND, "vlow");
-#endif
 	return 0;
 }
 
@@ -549,9 +472,8 @@ int twl6030_init_irq(int irq_num, unsigned irq_base, unsigned irq_end,
 			unsigned long features)
 {
 
-	int	status = 0;
+	int	status;
 	int	i;
-	int ret;
 	u8 mask[4];
 
 	static struct irq_chip	twl6030_irq_chip;
@@ -562,12 +484,17 @@ int twl6030_init_irq(int irq_num, unsigned irq_base, unsigned irq_end,
 	mask[1] = 0xFF;
 	mask[2] = 0xFF;
 	mask[3] = 0xFF;
-	ret = twl_i2c_write(TWL_MODULE_PIH, &mask[0],
+	status = twl_i2c_write(TWL_MODULE_PIH, &mask[0],
 			REG_INT_MSK_LINE_A, 3); /* MASK ALL INT LINES */
-	ret = twl_i2c_write(TWL_MODULE_PIH, &mask[0],
+	status |= twl_i2c_write(TWL_MODULE_PIH, &mask[0],
 			REG_INT_MSK_STS_A, 3); /* MASK ALL INT STS */
-	ret = twl_i2c_write(TWL_MODULE_PIH, &mask[0],
+	status |= twl_i2c_write(TWL_MODULE_PIH, &mask[0],
 			REG_INT_STS_A, 3); /* clear INT_STS_A,B,C */
+	if (status < 0) {
+		pr_err("twl6030: I2C err writing TWL_MODULE_PIH: %d\n",
+						status);
+		return status;
+	}
 
 	twl6030_irq_base = irq_base;
 	twl6030_irq_end = irq_end;
@@ -584,6 +511,7 @@ int twl6030_init_irq(int irq_num, unsigned irq_base, unsigned irq_end,
 		irq_set_chip_and_handler(i, &twl6030_irq_chip,
 					 handle_simple_irq);
 		irq_set_chip_data(i, (void *)irq_num);
+		irq_set_nested_thread(i, 1);
 		activate_irq(i);
 	}
 
@@ -591,17 +519,8 @@ int twl6030_init_irq(int irq_num, unsigned irq_base, unsigned irq_end,
 	pr_info("twl6030: %s (irq %d) chaining IRQs %d..%d\n", "PIH",
 			irq_num, irq_base, twl6030_irq_next - 1);
 
-	/* install an irq handler to demultiplex the TWL6030 interrupt */
-	init_completion(&irq_event);
-	task = kthread_run(twl6030_irq_thread, (void *)irq_num, "twl6030-irq");
-	if (IS_ERR(task)) {
-		pr_err("twl6030: could not create irq %d thread!\n", irq_num);
-		status = PTR_ERR(task);
-		goto fail_kthread;
-	}
-
-	status = request_irq(irq_num, handle_twl6030_pih, IRQF_DISABLED,
-				"TWL6030-PIH", &irq_event);
+	status = request_threaded_irq(irq_num, NULL, twl6030_irq_thread,
+			IRQF_ONESHOT, "TWL6030-PIH", NULL);
 	if (status < 0) {
 		pr_err("twl6030: could not claim irq%d: %d\n", irq_num, status);
 		goto fail_irq;
@@ -617,12 +536,9 @@ int twl6030_init_irq(int irq_num, unsigned irq_base, unsigned irq_end,
 	return status;
 
 fail_vlow:
-	free_irq(irq_num, &irq_event);
+	free_irq(irq_num, NULL);
 
 fail_irq:
-	kthread_stop(task);
-
-fail_kthread:
 	for (i = irq_base; i < irq_end; i++)
 		irq_set_chip_and_handler(i, NULL, NULL);
 	return status;
@@ -632,12 +548,6 @@ int twl6030_exit_irq(void)
 {
 	int i;
 	unregister_pm_notifier(&twl6030_irq_pm_notifier_block);
-#ifdef CONFIG_MACH_OMAP_4430_KC1
-	wake_lock_destroy(&vlow_wakelock);
-#endif
-
-	if (task)
-		kthread_stop(task);
 
 	if (!twl6030_irq_base || !twl6030_irq_end) {
 		pr_err("twl6030: can't yet clean up IRQs?\n");
@@ -647,7 +557,7 @@ int twl6030_exit_irq(void)
 	free_irq(twl6030_irq_base + TWL_VLOW_INTR_OFFSET,
 		handle_twl6030_vlow);
 
-	free_irq(twl_irq, &irq_event);
+	free_irq(twl_irq, NULL);
 
 	for (i = twl6030_irq_base; i < twl6030_irq_end; i++)
 		irq_set_chip_and_handler(i, NULL, NULL);

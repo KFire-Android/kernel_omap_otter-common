@@ -146,6 +146,11 @@ int __init tablet_button_init(void)
 		tablet_gpio_leds[4].gpio = TABLET2_GREEN_LED_GPIO;
 	}
 
+	if (omap_board_uses_hsic()) {
+		tablet_gpio_leds[2].gpio = 104;
+		tablet_gpio_leds[3].gpio = 36;
+	}
+
 	platform_add_devices(tablet_devices, ARRAY_SIZE(tablet_devices));
 	return 0;
 

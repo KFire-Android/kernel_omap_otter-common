@@ -3,31 +3,17 @@
  *
  * Copyright(c) 2011 Texas Instruments. All rights reserved.
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 as published by
+ * the Free Software Foundation.
  *
- * * Redistributions of source code must retain the above copyright
- *	 notice, this list of conditions and the following disclaimer.
- * * Redistributions in binary form must reproduce the above copyright
- *	 notice, this list of conditions and the following disclaimer in
- *	 the documentation and/or other materials provided with the
- *	 distribution.
- * * Neither the name Texas Instruments nor the names of its
- *	 contributors may be used to endorse or promote products derived
- *	 from this software without specific prior written permission.
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
- * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
- * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * You should have received a copy of the GNU General Public License along with
+ * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #ifndef _OMAP_RPC_H_
@@ -59,22 +45,22 @@ struct omaprpc_channel_info_t {
 };
 
 enum omaprpc_info_type_e {
-	/** The number of functions in the service instance */
+	/* The number of functions in the service instance */
 	OMAPRPC_INFO_NUMFUNCS,
-	/** The symbol name of the function */
+	/* The symbol name of the function */
 	OMAPRPC_INFO_FUNC_NAME,
-	/** The number of times a function has been called */
+	/* The number of times a function has been called */
 	OMAPRPC_INFO_NUM_CALLS,
-	/** The performance information releated to the function */
+	/* The performance information releated to the function */
 	OMAPRPC_INFO_FUNC_PERF,
 
-	/** @hidden used to define the maximum info type */
+	/* used to define the maximum info type */
 	OMAPRPC_INFO_MAX
 };
 
 struct omaprpc_query_instance_t {
-	uint32_t info_type;		/**< @see omaprpc_info_type_e */
-	uint32_t func_index;		/**< The index to querty */
+	uint32_t info_type;		/* omaprpc_info_type_e */
+	uint32_t func_index;		/* The index to querty */
 };
 
 struct omaprpc_func_perf_t {
@@ -84,11 +70,11 @@ struct omaprpc_func_perf_t {
 
 /** These core are specific to OMAP processors */
 enum omaprpc_core_e {
-	OMAPRPC_CORE_DSP = 0,	/**< DSP Co-processor */
-	OMAPRPC_CORE_SIMCOP,	/**< Video/Imaging Co-processor */
-	OMAPRPC_CORE_MCU0,	/**< Cortex M3/M4 [0] */
-	OMAPRPC_CORE_MCU1,	/**< Cortex M3/M4 [1] */
-	OMAPRPC_CORE_EVE,	/**< Imaging Accelerator */
+	OMAPRPC_CORE_DSP = 0,	/* DSP Co-processor */
+	OMAPRPC_CORE_SIMCOP,	/* Video/Imaging Co-processor */
+	OMAPRPC_CORE_MCU0,	/* Cortex M3/M4 [0] */
+	OMAPRPC_CORE_MCU1,	/* Cortex M3/M4 [1] */
+	OMAPRPC_CORE_EVE,	/* Imaging Accelerator */
 	OMAPRPC_CORE_REMOTE_MAX
 };
 
@@ -98,7 +84,7 @@ struct omaprpc_instance_info_t {
 	union info {
 		uint32_t num_funcs;
 		uint32_t num_calls;
-		uint32_t core_index; /**< @see omaprpc_core_e */
+		uint32_t core_index; /* omaprpc_core_e */
 		char func_name[64];
 		struct omaprpc_func_perf_t perf;
 	} info;
@@ -113,55 +99,63 @@ enum omaprpc_cache_ops_e {
 };
 
 struct omaprpc_param_translation_t {
-	/** The parameter index which indicates which is the base pointer */
+	/* The parameter index which indicates which is the base pointer */
 	uint32_t  index;
-	/** The offset from the base address to the pointer to translate */
+	/* The offset from the base address to the pointer to translate */
 	ptrdiff_t offset;
-	/** The base user virtual address of the pointer to translate
-	    (used to calc translated pointer offset). */
+	/*
+	 * The base user virtual address of the pointer to
+	 * translate (used to calc translated pointer offset).
+	 */
 	size_t base;
-	/** The enumeration of desired cache operations for efficiency */
+	/* The enumeration of desired cache operations for efficiency */
 	uint32_t cacheOps;
-	/** Reserved field */
+	/* Reserved field */
 	size_t reserved;
 };
 
 enum omaprpc_param_e {
 	OMAPRPC_PARAM_TYPE_UNKNOWN = 0,
-	/** An atomic data type, 1 byte to architecture limit sized bytes */
+	/* An atomic data type, 1 byte to architecture limit sized bytes */
 	OMAPRPC_PARAM_TYPE_ATOMIC,
-	/** A pointer to shared memory. The reserved field must contain the
-	   handle to the memory */
+	/*
+	 * A pointer to shared memory. The reserved field
+	 * must contain the handle to the memory
+	 */
 	OMAPRPC_PARAM_TYPE_PTR,
-	/** \hidden (Unsupported) A structure type. Will be architecure width
-	  aligned in memory. */
+	/*
+	 * (Unsupported) A structure type. Will be
+	 * architecure width aligned in memory.
+	 */
 	OMAPRPC_PARAM_TYPE_STRUCT,
 };
 
 struct omaprpc_param_t {
-	uint32_t type;		/**< @see omaprpc_param_e */
-	size_t size;		/**< The size of the data */
-	size_t data;		/**< Either the pointer to the data or the data
-					itself, @see .type */
-	size_t base;		/**< If a pointer is in data, this is the base
-				   pointer (if data has an offset from base). */
-	size_t reserved;	/**< Shared Memory Handle
-				    (used only with pointers) */
+	uint32_t type;		/* omaprpc_param_e */
+	size_t size;		/* The size of the data */
+	size_t data;		/* Either the pointer to the data or
+				the data itself */
+	size_t base;		/* If a pointer is in data, this is the base
+				pointer (if data has an offset from base). */
+	size_t reserved;	/* Shared Memory Handle
+				(used only with pointers) */
 };
 
 #define OMAPRPC_MAX_PARAMETERS (10)
 
 struct omaprpc_call_function_t {
-	/** The function to call */
+	/* The function to call */
 	uint32_t func_index;
-	/** The number of parameters in the array. */
+	/* The number of parameters in the array. */
 	uint32_t num_params;
-	/** The array of parameters */
+	/* The array of parameters */
 	struct omaprpc_param_t params[OMAPRPC_MAX_PARAMETERS];
-	/** The number of translations needed in the offsets array */
+	/* The number of translations needed in the offsets array */
 	uint32_t num_translations;
-	/** An indeterminate lenght array of offsets within payload_data to
-	    pointers which need translation */
+	/*
+	 * An indeterminate lenght array of offsets within
+	 * payload_data to pointers which need translation
+	 */
 	struct omaprpc_param_translation_t translations[0];
 };
 
@@ -174,61 +168,67 @@ struct omaprpc_function_return_t {
 
 #ifdef __KERNEL__
 
-/** The applicable types of messages that the HOST may send the SERVICE.
- * (@see omx_msg_types must duplicate these for now since they went and shoved
- * it so far down RCM that it's impossible to use it without this)
- */
+/* The applicable types of messages that the HOST may send the SERVICE. */
 enum omaprpc_msg_type_e {
-	/** Ask the ServiceMgr to create a new instance of the service.
-	 * No secondary data is needed. */
+	/*
+	 * Ask the ServiceMgr to create a new instance of the service.
+	 * No secondary data is needed.
+	 */
 	OMAPRPC_MSG_CREATE_INSTANCE = 0,
-	/** The return message from OMAPRPC_CREATE_INSTANCE,
-	 * contains the new endpoint address in the omaprpc_instance_handle_t */
+	/*
+	 * The return message from OMAPRPC_CREATE_INSTANCE,
+	 * contains the new endpoint address in the omaprpc_instance_handle_t
+	 */
 	OMAPRPC_MSG_INSTANCE_CREATED = 1,
-	/** Ask the Service Instance to send information about the Service */
+	/* Ask the Service Instance to send information about the Service */
 	OMAPRPC_MSG_QUERY_INSTANCE = 2,
-	/** The return message from OMAPRPC_QUERY_INSTANCE,
-	 * which contains the information about the instance */
+	/*
+	 * The return message from OMAPRPC_QUERY_INSTANCE,
+	 * which contains the information about the instance
+	 */
 	OMAPRPC_MSG_INSTANCE_INFO = 3,
-	/** Ask the Service Mgr to destroy an instance */
+	/* Ask the Service Mgr to destroy an instance */
 	OMAPRPC_MSG_DESTROY_INSTANCE = 4,
-	/** Ask the Service Instance to call a particular function */
+	/* Ask the Service Instance to call a particular function */
 	OMAPRPC_MSG_CALL_FUNCTION = 5,
-	/** The return message from OMAPRPC_DESTROY_INSTANCE.
-	 * contains the old endpoint address in the omaprpc_instance_handle_t */
+	/*
+	 * The return message from OMAPRPC_DESTROY_INSTANCE.
+	 * contains the old endpoint address in the omaprpc_instance_handle_t
+	 */
 	OMAPRPC_MSG_INSTANCE_DESTROYED = 6,
-	/** Returned from either the ServiceMgr or Service Instance
-	 * when an error occurs */
+	/*
+	 * Returned from either the ServiceMgr or Service Instance
+	 * when an error occurs
+	 */
 	OMAPRPC_MSG_ERROR = 7,
-	/** The return values from a function call */
+	/* The return values from a function call */
 	OMAPRPC_MSG_FUNCTION_RETURN = 8,
-	/** Ask Service for channel information*/
+	/* Ask Service for channel information*/
 	OMAPRPC_MSG_QUERY_CHAN_INFO = 9,
-	/** The return message from OMAPRPC_MSG_QUERY_CHAN_INFO*/
+	/* The return message from OMAPRPC_MSG_QUERY_CHAN_INFO*/
 	OMAPRPC_MSG_CHAN_INFO = 10,
 
-	/** \hidden used to define the max msg enum, not an actual message */
+	/* used to define the max msg enum, not an actual message */
 	OMAPRPC_MSG_MAX
 };
 
 enum omaprpc_state {
-	/** No errors, just not initialized */
+	/* No errors, just not initialized */
 	OMAPRPC_STATE_DISCONNECTED,
-	/** No errors, initialized remote DVP KGM */
+	/* No errors, initialized remote DVP KGM */
 	OMAPRPC_STATE_CONNECTED,
-	/** Some error has been detected. Disconnected. */
+	/* Some error has been detected. Disconnected. */
 	OMAPRPC_STATE_FAULT,
 
-	/* \hidden Last item in enum */
+	/* Last item in enum */
 	OMAPRPC_STATE_MAX
 };
 
-/** \brief The generic OMAPRPC message header.
- * (actually a copy of omx_msg_hdr which is a copy of an RCM header) */
+/*The generic OMAPRPC message header */
 struct omaprpc_msg_header_t {
-	uint32_t msg_type;	/**< @see omaprpc_msg_type_e */
-	uint32_t msg_flags;	/**< Unused */
-	uint32_t msg_len;	/**< The length of the message data in bytes */
+	uint32_t msg_type;	/* omaprpc_msg_type_e */
+	uint32_t msg_flags;	/* Unused */
+	uint32_t msg_len;	/* The length of the message data in bytes */
 	uint8_t  msg_data[0];
 } __packed;
 
@@ -274,14 +274,14 @@ enum _omaprpc_translation_direction_e {
 
 /** This is actually a frankensteined structure of RCM */
 struct omaprpc_packet_t {
-	uint16_t desc;		/**< @see RcmClient_Packet.desc */
-	uint16_t msg_id;	/**< @see RcmClient_Packet.msgId */
-	uint16_t pool_id;	/**< @see RcmClient_Message.poolId */
-	uint16_t job_id;	/**< @see RcmClient_Message.jobId */
-	uint32_t fxn_idx;	/**< @see RcmClient_Message.fxnIdx */
-	 int32_t result;	/**< @see RcmClient_Message.result */
-	uint32_t data_size;	/**< @see RcmClient_Message.data_size */
-	uint8_t  data[0];	/**< @see RcmClient_Message.data pointer */
+	uint16_t desc;		/* RcmClient_Packet.desc */
+	uint16_t msg_id;	/* RcmClient_Packet.msgId */
+	uint16_t pool_id;	/* RcmClient_Message.poolId */
+	uint16_t job_id;	/* RcmClient_Message.jobId */
+	uint32_t fxn_idx;	/* RcmClient_Message.fxnIdx */
+	int32_t result;		/* RcmClient_Message.result */
+	uint32_t data_size;	/* RcmClient_Message.data_size */
+	uint8_t  data[0];	/* RcmClient_Message.data pointer */
 } __packed;
 
 #endif /* _OMAP_RPC_H_ */

@@ -17,12 +17,15 @@
 
 #include "slab.h"
 
-/* The value below only applies to OMAP4 */
+#ifdef CONFIG_ARCH_OMAP4
 #define L1CACHE_SIZE 32768
 #define L2CACHE_SIZE 1048576
 
 #define L1THRESHOLD L1CACHE_SIZE
 #define L2THRESHOLD L2CACHE_SIZE
+#else
+#error Cache configuration must be specified.
+#endif
 
 struct c2dmrgn {
 	char *start;	/* addr of upper left of rect */

@@ -167,6 +167,21 @@ static struct omap_device_pad port1_tll_pads[] __initdata = {
 	},
 };
 
+static struct omap_device_pad port1_hsic_pads[] __initdata = {
+	{
+		.name = "usbb1_hsic_data.usbb1_hsic_data",
+		.flags  = OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
+		.enable = (OMAP_PIN_OUTPUT | OMAP_MUX_MODE0) & ~(OMAP_WAKEUP_EN),
+		.idle = OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
+	},
+	{
+		.name = "usbb1_hsic_strobe.usbb1_hsic_strobe",
+		.flags  = OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
+		.enable = (OMAP_PIN_OUTPUT | OMAP_MUX_MODE0) & ~(OMAP_WAKEUP_EN),
+		.idle = OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
+	},
+};
+
 static struct omap_device_pad port2_phy_pads[] __initdata = {
 	{
 		.name = "usbb2_ulpitll_stp.usbb2_ulpiphy_stp",
@@ -268,6 +283,21 @@ static struct omap_device_pad port2_tll_pads[] __initdata = {
 	{
 		.name = "usbb2_ulpitll_dat7.usbb2_ulpitll_dat7",
 		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE0,
+	},
+};
+
+static struct omap_device_pad port2_hsic_pads[] __initdata = {
+	{
+		.name = "usbb2_hsic_data.usbb2_hsic_data",
+		.flags  = OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
+		.enable = (OMAP_PIN_OUTPUT | OMAP_MUX_MODE0) & ~(OMAP_WAKEUP_EN),
+		.idle = OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
+	},
+	{
+		.name = "usbb2_hsic_strobe.usbb2_hsic_strobe",
+		.flags  = OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
+		.enable = (OMAP_PIN_OUTPUT | OMAP_MUX_MODE0) & ~(OMAP_WAKEUP_EN),
+		.idle = OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
 	},
 };
 
@@ -591,8 +621,8 @@ static void setup_ehci_io_mux(const enum usbhs_omap_port_mode *port_mode)
 static struct omap_hwmod_mux_info *
 setup_4430ehci_io_mux(const enum usbhs_omap_port_mode *port_mode)
 {
-	struct omap_device_pad *pads;
-	int pads_cnt;
+	struct omap_device_pad *pads = NULL;
+	int pads_cnt = 0;
 	u32 val = 0;
 
 	switch (port_mode[0]) {
@@ -610,6 +640,23 @@ setup_4430ehci_io_mux(const enum usbhs_omap_port_mode *port_mode)
 			val |= OMAP4_USBB1_DR0_DS_MASK;
 			omap4_ctrl_pad_writel(val, OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_SMART2IO_PADCONF_2);
 		}
+			break;
+	case OMAP_EHCI_PORT_MODE_HSIC:
+		/*
+		 * HSIC pads have special register for setting up
+		 * OFF mode / PU / PD settings
+		 */
+		val = omap4_ctrl_pad_readl(OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_USBB_HSIC);
+		val &= ~OMAP4_USBB1_HSIC_DATA_OFFMODE_WD_ENABLE_MASK &
+				~OMAP4_USBB1_HSIC_STROBE_OFFMODE_WD_ENABLE_MASK;
+		val |= OMAP4_USBB1_HSIC_DATA_OFFMODE_WD_ENABLE_MASK |
+				OMAP4_USBB1_HSIC_STROBE_OFFMODE_WD_ENABLE_MASK |
+				(0x3 << OMAP4_USBB1_HSIC_DATA_OFFMODE_WD_SHIFT) |
+				(0x3 << OMAP4_USBB1_HSIC_STROBE_OFFMODE_WD_SHIFT);
+		omap4_ctrl_pad_writel(val, OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_USBB_HSIC);
+
+		pads = port1_hsic_pads;
+		pads_cnt = ARRAY_SIZE(port1_hsic_pads);
 			break;
 	case OMAP_USBHS_PORT_MODE_UNUSED:
 	default:
@@ -630,6 +677,23 @@ setup_4430ehci_io_mux(const enum usbhs_omap_port_mode *port_mode)
 			val |= OMAP4_USBB2_DR0_DS_MASK;
 			omap4_ctrl_pad_writel(val, OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_SMART2IO_PADCONF_2);
 		}
+			break;
+	case OMAP_EHCI_PORT_MODE_HSIC:
+		/*
+		 * HSIC pads have special register for setting up
+		 * OFF mode / PU / PD settings
+		 */
+		val = omap4_ctrl_pad_readl(OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_USBB_HSIC);
+		val &= ~OMAP4_USBB2_HSIC_DATA_OFFMODE_WD_ENABLE_MASK &
+				~OMAP4_USBB2_HSIC_STROBE_OFFMODE_WD_ENABLE_MASK;
+		val |= OMAP4_USBB2_HSIC_DATA_OFFMODE_WD_ENABLE_MASK |
+				OMAP4_USBB2_HSIC_STROBE_OFFMODE_WD_ENABLE_MASK |
+				(0x3 << OMAP4_USBB2_HSIC_DATA_OFFMODE_WD_SHIFT) |
+				(0x3 << OMAP4_USBB2_HSIC_STROBE_OFFMODE_WD_SHIFT);
+		omap4_ctrl_pad_writel(val, OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_USBB_HSIC);
+
+		pads = port2_hsic_pads;
+		pads_cnt = ARRAY_SIZE(port2_hsic_pads);
 			break;
 	case OMAP_USBHS_PORT_MODE_UNUSED:
 	default:
@@ -739,8 +803,8 @@ static void setup_ohci_io_mux(const enum usbhs_omap_port_mode *port_mode)
 static struct omap_hwmod_mux_info *
 setup_4430ohci_io_mux(const enum usbhs_omap_port_mode *port_mode)
 {
-	struct omap_device_pad *pads;
-	int pads_cnt;
+	struct omap_device_pad *pads = NULL;
+	int pads_cnt = 0;
 
 	switch (port_mode[0]) {
 	case OMAP_OHCI_PORT_MODE_PHY_6PIN_DATSE0:
@@ -847,6 +911,7 @@ void __init usbhs_init(const struct usbhs_omap_board_data *pdata)
 		ohci_data.port_mode[i] = pdata->port_mode[i];
 		ehci_data.port_mode[i] = pdata->port_mode[i];
 		ehci_data.reset_gpio_port[i] = pdata->reset_gpio_port[i];
+		ehci_data.hsic_aux_port[i] = pdata->hsic_aux_port[i];
 		ehci_data.regulator[i] = pdata->regulator[i];
 		ehci_data.transceiver_clk[i] = pdata->transceiver_clk[i];
 	}
@@ -884,11 +949,7 @@ void __init usbhs_init(const struct usbhs_omap_board_data *pdata)
 		setup_ohci_io_mux(pdata->port_mode);
 	} else if (cpu_is_omap44xx()) {
 		oh[2]->mux = setup_4430ehci_io_mux(pdata->port_mode);
-		if (oh[2]->mux)
-			omap_hwmod_mux(oh[2]->mux, _HWMOD_STATE_ENABLED);
 		oh[1]->mux = setup_4430ohci_io_mux(pdata->port_mode);
-		if (oh[1]->mux)
-			omap_hwmod_mux(oh[1]->mux, _HWMOD_STATE_ENABLED);
 	}
 
 	od = omap_device_build_ss(OMAP_USBHS_DEVICE, bus_id, oh, 4,

@@ -313,10 +313,10 @@ static void omap_mbox_fini(struct omap_mbox *mbox)
 {
 	mutex_lock(&mbox_configured_lock);
 
+	flush_work_sync(&mbox->rxq->work);
 	if (!--mbox->use_count) {
 		free_irq(mbox->irq, mbox);
 		tasklet_kill(&mbox->txq->tasklet);
-		flush_work_sync(&mbox->rxq->work);
 		mbox_queue_free(mbox->txq);
 		mbox_queue_free(mbox->rxq);
 	}
@@ -364,9 +364,9 @@ EXPORT_SYMBOL(omap_mbox_get);
 
 void omap_mbox_put(struct omap_mbox *mbox, struct notifier_block *nb)
 {
+	omap_mbox_fini(mbox);
 	if (nb)
 		blocking_notifier_chain_unregister(&mbox->notifier, nb);
-	omap_mbox_fini(mbox);
 }
 EXPORT_SYMBOL(omap_mbox_put);
 

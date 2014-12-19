@@ -1004,6 +1004,24 @@ int omapfb_setup_overlay(struct fb_info *fbi, struct omap_overlay *ovl,
 	info.out_width = outw;
 	info.out_height = outh;
 
+	/*
+	 * Don't allow these to be zero or else we'll get
+	 * a divide by zero when the overlay is enabled.
+	 */
+	if (!info.max_x_decim)
+		info.max_x_decim = 255;
+	if (!info.max_y_decim)
+		info.max_y_decim = 255;
+	if (!info.min_x_decim)
+		info.min_x_decim = 1;
+	if (!info.min_y_decim)
+		info.min_y_decim = 1;
+
+	/*
+	 * If fb is used directly, set zorder to 0
+	 */
+	info.zorder = 0;
+
 	r = ovl->set_overlay_info(ovl, &info);
 	if (r) {
 		DBG("ovl->setup_overlay_info failed\n");

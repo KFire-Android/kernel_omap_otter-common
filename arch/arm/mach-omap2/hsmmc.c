@@ -137,9 +137,12 @@ static void omap4_hsmmc1_after_set_reg(struct device *dev, int slot,
 	unsigned long timeout;
 
 	if (power_on) {
+		int use_3_volt_mode = !((1 << vdd) <= MMC_VDD_165_195);
+		int dont_try_again = 0;
+try_again:
 		reg = omap4_ctrl_pad_readl(control_pbias_offset);
 		reg |= OMAP4_MMC1_PBIASLITE_PWRDNZ_MASK;
-		if ((1 << vdd) <= MMC_VDD_165_195)
+		if (!use_3_volt_mode)
 			reg &= ~OMAP4_MMC1_PBIASLITE_VMODE_MASK;
 		else
 			reg |= OMAP4_MMC1_PBIASLITE_VMODE_MASK;
@@ -150,16 +153,32 @@ static void omap4_hsmmc1_after_set_reg(struct device *dev, int slot,
 		timeout = jiffies + msecs_to_jiffies(5);
 		do {
 			reg = omap4_ctrl_pad_readl(control_pbias_offset);
-			if (!(reg & OMAP4_MMC1_PBIASLITE_VMODE_ERROR_MASK))
+			/* If we detect an error, stop immediately to handle it.
+			 * Otherwise, keep going to make sure that no error
+			 * shows up within our timeout
+			 */
+			if (reg & OMAP4_MMC1_PBIASLITE_VMODE_ERROR_MASK)
 				break;
 			usleep_range(100, 200);
 		} while (!time_after(jiffies, timeout));
 
 		if (reg & OMAP4_MMC1_PBIASLITE_VMODE_ERROR_MASK) {
-			pr_err("Pbias Voltage is not same as LDO\n");
 			/* Caution : On VMODE_ERROR Power Down MMC IO */
 			reg &= ~(OMAP4_MMC1_PWRDNZ_MASK);
 			omap4_ctrl_pad_writel(reg, control_pbias_offset);
+
+			if (!dont_try_again) {
+				use_3_volt_mode = !use_3_volt_mode;
+				pr_warn("Pbias Voltage is not the same as LDO,"
+				       "reconfiguring for %sv mode.\n",
+				       use_3_volt_mode ? "3" : "1.8");
+				usleep_range(100, 200);
+				dont_try_again = 1;
+				goto try_again;
+			} else {
+				pr_err("Pbias Voltage is still not the same as"
+				       " LDO.  Forcing shutdown\n");
+			}
 		}
 	}
 }

@@ -2603,14 +2603,20 @@ static int abe_add_widgets(struct snd_soc_platform *platform)
 {
 	struct abe_data *abe = snd_soc_platform_get_drvdata(platform);
 	struct fw_header *hdr = &abe->hdr;
-	int i, j;
+	int i, ii, j;
 
 	/* create equalizer controls */
-	for (i = 0; i < hdr->num_equ; i++) {
-		struct soc_enum *equalizer_enum = &abe->equalizer_enum[i];
+	for (i = 0, ii = 0; i < hdr->num_equ; i++) {
+		struct soc_enum *equalizer_enum = &abe->equalizer_enum[ii];
 		struct snd_kcontrol_new *equalizer_control =
-				&abe->equalizer_control[i];
+				&abe->equalizer_control[ii];
 
+#if !defined(CONFIG_SND_OMAP_SOC_ABE_DL2)
+		if (i+1 == EQ2L || i+1 == EQ2R)
+			continue;
+#endif
+
+		ii++;
 		equalizer_enum->reg = i;
 		equalizer_enum->max = abe->equ_texts[i].count;
 		for (j = 0; j < abe->equ_texts[i].count; j++)
@@ -2630,8 +2636,7 @@ static int abe_add_widgets(struct snd_soc_platform *platform)
 			dev_dbg(platform->dev, " %s\n", equalizer_enum->dtexts[j]);
 	}
 
-	snd_soc_add_platform_controls(platform, abe->equalizer_control,
-			hdr->num_equ);
+	snd_soc_add_platform_controls(platform, abe->equalizer_control, ii);
 
 	snd_soc_add_platform_controls(platform, abe_controls,
 			ARRAY_SIZE(abe_controls));

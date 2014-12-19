@@ -656,6 +656,7 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
 			w |= OMAP_I2C_CON_STP;
 			omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, w);
 		}
+		omap_i2c_init(dev);
 		return -EREMOTEIO;
 	}
 	return -EIO;

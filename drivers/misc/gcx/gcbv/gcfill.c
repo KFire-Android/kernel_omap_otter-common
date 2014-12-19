@@ -59,7 +59,7 @@
 #define GCZONE_COLOR		(1 << 0)
 #define GCZONE_FILL		(1 << 1)
 
-GCDBG_FILTERDEF(gcfill, GCZONE_NONE,
+GCDBG_FILTERDEF(fill, GCZONE_NONE,
 		"color",
 		"fill")
 

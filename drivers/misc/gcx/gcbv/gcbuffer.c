@@ -61,7 +61,7 @@
 #define GCZONE_FIXUP_ALLOC	(1 << 2)
 #define GCZONE_FIXUP		(1 << 3)
 
-GCDBG_FILTERDEF(gcbuffer, GCZONE_NONE,
+GCDBG_FILTERDEF(buffer, GCZONE_NONE,
 		"batchalloc",
 		"bufferalloc"
 		"fixupalloc",

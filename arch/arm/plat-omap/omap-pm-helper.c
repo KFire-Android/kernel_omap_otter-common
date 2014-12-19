@@ -30,6 +30,7 @@
 #include <plat/common.h>
 #include "../mach-omap2/powerdomain.h"
 #include "../mach-omap2/dvfs.h"
+#include "../mach-omap2/pm.h"
 #include "omap-pm-helper.h"
 
 struct omap_opp *dsp_opps;
@@ -225,9 +226,12 @@ unlock:
  */
 static unsigned long remove_req_tput(struct device *dev)
 {
+	struct platform_device *pdev;
 	struct users *user;
 	int found = 0;
 	int ret;
+
+	pdev = container_of(dev, struct platform_device, dev);
 
 	mutex_lock(&bus_tput->throughput_mutex);
 	list_for_each_entry(user, &bus_tput->users_list, node) {
@@ -238,7 +242,7 @@ static unsigned long remove_req_tput(struct device *dev)
 	}
 	if (!found) {
 		/* No such user exists */
-		pr_err("Invalid Device Structure\n");
+		pr_err("OMAP-PM: Invalid Device Structure for %s\n", pdev->name);
 		ret = 0;
 		goto unlock;
 	}
@@ -252,30 +256,39 @@ unlock:
 	return ret;
 }
 
-int omap_pm_set_min_bus_tput_helper(struct device *dev, u8 agent_id, long r)
+/**
+ * get_tput_level  - Gets the current requested interconnect bandwidth in KiB/s
+ *
+ * Returns the current level of interconnect throughput.
+ *
+ */
+static unsigned long get_tput_level(void)
 {
+	unsigned long ret;
 
-	int ret = 0;
+	mutex_lock(&bus_tput->throughput_mutex);
+	ret = bus_tput->target_level;
+	mutex_unlock(&bus_tput->throughput_mutex);
+
+	return ret;
+}
+
+int omap_pm_apply_min_bus_tput_helper_l(void)
+{
+	int ret;
+	unsigned long target_level;
 	struct device *l3_dev;
 	static struct device dummy_l3_dev = {
 		.init_name = "omap_pm_set_min_bus_tput",
 	};
-	unsigned long target_level = 0;
-
-	mutex_lock(&bus_tput_mutex);
 
 	l3_dev = omap2_get_l3_device();
 	if (!l3_dev) {
 		pr_err("Unable to get l3 device pointer");
-		ret = -EINVAL;
-		goto unlock;
+		return -EINVAL;
 	}
 
-	if (r == -1)
-		target_level = remove_req_tput(dev);
-	else
-		target_level = add_req_tput(dev, r);
-
+	target_level = get_tput_level();
 	/* Convert the throughput(in KiB/s) into Hz. */
 	target_level = (target_level * 1000) / 4;
 
@@ -288,7 +301,40 @@ int omap_pm_set_min_bus_tput_helper(struct device *dev, u8 agent_id, long r)
 		pr_err("Failed: change interconnect bandwidth to %ld\n",
 		     target_level);
 #endif
-unlock:
+	return ret;
+}
+
+int omap_pm_apply_min_bus_tput_helper(void)
+{
+	int ret;
+
+	mutex_lock(&bus_tput_mutex);
+	ret = omap_pm_apply_min_bus_tput_helper_l();
+	mutex_unlock(&bus_tput_mutex);
+
+	return ret;
+}
+
+int omap_pm_set_min_bus_tput_helper(struct device *dev, u8 agent_id, long r)
+{
+
+	int ret = 0;
+
+	mutex_lock(&bus_tput_mutex);
+
+	if (r == -1)
+		remove_req_tput(dev);
+	else
+		add_req_tput(dev, r);
+
+	/* Don't bother to attempt the device scale if the power management
+	 * subsystem has not been initialized yet since it will just fail.  PM
+	 * will call back after it has come up to enforce any pending tput
+	 * constraints.
+	 */
+	if (omap_pm_is_ready())
+		ret = omap_pm_apply_min_bus_tput_helper_l();
+
 	mutex_unlock(&bus_tput_mutex);
 	return ret;
 }

@@ -1130,7 +1130,7 @@ add_children(struct twl4030_platform_data *pdata, unsigned long features,
 			return PTR_ERR(child);
 
 		child = add_regulator(TWL6030_REG_REGEN1,
-				pdata->sysen, features);
+				pdata->regen1, features);
 		if (IS_ERR(child))
 			return PTR_ERR(child);
 	}
@@ -1501,10 +1501,17 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		/*
 		 * Check for the errata implementation
 		 * Errata ProDB00119490 present only in the TWL6032 ES1.1
+		 * Errata ProDB00112620 present only in the TWL6030 ES2.1
+		 * Errata ProDB00110684 present only in the TWL6030 ES2.1
 		 */
 		if (features & TWL6032_SUBCLASS) {
 			if (twlrev == 1)
 				errata |= TWL6032_ERRATA_DB00119490;
+		} else {
+			if (twlrev == 2) {
+				errata |= TWL6030_ERRATA_DB00112620;
+				errata |= TWL6030_ERRATA_DB00110684;
+			}
 		}
 	}
 

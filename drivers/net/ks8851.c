@@ -626,6 +626,9 @@ static void ks8851_irq_work(struct work_struct *work)
 
 	mutex_unlock(&ks->lock);
 
+	if (status & IRQ_LCI)
+		mii_check_link(&ks->mii);
+
 	if (status & IRQ_TXI)
 		netif_wake_queue(ks->netdev);
 

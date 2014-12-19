@@ -289,6 +289,7 @@ static void wl_ch_to_chanspec(int ch,
  */
 static void wl_rst_ie(struct wl_priv *wl);
 static __used s32 wl_add_ie(struct wl_priv *wl, u8 t, u8 l, u8 *v);
+static void wl_update_hidden_ap_ie(struct wl_bss_info *bi, u8 *ie_stream, u32 *ie_size);
 static s32 wl_mrg_ie(struct wl_priv *wl, u8 *ie_stream, u16 ie_size);
 static s32 wl_cp_ie(struct wl_priv *wl, u8 *dst, u16 dst_size);
 static u32 wl_get_ielen(struct wl_priv *wl);
@@ -1571,8 +1572,13 @@ __wl_cfg80211_scan(struct wiphy *wiphy, struct net_device *ndev,
 
 	WL_DBG(("Enter wiphy (%p)\n", wiphy));
 	if (wl_get_drv_status_all(wl, SCANNING)) {
-		WL_ERR(("Scanning already\n"));
-		return -EAGAIN;
+                if (wl->scan_request == NULL) {
+                        wl_clr_drv_status_all(wl, SCANNING);
+                        WL_DBG(("<<<<<<<<<<<Force Clear Scanning Status>>>>>>>>>>>\n"));
+                } else {
+                        WL_ERR(("Scanning already\n"));
+                        return -EAGAIN;
+                }
 	}
 	if (wl_get_drv_status(wl, SCAN_ABORTING, ndev)) {
 		WL_ERR(("Scanning being aborted\n"));
@@ -2365,6 +2371,8 @@ wl_cfg80211_connect(struct wiphy *wiphy, struct net_device *dev,
 			wl_cfgp2p_set_management_ie(wl, dev,
 				wl_cfgp2p_find_idx(wl, dev), VNDR_IE_PRBREQ_FLAG,
 				sme->ie, sme->ie_len);
+			wl_cfgp2p_set_management_ie(wl, dev, wl_cfgp2p_find_idx(wl, dev),
+				VNDR_IE_PRBREQ_FLAG, sme->ie, sme->ie_len);
 			wl_cfgp2p_set_management_ie(wl, dev, wl_cfgp2p_find_idx(wl, dev),
 				VNDR_IE_ASSOCREQ_FLAG, sme->ie, sme->ie_len);
 		}
@@ -4789,6 +4797,7 @@ static s32 wl_inform_single_bss(struct wl_priv *wl, struct wl_bss_info *bi)
 	beacon_proberesp->capab_info = cpu_to_le16(bi->capability);
 	wl_rst_ie(wl);
 
+	wl_update_hidden_ap_ie(bi, ((u8 *) bi) + bi->ie_offset, &bi->ie_length);
 	wl_mrg_ie(wl, ((u8 *) bi) + bi->ie_offset, bi->ie_length);
 	wl_cp_ie(wl, beacon_proberesp->variable, WL_BSS_INFO_MAX -
 		offsetof(struct wl_cfg80211_bss_info, frame_buf));
@@ -4806,7 +4815,7 @@ static s32 wl_inform_single_bss(struct wl_priv *wl, struct wl_bss_info *bi)
 		return -EINVAL;
 	}
 
-	WL_DBG(("SSID : \"%s\", rssi %d, channel %d, capability : 0x04%x, bssid %pM"
+	WL_DBG(("SSID : \"%s\", rssi %d, channel %d, capability : 0x04%x, bssid %pM "
 			"mgmt_type %d frame_len %d\n", bi->SSID,
 			notif_bss_info->rssi, notif_bss_info->channel,
 			mgmt->u.beacon.capab_info, &bi->BSSID, mgmt_type,
@@ -5386,6 +5395,7 @@ static s32 wl_update_bss_info(struct wl_priv *wl, struct net_device *ndev)
 		}
 		bi = (struct wl_bss_info *)(wl->extra_buf + 4);
 		if (memcmp(bi->BSSID.octet, curbssid, ETHER_ADDR_LEN)) {
+			WL_ERR(("Bssid doesn't match\n"));
 			err = -EIO;
 			goto update_bss_info_out;
 		}
@@ -5425,6 +5435,9 @@ static s32 wl_update_bss_info(struct wl_priv *wl, struct net_device *ndev)
 	wl_update_prof(wl, ndev, NULL, &dtim_period, WL_PROF_DTIMPERIOD);
 
 update_bss_info_out:
+	if (unlikely(err)) {
+		WL_ERR(("Failed with error %d\n", err));
+	}
 	mutex_unlock(&wl->usr_sync);
 	return err;
 }
@@ -5562,8 +5575,15 @@ wl_notify_pfn_status(struct wl_priv *wl, struct net_device *ndev,
 
 #ifndef WL_SCHED_SCAN
 	mutex_lock(&wl->usr_sync);
+#ifndef WL_SCHED_SCAN
 	/* TODO: Use cfg80211_sched_scan_results(wiphy); */
 	cfg80211_disconnected(ndev, 0, NULL, 0, GFP_KERNEL);
+#else
+	/* If cfg80211 scheduled scan is supported, report the pno results via sched
+	 * scan results
+	 */
+	wl_notify_sched_scan_results(wl, ndev, e, data);
+#endif /* WL_SCHED_SCAN */
 	mutex_unlock(&wl->usr_sync);
 #else
 	/* If cfg80211 scheduled scan is supported, report the pno results via sched
@@ -6437,7 +6457,6 @@ static s32 wl_escan_handler(struct wl_priv *wl,
 	wifi_p2p_ie_t * p2p_ie;
 	u32 bi_length;
 	u32 i;
-	u8 *p2p_dev_addr = NULL;
 
 	WL_DBG((" enter event type : %d, status : %d \n",
 		ntoh32(e->event_type), ntoh32(e->status)));
@@ -6491,8 +6510,7 @@ static s32 wl_escan_handler(struct wl_priv *wl,
 		}
 
 		if (wl_get_drv_status_all(wl, SENDING_ACT_FRM)) {
-			p2p_dev_addr = wl_cfgp2p_retreive_p2p_dev_addr(bi, bi_length);
-			if (p2p_dev_addr && !memcmp(p2p_dev_addr,
+			if (!memcmp(bi->BSSID.octet,
 				wl->afx_hdl->pending_tx_dst_addr.octet, ETHER_ADDR_LEN)) {
 				s32 channel = CHSPEC_CHANNEL(dtohchanspec(bi->chanspec));
 				WL_DBG(("ACTION FRAME SCAN : Peer " MACSTR " found, channel : %d\n",
@@ -7603,6 +7621,29 @@ static __used s32 wl_add_ie(struct wl_priv *wl, u8 t, u8 l, u8 *v)
 	ie->offset += l + 2;
 
 	return err;
+}
+
+static void wl_update_hidden_ap_ie(struct wl_bss_info *bi, u8 *ie_stream, u32 *ie_size)
+{
+	u8 *ssidie;
+
+	ssidie = (u8 *)cfg80211_find_ie(WLAN_EID_SSID, ie_stream, *ie_size);
+	if (!ssidie)
+		return;
+	if (ssidie[1] != bi->SSID_len) {
+		if (ssidie[1]) {
+			WL_ERR(("%s: Wrong SSID len: %d != %d\n", __func__, ssidie[1], bi->SSID_len));
+			return;
+		}
+		memmove(ssidie + bi->SSID_len + 2, ssidie + 2, *ie_size - (ssidie + 2 - ie_stream));
+		memcpy(ssidie + 2, bi->SSID, bi->SSID_len);
+		*ie_size = *ie_size + bi->SSID_len;
+		ssidie[1] = bi->SSID_len;
+		return;
+	}
+	if (*(ssidie + 2) == '\0')
+		memcpy(ssidie + 2, bi->SSID, bi->SSID_len);
+	return;
 }
 
 static s32 wl_mrg_ie(struct wl_priv *wl, u8 *ie_stream, u16 ie_size)

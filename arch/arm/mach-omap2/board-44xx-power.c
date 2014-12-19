@@ -25,6 +25,89 @@
 #include <plat/omap-serial.h>
 #include <linux/mfd/twl6040-codec.h>
 #include "common-board-devices.h"
+#include <linux/power/ti-fg.h>
+
+/* EDV Configuration */
+static struct edv_config edv_cfg = {
+	.averaging = true,
+	.seq_edv = 5,
+	.filter_light = 155,
+	.filter_heavy = 199,
+	.overload_current = 1000,
+	.edv = {
+		{3150, 0},
+		{3450, 4},
+		{3600, 10},
+	},
+};
+
+/* OCV Configuration */
+static struct ocv_config ocv_cfg = {
+	.voltage_diff = 75,
+	.current_diff = 30,
+
+	.sleep_enter_current = 60,
+	.sleep_enter_samples = 3,
+
+	.sleep_exit_current = 100,
+	.sleep_exit_samples = 3,
+
+	.long_sleep_current = 500,
+	.ocv_period = 300,
+	.relax_period = 600,
+
+	.flat_zone_low = 35,
+	.flat_zone_high = 65,
+
+	.max_ocv_discharge = 1300,
+
+	.table = {
+		3300, 3603, 3650, 3662, 3700,
+		3723, 3734, 3746, 3756, 3769,
+		3786, 3807, 3850, 3884, 3916,
+		3949, 3990, 4033, 4077, 4129,
+		4193
+	},
+};
+
+/* General Battery Cell Configuration */
+static struct cell_config cell_cfg =  {
+	.cc_voltage = 4175,
+	.cc_current = 250,
+	.cc_capacity = 15,
+	.seq_cc = 5,
+
+	.cc_polarity = true,
+	.cc_out = true,
+	.ocv_below_edv1 = false,
+
+	.design_capacity = 4000,
+	.design_qmax = 4100,
+	.r_sense = 10,
+
+	.qmax_adjust = 1,
+	.fcc_adjust = 2,
+
+	.max_overcharge = 100,
+	.electronics_load = 200, /* *10 uAh */
+
+	.max_increment = 150,
+	.max_decrement = 150,
+	.low_temp = 119,
+	.deep_dsg_voltage = 30,
+	.max_dsg_estimate = 300,
+	.light_load = 100,
+	.near_full = 500,
+	.cycle_threshold = 3500,
+	.recharge = 300,
+
+	.mode_switch_capacity = 5,
+
+	.call_period = 2,
+
+	.ocv = &ocv_cfg,
+	.edv = &edv_cfg,
+};
 
 static struct regulator_consumer_supply vmmc_supply[] = {
 	REGULATOR_SUPPLY("vmmc", "omap_hsmmc.0"),
@@ -345,14 +428,13 @@ static struct twl4030_bci_platform_data bci_data = {
 	.low_bat_voltagemV		= 3300,
 	.battery_tmp_tbl		= batt_table,
 	.tblsize			= ARRAY_SIZE(batt_table),
-	.sense_resistor_mohm		= 10,
+	.cell_cfg			= &cell_cfg,
 };
 
 static struct twl4030_usb_data omap4_usbphy_data = {
 	.phy_init	= omap4430_phy_init,
 	.phy_exit	= omap4430_phy_exit,
 	.phy_power	= omap4430_phy_power,
-	.phy_set_clock	= omap4430_phy_set_clk,
 	.phy_suspend	= omap4430_phy_suspend,
 };
 
@@ -473,4 +555,3 @@ void __init omap4_power_init(void)
 
 	omap4_pmic_init("twl6030", &twldata);
 }
-

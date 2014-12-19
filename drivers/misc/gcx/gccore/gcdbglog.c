@@ -1586,103 +1586,233 @@ EXPORT_SYMBOL(gc_dump_phys_surface);
  * MMU dumping functions.
  */
 
-typedef unsigned int (*pfn_get_present) (unsigned int entry);
-typedef void (*pfn_print_entry) (struct gcdbgfilter *filter, unsigned int zone,
-					unsigned int index, unsigned int entry);
+struct gcmmuentry {
+	unsigned int entry;
+	bool exception;
+	bool present;
+
+	union {
+		struct gcmmumaster {
+			unsigned int slaveaddr;
+			unsigned int pagesize;
+		} mtlb;
+
+		struct gcmmuslave {
+			unsigned int pageaddr;
+			bool writable;
+		} stlb;
+	} u;
+};
+
+typedef void (*pfn_get_entry) (unsigned int entry,
+			       struct gcmmuentry *gcmmuentry);
+typedef void (*pfn_print_entry) (struct gcdbgfilter *filter,
+				 unsigned int zone,
+				 unsigned int index,
+				 struct gcmmuentry *gcmmuentry);
 
 struct gcmmutable {
 	char *name;
+	bool master;
 	unsigned int entry_count;
 	unsigned int vacant_entry;
-	pfn_get_present get_present;
+	pfn_get_entry get_entry;
 	pfn_print_entry print_entry;
 };
 
-static unsigned int get_mtlb_present(unsigned int entry)
+static void get_mtlb_entry(unsigned int entry,
+			   struct gcmmuentry *gcmmuentry)
 {
-	return entry & GCMMU_MTLB_PRESENT_MASK;
+	static const unsigned int pagesize[] = {
+		1024 * 4,
+		1024 * 64,
+		1024 * 1024,
+		1024 * 1024 * 16
+	};
+
+	gcmmuentry->entry = entry;
+	gcmmuentry->exception = ((entry & GCMMU_MTLB_EXCEPTION_MASK) != 0);
+	gcmmuentry->present = ((entry & GCMMU_MTLB_PRESENT_MASK) != 0);
+	gcmmuentry->u.mtlb.slaveaddr = entry & GCMMU_MTLB_SLAVE_MASK;
+	gcmmuentry->u.mtlb.pagesize =
+		pagesize[(entry & GCMMU_MTLB_PAGE_SIZE_MASK) >> 2];
 }
 
-static unsigned int get_stlb_present(unsigned int entry)
+static void get_stlb_entry(unsigned int entry,
+			   struct gcmmuentry *gcmmuentry)
 {
-	return entry & GCMMU_STLB_PRESENT_MASK;
+	gcmmuentry->entry = entry;
+	gcmmuentry->exception = ((entry & GCMMU_STLB_EXCEPTION_MASK) != 0);
+	gcmmuentry->present = ((entry & GCMMU_STLB_PRESENT_MASK) != 0);
+	gcmmuentry->u.stlb.pageaddr = entry & GCMMU_STLB_ADDRESS_MASK;
+	gcmmuentry->u.stlb.writable =
+		((entry & GCMMU_STLB_WRITEABLE_MASK) != 0);
 }
 
-static void print_mtlb_entry(struct gcdbgfilter *filter, unsigned int zone,
-				unsigned int index, unsigned int entry)
+static void print_mtlb_entry(struct gcdbgfilter *filter,
+			     unsigned int zone,
+			     unsigned int index,
+			     struct gcmmuentry *gcmmuentry)
 {
 	gc_dump_string(filter, zone,
-			" entry[%03d]: 0x%08X "
-			"(stlb=0x%08X, ps=%d, ex=%d, pr=%d)\n",
-			index, entry,
-			entry & GCMMU_MTLB_SLAVE_MASK,
-			(entry & GCMMU_MTLB_PAGE_SIZE_MASK) >> 2,
-			(entry & GCMMU_MTLB_EXCEPTION_MASK) >> 1,
-			(entry & GCMMU_MTLB_PRESENT_MASK)
-			);
+		       "  entry[%04d]: 0x%08X "
+		       "(stlbaddr=0x%08X, pagesize=%d, "
+		       "exception=%d, present=%d)\n",
+		       index, gcmmuentry->entry,
+		       gcmmuentry->u.mtlb.slaveaddr,
+		       gcmmuentry->u.mtlb.pagesize,
+		       gcmmuentry->exception,
+		       gcmmuentry->present);
 }
 
-static void print_stlb_entry(struct gcdbgfilter *filter, unsigned int zone,
-				unsigned int index, unsigned int entry)
+static void print_stlb_entry(struct gcdbgfilter *filter,
+			     unsigned int zone,
+			     unsigned int index,
+			     struct gcmmuentry *gcmmuentry)
 {
 	gc_dump_string(filter, zone,
-			" entry[%03d]: 0x%08X "
-			"(user=0x%08X, wr=%d, ex=%d, pr=%d)\n",
-			index, entry,
-			entry & GCMMU_STLB_ADDRESS_MASK,
-			(entry & GCMMU_STLB_WRITEABLE_MASK) >> 2,
-			(entry & GCMMU_STLB_EXCEPTION_MASK) >> 1,
-			(entry & GCMMU_STLB_PRESENT_MASK)
-			);
+		       "  entry[%04d]: 0x%08X "
+		       "(pageaddr=0x%08X, writable=%d, "
+		       "exception=%d, present=%d)\n",
+		       index, gcmmuentry->entry,
+		       gcmmuentry->u.stlb.pageaddr,
+		       gcmmuentry->u.stlb.writable,
+		       gcmmuentry->exception,
+		       gcmmuentry->present);
+}
+
+static void finalize_vacant(struct gcdbgfilter *filter, unsigned int zone,
+			    int index, int *vacant, int skipped)
+{
+	if (*vacant == -1)
+		return;
+
+	skipped = index - *vacant;
+	*vacant = -1;
+	gc_dump_string(filter, zone, "%15cskipped %d vacant entries\n",
+		       ' ', skipped);
+}
+
+static void finalize_allocated(struct gcdbgfilter *filter, unsigned int zone,
+			       int index, int *allocated, int skipped,
+			       struct gcmmuentry *gcmmuentry,
+			       unsigned int pagesize)
+{
+	unsigned int start, end;
+	int i;
+
+	if (*allocated == -1)
+		return;
+
+	skipped = index - *allocated;
+	*allocated = -1;
+	start = gcmmuentry->u.stlb.pageaddr - skipped * pagesize;
+	end   = gcmmuentry->u.stlb.pageaddr + pagesize;
+
+	if (skipped > 5) {
+		gc_dump_string(filter, zone,
+			       "%15cskipped %d allocated entries\n",
+			       ' ', skipped);
+		gc_dump_string(filter, zone,
+			       "%17callocated address range 0x%08X - 0x%08X\n",
+			       ' ', start, end);
+		gc_dump_string(filter, zone,
+			       "%17ctotal pages = %d\n",
+			       ' ', skipped + 1);
+		gc_dump_string(filter, zone,
+			       "%17ctotal buffer size = %d\n",
+			       ' ', (skipped + 1) * pagesize);
+	} else {
+		gcmmuentry->u.stlb.pageaddr = start + pagesize;
+		gcmmuentry->entry = (start + pagesize)
+				  & GCMMU_STLB_ADDRESS_MASK;
+
+		if (gcmmuentry->u.stlb.writable)
+			gcmmuentry->entry |= GCMMU_STLB_WRITEABLE_MASK;
+
+		if (gcmmuentry->exception)
+			gcmmuentry->entry |= GCMMU_STLB_EXCEPTION_MASK;
+
+		if (gcmmuentry->present)
+			gcmmuentry->entry |= GCMMU_STLB_PRESENT_MASK;
+
+		for (i = 0; i < skipped; i += 1) {
+			print_stlb_entry(filter, zone, index - skipped + i,
+					 gcmmuentry);
+			gcmmuentry->u.stlb.pageaddr += pagesize;
+		}
+	}
 }
 
 static void dump_mmu_table(struct gcdbgfilter *filter, unsigned int zone,
-				struct gcmmutable *desc, unsigned int physical,
-				unsigned int *logical)
+			   struct gcmmutable *desc, unsigned int physical,
+			   unsigned int *logical, unsigned int pagesize)
 {
-	int present, vacant, skipped;
+	int vacant, allocated, skipped = 0;
+	bool sequential;
 	unsigned int entry, i;
+	struct gcmmuentry prev;
+	struct gcmmuentry curr;
 
 	gc_dump_string(filter, zone, "%s table:\n", desc->name);
 	gc_dump_string(filter, zone, "  physical=0x%08X\n", physical);
 
 	vacant = -1;
+	allocated = -1;
+	curr.present = false;
+
 	for (i = 0; i < desc->entry_count; i += 1) {
 		entry = logical[i];
+		prev = curr;
+		desc->get_entry(entry, &curr);
 
-		present = desc->get_present(entry);
+		if (!curr.present) {
+			finalize_allocated(filter, zone,
+					   i, &allocated, skipped,
+					   &prev, pagesize);
 
-		if (!present && (entry == desc->vacant_entry)) {
-			if (vacant == -1)
-				vacant = i;
+			if (entry == desc->vacant_entry) {
+				if (vacant == -1)
+					vacant = i;
+			} else {
+				finalize_vacant(filter, zone,
+						i, &vacant, skipped);
+
+				gc_dump_string(filter, zone,
+						" entry[%03d]: "
+						"invalid entry (0x%08X)\n",
+						i, entry);
+			}
+
 			continue;
 		}
 
-		if (vacant != -1) {
-			skipped = i - vacant;
-			vacant = -1;
-			gc_dump_string(filter, zone,
-					"%14cskipped %d vacant entries\n",
-					skipped);
+		finalize_vacant(filter, zone, i, &vacant, skipped);
+
+		sequential
+			 = (!desc->master
+			&& (curr.present == prev.present)
+			&& (curr.exception == prev.exception)
+			&& (curr.u.stlb.writable == prev.u.stlb.writable)
+			&& (curr.u.stlb.pageaddr == prev.u.stlb.pageaddr
+						  + pagesize));
+
+		if (sequential) {
+			if (allocated == -1)
+				allocated = i;
+
+			continue;
 		}
 
-		if (present) {
-			desc->print_entry(filter, zone, i, entry);
-		} else {
-			gc_dump_string(filter, zone,
-					" entry[%03d]: "
-					"invalid entry value (0x%08X)\n",
-					i, entry);
-		}
+		finalize_allocated(filter, zone, i, &allocated, skipped,
+				   &prev, pagesize);
+
+		desc->print_entry(filter, zone, i, &curr);
 	}
 
-	if (vacant != -1) {
-		skipped = i - vacant;
-		vacant = -1;
-		gc_dump_string(filter, zone,
-				"%14cskipped %d vacant entries\n",
-				skipped);
-	}
+	finalize_vacant(filter, zone, i, &vacant, skipped);
+	finalize_allocated(filter, zone, i, &allocated, skipped,
+			   &prev, pagesize);
 }
 
 void gc_dump_mmu(struct gcdbgfilter *filter, unsigned int zone,
@@ -1690,36 +1820,45 @@ void gc_dump_mmu(struct gcdbgfilter *filter, unsigned int zone,
 {
 	static struct gcmmutable mtlb_desc = {
 		"Master",
+		true,
 		GCMMU_MTLB_ENTRY_NUM,
 		GCMMU_MTLB_ENTRY_VACANT,
-		get_mtlb_present,
+		get_mtlb_entry,
 		print_mtlb_entry
 	};
 
 	static struct gcmmutable stlb_desc = {
 		"Slave",
+		false,
 		GCMMU_STLB_ENTRY_NUM,
 		GCMMU_STLB_ENTRY_VACANT,
-		get_stlb_present,
+		get_stlb_entry,
 		print_stlb_entry
 	};
 
 	unsigned int i;
+	struct gcmmuentry master;
 
 	GCDUMPARENAS(zone, "vacant arenas", &gcmmucontext->vacant);
 	GCDUMPARENAS(zone, "allocated arenas", &gcmmucontext->allocated);
 
 	gc_dump_string(filter, zone,
-			"*** MMU DUMP ***\n");
+		       "*** MMU DUMP ***\n");
 
-	dump_mmu_table(filter, zone, &mtlb_desc, gcmmucontext->master.physical,
-			gcmmucontext->master.logical);
+	dump_mmu_table(filter, zone, &mtlb_desc,
+		       gcmmucontext->master.physical,
+		       gcmmucontext->master.logical, 0);
 
-	for (i = 0; i < GCMMU_MTLB_ENTRY_NUM; i += 1)
-		if (gcmmucontext->slave[i].logical != NULL)
-			dump_mmu_table(filter, zone, &stlb_desc,
-					gcmmucontext->slave[i].physical,
-					gcmmucontext->slave[i].logical);
+	for (i = 0; i < GCMMU_MTLB_ENTRY_NUM; i += 1) {
+		if (gcmmucontext->slave[i].logical == NULL)
+			continue;
+
+		get_mtlb_entry(gcmmucontext->master.logical[i], &master);
+		dump_mmu_table(filter, zone, &stlb_desc,
+				gcmmucontext->slave[i].physical,
+				gcmmucontext->slave[i].logical,
+				master.u.mtlb.pagesize);
+	}
 }
 EXPORT_SYMBOL(gc_dump_mmu);
 

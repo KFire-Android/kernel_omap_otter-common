@@ -644,7 +644,7 @@ void gc_commit(struct gcicommit *gcicommit, bool fromuser)
 
 	/* Execute the buffer. */
 	gcicommit->gcerror = gcqueue_execute(gccorecontext, false,
-					    gcicommit->asynchronous);
+					     gcicommit->asynchronous);
 
 exit:
 	GCUNLOCK(&gccorecontext->mmucontextlock);
@@ -840,7 +840,7 @@ static int gc_probe_opp(struct platform_device *pdev)
 	}
 
 	size = gccorecontext->opp_count * sizeof(unsigned long);
-	gccorecontext->opp_freqs = kzalloc(size, GFP_KERNEL);
+	gccorecontext->opp_freqs = kzalloc(size, GFP_ATOMIC);
 	if (!gccorecontext->opp_freqs) {
 		gccorecontext->opp_count = 0;
 		goto done;

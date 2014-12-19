@@ -221,7 +221,7 @@ static u8 twl6030_uv_to_vsel(unsigned long uv)
 			return 0x3A;
 		pr_err("%s:OUT OF RANGE! non mapped vsel for %ld Vs max %ld\n",
 			__func__, uv, twl6030_vsel_to_uv(0x39));
-		return 0x3A;
+		return 0x39;
 	}
 
 	if (smps_offset & 0x8)

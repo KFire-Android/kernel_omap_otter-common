@@ -344,6 +344,18 @@ static void txstate(struct musb *musb, struct musb_request *req)
 		return;
 	}
 
+	/*
+	 * the dma might have been nuked asynchronously from the irq handler.
+	 * nuke() cancelled the dma, but the interrupt might already
+	 * have been pending but held off by the spinlock.  nuke() sets
+	 * dma to NULL so if we don't check here, we'll crash when
+	 * computing request_size.
+	 */
+	if (musb_ep->dma == NULL) {
+		dev_dbg(musb->controller, "dma cancelled...\n");
+		return;
+	}
+
 	/* read TXCSR before */
 	csr = musb_readw(epio, MUSB_TXCSR);
 
@@ -565,8 +577,7 @@ void musb_g_tx(struct musb *musb, u8 epnum)
 			&& (request->actual == request->length))
 #if defined(CONFIG_USB_INVENTRA_DMA) || defined(CONFIG_USB_UX500_DMA)
 			|| (is_dma && (!dma->desired_mode ||
-				(request->actual &
-					(musb_ep->packet_sz - 1))))
+				(request->actual % musb_ep->packet_sz)))
 #endif
 		) {
 			/*
@@ -578,8 +589,14 @@ void musb_g_tx(struct musb *musb, u8 epnum)
 
 			dev_dbg(musb->controller, "sending zero pkt\n");
 			musb_writew(epio, MUSB_TXCSR, MUSB_TXCSR_MODE
-					| MUSB_TXCSR_TXPKTRDY);
+					| MUSB_TXCSR_TXPKTRDY
+					| (csr & MUSB_TXCSR_P_ISO));
 			request->zero = 0;
+			/*
+			 * Return from here with the expectation of the endpoint
+			 * interrupt for further action.
+			 */
+			return;
 		}
 
 		if (request->actual == request->length) {
