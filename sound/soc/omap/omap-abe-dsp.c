@@ -2449,6 +2449,13 @@ static int aess_hw_params(struct snd_pcm_substream *substream,
 	abe->ping_pong_substream = substream;
 
 	format.f = params_rate(params);
+#ifdef CONFIG_MACH_OMAP_4430_KC1
+	if(format.f == 44100) {
+		dev_dbg(dai->dev, "%s: %s - set event generator at 44.1kHz\n",
+		__func__, dai->name);
+		abe_write_event_generator(EVENT_44100);
+	}
+#endif
 	if (params_format(params) == SNDRV_PCM_FORMAT_S32_LE)
 		format.samp_format = STEREO_MSB;
 	else
@@ -2959,7 +2966,11 @@ static int abe_probe(struct snd_soc_platform *platform)
 	abe_load_fw(abe->firmware);
 
 	/* "tick" of the audio engine */
+#ifdef CONFIG_ABE_44100
+	abe_write_event_generator(EVENT_44100);
+#else
 	abe_write_event_generator(EVENT_TIMER);
+#endif
 
 	abe_dsp_init_gains(abe);
 

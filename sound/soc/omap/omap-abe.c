@@ -408,7 +408,11 @@ static void enable_be_port(struct snd_soc_pcm_runtime *be,
 				return;
 
 			/* MM_EXT connection to McBSP 2 ports */
+#ifdef CONFIG_ABE_44100
+			format.f = 44100;
+#else
 			format.f = 48000;
+#endif
 			format.samp_format = STEREO_RSHIFTED_16;
 #ifdef CONFIG_SND_OMAP_SOC_RY_AIC3110
 			abe_connect_serial_port(MM_EXT_OUT_PORT, &format, MCBSP3_TX);
@@ -425,7 +429,11 @@ static void enable_be_port(struct snd_soc_pcm_runtime *be,
 				return;
 
 			/* MM_EXT connection to McBSP 2 ports */
+#ifdef CONFIG_ABE_44100
+			format.f = 44100;
+#else
 			format.f = 48000;
+#endif
 			format.samp_format = STEREO_RSHIFTED_16;
 #ifdef CONFIG_SND_OMAP_SOC_RY_AIC3110
 			abe_connect_serial_port(MM_EXT_IN_PORT, &format, MCBSP3_RX);
@@ -1484,14 +1492,22 @@ static struct snd_soc_dai_driver omap_abe_dai[] = {
 			.stream_name = "MultiMedia1 Playback",
 			.channels_min = 1,
 			.channels_max = 2,
+#ifdef CONFIG_ABE_44100
+			.rates = SNDRV_PCM_RATE_44100,
+#else
 			.rates = SNDRV_PCM_RATE_48000 | SNDRV_PCM_RATE_44100,
+#endif
 			.formats = OMAP_ABE_FORMATS,
 		},
 		.capture = {
 			.stream_name = "MultiMedia1 Capture",
 			.channels_min = 2,
 			.channels_max = 6,
+#ifdef CONFIG_ABE_44100
+			.rates = SNDRV_PCM_RATE_44100,
+#else
 			.rates = SNDRV_PCM_RATE_48000,
+#endif
 			.formats = SNDRV_PCM_FMTBIT_S32_LE,
 		},
 		.ops = &omap_abe_dai_ops,
@@ -1504,7 +1520,11 @@ static struct snd_soc_dai_driver omap_abe_dai[] = {
 			.stream_name = "MultiMedia2 Capture",
 			.channels_min = 1,
 			.channels_max = 2,
+#ifdef CONFIG_ABE_44100
+			.rates = SNDRV_PCM_RATE_44100,
+#else
 			.rates = SNDRV_PCM_RATE_48000,
+#endif
 			.formats = OMAP_ABE_FORMATS,
 		},
 		.ops = &omap_abe_dai_ops,
@@ -1585,7 +1605,11 @@ static struct snd_soc_dai_driver omap_abe_dai[] = {
 			.stream_name = "MultiMedia1 LP Playback",
 			.channels_min = 2,
 			.channels_max = 2,
+#ifdef CONFIG_ABE_44100
+			.rates = SNDRV_PCM_RATE_44100,
+#else
 			.rates = SNDRV_PCM_RATE_44100 | SNDRV_PCM_RATE_48000,
+#endif
 			.formats = OMAP_ABE_FORMATS,
 		},
 		.ops = &omap_abe_dai_ops,

@@ -132,8 +132,11 @@ EXPORT_SYMBOL(omap_abe_reset_hal);
 int omap_abe_wakeup(struct omap_abe *abe)
 {
 	/* Restart event generator */
+#ifdef CONFIG_ABE_44100
+	omap_abe_write_event_generator(abe, EVENT_44100);
+#else
 	omap_abe_write_event_generator(abe, EVENT_TIMER);
-
+#endif
 	/* reconfigure DMA Req and MCU Irq visibility */
 	omap_abe_hw_configuration(abe);
 	return 0;
